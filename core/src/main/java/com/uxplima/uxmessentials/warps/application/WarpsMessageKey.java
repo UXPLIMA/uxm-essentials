@@ -59,7 +59,6 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_WORLD_BLACKLISTED("warp.world-blacklisted"),
     WARP_RATED("warp.rated"),
     WARP_RATING("warp.rating"),
-    WARP_RATING_INVALID("warp.rating-invalid"),
 
     // editor
     WARP_EDITOR_TITLE("warp.editor.title"),
@@ -92,7 +91,6 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_EDITOR_TELEPORT_LORE("warp.editor.teleport.lore"),
     WARP_EDITOR_CLOSE("warp.editor.close"),
     WARP_EDITOR_INVALID_NUMBER("warp.editor.invalid-number"),
-    WARP_EDITOR_PROMPT_CANCELLED("warp.editor.prompt.cancelled"),
     WARP_EDITOR_WELCOME_LORE_ENTRY("warp.editor.welcome.lore.entry"),
 
     // editor display values

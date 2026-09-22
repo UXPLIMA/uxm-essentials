@@ -154,19 +154,29 @@ class RanksPanelGoldenTest {
     }
 
     @Test
-    void theBareRanksOpenIsNotWiredWhenTheGuiIsDisabled() {
-        // A disabled GUI hands RanksCommand no panel, so the /ranks root carries no bare-open executor: it stays
-        // the admin setrank-only surface, the operator-visible proof that a disabled GUI registers no open.
+    void theBareRanksBranchAnswersWithTheGuiDisabledToo() {
+        // This test read the other way round until 2026-09-22: a disabled GUI handed RanksCommand no panel and
+        // the /ranks root carried no bare executor at all, which left a player with the window off no way to
+        // read their own rank and ranks.current shipped in ten languages unsent. The branch is wired either
+        // way now and the GUI switch decides the answer: the panel when it is on, the line when it is off.
         RanksCommand command = new RanksCommand(
-                new SetRank(repository, ladder, event -> {}), ladder, Optional.empty(), new TemplateMessages());
+                new SetRank(repository, ladder, event -> {}),
+                ladder,
+                Optional.empty(),
+                new CurrentRank(repository, ladder),
+                new TemplateMessages());
 
-        assertThat(command.build().getCommand()).isNull();
+        assertThat(command.build().getCommand()).isNotNull();
     }
 
     @Test
     void theBareRanksOpenIsWiredWhenTheGuiIsEnabled() {
         RanksCommand command = new RanksCommand(
-                new SetRank(repository, ladder, event -> {}), ladder, Optional.of(newPanel()), new TemplateMessages());
+                new SetRank(repository, ladder, event -> {}),
+                ladder,
+                Optional.of(newPanel()),
+                new CurrentRank(repository, ladder),
+                new TemplateMessages());
 
         assertThat(command.build().getCommand()).isNotNull();
     }

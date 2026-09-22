@@ -127,6 +127,14 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
         services.kernel().scheduler().onEntity(targetRef, () -> {
             target.getInventory().addItem(new ItemStack(material, amount.amount()));
             reply(ctx, ItemworldMessageKey.GIVE_GIVEN, placeholders(name, itemKey, amount.amount()));
+            // The player who receives the stack is told too, unless they are the one who ran the command,
+            // who has just read the line above. GIVE_RECEIVED shipped in ten languages and was never sent.
+            if (!targetRef.equals(actor)) {
+                notify(
+                        targetRef,
+                        ItemworldMessageKey.GIVE_RECEIVED,
+                        Map.of("amount", String.valueOf(amount.amount()), "item", itemKey));
+            }
         });
         if (amount.amount() >= services.config().giveAuditThreshold()) {
             services.audit().gave(actor, targetRef, itemKey, amount.amount());

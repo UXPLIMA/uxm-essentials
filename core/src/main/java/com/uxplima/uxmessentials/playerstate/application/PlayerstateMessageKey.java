@@ -55,7 +55,6 @@ public enum PlayerstateMessageKey implements MessageKey {
     SPEED_FLY_SET("playerstate.speed.fly-self"),
     SPEED_WALK_SET_OTHER("playerstate.speed.walk-other"),
     SPEED_FLY_SET_OTHER("playerstate.speed.fly-other"),
-    SPEED_INVALID("playerstate.speed.invalid"),
 
     // /ext
     EXTINGUISHED("playerstate.extinguish.self"),

@@ -29,8 +29,6 @@ public enum SharedMessageKey implements MessageKey {
 
     // shared cooldown / warmup feedback rendered from the Cooldowns / Warmups ports
     COOLDOWN_ACTIVE("cooldown.active"),
-    WARMUP_STARTED("warmup.started"),
-    WARMUP_CANCELLED("warmup.cancelled"),
 
     // the /lang personal locale override command
     LANG_STATUS("lang.status"),

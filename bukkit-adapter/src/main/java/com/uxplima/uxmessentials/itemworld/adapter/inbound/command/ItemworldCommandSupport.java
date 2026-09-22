@@ -167,6 +167,16 @@ abstract class ItemworldCommandSupport {
                 .deliver(viewer, services.kernel().messages().resolve(viewer, key, placeholders));
     }
 
+    /**
+     * Send {@code key} to {@code viewer}, rendered in their locale, when the viewer is somebody other than
+     * the sender: the player who receives a stack rather than the operator who gave it.
+     */
+    final void notify(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+        services.kernel()
+                .messageSink()
+                .deliver(viewer, services.kernel().messages().resolve(viewer, key, placeholders));
+    }
+
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
         reply(

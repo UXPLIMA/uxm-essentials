@@ -114,6 +114,29 @@ class GiveCommandTest {
         assertThat(target.getInventory().contains(Material.APPLE)).isTrue();
     }
 
+    @Test
+    void theRecipientIsToldWhatTheyReceived() {
+        permissions.allow("uxmessentials.itemworld.give.apple");
+
+        execute("give Bob apple 3");
+
+        assertThat(sink.addressed)
+                .as("an item appearing in your inventory with no word about it looks like a bug to the player")
+                .contains("Bob " + ItemworldMessageKey.GIVE_RECEIVED.key());
+    }
+
+    @Test
+    void givingToYourselfIsOneLineRatherThanTwo() {
+        permissions.allow("uxmessentials.itemworld.give.apple");
+
+        execute("give Alice apple 1");
+
+        assertThat(sink.addressed).contains("Alice " + ItemworldMessageKey.GIVE_GIVEN.key());
+        assertThat(sink.addressed)
+                .as("the giver has just read that they gave it; telling them they received it as well is noise")
+                .doesNotContain("Alice " + ItemworldMessageKey.GIVE_RECEIVED.key());
+    }
+
     private void execute(String input) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(new GiveCommand(services()).build());
@@ -196,6 +219,7 @@ class GiveCommandTest {
 
     private static final class RecordingSink implements MessageSink {
         private final List<MessageKey> keys = new ArrayList<>();
+        private final List<String> addressed = new ArrayList<>();
 
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
@@ -207,6 +231,7 @@ class GiveCommandTest {
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
             sink.keys.add(key);
+            sink.addressed.add(viewer.name() + " " + key.key());
             return key.key();
         }
     }

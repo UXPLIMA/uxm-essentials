@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
@@ -9,6 +10,7 @@ import java.util.function.Supplier;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
@@ -16,6 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
+import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.PendingTeleport;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
@@ -33,6 +36,12 @@ import org.jspecify.annotations.NullMarked;
  * move-cancels-warmup invariant needs. A zero-duration (bypass) warmup returns an already-complete handle
  * the tracker drops, so a bypassed teleport is correctly immune to move-cancel.
  *
+ * <p>The wrapper is also what tells the player to stand still. The engine wires the cancel callback and
+ * announced nothing at the start, so a player who ran a command with a warmup waited three seconds with no
+ * notice and {@code teleport.warmup.started} shipped in ten languages unsent. The notice belongs here and
+ * not in the engine because this is where the real length is known: the engine reads the config default
+ * and the tier node a player holds is resolved below.
+ *
  * <p>The wrapper also resolves the warmup's duration here, the same min-reducer the kernel
  * {@code SchedulerWarmups} applies, and records the resulting completion instant with the tracker, so the
  * {@code teleport_warmup_remaining} placeholder can read the remaining wait the kernel port does not surface
@@ -46,18 +55,21 @@ public final class TrackingWarmups implements Warmups {
     private final Supplier<WarmupCancelToggles> toggles;
     private final Permissions permissions;
     private final Clock clock;
+    private final Notifier notifier;
 
     public TrackingWarmups(
             Warmups delegate,
             WarmupTracker tracker,
             Supplier<WarmupCancelToggles> toggles,
             Permissions permissions,
-            Clock clock) {
+            Clock clock,
+            Notifier notifier) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
     @Override
@@ -86,7 +98,9 @@ public final class TrackingWarmups implements Warmups {
         // marker keeps the tracker honest without re-plumbing the engine's destination through the port.
         PendingTeleport warmup =
                 PendingTeleport.arm(who, TeleportKind.ADMIN, origin, Destination.at(origin), toggles.get());
-        tracker.arm(who, warmup, handle, clock.instant().plus(resolveDuration(who, kind)));
+        Duration waiting = resolveDuration(who, kind);
+        tracker.arm(who, warmup, handle, clock.instant().plus(waiting));
+        notifier.send(who, TeleportMessageKey.WARMUP_STARTED, Map.of("seconds", Long.toString(waiting.toSeconds())));
     }
 
     private Duration resolveDuration(PlayerRef who, WarmupKind kind) {

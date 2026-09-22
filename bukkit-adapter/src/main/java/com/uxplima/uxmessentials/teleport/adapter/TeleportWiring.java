@@ -265,7 +265,7 @@ public final class TeleportWiring {
                 arrivalHud,
                 arrivalEffects);
         Warmups warmups = new TrackingWarmups(
-                kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock);
+                kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock, notifier);
         TeleportEngine engine = new TeleportEngine(
                 kernel.cooldowns(),
                 warmups,

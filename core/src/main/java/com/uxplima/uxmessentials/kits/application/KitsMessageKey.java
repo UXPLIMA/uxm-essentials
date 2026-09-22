@@ -111,7 +111,6 @@ public enum KitsMessageKey implements MessageKey {
 
     // prompts & editor errors
     KIT_EDITOR_PROMPT_CREATE("kit.editor.prompt.create"),
-    KIT_EDITOR_PROMPT_CANCELLED("kit.editor.prompt.cancelled"),
     KIT_EDITOR_ERROR_INVALID_NAME("kit.editor.error.invalid-name"),
     KIT_EDITOR_PROMPT_COOLDOWN("kit.editor.prompt.cooldown"),
     KIT_EDITOR_ERROR_NEGATIVE_COOLDOWN("kit.editor.error.negative-cooldown"),

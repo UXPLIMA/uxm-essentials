@@ -173,11 +173,8 @@ public enum EconomyMessageKey implements MessageKey {
     EXCHANGE_GUI_NO_RATE_NAME("eco.exchange.gui-no-rate-name"),
     EXCHANGE_GUI_NO_RATE_LORE("eco.exchange.gui-no-rate-lore"),
     EXCHANGE_PROMPT("eco.exchange.prompt"),
-    EXCHANGE_PROMPT_CANCEL("eco.exchange.prompt-cancel"),
 
     // Chat prompts shared by exchange/bank/loan flows
-    PROMPT_CANCEL_TOKENS("eco.prompt.cancel-tokens"),
-    PROMPT_CANCELLED("eco.prompt.cancelled"),
 
     // Loans
     LOAN_LIMIT_EXCEEDED("loan.limit-exceeded"),

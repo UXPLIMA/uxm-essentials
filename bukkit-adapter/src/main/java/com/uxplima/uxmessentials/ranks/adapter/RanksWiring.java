@@ -108,7 +108,7 @@ public final class RanksWiring {
                 "ranks", RanksMessageKey.RANKS_GUI_TITLE, Material.DIAMOND, RANKS_GUI_PERMISSION, menu::open)));
         List<CommandRegistration> commands = new ArrayList<>(List.of(
                 new RankupCommand(rankup, kernel.messages()),
-                new RanksCommand(setRank, ladder, panel, kernel.messages()),
+                new RanksCommand(setRank, ladder, panel, currentRank, kernel.messages()),
                 // The standalone /setrank publishes the same admin direct-set as /ranks setrank, under its own command
                 // id so it renames/disables independently through commands.conf.
                 new SetRankCommand(setRank, ladder, kernel.messages())));
