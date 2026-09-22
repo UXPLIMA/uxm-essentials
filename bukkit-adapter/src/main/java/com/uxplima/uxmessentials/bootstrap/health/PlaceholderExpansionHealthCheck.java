@@ -22,11 +22,19 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PlaceholderExpansionHealthCheck implements HealthCheck {
 
-    private final boolean published;
+    private final BooleanSupplier published;
     private final BooleanSupplier placeholderApiPresent;
 
     public PlaceholderExpansionHealthCheck(boolean published, BooleanSupplier placeholderApiPresent) {
-        this.published = published;
+        this(() -> published, placeholderApiPresent);
+    }
+
+    /**
+     * As above, with whether the expansion published asked when the doctor runs. The expansion is registered on
+     * {@code ServerLoadEvent}, after this check is built, because this plugin enables before PlaceholderAPI does.
+     */
+    public PlaceholderExpansionHealthCheck(BooleanSupplier published, BooleanSupplier placeholderApiPresent) {
+        this.published = Objects.requireNonNull(published, "published");
         this.placeholderApiPresent = Objects.requireNonNull(placeholderApiPresent, "placeholderApiPresent");
     }
 
@@ -37,7 +45,7 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
 
     @Override
     public HealthResult check() {
-        if (published) {
+        if (published.getAsBoolean()) {
             return HealthResult.ok("published");
         }
         if (!placeholderApiPresent.getAsBoolean()) {

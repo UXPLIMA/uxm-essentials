@@ -13,7 +13,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -823,7 +825,15 @@ public final class PluginModule {
                 menuCurrencyBackends,
                 menuTextInputRef);
         bus.start();
-        boolean placeholdersPublished = registerPlaceholders(plugin, placeholders, resources, kernel.log());
+        // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
+        // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
+        AtomicBoolean placeholdersPublished = new AtomicBoolean();
+        resources
+                .worldPhase()
+                .run(
+                        "placeholder expansion",
+                        () -> placeholdersPublished.set(
+                                registerPlaceholders(plugin, placeholders, resources, kernel.log())));
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
         // integration). These belong to no feature context: server links apply once on enable, the update checker
         // off by default, built on the uxmLib update toolkit. Self-registers its permission-gated join notice and
@@ -833,7 +843,7 @@ public final class PluginModule {
         resources.onClose(integrations.stop());
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
         List<HealthCheck> healthChecks =
-                healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished);
+                healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
         // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
@@ -969,7 +979,7 @@ public final class PluginModule {
             Persistence persistence,
             BusWiring.Wired bus,
             CloseableResources resources,
-            boolean placeholdersPublished) {
+            BooleanSupplier placeholdersPublished) {
         // Assembled after the modules are wired so the set reflects what is actually present: the database and
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that

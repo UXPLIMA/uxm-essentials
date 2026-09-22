@@ -28,6 +28,27 @@ final class StartupIntegrationsWaitForTheServerTest {
     private static final Path SOURCE = Path.of("src", "main", "java");
 
     @Test
+    @DisplayName("the PlaceholderAPI expansion is registered once the server has loaded, not while this plugin enables")
+    void theExpansionWaitsForTheServer() throws IOException {
+        // PlaceholderAPI is installed but not enabled while a STARTUP plugin enables, so the expansion has to be
+        // handed to the world phase, which runs it on ServerLoadEvent.
+        // Read without whitespace: the formatter wraps a long chain at the dot, and the call would hide there.
+        String module = Files.readString(
+                        SOURCE.resolve(
+                                Path.of("com", "uxplima", "uxmessentials", "bootstrap", "di", "PluginModule.java")),
+                        StandardCharsets.UTF_8)
+                .replaceAll("\\s+", "");
+        int call = module.indexOf("registerPlaceholders(plugin");
+
+        assertThat(call)
+                .describedAs("the module registers the expansion somewhere")
+                .isPositive();
+        assertThat(module.substring(Math.max(0, call - 120), call))
+                .describedAs("registerPlaceholders runs inside worldPhase().run(...), so it waits for the server")
+                .contains("worldPhase().run(");
+    }
+
+    @Test
     @DisplayName("a STARTUP plugin resolves its integrations once the server has loaded")
     void startupIntegrationsWaitForTheServer() throws IOException {
         assertThat(Files.readString(DESCRIPTOR, StandardCharsets.UTF_8))
