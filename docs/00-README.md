@@ -4,6 +4,7 @@
 
 | Document | Holds |
 |---|---|
+| `00-README.md` | This index |
 | `12-migration.md` | The importer, what each source maps, the runbook and the config ladder |
 | `13-i18n.md` | The key, the locale chain, the twelve catalogues and the parity gate |
 | `09-deployment.md` | The five jars, the three paths, the audit channel and what an upgrade does |
