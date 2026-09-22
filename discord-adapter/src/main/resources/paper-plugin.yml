@@ -5,7 +5,7 @@ loader: com.uxplima.uxmessentials.discord.UxmDiscordLoader
 api-version: '26.2'
 authors: ['UXPLIMA']
 description: 'Optional Discord bridge for uxmEssentials: mirrors audit events and economy notifications to Discord via JDA. Dormant until configured with a bot token.'
-website: 'https://github.com/UXPLIMA/uxmEssentials'
+website: 'https://github.com/UXPLIMA/uxm-essentials'
 
 # Folia: the JDA login and message dispatch run off-tick via Paper's async scheduler;
 # the bridge never touches a region-owned object.

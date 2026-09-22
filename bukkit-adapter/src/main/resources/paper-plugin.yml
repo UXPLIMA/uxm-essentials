@@ -13,7 +13,7 @@ api-version: '26.2'
 load: STARTUP
 authors: ['UXPLIMA']
 description: 'All-in-one essentials: homes, warps, teleport, DB-backed economy, kits, player-state, private messages + mail, presence, lightweight moderation, item/world utilities: organised as first-class hot-reloadable feature modules with an EssentialsX migration path.'
-website: 'https://github.com/UXPLIMA/uxmEssentials'
+website: 'https://github.com/UXPLIMA/uxm-essentials'
 
 # Folia: every scheduler call goes through the injected Scheduler port; the
 # adapter routes to the right region/entity/global scheduler.

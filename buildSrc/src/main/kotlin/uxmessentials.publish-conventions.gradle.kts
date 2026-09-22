@@ -31,8 +31,8 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/UXPLIMA/uxmEssentials")
-                    connection.set("scm:git:https://github.com/UXPLIMA/uxmEssentials.git")
+                    url.set("https://github.com/UXPLIMA/uxm-essentials")
+                    connection.set("scm:git:https://github.com/UXPLIMA/uxm-essentials.git")
                 }
             }
         }

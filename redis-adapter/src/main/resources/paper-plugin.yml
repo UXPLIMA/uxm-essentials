@@ -4,7 +4,7 @@ main: com.uxplima.uxmessentials.redis.UxmEssentialsRedisPlugin
 api-version: '26.2'
 authors: ['UXPLIMA']
 description: 'Optional Redis pub/sub transport for the uxmEssentials cross-server bus. Drop this jar in plugins/ and set network.transport=redis to sync homes/warps/economy/vaults over Redis with no proxy.'
-website: 'https://github.com/UXPLIMA/uxmEssentials'
+website: 'https://github.com/UXPLIMA/uxm-essentials'
 
 # Folia: Lettuce runs all its I/O on its own Netty event loop, off any region or tick thread.
 folia-supported: true

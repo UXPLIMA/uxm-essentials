@@ -6,7 +6,7 @@ plugins {
 // consumer uses. CI overrides it with the local one the current tree publishes, so a coordinate or a POM that
 // stopped working fails on the commit that broke it rather than on the next release.
 val uxmRepo: String = (project.findProperty("uxmRepo") as String?)
-        ?: "https://raw.githubusercontent.com/UXPLIMA/uxmEssentials/maven"
+        ?: "https://raw.githubusercontent.com/UXPLIMA/uxm-essentials/maven"
 
 // Which version to resolve. A release pins this; CI passes the version the tree currently builds.
 val uxmVersion: String = (project.findProperty("uxmVersion") as String?) ?: "0.8.2"

@@ -24,7 +24,7 @@ public record UpdateCheckSettings(boolean enabled, String sourceUrl, boolean not
     private static final String INTERVAL_HOURS_PATH = "update-check.interval-hours";
 
     private static final String DEFAULT_SOURCE_URL =
-            "https://api.github.com/repos/UXPLIMA/uxmEssentials/releases/latest";
+            "https://api.github.com/repos/UXPLIMA/uxm-essentials/releases/latest";
     private static final int DEFAULT_INTERVAL_HOURS = 12;
 
     public UpdateCheckSettings {

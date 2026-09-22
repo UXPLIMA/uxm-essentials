@@ -14,7 +14,7 @@ It resolves the API from the published repository, which is all a real consumer 
 
 ```kotlin
 repositories {
-    maven("https://raw.githubusercontent.com/UXPLIMA/uxmEssentials/maven")
+    maven("https://raw.githubusercontent.com/UXPLIMA/uxm-essentials/maven")
 }
 
 dependencies {
