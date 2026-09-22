@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.Balance;
 import com.uxplima.uxmessentials.economy.application.CombiningWorthSource;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
+import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.ExchangeService;
 import com.uxplima.uxmessentials.economy.application.LookupWorth;
@@ -75,6 +76,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.Hooks;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
@@ -530,8 +532,14 @@ public final class EconomyWiring {
                 settings.operationLogEnabled());
 
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
-        PendingPayRegistry pending =
-                new SchedulerPendingPayRegistry(kernel.scheduler(), kernel.log(), settings.confirmTimeout());
+        // The expiry tells the payer, not just the console: a prompt that lapsed while they read the rules
+        // used to vanish in silence.
+        Notifier payNotifier = new Notifier(kernel.messages(), kernel.messageSink());
+        PendingPayRegistry pending = new SchedulerPendingPayRegistry(
+                kernel.scheduler(),
+                kernel.log(),
+                settings.confirmTimeout(),
+                payer -> payNotifier.send(payer, EconomyMessageKey.PAY_CONFIRM_EXPIRED));
         Clock clock = Clock.systemUTC();
         EconomyProvider baltopProvider = new SnapshotBaltopProvider(resolved, snapshots);
         WorthTable configWorth = settings.worthTable(currencies, kernel.log());

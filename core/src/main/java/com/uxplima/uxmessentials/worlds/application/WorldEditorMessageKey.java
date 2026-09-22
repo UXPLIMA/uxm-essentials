@@ -16,7 +16,6 @@ public enum WorldEditorMessageKey implements MessageKey {
     GENERATION_TITLE("world.editor.generation-title"),
     ACCESS_TITLE("world.editor.access-title"),
 
-    NAV_CREATE("world.editor.nav.create"),
     NAV_RULES("world.editor.nav.rules"),
     NAV_GENERATION("world.editor.nav.generation"),
     NAV_ACCESS("world.editor.nav.access"),

@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.economy.application.port.PendingPayRegistry;
 import com.uxplima.uxmessentials.economy.domain.PendingPay;
@@ -18,7 +19,10 @@ import org.jspecify.annotations.NullMarked;
  * The one-outstanding-confirmation-per-payer registry behind the {@code /payconfirm} flow
  * ({@code docs/11-economy-integration.md} §9.2): a per-payer slot holding the staged {@link PendingPay}, with
  * a self-cancelling {@link Scheduler#asyncAfter} expiry that discards a stale prompt and logs
- * {@code event=economy_pay_confirm_expired}. Staging never debits. No money has moved while a pending pay is
+ * {@code event=economy_pay_confirm_expired} and calls {@code onExpired} so the payer hears about it.
+ * Telling them is the point of the seam: the expiry used to write one console line and leave the player
+ * looking at a prompt that was no longer there, while pay.confirm-expired sat unread in twelve catalogues.
+ * Staging never debits. No money has moved while a pending pay is
  * held, so a dropped or expired entry loses nothing.
  *
  * <p>A second large {@code /pay} replaces the first and re-prompts (the slot is overwritten), and the expiry
@@ -34,10 +38,15 @@ public final class SchedulerPendingPayRegistry implements PendingPayRegistry {
     private final Logger log;
     private final Duration timeout;
 
-    public SchedulerPendingPayRegistry(Scheduler scheduler, Logger log, Duration timeout) {
+    /** What to do with the payer when their prompt lapses: the wiring points this at their notifier. */
+    private final Consumer<PlayerRef> onExpired;
+
+    public SchedulerPendingPayRegistry(
+            Scheduler scheduler, Logger log, Duration timeout, Consumer<PlayerRef> onExpired) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.timeout = Objects.requireNonNull(timeout, "timeout");
+        this.onExpired = Objects.requireNonNull(onExpired, "onExpired");
         if (timeout.isNegative() || timeout.isZero()) {
             throw new IllegalArgumentException("confirm timeout must be positive: " + timeout);
         }
@@ -76,6 +85,7 @@ public final class SchedulerPendingPayRegistry implements PendingPayRegistry {
                     "event=economy_pay_confirm_expired payer={} target={}",
                     payer,
                     staged.target().uuid());
+            onExpired.accept(staged.payer());
         }
     }
 }

@@ -91,7 +91,6 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_EDITOR_TELEPORT_LORE("warp.editor.teleport.lore"),
     WARP_EDITOR_CLOSE("warp.editor.close"),
     WARP_EDITOR_INVALID_NUMBER("warp.editor.invalid-number"),
-    WARP_EDITOR_WELCOME_LORE_ENTRY("warp.editor.welcome.lore.entry"),
 
     // editor display values
     WARP_EDITOR_VALUE_NONE("warp.editor.value.none"),

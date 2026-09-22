@@ -151,6 +151,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
         return Commands.literal("resetall")
                 .requires(src -> src.getSender().hasPermission(BASE + ".bulk"))
+                // A bare resetall is the question, not the reset. Without this branch Brigadier answered its
+                // own parse error and eco.admin.resetall-confirm, the line that names the flag, went unsent.
+                .executes(this::askForResetAllConfirm)
                 .then(Commands.literal("--confirm")
                         .executes(ctx -> runResetAll(ctx))
                         .then(currencyArgument().executes(ctx -> runResetAll(ctx))));
@@ -276,8 +279,23 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         }
         Money money = amount.get();
         List<PlayerRef> online = EcoTargets.online();
+        if (noTargets(actor, online)) {
+            return Command.SINGLE_SUCCESS;
+        }
         offTick(() -> dispatchBulk(verb, actor, money, online));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Whether the bulk verb has nobody to act on, telling {@code actor} so when that is the case. An empty
+     * server used to run the verb over an empty roster and report nothing at all.
+     */
+    private boolean noTargets(PlayerRef actor, List<PlayerRef> online) {
+        if (!online.isEmpty()) {
+            return false;
+        }
+        services.notifier().send(actor, EconomyMessageKey.ECO_ADMIN_NO_TARGETS, Map.of());
+        return true;
     }
 
     private void dispatchBulk(String verb, PlayerRef actor, Money money, List<PlayerRef> online) {
@@ -286,6 +304,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return;
         }
         EcoTargets.randomOnline(online).ifPresent(chosen -> services.ecoAdmin().giveRandom(actor, chosen, money));
+    }
+
+    /** Tell the operator the flag this verb wants, and change nothing. */
+    private int askForResetAllConfirm(CommandContext<CommandSourceStack> ctx) {
+        services.notifier().send(actor(ctx), EconomyMessageKey.ECO_ADMIN_RESETALL_CONFIRM, Map.of());
+        return 0;
     }
 
     private int runResetAll(CommandContext<CommandSourceStack> ctx) {
@@ -297,6 +321,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         }
         Currency resolved = currency.get();
         List<PlayerRef> online = EcoTargets.online();
+        if (noTargets(actor, online)) {
+            return Command.SINGLE_SUCCESS;
+        }
         offTick(() -> services.ecoAdmin().resetAll(actor, online, resolved));
         return Command.SINGLE_SUCCESS;
     }
