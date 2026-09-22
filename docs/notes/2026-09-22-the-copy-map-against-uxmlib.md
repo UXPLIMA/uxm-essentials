@@ -36,7 +36,7 @@ This is the first port and it is the one item 1 of the standing order names thir
 | Class | Why it looks the same |
 |---|---|
 | `Tiles` | Both say "puts the title of a menu tile on the first line of its lore, under a blank name" |
-| `MenuTitles` | Both say "centres the title of a chest window" |
+| ~~`MenuTitles`~~ | Confirmed and **rejected**, see below |
 | `EquipmentSlot` | Both say "the six slots a fake-player NPC can wear" |
 | `SerializedItems` | Both are one item written down as one line of text |
 | `Comparison` | Both are a comparison of two resolved operands under an operator |
@@ -139,3 +139,32 @@ reported rather than settled in passing. It is reported here and in
 `standards/PROGRESS.md`. What is worth the owner's attention is not which answer is right but
 that the estate currently gives two answers to "what language is a doctor in", and an operator
 running twenty seven of our plugins meets both.
+
+## `MenuTitles`: confirmed, and it is not a port
+
+The first entry taken off the "looks identical" list, and the reason is worth more than the
+entry.
+
+Both centre a chest title by the same arithmetic: a 176 pixel window, a title origin of 8, the
+free space halved into spaces. They use different width tables underneath, `FontWidths` here and
+`GlyphWidthTable` there, and **if those disagreed then a menu title in this plugin would sit at a
+different offset from a menu title in every other plugin we ship, on the same server, in the same
+font.** This estate has already paid for that once: `2026-08-29-a-title-centred-twice`.
+
+They agree. `MenuTitleWidthAgreementTest` asks, over fourteen titles built from the characters
+that actually differ in width, and it is kept: if either table drifts, the two plugins' menus
+drift apart and that test says so on the next build.
+
+**So the arithmetic is duplicated and the behaviour is not.** The library's version appends the
+original component and keeps its styling; this one flattens to plain text, because the style
+canon writes a menu title centred and bare, with no colour. Porting would give every menu title
+in this plugin the colour the canon says it must not have.
+
+Verdict: same arithmetic, different policy, and this plugin's policy is the canon's. Not a port.
+
+**The general lesson, which changes how the rest of this list should be read.** The first
+sentence of a class is what its author meant, not what it does. Two classes can open with the
+same sentence, compute the same number, and differ on the one decision that matters. **Confirm a
+"looks identical" by reading the behaviour at the end of the method, not the description at the
+top of the file.** Four entries are still unconfirmed on that list, and `SerializedItems` is the
+one where getting it wrong costs data rather than colour.
