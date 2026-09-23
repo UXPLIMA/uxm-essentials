@@ -17,6 +17,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandDescriptions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -91,7 +92,12 @@ public final class HelpCommand implements CommandRegistration {
             if (!node.canUse(source)) {
                 continue;
             }
-            HelpEntry entry = new HelpEntry(node.getLiteral(), registration.description(), registration.aliases());
+            String description = CommandDescriptions.of(
+                    messages,
+                    CommandFeedback.refOf(source.getSender()),
+                    registration.commandId(),
+                    registration.description());
+            HelpEntry entry = new HelpEntry(node.getLiteral(), description, registration.aliases());
             if (entry.matches(query)) {
                 out.add(entry);
             }

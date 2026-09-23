@@ -57,7 +57,7 @@ public final class UsageBinding {
     }
 
     private LiteralCommandNode<CommandSourceStack> inject(
-            LiteralCommandNode<CommandSourceStack> node, String description) {
+            LiteralCommandNode<CommandSourceStack> node, Description description) {
         return literalBuilder(node, node.getLiteral(), description).build();
     }
 
@@ -70,7 +70,7 @@ public final class UsageBinding {
      * executor gains the usage prompt.
      */
     private LiteralArgumentBuilder<CommandSourceStack> literalBuilder(
-            LiteralCommandNode<CommandSourceStack> node, String path, String description) {
+            LiteralCommandNode<CommandSourceStack> node, String path, Description description) {
         LiteralArgumentBuilder<CommandSourceStack> builder = Commands.literal(node.getLiteral());
         if (node.getRequirement() != null) {
             builder.requires(node.getRequirement());
@@ -89,7 +89,7 @@ public final class UsageBinding {
 
     /** Recurse usage injection into a literal child; an argument child keeps its subtree verbatim (no usage on an arg). */
     private ArgumentBuilder<CommandSourceStack, ?> rebindChild(
-            CommandNode<CommandSourceStack> child, String parentPath, String description) {
+            CommandNode<CommandSourceStack> child, String parentPath, Description description) {
         if (child instanceof LiteralCommandNode<CommandSourceStack> literal) {
             return literalBuilder(literal, parentPath + " " + literal.getLiteral(), description);
         }
@@ -98,7 +98,7 @@ public final class UsageBinding {
 
     /** A usage line for whoever typed the bare command, listing what they can run. */
     private Command<CommandSourceStack> usageExecutor(
-            String command, CommandNode<CommandSourceStack> node, String description) {
+            String command, CommandNode<CommandSourceStack> node, Description description) {
         return ctx -> {
             reply(ctx.getSource().getSender(), command, BrigadierUsage.of(node, ctx.getSource()), description);
             return Command.SINGLE_SUCCESS;
@@ -109,15 +109,17 @@ public final class UsageBinding {
      * Send the usage line. The three values are text and never markup: the usage is syntax, and an argument
      * named after a colour role, {@code <value>}, was read as that colour and vanished from the line.
      */
-    private void reply(CommandSender sender, String command, String usage, String description) {
+    private void reply(CommandSender sender, String command, String usage, Description description) {
         // Escaped against the tags the line is parsed with, the theme's roles included: escaping against
         // MiniMessage's own tags alone leaves <value> standing, because MiniMessage has never heard of it.
         MiniMessage words = MiniMessage.miniMessage();
+        PlayerRef reader = refOf(sender);
+        String described = CommandDescriptions.of(messages, reader, description.commandId(), description.english());
         Map<String, String> placeholders = Map.of(
                 "command", words.escapeTags(command, StyleTags.resolver()),
                 "usage", words.escapeTags(usage, StyleTags.resolver()),
-                "description", words.escapeTags(description, StyleTags.resolver()));
-        String rendered = messages.resolve(refOf(sender), SharedMessageKey.COMMAND_USAGE, placeholders);
+                "description", words.escapeTags(described, StyleTags.resolver()));
+        String rendered = messages.resolve(reader, SharedMessageKey.COMMAND_USAGE, placeholders);
         sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered, StyleTags.resolver()));
     }
 
@@ -131,7 +133,7 @@ public final class UsageBinding {
 
         @Override
         public LiteralCommandNode<CommandSourceStack> build() {
-            return binding.inject(delegate.build(), delegate.description());
+            return binding.inject(delegate.build(), new Description(delegate.commandId(), delegate.description()));
         }
 
         @Override
@@ -164,4 +166,7 @@ public final class UsageBinding {
             return delegate.guiRoot();
         }
     }
+
+    /** Which command a usage line describes, and the code's English for it when the catalogue has no line. */
+    private record Description(String commandId, String english) {}
 }

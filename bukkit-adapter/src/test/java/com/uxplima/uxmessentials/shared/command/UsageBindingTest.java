@@ -73,6 +73,20 @@ class UsageBindingTest {
                 .containsEntry("description", "Set game mode.");
     }
 
+    /** The usage line's description is the catalogue's line for the command's id, in the reader's language. */
+    @Test
+    void theUsageDescriptionIsReadInTheReadersLanguage() {
+        PlayerMock player = server.addPlayer("Ayse");
+        player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.gamemode.use", true);
+        messages.answers.put("describe.gamemode", "Oyun modunu ayarla.");
+        CommandRegistration wrapped = binding.wrap(new GamemodeStub());
+
+        dispatch(wrapped, "gamemode", CommandSourceStackMock.from(player));
+
+        assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
+        assertThat(messages.lastPlaceholders).containsEntry("description", "Oyun modunu ayarla.");
+    }
+
     @Test
     void usageReplyReachesThePlayer() {
         PlayerMock player = server.addPlayer("Alice");
@@ -295,9 +309,14 @@ class UsageBindingTest {
     private static final class RecordingMessages implements Messages {
         private MessageKey lastKey;
         private Map<String, String> lastPlaceholders = Map.of();
+        private final Map<String, String> answers = new java.util.HashMap<>();
 
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            String answer = answers.get(key.key());
+            if (answer != null) {
+                return answer;
+            }
             this.lastKey = key;
             this.lastPlaceholders = Map.copyOf(placeholders);
             StringBuilder out = new StringBuilder(key.key());

@@ -121,6 +121,33 @@ class HelpCommandTest {
         assertThat(page2).noneSatisfy(line -> assertThat(line).contains("command=cmd00"));
     }
 
+    /**
+     * A command's description is the catalogue's line for its id, in the reader's language, and the code's English
+     * where the catalogue has none. Until 2026-09-23 every description was the code's English, so a Turkish player's
+     * /help was English from top to bottom, and a Turkish search found nothing.
+     */
+    @Test
+    void aDescriptionIsReadInTheReadersLanguageAndFallsBackToTheCodes() {
+        grant("uxmessentials.home.use");
+        grant("uxmessentials.warp.use");
+        HelpCommand command = new HelpCommand(
+                () -> List.of(
+                        fake("home", "uxmessentials.home.use", "Go to a home"),
+                        fake("warp", "uxmessentials.warp.use", "Teleport to a warp")),
+                new DescribingMessages(Map.of("describe.home", "Bir eve git")));
+
+        List<String> lines = run(command, "");
+
+        assertThat(lines)
+                .anySatisfy(line -> assertThat(line).contains("command=home").contains("description=Bir eve git"));
+        assertThat(lines)
+                .anySatisfy(
+                        line -> assertThat(line).contains("command=warp").contains("description=Teleport to a warp"));
+        assertThat(run(command, "eve"))
+                .anySatisfy(line -> assertThat(line).contains("command=home"))
+                .noneSatisfy(line -> assertThat(line).contains("command=warp"));
+    }
+
     private void grant(String node) {
         player.addAttachment(MockBukkit.createMockPlugin(), node, true);
     }
@@ -170,6 +197,21 @@ class HelpCommandTest {
                 return description;
             }
         };
+    }
+
+    /** Answers the description lines it holds and echoes every other key, as {@link EchoMessages} does. */
+    private static final class DescribingMessages implements Messages {
+        private final Map<String, String> lines;
+
+        private DescribingMessages(Map<String, String> lines) {
+            this.lines = lines;
+        }
+
+        @Override
+        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
+            String line = lines.get(key.key());
+            return line != null ? line : new EchoMessages().resolve(viewer, key, placeholders);
+        }
     }
 
     /** Echoes the catalog key and its placeholders as one line so the rendered reply is assertable. */

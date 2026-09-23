@@ -30,6 +30,12 @@ final class CatalogKeys {
     /** Keys under this prefix configure the catalog (its typography); they are not player-facing messages. */
     static final String META_PREFIX = "meta.";
 
+    /**
+     * Keys under this prefix describe a command by its id ({@code describe.home}). The command id names them, not a
+     * message key of the code, so they are checked apart: {@code EveryCommandIsDescribedInEveryLanguageTest}.
+     */
+    static final String DESCRIBE_PREFIX = "describe.";
+
     private static final String RESOURCE_DIR = "messages/";
 
     private CatalogKeys() {}
@@ -59,7 +65,7 @@ final class CatalogKeys {
             ConfigurationNode root = load(in);
             for (Object key : root.childrenMap().keySet()) {
                 String name = String.valueOf(key);
-                if (!PREFIX_KEY.equals(name) && !name.startsWith(META_PREFIX)) {
+                if (!PREFIX_KEY.equals(name) && !name.startsWith(META_PREFIX) && !name.startsWith(DESCRIBE_PREFIX)) {
                     values.put(name, Objects.requireNonNull(root.node(key).getString(), "non-string key " + name));
                 }
             }
@@ -67,6 +73,28 @@ final class CatalogKeys {
             throw new UncheckedIOException("failed to read catalog " + resource(language), failure);
         }
         return values;
+    }
+
+    /** Every command description of {@code language}, keyed by the command id, in file order. */
+    static Map<String, String> descriptions(String language) {
+        Map<String, String> descriptions = new LinkedHashMap<>();
+        try (InputStream in = CatalogKeys.class.getClassLoader().getResourceAsStream(resource(language))) {
+            if (in == null) {
+                throw new IllegalStateException("missing catalog: " + resource(language));
+            }
+            ConfigurationNode root = load(in);
+            for (Object key : root.childrenMap().keySet()) {
+                String name = String.valueOf(key);
+                if (name.startsWith(DESCRIBE_PREFIX)) {
+                    descriptions.put(
+                            name.substring(DESCRIBE_PREFIX.length()),
+                            Objects.requireNonNull(root.node(key).getString(), "non-string key " + name));
+                }
+            }
+        } catch (IOException failure) {
+            throw new UncheckedIOException("failed to read catalog " + resource(language), failure);
+        }
+        return descriptions;
     }
 
     /** The raw catalog value for one key, before MiniMessage and runtime placeholder resolution. */
