@@ -35,6 +35,8 @@ public enum SharedMessageKey implements MessageKey {
     LANG_SET("lang.set"),
     LANG_RESET("lang.reset"),
     LANG_UNKNOWN("lang.unknown"),
+    // the code of the language a catalogue is written in, so a name an operator writes per language finds its reader
+    LANG_CODE("lang.code"),
 
     // the cross-cutting /help command listing. One paginated page of usable commands
     HELP_HEADER("help.header"),

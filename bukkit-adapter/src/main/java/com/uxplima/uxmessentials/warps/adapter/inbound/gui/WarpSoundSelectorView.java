@@ -16,6 +16,7 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -30,17 +31,16 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The teleport-sound selector a warp editor opens to pick a warp's departure or arrival sound: a three-row picker
- * with one icon per preset sound, a custom-name button, a back button to the editor, and a remove button. Clicking a
- * sound runs the same set the old bespoke window did. The warp's departure or arrival sound through the shared
+ * with one icon per sound the warps file lists ({@link WarpPresets}), a custom-name button, a back button to the
+ * editor, and a remove button. Clicking a sound runs the same set the old bespoke window did. The warp's departure or arrival sound through the shared
  * {@link EditableWarp} loader, then returns the viewer to the warp editor.
  *
  * <p>The window draws through the menu engine's selector runtime ({@link Menus#openSelector}), so it is a
- * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The option
- * list is the same preset set the original fixed view drew, so a player sees an identical menu, only the machinery
- * behind it changed. The selector serves both server and player warps: the editable warp is resolved through the
- * loader from the warp name and its (nullable) owner, so the single picker covers either kind exactly as before. The
- * preset list is still exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
- * the same options. Every visible string resolves from the warps catalog.
+ * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The selector
+ * serves both server and player warps: the editable warp is resolved through the loader from the warp name and its
+ * (nullable) owner, so the single picker covers either kind exactly as before. The preset list is still exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
+ * the same options. Every visible string resolves from the warps catalog, except a sound's name, which the warps file
+ * writes per language.
  */
 @NullMarked
 public final class WarpSoundSelectorView {
@@ -57,14 +57,21 @@ public final class WarpSoundSelectorView {
     private final EditableWarpLoader loader;
     private final WarpEditorView editorView;
     private final TextInput textInput;
+    private final WarpPresets presets;
 
     private WarpSoundSelectorView(
-            Messages messages, Menus menus, EditableWarpLoader loader, WarpEditorView editorView, TextInput textInput) {
+            Messages messages,
+            Menus menus,
+            EditableWarpLoader loader,
+            WarpEditorView editorView,
+            TextInput textInput,
+            WarpPresets presets) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.loader = Objects.requireNonNull(loader, "loader");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.presets = Objects.requireNonNull(presets, "presets");
     }
 
     /**
@@ -73,9 +80,14 @@ public final class WarpSoundSelectorView {
      * needs only the public collaborators it already holds. Mirrors {@code WarpSoundMenu.create}.
      */
     public static WarpSoundSelectorView create(
-            Messages messages, Menus menus, WarpRepository repository, WarpEditorView editorView, TextInput textInput) {
+            Messages messages,
+            Menus menus,
+            WarpRepository repository,
+            WarpEditorView editorView,
+            TextInput textInput,
+            WarpPresets presets) {
         EditableWarpLoader loader = new EditableWarpLoader(repository, editorView);
-        return new WarpSoundSelectorView(messages, menus, loader, editorView, textInput);
+        return new WarpSoundSelectorView(messages, menus, loader, editorView, textInput, presets);
     }
 
     /** Open the sound selector for {@code warpName} (server warp when {@code warpOwner} is null), returning to the editor on pick. */
@@ -107,7 +119,7 @@ public final class WarpSoundSelectorView {
                             text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_NAME,
-                                    Map.of("sound", opt.displayName())),
+                                    Map.of("sound", nameOf(opt, viewer))),
                             List.of(text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_SOUND_SELECTOR_ENTRY_LORE,
@@ -195,25 +207,33 @@ public final class WarpSoundSelectorView {
         return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
-    /** The preset sounds the selector grids, shared with the engine-rendered server-warp sound menu. */
+    /** The preset sounds the selector grids, as the warps file lists them. */
     public List<SoundOption> getOptions() {
-        return List.of(
-                new SoundOption("minecraft:entity.enderman.teleport", Material.ENDER_PEARL, "Enderman Teleport"),
-                new SoundOption("minecraft:entity.player.teleport", Material.CHORUS_FRUIT, "Player Teleport"),
-                new SoundOption("minecraft:block.portal.travel", Material.OBSIDIAN, "Portal Travel"),
-                new SoundOption("minecraft:block.note_block.chime", Material.NOTE_BLOCK, "Note Block Chime"),
-                new SoundOption("minecraft:block.note_block.bell", Material.BELL, "Note Block Bell"),
-                new SoundOption("minecraft:block.note_block.flute", Material.FEATHER, "Note Block Flute"),
-                new SoundOption("minecraft:block.note_block.guitar", Material.STRING, "Note Block Guitar"),
-                new SoundOption("minecraft:block.note_block.harp", Material.REDSTONE, "Note Block Harp"),
-                new SoundOption("minecraft:block.beacon.activate", Material.BEACON, "Beacon Activate"),
-                new SoundOption(
-                        "minecraft:entity.experience_orb.pickup", Material.EXPERIENCE_BOTTLE, "Experience Pickup"),
-                new SoundOption("minecraft:entity.firework_rocket.launch", Material.FIREWORK_ROCKET, "Firework Launch"),
-                new SoundOption("minecraft:entity.lightning_bolt.thunder", Material.LIGHTNING_ROD, "Thunder Strike"),
-                new SoundOption("minecraft:entity.wither.spawn", Material.WITHER_SKELETON_SKULL, "Wither Spawn"),
-                new SoundOption("minecraft:block.anvil.use", Material.ANVIL, "Anvil Use"));
+        return presets.sounds().stream().map(SoundOption::new).toList();
     }
 
-    public record SoundOption(String soundName, Material material, String displayName) {}
+    /** The name {@code viewer} reads for {@code option}, in the language their catalogue is written in. */
+    public String nameOf(SoundOption option, PlayerRef viewer) {
+        Objects.requireNonNull(option, "option");
+        Objects.requireNonNull(viewer, "viewer");
+        return option.preset()
+                .nameIn(messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of())
+                        .strip());
+    }
+
+    /** One sound of the grid: the preset it shows. */
+    public record SoundOption(WarpPresets.Preset preset) {
+
+        public SoundOption {
+            Objects.requireNonNull(preset, "preset");
+        }
+
+        public String soundName() {
+            return preset.effect();
+        }
+
+        public Material material() {
+            return preset.icon();
+        }
+    }
 }

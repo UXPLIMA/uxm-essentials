@@ -30,8 +30,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The selector serves a server warp; the menu opens with a {@link WarpSoundEdit} subject carrying the warp and
  * whether the click sets its departure or arrival sound, so the single spec covers both editor buttons. The option
- * grid is the same preset list the original fixed view drew, so a player sees an identical menu, only the
- * machinery behind it changed.
+ * grid is the list the warps file writes ({@link WarpPresets}), shared with the selector view.
  */
 @NullMarked
 public final class WarpSoundMenu {
@@ -82,7 +81,8 @@ public final class WarpSoundMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("warp:sound-options", ctx -> optionSource.getOptions());
-        bindings.placeholder("sound", ctx -> ctx.entry(SoundOption.class).displayName());
+        bindings.placeholder(
+                "sound", ctx -> optionSource.nameOf(ctx.entry(SoundOption.class), BukkitRefs.toRef(ctx.viewer())));
         bindings.placeholder(
                 "sound_material", ctx -> ctx.entry(SoundOption.class).material().name());
         bindings.action("warp:set-sound", this::setSound);

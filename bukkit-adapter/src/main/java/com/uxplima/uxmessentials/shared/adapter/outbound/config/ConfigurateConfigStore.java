@@ -1,12 +1,14 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.config;
 
 import java.io.IOException;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -39,12 +41,15 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 public final class ConfigurateConfigStore implements ConfigStore {
 
-    private final Path rootFile;
+    private static final Pattern DOT = Pattern.compile("\\.");
+
+    private final @Nullable Path rootFile; // null = read from the jar, which does not change under a running server
     private final @Nullable Path modulesDir; // null = single-file mode (back-compat / tests)
     private final Logger log;
     private final AtomicReference<ConfigurationNode> tree;
 
-    private ConfigurateConfigStore(Path rootFile, @Nullable Path modulesDir, Logger log, ConfigurationNode tree) {
+    private ConfigurateConfigStore(
+            @Nullable Path rootFile, @Nullable Path modulesDir, Logger log, ConfigurationNode tree) {
         this.rootFile = rootFile;
         this.modulesDir = modulesDir;
         this.log = log;
@@ -65,6 +70,27 @@ public final class ConfigurateConfigStore implements ConfigStore {
         Path root = dataFolder.resolve("config.conf");
         Path modules = dataFolder.resolve("modules");
         return new ConfigurateConfigStore(root, modules, log, merged(root, modules, log, false));
+    }
+
+    /**
+     * A file the plugin ships, read from the jar. A module reads it where the operator's file is older than a section
+     * it now has, so the section's shipped content is written once, in the file, and not again in code. The store is
+     * fixed: {@link #reload()} has no file on disk to read.
+     */
+    public static ConfigurateConfigStore bundled(String resource, Logger log) {
+        Objects.requireNonNull(resource, "resource");
+        Objects.requireNonNull(log, "log");
+        URL url = ConfigurateConfigStore.class.getClassLoader().getResource(resource);
+        if (url == null) {
+            throw new IllegalStateException("the jar ships no " + resource);
+        }
+        try {
+            ConfigurationNode tree =
+                    HoconConfigurationLoader.builder().url(url).build().load();
+            return new ConfigurateConfigStore(null, null, log, tree);
+        } catch (ConfigurateException failure) {
+            throw new IllegalStateException("the shipped " + resource + " does not parse", failure);
+        }
     }
 
     @Override
@@ -113,6 +139,9 @@ public final class ConfigurateConfigStore implements ConfigStore {
     public void reload() {
         // Build the complete candidate before publishing it. A malformed sibling must never replace the running
         // tree with an empty/partial one: callers keep observing the last-known-good snapshot when this throws.
+        if (rootFile == null) {
+            return;
+        }
         tree.set(merged(rootFile, modulesDir, log, true));
     }
 
@@ -131,10 +160,23 @@ public final class ConfigurateConfigStore implements ConfigStore {
         return List.copyOf(keys);
     }
 
+    @Override
+    public int getListSize(String path) {
+        ConfigurationNode node = at(path);
+        return node.isList() ? node.childrenList().size() : 0;
+    }
+
     private ConfigurationNode at(String path) {
         Objects.requireNonNull(path, "path");
-        Object[] segments = path.split("\\.");
-        return Objects.requireNonNull(tree.get(), "tree").node(segments);
+        ConfigurationNode node = Objects.requireNonNull(tree.get(), "tree");
+        for (String segment : DOT.splitAsStream(path).toList()) {
+            node = node.isList() && isIndex(segment) ? node.node(Integer.parseInt(segment)) : node.node(segment);
+        }
+        return node;
+    }
+
+    private static boolean isIndex(String segment) {
+        return !segment.isEmpty() && segment.length() < 10 && segment.chars().allMatch(Character::isDigit);
     }
 
     /** Build the merged tree: the root file, then each module file mounted at its path. */

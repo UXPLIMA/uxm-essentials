@@ -134,12 +134,12 @@ class WarpEditorGoldenTest {
         WarpWelcomeMessagesView welcome =
                 WarpWelcomeMessagesView.create(engine.menus(), scheduler, textInput, repository, editor);
         welcome.register(engine.bindings(), dataFolder, NOOP);
-        WarpSoundSelectorView soundSelector =
-                WarpSoundSelectorView.create(new KeyMessages(), engine.menus(), repository, editor, textInput);
+        WarpSoundSelectorView soundSelector = WarpSoundSelectorView.create(
+                new KeyMessages(), engine.menus(), repository, editor, textInput, WarpPresets.bundled(NOOP));
         WarpSoundMenu soundMenu = WarpSoundMenu.create(engine.menus(), soundSelector, repository, editor, textInput);
         soundMenu.register(engine.bindings(), dataFolder, NOOP);
-        WarpParticleSelectorView particleSelector =
-                WarpParticleSelectorView.create(new KeyMessages(), engine.menus(), repository, editor, textInput);
+        WarpParticleSelectorView particleSelector = WarpParticleSelectorView.create(
+                new KeyMessages(), engine.menus(), repository, editor, textInput, WarpPresets.bundled(NOOP));
         editor.bind(categorySelector, welcome, soundMenu, soundSelector, particleSelector);
         editor.register(engine.bindings(), dataFolder, NOOP);
     }

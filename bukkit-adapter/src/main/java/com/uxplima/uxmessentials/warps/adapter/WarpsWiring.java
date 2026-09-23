@@ -137,13 +137,18 @@ public final class WarpsWiring {
         // The sound and particle selectors render through the menu engine's selector runtime; both pick the warp's
         // departure/arrival effect through the same editable-warp loader the editor uses and reopen the editor on a
         // pick, so a single picker covers server and player warps exactly as before.
+        // Both pickers offer what the warps file lists, or what the plugin ships where the file predates the list.
+        var presets = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.read(
+                ctx.config(),
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.bundled(kernel.log()),
+                kernel.log());
         var soundSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.create(
-                kernel.messages(), menus, repository, editorView, textInput);
+                kernel.messages(), menus, repository, editorView, textInput, presets);
         var soundMenu = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundMenu.create(
                 menus, soundSelectorView, repository, editorView, textInput);
         soundMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var particleSelectorView = com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpParticleSelectorView.create(
-                kernel.messages(), menus, repository, editorView, textInput);
+                kernel.messages(), menus, repository, editorView, textInput, presets);
         // The welcome-messages list editor renders through the menu engine's list pattern over the edited warp as its
         // subject; it shares an editable-warp loader built from the same repository/editor pair the editor uses, so
         // server and player warps resolve the same way and its back button reopens this editor.

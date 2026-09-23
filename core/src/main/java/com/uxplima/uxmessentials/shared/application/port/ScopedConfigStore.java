@@ -68,4 +68,9 @@ final class ScopedConfigStore implements ConfigStore {
     public List<String> getKeys(String path) {
         return delegate.getKeys(absolute(path));
     }
+
+    @Override
+    public int getListSize(String path) {
+        return delegate.getListSize(absolute(path));
+    }
 }

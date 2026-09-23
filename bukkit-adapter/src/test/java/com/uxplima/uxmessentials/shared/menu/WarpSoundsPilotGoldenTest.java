@@ -135,7 +135,13 @@ class WarpSoundsPilotGoldenTest {
                 playerWarpHandle(),
                 new PlayerWarpGoToHandle());
         editorView.register(bindings, dataFolder, new NoopLogger());
-        WarpSoundSelectorView view = WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
+        WarpSoundSelectorView view = WarpSoundSelectorView.create(
+                messages,
+                menus,
+                repository,
+                editorView,
+                textInput(),
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.bundled(new NoopLogger()));
         view.open(player, viewer, WARP.value(), null, true);
         Inventory inv = player.getOpenInventory().getTopInventory();
         return snapshot(inv);
@@ -158,7 +164,13 @@ class WarpSoundsPilotGoldenTest {
                 playerWarpHandle(),
                 new PlayerWarpGoToHandle());
         editorView.register(bindings, dataFolder, new NoopLogger());
-        return WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput())
+        return WarpSoundSelectorView.create(
+                        messages,
+                        menus,
+                        repository,
+                        editorView,
+                        textInput(),
+                        com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.bundled(new NoopLogger()))
                 .getOptions();
     }
 
@@ -190,8 +202,13 @@ class WarpSoundsPilotGoldenTest {
                 playerWarpHandle(),
                 new PlayerWarpGoToHandle());
         editorView.register(bindings, dataFolder, new NoopLogger());
-        WarpSoundSelectorView optionSource =
-                WarpSoundSelectorView.create(messages, menus, repository, editorView, textInput());
+        WarpSoundSelectorView optionSource = WarpSoundSelectorView.create(
+                messages,
+                menus,
+                repository,
+                editorView,
+                textInput(),
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.bundled(new NoopLogger()));
         WarpSoundMenu menu = WarpSoundMenu.create(menus, optionSource, repository, editorView, textInput());
         menu.register(bindings, dataFolder, new NoopLogger());
         menu.open(player, new WarpSoundEdit(WARP, true));

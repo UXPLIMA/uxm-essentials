@@ -77,6 +77,15 @@ public interface ConfigStore {
         return new ScopedConfigStore(this, prefix);
     }
 
+    /**
+     * Returns the number of entries in the list at {@code path}, or 0 if it is not a list or absent. An entry is read
+     * by its index as a path segment, so {@code presets.0.name} is the first entry's name. A list keeps the order the
+     * operator wrote, which the keys of a map do not.
+     */
+    default int getListSize(String path) {
+        return 0;
+    }
+
     /** Returns the child keys of the map at {@code path}, or an empty list if not a map/absent. */
     default List<String> getKeys(String path) {
         return List.of();

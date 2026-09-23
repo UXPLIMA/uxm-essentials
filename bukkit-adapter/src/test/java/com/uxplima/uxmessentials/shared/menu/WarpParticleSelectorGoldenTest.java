@@ -115,8 +115,13 @@ class WarpParticleSelectorGoldenTest {
                 new PlayerWarpRepositoryHandle(),
                 new PlayerWarpGoToHandle());
         editorView.register(engine.bindings(), dataFolder, NOOP);
-        selector =
-                WarpParticleSelectorView.create(new KeyMessages(), engine.menus(), repository, editorView, textInput);
+        selector = WarpParticleSelectorView.create(
+                new KeyMessages(),
+                engine.menus(),
+                repository,
+                editorView,
+                textInput,
+                com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpPresets.bundled(NOOP));
     }
 
     @AfterEach

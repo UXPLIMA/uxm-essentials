@@ -16,6 +16,7 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
@@ -30,16 +31,15 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The teleport-particle selector a warp editor opens to pick a warp's departure or arrival particle: a three-row
- * picker with one icon per preset particle, a custom-name button, a back button to the editor, and a remove button.
- * Clicking a particle runs the same set the old bespoke window did. The warp's departure or arrival particle through
+ * picker with one icon per particle the warps file lists ({@link WarpPresets}), a custom-name button, a back button to
+ * the editor, and a remove button. Clicking a particle runs the same set the old bespoke window did. The warp's departure or arrival particle through
  * the shared {@link EditableWarp} loader, then returns the viewer to the warp editor.
  *
  * <p>The window draws through the menu engine's selector runtime ({@link Menus#openSelector}), so it is a
- * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The option
- * list is the same preset set the original fixed view drew, so a player sees an identical menu, only the machinery
- * behind it changed. The selector serves both server and player warps: the editable warp is resolved through the
- * loader from the warp name and its (nullable) owner, so the single picker covers either kind exactly as before.
- * Every visible string resolves from the warps catalog.
+ * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The
+ * selector serves both server and player warps: the editable warp is resolved through the loader from the warp name
+ * and its (nullable) owner, so the single picker covers either kind exactly as before. Every visible string resolves
+ * from the warps catalog, except a particle's name, which the warps file writes per language.
  */
 @NullMarked
 public final class WarpParticleSelectorView {
@@ -56,14 +56,21 @@ public final class WarpParticleSelectorView {
     private final EditableWarpLoader loader;
     private final WarpEditorView editorView;
     private final TextInput textInput;
+    private final WarpPresets presets;
 
     private WarpParticleSelectorView(
-            Messages messages, Menus menus, EditableWarpLoader loader, WarpEditorView editorView, TextInput textInput) {
+            Messages messages,
+            Menus menus,
+            EditableWarpLoader loader,
+            WarpEditorView editorView,
+            TextInput textInput,
+            WarpPresets presets) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.loader = Objects.requireNonNull(loader, "loader");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
+        this.presets = Objects.requireNonNull(presets, "presets");
     }
 
     /**
@@ -72,9 +79,14 @@ public final class WarpParticleSelectorView {
      * wiring needs only the public collaborators it already holds. Mirrors {@code WarpSoundMenu.create}.
      */
     public static WarpParticleSelectorView create(
-            Messages messages, Menus menus, WarpRepository repository, WarpEditorView editorView, TextInput textInput) {
+            Messages messages,
+            Menus menus,
+            WarpRepository repository,
+            WarpEditorView editorView,
+            TextInput textInput,
+            WarpPresets presets) {
         EditableWarpLoader loader = new EditableWarpLoader(repository, editorView);
-        return new WarpParticleSelectorView(messages, menus, loader, editorView, textInput);
+        return new WarpParticleSelectorView(messages, menus, loader, editorView, textInput, presets);
     }
 
     /** Open the particle selector for {@code warpName} (server warp when {@code warpOwner} is null), returning to the editor on pick. */
@@ -106,7 +118,7 @@ public final class WarpParticleSelectorView {
                             text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_NAME,
-                                    Map.of("particle", opt.displayName())),
+                                    Map.of("particle", nameOf(opt, viewer))),
                             List.of(text(
                                     viewer,
                                     WarpsMessageKey.WARP_EDITOR_PARTICLE_SELECTOR_ENTRY_LORE,
@@ -194,24 +206,33 @@ public final class WarpParticleSelectorView {
         return StyledText.render(messages.resolve(viewer, key, placeholders));
     }
 
-    /** The preset particles the selector grids. */
+    /** The preset particles the selector grids, as the warps file lists them. */
     public List<ParticleOption> getOptions() {
-        return List.of(
-                new ParticleOption("minecraft:portal", Material.OBSIDIAN, "Portal"),
-                new ParticleOption("minecraft:witch", Material.BREWING_STAND, "Witch"),
-                new ParticleOption("minecraft:dragon_breath", Material.DRAGON_BREATH, "Dragon Breath"),
-                new ParticleOption("minecraft:flame", Material.TORCH, "Flame"),
-                new ParticleOption("minecraft:happy_villager", Material.EMERALD, "Happy Villager"),
-                new ParticleOption("minecraft:heart", Material.RED_DYE, "Heart"),
-                new ParticleOption("minecraft:cloud", Material.FEATHER, "Cloud"),
-                new ParticleOption("minecraft:reverse_portal", Material.CRYING_OBSIDIAN, "Reverse Portal"),
-                new ParticleOption("minecraft:totem_of_undying", Material.TOTEM_OF_UNDYING, "Totem"),
-                new ParticleOption("minecraft:smoke", Material.CAMPFIRE, "Smoke"),
-                new ParticleOption("minecraft:enchant", Material.ENCHANTING_TABLE, "Enchant"),
-                new ParticleOption("minecraft:glow", Material.GLOW_INK_SAC, "Glow"),
-                new ParticleOption("minecraft:soul", Material.SOUL_SOIL, "Soul"),
-                new ParticleOption("minecraft:explosion", Material.TNT, "Explosion"));
+        return presets.particles().stream().map(ParticleOption::new).toList();
     }
 
-    public record ParticleOption(String particleName, Material material, String displayName) {}
+    /** The name {@code viewer} reads for {@code option}, in the language their catalogue is written in. */
+    public String nameOf(ParticleOption option, PlayerRef viewer) {
+        Objects.requireNonNull(option, "option");
+        Objects.requireNonNull(viewer, "viewer");
+        return option.preset()
+                .nameIn(messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of())
+                        .strip());
+    }
+
+    /** One particle of the grid: the preset it shows. */
+    public record ParticleOption(WarpPresets.Preset preset) {
+
+        public ParticleOption {
+            Objects.requireNonNull(preset, "preset");
+        }
+
+        public String particleName() {
+            return preset.effect();
+        }
+
+        public Material material() {
+            return preset.icon();
+        }
+    }
 }
