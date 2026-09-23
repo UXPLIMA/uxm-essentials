@@ -188,6 +188,18 @@ class ModerationActiveListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/moderation/gui/moderation-active.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW moderation.gui.list.prev",
+                        50, "ARROW moderation.gui.list.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code ActivePunishmentsView} produced for this fixture (a
      * ban on "Mallory", a mute on "Eve", a jail on "Trent"), captured while both paths rendered it identically and
      * frozen here: a BARRIER, a BOOK and an IRON_BARS icon (content slots 0, 1 and 2. The names surface through the
@@ -198,8 +210,6 @@ class ModerationActiveListGoldenTest {
         baseline.put(0, new Snapshot(Material.BARRIER, "Mallory"));
         baseline.put(1, new Snapshot(Material.BOOK, "Eve"));
         baseline.put(2, new Snapshot(Material.IRON_BARS, "Trent"));
-        baseline.put(48, new Snapshot(Material.ARROW, "moderation.gui.list.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "moderation.gui.list.next"));
         return baseline;
     }
 

@@ -175,6 +175,18 @@ class KitCategoryParentSelectorGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/kits/gui/kit-category-parent-selector.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        PREV_SLOT, "ARROW " + KitsMessageKey.KIT_MENU_PREV.key(),
+                        NEXT_SLOT, "ARROW " + KitsMessageKey.KIT_MENU_NEXT.key()));
+    }
+
+    /**
      * The slot -> (material, plain name) map the bespoke {@code KitCategoryParentSelectorMenu} produced for this
      * fixture: a DIAMOND for "pvp" at content slot 0, a BOOK for the materialless "misc" at slot 1 (the old fallback),
      * the "No Parent" BARRIER at slot 49 and the back ARROW at slot 53, each named through the catalog key the test's
@@ -185,8 +197,6 @@ class KitCategoryParentSelectorGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.DIAMOND, "PvP"));
         baseline.put(1, new Snapshot(Material.BOOK, "Misc"));
-        baseline.put(PREV_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_MENU_PREV.key()));
-        baseline.put(NEXT_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_MENU_NEXT.key()));
         baseline.put(
                 NONE_SLOT, new Snapshot(Material.BARRIER, KitsMessageKey.KIT_EDITOR_CATEGORY_SELECTOR_NONE_NAME.key()));
         baseline.put(BACK_SLOT, new Snapshot(Material.ARROW, KitsMessageKey.KIT_EDITOR_SETTINGS_BACK_BUTTON.key()));

@@ -146,6 +146,18 @@ class BankMembersListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/economy/gui/economy-bank-members.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        45, "ARROW bank.members-gui-prev",
+                        53, "ARROW bank.members-gui-next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code BankMembersView} produced for this fixture (the LEADER
      * viewer "Alice" and the MEMBER "Bob"), captured while both paths rendered it identically and frozen here: two
      * PLAYER_HEAD icons (content slots 0 and 1. The names surface through the {@code bank_member} token), the prev
@@ -156,10 +168,8 @@ class BankMembersListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "Alice"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "Bob"));
-        baseline.put(45, new Snapshot(Material.ARROW, "bank.members-gui-prev"));
         baseline.put(47, new Snapshot(Material.ARROW, "bank.members-gui-back"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "bank.members-gui-add"));
-        baseline.put(53, new Snapshot(Material.ARROW, "bank.members-gui-next"));
         return baseline;
     }
 

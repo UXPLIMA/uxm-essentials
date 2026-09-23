@@ -155,6 +155,18 @@ class HomeInvitesGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/homes/gui/home-invites.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW home.invites.prev",
+                        50, "ARROW home.invites.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code InvitedPlayersMenu} produced for this fixture (two
      * invited players "alpha" and "beta"), captured while both paths rendered it identically and frozen here as the
      * contract: two PLAYER_HEAD heads in the first inner cells (slots 10 and 11, names through {@code invited_player}),
@@ -165,9 +177,7 @@ class HomeInvitesGoldenTest {
         baseline.put(10, new Snapshot(Material.PLAYER_HEAD, "alpha"));
         baseline.put(11, new Snapshot(Material.PLAYER_HEAD, "beta"));
         baseline.put(45, new Snapshot(Material.ARROW, "home.invites.back"));
-        baseline.put(48, new Snapshot(Material.ARROW, "home.invites.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "home.invites.add.name"));
-        baseline.put(50, new Snapshot(Material.ARROW, "home.invites.next"));
         return baseline;
     }
 

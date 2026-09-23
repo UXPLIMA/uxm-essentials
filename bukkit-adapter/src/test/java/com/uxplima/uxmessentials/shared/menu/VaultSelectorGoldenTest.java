@@ -151,6 +151,18 @@ class VaultSelectorGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/vaults/gui/vault-selector.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        21, "ARROW vaults.selector.prev",
+                        23, "ARROW vaults.selector.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code VaultSelectorView} produced for this fixture
      * (vaults 1 and 3 owned, cap 5, show-locked on), captured once while both paths rendered it identically and
      * frozen here as the contract: two owned CHEST cells (content slots 0 and 2), three locked grey panes (slots
@@ -165,8 +177,6 @@ class VaultSelectorGoldenTest {
         baseline.put(2, new Snapshot(Material.CHEST, "vaults.selector.entry.name"));
         baseline.put(3, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, "vaults.selector.locked.name"));
         baseline.put(4, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, "vaults.selector.locked.name"));
-        baseline.put(21, new Snapshot(Material.ARROW, "vaults.selector.prev"));
-        baseline.put(23, new Snapshot(Material.ARROW, "vaults.selector.next"));
         return baseline;
     }
 

@@ -174,6 +174,18 @@ class BankListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/economy/gui/economy-banks.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        45, "ARROW bank.list-gui-prev",
+                        53, "ARROW bank.list-gui-next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code BankGuiView} produced for this fixture (two banks
      * "Vault" and "Reserve"), captured while both paths rendered it identically and frozen here: two CHEST icons
      * (content slots 0 and 1. The names surface through the {@code bank_name} token), the EMERALD_BLOCK create button
@@ -183,9 +195,7 @@ class BankListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.CHEST, "Vault"));
         baseline.put(1, new Snapshot(Material.CHEST, "Reserve"));
-        baseline.put(45, new Snapshot(Material.ARROW, "bank.list-gui-prev"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "bank.list-gui-create"));
-        baseline.put(53, new Snapshot(Material.ARROW, "bank.list-gui-next"));
         return baseline;
     }
 

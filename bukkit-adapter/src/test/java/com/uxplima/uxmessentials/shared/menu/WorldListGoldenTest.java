@@ -167,6 +167,18 @@ class WorldListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/worlds/gui/world-list.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW world.editor.nav.prev",
+                        50, "ARROW world.editor.nav.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code WorldListView} produced for this fixture (two managed
      * worlds, "alpha" normal and "beta" nether), captured once while both paths rendered it identically and frozen
      * here as the contract: a GRASS_BLOCK and a NETHERRACK icon (content slots 0 and 1. The names surface through the
@@ -176,9 +188,7 @@ class WorldListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.GRASS_BLOCK, "alpha"));
         baseline.put(1, new Snapshot(Material.NETHERRACK, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "world.editor.nav.prev"));
         baseline.put(49, new Snapshot(Material.NETHER_STAR, "world.editor.create.button-name"));
-        baseline.put(50, new Snapshot(Material.ARROW, "world.editor.nav.next"));
         return baseline;
     }
 

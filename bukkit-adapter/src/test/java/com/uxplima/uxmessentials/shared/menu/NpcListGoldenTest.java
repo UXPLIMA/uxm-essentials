@@ -191,6 +191,18 @@ class NpcListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/npc/gui/npc-list.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW npc.gui.list.prev",
+                        50, "ARROW npc.gui.list.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code NpcListView} produced for this fixture (two
      * fake-player NPCs "alpha" and "beta"), captured once while both paths rendered it identically and frozen here
      * as the contract: two PLAYER_HEAD icons (content slots 0 and 1. The names surface through the {@code npc_name}
@@ -200,9 +212,7 @@ class NpcListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "alpha"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "npc.gui.list.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "npc.gui.list.create"));
-        baseline.put(50, new Snapshot(Material.ARROW, "npc.gui.list.next"));
         return baseline;
     }
 

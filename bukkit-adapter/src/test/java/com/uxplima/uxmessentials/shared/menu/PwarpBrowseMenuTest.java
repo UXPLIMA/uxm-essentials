@@ -157,11 +157,14 @@ class PwarpBrowseMenuTest {
         assertThat(filledContentSlots(inv)).isEqualTo(PAGE_SIZE);
         assertThat(inv.getItem(0).getType()).isEqualTo(Material.ENDER_PEARL);
         assertThat(plainName(inv.getItem(0))).isEqualTo("warp0");
-        // The bottom row is the control bar: sort / search / scope buttons and the two page arrows.
+        // The bottom row is the control bar: sort / search / scope buttons and the page arrows. This is the first of
+        // several pages, so the next arrow shows and the previous one, with no page before it, does not.
         assertThat(inv.getItem(45).getType()).isEqualTo(Material.COMPARATOR);
         assertThat(inv.getItem(46).getType()).isEqualTo(Material.SPYGLASS);
         assertThat(inv.getItem(47).getType()).isEqualTo(Material.WRITABLE_BOOK);
-        assertThat(inv.getItem(48).getType()).isEqualTo(Material.ARROW);
+        assertThat(inv.getItem(48).getType()).isNotEqualTo(Material.ARROW);
+        assertThat(PageArrows.declaredIn("modules/playerwarps/gui/pwarp-browse.conf"))
+                .containsEntry(48, "ARROW pwarp.gui.browse.prev");
         assertThat(inv.getItem(49).getType()).isEqualTo(Material.BOOKSHELF);
         assertThat(inv.getItem(50).getType()).isEqualTo(Material.ARROW);
         assertThat(inv.getItem(51).getType()).isEqualTo(Material.NETHER_STAR);

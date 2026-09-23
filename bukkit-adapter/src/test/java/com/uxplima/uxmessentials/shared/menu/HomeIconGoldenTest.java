@@ -180,6 +180,18 @@ class HomeIconGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/homes/gui/home-icon.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW home.icon.prev",
+                        50, "ARROW home.icon.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code IconSelectorView} produced for this fixture, captured
      * while both paths rendered it identically and frozen here as the contract: 42 palette icons in slots 0..41 (the
      * code-default materials, names surfacing through the {@code home_icon_name} token), the BARRIER reset button
@@ -192,9 +204,7 @@ class HomeIconGoldenTest {
             baseline.put(i, new Snapshot(icons.get(i), icons.get(i).name()));
         }
         baseline.put(45, new Snapshot(Material.BARRIER, "home.icon.reset.name"));
-        baseline.put(48, new Snapshot(Material.ARROW, "home.icon.prev"));
         baseline.put(49, new Snapshot(Material.ARROW, "home.icon.back"));
-        baseline.put(50, new Snapshot(Material.ARROW, "home.icon.next"));
         return baseline;
     }
 

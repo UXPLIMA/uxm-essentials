@@ -185,6 +185,18 @@ class HologramListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/holograms/gui/hologram-list.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW hologram.gui.list.prev",
+                        50, "ARROW hologram.gui.list.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code HologramListView} produced for this fixture (two
      * holograms "alpha" and "beta", no create disabled), captured once while both paths rendered it identically and
      * frozen here as the contract: two ARMOR_STAND icons (content slots 0 and 1. The names surface through the
@@ -194,9 +206,7 @@ class HologramListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.ARMOR_STAND, "alpha"));
         baseline.put(1, new Snapshot(Material.ARMOR_STAND, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "hologram.gui.list.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "hologram.gui.list.create"));
-        baseline.put(50, new Snapshot(Material.ARROW, "hologram.gui.list.next"));
         return baseline;
     }
 

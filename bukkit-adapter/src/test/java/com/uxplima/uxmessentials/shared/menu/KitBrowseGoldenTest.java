@@ -203,6 +203,18 @@ class KitBrowseGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/kits/gui/kit-browse.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW kit.menu.prev",
+                        50, "ARROW kit.menu.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code KitMenuView} produced for the two-kit legacy
      * fixture, frozen as the contract: two CHEST tiles (content slots 0 and 1, the names surfacing through the
      * kit-name token) and the two nav ARROWs (slots 48 and 50). The root level shows no back button.
@@ -211,8 +223,6 @@ class KitBrowseGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.CHEST, "alpha"));
         baseline.put(1, new Snapshot(Material.CHEST, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "kit.menu.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "kit.menu.next"));
         return baseline;
     }
 

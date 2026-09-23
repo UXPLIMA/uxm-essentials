@@ -92,6 +92,18 @@ class EntityCountGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/itemworld/gui/itemworld-entitycount.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW itemworld.entitycount.gui.prev",
+                        50, "ARROW itemworld.entitycount.gui.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code EntityCountListView} produced for this fixture
      * (zombie x7, cow x3, radius 64), captured once while both paths rendered it identically and frozen here as the
      * contract: the zombie egg at content slot 0 and the cow egg at slot 1 (both carrying the entry-name key), the
@@ -107,8 +119,6 @@ class EntityCountGoldenTest {
         for (int slot = 45; slot < 54; slot++) {
             baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
         }
-        baseline.put(48, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.next"));
         return baseline;
     }
 

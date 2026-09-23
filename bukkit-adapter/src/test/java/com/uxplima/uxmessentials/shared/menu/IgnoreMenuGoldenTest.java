@@ -143,6 +143,18 @@ class IgnoreMenuGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/messaging/gui/messaging-ignore.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW messaging.gui.ignore.prev",
+                        50, "ARROW messaging.gui.ignore.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code IgnoreListView} produced for this fixture (two
      * ignores), captured once while both paths rendered it identically and frozen here as the contract: two
      * PLAYER_HEAD heads at content slots 0 and 1, the add LIME_DYE button at slot 49, and the two nav ARROWs at
@@ -153,9 +165,7 @@ class IgnoreMenuGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "messaging.gui.ignore.entry-name"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "messaging.gui.ignore.entry-name"));
-        baseline.put(48, new Snapshot(Material.ARROW, "messaging.gui.ignore.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "messaging.gui.ignore.add"));
-        baseline.put(50, new Snapshot(Material.ARROW, "messaging.gui.ignore.next"));
         return baseline;
     }
 

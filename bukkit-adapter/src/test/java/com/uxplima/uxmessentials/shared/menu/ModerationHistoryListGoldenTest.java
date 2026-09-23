@@ -121,6 +121,18 @@ class ModerationHistoryListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/moderation/gui/moderation-history.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW moderation.gui.history.prev",
+                        50, "ARROW moderation.gui.history.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code PlayerHistoryView} produced for this fixture (a BAN
      * row then a MUTE row), captured while both paths rendered it identically and frozen here: a BARRIER and a BOOK
      * icon (content slots 0 and 1. The action surfaces through the {@code mod_history_action} token) and the two nav
@@ -130,8 +142,6 @@ class ModerationHistoryListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.BARRIER, "BAN"));
         baseline.put(1, new Snapshot(Material.BOOK, "MUTE"));
-        baseline.put(48, new Snapshot(Material.ARROW, "moderation.gui.history.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "moderation.gui.history.next"));
         return baseline;
     }
 

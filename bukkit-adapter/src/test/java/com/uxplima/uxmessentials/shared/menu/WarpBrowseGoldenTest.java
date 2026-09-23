@@ -171,6 +171,18 @@ class WarpBrowseGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/warps/gui/warp-browse.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW warp.menu.prev",
+                        50, "ARROW warp.menu.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code WarpMenuView} produced for the two-warp legacy fixture,
      * frozen as the contract: two ENDER_PEARL tiles (content slots 0 and 1, the names surfacing through the warp-name
      * token) and the two nav ARROWs (slots 48 and 50). The root level shows no back button.
@@ -179,8 +191,6 @@ class WarpBrowseGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.ENDER_PEARL, "alpha"));
         baseline.put(1, new Snapshot(Material.ENDER_PEARL, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "warp.menu.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "warp.menu.next"));
         return baseline;
     }
 
@@ -189,8 +199,6 @@ class WarpBrowseGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.BOOK, "places"));
         baseline.put(1, new Snapshot(Material.ENDER_PEARL, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "warp.menu.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "warp.menu.next"));
         return baseline;
     }
 
@@ -198,9 +206,7 @@ class WarpBrowseGoldenTest {
     private static Map<Integer, Snapshot> drilledBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.ENDER_PEARL, "alpha"));
-        baseline.put(48, new Snapshot(Material.ARROW, "warp.menu.prev"));
         baseline.put(49, new Snapshot(Material.ARROW, "warp.menu.back"));
-        baseline.put(50, new Snapshot(Material.ARROW, "warp.menu.next"));
         return baseline;
     }
 

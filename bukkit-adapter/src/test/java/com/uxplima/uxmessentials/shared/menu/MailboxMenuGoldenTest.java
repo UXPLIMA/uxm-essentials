@@ -160,6 +160,18 @@ class MailboxMenuGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/messaging/gui/messaging-mailbox.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW messaging.gui.mail.prev",
+                        50, "ARROW messaging.gui.mail.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code MailboxView} produced for this fixture (one unread
      * mail), captured once while both paths rendered it identically and frozen here as the contract: one
      * WRITTEN_BOOK mail icon at content slot 0, the clear LAVA_BUCKET button at slot 49, and the two nav ARROWs at
@@ -169,9 +181,7 @@ class MailboxMenuGoldenTest {
     private static Map<Integer, Snapshot> oldViewBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.WRITTEN_BOOK, "messaging.gui.mail.entry-name"));
-        baseline.put(48, new Snapshot(Material.ARROW, "messaging.gui.mail.prev"));
         baseline.put(49, new Snapshot(Material.LAVA_BUCKET, "messaging.gui.mail.clear"));
-        baseline.put(50, new Snapshot(Material.ARROW, "messaging.gui.mail.next"));
         return baseline;
     }
 

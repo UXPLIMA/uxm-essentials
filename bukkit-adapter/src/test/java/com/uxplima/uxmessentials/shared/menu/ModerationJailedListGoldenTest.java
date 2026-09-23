@@ -144,6 +144,18 @@ class ModerationJailedListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/moderation/gui/moderation-jailed.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW moderation.gui.jail.jailed-prev",
+                        50, "ARROW moderation.gui.jail.jailed-next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code JailedPlayersView} produced for this fixture (two
      * active jails, "Alpha" in "north" and "Beta" in "south"), captured while both paths rendered it identically and
      * frozen here: two PLAYER_HEAD icons (content slots 0 and 1. The names surface through the {@code
@@ -153,8 +165,6 @@ class ModerationJailedListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "Alpha"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "Beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "moderation.gui.jail.jailed-prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "moderation.gui.jail.jailed-next"));
         return baseline;
     }
 

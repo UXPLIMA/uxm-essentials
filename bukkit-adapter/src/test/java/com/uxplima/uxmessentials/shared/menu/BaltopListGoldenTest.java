@@ -145,6 +145,18 @@ class BaltopListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/economy/gui/economy-baltop.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        45, "ARROW baltop.gui-previous",
+                        53, "ARROW baltop.gui-next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code BaltopGuiView} produced for this fixture (Alice then
      * Bob), captured while both paths rendered it identically and frozen here: two PLAYER_HEAD skulls (content slots
      * 0 and 1, the owner surfacing through the {@code baltop_player} token), the prev ARROW at 45, the close BARRIER
@@ -154,9 +166,7 @@ class BaltopListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "Alice"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "Bob"));
-        baseline.put(45, new Snapshot(Material.ARROW, "baltop.gui-previous"));
         baseline.put(49, new Snapshot(Material.BARRIER, "baltop.gui-close"));
-        baseline.put(53, new Snapshot(Material.ARROW, "baltop.gui-next"));
         return baseline;
     }
 

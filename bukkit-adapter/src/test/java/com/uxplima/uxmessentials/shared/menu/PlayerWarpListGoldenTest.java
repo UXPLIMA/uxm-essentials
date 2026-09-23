@@ -173,6 +173,18 @@ class PlayerWarpListGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/playerwarps/gui/playerwarp-list.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW pwarp.gui.list.prev",
+                        50, "ARROW pwarp.gui.list.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code PlayerWarpListView} produced for this fixture (two
      * warps "alpha" and "beta", neither with a custom icon), captured once while both paths rendered it identically
      * and frozen here as the contract: two ENDER_PEARL icons (content slots 0 and 1, the fallback icon, with the
@@ -183,9 +195,7 @@ class PlayerWarpListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.ENDER_PEARL, "alpha"));
         baseline.put(1, new Snapshot(Material.ENDER_PEARL, "beta"));
-        baseline.put(48, new Snapshot(Material.ARROW, "pwarp.gui.list.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "pwarp.gui.list.create"));
-        baseline.put(50, new Snapshot(Material.ARROW, "pwarp.gui.list.next"));
         return baseline;
     }
 

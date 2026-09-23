@@ -143,6 +143,18 @@ class KitManagerGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/kits/gui/kit-manager.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        45, "ARROW kit.menu.prev",
+                        46, "ARROW kit.menu.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code KitManagerView} produced for this fixture (two item-less
      * kits, "alpha" and "beta"), captured once while both paths rendered it identically and frozen here as the contract:
      * two CHEST icons (content slots 0 and 1. The names surface through the kit-id token), the EMERALD_BLOCK create
@@ -153,8 +165,6 @@ class KitManagerGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.CHEST, "alpha"));
         baseline.put(1, new Snapshot(Material.CHEST, "beta"));
-        baseline.put(45, new Snapshot(Material.ARROW, "kit.menu.prev"));
-        baseline.put(46, new Snapshot(Material.ARROW, "kit.menu.next"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "kit.editor.create-button.name"));
         baseline.put(51, new Snapshot(Material.BOOK, "kit.editor.category.manager-title"));
         baseline.put(53, new Snapshot(Material.BARRIER, "kit.editor.close-button.name"));

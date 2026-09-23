@@ -112,13 +112,24 @@ class TransactionsHistoryListGoldenTest {
         assertThat(engine).isEqualTo(baseline);
     }
 
+    /**
+     * The file declares both arrows, and the engine draws each one when it has a page to turn to (uxmLib 0.119.0):
+     * forty six rows fill the forty five cells of the first page and spill onto a second, so the first page shows the
+     * next arrow and not the previous one.
+     */
     @Test
     void engineRestoresTheWorkingNavArrowsTheOldViewBuriedUnderGlass() {
-        history.add(record(1L, "CREDIT", "PAY"));
+        for (long id = 1L; id <= 46L; id++) {
+            history.add(record(id, "CREDIT", "PAY"));
+        }
         Inventory inv = openEngine();
 
-        assertThat(Objects.requireNonNull(inv.getItem(PREV_SLOT)).getType()).isEqualTo(Material.ARROW);
+        assertThat(PageArrows.declaredIn("modules/economy/gui/economy-transactions.conf"))
+                .containsExactlyInAnyOrderEntriesOf(
+                        Map.of(PREV_SLOT, "ARROW eco.history.gui-prev", NEXT_SLOT, "ARROW eco.history.gui-next"));
         assertThat(Objects.requireNonNull(inv.getItem(NEXT_SLOT)).getType()).isEqualTo(Material.ARROW);
+        // Nothing lies under the previous arrow in this file, so its slot is empty on the first page.
+        assertThat(inv.getItem(PREV_SLOT)).isNull();
     }
 
     @Test

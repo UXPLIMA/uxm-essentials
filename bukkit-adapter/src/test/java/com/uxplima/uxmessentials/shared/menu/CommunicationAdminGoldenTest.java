@@ -173,6 +173,18 @@ class CommunicationAdminGoldenTest {
     }
 
     /**
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
+     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     */
+    @Test
+    void thePageArrowsAreTheWindowFiles() {
+        assertThat(PageArrows.declaredIn("modules/communication/gui/communication-announcer.conf"))
+                .containsExactlyInAnyOrderEntriesOf(Map.of(
+                        48, "ARROW communication.gui.announcer.prev",
+                        50, "ARROW communication.gui.announcer.next"));
+    }
+
+    /**
      * The slot -> (material, plain name) map the deleted {@code CommunicationAdminView} panel produced, captured
      * once while both paths rendered it identically and frozen here as the contract so the old class could be
      * deleted: the four buttons (chat-lock IRON_DOOR, clearchat LAVA_BUCKET, broadcast BELL, announcer
@@ -198,8 +210,6 @@ class CommunicationAdminGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PAPER, "communication.gui.announcer.entry-name"));
         baseline.put(1, new Snapshot(Material.PAPER, "communication.gui.announcer.entry-name"));
-        baseline.put(48, new Snapshot(Material.ARROW, "communication.gui.announcer.prev"));
-        baseline.put(50, new Snapshot(Material.ARROW, "communication.gui.announcer.next"));
         return baseline;
     }
 
