@@ -66,12 +66,19 @@ public final class TeleportArrivalEffects {
             }
         }
         if (effect.hasParticle()) {
-            @Nullable Particle particle = resolveParticle(effect.particle());
-            if (particle != null) {
-                double spread = effect.particleSpread();
-                player.getWorld()
-                        .spawnParticle(particle, at, Math.max(0, effect.particleCount()), spread, spread, spread);
-            }
+            // The setting may carry the data a dust or a block needs after the name, "dust #00ff00"; a particle
+            // drawn with none is refused by the server.
+            double spread = effect.particleSpread();
+            BukkitRegistryKeys.readParticle(effect.particle(), at)
+                    .ifPresent(read -> player.getWorld()
+                            .spawnParticle(
+                                    read.particle(),
+                                    at,
+                                    Math.max(0, effect.particleCount()),
+                                    spread,
+                                    spread,
+                                    spread,
+                                    read.data()));
         }
     }
 

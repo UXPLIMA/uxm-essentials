@@ -5,12 +5,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Color;
 import org.bukkit.DyeColor;
 import org.bukkit.FireworkEffect;
 import org.bukkit.Location;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
@@ -22,6 +22,7 @@ import net.kyori.adventure.title.Title;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.particle.ParticleOptions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -89,17 +90,29 @@ final class KitActionEffects {
         player.playSound(Objects.requireNonNull(player.getLocation(), "player location"), sound, volume, pitch);
     }
 
-    /** Spawn a particle; spec is a single particle key (legacy {@code particles} target), e.g. {@code FLAME}. */
+    /**
+     * Spawn a particle; spec is a particle key (legacy {@code particles} target), e.g. {@code FLAME}, and for one that
+     * needs data, the data after it: {@code dust #00ff00}. A particle drawn with no data is refused by the server.
+     */
     void particle(Player player, String spec, String kitId) {
-        Particle particle = resolveParticle(spec.strip());
-        if (particle == null) {
-            log.warn("kit " + kitId + ": unknown particle key: " + spec);
-            return;
-        }
         Location at = Objects.requireNonNull(player.getLocation(), "player location")
                 .clone()
                 .add(0, 1, 0);
-        player.getWorld().spawnParticle(particle, at, 15, 0.3, 0.3, 0.3, 0.1);
+        Optional<ParticleOptions> read = BukkitRegistryKeys.readParticle(spec, at);
+        if (read.isEmpty()) {
+            log.warn("kit " + kitId + ": unknown particle, or data that cannot be read: " + spec);
+            return;
+        }
+        player.getWorld()
+                .spawnParticle(
+                        read.get().particle(),
+                        at,
+                        15,
+                        0.3,
+                        0.3,
+                        0.3,
+                        0.1,
+                        read.get().data());
     }
 
     /** Launch a firework; spec is {@code colors:RED,BLUE type:BALL_LARGE power:1}, each token optional. */
@@ -170,10 +183,6 @@ final class KitActionEffects {
 
     private static @Nullable Sound resolveSound(String raw) {
         return BukkitRegistryKeys.resolveSound(raw);
-    }
-
-    private static @Nullable Particle resolveParticle(String raw) {
-        return BukkitRegistryKeys.resolveParticle(raw);
     }
 
     private static Duration ticks(long count) {

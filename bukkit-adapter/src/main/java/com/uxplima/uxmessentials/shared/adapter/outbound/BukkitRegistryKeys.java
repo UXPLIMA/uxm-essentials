@@ -2,12 +2,15 @@ package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
+import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
 import org.bukkit.Sound;
 
+import com.uxplima.uxmlib.particle.ParticleOptions;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -81,6 +84,22 @@ public final class BukkitRegistryKeys {
                 .filter(key -> key.value().replace('.', '_').equals(flattened))
                 .findFirst()
                 .orElse(null);
+    }
+
+    /**
+     * The particle a setting names and the data it needs, written after the name: {@code "end_rod"},
+     * {@code "minecraft:dust #00ff00"}, {@code "block oak_log"}. The name resolves the way
+     * {@link #resolveParticle} does, and {@link ParticleOptions#read} reads the data or its default. Empty when the
+     * name or the data cannot be read. Draw what this answers: a particle resolved by name alone and drawn with no
+     * data is refused by the server for a dust, a block, an item and nineteen more.
+     */
+    public static Optional<ParticleOptions> readParticle(String written, Location at) {
+        String value = written.strip();
+        int space = value.indexOf(' ');
+        String name = space < 0 ? value : value.substring(0, space);
+        String data = space < 0 ? "" : value.substring(space + 1);
+        @Nullable Particle particle = resolveParticle(name);
+        return particle == null ? Optional.empty() : ParticleOptions.read(particle, data, at);
     }
 
     /**

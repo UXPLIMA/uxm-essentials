@@ -11,7 +11,6 @@ import java.util.function.Consumer;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
@@ -206,7 +205,9 @@ public final class VoteWiring {
 
         // Subscribe the party sound/particle handler to the in-process bus.
         @Nullable Sound sound = BukkitRegistryKeys.resolveSound(ctx.config().getString("voteparty.sound", ""));
-        @Nullable Particle particle = BukkitRegistryKeys.resolveParticle(ctx.config().getString("voteparty.particle", ""));
+        // Read at each party against the player it is drawn for, so a dust's colour written after the name is kept:
+        // "dust #ffaa00". A particle drawn with no data is refused by the server.
+        String particle = ctx.config().getString("voteparty.particle", "").strip();
         Consumer<DomainEvent> partyEffects = buildPartyEffectsHandler(sound, particle, kernel);
         events.subscribe(partyEffects);
 
@@ -567,12 +568,12 @@ public final class VoteWiring {
      * config name simply skips that effect without logging so a default-unconfigured server is silent.
      */
     private static Consumer<DomainEvent> buildPartyEffectsHandler(
-            @Nullable Sound sound, @Nullable Particle particle, KernelPorts kernel) {
+            @Nullable Sound sound, String particle, KernelPorts kernel) {
         return event -> {
             if (!(event instanceof VotePartyTriggered)) {
                 return;
             }
-            if (sound == null && particle == null) {
+            if (sound == null && particle.isEmpty()) {
                 return;
             }
             // VotePartyTriggered is published off-tick from the vote handler, so enumerate the live online
@@ -580,7 +581,6 @@ public final class VoteWiring {
             kernel.scheduler().onGlobal(() -> {
                 for (Player online : Bukkit.getOnlinePlayers()) {
                     Sound s = sound;
-                    Particle p = particle;
                     kernel.scheduler()
                             .onEntity(
                                     new com.uxplima.uxmessentials.shared.domain.PlayerRef(
@@ -593,9 +593,9 @@ public final class VoteWiring {
                                         if (s != null) {
                                             online.playSound(loc, s, 1.0f, 1.0f);
                                         }
-                                        if (p != null) {
-                                            online.spawnParticle(p, loc, 30, 0.5, 0.5, 0.5, 0.1);
-                                        }
+                                        BukkitRegistryKeys.readParticle(particle, loc)
+                                                .ifPresent(read -> online.spawnParticle(
+                                                        read.particle(), loc, 30, 0.5, 0.5, 0.5, 0.1, read.data()));
                                     });
                 }
             });

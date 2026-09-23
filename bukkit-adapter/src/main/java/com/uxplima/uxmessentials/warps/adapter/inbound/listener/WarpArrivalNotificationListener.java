@@ -7,7 +7,6 @@ import java.util.UUID;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Particle;
 import org.bukkit.Sound;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -108,14 +107,14 @@ public final class WarpArrivalNotificationListener implements Listener {
         }
     }
 
+    /**
+     * The warp's particle, with the data a dust or a block needs written after its name, or the fallback when the
+     * warp's cannot be read. A particle drawn with no data is refused by the server.
+     */
     private void playParticle(World world, Location loc, Optional<String> particleName, String fallback) {
-        Particle particle = BukkitRegistryKeys.resolveParticle(particleName.orElse(fallback));
-        if (particle == null) {
-            particle = BukkitRegistryKeys.resolveParticle(fallback);
-        }
-        if (particle != null) {
-            world.spawnParticle(particle, loc, 30, 0.5, 0.5, 0.5, 0.1);
-        }
+        BukkitRegistryKeys.readParticle(particleName.orElse(fallback), loc)
+                .or(() -> BukkitRegistryKeys.readParticle(fallback, loc))
+                .ifPresent(read -> world.spawnParticle(read.particle(), loc, 30, 0.5, 0.5, 0.5, 0.1, read.data()));
     }
 
     private void showWelcomeMessages(Player player, PlayerRef ref, PendingWarpNotification pending) {
