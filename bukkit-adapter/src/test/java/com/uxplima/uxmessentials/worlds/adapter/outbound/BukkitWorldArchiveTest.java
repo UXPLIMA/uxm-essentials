@@ -67,6 +67,20 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class BukkitWorldArchiveTest {
 
+    /**
+     * A world's folder is found under the key {@code WorldCreator} gives its name, and that reads the server's
+     * unsafe values, which MockBukkit answers. The server the archive asks is still the Mockito double below.
+     */
+    @org.junit.jupiter.api.BeforeEach
+    void startTheServerTheKeyRuleReads() {
+        org.mockbukkit.mockbukkit.MockBukkit.mock();
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void stopIt() {
+        org.mockbukkit.mockbukkit.MockBukkit.unmock();
+    }
+
     private static final DateTimeFormatter STAMP =
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
     private static final WorldName WORLD = WorldName.of("arena");
@@ -349,6 +363,9 @@ class BukkitWorldArchiveTest {
         lenient()
                 .when(s.getWorldContainer())
                 .thenAnswer(inv -> Objects.requireNonNull(worldContainer).toFile());
+        lenient()
+                .when(s.getLevelDirectory())
+                .thenAnswer(inv -> Objects.requireNonNull(worldContainer).resolve("world"));
         lenient().when(s.getWorld("arena")).thenReturn(null);
         return s;
     }

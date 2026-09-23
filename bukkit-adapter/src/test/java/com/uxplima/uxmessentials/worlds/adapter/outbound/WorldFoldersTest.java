@@ -12,10 +12,12 @@ import java.util.List;
 import org.bukkit.Server;
 import org.bukkit.World;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.mockbukkit.mockbukkit.MockBukkit;
 
 /**
  * Where a world keeps its files on Paper 26.2.
@@ -36,8 +38,11 @@ final class WorldFoldersTest {
 
     @BeforeEach
     void setUp() throws IOException {
+        // WorldCreator reads its key through the server's unsafe values, which MockBukkit answers.
+        MockBukkit.mock();
         server = mock(Server.class);
         when(server.getWorldContainer()).thenReturn(container.toFile());
+        when(server.getLevelDirectory()).thenReturn(container.resolve("world"));
         World overworld = mock(World.class);
         when(overworld.getName()).thenReturn("world");
         when(overworld.getWorldFolder())
@@ -50,6 +55,20 @@ final class WorldFoldersTest {
         Files.createDirectories(container.resolve("world/dimensions/minecraft/the_nether/region"));
         Files.createDirectories(container.resolve("world/dimensions/minecraft/probeworld/region"));
         Files.createFile(container.resolve("world/level.dat"));
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
+    }
+
+    @Test
+    @DisplayName("a world named with a space is found under the key the server gives it")
+    void aSpaceBecomesTheServersKey() throws IOException {
+        Files.createDirectories(container.resolve("world/dimensions/minecraft/my_arena/region"));
+
+        assertThat(new WorldFolders(server).of("My Arena"))
+                .isEqualTo(container.resolve("world/dimensions/minecraft/my_arena"));
     }
 
     @Test

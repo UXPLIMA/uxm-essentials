@@ -5,14 +5,15 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.Server;
 import org.bukkit.World;
+import org.bukkit.WorldCreator;
 
 /**
  * Where a world keeps its files.
@@ -25,8 +26,6 @@ import org.bukkit.World;
  * that is in neither place is answered with where a new one would go.
  */
 public final class WorldFolders {
-
-    private static final String DEFAULT_LEVEL = "world";
 
     private static final String NETHER_SUFFIX = "_nether";
 
@@ -78,8 +77,10 @@ public final class WorldFolders {
      */
     public Set<String> onDisk() {
         Set<String> names = new TreeSet<>();
-        for (Path dimension : folders(level().resolve("dimensions").resolve("minecraft"))) {
-            names.add(nameOf(String.valueOf(dimension.getFileName())));
+        for (Path namespace : folders(level().resolve("dimensions"))) {
+            for (Path dimension : folders(namespace)) {
+                names.add(nameOf(String.valueOf(dimension.getFileName())));
+            }
         }
         for (Path beside : folders(container())) {
             if (Files.isRegularFile(beside.resolve("level.dat")) && !beside.equals(level())) {
@@ -98,41 +99,29 @@ public final class WorldFolders {
                 && name.indexOf('\\') < 0;
     }
 
+    /**
+     * The dimension folder of a world of that name, under the key the server gives it. {@link WorldCreator#key()} is
+     * Paper's own rule: the level's three become {@code overworld}, {@code the_nether} and {@code the_end}, others
+     * are lower-cased with a space turned into an underscore. uxm-plots pointed at it, and a hand-written copy of the
+     * rule got the space wrong.
+     */
     private Path dimension(String name) {
-        return level().resolve("dimensions").resolve("minecraft").resolve(keyOf(name));
-    }
-
-    /** The key the server gives a world of that name: the level's own three by their vanilla keys, others lower-cased. */
-    private String keyOf(String name) {
-        String levelName = levelName();
-        if (name.equals(levelName)) {
-            return "overworld";
-        }
-        if (name.equals(levelName + NETHER_SUFFIX)) {
-            return "the_nether";
-        }
-        if (name.equals(levelName + END_SUFFIX)) {
-            return "the_end";
-        }
-        return name.toLowerCase(Locale.ROOT);
+        NamespacedKey key = new WorldCreator(name).key();
+        return level().resolve("dimensions").resolve(key.namespace()).resolve(key.value());
     }
 
     private String nameOf(String key) {
+        String levelName = String.valueOf(level().getFileName());
         return switch (key) {
-            case "overworld" -> levelName();
-            case "the_nether" -> levelName() + NETHER_SUFFIX;
-            case "the_end" -> levelName() + END_SUFFIX;
+            case "overworld" -> levelName;
+            case "the_nether" -> levelName + NETHER_SUFFIX;
+            case "the_end" -> levelName + END_SUFFIX;
             default -> key;
         };
     }
 
     private Path level() {
-        return container().resolve(levelName());
-    }
-
-    private String levelName() {
-        List<World> worlds = server.getWorlds();
-        return worlds.isEmpty() ? DEFAULT_LEVEL : worlds.get(0).getName();
+        return server.getLevelDirectory();
     }
 
     private Path container() {
