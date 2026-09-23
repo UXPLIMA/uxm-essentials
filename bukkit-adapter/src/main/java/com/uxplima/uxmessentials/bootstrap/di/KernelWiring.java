@@ -160,7 +160,10 @@ final class KernelWiring {
 
         LocaleStore localeStore = new PdcLocaleStore(plugin);
         java.util.Locale serverDefault = serverDefaultLocale(config);
-        LocaleResolver resolver = new LocaleResolver(localeStore, serverDefault);
+        LocaleResolver resolver = new LocaleResolver(
+                localeStore,
+                new com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales(),
+                serverDefault);
         // The translatable-key path (docs/13-i18n §8.2): register every catalog key with Adventure's
         // GlobalTranslator so a Component.translatable("uxmessentials.<key>") renders per the receiving
         // connection's locale. The MessageKey-resolve path stays the primary surface.

@@ -882,6 +882,9 @@ public final class PluginModule {
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
         applyCatalog(plugin, kernel, wiredKernel.localeStore(), wiredKernel.serverDefault(), resources);
+        // The language each client reads, kept for the lines written off the command's thread.
+        resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.locale.ClientLocaleListener(
+                wiredKernel.resolver().clients()));
         return resources;
     }
 

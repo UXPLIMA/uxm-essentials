@@ -17,8 +17,9 @@ import java.util.Objects;
  * API and would version-lock the compiled classes to a single JDK). {@link #runWith} sets the value for
  * the duration of the call and restores the previous binding in a {@code finally} block, so nothing
  * leaks across a pooled worker thread. When a handler hops to a different executor the binding does not
- * follow, and that is fine: the locale resolver falls back to the recipient's own client locale, which
- * is the correct language for that viewer anyway. The bound value is an immutable {@link Locale};
+ * follow, and the resolver then reads the recipient's own client locale, which the adapter keeps for every
+ * online player. This sentence said so for a long time before it was true: the resolver fell back to the
+ * server's default, and a Turkish player's {@code /balance}, written after a database read, arrived in English. The bound value is an immutable {@link Locale};
  * capturing the client locale off the Bukkit API happens once on the region thread at the boundary.
  */
 public final class LocaleScope {

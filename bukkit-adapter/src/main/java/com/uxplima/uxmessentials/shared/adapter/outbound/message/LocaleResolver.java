@@ -19,8 +19,11 @@ import org.jspecify.annotations.NullMarked;
  *   <li>the locale bound for this request at the command boundary ({@link LocaleScope#CURRENT}), the
  *       client locale captured on the region thread and carried across async hops, so a deferred
  *       message resolves in the requester's language on a worker thread;</li>
- *   <li>the configured server-default locale. The fallback for a path that never crossed the
- *       boundary (an event-driven broadcast with no requesting command);</li>
+ *   <li>the language the viewer's own client reads, which {@link ClientLocales} knows for every online player on
+ *       any thread. A line written after a hop off the command's thread, or with no command behind it at all,
+ *       finds its reader's language here; before this step it found the server's default, and a Turkish
+ *       player's {@code /balance} arrived in English;</li>
+ *   <li>the configured server-default locale, for a viewer the server has not heard from;</li>
  *   <li>{@link Locale#ENGLISH}, the canonical root.</li>
  * </ol>
  *
@@ -34,20 +37,27 @@ import org.jspecify.annotations.NullMarked;
 public final class LocaleResolver {
 
     private final LocaleStore overrides;
+    private final ClientLocales clients;
     private final Locale serverDefault;
 
-    public LocaleResolver(LocaleStore overrides, Locale serverDefault) {
+    public LocaleResolver(LocaleStore overrides, ClientLocales clients, Locale serverDefault) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
+        this.clients = Objects.requireNonNull(clients, "clients");
         this.serverDefault = Objects.requireNonNull(serverDefault, "serverDefault");
     }
 
-    /** The viewer's resolved locale, walking the override → scope → server-default → en chain. */
+    /** The clients' languages this resolver reads, for the listener that keeps them current. */
+    public ClientLocales clients() {
+        return clients;
+    }
+
+    /** The viewer's resolved locale, walking the override, scope, client, server-default chain. */
     public Locale resolve(PlayerRef viewer) {
         Objects.requireNonNull(viewer, "viewer");
         Optional<Locale> override = overrides.override(viewer);
         if (override.isPresent()) {
             return override.get();
         }
-        return LocaleScope.orElse(serverDefault);
+        return LocaleScope.orElse(clients.of(viewer.uuid()).orElse(serverDefault));
     }
 }
