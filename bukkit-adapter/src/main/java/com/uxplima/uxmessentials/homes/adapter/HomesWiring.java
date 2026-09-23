@@ -284,8 +284,13 @@ public final class HomesWiring {
                 (player, home) -> invitesHolder[0].open(player, home),
                 listHolder);
         HomeMenus.ActionMenuOpener reopenAction = (player, viewer, home) -> actionMenu.open(player, home);
-        HomeMenus homeMenus =
-                new HomeMenus(menus, kernel.scheduler(), setHomeIcon, iconLayout(guiLayouts), reopenAction);
+        HomeMenus homeMenus = new HomeMenus(
+                menus,
+                kernel.scheduler(),
+                setHomeIcon,
+                iconLayout(guiLayouts),
+                listLayout(guiLayouts).fallbackIcon(),
+                reopenAction);
         homeMenus.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         iconHolder[0] = homeMenus;
         HomeInvitesMenu invitesMenu = new HomeInvitesMenu(

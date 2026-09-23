@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
+import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
@@ -55,6 +56,7 @@ public final class HomeMenus {
     private final Scheduler scheduler;
     private final SetHomeIcon setHomeIcon;
     private final IconSelectorLayout iconLayout;
+    private final Material fallbackIcon;
     private final ActionMenuOpener actionMenu;
 
     public HomeMenus(
@@ -62,11 +64,13 @@ public final class HomeMenus {
             Scheduler scheduler,
             SetHomeIcon setHomeIcon,
             IconSelectorLayout iconLayout,
+            Material fallbackIcon,
             ActionMenuOpener actionMenu) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.setHomeIcon = Objects.requireNonNull(setHomeIcon, "setHomeIcon");
         this.iconLayout = Objects.requireNonNull(iconLayout, "iconLayout");
+        this.fallbackIcon = Objects.requireNonNull(fallbackIcon, "fallbackIcon");
         this.actionMenu = Objects.requireNonNull(actionMenu, "actionMenu");
     }
 
@@ -76,11 +80,25 @@ public final class HomeMenus {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("homes:icon-palette", ctx -> iconLayout.icons());
-        bindings.placeholder("home_icon_name", ctx -> ctx.entry(Material.class).name());
+        bindings.placeholder("home_icon_name", this::iconName);
         bindings.action("homes:set-icon", this::setIcon);
         bindings.action("homes:reset-icon", this::resetIcon);
         bindings.action("homes:icon-back", this::iconBack);
         menus.registerSpec(ICON_SPEC_ID, MenuSpecs.loadOrBundled(ICON_RESOURCE, dataFolder, 6, EngineLog.of(log)));
+    }
+
+    /**
+     * The icon a line names: a palette cell's own material, or on the home's own window, where no cell is being
+     * drawn, the icon the home shows. It was bound for the palette alone, so the home's window wrote
+     * "current {home_icon_name}" as the token itself.
+     */
+    private String iconName(MenuContext ctx) {
+        return ctx.entry()
+                .filter(Material.class::isInstance)
+                .map(Material.class::cast)
+                .orElseGet(
+                        () -> HomeIconResolver.resolve(ctx.subject(Home.class).icon(), fallbackIcon))
+                .name();
     }
 
     /** Open the icon picker for {@code home}; the live player is resolved by the engine. */

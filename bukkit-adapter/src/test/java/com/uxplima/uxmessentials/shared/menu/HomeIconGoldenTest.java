@@ -111,6 +111,40 @@ class HomeIconGoldenTest {
         assertThat(engine).isEqualTo(baseline);
     }
 
+    /**
+     * The home's own window writes "current {home_icon_name}" on its change-icon button, and the value was bound only
+     * for a palette cell, where the entry is a material. On the home's window there is no entry, so a live player
+     * read the token itself. It now answers with the home's own icon there, or the icon a home without one shows.
+     */
+    @Test
+    void theIconNameAnswersOnTheHomesOwnWindowToo() {
+        com.uxplima.uxmlib.menu.binding.MenuBindings own = new com.uxplima.uxmlib.menu.binding.MenuBindings();
+        new HomeMenus(
+                        org.mockito.Mockito.mock(Menus.class),
+                        new SyncScheduler(),
+                        new SetHomeIcon(
+                                repository,
+                                new com.uxplima.uxmessentials.shared.application.message.Notifier(
+                                        new KeyMessages(), (v, t) -> {}),
+                                new SilentEvents(),
+                                Clock.systemUTC()),
+                        IconSelectorLayout.codeDefault(),
+                        Material.RED_BED,
+                        (p, v, home) -> {})
+                .register(own, Path.of("nonexistent"), NOOP);
+        java.util.function.Function<com.uxplima.uxmlib.menu.runtime.MenuContext, String> name =
+                own.placeholder("home_icon_name").orElseThrow();
+        seedHome(Optional.of(HomeIcon.of("DIAMOND_BLOCK")));
+        Home withIcon = repository.findSlot(viewer, SLOT).orElseThrow();
+        seedHome(Optional.empty());
+        Home without = repository.findSlot(viewer, SLOT).orElseThrow();
+
+        assertThat(name.apply(com.uxplima.uxmlib.menu.runtime.MenuContext.of(player, withIcon, 0)))
+                .isEqualTo("DIAMOND_BLOCK");
+        assertThat(name.apply(com.uxplima.uxmlib.menu.runtime.MenuContext.of(player, without, 0)))
+                .isEqualTo("RED_BED");
+    }
+
     @Test
     void clickingAPaletteCellThroughTheEngineSetsTheHomeIcon() {
         seedHome();
@@ -185,6 +219,8 @@ class HomeIconGoldenTest {
                 scheduler,
                 new SetHomeIcon(repository, notifier, new SilentEvents(), Clock.systemUTC()),
                 IconSelectorLayout.codeDefault(),
+                com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListLayout.codeDefault()
+                        .fallbackIcon(),
                 (p, v, home) -> reopenedAction.add(home));
         homeMenus.register(bindings, Path.of("nonexistent"), NOOP);
         homeMenus.openIcons(player, repository.findSlot(viewer, SLOT).orElseThrow());
