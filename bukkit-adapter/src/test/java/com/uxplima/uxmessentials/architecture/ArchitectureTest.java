@@ -29,6 +29,22 @@ import com.uxplima.uxmessentials.shared.domain.DomainProposal;
 @AnalyzeClasses(packages = "com.uxplima.uxmessentials")
 class ArchitectureTest {
 
+    /**
+     * Folia-safety: nothing moves an entity in place. Folia refuses {@code Entity.teleport} for every entity, a
+     * player, an armour stand and a display alike, on its own region's thread too, with "Must use teleportAsync while
+     * in region threading": proved on a Folia 26.2 server on 2026-09-23. An entity is moved with teleportAsync.
+     */
+    @ArchTest
+    static final ArchRule noEntityIsTeleportedInPlace = noClasses()
+            .should()
+            .callMethodWhere(com.tngtech.archunit.core.domain.JavaCall.Predicates.target(
+                            com.tngtech.archunit.core.domain.properties.HasName.Predicates.name("teleport"))
+                    .and(com.tngtech.archunit.core.domain.JavaCall.Predicates.target(
+                            com.tngtech.archunit.core.domain.properties.HasOwner.Predicates.With.owner(
+                                    com.tngtech.archunit.core.domain.properties.HasName.Predicates.nameStartingWith(
+                                            "org.bukkit.entity.")))))
+            .because("Folia refuses Entity.teleport; an entity is moved with teleportAsync");
+
     // Domain layer (:core) imports no Bukkit / Paper / Adventure.
     @ArchTest
     static final ArchRule domainHasNoBukkit = noClasses()

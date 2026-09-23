@@ -737,7 +737,9 @@ class PosesAdapterTest {
     }
 
     private PlayerMock playerAt(double x, double y, double z) {
-        PlayerMock player = server.addPlayer("Steve");
+        // A player that answers teleportAsync, which is how a pose now puts them back: MockBukkit's own leaves it
+        // unimplemented, and every test that stood a player up would have aborted instead of asserting.
+        PlayerMock player = com.uxplima.uxmessentials.testing.CompletePlayerMock.addTo(server, "Steve");
         player.teleport(new Location(world, x, y, z));
         return player;
     }

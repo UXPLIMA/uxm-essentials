@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.poses.adapter.outbound;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 import org.bukkit.Location;
 import org.bukkit.World;
@@ -37,7 +38,13 @@ public final class BukkitPoseReturn implements PoseReturn {
             World world = plugin.getServer().getWorld(where.world().uid());
             if (player != null && world != null) {
                 Location destination = BukkitRefs.toLocation(world, where);
-                player.teleport(destination);
+                // teleportAsync and never teleport: Folia refuses the in-place move for every entity, and a
+                // player standing up from a seat on a Folia server threw here instead of being put back.
+                CompletableFuture<Boolean> unused = player.teleportAsync(destination)
+                        .exceptionally(failure -> {
+                            plugin.getLogger().warning("A player could not be put back after a pose: " + failure);
+                            return false;
+                        });
             }
         });
     }
