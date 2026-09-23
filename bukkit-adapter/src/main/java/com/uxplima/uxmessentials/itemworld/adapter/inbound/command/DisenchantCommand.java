@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -47,7 +48,7 @@ public final class DisenchantCommand extends ItemworldCommandSupport implements 
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
                 .then(Commands.literal("all").executes(ctx -> run(ctx, Optional.empty())))
-                .then(Commands.argument("enchant", StringArgumentType.word())
+                .then(Commands.argument("enchant", Args.token())
                         .executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "enchant")))))
                 .build();
     }

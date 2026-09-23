@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -112,7 +113,7 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> explicitPositionArguments() {
-        return Commands.argument("world", StringArgumentType.word())
+        return Commands.argument("world", Args.token())
                 .suggests(CommandSuggestions.loadedWorlds())
                 .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())

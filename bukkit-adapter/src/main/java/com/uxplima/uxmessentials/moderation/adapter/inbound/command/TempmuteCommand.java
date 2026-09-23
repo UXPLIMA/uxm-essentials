@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -57,7 +58,7 @@ public final class TempmuteCommand extends ModerationCommandSupport implements C
         return Commands.literal("tempmute")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
-                        .then(Commands.argument("duration", StringArgumentType.word())
+                        .then(Commands.argument("duration", Args.token())
                                 .executes(ctx -> run(ctx, Optional.empty()))
                                 .then(Commands.argument("reason", StringArgumentType.greedyString())
                                         .executes(ctx -> run(ctx, optionalReason(ctx))))))

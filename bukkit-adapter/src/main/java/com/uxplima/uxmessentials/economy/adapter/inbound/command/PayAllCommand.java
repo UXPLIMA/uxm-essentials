@@ -9,7 +9,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -18,6 +17,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -43,7 +43,7 @@ public final class PayAllCommand extends EconomyCommandSupport implements Comman
         return Commands.literal("payall")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> usage(ctx, "payall", "<amount> [currency]", "Pay all online players"))
-                .then(Commands.argument("amount", StringArgumentType.word())
+                .then(Commands.argument("amount", Args.token())
                         .executes(this::run)
                         .then(currencyArgument().executes(this::run)))
                 .build();

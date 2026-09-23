@@ -10,7 +10,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -25,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -50,7 +50,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                 .then(Commands.literal("take")
                         .requires(src -> src.getSender().hasPermission(TAKE))
                         .executes(ctx -> usage(ctx, "loan take", "<amount> [currency] [installments]", "Take a loan"))
-                        .then(Commands.argument("amount", StringArgumentType.word())
+                        .then(Commands.argument("amount", Args.token())
                                 .executes(ctx -> this.runTake(ctx, null, 10)) // default 10 installments
                                 .then(Commands.argument("installments", IntegerArgumentType.integer(1, 100))
                                         .executes(ctx -> this.runTake(
@@ -65,11 +65,10 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                                                         ctx.getArgument("installments", Integer.class)))))))
                 .then(Commands.literal("pay")
                         .executes(ctx -> usage(ctx, "loan pay", "<loan_id> <amount>", "Repay a loan"))
-                        .then(Commands.argument("loan_id", StringArgumentType.word())
+                        .then(Commands.argument("loan_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.loanService()::getActiveLoanIds))
                                 .executes(ctx -> usage(ctx, "loan pay", "<loan_id> <amount>", "Repay a loan"))
-                                .then(Commands.argument("amount", StringArgumentType.word())
-                                        .executes(this::runPay))))
+                                .then(Commands.argument("amount", Args.token()).executes(this::runPay))))
                 .build();
     }
 

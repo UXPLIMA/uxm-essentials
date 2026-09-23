@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -84,8 +85,7 @@ abstract class HologramCommandSupport {
 
     /** A literal argument that completes against a fixed set of choices (enum values, booleans). */
     static RequiredArgumentBuilder<CommandSourceStack, String> choiceArgument(String literal, List<String> choices) {
-        return Commands.argument(literal, StringArgumentType.word())
-                .suggests(CommandSuggestions.fromStrings(() -> choices));
+        return Commands.argument(literal, Args.token()).suggests(CommandSuggestions.fromStrings(() -> choices));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */

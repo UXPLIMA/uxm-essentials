@@ -16,7 +16,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -24,6 +23,7 @@ import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -207,6 +207,6 @@ public final class CommandSuggestions {
      */
     public static RequiredArgumentBuilder<CommandSourceStack, String> playerArgument(String name) {
         Objects.requireNonNull(name, "name");
-        return Commands.argument(name, StringArgumentType.word()).suggests(onlinePlayers());
+        return Commands.argument(name, Args.token()).suggests(onlinePlayers());
     }
 }

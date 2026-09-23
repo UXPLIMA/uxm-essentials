@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -69,7 +69,7 @@ public final class LangCommand implements CommandRegistration {
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::runStatus)
                 .then(Commands.literal(RESET_LITERAL).executes(this::runReset))
-                .then(Commands.argument("code", StringArgumentType.word()).executes(this::runSet))
+                .then(Commands.argument("code", Args.token()).executes(this::runSet))
                 .build();
     }
 

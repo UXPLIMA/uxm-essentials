@@ -23,7 +23,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.registry.RegistryAccess;
 import io.papermc.paper.registry.RegistryKey;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -35,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -201,13 +201,13 @@ abstract class ItemworldCommandSupport {
      * arbitrary typed id keeps working.
      */
     static RequiredArgumentBuilder<CommandSourceStack, String> itemArgument() {
-        return Commands.argument("item", StringArgumentType.word())
+        return Commands.argument("item", Args.token())
                 .suggests(keyedSuggestions(() -> Registry.MATERIAL, Material::isItem));
     }
 
     /** A {@code type} string argument that completes against the spawnable entity types in the live registry. */
     static RequiredArgumentBuilder<CommandSourceStack, String> mobTypeArgument() {
-        return Commands.argument("type", StringArgumentType.word())
+        return Commands.argument("type", Args.token())
                 .suggests(keyedSuggestions(
                         () -> Registry.ENTITY_TYPE,
                         type -> type != EntityType.UNKNOWN && type != EntityType.PLAYER && type.isSpawnable()));
@@ -219,7 +219,7 @@ abstract class ItemworldCommandSupport {
      * value still resolves at execution, so a typed-but-unsuggested token keeps working.
      */
     static RequiredArgumentBuilder<CommandSourceStack, String> itemFlagArgument() {
-        return Commands.argument("flag", StringArgumentType.word()).suggests(enumNames(ItemFlag.values()));
+        return Commands.argument("flag", Args.token()).suggests(enumNames(ItemFlag.values()));
     }
 
     /**
@@ -229,7 +229,7 @@ abstract class ItemworldCommandSupport {
      * the canonical names cover the discoverable set, and the value still resolves at execution.
      */
     static RequiredArgumentBuilder<CommandSourceStack, String> treeTypeArgument() {
-        return Commands.argument("type", StringArgumentType.word()).suggests(enumNames(TreeType.values()));
+        return Commands.argument("type", Args.token()).suggests(enumNames(TreeType.values()));
     }
 
     /**
@@ -238,14 +238,14 @@ abstract class ItemworldCommandSupport {
      * typed-but-unsuggested id keeps working: the registry only drives the type-ahead.
      */
     static RequiredArgumentBuilder<CommandSourceStack, String> attributeArgument() {
-        return Commands.argument("attribute", StringArgumentType.word())
+        return Commands.argument("attribute", Args.token())
                 .suggests(keyedSuggestions(
                         () -> RegistryAccess.registryAccess().getRegistry(RegistryKey.ATTRIBUTE), attribute -> true));
     }
 
     /** A {@code slot} string argument that completes against the equipment-slot-group tokens the resolver accepts. */
     static RequiredArgumentBuilder<CommandSourceStack, String> slotGroupArgument() {
-        return Commands.argument("slot", StringArgumentType.word())
+        return Commands.argument("slot", Args.token())
                 .suggests(CommandSuggestions.fromStrings(() -> SLOT_GROUP_TOKENS));
     }
 
@@ -272,7 +272,7 @@ abstract class ItemworldCommandSupport {
 
     /** An {@code effect} string argument that completes against the potion effect types in the live registry. */
     static RequiredArgumentBuilder<CommandSourceStack, String> effectArgument() {
-        return Commands.argument("effect", StringArgumentType.word())
+        return Commands.argument("effect", Args.token())
                 .suggests(keyedSuggestions(() -> Registry.EFFECT, effect -> true));
     }
 
@@ -284,7 +284,7 @@ abstract class ItemworldCommandSupport {
     static RequiredArgumentBuilder<CommandSourceStack, String> enchantArgument() {
         // Enchantments live in the data-driven RegistryAccess (the legacy Registry.ENCHANTMENT is deprecated), the
         // same registry BukkitItemResolver#enchantment resolves the typed value against.
-        return Commands.argument("enchant", StringArgumentType.word())
+        return Commands.argument("enchant", Args.token())
                 .suggests(keyedSuggestions(
                         () -> RegistryAccess.registryAccess().getRegistry(RegistryKey.ENCHANTMENT), enchant -> true));
     }

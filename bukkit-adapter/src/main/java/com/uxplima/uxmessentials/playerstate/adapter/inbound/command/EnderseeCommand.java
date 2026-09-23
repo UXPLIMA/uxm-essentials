@@ -8,13 +8,13 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,7 +44,7 @@ public final class EnderseeCommand extends PlayerstateCommandSupport implements 
         return Commands.literal("endersee")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::view)
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(Commands.argument("player", Args.token())
                         .suggests(onlinePlayerSuggestions())
                         .executes(this::view))
                 .build();

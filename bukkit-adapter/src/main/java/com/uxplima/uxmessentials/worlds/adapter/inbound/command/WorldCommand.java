@@ -44,6 +44,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -86,7 +87,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("info").requires(p(INFO)).then(nameArg().executes(this::runInfo)))
                 .then(Commands.literal("create")
                         .requires(p(CREATE))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .executes(this::runCreate)
                                 .then(envArg().executes(this::runCreate)
                                         .then(typeArg()
@@ -114,16 +115,16 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("set")
                         .requires(p(SET))
                         .then(nameArg()
-                                .then(Commands.argument("property", StringArgumentType.word())
+                                .then(Commands.argument("property", Args.token())
                                         .suggests(CommandSuggestions.fromStrings(this::propertyKeys))
                                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                                 .executes(this::runSet)))))
                 .then(Commands.literal("gamerule")
                         .requires(p(GAMERULE))
                         .then(nameArg()
-                                .then(Commands.argument("rule", StringArgumentType.word())
+                                .then(Commands.argument("rule", Args.token())
                                         .suggests(CommandSuggestions.fromStrings(services::gameRuleNames))
-                                        .then(Commands.argument("value", StringArgumentType.word())
+                                        .then(Commands.argument("value", Args.token())
                                                 .executes(this::runGamerule)))))
                 .then(setSpawnNode())
                 .then(Commands.literal("spawn")
@@ -159,8 +160,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .then(nameArg()
                                 // No backup-id suggestions: enumerating them is a backups-directory read, and
                                 // suggestion callbacks run on the tick thread and must stay off I/O.
-                                .then(Commands.argument("backup", StringArgumentType.word())
-                                        .executes(this::runRestore))))
+                                .then(Commands.argument("backup", Args.token()).executes(this::runRestore))))
                 .then(Commands.literal("restoreconfirm")
                         .requires(p(RESTORE))
                         .then(nameArg().executes(this::runRestoreConfirm)))
@@ -188,7 +188,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> nameArg() {
-        return Commands.argument("name", StringArgumentType.word())
+        return Commands.argument("name", Args.token())
                 .suggests(CommandSuggestions.fromStrings(() -> services.repository().all().stream()
                         .map(w -> w.name().value())
                         .toList()));
@@ -196,24 +196,24 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
 
     private RequiredArgumentBuilder<CommandSourceStack, String> folderArg() {
         services.refreshImportableFolders(); // fire-and-forget async rescan
-        return Commands.argument("folder", StringArgumentType.word())
+        return Commands.argument("folder", Args.token())
                 .suggests(CommandSuggestions.fromStrings(services::importableFolders));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> envArg() {
-        return Commands.argument("environment", StringArgumentType.word())
+        return Commands.argument("environment", Args.token())
                 .suggests(CommandSuggestions.fromStrings(() ->
                         Arrays.stream(WorldEnvironment.values()).map(Enum::name).toList()));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> typeArg() {
-        return Commands.argument("type", StringArgumentType.word())
+        return Commands.argument("type", Args.token())
                 .suggests(CommandSuggestions.fromStrings(() ->
                         Arrays.stream(WorldGenType.values()).map(Enum::name).toList()));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> generatorArg() {
-        return Commands.argument("generator", StringArgumentType.word())
+        return Commands.argument("generator", Args.token())
                 .suggests(
                         CommandSuggestions.fromStrings(() -> List.of(BuiltInGenerators.VOID, BuiltInGenerators.FLAT)));
     }

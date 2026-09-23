@@ -77,6 +77,9 @@ dependencies {
     // absent. So there is no compile dependency on :redis-adapter here. That would re-introduce the duplicate
     // BusTransport class the ServicesManager design exists to avoid.
 
+    // uxmLib command toolkit, for Args.token(): one argument read up to the next space, where Brigadier's word()
+    // refused a colon, a hash and every Turkish letter. uxmlib-common arrives with uxmlib-gui.
+    implementation(libs.uxmlib.command) { isTransitive = false }
     // uxmLib GUI toolkit (dogfood). Consumed from mavenLocal; pulls uxmlib-item + uxmlib-common
     // transitively. Configurate is loaded at runtime via Paper library loader.
     implementation(libs.uxmlib.gui) {

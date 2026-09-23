@@ -18,7 +18,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.BoolArgumentType;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
@@ -28,6 +27,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.EquipmentPayloads;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.packet.npc.NpcPose;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -88,7 +88,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> typeNode() {
         return Commands.literal("type")
                 .then(nameArgument()
-                        .then(Commands.argument("type", StringArgumentType.word())
+                        .then(Commands.argument("type", Args.token())
                                 .suggests(this::suggestEntityTypes)
                                 .executes(this::type)));
     }
@@ -138,9 +138,9 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
                 .then(nameArgument()
                         .then(Commands.literal("clear").executes(this::equipClear))
                         .then(Commands.literal("list").executes(this::equipList))
-                        .then(Commands.argument("slot", StringArgumentType.word())
+                        .then(Commands.argument("slot", Args.token())
                                 .suggests((ctx, builder) -> suggest(builder, SLOT_WORDS))
-                                .then(Commands.argument("material", StringArgumentType.word())
+                                .then(Commands.argument("material", Args.token())
                                         .suggests(this::suggestMaterials)
                                         .executes(this::equip))));
     }
@@ -177,7 +177,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
                         .then(Commands.argument("value", BoolArgumentType.bool())
                                 .suggests((ctx, builder) -> suggest(builder, BOOLEAN_WORDS))
                                 .executes(this::glow)
-                                .then(Commands.argument("color", StringArgumentType.word())
+                                .then(Commands.argument("color", Args.token())
                                         .suggests((ctx, builder) -> suggest(builder, COLOR_WORDS))
                                         .executes(this::glow))));
     }
@@ -197,7 +197,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> poseNode() {
         return Commands.literal("pose")
                 .then(nameArgument()
-                        .then(Commands.argument("pose", StringArgumentType.word())
+                        .then(Commands.argument("pose", Args.token())
                                 .suggests(this::suggestPoses)
                                 .executes(this::pose)));
     }

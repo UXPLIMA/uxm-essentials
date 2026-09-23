@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -27,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +50,7 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
         return Commands.literal("exchange")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::openGui)
-                .then(Commands.argument("amount", StringArgumentType.word())
+                .then(Commands.argument("amount", Args.token())
                         .executes(ctx ->
                                 usage(ctx, "exchange", "<amount> <from_currency> <to_currency>", "Exchange currency"))
                         .then(sourceArgument()
@@ -119,13 +119,11 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> sourceArgument() {
-        return Commands.argument("source", StringArgumentType.word())
-                .suggests(CommandSuggestions.fromStrings(this::currencyIds));
+        return Commands.argument("source", Args.token()).suggests(CommandSuggestions.fromStrings(this::currencyIds));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> targetArgument() {
-        return Commands.argument("target", StringArgumentType.word())
-                .suggests(CommandSuggestions.fromStrings(this::currencyIds));
+        return Commands.argument("target", Args.token()).suggests(CommandSuggestions.fromStrings(this::currencyIds));
     }
 
     private List<String> currencyIds() {

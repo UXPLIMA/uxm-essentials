@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTypeData;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -184,14 +185,14 @@ final class NpcDataCommands extends NpcCommandSupport {
         return Commands.literal("data")
                 .then(Commands.literal("set")
                         .then(nameArgument()
-                                .then(Commands.argument("key", StringArgumentType.word())
+                                .then(Commands.argument("key", Args.token())
                                         .suggests(this::suggestDataKeys)
                                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                                 .suggests(this::suggestDataValues)
                                                 .executes(this::dataSet)))))
                 .then(Commands.literal("clear")
                         .then(nameArgument()
-                                .then(Commands.argument("key", StringArgumentType.word())
+                                .then(Commands.argument("key", Args.token())
                                         .suggests(this::suggestDataKeys)
                                         .executes(this::dataClear))))
                 .then(Commands.literal("list").then(nameArgument().executes(this::dataList)));

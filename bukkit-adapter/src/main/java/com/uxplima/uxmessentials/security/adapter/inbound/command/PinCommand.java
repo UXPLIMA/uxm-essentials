@@ -11,7 +11,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.security.application.ChangePin;
@@ -30,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -86,18 +86,15 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.literal("set")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_USAGE))
-                        .then(Commands.argument("pin", StringArgumentType.word())
-                                .executes(this::set)))
+                        .then(Commands.argument("pin", Args.token()).executes(this::set)))
                 .then(Commands.literal("change")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_CHANGE_USAGE))
-                        .then(Commands.argument("old", StringArgumentType.word())
+                        .then(Commands.argument("old", Args.token())
                                 .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_CHANGE_USAGE))
-                                .then(Commands.argument("new", StringArgumentType.word())
-                                        .executes(this::change))))
+                                .then(Commands.argument("new", Args.token()).executes(this::change))))
                 .then(Commands.literal("remove")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_REMOVE_USAGE))
-                        .then(Commands.argument("pin", StringArgumentType.word())
-                                .executes(this::remove)))
+                        .then(Commands.argument("pin", Args.token()).executes(this::remove)))
                 .then(Commands.literal("lock").executes(this::lock))
                 .executes(this::status)
                 .build();

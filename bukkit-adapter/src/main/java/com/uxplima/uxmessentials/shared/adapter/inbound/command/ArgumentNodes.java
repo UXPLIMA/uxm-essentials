@@ -30,6 +30,7 @@ import com.mojang.brigadier.context.ParsedCommandNode;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec.ArgType;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -131,7 +132,7 @@ public final class ArgumentNodes {
                                 arg.min().orElse(-Double.MAX_VALUE), arg.max().orElse(Double.MAX_VALUE));
             case BOOL -> BoolArgumentType.bool();
             case ONLINE_PLAYER -> ArgumentTypes.player();
-            case STRING, PLAYER, MATERIAL, WORLD -> StringArgumentType.word();
+            case STRING, PLAYER, MATERIAL, WORLD -> Args.token();
         };
     }
 

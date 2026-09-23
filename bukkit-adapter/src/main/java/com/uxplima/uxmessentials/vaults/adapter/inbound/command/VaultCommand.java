@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -88,7 +89,7 @@ public final class VaultCommand implements CommandRegistration {
                 .then(Commands.literal("delete")
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> deleteOwn(ctx, ctx.getArgument("n", Integer.class))))
-                        .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("player", Args.token())
                                 .requires(src -> src.getSender().hasPermission(ADMIN_DELETE))
                                 .suggests(onlinePlayerSuggestions())
                                 .then(Commands.argument("idx", IntegerArgumentType.integer(1))
@@ -106,7 +107,7 @@ public final class VaultCommand implements CommandRegistration {
                         .requires(src -> src.getSender().hasPermission(ICON))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> iconHeld(ctx, ctx.getArgument("n", Integer.class)))
-                                .then(Commands.argument("material", StringArgumentType.word())
+                                .then(Commands.argument("material", Args.token())
                                         .executes(ctx -> iconNamed(
                                                 ctx,
                                                 ctx.getArgument("n", Integer.class),

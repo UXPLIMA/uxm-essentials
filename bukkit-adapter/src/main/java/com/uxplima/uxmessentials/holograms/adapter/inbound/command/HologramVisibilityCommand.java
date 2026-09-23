@@ -15,7 +15,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -88,7 +88,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
                 .then(nameArgument("name")
                         .then(choiceArgument("mode", MODES)
                                 .executes(this::visibility)
-                                .then(Commands.argument("permission", StringArgumentType.word())
+                                .then(Commands.argument("permission", Args.token())
                                         .executes(this::visibility))));
     }
 

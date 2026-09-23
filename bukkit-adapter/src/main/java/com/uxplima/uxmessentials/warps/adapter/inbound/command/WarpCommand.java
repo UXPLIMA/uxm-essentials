@@ -15,7 +15,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -90,15 +90,14 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                         .executes(this::runList))
                 .then(Commands.literal("create")
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .executes(this::runSet)
                                 .then(Commands.literal("at").then(explicitPositionArguments(this::runSetAt)))))
                 .then(explicitPositionNode("createat", SET_PERMISSION, this::runSetAt))
                 // Hidden alias of `create` so existing `/warp set <name>` muscle-memory and docs keep working.
                 .then(Commands.literal("set")
                         .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::runSet)))
+                        .then(Commands.argument("name", Args.token()).executes(this::runSet)))
                 .then(Commands.literal("del")
                         .requires(src -> src.getSender().hasPermission(DELETE_PERMISSION))
                         .then(warpNameArgument().executes(this::runDelete)))
@@ -113,36 +112,36 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .then(explicitPositionNode("moveat", MOVE_PERMISSION, this::runMoveAt))
                 .then(Commands.literal("lock")
                         .requires(src -> src.getSender().hasPermission(LOCK_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::toggleLock)))
                 .then(Commands.literal("password")
                         .requires(src -> src.getSender().hasPermission(PASSWORD_PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::setPasswordClear)
-                                .then(Commands.argument("password", StringArgumentType.word())
+                                .then(Commands.argument("password", Args.token())
                                         .executes(this::setPassword))))
                 .then(Commands.literal("rate")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .then(Commands.argument(
                                                 "rating",
                                                 com.mojang.brigadier.arguments.DoubleArgumentType.doubleArg(1.0, 5.0))
                                         .executes(this::rateWarp))))
                 .then(Commands.literal("rating")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::getWarpRating)))
                 .then(Commands.literal("editor")
                         .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
                         .executes(this::openWarpManager)
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::openWarpEditor)))
                 .then(warpNameArgument()
                         .executes(this::run)
-                        .then(Commands.argument("arg", StringArgumentType.word())
+                        .then(Commands.argument("arg", Args.token())
                                 .suggests(CommandSuggestions.onlinePlayers())
                                 .executes(this::runWithArg)))
                 .build();
@@ -388,12 +387,12 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
             String literal, String permission, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(permission))
-                .then(Commands.argument("name", StringArgumentType.word()).then(explicitPositionArguments(action)));
+                .then(Commands.argument("name", Args.token()).then(explicitPositionArguments(action)));
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> explicitPositionArguments(
             Command<CommandSourceStack> action) {
-        return Commands.argument("world", StringArgumentType.word())
+        return Commands.argument("world", Args.token())
                 .suggests(CommandSuggestions.loadedWorlds())
                 .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())

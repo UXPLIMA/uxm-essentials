@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -58,7 +59,7 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> leaderboardNode() {
         return Commands.literal("leaderboard")
                 .then(nameArgument("name")
-                        .then(Commands.argument("provider", StringArgumentType.word())
+                        .then(Commands.argument("provider", Args.token())
                                 .executes(ctx -> leaderboard(ctx, DEFAULT_LEADERBOARD_LIMIT))
                                 .then(Commands.argument(
                                                 "limit",
@@ -80,8 +81,7 @@ final class HologramConvenienceCommand extends HologramCommandSupport {
         // The source completes against the existing names; the destination is a brand-new name, so it does not.
         return Commands.literal("copy")
                 .then(nameArgument("name")
-                        .then(Commands.argument("dest", StringArgumentType.word())
-                                .executes(this::copy)));
+                        .then(Commands.argument("dest", Args.token()).executes(this::copy)));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> nearbyNode() {

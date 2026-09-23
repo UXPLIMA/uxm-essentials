@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -18,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -47,7 +47,7 @@ public final class PayCommand extends EconomyCommandSupport implements CommandRe
                 .executes(ctx -> usage(ctx, "pay", "<player> <amount> [currency]", "Pay money to a player"))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> usage(ctx, "pay", "<player> <amount> [currency]", "Pay money to a player"))
-                        .then(Commands.argument("amount", StringArgumentType.word())
+                        .then(Commands.argument("amount", Args.token())
                                 .executes(this::run)
                                 .then(currencyArgument().executes(this::run))))
                 .build();

@@ -10,7 +10,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -88,8 +88,7 @@ abstract class WarpCommandSupport {
      * permission-filtered set {@code /warps} renders, so a player never sees a warp they cannot teleport to.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> warpNameArgument() {
-        return Commands.argument("name", StringArgumentType.word())
-                .suggests(CommandSuggestions.forPlayer(this::usableWarpNames));
+        return Commands.argument("name", Args.token()).suggests(CommandSuggestions.forPlayer(this::usableWarpNames));
     }
 
     final List<String> usableWarpNames(PlayerRef viewer) {

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,7 +65,7 @@ public final class PermissionsSubcommand {
                 .requires(source -> source.getSender().hasPermission(PERMISSION))
                 .executes(this::runAreas)
                 .then(Commands.literal("export").executes(this::runExport))
-                .then(Commands.argument("area", StringArgumentType.word())
+                .then(Commands.argument("area", Args.token())
                         .suggests((ctx, builder) -> {
                             PermissionCatalog.areas().forEach(builder::suggest);
                             return builder.buildFuture();

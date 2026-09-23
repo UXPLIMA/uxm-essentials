@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -57,39 +58,37 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                 .then(Commands.literal("deposit")
                         .requires(src -> src.getSender().hasPermission(DEPOSIT))
                         .executes(ctx -> usage(ctx, "bank deposit", "<bank_id> <amount>", "Deposit into bank"))
-                        .then(Commands.argument("bank_id", StringArgumentType.word())
+                        .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
                                 .executes(ctx -> usage(ctx, "bank deposit", "<bank_id> <amount>", "Deposit into bank"))
-                                .then(Commands.argument("amount", StringArgumentType.word())
-                                        .executes(this::runDeposit))))
+                                .then(Commands.argument("amount", Args.token()).executes(this::runDeposit))))
                 .then(Commands.literal("withdraw")
                         .requires(src -> src.getSender().hasPermission(WITHDRAW))
                         .executes(ctx -> usage(ctx, "bank withdraw", "<bank_id> <amount>", "Withdraw from bank"))
-                        .then(Commands.argument("bank_id", StringArgumentType.word())
+                        .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
                                 .executes(
                                         ctx -> usage(ctx, "bank withdraw", "<bank_id> <amount>", "Withdraw from bank"))
-                                .then(Commands.argument("amount", StringArgumentType.word())
-                                        .executes(this::runWithdraw))))
+                                .then(Commands.argument("amount", Args.token()).executes(this::runWithdraw))))
                 .then(Commands.literal("addmember")
                         .requires(src -> src.getSender().hasPermission(MEMBERS))
                         .executes(ctx -> usage(ctx, "bank addmember", "<bank_id> <player>", "Add member to bank"))
-                        .then(Commands.argument("bank_id", StringArgumentType.word())
+                        .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
                                 .executes(
                                         ctx -> usage(ctx, "bank addmember", "<bank_id> <player>", "Add member to bank"))
-                                .then(Commands.argument("player", StringArgumentType.word())
+                                .then(Commands.argument("player", Args.token())
                                         .suggests(CommandSuggestions.onlinePlayers())
                                         .executes(this::runAddMember))))
                 .then(Commands.literal("removemember")
                         .requires(src -> src.getSender().hasPermission(MEMBERS))
                         .executes(
                                 ctx -> usage(ctx, "bank removemember", "<bank_id> <player>", "Remove member from bank"))
-                        .then(Commands.argument("bank_id", StringArgumentType.word())
+                        .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
                                 .executes(ctx -> usage(
                                         ctx, "bank removemember", "<bank_id> <player>", "Remove member from bank"))
-                                .then(Commands.argument("player", StringArgumentType.word())
+                                .then(Commands.argument("player", Args.token())
                                         .suggests(CommandSuggestions.onlinePlayers())
                                         .executes(this::runRemoveMember))))
                 .build();

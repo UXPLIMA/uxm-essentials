@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.skin.application.SkinMessageKey;
 import com.uxplima.uxmessentials.skin.application.UpdateSkin;
 import com.uxplima.uxmessentials.skin.domain.SkinModel;
 import com.uxplima.uxmessentials.skin.domain.SkinSource;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -123,12 +124,12 @@ public final class SkinCommand implements CommandRegistration {
                                         .executes(ctx -> byName(ctx, StringArgumentType.getString(ctx, "player"))))))
                 .then(Commands.literal("url")
                         .requires(src -> src.getSender().hasPermission(URL))
-                        .then(Commands.argument("link", StringArgumentType.string())
+                        .then(Commands.argument("link", Args.token())
                                 .executes(ctx -> fromUpload(ctx, true, false))
                                 .then(Commands.literal(SLIM).executes(ctx -> fromUpload(ctx, true, true)))))
                 .then(Commands.literal("file")
                         .requires(src -> src.getSender().hasPermission(FILE))
-                        .then(Commands.argument("file", StringArgumentType.word())
+                        .then(Commands.argument("file", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(skinFiles))
                                 .executes(ctx -> fromUpload(ctx, false, false))
                                 .then(Commands.literal(SLIM).executes(ctx -> fromUpload(ctx, false, true)))))
@@ -163,7 +164,7 @@ public final class SkinCommand implements CommandRegistration {
      * account nobody on this server is logged in as.
      */
     private static RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
-        return Commands.argument("name", StringArgumentType.word()).suggests(CommandSuggestions.onlinePlayers());
+        return Commands.argument("name", Args.token()).suggests(CommandSuggestions.onlinePlayers());
     }
 
     @Override

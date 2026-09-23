@@ -14,7 +14,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
@@ -32,6 +31,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -108,8 +108,7 @@ abstract class EconomyCommandSupport {
      * at execution, so an unknown id remains an error rather than a silent default.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> currencyArgument() {
-        return Commands.argument("currency", StringArgumentType.word())
-                .suggests(CommandSuggestions.fromStrings(this::currencyIds));
+        return Commands.argument("currency", Args.token()).suggests(CommandSuggestions.fromStrings(this::currencyIds));
     }
 
     private List<String> currencyIds() {
@@ -126,7 +125,7 @@ abstract class EconomyCommandSupport {
      * keeps working.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> itemArgument() {
-        return Commands.argument("item", StringArgumentType.word())
+        return Commands.argument("item", Args.token())
                 .suggests(CommandSuggestions.fromStrings(EconomyCommandSupport::itemMaterialNames));
     }
 

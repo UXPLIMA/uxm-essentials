@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 
 /**
  * The operator surface over the loaded definitions: what is loaded, what one definition says, re-reading the folder
@@ -93,7 +94,7 @@ public final class CustomCommandCommand implements CommandRegistration {
                         .then(idArgument().executes(this::reloadOne)))
                 .then(Commands.literal("test").then(idArgument().executes(this::test)))
                 .then(Commands.literal("create")
-                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::create)))
+                        .then(Commands.argument("id", Args.token()).executes(this::create)))
                 .then(Commands.literal("delete")
                         .then(idArgument()
                                 .executes(this::deleteAsk)
@@ -117,7 +118,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> idArgument() {
-        return Commands.argument("id", StringArgumentType.word())
+        return Commands.argument("id", Args.token())
                 .suggests(
                         CommandSuggestions.fromStrings(() -> loaded().catalog().ids()));
     }

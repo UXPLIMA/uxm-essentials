@@ -44,6 +44,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
@@ -185,7 +186,7 @@ public final class MenuCommand implements CommandRegistration {
 
     /** The {@code <name>} argument, completed from the currently registered menu names. */
     private RequiredArgumentBuilder<CommandSourceStack, String> nameArgument() {
-        return Commands.argument("name", StringArgumentType.word()).suggests(nameSuggestions());
+        return Commands.argument("name", Args.token()).suggests(nameSuggestions());
     }
 
     /**
@@ -194,7 +195,7 @@ public final class MenuCommand implements CommandRegistration {
      * it can sit on the same {@code /menu} node without colliding with the open branch's {@code <name>}.
      */
     private RequiredArgumentBuilder<CommandSourceStack, String> menuArgument() {
-        return Commands.argument("menu", StringArgumentType.word()).suggests(nameSuggestions());
+        return Commands.argument("menu", Args.token()).suggests(nameSuggestions());
     }
 
     private SuggestionProvider<CommandSourceStack> nameSuggestions() {

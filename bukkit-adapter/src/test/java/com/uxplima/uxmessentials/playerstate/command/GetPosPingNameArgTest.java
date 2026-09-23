@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.playerstate.command;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 
+import io.papermc.paper.command.brigadier.argument.CustomArgumentType;
+
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.ArgumentCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
@@ -48,7 +50,8 @@ import org.mockbukkit.mockbukkit.MockBukkit;
  * The single-target read verbs {@code /getpos} and {@code /ping} take a plain online-player name, never a Paper
  * entity selector, so they no longer surface {@code @a}/{@code @p}/{@code @s} in tab-completion (showing one
  * player's position or ping is a single-target read where fanning out is nonsensical). Asserting the {@code player}
- * argument is a Brigadier {@link StringArgumentType} word, not a selector argument, proves the conversion held.
+ * argument is one token the client is told is a {@link StringArgumentType} word, not a selector argument, proves the
+ * conversion held.
  */
 class GetPosPingNameArgTest {
 
@@ -79,7 +82,14 @@ class GetPosPingNameArgTest {
 
     private static void assertPlayerArgIsWord(com.mojang.brigadier.tree.CommandNode<?> playerArg) {
         assertThat(playerArg).isInstanceOf(ArgumentCommandNode.class);
-        assertThat(((ArgumentCommandNode<?, ?>) playerArg).getType()).isInstanceOf(StringArgumentType.class);
+        assertThat(((ArgumentCommandNode<?, ?>) playerArg).getType())
+                .isInstanceOfSatisfying(
+                        CustomArgumentType.class,
+                        token -> assertThat(token.getNativeType())
+                                .isInstanceOfSatisfying(
+                                        StringArgumentType.class,
+                                        word -> assertThat(word.getType())
+                                                .isEqualTo(StringArgumentType.StringType.SINGLE_WORD)));
     }
 
     private PlayerStateServices services() {

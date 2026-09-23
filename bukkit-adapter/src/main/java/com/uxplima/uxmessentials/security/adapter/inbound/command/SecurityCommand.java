@@ -13,7 +13,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.security.adapter.VerificationController;
@@ -35,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -109,7 +109,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_RESET_USAGE))
                         .then(CommandSuggestions.playerArgument("player")
                                 .executes(ctx -> reset(ctx, FactorScope.ALL))
-                                .then(Commands.argument("factor", StringArgumentType.word())
+                                .then(Commands.argument("factor", Args.token())
                                         .suggests(CommandSuggestions.fromStrings(() -> SCOPES))
                                         .executes(this::resetScoped))))
                 .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_USAGE))

@@ -20,7 +20,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.kits.adapter.KitServices;
@@ -35,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -107,8 +107,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
                 .then(Commands.literal("create")
                         .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit create", "<name>", "Create a kit from inventory"))
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .executes(this::create)))
+                        .then(Commands.argument("name", Args.token()).executes(this::create)))
                 .then(Commands.literal("del")
                         .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit del", "<name>", "Delete a kit"))

@@ -8,7 +8,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
@@ -18,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -47,7 +47,7 @@ public final class LockdownCommand extends ModerationCommandSupport implements C
         return Commands.literal("lockdown")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
-                .then(Commands.argument(STATE_ARG, StringArgumentType.word())
+                .then(Commands.argument(STATE_ARG, Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> List.of(ON, OFF)))
                         .executes(ctx -> run(ctx, Optional.of(ctx.getArgument(STATE_ARG, String.class)))))
                 .build();

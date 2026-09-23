@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,7 +45,7 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setjail")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", Args.token())
                         .executes(this::run)
                         .then(Commands.literal("at").then(positionArguments())))
                 .build();
@@ -66,7 +67,7 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> positionArguments() {
-        return Commands.argument("world", StringArgumentType.word())
+        return Commands.argument("world", Args.token())
                 .suggests(CommandSuggestions.loadedWorlds())
                 .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())

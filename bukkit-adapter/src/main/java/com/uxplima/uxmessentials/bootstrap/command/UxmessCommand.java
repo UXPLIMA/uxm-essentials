@@ -15,7 +15,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -35,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.reload.ReloadReport;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadStatus;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -200,7 +200,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         return Commands.literal("reload")
                 .requires(src -> src.getSender().hasPermission(PERMISSION_RELOAD))
                 .executes(this::runReloadAll)
-                .then(Commands.argument("module", StringArgumentType.word())
+                .then(Commands.argument("module", Args.token())
                         .suggests((context, builder) -> {
                             String remaining = builder.getRemainingLowerCase();
                             registry.all().stream()

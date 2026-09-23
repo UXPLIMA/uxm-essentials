@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -59,7 +60,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
                 choiceValueNode("billboard", BILLBOARDS, this::billboard),
                 valueNode("background", StringArgumentType.greedyString(), this::background),
                 valueNode("glow", StringArgumentType.greedyString(), this::glow),
-                valueNode("opacity", StringArgumentType.word(), this::opacity),
+                valueNode("opacity", Args.token(), this::opacity),
                 valueNode("shadow", BoolArgumentType.bool(), this::shadow),
                 brightnessNode(),
                 scaleNode(),

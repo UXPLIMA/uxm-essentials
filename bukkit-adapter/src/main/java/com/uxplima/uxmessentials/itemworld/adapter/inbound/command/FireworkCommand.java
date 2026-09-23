@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -50,7 +51,7 @@ public final class FireworkCommand extends ItemworldCommandSupport implements Co
                 .then(Commands.literal("power")
                         .then(Commands.argument("power", IntegerArgumentType.integer(0, 4))
                                 .executes(ctx -> power(ctx, IntegerArgumentType.getInteger(ctx, "power")))))
-                .then(Commands.argument("color", StringArgumentType.word())
+                .then(Commands.argument("color", Args.token())
                         .executes(ctx -> color(ctx, StringArgumentType.getString(ctx, "color"))))
                 .build();
     }

@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -284,16 +285,16 @@ public final class HologramCommand extends HologramCommandSupport implements Com
                 .then(nameArgument("name")
                         .executes(ctx ->
                                 usage(ctx, "hologram moveto", "<name> <x> <y> <z>", "Move hologram to coordinates"))
-                        .then(Commands.argument("x", StringArgumentType.word())
+                        .then(Commands.argument("x", Args.token())
                                 .executes(ctx -> usage(
                                         ctx, "hologram moveto", "<name> <x> <y> <z>", "Move hologram to coordinates"))
-                                .then(Commands.argument("y", StringArgumentType.word())
+                                .then(Commands.argument("y", Args.token())
                                         .executes(ctx -> usage(
                                                 ctx,
                                                 "hologram moveto",
                                                 "<name> <x> <y> <z>",
                                                 "Move hologram to coordinates"))
-                                        .then(Commands.argument("z", StringArgumentType.word())
+                                        .then(Commands.argument("z", Args.token())
                                                 .executes(this::moveTo)))));
     }
 
@@ -364,7 +365,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         } else {
             z.executes(action);
         }
-        return Commands.argument("world", StringArgumentType.word())
+        return Commands.argument("world", Args.token())
                 .suggests(com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.loadedWorlds())
                 .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())

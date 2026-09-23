@@ -144,7 +144,17 @@ class PlaytimeCommandPathTest {
         assertThat(playerArg.getName()).isEqualTo("player");
         assertThat(playerArg).isInstanceOf(com.mojang.brigadier.tree.ArgumentCommandNode.class);
         var argNode = (com.mojang.brigadier.tree.ArgumentCommandNode<?, ?>) playerArg;
-        assertThat(argNode.getType()).isInstanceOf(com.mojang.brigadier.arguments.StringArgumentType.class);
+        // One token, which the client is told is a word: the name is read up to the next space, a selector never.
+        assertThat(argNode.getType())
+                .isInstanceOfSatisfying(
+                        io.papermc.paper.command.brigadier.argument.CustomArgumentType.class,
+                        token -> assertThat(token.getNativeType())
+                                .isInstanceOfSatisfying(
+                                        com.mojang.brigadier.arguments.StringArgumentType.class,
+                                        word -> assertThat(word.getType())
+                                                .isEqualTo(
+                                                        com.mojang.brigadier.arguments.StringArgumentType.StringType
+                                                                .SINGLE_WORD)));
     }
 
     @Test

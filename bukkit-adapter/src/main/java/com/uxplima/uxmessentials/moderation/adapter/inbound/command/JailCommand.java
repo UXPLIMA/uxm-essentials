@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -60,16 +61,16 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.literal("del")
                         .requires(src -> src.getSender().hasPermission(PERMISSION))
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(
                                         () -> services.listJails().suggestionNames()))
                                 .executes(this::runDelete)))
                 .then(CommandSuggestions.playerArgument("player")
-                        .then(Commands.argument("jail", StringArgumentType.word())
+                        .then(Commands.argument("jail", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(
                                         () -> services.listJails().suggestionNames()))
                                 .executes(ctx -> run(ctx, "", Optional.empty()))
-                                .then(Commands.argument("duration", StringArgumentType.word())
+                                .then(Commands.argument("duration", Args.token())
                                         .executes(ctx ->
                                                 run(ctx, ctx.getArgument("duration", String.class), Optional.empty()))
                                         .then(Commands.argument("reason", StringArgumentType.greedyString())

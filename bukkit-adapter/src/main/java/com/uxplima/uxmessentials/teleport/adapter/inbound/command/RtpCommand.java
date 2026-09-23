@@ -13,7 +13,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.Suggestions;
 import com.mojang.brigadier.suggestion.SuggestionsBuilder;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -75,10 +75,10 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
                         .executes(this::openGui))
                 .then(Commands.literal("biome")
                         .requires(src -> src.getSender().hasPermission(BIOME_PERMISSION))
-                        .then(Commands.argument("biome", StringArgumentType.word())
+                        .then(Commands.argument("biome", Args.token())
                                 .suggests(this::suggestBiomes)
                                 .executes(this::runBiome)))
-                .then(Commands.argument("target", StringArgumentType.word())
+                .then(Commands.argument("target", Args.token())
                         .suggests(this::suggestTargets)
                         .executes(this::runTarget))
                 .build();

@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -126,14 +127,12 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                         .then(nameArgument()
                                 .executes(this::create)
                                 .then(Commands.literal("at").then(createAtArguments()))
-                                .then(Commands.argument("type", StringArgumentType.word())
-                                        .executes(this::createTyped))),
+                                .then(Commands.argument("type", Args.token()).executes(this::createTyped))),
                 createAtNode(),
                 name("delete", this::delete),
                 Commands.literal("list")
                         .executes(this::list)
-                        .then(Commands.argument("type", StringArgumentType.word())
-                                .executes(this::listFiltered)),
+                        .then(Commands.argument("type", Args.token()).executes(this::listFiltered)),
                 Commands.literal("help").executes(this::help),
                 Commands.literal("nearby")
                         .executes(ctx -> nearby(ctx, NearbyNpcs.DEFAULT_RADIUS))
@@ -338,14 +337,14 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             z.then(Commands.argument("yaw", DoubleArgumentType.doubleArg())
                     .then(Commands.argument("pitch", DoubleArgumentType.doubleArg())
                             .executes(ctx -> createAt(ctx, floatArg(ctx, "yaw"), floatArg(ctx, "pitch"), null))
-                            .then(Commands.argument("type", StringArgumentType.word())
+                            .then(Commands.argument("type", Args.token())
                                     .executes(ctx -> createAt(
                                             ctx,
                                             floatArg(ctx, "yaw"),
                                             floatArg(ctx, "pitch"),
                                             ctx.getArgument("type", String.class))))));
         }
-        return Commands.argument("world", StringArgumentType.word())
+        return Commands.argument("world", Args.token())
                 .suggests(com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions.loadedWorlds())
                 .then(Commands.argument("x", DoubleArgumentType.doubleArg())
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())

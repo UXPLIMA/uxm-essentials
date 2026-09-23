@@ -13,7 +13,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -27,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -125,8 +125,7 @@ abstract class KitCommandSupport {
      * permission/consumed filter {@code /kit list} renders, so a player never sees a kit they cannot take.
      */
     final RequiredArgumentBuilder<CommandSourceStack, String> kitNameArgument(String argName) {
-        return Commands.argument(argName, StringArgumentType.word())
-                .suggests(CommandSuggestions.forPlayer(this::claimableKitIds));
+        return Commands.argument(argName, Args.token()).suggests(CommandSuggestions.forPlayer(this::claimableKitIds));
     }
 
     private List<String> claimableKitIds(PlayerRef viewer) {

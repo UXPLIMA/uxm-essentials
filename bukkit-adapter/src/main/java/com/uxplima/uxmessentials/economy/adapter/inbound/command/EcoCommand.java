@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -78,7 +78,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(Commands.literal("restore")
                         .requires(src -> src.getSender().hasPermission(BASE + ".restore"))
                         .then(CommandSuggestions.playerArgument("player")
-                                .then(Commands.argument("date", StringArgumentType.word())
+                                .then(Commands.argument("date", Args.token())
                                         .suggests((ctx, builder) -> {
                                             for (String date :
                                                     services.backupManager().getBackupDates()) {
@@ -127,7 +127,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx ->
                                 usage(ctx, "eco " + literal, "<player> <amount> [currency]", "Economy " + literal))
-                        .then(Commands.argument("amount", StringArgumentType.word())
+                        .then(Commands.argument("amount", Args.token())
                                 .executes(ctx -> runTarget(ctx, literal))
                                 .then(currencyArgument().executes(ctx -> runTarget(ctx, literal)))));
     }
@@ -143,7 +143,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String node) {
         return Commands.literal(literal)
                 .requires(src -> src.getSender().hasPermission(BASE + "." + node))
-                .then(Commands.argument("amount", StringArgumentType.word())
+                .then(Commands.argument("amount", Args.token())
                         .executes(ctx -> runBulk(ctx, literal))
                         .then(currencyArgument().executes(ctx -> runBulk(ctx, literal))));
     }
@@ -163,8 +163,8 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return Commands.literal("give-random")
                 .requires(src -> src.getSender().hasPermission(BASE + ".give"))
                 .then(CommandSuggestions.playerArgument("player")
-                        .then(Commands.argument("min", StringArgumentType.word())
-                                .then(Commands.argument("max", StringArgumentType.word())
+                        .then(Commands.argument("min", Args.token())
+                                .then(Commands.argument("max", Args.token())
                                         .executes(this::runGiveRandomRange)
                                         .then(currencyArgument().executes(this::runGiveRandomRange)))));
     }
@@ -187,7 +187,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .requires(src -> src.getSender().hasPermission(BASE + ".note"))
                 .then(Commands.literal("give")
                         .then(CommandSuggestions.playerArgument("player")
-                                .then(Commands.argument("amount", StringArgumentType.word())
+                                .then(Commands.argument("amount", Args.token())
                                         .executes(this::runNoteGive)
                                         .then(currencyArgument().executes(this::runNoteGive)))));
     }

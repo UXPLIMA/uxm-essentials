@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -59,10 +60,10 @@ public final class NickCommand extends PresenceCommandSupport implements Command
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(Commands.literal(CLEAR).executes(this::runClear))
                 .then(Commands.literal(OFF).executes(this::runClear))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", Args.token())
                         .suggests(nameSuggestions())
                         .executes(this::runSelf)
-                        .then(Commands.argument("value", StringArgumentType.word())
+                        .then(Commands.argument("value", Args.token())
                                 .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
                                 .executes(this::runOther)))
                 .build();

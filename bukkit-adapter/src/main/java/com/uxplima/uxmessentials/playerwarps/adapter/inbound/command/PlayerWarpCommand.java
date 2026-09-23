@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -110,8 +111,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                 .then(verb("move", MOVE_PERMISSION).then(nameArg().executes(this::runMove)))
                 .then(verb("rename", RENAME_PERMISSION)
                         .then(nameArg()
-                                .then(Commands.argument("newName", StringArgumentType.word())
-                                        .executes(this::runRename))))
+                                .then(Commands.argument("newName", Args.token()).executes(this::runRename))))
                 .then(textVerb("displayname", DISPLAYNAME_PERMISSION, "text", this::runDisplayName))
                 .then(textVerb("description", DESCRIPTION_PERMISSION, "text", this::runDescription))
                 .then(textVerb("icon", ICON_PERMISSION, "icon", this::runIcon))
@@ -451,7 +451,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                 .then(nameArg()
                         .then(CommandSuggestions.playerArgument("player")
                                 .executes(this::runBan)
-                                .then(Commands.argument("duration", StringArgumentType.word())
+                                .then(Commands.argument("duration", Args.token())
                                         .executes(this::runBan)
                                         .then(Commands.argument("reason", StringArgumentType.greedyString())
                                                 .executes(this::runBan)))));
@@ -734,7 +734,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
                 .then(nameArg()
                         .then(Commands.argument("amount", DoubleArgumentType.doubleArg(0.0))
                                 .executes(ctx -> runPrice(ctx, Optional.empty()))
-                                .then(Commands.argument("currency", StringArgumentType.word())
+                                .then(Commands.argument("currency", Args.token())
                                         .executes(ctx -> runPrice(
                                                 ctx, Optional.of(ctx.getArgument("currency", String.class)))))));
     }

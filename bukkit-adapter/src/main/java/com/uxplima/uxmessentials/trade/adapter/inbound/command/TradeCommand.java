@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -85,7 +86,7 @@ public final class TradeCommand implements CommandRegistration {
                 .executes(this::usage)
                 .then(resolutionNode("accept", this::accept))
                 .then(resolutionNode("deny", this::deny))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(Commands.argument("player", Args.token())
                         .suggests(CommandSuggestions.onlinePlayers())
                         .executes(this::runSend))
                 .build();
@@ -100,7 +101,7 @@ public final class TradeCommand implements CommandRegistration {
             String literal, BiConsumer<Player, @Nullable String> handler) {
         return Commands.literal(literal)
                 .executes(ctx -> runResolution(ctx, handler, null))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(Commands.argument("player", Args.token())
                         .suggests(this::suggestPendingRequesters)
                         .executes(ctx -> runResolution(ctx, handler, StringArgumentType.getString(ctx, "player"))));
     }

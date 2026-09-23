@@ -14,7 +14,6 @@ import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSele
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
@@ -30,6 +29,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -98,7 +98,7 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
                     .then(Commands.argument("y", DoubleArgumentType.doubleArg())
                             .then(Commands.argument("z", DoubleArgumentType.doubleArg())
                                     .executes(ctx -> runPosition(ctx, null))
-                                    .then(Commands.argument("world", StringArgumentType.word())
+                                    .then(Commands.argument("world", Args.token())
                                             .executes(ctx ->
                                                     runPosition(ctx, ctx.getArgument("world", String.class)))))));
         }

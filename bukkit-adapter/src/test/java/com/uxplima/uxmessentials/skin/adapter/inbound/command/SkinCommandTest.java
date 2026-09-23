@@ -119,6 +119,16 @@ class SkinCommandTest {
         assertThat(view.dressed).isEmpty();
     }
 
+    /** The link as the config file documents it, unquoted. Read as a quoted string, it stopped at the colon. */
+    @Test
+    void anUnquotedLinkIsReadWhole() {
+        PlayerMock player = allowed("Wearer");
+
+        execute(player, "skin url https://i.imgur.com/a.png slim");
+
+        assertThat(uploads.models).containsExactly(SkinModel.SLIM);
+    }
+
     @Test
     void theSlimWordCutsAnUploadedImageForTheThreePixelArm() {
         PlayerMock player = allowed("Wearer");

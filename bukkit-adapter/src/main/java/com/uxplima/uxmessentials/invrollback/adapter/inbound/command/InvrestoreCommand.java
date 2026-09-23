@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -109,7 +110,7 @@ public final class InvrestoreCommand implements CommandRegistration {
                         .executes(
                                 ctx -> usage(ctx, "invrestore tp", "<player> <index>", "Teleport to snapshot location"))
                         .then(indexed("invrestore tp", "Teleport to snapshot location", this::teleportSnapshot)))
-                .then(Commands.argument("player", StringArgumentType.word())
+                .then(Commands.argument("player", Args.token())
                         .requires(src -> src.getSender().hasPermission(RESTORE_PERMISSION))
                         .suggests(CommandSuggestions.onlinePlayers())
                         .executes(this::open))
@@ -119,7 +120,7 @@ public final class InvrestoreCommand implements CommandRegistration {
     /** The shared {@code <player> <index>} argument tail every subcommand appends to its literal. */
     private RequiredArgumentBuilder<CommandSourceStack, String> indexed(
             String command, String desc, Command<CommandSourceStack> action) {
-        return Commands.argument("player", StringArgumentType.word())
+        return Commands.argument("player", Args.token())
                 .suggests(CommandSuggestions.onlinePlayers())
                 .executes(ctx -> usage(ctx, command, "<player> <index>", desc))
                 .then(Commands.argument("index", IntegerArgumentType.integer(1)).executes(action));

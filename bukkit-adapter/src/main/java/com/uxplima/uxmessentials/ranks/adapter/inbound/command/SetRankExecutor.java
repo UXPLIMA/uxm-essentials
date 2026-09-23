@@ -14,7 +14,6 @@ import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
 import io.papermc.paper.command.brigadier.argument.resolvers.selector.PlayerSelectorArgumentResolver;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
@@ -29,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +56,7 @@ final class SetRankExecutor {
     ArgumentBuilder<CommandSourceStack, ?> arguments() {
         return Commands.argument("player", ArgumentTypes.player())
                 .suggests(CommandSuggestions.singlePlayerTarget())
-                .then(Commands.argument("rank", StringArgumentType.word())
+                .then(Commands.argument("rank", Args.token())
                         .suggests(CommandSuggestions.fromStrings(this::rankIds))
                         .executes(this::run));
     }

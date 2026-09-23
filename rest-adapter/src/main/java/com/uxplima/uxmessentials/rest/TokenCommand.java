@@ -62,14 +62,14 @@ public final class TokenCommand {
                 .requires(source -> source.getSender().hasPermission(PERMISSION))
                 .then(Commands.literal("token")
                         .then(Commands.literal("create")
-                                .then(Commands.argument("label", StringArgumentType.word())
+                                .then(Commands.argument("label", LabelArgument.INSTANCE)
                                         .executes(ctx -> create(ctx, Scopes.READ + "," + Scopes.EVENTS))
                                         .then(Commands.argument("scopes", StringArgumentType.greedyString())
                                                 .executes(ctx ->
                                                         create(ctx, StringArgumentType.getString(ctx, "scopes"))))))
                         .then(Commands.literal("list").executes(this::list))
                         .then(Commands.literal("revoke")
-                                .then(Commands.argument("label", StringArgumentType.word())
+                                .then(Commands.argument("label", LabelArgument.INSTANCE)
                                         .executes(this::revoke))))
                 .then(Commands.literal("status").executes(this::status))
                 .build();

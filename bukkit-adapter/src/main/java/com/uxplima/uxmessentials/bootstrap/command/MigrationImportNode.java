@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
@@ -21,6 +20,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -69,7 +69,7 @@ public final class MigrationImportNode {
     }
 
     private com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> sourceArgument() {
-        return Commands.argument("source", StringArgumentType.word())
+        return Commands.argument("source", Args.token())
                 .suggests(sourceSuggestions())
                 .executes(ctx -> dispatch(ctx, ImportMode.LIVE))
                 .then(Commands.literal("dry-run").executes(ctx -> dispatch(ctx, ImportMode.DRY_RUN)))

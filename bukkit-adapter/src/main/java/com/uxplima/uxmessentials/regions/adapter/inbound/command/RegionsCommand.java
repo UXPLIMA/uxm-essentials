@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -116,33 +117,33 @@ public final class RegionsCommand implements CommandRegistration {
                         .executes(ctx -> markCorner(ctx, RegionSelection.Corner.SECOND)))
                 .then(Commands.literal("create")
                         .requires(p(CREATE_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::create)))
+                        .then(Commands.argument("id", Args.token()).executes(this::create)))
                 .then(Commands.literal("createat")
                         .requires(p(CREATE_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word()).then(createAtArguments())))
+                        .then(Commands.argument("id", Args.token()).then(createAtArguments())))
                 .then(Commands.literal("flags")
                         .requires(p(FLAGS_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::openFlags)))
+                        .then(Commands.argument("id", Args.token()).executes(this::openFlags)))
                 .then(Commands.literal("members")
                         .requires(p(MEMBERS_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::openMembers)))
+                        .then(Commands.argument("id", Args.token()).executes(this::openMembers)))
                 .then(Commands.literal("addmember")
                         .requires(p(MEMBERS_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", Args.token())
+                                .then(Commands.argument("player", Args.token())
                                         .executes(ctx -> add(ctx, RegionMemberChange.Role.MEMBER))
                                         .then(worldArgument()
                                                 .executes(ctx -> add(ctx, RegionMemberChange.Role.MEMBER))))))
                 .then(Commands.literal("addowner")
                         .requires(p(MEMBERS_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word())
-                                .then(Commands.argument("player", StringArgumentType.word())
+                        .then(Commands.argument("id", Args.token())
+                                .then(Commands.argument("player", Args.token())
                                         .executes(ctx -> add(ctx, RegionMemberChange.Role.OWNER))
                                         .then(worldArgument()
                                                 .executes(ctx -> add(ctx, RegionMemberChange.Role.OWNER))))))
                 .then(Commands.literal("priority")
                         .requires(p(ADMIN_PERMISSION))
-                        .then(Commands.argument("id", StringArgumentType.word())
+                        .then(Commands.argument("id", Args.token())
                                 .then(Commands.argument("value", IntegerArgumentType.integer())
                                         .executes(this::setPriority)
                                         .then(worldArgument().executes(this::setPriority)))))
@@ -455,7 +456,7 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private com.mojang.brigadier.builder.RequiredArgumentBuilder<CommandSourceStack, String> worldArgument() {
-        return Commands.argument("world", StringArgumentType.word()).suggests(CommandSuggestions.loadedWorlds());
+        return Commands.argument("world", Args.token()).suggests(CommandSuggestions.loadedWorlds());
     }
 
     /** Explicit world wins; otherwise a live player's current world supplies the context. */

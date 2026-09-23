@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -61,7 +62,7 @@ public final class GlowCommand extends PlayerstateCommandSupport implements Comm
         return Commands.literal("glow")
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .executes(this::toggle)
-                .then(Commands.argument("color", StringArgumentType.word())
+                .then(Commands.argument("color", Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> COLOUR_IDS))
                         .executes(this::colour)
                         .then(PlayerTargets.players("player").executes(this::colour)))

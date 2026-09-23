@@ -13,7 +13,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -28,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -195,8 +195,7 @@ abstract class PlayerWarpCommandSupport {
 
     /** A {@code name} argument completing (cheaply, no I/O) against the sender's own cached warp names. */
     final RequiredArgumentBuilder<CommandSourceStack, String> nameArg() {
-        return Commands.argument("name", StringArgumentType.word())
-                .suggests(CommandSuggestions.forPlayer(services::ownWarpNames));
+        return Commands.argument("name", Args.token()).suggests(CommandSuggestions.forPlayer(services::ownWarpNames));
     }
 
     /** A resolved command target: the live sender, its ref, and the parsed warp name. */

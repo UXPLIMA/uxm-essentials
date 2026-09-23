@@ -6,7 +6,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -17,6 +16,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -40,9 +40,8 @@ public final class SetSpawnCommand extends TeleportCommandSupport implements Com
                 .executes(this::runDefault)
                 .then(Commands.literal("location").then(positionArguments(this::runDefaultAt)))
                 .then(Commands.literal("named")
-                        .then(Commands.argument("name", StringArgumentType.word())
-                                .then(positionArguments(this::runNamedAt))))
-                .then(Commands.argument("name", StringArgumentType.word()).executes(this::runNamed))
+                        .then(Commands.argument("name", Args.token()).then(positionArguments(this::runNamedAt))))
+                .then(Commands.argument("name", Args.token()).executes(this::runNamed))
                 .build();
     }
 

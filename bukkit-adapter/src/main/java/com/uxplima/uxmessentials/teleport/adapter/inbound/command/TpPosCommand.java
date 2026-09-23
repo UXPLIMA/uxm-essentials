@@ -10,7 +10,6 @@ import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.DoubleArgumentType;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -23,6 +22,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -47,7 +47,7 @@ public final class TpPosCommand extends TeleportCommandSupport implements Comman
                         .then(Commands.argument("y", DoubleArgumentType.doubleArg())
                                 .then(Commands.argument("z", DoubleArgumentType.doubleArg())
                                         .executes(ctx -> run(ctx, null))
-                                        .then(Commands.argument("world", StringArgumentType.word())
+                                        .then(Commands.argument("world", Args.token())
                                                 .executes(ctx -> run(ctx, ctx.getArgument("world", String.class)))))))
                 .build();
     }

@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -93,9 +94,9 @@ final class NpcActionCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> actionAddNode() {
         return Commands.literal("add")
                 .then(nameArgument()
-                        .then(Commands.argument("trigger", StringArgumentType.word())
+                        .then(Commands.argument("trigger", Args.token())
                                 .suggests(this::suggestTriggers)
-                                .then(Commands.argument("type", StringArgumentType.word())
+                                .then(Commands.argument("type", Args.token())
                                         .suggests(this::suggestTypes)
                                         .then(Commands.argument("value", StringArgumentType.greedyString())
                                                 .executes(this::actionAdd)))));
@@ -107,9 +108,9 @@ final class NpcActionCommands extends NpcCommandSupport {
         return Commands.literal(literal)
                 .then(nameArgument()
                         .then(Commands.argument("index", IntegerArgumentType.integer(1))
-                                .then(Commands.argument("trigger", StringArgumentType.word())
+                                .then(Commands.argument("trigger", Args.token())
                                         .suggests(this::suggestTriggers)
-                                        .then(Commands.argument("type", StringArgumentType.word())
+                                        .then(Commands.argument("type", Args.token())
                                                 .suggests(this::suggestTypes)
                                                 .then(Commands.argument("value", StringArgumentType.greedyString())
                                                         .executes(exec))))));

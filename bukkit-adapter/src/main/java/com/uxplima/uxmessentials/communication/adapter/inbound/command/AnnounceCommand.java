@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationSettings;
@@ -28,6 +27,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -122,7 +122,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
                         .executes(this::list))
                 .then(Commands.literal("preview")
                         .requires(src -> src.getSender().hasPermission(PREVIEW))
-                        .then(Commands.argument("id", StringArgumentType.word()).executes(this::preview)))
+                        .then(Commands.argument("id", Args.token()).executes(this::preview)))
                 .then(Commands.literal("toggle")
                         .requires(src -> src.getSender().hasPermission(TOGGLE))
                         .executes(this::toggle))

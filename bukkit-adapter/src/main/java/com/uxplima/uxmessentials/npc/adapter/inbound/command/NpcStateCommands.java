@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -117,7 +118,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> cooldownNode() {
         return Commands.literal("cooldown")
                 .then(nameArgument()
-                        .then(Commands.argument("duration", StringArgumentType.word())
+                        .then(Commands.argument("duration", Args.token())
                                 .suggests((ctx, builder) ->
                                         suggest(builder, List.of(DEFAULT_KEYWORD, "0", "500ms", "30s", "5min")))
                                 .executes(this::cooldown)));
@@ -138,7 +139,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> distanceNode(String literal, SetNpcRange.Kind kind) {
         return Commands.literal(literal)
                 .then(nameArgument()
-                        .then(Commands.argument("blocks", StringArgumentType.word())
+                        .then(Commands.argument("blocks", Args.token())
                                 .suggests((ctx, builder) -> suggest(
                                         builder,
                                         List.of(
@@ -182,7 +183,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     private LiteralArgumentBuilder<CommandSourceStack> stateNode() {
         return Commands.literal("state")
                 .then(nameArgument()
-                        .then(Commands.argument("state", StringArgumentType.word())
+                        .then(Commands.argument("state", Args.token())
                                 .suggests((ctx, builder) -> suggest(builder, STATE_WORDS))
                                 .then(Commands.argument("value", BoolArgumentType.bool())
                                         .suggests((ctx, builder) -> suggest(builder, BOOLEAN_WORDS))

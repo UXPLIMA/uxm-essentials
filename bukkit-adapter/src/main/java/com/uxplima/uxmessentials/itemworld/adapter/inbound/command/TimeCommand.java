@@ -11,7 +11,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
@@ -20,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -52,9 +52,9 @@ public final class TimeCommand extends ItemworldCommandSupport implements Comman
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .then(Commands.argument("mode", StringArgumentType.word())
+                .then(Commands.argument("mode", Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> MODES))
-                        .then(Commands.argument("value", StringArgumentType.word())
+                        .then(Commands.argument("value", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(() -> VALUES))
                                 .executes(this::run)))
                 .build();

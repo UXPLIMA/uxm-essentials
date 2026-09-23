@@ -10,6 +10,7 @@ import java.util.Optional;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.argument.ArgumentTypes;
+import io.papermc.paper.command.brigadier.argument.CustomArgumentType;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
@@ -222,7 +223,14 @@ class MenuArgumentCommandTest {
                 new MenuOpenCommand(menus, "say", spec, messages).build().getChild("message");
         ArgumentType<?> type = ((ArgumentCommandNode<?, ?>) node).getType();
 
-        assertThat(((StringArgumentType) type).getType()).isEqualTo(StringArgumentType.StringType.SINGLE_WORD);
+        assertThat(type)
+                .isInstanceOfSatisfying(
+                        CustomArgumentType.class,
+                        token -> assertThat(token.getNativeType())
+                                .isInstanceOfSatisfying(
+                                        StringArgumentType.class,
+                                        word -> assertThat(word.getType())
+                                                .isEqualTo(StringArgumentType.StringType.SINGLE_WORD)));
     }
 
     private MenuOpenCommand sayCommand(boolean greedy) {

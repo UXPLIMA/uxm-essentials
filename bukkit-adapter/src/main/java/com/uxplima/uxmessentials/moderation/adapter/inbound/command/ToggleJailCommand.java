@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -40,7 +41,7 @@ public final class ToggleJailCommand extends ModerationCommandSupport implements
                 .requires(src -> src.getSender().hasPermission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> run(ctx, "", Optional.empty()))
-                        .then(Commands.argument("jail", StringArgumentType.word())
+                        .then(Commands.argument("jail", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(
                                         () -> services.listJails().suggestionNames()))
                                 .executes(ctx -> run(ctx, ctx.getArgument("jail", String.class), Optional.empty()))

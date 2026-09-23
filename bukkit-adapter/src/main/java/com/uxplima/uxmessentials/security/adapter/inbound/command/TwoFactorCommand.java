@@ -12,7 +12,6 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
-import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.security.application.BeginTotpEnrollment;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Args;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -89,12 +89,10 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
                 .then(Commands.literal("setup").executes(this::setup))
                 .then(Commands.literal("confirm")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_2FA_CONFIRM_USAGE))
-                        .then(Commands.argument("code", StringArgumentType.word())
-                                .executes(this::confirmCode)))
+                        .then(Commands.argument("code", Args.token()).executes(this::confirmCode)))
                 .then(Commands.literal("disable")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_2FA_DISABLE_USAGE))
-                        .then(Commands.argument("code", StringArgumentType.word())
-                                .executes(this::disableFactor)))
+                        .then(Commands.argument("code", Args.token()).executes(this::disableFactor)))
                 .executes(this::status)
                 .build();
     }
