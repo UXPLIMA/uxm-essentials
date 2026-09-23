@@ -110,7 +110,16 @@ public final class ItemActions {
             log.warn("event=menu_item_skipped action=take-item reason=unknown_material value={}", arg.material());
             return;
         }
-        ctx.player().getInventory().removeItem(new ItemStack(material, arg.amount()));
+        Map<Integer, ItemStack> missing = ctx.player().getInventory().removeItem(new ItemStack(material, arg.amount()));
+        if (!missing.isEmpty()) {
+            // removeItem takes plain stacks only and answers with what it could not find. A take-item that fell
+            // short is said, so an operator who put it in front of a reward can see the reward was not paid for.
+            log.warn(
+                    "event=menu_item_short action=take-item material={} wanted={} missing={}",
+                    material,
+                    arg.amount(),
+                    missing.values().stream().mapToInt(ItemStack::getAmount).sum());
+        }
     }
 
     /**

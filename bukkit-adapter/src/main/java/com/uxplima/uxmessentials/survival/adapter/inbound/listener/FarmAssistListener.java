@@ -84,10 +84,8 @@ public final class FarmAssistListener implements Listener {
     /** Remove one {@code seed} from the player's inventory, returning whether one was present and spent. */
     private static boolean consumeSeed(Player player, Material seed) {
         PlayerInventory inventory = player.getInventory();
-        if (!inventory.contains(seed)) {
-            return false;
-        }
-        inventory.removeItem(new ItemStack(seed, 1));
-        return true;
+        // What removeItem answers is what it could not find: a renamed seed passes contains(seed) and is not
+        // taken, so the crop was replanted for nothing. A seed counts as spent only when it is gone.
+        return inventory.removeItem(new ItemStack(seed, 1)).isEmpty();
     }
 }

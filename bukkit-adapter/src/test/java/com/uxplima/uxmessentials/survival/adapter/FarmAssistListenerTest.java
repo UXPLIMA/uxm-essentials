@@ -74,6 +74,25 @@ class FarmAssistListenerTest {
         assertThat(crop.getType()).isEqualTo(Material.AIR);
     }
 
+    /**
+     * A renamed carrot passed {@code contains(CARROT)} and a plain {@code removeItem} could not take it, so the crop
+     * regrew for nothing and the carrot stayed.
+     */
+    @Test
+    void aRenamedSeedIsNotSpentSoTheCropIsNotReplantedForFree() {
+        Block crop = matureCarrotsAt(0, 64, 0);
+        ItemStack renamed = new ItemStack(Material.CARROT, 3);
+        org.bukkit.inventory.meta.ItemMeta meta = renamed.getItemMeta();
+        meta.displayName(net.kyori.adventure.text.Component.text("Golden"));
+        renamed.setItemMeta(meta);
+        player.getInventory().addItem(renamed);
+
+        listener.onHarvest(rightClick(crop));
+
+        assertThat(crop.getType()).isEqualTo(Material.AIR);
+        assertThat(seedCount()).isEqualTo(3);
+    }
+
     private Block matureCarrotsAt(int x, int y, int z) {
         Block crop = world.getBlockAt(x, y, z);
         crop.setType(Material.CARROTS);
