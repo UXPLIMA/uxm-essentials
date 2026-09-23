@@ -4,6 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
@@ -31,33 +32,51 @@ final class BrigadierUsage {
     /** The usage suffix for {@code root}'s children, joined the way smart-usage joins them. */
     static String of(LiteralCommandNode<CommandSourceStack> root) {
         Objects.requireNonNull(root, "root");
-        return joinChildren(root, false);
+        return joinChildren(root, false, child -> true);
+    }
+
+    /**
+     * The same, for one sender: a branch whose requirement this sender fails is left out.
+     *
+     * <p>Worked out once with no sender, a usage line listed every branch to everybody, and a player with no admin
+     * node read {@code reload}, {@code dump} and {@code editor} under {@code /menu}, each one refused the moment
+     * they typed it. At the moment a usage line is sent there is a sender, so it is asked.
+     */
+    static String of(CommandNode<CommandSourceStack> root, CommandSourceStack sender) {
+        Objects.requireNonNull(root, "root");
+        Objects.requireNonNull(sender, "sender");
+        return joinChildren(root, false, child -> child.canUse(sender));
     }
 
     /** Render every usable child of {@code node} and join the single- or multi-branch shape. */
-    private static String joinChildren(CommandNode<CommandSourceStack> node, boolean parentExecutable) {
-        List<CommandNode<CommandSourceStack>> children = List.copyOf(node.getChildren());
+    private static String joinChildren(
+            CommandNode<CommandSourceStack> node,
+            boolean parentExecutable,
+            Predicate<CommandNode<CommandSourceStack>> usable) {
+        List<CommandNode<CommandSourceStack>> children =
+                node.getChildren().stream().filter(usable).toList();
         if (children.isEmpty()) {
             return "";
         }
         if (children.size() == 1) {
-            return smartUsage(children.get(0), parentExecutable);
+            return smartUsage(children.get(0), parentExecutable, usable);
         }
         Set<String> rendered = new LinkedHashSet<>();
         for (CommandNode<CommandSourceStack> child : children) {
-            rendered.add(smartUsage(child, false));
+            rendered.add(smartUsage(child, false, usable));
         }
         return bracketAlternatives(rendered, parentExecutable);
     }
 
     /** One node's usage text plus its own (optionally bracketed) sub-tree, mirroring smart-usage. */
-    private static String smartUsage(CommandNode<CommandSourceStack> node, boolean optional) {
+    private static String smartUsage(
+            CommandNode<CommandSourceStack> node, boolean optional, Predicate<CommandNode<CommandSourceStack>> usable) {
         String self = optional ? "[" + node.getUsageText() + "]" : node.getUsageText();
         if (node.getChildren().isEmpty()) {
             return self;
         }
         boolean executable = node.getCommand() != null;
-        String deeper = joinChildren(node, executable);
+        String deeper = joinChildren(node, executable, usable);
         return deeper.isEmpty() ? self : self + SPACE + deeper;
     }
 

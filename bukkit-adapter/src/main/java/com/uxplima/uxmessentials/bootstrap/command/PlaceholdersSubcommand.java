@@ -19,6 +19,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -124,6 +125,6 @@ public final class PlaceholdersSubcommand {
 
     /** A key and its description are data, not markup: neither may be read as MiniMessage. */
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text);
+        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
     }
 }

@@ -19,6 +19,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthReport;
 import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
@@ -593,7 +594,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text);
+        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
     }
 
     private @Nullable FeatureModule resolve(String requested) {

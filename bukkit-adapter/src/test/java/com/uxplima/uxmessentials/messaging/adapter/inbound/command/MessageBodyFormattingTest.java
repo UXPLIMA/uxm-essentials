@@ -77,6 +77,24 @@ class MessageBodyFormattingTest {
         assertThat(body.value()).doesNotContain("\u00A7");
     }
 
+    /**
+     * The body is parsed with the theme's tags as well as MiniMessage's, and the escape only knew MiniMessage's. A
+     * player without the node could write {@code <tag:'STAFF'>} and the receiver read a staff badge, or
+     * {@code <etag:'ERROR'>} and read a server error, in a message the player typed.
+     */
+    @Test
+    void aThemeTagArrivesAsTextWhenTheSenderMayNotColourThem() {
+        MessageBody body = requireBody(MessagingCommandSupport.body(alice, "<tag:'STAFF'> <value>trust me"));
+
+        String read = PlainTextComponentSerializer.plainText()
+                .serialize(MiniMessage.miniMessage()
+                        .deserialize(
+                                body.value(),
+                                com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags.resolver()));
+
+        assertThat(read).isEqualTo("<tag:'STAFF'> <value>trust me");
+    }
+
     /** What the receiver actually reads once the body has been through MiniMessage. */
     private static String rendered(MessageBody body) {
         return PlainTextComponentSerializer.plainText()

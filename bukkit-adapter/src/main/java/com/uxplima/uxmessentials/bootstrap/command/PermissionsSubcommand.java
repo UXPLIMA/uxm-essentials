@@ -20,6 +20,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -126,7 +127,7 @@ public final class PermissionsSubcommand {
 
     /** Node text is data, not markup: a description must never be read as MiniMessage. */
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text);
+        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
     }
 
     /** The lines the areas screen prints, exposed so a test can assert the listing without a live server. */

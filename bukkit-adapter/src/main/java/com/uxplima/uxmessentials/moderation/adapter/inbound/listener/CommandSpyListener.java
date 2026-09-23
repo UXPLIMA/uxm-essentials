@@ -14,6 +14,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.CommandSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,8 +58,8 @@ public final class CommandSpyListener implements Listener {
         Player runner = event.getPlayer();
         PlayerRef runnerRef = BukkitRefs.toRef(runner);
         Map<String, String> placeholders = Map.of(
-                "player", MINI_MESSAGE.escapeTags(runner.getName()),
-                "command", MINI_MESSAGE.escapeTags(event.getMessage()));
+                "player", MINI_MESSAGE.escapeTags(runner.getName(), StyleTags.resolver()),
+                "command", MINI_MESSAGE.escapeTags(event.getMessage(), StyleTags.resolver()));
         for (PlayerRef spy : spies) {
             if (!spy.uuid().equals(runnerRef.uuid())) {
                 sink.deliver(spy, messages.resolve(spy, ModerationMessageKey.COMMANDSPY_OBSERVED, placeholders));

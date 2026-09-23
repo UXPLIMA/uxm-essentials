@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -131,6 +132,6 @@ public final class MigrationImportNode {
     }
 
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text);
+        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
     }
 }

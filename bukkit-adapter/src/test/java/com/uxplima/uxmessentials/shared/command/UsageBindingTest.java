@@ -149,6 +149,77 @@ class UsageBindingTest {
         assertThat(wrapped.description()).isEqualTo("Set game mode.");
     }
 
+    /**
+     * The usage line is syntax, and it reaches the player through a MiniMessage template. An argument named after
+     * a colour role of the theme was read as that colour and vanished: a live player typing {@code /nick} read
+     * {@code (clear|off|<name> [])}, because the second argument is called {@code value}.
+     */
+    @Test
+    void anArgumentNamedLikeAColourStaysInTheUsage() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.nick", true);
+        CommandRegistration wrapped = binding.wrap(new NickStub());
+
+        dispatch(wrapped, "nick", CommandSourceStackMock.from(player));
+
+        assertThat(nextPlainMessage(player)).contains("<name> [<value>]");
+    }
+
+    /**
+     * A usage line lists what this sender can run. It was worked out once, with no sender, so a player without a
+     * single admin node read {@code /menu (open ...|reload ...|dump ...|editor|...)} and every branch Brigadier
+     * then refused them.
+     */
+    @Test
+    void aBranchTheSenderCannotUseIsNotShown() {
+        PlayerMock player = server.addPlayer("Alice");
+        player.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.menu", true);
+        CommandRegistration wrapped = binding.wrap(new MenuStub());
+
+        dispatch(wrapped, "menu", CommandSourceStackMock.from(player));
+
+        assertThat(nextPlainMessage(player)).contains("open").doesNotContain("reload");
+    }
+
+    private record NickStub() implements CommandRegistration {
+        @Override
+        public LiteralCommandNode<CommandSourceStack> build() {
+            return Commands.literal("nick")
+                    .requires(src -> src.getSender().hasPermission("uxmessentials.nick"))
+                    .then(Commands.literal("clear").executes(c -> 1))
+                    .then(Commands.argument("name", StringArgumentType.word())
+                            .executes(c -> 1)
+                            .then(Commands.argument("value", StringArgumentType.word())
+                                    .executes(c -> 1)))
+                    .build();
+        }
+
+        @Override
+        public String description() {
+            return "Set a display name.";
+        }
+    }
+
+    private record MenuStub() implements CommandRegistration {
+        @Override
+        public LiteralCommandNode<CommandSourceStack> build() {
+            return Commands.literal("menu")
+                    .requires(src -> src.getSender().hasPermission("uxmessentials.menu"))
+                    .then(Commands.literal("open")
+                            .then(Commands.argument("name", StringArgumentType.word())
+                                    .executes(c -> 1)))
+                    .then(Commands.literal("reload")
+                            .requires(src -> src.getSender().hasPermission("uxmessentials.menu.admin"))
+                            .executes(c -> 1))
+                    .build();
+        }
+
+        @Override
+        public String description() {
+            return "Open a menu.";
+        }
+    }
+
     private static void dispatch(CommandRegistration reg, String input, CommandSourceStack source) {
         CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
         dispatcher.getRoot().addChild(reg.build());

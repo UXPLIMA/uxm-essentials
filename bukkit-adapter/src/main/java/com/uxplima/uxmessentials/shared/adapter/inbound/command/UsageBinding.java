@@ -79,7 +79,7 @@ public final class UsageBinding {
         if (executor != null) {
             builder.executes(executor);
         } else if (!node.getChildren().isEmpty()) {
-            builder.executes(usageExecutor(path, BrigadierUsage.of(node), description));
+            builder.executes(usageExecutor(path, node, description));
         }
         for (CommandNode<CommandSourceStack> child : node.getChildren()) {
             builder.then(rebindChild(child, path, description));
@@ -96,15 +96,27 @@ public final class UsageBinding {
         return BrigadierNodes.rebindChild(child);
     }
 
-    private Command<CommandSourceStack> usageExecutor(String command, String usage, String description) {
+    /** A usage line for whoever typed the bare command, listing what they can run. */
+    private Command<CommandSourceStack> usageExecutor(
+            String command, CommandNode<CommandSourceStack> node, String description) {
         return ctx -> {
-            reply(ctx.getSource().getSender(), command, usage, description);
+            reply(ctx.getSource().getSender(), command, BrigadierUsage.of(node, ctx.getSource()), description);
             return Command.SINGLE_SUCCESS;
         };
     }
 
+    /**
+     * Send the usage line. The three values are text and never markup: the usage is syntax, and an argument
+     * named after a colour role, {@code <value>}, was read as that colour and vanished from the line.
+     */
     private void reply(CommandSender sender, String command, String usage, String description) {
-        Map<String, String> placeholders = Map.of("command", command, "usage", usage, "description", description);
+        // Escaped against the tags the line is parsed with, the theme's roles included: escaping against
+        // MiniMessage's own tags alone leaves <value> standing, because MiniMessage has never heard of it.
+        MiniMessage words = MiniMessage.miniMessage();
+        Map<String, String> placeholders = Map.of(
+                "command", words.escapeTags(command, StyleTags.resolver()),
+                "usage", words.escapeTags(usage, StyleTags.resolver()),
+                "description", words.escapeTags(description, StyleTags.resolver()));
         String rendered = messages.resolve(refOf(sender), SharedMessageKey.COMMAND_USAGE, placeholders);
         sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered, StyleTags.resolver()));
     }

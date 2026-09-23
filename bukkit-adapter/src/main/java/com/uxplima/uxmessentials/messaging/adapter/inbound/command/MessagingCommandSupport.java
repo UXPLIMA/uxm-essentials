@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -86,7 +87,9 @@ abstract class MessagingCommandSupport {
     static @Nullable MessageBody body(Player sender, String raw) {
         String text = raw.replace('§', ' ');
         if (!sender.hasPermission(COLOUR)) {
-            text = MiniMessage.miniMessage().escapeTags(text);
+            // Against the theme's tags too, because the body is parsed with them: escaping MiniMessage's own
+            // alone let a player write <tag:'STAFF'> and hand the receiver a staff badge.
+            text = MiniMessage.miniMessage().escapeTags(text, StyleTags.resolver());
         }
         try {
             return MessageBody.of(text);

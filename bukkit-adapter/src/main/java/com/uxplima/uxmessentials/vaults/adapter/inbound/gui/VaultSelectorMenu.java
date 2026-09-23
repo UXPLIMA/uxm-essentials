@@ -15,6 +15,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -224,7 +225,7 @@ public final class VaultSelectorMenu {
     /** Clamp the stored name to a sane menu width and escape MiniMessage tags so it cannot inject markup. */
     private String displaySafe(String name) {
         String clamped = name.length() > MAX_DISPLAY_NAME ? name.substring(0, MAX_DISPLAY_NAME) : name;
-        return miniMessage.escapeTags(clamped);
+        return miniMessage.escapeTags(clamped, StyleTags.resolver());
     }
 
     private String resolve(PlayerRef viewer, MessageKey key, String token, String value) {
