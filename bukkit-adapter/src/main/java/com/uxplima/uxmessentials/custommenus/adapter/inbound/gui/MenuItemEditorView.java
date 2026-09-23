@@ -103,6 +103,9 @@ public final class MenuItemEditorView {
 
     private static final long MAX_MODEL_DATA = 9_999_999L;
 
+    /** The furthest page a jump set in the editor can name; a file may name any page. */
+    private static final long MAX_JUMP_PAGE = 999L;
+
     /** The stand-in an editor reads when its item vanished mid-edit (a stale click after a clear); setters no-op then. */
     private static final MenuItemSpec MISSING = new MenuItemSpec(
             new SlotSet(List.of(0)),
@@ -224,6 +227,9 @@ public final class MenuItemEditorView {
         props.add(vanillaTooltipProperty(target));
         props.add(loreModeProperty(target));
         props.add(typeProperty(target));
+        if (current(target).type() == ItemType.JUMP) {
+            props.add(toPageProperty(target));
+        }
         props.add(clickActions.row(target.session(), target.itemId()));
         props.add(requirements.row(target.session(), target.itemId()));
         for (String token : FLAG_TOKENS) {
@@ -374,6 +380,20 @@ public final class MenuItemEditorView {
                 -64,
                 64,
                 value -> target.session().setPriority(target.itemId(), (int) (long) value),
+                scheduler);
+    }
+
+    /** The page a jump goes to, counted from one; offered only on a jump, the one item that reads it. */
+    private EditableProperty toPageProperty(ItemTarget target) {
+        return new NumberProperty(
+                CustomMenusMessageKey.MENU_ITEM_EDITOR_TO_PAGE.key(),
+                Material.MAP,
+                () -> current(target).toPage(),
+                1,
+                5,
+                1,
+                MAX_JUMP_PAGE,
+                value -> target.session().setToPage(target.itemId(), (int) (long) value),
                 scheduler);
     }
 

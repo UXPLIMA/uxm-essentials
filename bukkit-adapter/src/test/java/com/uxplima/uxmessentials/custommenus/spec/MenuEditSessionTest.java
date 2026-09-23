@@ -307,4 +307,48 @@ class MenuEditSessionTest {
             throw new IllegalStateException("the written menu file is not one HOCON document", failure);
         }
     }
+
+    /**
+     * A jump chosen in the editor goes to page one until a page is set, so the file it writes loads again. uxmLib
+     * 0.120.0 refuses a jump that names no page, and the editor offered the type with nowhere to set one.
+     */
+    @Test
+    void aJumpChosenInTheEditorGoesToPageOneAndLoadsAgain() {
+        MenuEditSession session =
+                MenuEditSession.from(loader.parse("rows = 1\nitems { a { slot = 0, material = MAP } }"));
+
+        session.setType("a", ItemType.JUMP);
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+
+        assertThat(reloaded.items().get("a").type()).isEqualTo(ItemType.JUMP);
+        assertThat(reloaded.items().get("a").toPage()).isEqualTo(1);
+    }
+
+    /** The page a jump goes to is set in the editor and comes back from the file. */
+    @Test
+    void aJumpsPageRoundTripsThroughTheWriter() {
+        MenuEditSession session =
+                MenuEditSession.from(loader.parse("rows = 1\nitems { a { slot = 0, material = MAP } }"));
+
+        session.setType("a", ItemType.JUMP);
+        session.setToPage("a", 4);
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+
+        assertThat(reloaded.items().get("a").toPage()).isEqualTo(4);
+    }
+
+    /** An item that stops being a jump drops its page, which the loader would refuse on anything else. */
+    @Test
+    void anItemThatStopsBeingAJumpDropsItsPage() {
+        MenuEditSession session =
+                MenuEditSession.from(loader.parse("rows = 1\nitems { a { slot = 0, material = MAP } }"));
+
+        session.setType("a", ItemType.JUMP);
+        session.setToPage("a", 4);
+        session.setType("a", ItemType.NEXT);
+        MenuSpec reloaded = loader.parse(writer.write(session.toSpec()));
+
+        assertThat(reloaded.items().get("a").type()).isEqualTo(ItemType.NEXT);
+        assertThat(reloaded.items().get("a").toPage()).isZero();
+    }
 }

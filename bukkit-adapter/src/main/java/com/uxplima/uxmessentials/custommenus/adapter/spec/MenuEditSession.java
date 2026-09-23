@@ -169,10 +169,19 @@ public final class MenuEditSession {
         return updateItem(id, item -> item.withPriority(priority));
     }
 
-    /** Set the pagination role of the item under {@code id}. */
+    /**
+     * Set the pagination role of the item under {@code id}. A jump goes to page one until a page is set, and any
+     * other role drops the page, because the engine refuses a jump with no page and a page on anything else.
+     */
     public MenuEditSession setType(String id, ItemType type) {
         Objects.requireNonNull(type, "type");
-        return updateItem(id, item -> item.withType(type));
+        return updateItem(
+                id, item -> item.withType(type).withToPage(type == ItemType.JUMP ? Math.max(1, item.toPage()) : 0));
+    }
+
+    /** Set the page, counted from one, that the jump under {@code id} goes to. Anything but a jump keeps no page. */
+    public MenuEditSession setToPage(String id, int page) {
+        return updateItem(id, item -> item.type() == ItemType.JUMP ? item.withToPage(Math.max(1, page)) : item);
     }
 
     /** Set how the item under {@code id} combines its spec lore with the base icon's lore. */

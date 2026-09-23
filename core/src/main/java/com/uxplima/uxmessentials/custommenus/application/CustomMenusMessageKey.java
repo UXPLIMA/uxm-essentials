@@ -241,6 +241,7 @@ public enum CustomMenusMessageKey implements MessageKey {
 
     /** Label of the item editor's pagination-type selector. */
     MENU_ITEM_EDITOR_TYPE("menu.item-editor.type"),
+    MENU_ITEM_EDITOR_TO_PAGE("menu.item-editor.to-page"),
 
     /** Title of the pagination-type selector sub-menu. */
     MENU_ITEM_EDITOR_SELECT_TYPE("menu.item-editor.select-type"),
