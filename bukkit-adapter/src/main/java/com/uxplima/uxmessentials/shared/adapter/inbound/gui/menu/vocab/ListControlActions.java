@@ -69,7 +69,7 @@ public final class ListControlActions {
     private static void search(MenuActionContext ctx, Logger log) {
         ListControlSyntax.parseSearch(ctx.arg())
                 .ifPresentOrElse(
-                        ref -> ctx.control().searchList(ref.listId(), ref.key()),
+                        ref -> ctx.control().searchList(ref.listId(), ref.key(), ref.prompt()),
                         () -> warnUnparseable(ListControlSyntax.SEARCH_ACTION, ctx, log));
     }
 

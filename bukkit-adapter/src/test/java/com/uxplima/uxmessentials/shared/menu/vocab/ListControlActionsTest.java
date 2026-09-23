@@ -86,7 +86,7 @@ class ListControlActionsTest {
               sortReset   { slot = 48, material = RED_DYE,    name = "s", click { left = ["list-sort:pw:browse:reset"] } }
               filterSet   { slot = 49, material = HOPPER,     name = "f", click { left = ["list-filter:pw:browse:category=%argument_cat%"] } }
               filterClear { slot = 50, material = BUCKET,     name = "f", click { left = ["list-filter:pw:browse:category="] } }
-              search      { slot = 51, material = COMPASS,    name = "q", click { left = ["list-search:pw:browse:category"] } }
+              search      { slot = 51, material = COMPASS,    name = "q", click { left = ["list-search:pw:browse:category:@pwarp.gui.browse.search-prompt"] } }
               unknown     { slot = 52, material = BARRIER,    name = "u", click { left = ["list-filter:missing:category=x"] } }
               warps {
                 slots = ["0-44"]
@@ -241,6 +241,10 @@ class ListControlActionsTest {
 
         clickSlot(SEARCH_SLOT);
         assertThat(prompt.prompts).as("the click opened the text prompt").isEqualTo(1);
+        assertThat(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(prompt.shown))
+                .as("the prompt shows the words the window names, not an empty line and an untitled anvil")
+                .isEqualTo("pwarp.gui.browse.search-prompt");
         assertThat(scheduler.pendingAsync())
                 .as("nothing is queried until the line is submitted")
                 .isZero();
@@ -403,6 +407,8 @@ class ListControlActionsTest {
     private static final class RecordingPrompt implements MenuTextPrompt {
         int prompts;
 
+        Component shown = Component.empty();
+
         @Nullable Consumer<String> onSubmit;
 
         @Nullable Runnable onCancel;
@@ -416,6 +422,7 @@ class ListControlActionsTest {
                 Consumer<String> onSubmit,
                 Runnable onCancel) {
             this.prompts++;
+            this.shown = promptLabel;
             this.onSubmit = onSubmit;
             this.onCancel = onCancel;
         }
