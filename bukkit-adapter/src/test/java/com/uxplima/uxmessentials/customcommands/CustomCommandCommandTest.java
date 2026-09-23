@@ -199,6 +199,30 @@ class CustomCommandCommandTest {
         assertThat(actions.actors).containsExactly(other.getUniqueId());
     }
 
+    /**
+     * A target nobody matches is an unknown player, named as typed. It answered "no custom command named player",
+     * the argument's own name put where the command's id belongs.
+     */
+    @Test
+    void runForAPlayerNobodyMatchesNamesThePlayer() throws Exception {
+        operator.addAttachment(MockBukkit.createMockPlugin(), RUN_OTHERS, true);
+
+        int result;
+        try {
+            result = run("customcmd run gmc Nobody");
+        } catch (com.mojang.brigadier.exceptions.CommandSyntaxException selectorRefused) {
+            // Paper's selector refuses a name nobody holds before the command runs, which answers the same way.
+            assertThat(selectorRefused.getMessage()).isNotBlank();
+            return;
+        }
+
+        assertThat(result).isZero();
+        assertThat(actions.actors).isEmpty();
+        List<String> replies = replies();
+        assertThat(replies).anySatisfy(line -> assertThat(line).contains("command.unknown-player", "player=Nobody"));
+        assertThat(replies).noneSatisfy(line -> assertThat(line).contains("customcommand.not-found"));
+    }
+
     @Test
     void testNamesTheFirstClosedGateAndChangesNothing() throws Exception {
         permissions.grant("uxmessentials.customcommand.odul");

@@ -259,7 +259,7 @@ public final class CustomCommandCommand implements CommandRegistration {
         PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());
         if (resolved.isEmpty()) {
-            feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_NOT_FOUND, Map.of("id", "player"));
+            feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", typedTarget(ctx)));
             return 0;
         }
         Player target = resolved.get(0);
@@ -326,5 +326,14 @@ public final class CustomCommandCommand implements CommandRegistration {
     private int notFound(CommandSender sender, String id) {
         feedback.send(sender, CustomCommandsMessageKey.CUSTOMCOMMAND_NOT_FOUND, Map.of("id", id));
         return 0;
+    }
+
+    /** The target exactly as the sender typed it, for the line that says nobody matched it. */
+    private static String typedTarget(CommandContext<CommandSourceStack> ctx) {
+        return ctx.getNodes().stream()
+                .filter(node -> "player".equals(node.getNode().getName()))
+                .findFirst()
+                .map(node -> node.getRange().get(ctx.getInput()))
+                .orElse("");
     }
 }
