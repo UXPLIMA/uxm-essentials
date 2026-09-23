@@ -184,6 +184,21 @@ public final class LocaleBinding {
         }
 
         @Override
+        public String commandId() {
+            return delegate.commandId();
+        }
+
+        @Override
+        public String defaultName() {
+            return delegate.defaultName();
+        }
+
+        @Override
+        public List<String> defaultAliases() {
+            return delegate.defaultAliases();
+        }
+
+        @Override
         public Optional<Command<CommandSourceStack>> guiRoot() {
             return delegate.guiRoot();
         }
