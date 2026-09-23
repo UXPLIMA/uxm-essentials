@@ -4,7 +4,6 @@ import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
-import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -55,44 +54,53 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
+        if (sender != null) {
+            sell(sender);
         }
-        Map<Material, Integer> snapshot = snapshot(sender);
-        Map<String, Integer> byId = new LinkedHashMap<>();
-        snapshot.forEach((material, count) -> byId.put(material.name().toLowerCase(Locale.ROOT), count));
-        PlayerRef seller = ref(sender);
-        offTick(() -> sellOffTick(seller, byId));
         return Command.SINGLE_SUCCESS;
     }
 
-    private Map<Material, Integer> snapshot(Player sender) {
+    /**
+     * Sell every plain stack the player carries: take them here, on the seller's own thread, ask for the sale off the
+     * tick, and give back every item the sale does not buy.
+     *
+     * <p>It used to count every stack by material, armour and off hand included, pay for the lot and then remove with
+     * a plain {@code removeItem} whose shortfall nobody read, so a renamed stack was paid for and kept.
+     */
+    void sell(Player sender) {
+        Map<Material, Integer> taken = new LinkedHashMap<>();
+        for (Map.Entry<Material, Integer> plain : plainStacks(sender).entrySet()) {
+            int got = SoldItems.take(sender, plain.getKey(), plain.getValue());
+            if (got > 0) {
+                taken.put(plain.getKey(), got);
+            }
+        }
+        PlayerRef seller = ref(sender);
+        Map<String, Integer> byId = new LinkedHashMap<>();
+        taken.forEach((material, count) -> byId.put(material.name().toLowerCase(Locale.ROOT), count));
+        offTick(() -> {
+            SellAllOutcome outcome = services.sellAll().sellAll(seller, byId);
+            services.scheduler()
+                    .onEntity(
+                            seller,
+                            () -> taken.forEach((material, count) -> {
+                                int sold = outcome.sold()
+                                        .getOrDefault(material.name().toLowerCase(Locale.ROOT), 0);
+                                if (count > sold) {
+                                    SoldItems.giveBack(seller, material, count - sold);
+                                }
+                            }));
+        });
+    }
+
+    /** The plain stacks of the player's own storage, counted by material: no armour, no off hand, no renamed item. */
+    private static Map<Material, Integer> plainStacks(Player sender) {
         Map<Material, Integer> totals = new LinkedHashMap<>();
-        for (ItemStack stack : sender.getInventory().getContents()) {
-            if (stack != null && !stack.getType().isAir()) {
+        for (ItemStack stack : sender.getInventory().getStorageContents()) {
+            if (stack != null && !stack.getType().isAir() && stack.isSimilar(new ItemStack(stack.getType()))) {
                 totals.merge(stack.getType(), stack.getAmount(), Integer::sum);
             }
         }
         return totals;
-    }
-
-    private void sellOffTick(PlayerRef seller, Map<String, Integer> byId) {
-        SellAllOutcome outcome = services.sellAll().sellAll(seller, byId);
-        if (!outcome.sold().isEmpty()) {
-            services.scheduler().onEntity(seller, () -> removeItems(seller, outcome.sold()));
-        }
-    }
-
-    private void removeItems(PlayerRef seller, Map<String, Integer> sold) {
-        Player player = Bukkit.getPlayer(seller.uuid());
-        if (player == null) {
-            return;
-        }
-        sold.forEach((id, count) -> {
-            Material material = Material.matchMaterial(id);
-            if (material != null) {
-                player.getInventory().removeItem(new ItemStack(material, count));
-            }
-        });
     }
 }

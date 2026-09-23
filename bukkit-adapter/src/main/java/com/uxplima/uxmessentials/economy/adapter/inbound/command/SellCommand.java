@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.command;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.bukkit.Material;
@@ -55,33 +56,43 @@ public final class SellCommand extends EconomyCommandSupport implements CommandR
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<Integer> requested) {
         Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
+        if (sender != null) {
+            sell(sender, requested);
         }
-        ItemStack held = sender.getInventory().getItemInMainHand();
-        if (held.getType().isAir()) {
-            services.notifier().send(ref(sender), EconomyMessageKey.SELL_NO_ITEM_IN_HAND);
-            return Command.SINGLE_SUCCESS;
-        }
-        Material material = held.getType();
-        int amount = Math.min(requested.orElse(held.getAmount()), held.getAmount());
-        String id = material.name().toLowerCase(Locale.ROOT);
-        PlayerRef seller = ref(sender);
-        offTick(() -> sellOffTick(seller, material, amount, id));
         return Command.SINGLE_SUCCESS;
     }
 
-    private void sellOffTick(PlayerRef seller, Material material, int amount, String id) {
-        boolean sold = services.sellItem().sell(seller, id, amount).sold();
-        if (sold) {
-            services.scheduler().onEntity(seller, () -> removeItems(seller, material, amount));
+    /**
+     * Sell from the held stack: take the items here, on the seller's own thread, then ask for the sale off the tick,
+     * and give back what it does not pay for.
+     *
+     * <p>It used to pay first and remove afterwards with a plain {@code removeItem}, which finds only a plain stack
+     * and says so in a return value nobody read. A player holding renamed diamonds was paid for them and kept them.
+     * So only a plain stack is sold, it is taken before anything is paid, and a refused sale puts it back.
+     */
+    void sell(Player sender, Optional<Integer> requested) {
+        ItemStack held = sender.getInventory().getItemInMainHand();
+        PlayerRef seller = ref(sender);
+        if (held.getType().isAir()) {
+            services.notifier().send(seller, EconomyMessageKey.SELL_NO_ITEM_IN_HAND);
+            return;
         }
-    }
-
-    private void removeItems(PlayerRef seller, Material material, int amount) {
-        Player player = org.bukkit.Bukkit.getPlayer(seller.uuid());
-        if (player != null) {
-            player.getInventory().removeItem(new ItemStack(material, amount));
+        Material material = held.getType();
+        String id = material.name().toLowerCase(Locale.ROOT);
+        if (!held.isSimilar(new ItemStack(material))) {
+            services.notifier().send(seller, EconomyMessageKey.SELL_NOT_SELLABLE, Map.of("item", id));
+            return;
         }
+        int amount = Math.min(requested.orElse(held.getAmount()), held.getAmount());
+        int taken = SoldItems.take(sender, material, amount);
+        if (taken == 0) {
+            services.notifier().send(seller, EconomyMessageKey.SELL_NO_ITEM_IN_HAND);
+            return;
+        }
+        offTick(() -> {
+            if (!services.sellItem().sell(seller, id, taken).sold()) {
+                services.scheduler().onEntity(seller, () -> SoldItems.giveBack(seller, material, taken));
+            }
+        });
     }
 }
