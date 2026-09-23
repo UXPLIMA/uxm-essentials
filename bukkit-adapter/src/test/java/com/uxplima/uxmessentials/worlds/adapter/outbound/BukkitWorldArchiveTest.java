@@ -121,6 +121,27 @@ class BukkitWorldArchiveTest {
         assertThat(read(roundTrip.resolve("region/r.0.0.mca"))).isEqualTo("region-bytes");
     }
 
+    /**
+     * On Paper 26.2 a world lives under the level's dimensions, not beside the server. A backup of a world laid out
+     * that way zipped {@code <container>/arena}, which is not there, and failed every time.
+     */
+    @Test
+    void backupOfAWorldUnderTheLevelsDimensionsZipsThatFolder(@TempDir Path container, @TempDir Path dataFolder)
+            throws IOException {
+        writeFile(
+                container.resolve("world/dimensions/minecraft/arena/region/r.0.0.mca"),
+                "region-bytes".getBytes(StandardCharsets.UTF_8));
+        lenient().when(server.getWorlds()).thenReturn(List.of());
+        BukkitWorldArchive archive = archive(container, dataFolder, settings("backups/worlds", 10));
+
+        BackupId id = archive.backup(INITIATOR, WORLD).orElseThrow();
+
+        assertThat(messages.keysFor(INITIATOR)).contains(WorldsMessageKey.WORLD_BACKUP_CREATED);
+        Path roundTrip = dataFolder.resolve("round-trip");
+        archiver.unzip(dataFolder.resolve("backups/worlds/arena").resolve(id.value() + ".zip"), roundTrip);
+        assertThat(read(roundTrip.resolve("region/r.0.0.mca"))).isEqualTo("region-bytes");
+    }
+
     @Test
     void backupPrunesDownToTheRetentionCount(@TempDir Path container, @TempDir Path dataFolder) throws IOException {
         seedWorldFolder(container, "level.dat", "level-bytes");
@@ -357,6 +378,11 @@ class BukkitWorldArchiveTest {
     private World world(List<Player> residents) {
         World w = mock(World.class);
         lenient().when(w.getPlayers()).thenAnswer(inv -> List.copyOf(residents));
+        // A loaded world says where its files are, and these tests keep it where they seed it.
+        lenient()
+                .when(w.getWorldFolder())
+                .thenAnswer(inv ->
+                        Objects.requireNonNull(worldContainer).resolve("arena").toFile());
         return w;
     }
 

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter.outbound;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -43,11 +44,13 @@ import org.jspecify.annotations.Nullable;
 public final class BukkitWorldEngine implements WorldEngine {
 
     private final Server server;
+    private final WorldFolders folders;
     private final Logger log;
     private final WorldGeneratorResolver generators;
 
     public BukkitWorldEngine(Server server, Logger log, WorldGeneratorResolver generators) {
         this.server = Objects.requireNonNull(server, "server");
+        this.folders = new WorldFolders(server);
         this.log = Objects.requireNonNull(log, "log");
         this.generators = Objects.requireNonNull(generators, "generators");
     }
@@ -144,8 +147,8 @@ public final class BukkitWorldEngine implements WorldEngine {
             return Optional.of(
                     new DetectedWorld(fromBukkitEnvironment(live.getEnvironment()), Optional.of(live.getSeed())));
         }
-        Path levelDat = worldFolder(name).resolve("level.dat");
-        if (!Files.isRegularFile(levelDat)) {
+        // A dimension folder of Paper 26.2 holds no level.dat of its own, so the folder being there is the test.
+        if (!folders.exists(name.value())) {
             return Optional.empty();
         }
         // Precise NBT environment/seed detection for unloaded folders needs NMS; default NORMAL/no-seed.
@@ -154,7 +157,7 @@ public final class BukkitWorldEngine implements WorldEngine {
 
     @Override
     public boolean exists(WorldName name) {
-        return server.getWorld(name.value()) != null || Files.isDirectory(worldFolder(name));
+        return folders.exists(name.value());
     }
 
     @Override
@@ -172,34 +175,26 @@ public final class BukkitWorldEngine implements WorldEngine {
     }
 
     /**
-     * Every world folder under the server container (loaded or not), identified by a {@code level.dat}.
+     * Every world with files on disk, loaded or not: each dimension of the level, and each folder beside the server
+     * that holds a {@code level.dat}, which is {@link WorldFolders#onDisk()}. Only the second was scanned before
+     * Paper 26.2 moved every world under the level, so the reconcile saw no world at all.
      * Used by the enable-time reconcile in sub-project A; not part of the {@link WorldEngine} port.
      */
     public Set<WorldName> onDiskWorldNames() {
         Set<WorldName> names = new HashSet<>();
-        Path container = server.getWorldContainer().toPath();
-        try (var entries = Files.list(container)) {
-            entries.filter(BukkitWorldEngine::isWorldFolder).forEach(p -> addIfValid(names, p));
-            return names;
-        } catch (IOException e) {
-            log.error("Failed to scan world container " + container, e);
-            return names;
-        }
-    }
-
-    private static boolean isWorldFolder(Path candidate) {
-        return Files.isDirectory(candidate) && Files.isRegularFile(candidate.resolve("level.dat"));
-    }
-
-    private void addIfValid(Set<WorldName> names, Path folder) {
-        Path fileName = folder.getFileName();
-        if (fileName == null) {
-            return;
-        }
         try {
-            names.add(WorldName.of(fileName.toString()));
+            folders.onDisk().forEach(name -> addIfValid(names, name));
+        } catch (UncheckedIOException e) {
+            log.error("Failed to scan the world folders", e);
+        }
+        return names;
+    }
+
+    private void addIfValid(Set<WorldName> names, String name) {
+        try {
+            names.add(WorldName.of(name));
         } catch (IllegalArgumentException e) {
-            log.warn("Skipping world folder with an unusable name: {}", fileName);
+            log.warn("Skipping world folder with an unusable name: {}", name);
         }
     }
 
@@ -229,8 +224,9 @@ public final class BukkitWorldEngine implements WorldEngine {
         return Optional.ofNullable(world).map(w -> BukkitRefs.toPosition(w.getSpawnLocation()));
     }
 
+    /** Where the world keeps its files, which on Paper 26.2 is under the level's dimensions: {@link WorldFolders}. */
     private Path worldFolder(WorldName name) {
-        return server.getWorldContainer().toPath().resolve(name.value());
+        return folders.of(name.value());
     }
 
     private static World.Environment toBukkitEnvironment(WorldEnvironment environment) {

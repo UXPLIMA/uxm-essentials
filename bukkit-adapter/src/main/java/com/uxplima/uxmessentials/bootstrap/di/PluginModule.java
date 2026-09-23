@@ -313,6 +313,7 @@ import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.TeleportRescueTargets;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldFolders;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldQueries;
 import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
@@ -989,8 +990,7 @@ public final class PluginModule {
         // throws becomes a FAIL line rather than aborting the run).
         List<HealthCheck> checks = new ArrayList<>();
         checks.add(new DatabaseHealthCheck(persistence));
-        checks.add(persistence.integrityCheck(
-                plugin.getServer().getWorldContainer().toPath()));
+        checks.add(persistence.integrityCheck(new WorldFolders(plugin.getServer())::exists));
         if (economyEnabled(registry, config)) {
             checks.add(new EconomyProviderHealthCheck(plugin.getServer().getServicesManager(), plugin));
         }

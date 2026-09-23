@@ -6,8 +6,6 @@ import static org.jooq.impl.DSL.selectOne;
 import static org.jooq.impl.DSL.table;
 import static org.jooq.impl.DSL.trueCondition;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -15,6 +13,7 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.shared.application.health.HealthResult;
 import com.uxplima.uxmessentials.shared.application.health.RepairResult;
@@ -79,13 +78,16 @@ public final class PersistenceIntegrityHealthCheck implements RepairableHealthCh
             new WorldReference("moderation_jail_locations", "world_name"));
 
     private final DSLContext dsl;
-    private final Path worldContainer;
+    /**
+     * Whether a world of that name has files on the server. Asked of the server rather than read off a folder here,
+     * because on Paper 26.2 a world lives under the level's dimensions and not beside the server, and this check
+     * reported every world but the level's own as missing.
+     */
+    private final Predicate<String> worldExists;
 
-    public PersistenceIntegrityHealthCheck(DSLContext dsl, Path worldContainer) {
+    public PersistenceIntegrityHealthCheck(DSLContext dsl, Predicate<String> worldExists) {
         this.dsl = Objects.requireNonNull(dsl, "dsl");
-        this.worldContainer = Objects.requireNonNull(worldContainer, "worldContainer")
-                .toAbsolutePath()
-                .normalize();
+        this.worldExists = Objects.requireNonNull(worldExists, "worldExists");
     }
 
     @Override
@@ -201,8 +203,7 @@ public final class PersistenceIntegrityHealthCheck implements RepairableHealthCh
         }
         Set<String> missing = new TreeSet<>(String.CASE_INSENSITIVE_ORDER);
         for (String world : referenced) {
-            Path candidate = worldContainer.resolve(world).normalize();
-            if (!candidate.startsWith(worldContainer) || !Files.isDirectory(candidate)) {
+            if (!worldExists.test(world)) {
                 missing.add(world);
             }
         }

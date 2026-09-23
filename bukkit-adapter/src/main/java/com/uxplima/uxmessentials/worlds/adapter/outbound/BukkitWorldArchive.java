@@ -285,8 +285,11 @@ public final class BukkitWorldArchive implements WorldArchive {
                 notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
                 return; // never delete a loaded world's files
             }
-            archiver.deleteTree(worldFolder(world));
-            archiver.unzip(archive, worldFolder(world));
+            // Resolved once: the folder is found by looking at the disk, and once it is deleted a second look would
+            // answer somewhere else.
+            Path folder = worldFolder(world);
+            archiver.deleteTree(folder);
+            archiver.unzip(archive, folder);
             scheduler.onGlobal(() -> finishRestore(initiator, world, id, managed));
         } catch (IOException e) {
             log.error("restore of " + world.value() + " failed", e);
@@ -305,8 +308,9 @@ public final class BukkitWorldArchive implements WorldArchive {
         scheduler.onEntity(ref, () -> notifier.send(ref, key, placeholders));
     }
 
+    /** Where the world keeps its files, which on Paper 26.2 is under the level's dimensions: {@link WorldFolders}. */
     private Path worldFolder(WorldName name) {
-        return server.getWorldContainer().toPath().resolve(name.value());
+        return new WorldFolders(server).of(name.value());
     }
 
     private Path backupsDir(WorldName name) {

@@ -75,8 +75,8 @@ public final class Persistence implements AutoCloseable {
     }
 
     /** Build the cross-context integrity check without leaking jOOQ into the bootstrap adapter. */
-    public RepairableHealthCheck integrityCheck(Path worldContainer) {
-        return new PersistenceIntegrityHealthCheck(dsl, worldContainer);
+    public RepairableHealthCheck integrityCheck(java.util.function.Predicate<String> worldExists) {
+        return new PersistenceIntegrityHealthCheck(dsl, worldExists);
     }
 
     /**
