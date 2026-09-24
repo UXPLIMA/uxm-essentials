@@ -41,6 +41,18 @@ public enum GuiMessageKey implements MessageKey {
     PAGE_PREVIOUS("gui.page.previous"),
     PAGE_NEXT("gui.page.next"),
 
+    // the shared gesture form. The question a Bedrock form asks when one tile does more than one thing, and the
+    // answers: a form has one tap where a chest has six gestures, so the viewer is asked rather than guessed at
+    GESTURE_TITLE("gui.gesture.title"),
+    GESTURE_LEFT("gui.gesture.left"),
+    GESTURE_RIGHT("gui.gesture.right"),
+    GESTURE_SHIFT_LEFT("gui.gesture.shift-left"),
+    GESTURE_SHIFT_RIGHT("gui.gesture.shift-right"),
+    GESTURE_MIDDLE("gui.gesture.middle"),
+    GESTURE_DROP("gui.gesture.drop"),
+    GESTURE_CONTROL_DROP("gui.gesture.control-drop"),
+    GESTURE_DOUBLE_CLICK("gui.gesture.double-click"),
+
     // the shared colour-picker widget: its chrome buttons
     COLOUR_PICKER_TITLE("gui.colour-picker.title"),
     COLOUR_PICKER_CUSTOM("gui.colour-picker.custom"),
