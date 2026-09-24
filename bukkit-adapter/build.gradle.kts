@@ -301,24 +301,16 @@ tasks.runServer {
     }
 }
 
-// This module, uxmlib-nametags and uxmlib-packet all apply paperweight-userdev against the same
-// Mojang-mapped dev bundle, so all three derive one work directory and want its lock. Gradle runs them
-// in parallel, and paperweight's lock is not re-entrant inside a build, so the second to reach it dies
-// with the lock held by its own process. That is what made a cold build fail once and pass on the retry.
+// This module applies paperweight-userdev, which unpacks the Mojang-mapped dev bundle behind a lock that
+// is not re-entrant inside a build. It used to share that bundle with the library's own uxmlib-nametags and
+// uxmlib-packet, because the library was an included build, and a cold parallel build could have two tasks
+// reach the same lock: the second died holding it against its own process. The block that ordered ours
+// behind the library's two is gone with the composite build, and could not have fired since it left: it
+// asked gradle.includedBuilds for a build that is no longer there.
 //
-// The library orders its own two. This orders ours behind them, which is the only place the three meet:
-// a composite build can depend on an included build's task but cannot merely order against it. The
-// dependency costs nothing that was not already going to run, because a composite build builds both.
-//
-// CI solves the same problem by unpacking the bundle once with --no-parallel before anything else. That
-// step can go once this has been through a few cold builds.
-val includedUxmLib = gradle.includedBuilds.firstOrNull { it.name == "uxm-lib" || it.name == "uxmLib" }
-if (includedUxmLib != null) {
-    tasks.named("paperweightUserdevSetup") {
-        dependsOn(includedUxmLib.task(":uxmlib-nametags:paperweightUserdevSetup"))
-        dependsOn(includedUxmLib.task(":uxmlib-packet:paperweightUserdevSetup"))
-    }
-}
+// Nothing here needs ordering now. This module is the only paperweight consumer in this build, and the
+// library arrives as a published jar with its own bundle work already done. CI still unpacks the bundle
+// once with --no-parallel before anything else, which is belt and braces rather than a requirement.
 
 // A hand audit of the shipped jar with unzip is right on the day somebody ran it and never again, and this
 // is the 12 MB product jar an operator downloads. Everything this module bundles is either our own code or

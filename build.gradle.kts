@@ -8,8 +8,13 @@ allprojects {
     version = project.findProperty("projectVersion")?.toString() ?: "0.9.1"
 
     repositories {
-        mavenLocal() // uxmLib is consumed from ~/.m2 during the dogfood (publishToMavenLocal)
+        // Ahead of the organisation repository on purpose, and only for that: a library change is
+        // tried out here by publishing it to ~/.m2 with publishToMavenLocal and raising the pin, so
+        // the local copy of a version has to win over the published one.
+        mavenLocal()
         mavenCentral()
+        // uxmLib and the other in-house libraries. No credentials: maven-public serves anonymously.
+        maven("https://repo.uxplima.com/repository/maven-public/")
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.codemc.org/repository/maven-public/")  // Treasury economy API
         maven("https://jitpack.io")                                 // Vault economy API

@@ -28,8 +28,8 @@ luckperms      = "5.5"
 jda            = "5.6.1"
 lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core: Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
 
-# uxmLib (sibling toolkit; built via composite in dev, resolved from mavenLocal otherwise)
-uxmlib = "0.144.0"                 # com.github.UXPLIMA.uxm-lib (workspace .m2, published 2026-09-24)
+# uxmLib, resolved from the organisation repository like every other dependency here
+uxmlib = "0.144.0"                 # com.uxplima.uxmlib: repo.uxplima.com/repository/maven-public
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api: CodeMC repo, NOT Maven Central (verified 2026-05-30)
@@ -102,18 +102,18 @@ velocity-api      = { module = "com.velocitypowered:velocity-api",              
 luckperms-api     = { module = "net.luckperms:api",                              version.ref = "luckperms" }
 jda               = { module = "net.dv8tion:JDA",                                version.ref = "jda" }
 lettuce           = { module = "io.lettuce:lettuce-core",                        version.ref = "lettuce" }
-uxmlib-redis      = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-redis",                version.ref = "uxmlib" }
-uxmlib-command   = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-command",            version.ref = "uxmlib" }
-uxmlib-gui       = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-gui",                version.ref = "uxmlib" }
-uxmlib-bedrock   = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-bedrock",            version.ref = "uxmlib" }
-uxmlib-item      = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-item",               version.ref = "uxmlib" }
-uxmlib-menu      = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-menu",               version.ref = "uxmlib" }
-uxmlib-hud       = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-hud",                version.ref = "uxmlib" }
-uxmlib-integration = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-integration",        version.ref = "uxmlib" }
-uxmlib-nametags  = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-nametags",           version.ref = "uxmlib" }
-uxmlib-packet    = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-packet",             version.ref = "uxmlib" }
-uxmlib-pipeline  = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-pipeline",           version.ref = "uxmlib" }
-uxmlib-update    = { module = "com.github.UXPLIMA.uxm-lib:uxmlib-update",             version.ref = "uxmlib" }
+uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",                version.ref = "uxmlib" }
+uxmlib-command   = { module = "com.uxplima.uxmlib:uxmlib-command",            version.ref = "uxmlib" }
+uxmlib-gui       = { module = "com.uxplima.uxmlib:uxmlib-gui",                version.ref = "uxmlib" }
+uxmlib-bedrock   = { module = "com.uxplima.uxmlib:uxmlib-bedrock",            version.ref = "uxmlib" }
+uxmlib-item      = { module = "com.uxplima.uxmlib:uxmlib-item",               version.ref = "uxmlib" }
+uxmlib-menu      = { module = "com.uxplima.uxmlib:uxmlib-menu",               version.ref = "uxmlib" }
+uxmlib-hud       = { module = "com.uxplima.uxmlib:uxmlib-hud",                version.ref = "uxmlib" }
+uxmlib-integration = { module = "com.uxplima.uxmlib:uxmlib-integration",        version.ref = "uxmlib" }
+uxmlib-nametags  = { module = "com.uxplima.uxmlib:uxmlib-nametags",           version.ref = "uxmlib" }
+uxmlib-packet    = { module = "com.uxplima.uxmlib:uxmlib-packet",             version.ref = "uxmlib" }
+uxmlib-pipeline  = { module = "com.uxplima.uxmlib:uxmlib-pipeline",           version.ref = "uxmlib" }
+uxmlib-update    = { module = "com.uxplima.uxmlib:uxmlib-update",             version.ref = "uxmlib" }
 
 # economy provider APIs: compileOnly soft-depends (see §9 + §16)
 treasury-api      = { module = "me.lokka30:treasury-api",                        version.ref = "treasury" }
