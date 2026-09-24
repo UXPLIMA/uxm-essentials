@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,7 +68,7 @@ public final class PosesCommand implements CommandRegistration {
     }
 
     private int toggle(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -81,7 +82,7 @@ public final class PosesCommand implements CommandRegistration {
 
     /** The bare {@code /poses}: open the panel for a player, or fall back to the usage line for the console. */
     private int open(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player) || !player.hasPermission(GUI_PERMISSION)) {
             feedback.send(sender, PosesMessageKey.POSES_USAGE);
             return Command.SINGLE_SUCCESS;
@@ -91,7 +92,7 @@ public final class PosesCommand implements CommandRegistration {
     }
 
     private int openGui(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;

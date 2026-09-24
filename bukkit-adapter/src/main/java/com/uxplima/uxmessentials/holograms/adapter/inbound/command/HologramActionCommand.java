@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
+import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.item.SerializedItems;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -116,7 +117,7 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
@@ -134,7 +135,7 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int insertAt(CommandContext<CommandSourceStack> ctx, boolean after) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;
@@ -145,7 +146,7 @@ final class HologramActionCommand extends HologramCommandSupport {
     }
 
     private int set(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         ClickAction action = parseAction(sender, ctx);
         if (action == null) {
             return 0;

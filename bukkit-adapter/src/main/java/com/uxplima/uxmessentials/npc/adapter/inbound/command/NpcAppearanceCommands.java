@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.packet.npc.NpcPose;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -94,7 +95,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int type(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String word = ctx.getArgument("type", String.class);
         EntityType entityType = parseRenderableType(word);
         if (entityType == null) {
@@ -156,7 +157,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int equip(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<EquipmentSlot> slot = EquipmentSlot.parse(ctx.getArgument("slot", String.class));
         if (slot.isEmpty()) {
             feedback.send(
@@ -183,7 +184,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int glow(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         boolean glowing = ctx.getArgument("value", Boolean.class);
         String color = colorArg(ctx);
         if (glowing && color != null && !isKnownColor(color)) {
@@ -203,7 +204,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int pose(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String word = ctx.getArgument("pose", String.class);
         NpcPose pose = parsePose(word);
         if (pose == null) {
@@ -222,7 +223,7 @@ final class NpcAppearanceCommands extends NpcCommandSupport {
     }
 
     private int scale(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         double value = ctx.getArgument("value", Double.class);
         if (!Double.isFinite(value) || value < MIN_SCALE || value > MAX_SCALE) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_SCALE, Map.of("scale", Double.toString(value)));

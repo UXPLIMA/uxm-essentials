@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -123,7 +124,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
      * rather than frozen out of their own session.
      */
     private int lock(CommandContext<CommandSourceStack> ctx) {
-        Player player = requirePlayer(ctx.getSource().getSender());
+        Player player = requirePlayer(Sender.audience(ctx.getSource()));
         if (player == null) {
             return 0;
         }
@@ -146,13 +147,13 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, MessageKey key) {
-        reply(ctx.getSource().getSender(), key);
+        reply(Sender.audience(ctx.getSource()), key);
         return Command.SINGLE_SUCCESS;
     }
 
     /** Bare {@code /pin}: report whether this player holds a PIN. The store read hops off the tick thread. */
     private int status(CommandContext<CommandSourceStack> ctx) {
-        Player player = requirePlayer(ctx.getSource().getSender());
+        Player player = requirePlayer(Sender.audience(ctx.getSource()));
         if (player == null) {
             return 0;
         }
@@ -196,7 +197,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
      * hold one with no way to take it back off.
      */
     private int remove(CommandContext<CommandSourceStack> ctx) {
-        Player player = requirePlayer(ctx.getSource().getSender());
+        Player player = requirePlayer(Sender.audience(ctx.getSource()));
         if (player == null) {
             return 0;
         }
@@ -208,7 +209,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
 
     /** The caller as a player, or {@code null} after replying, when they may not enrol a PIN right now. */
     private @Nullable Player enrollingPlayer(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player player = requirePlayer(sender);
         if (player == null) {
             return null;

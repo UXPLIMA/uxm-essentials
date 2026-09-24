@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -92,14 +93,14 @@ public final class VotePartyCommand implements CommandRegistration {
     }
 
     private int forceParty(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = CommandFeedback.refOf(sender);
         services.scheduler().async(() -> services.forceParty().execute(actor));
         return Command.SINGLE_SUCCESS;
     }
 
     private int setCount(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         int count = ctx.getArgument("count", Integer.class);
         PlayerRef actor = CommandFeedback.refOf(sender);
         services.scheduler().async(() -> services.setPartyCount().set(actor, count));
@@ -107,7 +108,7 @@ public final class VotePartyCommand implements CommandRegistration {
     }
 
     private int addCount(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         int amount = ctx.getArgument("amount", Integer.class);
         PlayerRef actor = CommandFeedback.refOf(sender);
         services.scheduler().async(() -> services.addPartyCount().add(actor, amount));
@@ -115,7 +116,7 @@ public final class VotePartyCommand implements CommandRegistration {
     }
 
     private @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

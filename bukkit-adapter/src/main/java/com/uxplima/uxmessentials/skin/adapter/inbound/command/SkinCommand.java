@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.skin.application.UpdateSkin;
 import com.uxplima.uxmessentials.skin.domain.SkinModel;
 import com.uxplima.uxmessentials.skin.domain.SkinSource;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -179,7 +180,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin <name>}, {@code /skin set <name>} and the staff {@code /skin set <name> <player>}. */
     private int byName(CommandContext<CommandSourceStack> ctx, @Nullable String targetName) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorOf(sender);
         if (actor == null) {
             return 0;
@@ -201,7 +202,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin url <link> [slim]} and {@code /skin file <name> [slim]}, which share everything but the source. */
     private int fromUpload(CommandContext<CommandSourceStack> ctx, boolean fromWeb, boolean slim) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorOf(sender);
         if (actor == null) {
             return 0;
@@ -216,7 +217,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin clear} and the staff {@code /skin clear <player>}. */
     private int clear(CommandContext<CommandSourceStack> ctx, @Nullable String targetName) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorOf(sender);
         if (actor == null) {
             return 0;
@@ -240,7 +241,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin update}: re-pull the skin the player already chose. */
     private int update(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorOf(sender);
         if (actor == null) {
             return 0;
@@ -259,7 +260,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin drop <player>}: delete a stored skin, whether or not its owner is online. */
     private int drop(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef target = named(sender, StringArgumentType.getString(ctx, "player"));
         if (target == null) {
             return 0;
@@ -277,7 +278,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin info <player>}: which skin, from where, on which model, and when. */
     private int info(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef target = named(sender, StringArgumentType.getString(ctx, "player"));
         if (target == null) {
             return 0;
@@ -307,7 +308,7 @@ public final class SkinCommand implements CommandRegistration {
 
     /** {@code /skin purge <name>}: forget a cached texture so the next lookup is fresh. */
     private int purge(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "name");
         run(sender, () -> {
             purgeCache.purge(name);
@@ -317,7 +318,7 @@ public final class SkinCommand implements CommandRegistration {
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx) {
-        feedback.send(ctx.getSource().getSender(), SkinMessageKey.SKIN_USAGE);
+        feedback.send(Sender.audience(ctx.getSource()), SkinMessageKey.SKIN_USAGE);
         return Command.SINGLE_SUCCESS;
     }
 

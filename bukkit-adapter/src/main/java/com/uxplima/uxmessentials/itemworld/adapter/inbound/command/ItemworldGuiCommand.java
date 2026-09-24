@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -57,7 +58,7 @@ public final class ItemworldGuiCommand implements CommandRegistration {
     }
 
     private int open(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             PlayerRef console = PlayerRef.system(sender.getName());
             sink.deliver(console, messages.resolve(console, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of()));

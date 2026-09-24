@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -65,7 +66,7 @@ public final class WhoisCommand extends PresenceCommandSupport implements Comman
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String query = StringArgumentType.getString(ctx, "player");
         // The roster (names + display names + per-viewer canSee) is read on the global region thread (Folia forbids
         // iterating Bukkit.getOnlinePlayers() off it); the matched player's live status fields are then read on that

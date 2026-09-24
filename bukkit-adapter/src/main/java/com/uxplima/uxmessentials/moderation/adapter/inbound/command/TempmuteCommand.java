@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -76,7 +77,7 @@ public final class TempmuteCommand extends ModerationCommandSupport implements C
             return Optional.empty();
         }
         return Optional.of(ctx -> {
-            if (ctx.getSource().getSender() instanceof Player sender) {
+            if (Sender.audience(ctx.getSource()) instanceof Player sender) {
                 guiFlow.open(sender, BukkitRefs.toRef(sender), PunishmentAction.TEMPMUTE);
             }
             return Command.SINGLE_SUCCESS;

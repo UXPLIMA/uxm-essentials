@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -100,7 +101,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int visibility(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Visibility.Mode> mode = parseMode(ctx.getArgument("mode", String.class));
         if (mode.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_VISIBILITY_MODE_INVALID, Map.of());
@@ -135,7 +136,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
@@ -145,7 +146,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int hide(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
@@ -155,7 +156,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int blacklist(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;
@@ -165,7 +166,7 @@ final class HologramVisibilityCommand extends HologramCommandSupport {
     }
 
     private int unblacklist(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player target = onlineTarget(ctx, sender);
         if (target == null) {
             return 0;

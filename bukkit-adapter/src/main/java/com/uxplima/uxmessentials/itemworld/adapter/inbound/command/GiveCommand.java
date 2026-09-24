@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -110,13 +111,13 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
      * console source (which has already passed the base node and carries no per-player nodes) is allowed every type.
      */
     private boolean allowsItem(CommandContext<CommandSourceStack> ctx, Material material) {
-        return !(ctx.getSource().getSender() instanceof Player sender)
+        return !(Sender.audience(ctx.getSource()) instanceof Player sender)
                 || allowsType(ctx, sender, "give", material.getKey().getKey());
     }
 
     private void deliver(CommandContext<CommandSourceStack> ctx, Material material, AmountSpec amount) {
         String name = ctx.getArgument("player", String.class);
-        Player target = ctx.getSource().getSender().getServer().getPlayerExact(name);
+        Player target = Sender.audience(ctx.getSource()).getServer().getPlayerExact(name);
         if (target == null) {
             reply(ctx, ItemworldMessageKey.UNKNOWN_TARGET, Map.of("player", name));
             return;
@@ -142,9 +143,9 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
     }
 
     private PlayerRef actorOf(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getSource().getSender() instanceof Player player
+        return Sender.audience(ctx.getSource()) instanceof Player player
                 ? BukkitRefs.toRef(player)
-                : PlayerRef.system(ctx.getSource().getSender().getName());
+                : PlayerRef.system(Sender.audience(ctx.getSource()).getName());
     }
 
     private static Map<String, String> placeholders(String player, String item, int amount) {

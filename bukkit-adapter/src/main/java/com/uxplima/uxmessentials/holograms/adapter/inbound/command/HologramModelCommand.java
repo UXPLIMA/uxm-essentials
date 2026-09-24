@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +51,7 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int entity(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String raw = content(ctx).strip();
         org.bukkit.entity.EntityType type = parseEntityType(raw);
         if (type == null) {
@@ -82,7 +83,7 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int item(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String raw = content(ctx);
         Material material = Material.matchMaterial(raw.strip().toUpperCase(Locale.ROOT));
         if (material == null || !material.isItem()) {
@@ -94,7 +95,7 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int block(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String raw = content(ctx).strip();
         if (!isValidBlockData(raw)) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BLOCK_INVALID, Map.of("value", raw));
@@ -105,7 +106,7 @@ final class HologramModelCommand extends HologramCommandSupport {
     }
 
     private int head(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String raw = content(ctx).strip();
         String texture = resolveTexture(raw, sender);
         if (texture == null) {

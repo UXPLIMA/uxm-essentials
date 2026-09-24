@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -186,8 +187,8 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
      * node is checked through the live sender's permissions, the same gate the {@code /uxmess gui} hub entry uses.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
-        if (!(ctx.getSource().getSender() instanceof Player sender)) {
-            feedback.send(ctx.getSource().getSender(), NpcMessageKey.NPC_HELP, java.util.Map.of());
+        if (!(Sender.audience(ctx.getSource()) instanceof Player sender)) {
+            feedback.send(Sender.audience(ctx.getSource()), NpcMessageKey.NPC_HELP, java.util.Map.of());
             return Command.SINGLE_SUCCESS;
         }
         if (sender.hasPermission(GUI_PERMISSION)) {
@@ -240,7 +241,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     }
 
     private int help(CommandContext<CommandSourceStack> ctx) {
-        feedback.send(ctx.getSource().getSender(), NpcMessageKey.NPC_HELP, java.util.Map.of());
+        feedback.send(Sender.audience(ctx.getSource()), NpcMessageKey.NPC_HELP, java.util.Map.of());
         return Command.SINGLE_SUCCESS;
     }
 
@@ -369,7 +370,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
         if (at == null) {
             return 0;
         }
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         EntityType type = typeWord == null ? null : parseRenderableType(typeWord);
         if (typeWord != null && type == null) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_ENTITY_TYPE, Map.of("type", typeWord));
@@ -383,7 +384,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
 
     private @org.jspecify.annotations.Nullable Position explicitPosition(
             CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
         double x = ctx.getArgument("x", Double.class);
         double y = ctx.getArgument("y", Double.class);

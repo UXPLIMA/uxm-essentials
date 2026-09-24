@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -74,7 +75,7 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        String actor = ctx.getSource().getSender().getName();
+        String actor = Sender.audience(ctx.getSource()).getName();
         scheduler.onGlobal(() -> {
             for (Player viewer : Bukkit.getOnlinePlayers()) {
                 if (!viewer.hasPermission(EXEMPT_PERMISSION)) {
@@ -83,7 +84,7 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
             }
         });
         // Console may run /clearchat as an operator action; only a player actor gets the chat confirmation.
-        if (ctx.getSource().getSender() instanceof Player sender) {
+        if (Sender.audience(ctx.getSource()) instanceof Player sender) {
             notifier.send(ref(sender), CommunicationMessageKey.CLEARCHAT_BY, Map.of("player", actor));
         }
         return Command.SINGLE_SUCCESS;

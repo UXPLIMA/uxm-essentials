@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -57,7 +58,7 @@ abstract class PlayerWarpCommandSupport {
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
     final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }
@@ -68,7 +69,7 @@ abstract class PlayerWarpCommandSupport {
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
         feedback.send(
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
                 Map.of(
                         "command", command,
@@ -79,7 +80,7 @@ abstract class PlayerWarpCommandSupport {
 
     /** The invoking player, or the reserved system identity for console and command-block sources. */
     final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
-        return CommandFeedback.refOf(ctx.getSource().getSender());
+        return CommandFeedback.refOf(Sender.audience(ctx.getSource()));
     }
 
     /** Tell {@code sender} the named target was not found, in their locale. */

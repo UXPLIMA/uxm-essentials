@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -77,7 +78,7 @@ public final class PermissionsSubcommand {
     }
 
     private int runAreas(CommandContext<CommandSourceStack> context) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         send(
                 sender,
                 HEADER,
@@ -88,7 +89,7 @@ public final class PermissionsSubcommand {
     }
 
     private int runArea(CommandContext<CommandSourceStack> context, int page) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         String asked = StringArgumentType.getString(context, "area");
         PermissionCatalogRenderer.Page rendered = PermissionCatalogRenderer.page(asked, page);
         if (rendered.empty()) {
@@ -106,7 +107,7 @@ public final class PermissionsSubcommand {
     }
 
     private int runExport(CommandContext<CommandSourceStack> context) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         Path target = dataFolder.resolve(EXPORT_FILE);
         try {
             Files.createDirectories(dataFolder);

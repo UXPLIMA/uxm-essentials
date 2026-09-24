@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -55,7 +56,7 @@ abstract class TeleportCommandSupport {
 
     /** The command actor: a live player ref, or the stable system ref used by console automation. */
     final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
-        return CommandFeedback.refOf(ctx.getSource().getSender());
+        return CommandFeedback.refOf(Sender.audience(ctx.getSource()));
     }
 
     /** A reusable {@code <world> <x> <y> <z> [yaw pitch]} branch for explicit-location commands. */
@@ -74,7 +75,7 @@ abstract class TeleportCommandSupport {
     /** Parse the shared explicit-location branch and report a precise world/number error. */
     final @Nullable Position explicitPosition(CommandContext<CommandSourceStack> ctx) {
         String worldName = ctx.getArgument("world", String.class);
-        World world = ctx.getSource().getSender().getServer().getWorld(worldName);
+        World world = Sender.audience(ctx.getSource()).getServer().getWorld(worldName);
         PlayerRef actor = actor(ctx);
         if (world == null) {
             services.notifier()

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -69,7 +70,7 @@ public final class GuiSubcommand {
     }
 
     private int runGui(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY, Map.of());
             return 0;

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,7 +54,7 @@ final class HologramPageCommand extends HologramCommandSupport {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         List<HologramLine> lines = LINE_SPLITTER.splitToList(ctx.getArgument("text", String.class)).stream()
                 .map(String::strip)
                 .filter(segment -> !segment.isBlank())

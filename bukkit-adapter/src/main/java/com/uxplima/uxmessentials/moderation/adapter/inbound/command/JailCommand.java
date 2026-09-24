@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -92,7 +93,7 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
             return Optional.empty();
         }
         return Optional.of(ctx -> {
-            if (ctx.getSource().getSender() instanceof Player sender) {
+            if (Sender.audience(ctx.getSource()) instanceof Player sender) {
                 jailGui.openHub(sender, BukkitRefs.toRef(sender));
             }
             return Command.SINGLE_SUCCESS;

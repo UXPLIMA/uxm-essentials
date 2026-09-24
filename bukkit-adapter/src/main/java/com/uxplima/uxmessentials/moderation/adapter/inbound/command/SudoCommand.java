@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -93,7 +94,7 @@ public final class SudoCommand implements CommandRegistration {
     }
 
     private PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         return sender instanceof Player player
                 ? new PlayerRef(player.getUniqueId(), player.getName())
                 : PlayerRef.system(sender.getName());

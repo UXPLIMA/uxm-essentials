@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -119,13 +120,13 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, MessageKey key) {
-        reply(ctx.getSource().getSender(), key);
+        reply(Sender.audience(ctx.getSource()), key);
         return Command.SINGLE_SUCCESS;
     }
 
     /** Bare {@code /2fa}: report whether this player holds an authenticator factor, ignoring any PIN they have. */
     private int status(CommandContext<CommandSourceStack> ctx) {
-        Player player = requirePlayer(ctx.getSource().getSender());
+        Player player = requirePlayer(Sender.audience(ctx.getSource()));
         if (player == null) {
             return 0;
         }
@@ -143,7 +144,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
     }
 
     private int setup(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player player = requirePlayer(sender);
         if (player == null) {
             return 0;
@@ -173,7 +174,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
     }
 
     private int confirmCode(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player player = requirePlayer(sender);
         if (player == null) {
             return 0;
@@ -194,7 +195,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
      * off must not strand the players who already hold one with no way to take it back off.
      */
     private int disableFactor(CommandContext<CommandSourceStack> ctx) {
-        Player player = requirePlayer(ctx.getSource().getSender());
+        Player player = requirePlayer(Sender.audience(ctx.getSource()));
         if (player == null) {
             return 0;
         }

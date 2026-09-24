@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -100,7 +101,7 @@ public final class UsageBinding {
     private Command<CommandSourceStack> usageExecutor(
             String command, CommandNode<CommandSourceStack> node, Description description) {
         return ctx -> {
-            reply(ctx.getSource().getSender(), command, BrigadierUsage.of(node, ctx.getSource()), description);
+            reply(Sender.audience(ctx.getSource()), command, BrigadierUsage.of(node, ctx.getSource()), description);
             return Command.SINGLE_SUCCESS;
         };
     }

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -144,7 +145,7 @@ public final class NickCommand extends PresenceCommandSupport implements Command
     private static SuggestionProvider<CommandSourceStack> nameSuggestions() {
         return (ctx, builder) -> {
             Set<String> candidates = new LinkedHashSet<>();
-            CommandSender sender = ctx.getSource().getSender();
+            CommandSender sender = Sender.audience(ctx.getSource());
             if (sender instanceof Player self) {
                 candidates.add(self.getName());
             }

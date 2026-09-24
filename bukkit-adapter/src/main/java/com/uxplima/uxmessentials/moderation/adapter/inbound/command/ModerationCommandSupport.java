@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -50,7 +51,7 @@ abstract class ModerationCommandSupport {
 
     /** The actor: the live player, or a stable system ref for a console/command-block sender. */
     final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         return sender instanceof Player player
                 ? new PlayerRef(player.getUniqueId(), player.getName())
                 : PlayerRef.system(sender.getName());
@@ -116,7 +117,7 @@ abstract class ModerationCommandSupport {
 
     /** The live player behind {@code target}, if connected: for a command that must act on a session. */
     static @Nullable Player onlinePlayer(CommandContext<CommandSourceStack> ctx, PlayerRef target) {
-        return ctx.getSource().getSender().getServer().getPlayer(target.uuid());
+        return Sender.audience(ctx.getSource()).getServer().getPlayer(target.uuid());
     }
 
     /**
@@ -124,7 +125,7 @@ abstract class ModerationCommandSupport {
      * by the position-capturing commands ({@code /setjail}) a console cannot run.
      */
     final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

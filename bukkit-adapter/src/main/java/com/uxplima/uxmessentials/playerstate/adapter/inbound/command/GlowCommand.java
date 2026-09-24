@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -84,7 +85,7 @@ public final class GlowCommand extends PlayerstateCommandSupport implements Comm
     }
 
     private int colour(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String typed = StringArgumentType.getString(ctx, "color");
         Optional<GlowColor> colour = GlowColor.fromId(typed);
         if (colour.isEmpty()) {

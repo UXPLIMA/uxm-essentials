@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -109,7 +110,7 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
         // Bukkit.getOnlinePlayers() off it); each recipient's stack is then added on that player's own region thread.
         services.kernel().scheduler().onGlobal(() -> {
             int recipients = 0;
-            for (Player target : ctx.getSource().getSender().getServer().getOnlinePlayers()) {
+            for (Player target : Sender.audience(ctx.getSource()).getServer().getOnlinePlayers()) {
                 deliverTo(actor, BukkitRefs.toRef(target), material, amount, itemKey, audit);
                 recipients++;
             }
@@ -131,9 +132,9 @@ public final class GiveAllCommand extends ItemworldCommandSupport implements Com
     }
 
     private PlayerRef actorOf(CommandContext<CommandSourceStack> ctx) {
-        return ctx.getSource().getSender() instanceof Player player
+        return Sender.audience(ctx.getSource()) instanceof Player player
                 ? BukkitRefs.toRef(player)
-                : PlayerRef.system(ctx.getSource().getSender().getName());
+                : PlayerRef.system(Sender.audience(ctx.getSource()).getName());
     }
 
     private static Map<String, String> placeholders(String item, int amount, int count) {

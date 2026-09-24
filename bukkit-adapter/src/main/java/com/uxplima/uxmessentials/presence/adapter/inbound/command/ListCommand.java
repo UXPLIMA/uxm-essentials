@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -96,7 +97,7 @@ public final class ListCommand extends PresenceCommandSupport implements Command
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         // The roster (names + per-viewer canSee) is read on the global region thread (Folia forbids iterating
         // Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.
         scheduler.onGlobal(() -> {
@@ -113,7 +114,7 @@ public final class ListCommand extends PresenceCommandSupport implements Command
      * the head grid. A console has no inventory, so it falls back to the chat listing.
      */
     private int runGui(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (listView == null || !(sender instanceof Player viewer)) {
             return run(ctx);
         }

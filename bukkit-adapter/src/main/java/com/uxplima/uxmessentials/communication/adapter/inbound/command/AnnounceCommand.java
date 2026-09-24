@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -155,7 +156,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     }
 
     private int reload(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         // Re-reading the three HOCON files is blocking I/O, so it runs off the tick thread; re-arming the override
         // loops then picks up any announcement newly given an interval-seconds override (otherwise it would be
         // excluded from the rotation with no loop of its own and silently never broadcast). The confirmation hops
@@ -171,7 +172,7 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         // The merged set reads the enabled store announcements, a DB query, so it is resolved off the tick thread and
         // the framing hops back to the global region for delivery, the same off-tick shape as reload.
         scheduler.async(() -> {

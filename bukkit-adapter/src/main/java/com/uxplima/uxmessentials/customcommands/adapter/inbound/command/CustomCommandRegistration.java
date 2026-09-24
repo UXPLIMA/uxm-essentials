@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Sender;
 
 /**
  * One operator-defined command as a Brigadier registration. It is a {@link CommandRegistration} like any built-in
@@ -121,7 +122,7 @@ public final class CustomCommandRegistration implements CommandRegistration {
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Map<String, String> values = new LinkedHashMap<>(ArgumentNodes.read(ctx, arguments));
         values.put(RAW_ARGUMENTS, remainder(ctx.getInput()));
         RunOutcome outcome = runner.run(live.get(), CommandFeedback.refOf(sender), !(sender instanceof Player), values);

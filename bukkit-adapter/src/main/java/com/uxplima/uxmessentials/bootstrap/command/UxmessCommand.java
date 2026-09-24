@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadStatus;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -213,7 +214,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private int runStatus(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         sendHeader(sender, STATUS_HEADER);
         List<FeatureModule> modules = registry.all();
         if (modules.isEmpty()) {
@@ -227,7 +228,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private int runDoctor(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (closed.get()) {
             send(sender, ERROR, DOCTOR_CLOSED);
             return 0;
@@ -257,14 +258,14 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private int runRepairPreview(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         sendHeader(sender, DOCTOR_REPAIR_HEADER);
         sendBody(sender, DOCTOR_REPAIR_PREVIEW);
         return Command.SINGLE_SUCCESS;
     }
 
     private int runRepairConfirmed(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (closed.get()) {
             send(sender, ERROR, DOCTOR_CLOSED);
             return 0;
@@ -391,7 +392,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private int runHelp(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         sendHeader(sender, HELP_HEADER);
         sendBody(sender, HELP_STATUS);
         sendBody(sender, HELP_DOCTOR);
@@ -405,11 +406,11 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private int runReloadAll(CommandContext<CommandSourceStack> ctx) {
-        return runReload(ctx.getSource().getSender(), null);
+        return runReload(Sender.audience(ctx.getSource()), null);
     }
 
     private int runReloadOne(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String requested = ctx.getArgument("module", String.class);
         FeatureModule module = resolve(requested);
         if (module == null) {

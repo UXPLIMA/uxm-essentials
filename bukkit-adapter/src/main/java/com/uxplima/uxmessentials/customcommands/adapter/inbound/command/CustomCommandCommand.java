@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 
 /**
  * The operator surface over the loaded definitions: what is loaded, what one definition says, re-reading the folder
@@ -124,7 +125,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx) {
-        feedback.send(ctx.getSource().getSender(), CustomCommandsMessageKey.CUSTOMCOMMAND_USAGE);
+        feedback.send(Sender.audience(ctx.getSource()), CustomCommandsMessageKey.CUSTOMCOMMAND_USAGE);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -134,7 +135,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         CustomCommandLoader.LoadResult loaded = loaded();
         List<CustomCommand> commands = loaded.catalog().commands();
         if (commands.isEmpty()) {
@@ -161,7 +162,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int info(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String id = StringArgumentType.getString(ctx, "id");
         Optional<CustomCommand> found = loaded().catalog().byId(id);
         if (found.isEmpty()) {
@@ -203,7 +204,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int reloadAll(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         scheduler.async(() -> {
             CustomCommandLoader.LoadResult loaded = reloadAll.get();
             state.set(loaded);
@@ -218,7 +219,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int reloadOne(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String id = StringArgumentType.getString(ctx, "id");
         scheduler.async(() -> {
             CustomCommandLoader.LoadResult loaded = reloadOne.apply(id);
@@ -235,7 +236,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int test(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String id = StringArgumentType.getString(ctx, "id");
         Optional<CustomCommand> found = loaded().catalog().byId(id);
         if (found.isEmpty()) {
@@ -251,12 +252,12 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int runForSelf(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         return dispatch(ctx, sender, CommandFeedback.refOf(sender), !(sender instanceof Player));
     }
 
     private int runForOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerSelectorArgumentResolver resolver = ctx.getArgument("player", PlayerSelectorArgumentResolver.class);
         List<Player> resolved = resolver.resolve(ctx.getSource());
         if (resolved.isEmpty()) {
@@ -288,7 +289,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int create(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             // The wizard is a conversation: it needs somebody to ask, and the console cannot answer a prompt.
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
@@ -299,7 +300,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int deleteAsk(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String id = StringArgumentType.getString(ctx, "id");
         if (loaded().catalog().byId(id).isEmpty()) {
             return notFound(sender, id);
@@ -309,7 +310,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     }
 
     private int deleteConfirm(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String id = StringArgumentType.getString(ctx, "id");
         if (loaded().catalog().byId(id).isEmpty()) {
             return notFound(sender, id);

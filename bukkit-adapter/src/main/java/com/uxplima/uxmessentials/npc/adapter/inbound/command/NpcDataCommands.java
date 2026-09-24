@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.NpcTypeData;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -199,7 +200,7 @@ final class NpcDataCommands extends NpcCommandSupport {
     }
 
     private int dataSet(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
         String value = value(ctx);
         if (!NpcTypeData.isKnownKey(key) || !NpcTypeData.isValidValue(key, value)) {
@@ -211,7 +212,7 @@ final class NpcDataCommands extends NpcCommandSupport {
     }
 
     private int dataClear(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         String key = ctx.getArgument("key", String.class).toLowerCase(Locale.ROOT);
         if (!NpcTypeData.isKnownKey(key)) {
             feedback.send(sender, NpcMessageKey.NPC_INVALID_DATA, Map.of("key", key, "value", ""));

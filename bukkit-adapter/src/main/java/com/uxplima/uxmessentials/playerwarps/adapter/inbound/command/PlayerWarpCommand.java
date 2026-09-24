@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -554,7 +555,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
 
     /** First {@code purge}/{@code delete} invocation: warn the operator and require the {@code confirm} step (invariant 5). */
     private int runAdminPurgePrompt(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         long id = ctx.getArgument("id", Long.class);
         feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_PURGE_CONFIRM, Map.of("id", Long.toString(id)));
         return Command.SINGLE_SUCCESS;
@@ -566,7 +567,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     private int runAdminSetOwner(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         long id = ctx.getArgument("id", Long.class);
         String playerName = ctx.getArgument("player", String.class);
         PlayerRef admin = actor(ctx);
@@ -593,7 +594,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
      * so point the operator there rather than reimplementing a hot-reload the services holder cannot reach.
      */
     private int runAdminReload(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         feedback.send(sender, PlayerwarpsMessageKey.PWARP_ADMIN_RELOAD_HINT, Map.of());
         return Command.SINGLE_SUCCESS;
     }
@@ -606,7 +607,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
             CommandContext<CommandSourceStack> ctx,
             Function<PlayerWarpId, Result<Unit, PlayerWarpError>> action,
             PlayerwarpsMessageKey okKey) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         long id = ctx.getArgument("id", Long.class);
         PlayerRef admin = actor(ctx);
         Map<String, String> placeholders = Map.of("id", Long.toString(id));
@@ -685,7 +686,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     }
 
     private int runListOther(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef viewer = actor(ctx);
         String ownerName = ctx.getArgument("player", String.class);
         services.scheduler().async(() -> {

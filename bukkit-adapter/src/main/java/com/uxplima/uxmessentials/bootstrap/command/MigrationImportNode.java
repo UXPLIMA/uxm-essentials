@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -91,7 +92,7 @@ public final class MigrationImportNode {
     }
 
     private int runList(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         sender.sendMessage(MINI_MESSAGE.deserialize(HEADER + escape(LIST_HEADER) + HEADER_END));
         for (SourceDescriptor descriptor : service.builtSources()) {
             sender.sendMessage(MINI_MESSAGE.deserialize(BODY + escape(describe(descriptor))));
@@ -110,7 +111,7 @@ public final class MigrationImportNode {
             reply(ctx, ERROR, UNKNOWN_SOURCE + raw + ". Built sources: " + joinedBuiltIds());
             return 0;
         }
-        String actor = ctx.getSource().getSender().getName();
+        String actor = Sender.audience(ctx.getSource()).getName();
         service.dispatch(actor, resolved.get(), mode);
         reply(ctx, SUCCESS, STARTED + resolved.get().value() + (mode.isDryRun() ? DRY_PREFIX : ""));
         return Command.SINGLE_SUCCESS;
@@ -128,7 +129,7 @@ public final class MigrationImportNode {
     }
 
     private static void reply(CommandContext<CommandSourceStack> ctx, String palette, String message) {
-        ctx.getSource().getSender().sendMessage(MINI_MESSAGE.deserialize(palette + escape(message)));
+        Sender.audience(ctx.getSource()).sendMessage(MINI_MESSAGE.deserialize(palette + escape(message)));
     }
 
     private static String escape(String text) {

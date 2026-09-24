@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,7 +65,7 @@ public final class GcCommand extends PresenceCommandSupport implements CommandRe
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         // The world totals iterate every world's entities and loaded chunks, a cross-region read on Folia, where
         // each world's entities are owned by their own region threads, not the command-dispatch thread. The whole
         // snapshot is therefore taken on the global region thread (the one thread that can read every world's

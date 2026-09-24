@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,7 +68,7 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
     private int runRefresh(CommandContext<CommandSourceStack> ctx) {
         offTick(() -> {
             services.baltopSnapshots().refreshAll();
-            feedback.send(ctx.getSource().getSender(), EconomyMessageKey.BALTOP_REFRESHED, Map.of());
+            feedback.send(Sender.audience(ctx.getSource()), EconomyMessageKey.BALTOP_REFRESHED, Map.of());
         });
         return Command.SINGLE_SUCCESS;
     }

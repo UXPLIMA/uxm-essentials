@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -79,7 +80,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int moveTo(CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         double x = ctx.getArgument("x", Double.class);
         double y = ctx.getArgument("y", Double.class);
         double z = ctx.getArgument("z", Double.class);
@@ -125,7 +126,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int cooldown(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         String word = ctx.getArgument("duration", String.class).strip();
         Long millis = word.equalsIgnoreCase(DEFAULT_KEYWORD) ? 0L : parseFriendlyMillis(word);
         if (millis == null) {
@@ -153,7 +154,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int distance(CommandContext<CommandSourceStack> ctx, SetNpcRange.Kind kind) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         String word = ctx.getArgument("blocks", String.class).strip();
         if (word.equalsIgnoreCase(DEFAULT_KEYWORD)) {
             services.range().setRange(actor(ctx), nameArg(ctx), kind, null);
@@ -191,7 +192,7 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int state(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         String word = ctx.getArgument("state", String.class).strip().toUpperCase(Locale.ROOT);
         SetNpcState.Flag flag = parseFlag(word);
         if (flag == null) {

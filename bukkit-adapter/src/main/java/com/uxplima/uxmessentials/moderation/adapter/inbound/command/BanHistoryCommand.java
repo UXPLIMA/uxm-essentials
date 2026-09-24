@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -81,7 +82,7 @@ public final class BanHistoryCommand extends ModerationCommandSupport implements
             return Optional.empty();
         }
         return Optional.of(ctx -> {
-            if (ctx.getSource().getSender() instanceof Player sender) {
+            if (Sender.audience(ctx.getSource()) instanceof Player sender) {
                 PlayerRef viewer = BukkitRefs.toRef(sender);
                 picker.open(sender, viewer, pickRequest(sender, viewer));
             }

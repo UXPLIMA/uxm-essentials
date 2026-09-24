@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,7 +68,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
     }
 
     private int setMode(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<GameModeRef> mode = GameModeRef.parse(ctx.getArgument("mode", String.class));
         if (mode.isEmpty()) {
             feedback.send(sender, PlayerstateMessageKey.GAMEMODE_INVALID, Map.of());

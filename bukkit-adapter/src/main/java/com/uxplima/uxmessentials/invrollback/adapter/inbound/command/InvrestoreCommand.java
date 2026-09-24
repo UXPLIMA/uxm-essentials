@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -127,7 +128,7 @@ public final class InvrestoreCommand implements CommandRegistration {
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         feedback.send(
                 sender,
                 SharedMessageKey.COMMAND_USAGE,
@@ -144,7 +145,7 @@ public final class InvrestoreCommand implements CommandRegistration {
     }
 
     private int open(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player staff)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -174,7 +175,7 @@ public final class InvrestoreCommand implements CommandRegistration {
      * member, so an offline target is fine.
      */
     private int withSnapshot(CommandContext<CommandSourceStack> ctx, SnapshotAction action) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player staff)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;

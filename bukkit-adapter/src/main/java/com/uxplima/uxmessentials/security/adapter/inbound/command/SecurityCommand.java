@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -122,13 +123,13 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, MessageKey key) {
-        reply(ctx.getSource().getSender(), key);
+        reply(Sender.audience(ctx.getSource()), key);
         return Command.SINGLE_SUCCESS;
     }
 
     /** {@code /security status <player>}: which factors the target holds, one line each. */
     private int status(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
         scheduler.async(() -> onTarget(sender, name, target -> {
             TwoFactorRegistration registration = repository.find(target.uuid()).orElse(null);
@@ -154,7 +155,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
      * back into the freeze.
      */
     private int force(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
         scheduler.async(() -> onTarget(sender, name, target -> {
             if (forceReverification.force(target.uuid()) == ForceResult.NOT_ENROLLED) {
@@ -176,7 +177,7 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
 
     /** {@code /security reset <player> [scope]}: clear a factor the target can no longer prove, and log it. */
     private int reset(CommandContext<CommandSourceStack> ctx, FactorScope scope) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
         String scopeName = scope.name().toLowerCase(Locale.ROOT);
         scheduler.async(() -> onTarget(sender, name, target -> {

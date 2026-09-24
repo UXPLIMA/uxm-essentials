@@ -24,6 +24,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -77,7 +78,7 @@ public final class CommandSuggestions {
         // roster that shifts mid-keystroke at worst offers or omits one stale name for that keystroke, harmless.
         return (ctx, builder) -> {
             String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-            for (Player online : visibleOnlinePlayers(ctx.getSource().getSender())) {
+            for (Player online : visibleOnlinePlayers(Sender.audience(ctx.getSource()))) {
                 String name = online.getName();
                 if (matches(name, prefix)) {
                     builder.suggest(name);
@@ -138,7 +139,7 @@ public final class CommandSuggestions {
             builder.suggest(token);
         }
         String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-        for (Player online : visibleOnlinePlayers(ctx.getSource().getSender())) {
+        for (Player online : visibleOnlinePlayers(Sender.audience(ctx.getSource()))) {
             String name = online.getName();
             if (matches(name, prefix)) {
                 builder.suggest(name);
@@ -179,7 +180,7 @@ public final class CommandSuggestions {
             Function<PlayerRef, ? extends Collection<String>> lookup) {
         Objects.requireNonNull(lookup, "lookup");
         return (ctx, builder) -> {
-            CommandSender sender = ctx.getSource().getSender();
+            CommandSender sender = Sender.audience(ctx.getSource());
             if (!(sender instanceof Player player)) {
                 return builder.buildFuture();
             }

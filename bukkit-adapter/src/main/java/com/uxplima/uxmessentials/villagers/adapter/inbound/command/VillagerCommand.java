@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerFollowService;
 import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -107,14 +108,14 @@ public final class VillagerCommand implements CommandRegistration {
     private int help(CommandContext<CommandSourceStack> ctx) {
         boolean anyEnabled = managerView != null || protectToggle != null || followService != null;
         feedback.send(
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 anyEnabled ? VillagersMessageKey.VILLAGERS_USAGE : VillagersMessageKey.VILLAGERS_NONE_ENABLED);
         return Command.SINGLE_SUCCESS;
     }
 
     private int openManager(CommandContext<CommandSourceStack> ctx) {
         VillagerManagerView view = Objects.requireNonNull(managerView, "managerView");
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -130,7 +131,7 @@ public final class VillagerCommand implements CommandRegistration {
 
     private int toggleProtect(CommandContext<CommandSourceStack> ctx) {
         VillagerProtectToggle toggle = Objects.requireNonNull(protectToggle, "protectToggle");
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -146,7 +147,7 @@ public final class VillagerCommand implements CommandRegistration {
 
     private int toggleFollow(CommandContext<CommandSourceStack> ctx) {
         VillagerFollowService follow = Objects.requireNonNull(followService, "followService");
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;

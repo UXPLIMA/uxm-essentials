@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.domain.Vote;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -318,7 +319,7 @@ public final class VoteCommand implements CommandRegistration {
     }
 
     private int giveVoteImpl(CommandContext<CommandSourceStack> ctx, int amount) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = CommandFeedback.refOf(sender);
         String name = ctx.getArgument("player", String.class);
         Optional<PlayerRef> target = services.playerLookup().findByName(name);
@@ -332,7 +333,7 @@ public final class VoteCommand implements CommandRegistration {
     }
 
     private int resetTotals(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = CommandFeedback.refOf(sender);
         String name = ctx.getArgument("player", String.class);
         Optional<PlayerRef> target = services.playerLookup().findByName(name);
@@ -346,7 +347,7 @@ public final class VoteCommand implements CommandRegistration {
     }
 
     private @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

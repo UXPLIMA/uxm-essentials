@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -80,7 +81,7 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
 
     private int runAt(CommandContext<CommandSourceStack> ctx) {
         String worldName = StringArgumentType.getString(ctx, "world");
-        World world = ctx.getSource().getSender().getServer().getWorld(worldName);
+        World world = Sender.audience(ctx.getSource()).getServer().getWorld(worldName);
         if (world == null) {
             notify(ctx, SharedMessageKey.COMMAND_UNKNOWN_WORLD, Map.of("world", worldName));
             return 0;

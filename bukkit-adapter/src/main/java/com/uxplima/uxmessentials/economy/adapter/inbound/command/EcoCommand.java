@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -113,7 +114,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return java.util.Optional.empty();
         }
         return java.util.Optional.of(ctx -> {
-            if (ctx.getSource().getSender() instanceof Player sender) {
+            if (Sender.audience(ctx.getSource()) instanceof Player sender) {
                 gui.hub().open(sender, BukkitRefs.toRef(sender));
             }
             return Command.SINGLE_SUCCESS;

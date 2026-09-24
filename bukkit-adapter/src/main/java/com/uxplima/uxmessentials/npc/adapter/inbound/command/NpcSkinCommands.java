@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -75,7 +76,7 @@ final class NpcSkinCommands extends NpcCommandSupport {
     }
 
     private int skin(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         com.uxplima.uxmessentials.shared.domain.PlayerRef actor = actor(ctx);
         String spec = value(ctx);
         if (spec.strip().equalsIgnoreCase(NONE_KEYWORD) || spec.strip().equalsIgnoreCase("none")) {

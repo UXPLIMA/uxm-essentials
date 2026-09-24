@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 
@@ -84,7 +85,7 @@ public final class MenuOpenCommand implements CommandRegistration {
     }
 
     private int open(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         // A non-player sender is turned away first unless the block explicitly allows the console.
         if (!(sender instanceof Player) && !spec.consoleAllowed()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_CONSOLE_DENIED);

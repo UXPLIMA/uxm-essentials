@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatal
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -75,7 +76,7 @@ public final class PlaceholdersSubcommand {
     }
 
     private int runAreas(CommandContext<CommandSourceStack> context) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         send(
                 sender,
                 HEADER,
@@ -86,7 +87,7 @@ public final class PlaceholdersSubcommand {
     }
 
     private int runArea(CommandContext<CommandSourceStack> context, int page) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         String asked = StringArgumentType.getString(context, "area");
         PlaceholderCatalogRenderer.Page rendered = PlaceholderCatalogRenderer.page(asked, page);
         if (rendered.empty()) {
@@ -104,7 +105,7 @@ public final class PlaceholdersSubcommand {
     }
 
     private int runExport(CommandContext<CommandSourceStack> context) {
-        CommandSender sender = context.getSource().getSender();
+        CommandSender sender = Sender.audience(context.getSource());
         Path target = dataFolder.resolve(EXPORT_FILE);
         try {
             Files.createDirectories(dataFolder);

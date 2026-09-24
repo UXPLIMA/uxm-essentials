@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -106,14 +107,14 @@ public final class LocaleBinding {
 
     private int runBound(CommandContext<CommandSourceStack> ctx, Command<CommandSourceStack> delegate)
             throws CommandSyntaxException {
-        if (ctx.getSource().getSender() instanceof Player player) {
+        if (Sender.audience(ctx.getSource()) instanceof Player player) {
             return runInLocale(ctx, delegate, player);
         }
         try {
             return delegate.run(ctx); // console / command block has no client locale to bind
         } catch (RuntimeException bug) {
             // CommandSyntaxException is checked, so it slips past this catch and surfaces as Brigadier expects.
-            return reportFailure(ctx, ctx.getSource().getSender(), bug);
+            return reportFailure(ctx, Sender.audience(ctx.getSource()), bug);
         }
     }
 

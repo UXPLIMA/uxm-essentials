@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -333,7 +334,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     }
 
     private PlayerRef refOf(CommandContext<CommandSourceStack> ctx) {
-        return ref((Player) ctx.getSource().getSender());
+        return ref((Player) Sender.audience(ctx.getSource()));
     }
 
     private static HomeSlot slotArg(CommandContext<CommandSourceStack> ctx) {

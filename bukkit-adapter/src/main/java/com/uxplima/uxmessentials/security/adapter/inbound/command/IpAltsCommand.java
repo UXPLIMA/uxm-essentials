@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.AltGroup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -71,7 +72,7 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = ctx.getArgument("player", String.class);
         scheduler.async(() -> report(sender, name));
         return Command.SINGLE_SUCCESS;

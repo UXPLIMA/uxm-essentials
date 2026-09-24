@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -224,7 +225,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
      * hub entry uses.
      */
     private int openGui(CommandContext<CommandSourceStack> ctx) {
-        if (!(ctx.getSource().getSender() instanceof Player sender)) {
+        if (!(Sender.audience(ctx.getSource()) instanceof Player sender)) {
             services.list().list(actor(ctx));
             return Command.SINGLE_SUCCESS;
         }
@@ -391,7 +392,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     }
 
     private @Nullable Position explicitPosition(CommandContext<CommandSourceStack> ctx) {
-        org.bukkit.command.CommandSender sender = ctx.getSource().getSender();
+        org.bukkit.command.CommandSender sender = Sender.audience(ctx.getSource());
         World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
         double x = ctx.getArgument("x", Double.class);
         double y = ctx.getArgument("y", Double.class);

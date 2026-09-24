@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -63,7 +64,7 @@ public final class RealnameCommand extends PresenceCommandSupport implements Com
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String query = StringArgumentType.getString(ctx, "player");
         // The roster (names + display names + per-viewer canSee) is read on the global region thread (Folia forbids
         // iterating Bukkit.getOnlinePlayers() off it); the one reply then lands on the sender's own thread.

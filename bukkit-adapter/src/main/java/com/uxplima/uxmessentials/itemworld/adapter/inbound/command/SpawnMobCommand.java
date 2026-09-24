@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -97,7 +98,7 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
         }
         if (!allowsType(
                 ctx,
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 "spawnmob",
                 type.get().getKey().getKey())) {
             return Command.SINGLE_SUCCESS;
@@ -128,7 +129,7 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
         if (!enabled(ctx)) {
             return Command.SINGLE_SUCCESS;
         }
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String worldName = StringArgumentType.getString(ctx, "world");
         World world = sender.getServer().getWorld(worldName);
         if (world == null) {

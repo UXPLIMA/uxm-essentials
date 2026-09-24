@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
 import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -161,7 +162,7 @@ public final class VanishCommand implements CommandRegistration {
     }
 
     private int vanishOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
             feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER, Map.of("player", targetToken(ctx)));
@@ -213,7 +214,7 @@ public final class VanishCommand implements CommandRegistration {
 
     private void confirmPickup(CommandContext<CommandSourceStack> ctx, boolean picksUp) {
         VanishMessageKey key = picksUp ? VanishMessageKey.VANISH_PICKUP_ON : VanishMessageKey.VANISH_PICKUP_OFF;
-        feedback.send(ctx.getSource().getSender(), key);
+        feedback.send(Sender.audience(ctx.getSource()), key);
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
@@ -223,7 +224,7 @@ public final class VanishCommand implements CommandRegistration {
         }
         List<UUID> visible = listVanished.visibleTo(caller);
         if (visible.isEmpty()) {
-            feedback.send(ctx.getSource().getSender(), VanishMessageKey.VANISH_LIST_EMPTY);
+            feedback.send(Sender.audience(ctx.getSource()), VanishMessageKey.VANISH_LIST_EMPTY);
             return Command.SINGLE_SUCCESS;
         }
         String names = visible.stream()
@@ -231,7 +232,7 @@ public final class VanishCommand implements CommandRegistration {
                 .flatMap(Optional::stream)
                 .collect(Collectors.joining(", "));
         feedback.send(
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 VanishMessageKey.VANISH_LIST,
                 Map.of("count", Integer.toString(visible.size()), "players", names));
         return Command.SINGLE_SUCCESS;
@@ -260,7 +261,7 @@ public final class VanishCommand implements CommandRegistration {
 
     /** The invoking player's ref, or {@code null} (after the players-only reply) for a console source. */
     private @Nullable PlayerRef playerRef(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return BukkitRefs.toRef(player);
         }

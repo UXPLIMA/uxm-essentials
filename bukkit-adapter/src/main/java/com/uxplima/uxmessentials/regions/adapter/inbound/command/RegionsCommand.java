@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -248,7 +249,7 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private int createAt(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!service.available()) {
             feedback.send(sender, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
             return Command.SINGLE_SUCCESS;
@@ -352,7 +353,7 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private int add(CommandContext<CommandSourceStack> ctx, RegionMemberChange.Role role) {
-        CommandSender staff = ctx.getSource().getSender();
+        CommandSender staff = Sender.audience(ctx.getSource());
         if (!service.available()) {
             feedback.send(staff, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
             return Command.SINGLE_SUCCESS;
@@ -419,7 +420,7 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private int setPriority(CommandContext<CommandSourceStack> ctx) {
-        CommandSender staff = ctx.getSource().getSender();
+        CommandSender staff = Sender.audience(ctx.getSource());
         if (!service.available()) {
             feedback.send(staff, RegionsMessageKey.REGIONS_NO_WORLDGUARD);
             return Command.SINGLE_SUCCESS;
@@ -478,7 +479,7 @@ public final class RegionsCommand implements CommandRegistration {
     }
 
     private @Nullable Player playerOrReject(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

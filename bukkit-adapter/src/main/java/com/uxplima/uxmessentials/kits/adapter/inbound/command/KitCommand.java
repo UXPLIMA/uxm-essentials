@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -157,8 +158,8 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int give(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
-        Optional<PlayerRef> target = resolveSelectorTarget(ctx, ctx.getSource().getSender());
+        CommandSender sender = Sender.audience(ctx.getSource());
+        Optional<PlayerRef> target = resolveSelectorTarget(ctx, Sender.audience(ctx.getSource()));
         if (target.isEmpty()) {
             return 0;
         }
@@ -179,7 +180,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
      * filter so the two presentations never disagree. The mode is read live so a reload takes effect at once.
      */
     private int runList(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player viewer)) {
             // A console has no inventory to open a menu in; show the chat list instead.
             return runChatList(ctx);
@@ -195,12 +196,12 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int runChatList(CommandContext<CommandSourceStack> ctx) {
-        services.listKits().list(actorRef(ctx.getSource().getSender()));
+        services.listKits().list(actorRef(Sender.audience(ctx.getSource())));
         return Command.SINGLE_SUCCESS;
     }
 
     private int show(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorRef(sender);
         KitId id = KitId.of(ctx.getArgument("name", String.class));
         services.showKit().show(actor, id).asValue().ifPresent(definition -> present(sender, actor, definition));
@@ -247,7 +248,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
 
     private int delete(CommandContext<CommandSourceStack> ctx) {
         services.delKit()
-                .delete(actorRef(ctx.getSource().getSender()), KitId.of(ctx.getArgument("name", String.class)));
+                .delete(actorRef(Sender.audience(ctx.getSource())), KitId.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -299,7 +300,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int resetAll(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorRef(sender);
         Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
         if (target.isEmpty()) {
@@ -310,7 +311,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     }
 
     private int resetOne(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         PlayerRef actor = actorRef(sender);
         Optional<PlayerRef> target = resolveSelectorTarget(ctx, sender);
         if (target.isEmpty()) {

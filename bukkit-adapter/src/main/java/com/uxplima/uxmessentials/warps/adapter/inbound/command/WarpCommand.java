@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -226,7 +227,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
      * filter so the two presentations never disagree. The mode is read live so a reload takes effect at once.
      */
     private int runList(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player viewer)) {
             // A console has no inventory to open a menu in; show the chat list instead.
             return runChatList(ctx);
@@ -278,7 +279,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int toggleLock(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String warpName = ctx.getArgument("name", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
         if (opt.isEmpty()) {
@@ -297,7 +298,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int setPasswordClear(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String warpName = ctx.getArgument("name", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
         if (opt.isEmpty()) {
@@ -313,7 +314,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int setPassword(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String warpName = ctx.getArgument("name", String.class);
         String password = ctx.getArgument("password", String.class);
         Optional<Warp> opt = services.repository().find(WarpName.of(warpName));
@@ -357,7 +358,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private int getWarpRating(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String warpName = ctx.getArgument("name", String.class);
 
         // The existence check is in-memory; the average rating is an aggregate query against the database, so
@@ -419,7 +420,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     }
 
     private @org.jspecify.annotations.Nullable Position explicitPosition(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         World world = sender.getServer().getWorld(ctx.getArgument("world", String.class));
         double x = ctx.getArgument("x", Double.class);
         double y = ctx.getArgument("y", Double.class);

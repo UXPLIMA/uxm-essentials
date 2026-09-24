@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,7 +68,7 @@ public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implement
         String ownerName = ctx.getArgument("player", String.class);
         Optional<PlayerRef> owner = services.players().findByName(ownerName);
         if (owner.isEmpty()) {
-            unknownPlayer(ctx.getSource().getSender(), ownerName);
+            unknownPlayer(Sender.audience(ctx.getSource()), ownerName);
             return 0;
         }
         PlayerRef viewer = ref(sender);

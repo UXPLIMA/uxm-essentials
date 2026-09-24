@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
@@ -211,7 +212,7 @@ public final class MenuCommand implements CommandRegistration {
     }
 
     private int open(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -242,7 +243,7 @@ public final class MenuCommand implements CommandRegistration {
      * the target's own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe.
      */
     private int openForOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "name");
         if (!menuNames.get().contains(name)) {
             feedback.send(sender, CustomMenusMessageKey.MENU_NOT_FOUND, Map.of("name", name));
@@ -284,7 +285,7 @@ public final class MenuCommand implements CommandRegistration {
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         List<String> names = menuNames.get();
         if (names.isEmpty()) {
             feedback.send(sender, CustomMenusMessageKey.MENU_LIST_EMPTY);
@@ -307,7 +308,7 @@ public final class MenuCommand implements CommandRegistration {
      * The reopen lands on the player's own region thread through the facade, so it stays Folia-safe.
      */
     private int last(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -322,7 +323,7 @@ public final class MenuCommand implements CommandRegistration {
     private int reload(CommandContext<CommandSourceStack> ctx) {
         CustomMenuLoader.LoadResult result = reload.get();
         feedback.send(
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 CustomMenusMessageKey.MENU_RELOADED,
                 Map.of(
                         "loaded",
@@ -340,7 +341,7 @@ public final class MenuCommand implements CommandRegistration {
      * skipped}). Bare {@code /menu reload} still reloads every menu: this is the argument-bearing branch only.
      */
     private int reloadOne(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "menu");
         CustomMenuLoader.SingleLoad result = reloadOne.apply(name);
         if (!result.found()) {
@@ -366,7 +367,7 @@ public final class MenuCommand implements CommandRegistration {
      * standalone (no menu need be open or registered), and the sender is told which action ran for whom.
      */
     private int executeAction(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Player target = resolvePlayer(ctx);
         if (target == null) {
             feedback.send(sender, SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
@@ -391,7 +392,7 @@ public final class MenuCommand implements CommandRegistration {
      * resolves through a {@link CustomMenusMessageKey}, so the dump carries no inline literal.
      */
     private int dump(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "menu");
         Optional<MenuSpec> found = menus.registeredSpec(name);
         if (found.isEmpty()) {
@@ -420,7 +421,7 @@ public final class MenuCommand implements CommandRegistration {
      * {@link CustomMenusMessageKey}.
      */
     private int meta(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "menu");
         Optional<MenuSpec> found = menus.registeredSpec(name);
         if (found.isEmpty()) {
@@ -440,7 +441,7 @@ public final class MenuCommand implements CommandRegistration {
      * ids and nothing is written, so a save can never leave a menu the loader would only skip.
      */
     private int save(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String name = StringArgumentType.getString(ctx, "menu");
         Optional<MenuSpec> found = menus.registeredSpec(name);
         if (found.isEmpty()) {
@@ -478,7 +479,7 @@ public final class MenuCommand implements CommandRegistration {
      * line. The picker itself opens on the player's own entity thread through the engine, so the open stays Folia-safe.
      */
     private int editor(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -496,7 +497,7 @@ public final class MenuCommand implements CommandRegistration {
      * nothing. The hook re-opens the grid on the viewer's own entity thread, so the redraw stays Folia-safe.
      */
     private int captureItem(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
@@ -559,7 +560,7 @@ public final class MenuCommand implements CommandRegistration {
      * emitted files, then runs {@code /menu reload}, and the per-file conversion never crashes the command.
      */
     private int convertDeluxeMenus(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String path = StringArgumentType.getString(ctx, "path");
         var report = deluxeMenusConvert.convert(path);
         if (!report.found()) {
@@ -576,7 +577,7 @@ public final class MenuCommand implements CommandRegistration {
      * report, same deliberate no-reload. The per-file conversion never crashes the command.
      */
     private int convertZMenu(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String path = StringArgumentType.getString(ctx, "path");
         var report = zMenuConvert.convert(path);
         if (!report.found()) {
@@ -593,7 +594,7 @@ public final class MenuCommand implements CommandRegistration {
      * warning report, same deliberate no-reload. The per-file conversion never crashes the command.
      */
     private int convertOgui(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String path = StringArgumentType.getString(ctx, "path");
         var report = oguiConvert.convert(path);
         if (!report.found()) {
@@ -610,7 +611,7 @@ public final class MenuCommand implements CommandRegistration {
      * warning report, same deliberate no-reload. The per-file conversion never crashes the command.
      */
     private int convertGuiPlus(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String path = StringArgumentType.getString(ctx, "path");
         var report = guiPlusConvert.convert(path);
         if (!report.found()) {

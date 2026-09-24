@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -39,12 +40,12 @@ abstract class WorldCommandSupport {
 
     /** The command actor: a live player ref, or the stable system ref used by console automation. */
     final PlayerRef actor(CommandContext<CommandSourceStack> ctx) {
-        return CommandFeedback.refOf(ctx.getSource().getSender());
+        return CommandFeedback.refOf(Sender.audience(ctx.getSource()));
     }
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
     final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

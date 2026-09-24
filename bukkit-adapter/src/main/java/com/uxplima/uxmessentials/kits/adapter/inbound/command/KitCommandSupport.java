@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -56,7 +57,7 @@ abstract class KitCommandSupport {
 
     /** The invoking player, or {@code null} (after sending the players-only reply) for a console source. */
     final @Nullable Player player(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }
@@ -67,7 +68,7 @@ abstract class KitCommandSupport {
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
         feedback.send(
-                ctx.getSource().getSender(),
+                Sender.audience(ctx.getSource()),
                 SharedMessageKey.COMMAND_USAGE,
                 Map.of(
                         "command", command,

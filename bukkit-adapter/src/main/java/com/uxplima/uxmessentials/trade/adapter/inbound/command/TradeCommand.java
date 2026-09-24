@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -111,7 +112,7 @@ public final class TradeCommand implements CommandRegistration {
             suggestPendingRequesters(
                     CommandContext<CommandSourceStack> ctx,
                     com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
-        if (ctx.getSource().getSender() instanceof Player player) {
+        if (Sender.audience(ctx.getSource()) instanceof Player player) {
             String prefix = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
             for (String name : requests.pendingRequesterNames(player.getUniqueId())) {
                 if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
@@ -265,12 +266,12 @@ public final class TradeCommand implements CommandRegistration {
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx) {
-        feedback.send(ctx.getSource().getSender(), TradeMessageKey.TRADE_USAGE);
+        feedback.send(Sender.audience(ctx.getSource()), TradeMessageKey.TRADE_USAGE);
         return Command.SINGLE_SUCCESS;
     }
 
     private @Nullable Player playerOrNull(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (sender instanceof Player player) {
             return player;
         }

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -193,12 +194,13 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
     private CompletableFuture<Suggestions> suggestTargets(
             CommandContext<CommandSourceStack> ctx, SuggestionsBuilder builder) {
         String prefix = builder.getRemaining().toLowerCase(Locale.ROOT);
-        for (Player online : ctx.getSource().getSender().getServer().getOnlinePlayers()) {
+        for (Player online : Sender.audience(ctx.getSource()).getServer().getOnlinePlayers()) {
             if (online.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
                 builder.suggest(online.getName());
             }
         }
-        for (org.bukkit.World world : ctx.getSource().getSender().getServer().getWorlds()) {
+        for (org.bukkit.World world :
+                Sender.audience(ctx.getSource()).getServer().getWorlds()) {
             if (world.getName().toLowerCase(Locale.ROOT).startsWith(prefix)) {
                 builder.suggest(world.getName());
             }

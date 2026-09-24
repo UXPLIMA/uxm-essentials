@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.TextAlignment;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -119,7 +120,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int billboard(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Billboard> billboard = Billboard.parse(ctx.getArgument("value", String.class));
         if (billboard.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BILLBOARD_INVALID, Map.of());
@@ -129,7 +130,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int background(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Integer> argb = HologramColors.parse(ctx.getArgument("value", String.class));
         if (argb.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_BACKGROUND_INVALID, Map.of());
@@ -139,7 +140,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int glow(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String value = ctx.getArgument("value", String.class);
         if (isClear(value)) {
             return applyAppearance(ctx, current -> current.withGlowArgb(Appearance.DEFAULT_GLOW));
@@ -153,7 +154,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int opacity(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         String value = ctx.getArgument("value", String.class);
         if (isClear(value)) {
             return applyAppearance(ctx, current -> current.withTextOpacity(Appearance.DEFAULT_OPACITY));
@@ -214,7 +215,7 @@ final class HologramAppearanceCommand extends HologramCommandSupport {
     }
 
     private int alignment(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<TextAlignment> alignment = TextAlignment.parse(ctx.getArgument("value", String.class));
         if (alignment.isEmpty()) {
             feedback.send(sender, HologramsMessageKey.HOLOGRAM_ALIGNMENT_INVALID, Map.of());

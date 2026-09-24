@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -99,7 +100,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
             return Optional.empty();
         }
         return Optional.of(ctx -> {
-            if (ctx.getSource().getSender() instanceof Player sender) {
+            if (Sender.audience(ctx.getSource()) instanceof Player sender) {
                 PlayerRef viewer = ref(sender);
                 view.open(sender, viewer, viewer);
             }
@@ -127,7 +128,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
      * shared {@code .others} node inside {@link #resolveNamedTarget}.
      */
     private int showNamed(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
@@ -142,7 +143,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     }
 
     private int reset(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;

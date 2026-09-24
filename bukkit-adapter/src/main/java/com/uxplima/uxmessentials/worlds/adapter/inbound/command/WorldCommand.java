@@ -45,6 +45,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -239,7 +240,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runCreate(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -273,7 +274,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runImport(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("folder", String.class));
         if (name == null) {
             return 0;
@@ -299,7 +300,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runDelete(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -311,7 +312,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     // The target of the delete-confirmation prompt's click. Kept under the root as `/worlds confirm <name>`
     // rather than a separate top-level command so the whole world surface lives behind one literal.
     private int runConfirm(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -322,7 +323,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runList(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         var entries = services.listWorlds().all();
         if (entries.isEmpty()) {
             feedback.send(sender, WorldsMessageKey.WORLD_LIST_EMPTY, Map.of());
@@ -342,7 +343,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runInfo(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -379,7 +380,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runSet(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -396,7 +397,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runGamerule(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -424,7 +425,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runSetSpawnAt(CommandContext<CommandSourceStack> ctx, float yaw, float pitch) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -509,7 +510,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runTpOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
             return 0;
@@ -551,7 +552,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runPregen(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -563,7 +564,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runPregenCancel(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -574,7 +575,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runBackup(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -585,7 +586,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runBackups(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -625,7 +626,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runRestore(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -650,7 +651,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int runRestoreConfirm(CommandContext<CommandSourceStack> ctx) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
@@ -668,7 +669,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int mutate(CommandContext<CommandSourceStack> ctx, Mutation mutation) {
-        CommandSender sender = ctx.getSource().getSender();
+        CommandSender sender = Sender.audience(ctx.getSource());
         WorldName name = parseName(sender, ctx.getArgument("name", String.class));
         if (name == null) {
             return 0;
