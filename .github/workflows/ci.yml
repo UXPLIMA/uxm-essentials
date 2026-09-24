@@ -79,7 +79,8 @@ jobs:
 
       - name: Upload the test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        # See uxm-lib: the upstream action refuses a Forgejo instance from v4 on.
+        uses: forgejo/upload-artifact@v5
         with:
           name: test-reports
           path: uxmEssentials/*/build/reports/tests/
