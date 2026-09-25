@@ -24,15 +24,6 @@ jobs:
         with:
           path: uxmEssentials
 
-      # settings.gradle.kts builds against a sibling ../uxmLib checkout as a composite
-      # build, so the library is compiled from source alongside the plugin.
-      - name: Check out uxmLib
-        uses: actions/checkout@v4
-        with:
-          repository: UXPLIMA/uxm-lib
-          ref: 0.4.0
-          path: uxmLib
-
       - name: Set up JDK 25
         uses: actions/setup-java@v4
         with:
@@ -46,9 +37,11 @@ jobs:
         working-directory: uxmEssentials
         run: scripts/check-style.sh
 
-      # Both this build and the uxmLib build it includes ask paperweight for the same Mojang-mapped dev
-      # bundle. Run in parallel from a cold cache they reach for the same lock at the same moment and the
-      # second one fails outright, so the bundle is unpacked once, on its own, before anything else runs.
+      # paperweight unpacks the Mojang-mapped dev bundle behind a lock that is not re-entrant inside a
+      # build. Two tasks reaching it at once from a cold cache used to kill the second one outright, which
+      # is why the bundle is unpacked once, on its own, before anything else runs. Only :bukkit-adapter
+      # asks for it now that the library arrives as a published jar, so this is cheap insurance rather
+      # than a requirement.
       - name: Warm the Mojang-mapped dev bundle
         working-directory: uxmEssentials
         run: ./gradlew :bukkit-adapter:paperweightUserdevSetup --no-parallel
@@ -86,7 +79,8 @@ jobs:
 
       - name: Upload the test reports
         if: failure()
-        uses: actions/upload-artifact@v4
+        # See uxm-lib: the upstream action refuses a Forgejo instance from v4 on.
+        uses: forgejo/upload-artifact@v5
         with:
           name: test-reports
           path: uxmEssentials/*/build/reports/tests/
