@@ -88,8 +88,12 @@ jobs:
           printf '%s\n' "$notes" > "${RUNNER_TEMP}/release-notes.md"
           cat "${RUNNER_TEMP}/release-notes.md"
 
+      # The absolute URL is not decoration. Forgejo resolves a bare `uses:` name against
+      # data.forgejo.org, which does not carry this action, and it resolves every step in the job before
+      # running any of them -- so a bare name fails the whole job at preparation. uxm-skyblock's run 447
+      # died that way. A URL sends the runner to GitHub for the action.
       - name: Publish the GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: https://github.com/softprops/action-gh-release@v2
         with:
           tag_name: ${{ inputs.tag || github.ref_name }}
           name: ${{ inputs.tag || github.ref_name }}
