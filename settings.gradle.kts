@@ -10,8 +10,8 @@ plugins {
 }
 
 // uxmLib reaches this plugin the way it reaches the other twenty six: as the published artifact named in
-// gradle/libs.versions.toml, resolved from the workspace Maven repository through mavenLocal() and from
-// JitPack after that. There is deliberately no composite build here.
+// gradle/libs.versions.toml, resolved from repo.uxplima.com, and from mavenLocal() first so a locally
+// published library build can be tried out. There is deliberately no composite build here.
 //
 // There was one, and it is worth saying what it cost. It substituted the library's sibling checkout for the
 // pinned version whenever that checkout existed, so this build compiled against whatever the working tree
@@ -20,8 +20,10 @@ plugins {
 // and nobody would have found out here. That is the same failure scripts/publish-lib.sh exists to stop, one
 // level up.
 //
-// So a library change now goes the way it goes for every other plugin: publish a new version with
-// scripts/publish-lib.sh and raise the pin.
+// So a library change now goes the way it goes for every other plugin: release a new version of uxm-lib,
+// which publishes it to repo.uxplima.com, and raise the pin here. To try one out before releasing it, run
+// publishToMavenLocal in uxm-lib and raise the pin to that snapshot; mavenLocal() is ahead of the
+// organisation repository so the local copy wins.
 
 rootProject.name = "uxmEssentials"
 
