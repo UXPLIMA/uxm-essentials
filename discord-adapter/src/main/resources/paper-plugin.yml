@@ -13,9 +13,12 @@ folia-supported: true
 
 # The bridge sits on top of the host plugin's audit/economy notifications. It is a
 # soft-depend: if uxmEssentials is absent the bridge has no source and stays dormant,
-# and the host plugin runs fully without this jar.
+# and the host plugin runs fully without this jar. load: BEFORE loads the host first.
+# join-classpath gives the bridge the host's :api classes, the same ones the host
+# registers its services under. The bridge carries no copy of its own.
 dependencies:
   server:
     uxmEssentials:
       load: BEFORE
       required: false
+      join-classpath: true

@@ -9,6 +9,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import com.uxplima.uxmessentials.api.audit.AuditFeed;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
@@ -21,10 +22,13 @@ import org.spongepowered.configurate.ConfigurateException;
  * host plugin runs entirely unaffected.
  *
  * <h2>Host integration</h2>
- * The bridge consumes the host plugin's notification source through Bukkit's {@code ServicesManager}: there
- * is no compile-time link to {@code :bukkit-adapter}. The wiring that subscribes to the host's audit /
- * economy events and feeds the {@link NotificationForwarder} is registered once the gateway is ready; until
- * then the forwarder simply drops everything (an unconnected gateway forwards nothing).
+ * The bridge reads the host's {@link AuditFeed} through Bukkit's {@code ServicesManager}: there is no compile-time
+ * link to {@code :bukkit-adapter}. The subscription that feeds the {@link NotificationForwarder} opens once the gateway
+ * is ready; until then the forwarder simply drops everything (an unconnected gateway forwards nothing).
+ *
+ * <p>Every service the two jars share is an {@code :api} class, and this jar carries no copy of {@code :api}: the
+ * manifest joins the host's classpath, so the class the bridge asks for is the one the host registered. With the host
+ * absent those classes do not exist here, so nothing that names one runs until the host is known to be enabled.
  *
  * <h2>Threading</h2>
  * The JDA login blocks, so it runs on Paper's async scheduler ({@code getAsyncScheduler().runNow}), never on
@@ -32,6 +36,9 @@ import org.spongepowered.configurate.ConfigurateException;
  * races the async connect either sees the whole forwarder or none.
  */
 public final class UxmEssentialsDiscord extends JavaPlugin {
+
+    /** The host's name in its own manifest, the plugin this bridge mirrors. */
+    private static final String HOST = "uxmEssentials";
 
     private final DiscordGateway gateway;
     private final AtomicReference<NotificationForwarder> forwarder = new AtomicReference<>();
@@ -86,6 +93,12 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
             gateway.connect(config.token());
             NotificationForwarder live = new NotificationForwarder(gateway, config);
             forwarder.set(live);
+            if (!getServer().getPluginManager().isPluginEnabled(HOST)) {
+                getLogger()
+                        .warning("discord bridge connected but uxmEssentials is not enabled on this server: nothing "
+                                + "will be forwarded and /link is dormant");
+                return;
+            }
             startSubscription(config, live);
             enableLinking();
             getLogger()
@@ -97,16 +110,16 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
     }
 
     /**
-     * Find the host's {@link NotificationSource} via {@code ServicesManager} (no compile-time link to the host
-     * jar) and start the subscriber. When the host plugin exposes no source. It is older than the bridge, or
-     * not yet enabled: the bridge stays connected but forwards nothing, logging why rather than failing.
+     * Find the host's {@link AuditFeed} via {@code ServicesManager} (no compile-time link to the host jar) and start
+     * the subscriber. When the host exposes no feed, because it is older than the bridge, the bridge stays connected
+     * but forwards nothing, logging why rather than failing.
      */
     private void startSubscription(DiscordConfig config, NotificationForwarder live) {
         NotificationSource source = lookupSource();
         if (source == null) {
             getLogger()
-                    .warning("discord bridge connected but the host plugin exposes no notification source, "
-                            + "nothing will be forwarded (is uxmEssentials installed and enabled on this backend?)");
+                    .warning("discord bridge connected but uxmEssentials publishes no audit feed, nothing will be "
+                            + "forwarded (update uxmEssentials to the same version as this bridge)");
             return;
         }
         AuditNoticeSubscriber active = new AuditNoticeSubscriber(source, live, rateLimiter(config));
@@ -115,9 +128,9 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
     }
 
     private @Nullable NotificationSource lookupSource() {
-        RegisteredServiceProvider<NotificationSource> rsp =
-                getServer().getServicesManager().getRegistration(NotificationSource.class);
-        return rsp != null ? rsp.getProvider() : null;
+        RegisteredServiceProvider<AuditFeed> rsp =
+                getServer().getServicesManager().getRegistration(AuditFeed.class);
+        return rsp != null ? new HostAuditSource(rsp.getProvider()) : null;
     }
 
     /**

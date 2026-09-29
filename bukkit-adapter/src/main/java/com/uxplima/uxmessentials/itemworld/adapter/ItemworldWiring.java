@@ -30,16 +30,14 @@ import com.uxplima.uxmessentials.itemworld.application.port.ItemworldAudit;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
-import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ItemworldPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
-import org.slf4j.LoggerFactory;
 
 /**
  * Constructs the itemworld context's adapters over the injected kernel ports and produces everything the plugin
@@ -58,7 +56,6 @@ import org.slf4j.LoggerFactory;
 @NullMarked
 public final class ItemworldWiring {
 
-    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
     private static final int DISPOSAL_ROWS = 6;
 
     private ItemworldWiring() {}
@@ -67,6 +64,7 @@ public final class ItemworldWiring {
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
+            AuditChannel auditChannel,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -79,7 +77,7 @@ public final class ItemworldWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         ItemworldConfig config = ItemworldConfig.from(ctx.config());
-        ItemworldAudit audit = new LoggingItemworldAudit(auditLogger(), config);
+        ItemworldAudit audit = new LoggingItemworldAudit(auditChannel.logger(), config);
         GuiLayout disposalLayout = guiLayouts.load("itemworld", "disposal", GuiLayout.storageDefault(DISPOSAL_ROWS));
         ItemworldServices services = new ItemworldServices(kernel, audit, config, disposalLayout);
 
@@ -128,10 +126,6 @@ public final class ItemworldWiring {
                 shulkerView,
                 powertoolStore,
                 new StoreItemworldPlaceholders(plugin.getServer(), powertoolStore, powertoolToggles, unlimited));
-    }
-
-    private static Logger auditLogger() {
-        return new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL));
     }
 
     /**

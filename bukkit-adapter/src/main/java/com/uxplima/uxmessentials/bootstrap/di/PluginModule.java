@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.api.action.UxmKitActions;
 import com.uxplima.uxmessentials.api.action.UxmRanksActions;
 import com.uxplima.uxmessentials.api.action.UxmSecurityActions;
 import com.uxplima.uxmessentials.api.action.UxmWarpActions;
+import com.uxplima.uxmessentials.api.audit.AuditFeed;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
@@ -223,6 +224,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
@@ -567,6 +569,11 @@ public final class PluginModule {
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);
         UxmApiHolder.install(devApi);
         resources.onClose(UxmApiHolder::uninstall);
+        // The audit channel every module writes through, published as the feed the Discord bridge mirrors. Registered
+        // before any module wires so a line written while the server starts is already on it.
+        AuditChannel auditChannel = new AuditChannel(kernel.log());
+        plugin.getServer().getServicesManager().register(AuditFeed.class, auditChannel, plugin, ServicePriority.Normal);
+        resources.onClose(() -> plugin.getServer().getServicesManager().unregister(AuditFeed.class, auditChannel));
         // Every domain fact the plugin publishes becomes a Bukkit event for whoever is listening. One subscriber for
         // all twenty contexts, and it costs a map lookup when nobody is listening, which is the ordinary case.
         EventBridgeRegistry bridgeRegistry = new EventBridgeRegistry();
@@ -813,6 +820,7 @@ public final class PluginModule {
                 registry,
                 config,
                 kernel,
+                auditChannel,
                 queries,
                 actions,
                 persistence,
@@ -842,7 +850,7 @@ public final class PluginModule {
         // Dynmap/squaremap when one is installed (homes opt-in).
         IntegrationsWiring.Wired integrations = IntegrationsWiring.wire(plugin, config, kernel, persistence);
         resources.onClose(integrations.stop());
-        MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence);
+        MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence, auditChannel);
         List<HealthCheck> healthChecks =
                 healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
@@ -959,7 +967,11 @@ public final class PluginModule {
     }
 
     private static MigrationImportNode wireMigration(
-            JavaPlugin plugin, ConfigStore config, KernelPorts kernel, Persistence persistence) {
+            JavaPlugin plugin,
+            ConfigStore config,
+            KernelPorts kernel,
+            Persistence persistence,
+            AuditChannel auditChannel) {
         // The migration adapter is command-gated, not a steady-state feature context, so it is wired here in
         // the operator surface rather than registered in the feature-module registry. Its enable gate ships
         // disabled; an enabled module publishes a live /uxmess import, a disabled one a dormant command that
@@ -972,6 +984,7 @@ public final class PluginModule {
                 config.scoped(ModuleId.of("economy").configRoot()),
                 kernel.scheduler(),
                 kernel.log(),
+                auditChannel,
                 module.enabled(config));
         return new MigrationImportNode(service);
     }
@@ -1077,6 +1090,7 @@ public final class PluginModule {
             ModuleRegistry registry,
             ConfigStore config,
             KernelPorts kernel,
+            AuditChannel auditChannel,
             QueryContexts queries,
             ActionContexts actions,
             Persistence persistence,
@@ -1091,7 +1105,7 @@ public final class PluginModule {
             AtomicReference<TextInput> menuTextInputRef) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks(queries, actions);
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions);
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1690,6 +1704,7 @@ public final class PluginModule {
                 : null;
         TradeWiring.Wired wired = TradeWiring.wire(
                 ctx,
+                links.auditChannel,
                 textInput,
                 economy,
                 persistence,
@@ -2088,6 +2103,7 @@ public final class PluginModule {
         EconomyWiring.Wired wired = EconomyWiring.wire(
                 plugin,
                 ctx,
+                links.auditChannel,
                 persistence,
                 bus,
                 hooks,
@@ -2423,6 +2439,7 @@ public final class PluginModule {
         ModerationWiring.Wired wired = ModerationWiring.wire(
                 plugin,
                 ctx,
+                links.auditChannel,
                 persistence,
                 gates,
                 bus,
@@ -2487,7 +2504,8 @@ public final class PluginModule {
         // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
         // deferred them, §15.6), so they register here and the two modules never double-register. The utilities
         // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
-        ItemworldWiring.Wired wired = ItemworldWiring.wire(plugin, ctx, guiLayouts, textInput, menus, menuBindings);
+        ItemworldWiring.Wired wired =
+                ItemworldWiring.wire(plugin, ctx, links.auditChannel, guiLayouts, textInput, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // Write back any still-open in-inventory shulker view before the module stops, so no edit is lost on disable.
@@ -2530,7 +2548,14 @@ public final class PluginModule {
         // through the shared menu engine. On stop the still-open vault windows are close-and-saved before the pool
         // closes.
         VaultsWiring.Wired wired = VaultsWiring.wire(
-                plugin, ctx, persistence, bus, Optional.ofNullable(links.vaultEconomy), menus, menuBindings);
+                plugin,
+                ctx,
+                links.auditChannel,
+                persistence,
+                bus,
+                Optional.ofNullable(links.vaultEconomy),
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -3273,10 +3298,14 @@ public final class PluginModule {
         private final com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries;
         // The published write surfaces, held for the same reason and filled the same way.
         private final com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions;
+        // The one audit channel, so every module that writes a line writes it where the Discord bridge hears it.
+        private final AuditChannel auditChannel;
 
         private ContextLinks(
+                AuditChannel auditChannel,
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries,
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions) {
+            this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
         }

@@ -121,6 +121,7 @@ public final class EconomyWiring {
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
+            com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel auditChannel,
             Persistence persistence,
             Bus bus,
             Integrations hooks,
@@ -132,6 +133,7 @@ public final class EconomyWiring {
             Path dataFolder) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(auditChannel, "auditChannel");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hooks, "hooks");
@@ -179,6 +181,7 @@ public final class EconomyWiring {
         return assemble(
                 plugin,
                 ctx,
+                auditChannel,
                 persistence,
                 settings,
                 currencies,
@@ -266,6 +269,7 @@ public final class EconomyWiring {
     private static Wired assemble(
             Plugin plugin,
             ModuleContext ctx,
+            com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel auditChannel,
             Persistence persistence,
             EconomyConfig settings,
             CurrencyRegistry currencies,
@@ -299,6 +303,7 @@ public final class EconomyWiring {
         currencyPicker.register(menuBindings, dataFolder, kernel.log());
         EconomyServices services = useCases(
                 plugin,
+                auditChannel,
                 persistence,
                 kernel,
                 settings,
@@ -496,6 +501,7 @@ public final class EconomyWiring {
 
     private static EconomyServices useCases(
             Plugin plugin,
+            com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel auditChannel,
             Persistence persistence,
             KernelPorts kernel,
             EconomyConfig settings,
@@ -515,7 +521,9 @@ public final class EconomyWiring {
         EconomyNotifier notifier =
                 new EconomyNotifier(kernel.messages(), kernel.messageSink(), settings.amountFormat());
 
-        EconomyAudit baseAudit = new LoggingEconomyAudit(kernel.log());
+        // The economy writes its lines to the plugin log, not the audit channel. The tee hands them to the feed as
+        // well, so the Discord bridge mirrors an eco-admin change the way it mirrors a mute.
+        EconomyAudit baseAudit = new LoggingEconomyAudit(auditChannel.tee(kernel.log()));
         EconomyAudit audit = new com.uxplima.uxmessentials.economy.adapter.outbound.FraudDetector(
                 baseAudit,
                 kernel.log(),

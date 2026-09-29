@@ -52,14 +52,13 @@ import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
-import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import org.jspecify.annotations.NullMarked;
-import org.slf4j.LoggerFactory;
 
 /**
  * The one place the migration adapter is wired (docs/12-migration §10). It assembles the EssentialsX
@@ -73,7 +72,6 @@ import org.slf4j.LoggerFactory;
 @NullMarked
 public final class MigrationWiring {
 
-    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
     private static final String DEFAULT_SOURCE_PATH = "Essentials";
 
     private MigrationWiring() {}
@@ -96,6 +94,7 @@ public final class MigrationWiring {
             ConfigStore economyConfig,
             Scheduler scheduler,
             Logger log,
+            AuditChannel auditChannel,
             boolean enabled) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
@@ -104,7 +103,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
-        ImportData importData = new ImportData(audit(), backup(plugin, log), log);
+        ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(plugin, persistence, economyConfig, log);
         ImportOptions options = options(plugin, migrationConfig);
         return new MigrationImportService(
@@ -249,8 +248,8 @@ public final class MigrationWiring {
         return ConfigurateKitRepository.load(kitsDir, legacy, log);
     }
 
-    private static MigrationAudit audit() {
-        return new AuditChannelMigrationAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));
+    private static MigrationAudit audit(AuditChannel auditChannel) {
+        return new AuditChannelMigrationAudit(auditChannel.logger());
     }
 
     private static BackupSnapshot backup(Plugin plugin, Logger log) {

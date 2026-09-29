@@ -1,11 +1,11 @@
 package com.uxplima.uxmessentials.discord;
 
 /**
- * The host plugin's notification feed, consumed by the bridge through Bukkit's {@code ServicesManager}: there
- * is no compile-time link to {@code :bukkit-adapter} (docs/01-architecture.md, docs/09-deployment.md Path C).
- * The host registers an implementation that fans audit events and economy notifications (mute/jail/tempban/
- * banip, eco-admin, etc.) out as {@link AuditNotice}s; the bridge subscribes once the gateway is ready and
- * unsubscribes on disable.
+ * The host plugin's notification feed, as the bridge reads it. {@link HostAuditSource} is the one implementation: it
+ * reads the host's {@code AuditFeed}, which the host registers in {@code ServicesManager}, and fans every audit and
+ * economy line out as an {@link AuditNotice}. The bridge subscribes once the gateway is ready and unsubscribes on
+ * disable (docs/09-deployment.md Path C). This port is the bridge's own and never crosses to the host: a type both
+ * jars name lives in {@code :api}.
  *
  * <p>Keeping the subscription behind this thin port is what lets the forwarding pipeline be unit-tested with a
  * fake source and a fake gateway, with no live JDA connection and no MockBukkit server (CLAUDE.md GROUND RULE).

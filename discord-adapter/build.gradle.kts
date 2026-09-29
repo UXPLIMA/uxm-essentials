@@ -13,14 +13,18 @@ plugins {
 // paper-plugin.yml loader directive. opus-java is dropped at the loader level because the
 // bridge only posts text and never touches voice.
 
+// :api is compileOnly. The host jar carries it and paper-plugin.yml joins the host's classpath. A shaded copy was a
+// second class with the same name: the link confirmation the host registered was invisible to the bridge's lookup,
+// and /link never worked on a real server.
 dependencies {
     implementation(project(":core"))
-    api(project(":api"))
+    compileOnly(project(":api"))
     compileOnly(libs.paper.api)
 
     compileOnly(libs.jda)
     compileOnly(libs.bundles.configs)
 
+    testImplementation(project(":api"))
     testImplementation(libs.bundles.testing)
     testImplementation(libs.paper.api)
     testImplementation(libs.jda)
@@ -37,6 +41,8 @@ tasks.shadowJar {
     archiveBaseName.set("uxmEssentials-discord")
     archiveClassifier.set("")
     mergeServiceFiles()
+    // :core brings :api along as its own api dependency. The host's copy is the one the bridge must use.
+    dependencies { exclude(project(":api")) }
 }
 
 tasks.assemble { dependsOn(tasks.shadowJar) }
@@ -59,6 +65,8 @@ val forbiddenJarEntries =
         "com/typesafe/" to "Typesafe Config arrives with Configurate through that loader.",
         "io/leangen/" to "geantyref arrives with Configurate through that loader.",
         "org/bstats/" to "Only the host jar reports metrics. A companion carrying bStats would double-count a server.",
+        "com/uxplima/uxmessentials/api/" to
+            "The host carries :api. A second copy is a second class, and the host's services stop matching it.",
     )
 
 val verifyJar =

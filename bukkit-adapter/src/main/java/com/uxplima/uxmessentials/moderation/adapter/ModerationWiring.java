@@ -96,19 +96,17 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
-import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
-import org.slf4j.LoggerFactory;
 
 /**
  * Constructs the moderation context's adapters and use cases over the injected kernel ports and the
@@ -126,8 +124,6 @@ import org.slf4j.LoggerFactory;
  */
 @NullMarked
 public final class ModerationWiring {
-
-    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
 
     /** The locale dimension the shared chat prefix is resolved against: the console has no per-viewer locale. */
     private static final com.uxplima.uxmessentials.shared.domain.PlayerRef BROADCAST_PREFIX_VIEWER =
@@ -150,6 +146,7 @@ public final class ModerationWiring {
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
+            AuditChannel auditChannel,
             Persistence persistence,
             GateSinks gates,
             Bus bus,
@@ -190,6 +187,7 @@ public final class ModerationWiring {
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
         ModerationServices services = assemble(
                 plugin,
+                auditChannel,
                 kernel,
                 settings,
                 repository,
@@ -316,6 +314,7 @@ public final class ModerationWiring {
 
     private static ModerationServices assemble(
             Plugin plugin,
+            AuditChannel auditChannel,
             KernelPorts kernel,
             ModerationSettings settings,
             ModerationRepository repository,
@@ -336,7 +335,7 @@ public final class ModerationWiring {
         // The operator audit is wrapped so a successful punishment also emits a name-based Discord notice on the
         // same channel when discord-notify is on; disabled or bridge-absent, it is a no-op.
         ModerationAudit audit = new DiscordPunishmentAudit(
-                new LoggingModerationAudit(auditLogger()), auditLogger(), settings.discordNotify());
+                new LoggingModerationAudit(auditChannel.logger()), auditChannel.logger(), settings.discordNotify());
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
         Jail jail = new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock);
@@ -463,10 +462,6 @@ public final class ModerationWiring {
                 new MutedCommandListener(
                         repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
-    }
-
-    private static Logger auditLogger() {
-        return new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL));
     }
 
     /**

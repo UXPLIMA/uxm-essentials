@@ -185,6 +185,18 @@ interface com.uxplima.uxmessentials.api.action.UxmWorldsActions
   CompletableFuture load(String)
   CompletableFuture unload(String)
   CompletableFuture unload(String, boolean)
+record com.uxplima.uxmessentials.api.audit.AuditEntry
+  <init>(String, Map)
+  Map fields()
+  Optional field(String)
+  String event()
+  String toString()
+  boolean equals(Object)
+  int hashCode()
+interface com.uxplima.uxmessentials.api.audit.AuditFeed
+  com.uxplima.uxmessentials.api.audit.AuditFeed$Subscription subscribe(Consumer)
+interface com.uxplima.uxmessentials.api.audit.AuditFeed$Subscription
+  void close()
 class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()

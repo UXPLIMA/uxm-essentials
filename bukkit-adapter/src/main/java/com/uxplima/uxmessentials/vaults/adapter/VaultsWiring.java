@@ -17,10 +17,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VaultSync;
-import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
@@ -46,7 +45,6 @@ import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.LoggerFactory;
 
 /**
  * Constructs the vaults context's adapters and use cases over the injected kernel ports and the persistence
@@ -70,8 +68,6 @@ import org.slf4j.LoggerFactory;
 @NullMarked
 public final class VaultsWiring {
 
-    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
-
     private VaultsWiring() {}
 
     /**
@@ -81,11 +77,12 @@ public final class VaultsWiring {
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
+            AuditChannel auditChannel,
             Persistence persistence,
             Bus bus,
             Menus menus,
             MenuBindings menuBindings) {
-        return wire(plugin, ctx, persistence, bus, Optional.empty(), menus, menuBindings);
+        return wire(plugin, ctx, auditChannel, persistence, bus, Optional.empty(), menus, menuBindings);
     }
 
     /**
@@ -101,6 +98,7 @@ public final class VaultsWiring {
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
+            AuditChannel auditChannel,
             Persistence persistence,
             Bus bus,
             Optional<VaultEconomy> vaultEconomy,
@@ -121,7 +119,7 @@ public final class VaultsWiring {
         CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
         bus.registry().register(VaultSync.listener(cached));
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
-        VaultAudit audit = new LoggingVaultAudit(auditLogger());
+        VaultAudit audit = new LoggingVaultAudit(auditChannel.logger());
         // The two quota reducers are built once here so the placeholder seam reads the same resolved
         // vault.amount / vault.size the use cases enforce, rather than constructing a second pair.
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
@@ -242,10 +240,6 @@ public final class VaultsWiring {
             return new VaultCharge(kernel.permissions(), Optional.empty(), VaultChargeSettings.allFree());
         }
         return new VaultCharge(kernel.permissions(), vaultEconomy, settings.chargeSettings());
-    }
-
-    private static Logger auditLogger() {
-        return new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL));
     }
 
     /**

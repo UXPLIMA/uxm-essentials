@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.trade.TradeRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand;
@@ -49,7 +49,6 @@ import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-import org.slf4j.LoggerFactory;
 
 /**
  * Constructs the trade context's adapters over the injected kernel ports. The same-server trade window is the in-memory
@@ -67,8 +66,6 @@ import org.slf4j.LoggerFactory;
 public final class TradeWiring {
 
     /** The dedicated audit channel a completed trade's line is written to: the same channel the other contexts use. */
-    private static final String AUDIT_CHANNEL = "com.uxplima.uxmessentials.audit";
-
     private TradeWiring() {}
 
     /**
@@ -77,6 +74,7 @@ public final class TradeWiring {
      */
     public static Wired wire(
             ModuleContext ctx,
+            AuditChannel auditChannel,
             TextInput textInput,
             @Nullable TradeEconomy economy,
             @Nullable Persistence persistence,
@@ -110,7 +108,7 @@ public final class TradeWiring {
                 InputRequest.of("trade.experience", TradeMessageKey.TRADE_EXPERIENCE_PROMPT.key()),
                 onSubmit,
                 onCancel);
-        TradeAudit audit = new LoggingTradeAudit(new Slf4jLogger(LoggerFactory.getLogger(AUDIT_CHANNEL)));
+        TradeAudit audit = new LoggingTradeAudit(auditChannel.logger());
         // The window's chrome comes from modules/trade/gui/trade.conf; the currencies it may cycle through are the
         // module's allowed list, and an empty list is what turns the money button off on an install with no economy.
         TradeWindow window = new TradeWindow(
