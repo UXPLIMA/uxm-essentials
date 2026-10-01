@@ -41,9 +41,14 @@ public sealed interface Region {
             Objects.requireNonNull(player, "player");
         }
 
+        /**
+         * On the player's thread, or on the global region when the player is not online. The entity scheduler drops a
+         * task for an entity that is not there, and it dropped every event about an offline player with it: money
+         * paid to them, a warning, a mail. Nothing owns an offline player, so the global region is the right place.
+         */
         @Override
         public void schedule(Scheduler scheduler, Runnable task) {
-            scheduler.onEntity(player, task);
+            scheduler.onEntity(player, task, () -> scheduler.onGlobal(task));
         }
     }
 
