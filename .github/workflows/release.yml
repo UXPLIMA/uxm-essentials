@@ -19,13 +19,15 @@ permissions:
 
 jobs:
   release:
-    # The release is GitHub's: the jars hang off a GitHub release, the developer API is a branch of the GitHub
-    # repository, and the store tokens are GitHub secrets. Forgejo runs this repository's CI as a mirror and pulls
-    # every tag with it, so without this line each tag would start a release there that has none of the three and
-    # fails halfway, after the build. On Forgejo the job is skipped instead.
-    if: github.server_url == 'https://github.com'
+    # This runs in two places. Forgejo mirrors this repository, runs its CI and pulls every tag, and the store tokens
+    # are Forgejo secrets, so on Forgejo a tag builds the jars and sends them to the stores. The GitHub release and
+    # the maven branch belong to GitHub and run only there, which is why those two steps ask where they are. Each
+    # store step checks for the version first, so a tag that reaches both places is published once.
     runs-on: ubuntu-latest
     env:
+      # The GitHub repository, named outright: on Forgejo GITHUB_REPOSITORY is the mirror's own name, and every
+      # link below points at the GitHub release.
+      RELEASE_REPO: UXPLIMA/uxm-essentials
       # Read through env rather than straight from secrets so the store steps can ask whether they are set: the
       # secrets context is not available to a step's `if`. A repository without the tokens still cuts its GitHub
       # release, and a fork publishes nowhere.
@@ -79,16 +81,28 @@ jobs:
       # Written once and read by both publishers, so the two stores show the same text. A tag that already has a
       # release keeps the notes it has: asking GitHub to generate them again on an update puts the existing body in
       # front of the freshly generated one, and re-running the workflow over a published tag says everything twice.
+      # The notes are read from the GitHub release over its public API, which answers on either host. On GitHub a
+      # tag with no release yet gets generated notes; on Forgejo it gets a link, which the release will be behind.
+      - name: Make sure jq is there
+        run: |
+          command -v jq > /dev/null && exit 0
+          if command -v sudo > /dev/null; then sudo apt-get update -q && sudo apt-get install -yq jq
+          else apt-get update -q && apt-get install -yq jq; fi
+
       - name: Prepare the release notes
         working-directory: uxmEssentials
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.tag || github.ref_name }}
+          ON_GITHUB: ${{ github.server_url == 'https://github.com' }}
         run: |
           set -euo pipefail
-          notes="$(gh release view "$TAG" --json body --jq .body 2>/dev/null || true)"
+          notes="$(curl -sS "https://api.github.com/repos/${RELEASE_REPO}/releases/tags/${TAG}" | jq -r '.body // empty' || true)"
+          if [ -z "$notes" ] && [ "$ON_GITHUB" = "true" ]; then
+            notes="$(gh api "repos/${RELEASE_REPO}/releases/generate-notes" -f tag_name="$TAG" --jq .body)"
+          fi
           if [ -z "$notes" ]; then
-            notes="$(gh api "repos/${GITHUB_REPOSITORY}/releases/generate-notes" -f tag_name="$TAG" --jq .body)"
+            notes="https://github.com/${RELEASE_REPO}/releases/tag/${TAG}"
           fi
           printf '%s\n' "$notes" > "${RUNNER_TEMP}/release-notes.md"
           cat "${RUNNER_TEMP}/release-notes.md"
@@ -98,6 +112,7 @@ jobs:
       # the absolute URL that once worked around that. A tag that already has a release, cut by hand or by an
       # earlier run, gets its jars replaced and keeps its notes.
       - name: Publish the GitHub release
+        if: github.server_url == 'https://github.com'
         working-directory: uxmEssentials
         env:
           GH_TOKEN: ${{ github.token }}
@@ -127,6 +142,7 @@ jobs:
       # never once resolved what had been published. Files are copied over the existing tree rather than replacing
       # it, so every earlier version stays resolvable.
       - name: Publish the API artifacts to the maven branch
+        if: github.server_url == 'https://github.com'
         working-directory: uxmEssentials
         env:
           GH_TOKEN: ${{ github.token }}
@@ -165,7 +181,7 @@ jobs:
           version="${TAG#v}"
           changelog="$(cat "${RUNNER_TEMP}/release-notes.md")"
           if [ -z "$changelog" ]; then
-            changelog="https://github.com/${GITHUB_REPOSITORY}/releases/tag/${TAG}"
+            changelog="https://github.com/${RELEASE_REPO}/releases/tag/${TAG}"
           fi
 
           publish() {
@@ -272,7 +288,7 @@ jobs:
             # this is version-specific: whichever jars fit are uploaded, and the rest link out.
             size="$(stat -c %s "$jar")"
             if [ "$size" -ge 10000000 ]; then
-              url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${TAG}/$(basename "$jar")"
+              url="https://github.com/${RELEASE_REPO}/releases/download/${TAG}/$(basename "$jar")"
               files="$(jq -n --arg platform "$platform" --arg url "$url" \
                 '[{platforms: [$platform], externalUrl: $url}]')"
               echo "$(basename "$jar") is ${size} bytes, over hangar's limit; linking to the release asset instead"
