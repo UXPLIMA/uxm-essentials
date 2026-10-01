@@ -44,6 +44,11 @@ public final class CommandFeedback {
         this.miniMessage = MiniMessage.miniMessage();
     }
 
+    /** Send the usage line for {@code command}, described the way the catalogue describes it. */
+    public void usage(CommandSender sender, String command, String usage, String english) {
+        CommandUsage.send(messages, sender, command, usage, english);
+    }
+
     /** Resolve {@code key} for {@code sender} with no placeholders and send it with the prefix folded in. */
     public void send(CommandSender sender, MessageKey key) {
         send(sender, key, Map.of());

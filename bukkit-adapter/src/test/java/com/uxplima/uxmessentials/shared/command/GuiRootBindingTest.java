@@ -6,10 +6,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
+
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
@@ -19,6 +23,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
 
 /**
  * The GUI binding turns a command's catalog {@code gui} flag into the bare-input behaviour: when on, the
@@ -32,9 +38,11 @@ class GuiRootBindingTest {
 
     private static final Command<CommandSourceStack> OPENER = c -> 7;
 
+    private ServerMock server;
+
     @BeforeEach
     void setUp() {
-        MockBukkit.mock();
+        server = MockBukkit.mock();
     }
 
     @AfterEach
@@ -50,7 +58,7 @@ class GuiRootBindingTest {
                 binding.wrap(new OpenerStub("kit")).build();
 
         assertThat(built.getLiteral()).isEqualTo("kit");
-        assertThat(built.getCommand()).isSameAs(OPENER);
+        assertThat(run(built, "kit", server.addPlayer("Alice"))).isEqualTo(7);
         assertThat(built.getChild("list")).isNotNull();
     }
 
@@ -74,7 +82,22 @@ class GuiRootBindingTest {
                 binding.wrap(new HelpRootStub("uxmess")).build();
 
         // the shipped help root executor is swapped for the GUI opener
-        assertThat(built.getCommand()).isSameAs(OPENER);
+        assertThat(run(built, "uxmess", server.addPlayer("Alice"))).isEqualTo(7);
+    }
+
+    /**
+     * The console cannot see a screen. {@code /banlist}, {@code /eco} and {@code /uxmess} opened nothing for it and
+     * said nothing, or refused it as player-only, so an operator at the console got no answer at all. The command's
+     * own root runs instead, which for {@code /uxmess} is the help and for {@code /banlist} is the list in text.
+     */
+    @Test
+    void theConsoleRunsTheRootTheCommandShippedWith() {
+        GuiRootBinding binding = guiBinding("uxmess", true);
+
+        LiteralCommandNode<CommandSourceStack> built =
+                binding.wrap(new HelpRootStub("uxmess")).build();
+
+        assertThat(run(built, "uxmess", server.getConsoleSender())).isEqualTo(99);
     }
 
     @Test
@@ -95,7 +118,17 @@ class GuiRootBindingTest {
         LiteralCommandNode<CommandSourceStack> built =
                 binding.wrap(new OpenerStub("kit")).build();
 
-        assertThat(built.getCommand()).isSameAs(OPENER);
+        assertThat(run(built, "kit", server.addPlayer("Alice"))).isEqualTo(7);
+    }
+
+    private static int run(LiteralCommandNode<CommandSourceStack> node, String input, CommandSender sender) {
+        CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+        dispatcher.getRoot().addChild(node);
+        try {
+            return dispatcher.execute(input, CommandSourceStackMock.from(sender));
+        } catch (CommandSyntaxException e) {
+            throw new AssertionError("command did not parse: " + input, e);
+        }
     }
 
     private static GuiRootBinding guiBinding(String id, boolean gui) {

@@ -128,14 +128,7 @@ public final class InvrestoreCommand implements CommandRegistration {
     }
 
     private int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        CommandSender sender = Sender.audience(ctx.getSource());
-        feedback.send(
-                sender,
-                SharedMessageKey.COMMAND_USAGE,
-                Map.of(
-                        "command", command,
-                        "usage", usage,
-                        "description", description));
+        feedback.usage(Sender.audience(ctx.getSource()), command, usage, description);
         return 0;
     }
 

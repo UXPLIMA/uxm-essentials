@@ -1,28 +1,21 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
-
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.ArgumentBuilder;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -77,7 +70,12 @@ public final class UsageBinding {
             builder.requires(node.getRequirement());
         }
         Command<CommandSourceStack> executor = node.getCommand();
-        if (executor != null) {
+        if (executor instanceof GuiRootBinding.GuiRoot screen
+                && screen.fallback() == null
+                && !node.getChildren().isEmpty()) {
+            // A root that only opens a screen: the console reads the usage line rather than nothing.
+            builder.executes(screen.withFallback(usageExecutor(path, node, description)));
+        } else if (executor != null) {
             builder.executes(executor);
         } else if (!node.getChildren().isEmpty()) {
             builder.executes(usageExecutor(path, node, description));
@@ -106,26 +104,9 @@ public final class UsageBinding {
         };
     }
 
-    /**
-     * Send the usage line. The three values are text and never markup: the usage is syntax, and an argument
-     * named after a colour role, {@code <value>}, was read as that colour and vanished from the line.
-     */
+    /** Send the usage line. */
     private void reply(CommandSender sender, String command, String usage, Description description) {
-        // Escaped against the tags the line is parsed with, the theme's roles included: escaping against
-        // MiniMessage's own tags alone leaves <value> standing, because MiniMessage has never heard of it.
-        MiniMessage words = MiniMessage.miniMessage();
-        PlayerRef reader = refOf(sender);
-        String described = CommandDescriptions.of(messages, reader, description.commandId(), description.english());
-        Map<String, String> placeholders = Map.of(
-                "command", words.escapeTags(command, StyleTags.resolver()),
-                "usage", words.escapeTags(usage, StyleTags.resolver()),
-                "description", words.escapeTags(described, StyleTags.resolver()));
-        String rendered = messages.resolve(reader, SharedMessageKey.COMMAND_USAGE, placeholders);
-        sender.sendMessage(MiniMessage.miniMessage().deserialize(rendered, StyleTags.resolver()));
-    }
-
-    private static PlayerRef refOf(CommandSender sender) {
-        return sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
+        CommandUsage.send(messages, sender, command, usage, description.english());
     }
 
     /** A {@link CommandRegistration} whose built tree gains a usage root executor when it lacks one. */

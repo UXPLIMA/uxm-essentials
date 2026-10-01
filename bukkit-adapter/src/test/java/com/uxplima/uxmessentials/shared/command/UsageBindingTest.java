@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -17,6 +18,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -193,6 +195,53 @@ class UsageBindingTest {
         dispatch(wrapped, "menu", CommandSourceStackMock.from(player));
 
         assertThat(nextPlainMessage(player)).contains("open").doesNotContain("reload");
+    }
+
+    /**
+     * A root that opens a screen and has nothing else to run, {@code /eco}, answered the console with nothing: the
+     * opener only knows players. The console reads the usage line instead, and a player still gets the screen.
+     */
+    @Test
+    void theConsoleReadsTheUsageOfARootThatOnlyOpensAScreen() {
+        Command<CommandSourceStack> opener = c -> {
+            c.getSource().getSender().sendMessage("screen opened");
+            return 1;
+        };
+        CommandRegistration wrapped = binding.wrap(new GuiRootBinding(java.util.Map.of()).wrap(new EcoStub(opener)));
+        PlayerMock player = server.addPlayer("Alice");
+
+        dispatch(wrapped, "eco", CommandSourceStackMock.from(server.getConsoleSender()));
+        dispatch(wrapped, "eco", CommandSourceStackMock.from(player));
+
+        assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
+        assertThat(messages.lastPlaceholders).containsEntry("command", "eco").containsEntry("usage", "give <amount>");
+        assertThat(nextPlainMessage(player)).isEqualTo("screen opened");
+    }
+
+    private record EcoStub(Command<CommandSourceStack> opener) implements CommandRegistration {
+        @Override
+        public LiteralCommandNode<CommandSourceStack> build() {
+            return Commands.literal("eco")
+                    .then(Commands.literal("give")
+                            .then(Commands.argument("amount", StringArgumentType.word())
+                                    .executes(c -> 1)))
+                    .build();
+        }
+
+        @Override
+        public String description() {
+            return "Manage balances.";
+        }
+
+        @Override
+        public String commandId() {
+            return "eco";
+        }
+
+        @Override
+        public Optional<Command<CommandSourceStack>> guiRoot() {
+            return Optional.of(opener);
+        }
     }
 
     private record NickStub() implements CommandRegistration {

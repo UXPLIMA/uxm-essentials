@@ -68,13 +68,7 @@ abstract class PlayerWarpCommandSupport {
 
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        feedback.send(
-                Sender.audience(ctx.getSource()),
-                com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_USAGE,
-                Map.of(
-                        "command", command,
-                        "usage", usage,
-                        "description", description));
+        feedback.usage(Sender.audience(ctx.getSource()), command, usage, description);
         return 0;
     }
 

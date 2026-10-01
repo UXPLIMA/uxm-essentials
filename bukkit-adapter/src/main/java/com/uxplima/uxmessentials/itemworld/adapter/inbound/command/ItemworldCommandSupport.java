@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandUsage;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
@@ -180,13 +181,7 @@ abstract class ItemworldCommandSupport {
 
     /** Send the command usage format to the sender. */
     final int usage(CommandContext<CommandSourceStack> ctx, String command, String usage, String description) {
-        reply(
-                ctx,
-                SharedMessageKey.COMMAND_USAGE,
-                Map.of(
-                        "command", command,
-                        "usage", usage,
-                        "description", description));
+        CommandUsage.send(services.kernel().messages(), Sender.audience(ctx.getSource()), command, usage, description);
         return 0;
     }
 
