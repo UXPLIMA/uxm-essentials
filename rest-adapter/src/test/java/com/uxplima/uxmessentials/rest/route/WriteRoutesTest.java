@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
@@ -122,6 +123,29 @@ class WriteRoutesTest {
 
         assertThat(answer.ok()).isTrue();
         verify(economy).transfer(PLAYER, OTHER, new BigDecimal("10"));
+    }
+
+    /**
+     * A negative amount is the caller's mistake. The economy refuses one by throwing, and the route let that through,
+     * so a panel that sent {@code -5} read a 500 and the server log a stack trace.
+     */
+    @Test
+    void aNegativeAmountIsABadRequestThatNeverReachesTheEconomy() {
+        UxmEconomyActions economy = mock(UxmEconomyActions.class);
+
+        Calls.Answer deposit =
+                Calls.post(mock(UxmEssentialsApi.class), economy(economy), PLAYER_PATH + "/balance/deposit", """
+                {"amount": -5}""");
+        Calls.Answer transfer = Calls.post(
+                mock(UxmEssentialsApi.class),
+                economy(economy),
+                "/api/v1/economy/transfer",
+                "{\"from\": \"" + PLAYER + "\", \"to\": \"" + OTHER + "\", \"amount\": -1}");
+
+        assertThat(deposit.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(deposit.message()).contains("amount");
+        assertThat(transfer.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(economy);
     }
 
     @Test

@@ -138,7 +138,7 @@ public final class EconomyRoutes {
         UxmEconomyActions economy = writes(actions, request);
         UUID playerId = request.uuidParameter("uuid");
         Body body = Body.of(request);
-        BigDecimal amount = body.decimal("amount");
+        BigDecimal amount = body.amount("amount");
         Optional<String> currency = body.optionalText("currency");
 
         return Writes.result(
@@ -153,7 +153,7 @@ public final class EconomyRoutes {
         Body body = Body.of(request);
         UUID from = body.uuid("from");
         UUID to = body.uuid("to");
-        BigDecimal amount = body.decimal("amount");
+        BigDecimal amount = body.amount("amount");
         Optional<String> currency = body.optionalText("currency");
 
         return Writes.outcome(currency.map(name -> economy.transfer(from, to, amount, name))

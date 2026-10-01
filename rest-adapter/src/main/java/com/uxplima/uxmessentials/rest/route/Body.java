@@ -64,6 +64,18 @@ public record Body(JsonObject json) {
         }
     }
 
+    /**
+     * An amount of money: a number, and not below zero. The economy throws on a negative one, which reached the
+     * client as a 500, so the route refuses it as the caller's mistake first.
+     */
+    public BigDecimal amount(String name) {
+        BigDecimal amount = decimal(name);
+        if (amount.signum() < 0) {
+            throw bad(name, "must not be negative");
+        }
+        return amount;
+    }
+
     /** A number read as a float, for the speed multipliers. */
     public float number(String name) {
         return decimal(name).floatValue();
