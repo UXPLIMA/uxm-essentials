@@ -171,6 +171,25 @@ class PlaytimeCommandPathTest {
         assertThat(line).contains("playerstate.playtime.show-other").contains("player=Other");
     }
 
+    /**
+     * Playtime is kept in the database, so staff read it for a player who has gone. It looked only at who was online,
+     * and the console asking for a player who had logged off was told nobody by that name existed.
+     */
+    @Test
+    void aNameResolvesAPlayerWhoHasLoggedOff() {
+        PlayerMock viewer = server.addPlayer("Viewer");
+        viewer.addAttachment(MockBukkit.createMockPlugin(), USE, true);
+        viewer.addAttachment(MockBukkit.createMockPlugin(), OTHERS, true);
+        PlayerMock gone = server.addPlayer("Gone");
+        repo.addSeconds(gone.getUniqueId(), LocalDate.now(java.time.ZoneOffset.UTC), 60L, 0L);
+        gone.disconnect();
+
+        execute(CommandSourceStackMock.from(viewer), "playtime Gone");
+
+        String line = PLAIN.serialize(viewer.nextComponentMessage());
+        assertThat(line).contains("playerstate.playtime.show-other").contains("player=Gone");
+    }
+
     @Test
     void resetAllWithoutTheResetNodeDoesNothing() {
         PlayerMock player = server.addPlayer("Player");

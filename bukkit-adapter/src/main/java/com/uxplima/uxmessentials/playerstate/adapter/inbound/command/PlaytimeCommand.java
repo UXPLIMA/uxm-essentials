@@ -125,11 +125,12 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     /**
      * {@code /playtime <name>}: open the named player's panel when a GUI is wired (the richer view of the same
      * data), or render their chat breakdown otherwise. The named form is the staff inspection path, gated by the
-     * shared {@code .others} node inside {@link #resolveNamedTarget}.
+     * shared {@code .others} node inside {@link #resolveStorageTarget}. Playtime is kept in the database, so the name
+     * may be a player who has logged off: staff asking about one were told nobody by that name existed.
      */
     private int showNamed(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
+        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
@@ -144,7 +145,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
 
     private int reset(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        Optional<PlayerRef> target = resolveNamedTarget(ctx, sender);
+        Optional<PlayerRef> target = resolveStorageTarget(ctx, sender);
         if (target.isEmpty()) {
             return 0;
         }
