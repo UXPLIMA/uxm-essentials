@@ -98,9 +98,14 @@ public final class Persistence implements AutoCloseable {
 
     private Optional<String> appliedVersion() {
         try {
-            Record1<Object> row = dsl.select(DSL.max(DSL.field("version")))
+            // The order Flyway applied them in, not the largest version: the column is text, and as text "9"
+            // sorts after "85", so a database on V85 reported itself as v9.
+            Record1<Object> row = dsl.select(DSL.field("version"))
                     .from(DSL.table("flyway_schema_history"))
                     .where(DSL.field("success").eq(true))
+                    .and(DSL.field("version").isNotNull())
+                    .orderBy(DSL.field("installed_rank").desc())
+                    .limit(1)
                     .fetchOne();
             Object version = row == null ? null : row.value1();
             return Optional.ofNullable(version).map(Object::toString);
