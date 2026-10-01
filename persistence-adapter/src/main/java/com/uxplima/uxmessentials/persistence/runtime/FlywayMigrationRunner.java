@@ -8,6 +8,7 @@ import javax.sql.DataSource;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.FlywayException;
 import org.flywaydb.core.api.configuration.FluentConfiguration;
+import org.flywaydb.core.api.logging.LogFactory;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -60,6 +61,11 @@ public final class FlywayMigrationRunner {
                 .initSql(initSql(backend));
         try {
             Flyway flyway = configuration.load();
+            // Flyway's log, without the warning MariaDB writes for every named primary key: see QuietFlywayLog. Set as
+            // an instance, because Flyway looks a class name up in its own loader, which cannot see this plugin's
+            // classes, and set after load, because building a Flyway resets it. Flyway is loaded for this plugin
+            // alone, so the setting reaches no other plugin.
+            LogFactory.setLogCreator(new QuietFlywayLog());
             // Realign recorded checksums with the resolved scripts before validating, so a cosmetic edit to
             // an already-applied migration (e.g. a reworded comment) does not brick a server that ran the
             // old script. Then apply forward; an up-to-date database is a no-op.
