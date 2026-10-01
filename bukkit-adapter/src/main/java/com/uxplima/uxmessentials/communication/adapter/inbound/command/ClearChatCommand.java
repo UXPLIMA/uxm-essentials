@@ -83,10 +83,11 @@ public final class ClearChatCommand extends CommunicationCommandSupport implemen
                 }
             }
         });
-        // Console may run /clearchat as an operator action; only a player actor gets the chat confirmation.
-        if (Sender.audience(ctx.getSource()) instanceof Player sender) {
-            notifier.send(ref(sender), CommunicationMessageKey.CLEARCHAT_BY, Map.of("player", actor));
-        }
+        // Whoever cleared it is told, the console too: an operator at the console read nothing back and could not
+        // tell the command had run.
+        PlayerRef issuer =
+                Sender.audience(ctx.getSource()) instanceof Player sender ? ref(sender) : PlayerRef.system(actor);
+        notifier.send(issuer, CommunicationMessageKey.CLEARCHAT_BY, Map.of("player", actor));
         return Command.SINGLE_SUCCESS;
     }
 
