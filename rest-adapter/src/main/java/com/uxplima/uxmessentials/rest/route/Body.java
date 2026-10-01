@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.rest.route;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
@@ -38,6 +39,23 @@ public record Body(JsonObject json) {
     /** Read the request's body, or {@code 400} when it is not a JSON object. */
     public static Body of(RestRequest request) {
         return new Body(Json.parse(request.http().body()));
+    }
+
+    /**
+     * Refuse a field this route does not read. For a sanction a field left unread is not harmless: a mute sent with
+     * {@code "duration": "5m"} instead of {@code "duration-seconds"} was issued for good, because nothing looked at
+     * the field it did not know.
+     */
+    public Body only(String... fields) {
+        List<String> known = List.of(fields);
+        for (String field : json.keySet()) {
+            if (!known.contains(field)) {
+                throw new HttpException(
+                        HttpStatus.BAD_REQUEST,
+                        "unknown field " + field + ": this route reads " + String.join(", ", known));
+            }
+        }
+        return this;
     }
 
     /** A string field that has to be there. */

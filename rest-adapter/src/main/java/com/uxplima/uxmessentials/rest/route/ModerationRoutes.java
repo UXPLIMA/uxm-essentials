@@ -83,7 +83,7 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse ban(ActionsFor actions, RestRequest request) {
-        Body body = Body.of(request);
+        Body body = Body.of(request).only("reason", "duration-seconds", "silent");
         UxmModerationActions moderation = writes(actions, request, body);
         UUID target = request.uuidParameter("uuid");
         Optional<String> reason = body.optionalText("reason");
@@ -98,7 +98,7 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse mute(ActionsFor actions, RestRequest request) {
-        Body body = Body.of(request);
+        Body body = Body.of(request).only("reason", "duration-seconds", "silent");
         UxmModerationActions moderation = writes(actions, request, body);
         UUID target = request.uuidParameter("uuid");
         Optional<String> reason = body.optionalText("reason");
@@ -129,7 +129,7 @@ public final class ModerationRoutes {
     }
 
     private static HttpResponse jail(ActionsFor actions, RestRequest request) {
-        Body body = Body.of(request);
+        Body body = Body.of(request).only("jail", "reason", "duration-seconds", "silent");
         UxmModerationActions moderation = writes(actions, request, body);
         UUID target = request.uuidParameter("uuid");
         String jail = body.text("jail");

@@ -148,6 +148,31 @@ class WriteRoutesTest {
         verifyNoInteractions(economy);
     }
 
+    /**
+     * A sanction with a field the route does not read is refused, not issued without it. A panel that sent
+     * {@code "duration": "5m"} rather than {@code "duration-seconds": 300} muted the player for good, because the
+     * route never looked at the field it did not know.
+     */
+    @Test
+    void aSanctionWithAFieldTheRouteDoesNotReadIsRefusedRatherThanMadePermanent() {
+        UxmModerationActions moderation = mock(UxmModerationActions.class);
+
+        Calls.Answer mute =
+                Calls.post(mock(UxmEssentialsApi.class), moderation(moderation), PLAYER_PATH + "/mute", """
+                {"reason": "spam", "duration": "5m"}""");
+        Calls.Answer ban = Calls.post(mock(UxmEssentialsApi.class), moderation(moderation), PLAYER_PATH + "/ban", """
+                {"durationSeconds": 300}""");
+        Calls.Answer jail =
+                Calls.post(mock(UxmEssentialsApi.class), moderation(moderation), PLAYER_PATH + "/jail", """
+                {"jail": "main", "time": 60}""");
+
+        assertThat(mute.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(mute.message()).contains("duration").contains("duration-seconds");
+        assertThat(ban.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(jail.status()).isEqualTo(HttpStatus.BAD_REQUEST);
+        verifyNoInteractions(moderation);
+    }
+
     @Test
     void aFieldTheBodyLeftOutIsABadRequestThatNamesIt() {
         Calls.Answer answer = Calls.post(
