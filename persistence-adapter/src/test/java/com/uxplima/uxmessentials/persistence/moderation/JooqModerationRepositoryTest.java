@@ -56,6 +56,23 @@ class JooqModerationRepositoryTest {
         persistence.close();
     }
 
+    /**
+     * An issuer whose name is longer than a player's is kept, not refused. A panel acting through the API issues as
+     * {@code uxmEssentials-rest/admin}, which overran the sixteen-character column, and on MySQL and PostgreSQL the
+     * whole mute was rolled back. The stored name is cut to the column, the same on every backend.
+     */
+    @Test
+    void anIssuerLongerThanTheColumnIsCutToFitRatherThanRefused() {
+        Issuer panel = Issuer.console("uxmEssentials-rest/admin");
+
+        repository.saveMute(alice, MuteState.timed(T0.plus(Duration.ofHours(1)), panel, Optional.empty(), T0));
+        repository.appendWarn(alice, Warn.standing(panel, Optional.empty(), T0));
+
+        assertThat(((MuteState.Timed) repository.loadMute(alice)).issuer().name())
+                .isEqualTo("uxmEssentials-re");
+        assertThat(repository.warns(alice, T0).get(0).issuer().name()).isEqualTo("uxmEssentials-re");
+    }
+
     @Test
     void timedMuteRoundTripsAndUnmuteDeletes() {
         repository.saveMute(alice, MuteState.timed(T0.plus(Duration.ofHours(1)), STAFF, Optional.of("spam"), T0));

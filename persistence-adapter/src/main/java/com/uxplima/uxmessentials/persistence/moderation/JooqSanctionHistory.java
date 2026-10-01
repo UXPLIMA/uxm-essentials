@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSanctionHistory.MODERATION_SANCTION_HISTORY;
+import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
 import java.time.Instant;
 import java.util.List;
@@ -42,7 +43,11 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
                 .set(MODERATION_SANCTION_HISTORY.TARGET, entry.target().toString())
                 .set(MODERATION_SANCTION_HISTORY.REASON, entry.reason().orElse(null))
                 .set(MODERATION_SANCTION_HISTORY.ACTOR, actorUuid(entry))
-                .set(MODERATION_SANCTION_HISTORY.ACTOR_NAME, entry.actor().name())
+                .set(
+                        MODERATION_SANCTION_HISTORY.ACTOR_NAME,
+                        fit(
+                                MODERATION_SANCTION_HISTORY.ACTOR_NAME,
+                                entry.actor().name()))
                 .set(MODERATION_SANCTION_HISTORY.IP, entry.ip().orElse(null))
                 .set(
                         MODERATION_SANCTION_HISTORY.EXPIRES_AT,

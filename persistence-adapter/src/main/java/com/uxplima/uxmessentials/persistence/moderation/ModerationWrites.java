@@ -6,6 +6,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSeen.MODERATION_SEEN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempbans.MODERATION_TEMPBANS;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.MODERATION_WARNS;
+import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
 import java.time.Instant;
 
@@ -64,7 +65,7 @@ final class ModerationWrites {
                 .set(MODERATION_MUTES.UNTIL, until)
                 .set(MODERATION_MUTES.REASON, reason)
                 .set(MODERATION_MUTES.MUTED_BY, issuerUuid(issuer))
-                .set(MODERATION_MUTES.MUTED_BY_NAME, issuer.name())
+                .set(MODERATION_MUTES.MUTED_BY_NAME, fit(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()))
                 .set(MODERATION_MUTES.CREATED_AT, issuedAt.toEpochMilli())
                 .execute();
     }
@@ -84,7 +85,9 @@ final class ModerationWrites {
                 .set(MODERATION_JAILS.REMAINING_MILLIS, remaining)
                 .set(MODERATION_JAILS.REASON, active.reason().orElse(null))
                 .set(MODERATION_JAILS.JAILED_BY, issuerUuid(active.issuer()))
-                .set(MODERATION_JAILS.JAILED_BY_NAME, active.issuer().name())
+                .set(
+                        MODERATION_JAILS.JAILED_BY_NAME,
+                        fit(MODERATION_JAILS.JAILED_BY_NAME, active.issuer().name()))
                 .set(MODERATION_JAILS.CREATED_AT, active.issuedAt().toEpochMilli())
                 .execute();
     }
@@ -102,7 +105,9 @@ final class ModerationWrites {
                 .set(MODERATION_TEMPBANS.UNTIL, active.until().toEpochMilli())
                 .set(MODERATION_TEMPBANS.REASON, active.reason().orElse(null))
                 .set(MODERATION_TEMPBANS.BANNED_BY, issuerUuid(active.issuer()))
-                .set(MODERATION_TEMPBANS.BANNED_BY_NAME, active.issuer().name())
+                .set(
+                        MODERATION_TEMPBANS.BANNED_BY_NAME,
+                        fit(MODERATION_TEMPBANS.BANNED_BY_NAME, active.issuer().name()))
                 .set(MODERATION_TEMPBANS.CREATED_AT, active.issuedAt().toEpochMilli())
                 .execute();
     }
@@ -115,7 +120,9 @@ final class ModerationWrites {
                 .set(MODERATION_WARNS.TARGET, target.uuid().toString())
                 .set(MODERATION_WARNS.REASON, warn.reason().orElse(null))
                 .set(MODERATION_WARNS.WARNED_BY, issuerUuid(warn.issuer()))
-                .set(MODERATION_WARNS.WARNED_BY_NAME, warn.issuer().name())
+                .set(
+                        MODERATION_WARNS.WARNED_BY_NAME,
+                        fit(MODERATION_WARNS.WARNED_BY_NAME, warn.issuer().name()))
                 .set(MODERATION_WARNS.TS, warn.issuedAt().toEpochMilli())
                 .set(MODERATION_WARNS.EXPIRES_AT, expiresAt)
                 .execute();
@@ -169,7 +176,9 @@ final class ModerationWrites {
                         MODERATION_IP_BANS.TARGET,
                         ban.target().map(java.util.UUID::toString).orElse(null))
                 .set(MODERATION_IP_BANS.BANNED_BY, issuerUuid(ban.issuer()))
-                .set(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name())
+                .set(
+                        MODERATION_IP_BANS.BANNED_BY_NAME,
+                        fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()))
                 .set(MODERATION_IP_BANS.CREATED_AT, ban.issuedAt().toEpochMilli())
                 .execute();
     }
