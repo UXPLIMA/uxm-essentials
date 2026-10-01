@@ -5,7 +5,8 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 /**
  * The economy context's sealed family of domain events. The per-context seal that closes the event set
  * without touching the shared {@code DomainEvent} marker. The {@link com.uxplima.uxmessentials.economy.domain.Wallet}
- * aggregate is the only thing that emits these, and exactly one is raised per applied or refused change:
+ * aggregate raises these, and so does the {@code PublishingEconomyProvider} in front of the ledger, which moves money
+ * without the aggregate. Exactly one is raised per applied or refused change:
  * a credit raises {@link WalletCredited}, a debit raises {@link WalletDebited}, a debit refused for
  * insufficient funds raises {@link WalletRejected} (a first-class event, not a thrown exception, so audit
  * and the requesting context observe a refusal the same way they observe success).

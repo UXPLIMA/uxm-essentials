@@ -48,6 +48,7 @@ import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayTaxation;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.PublishingEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.RoutingEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
@@ -215,11 +216,14 @@ public final class EconomyWiring {
             Clock clock) {
         CurrencyBackendRegistry backends = CurrencyBackends.discover(
                 plugin.getServer(), hooks, kernel.log(), kernel.scheduler(), repository, ctx.config());
-        EconomyProvider nativeProvider = new RoutingEconomyProvider(backends, currencies, clock, kernel.log());
+        // In front of whichever provider is in play, so every change of money raises its event: the ledger moves
+        // money in one statement and never passes through the aggregate that would raise one.
+        EconomyProvider nativeProvider = new PublishingEconomyProvider(
+                new RoutingEconomyProvider(backends, currencies, clock, kernel.log()), kernel.events(), clock);
         Optional<EconomyProvider> foreign = ForeignEconomyProviders.discover(plugin, currencies, kernel.log());
         if (foreign.isPresent()) {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
-            return new ResolvedEconomy(foreign.get(), backends);
+            return new ResolvedEconomy(new PublishingEconomyProvider(foreign.get(), kernel.events(), clock), backends);
         }
         logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
@@ -460,7 +464,7 @@ public final class EconomyWiring {
      */
     private static boolean walletLedgerIsAuthoritative(
             EconomyProvider resolved, CurrencyRegistry currencies, KernelPorts kernel) {
-        if (!(resolved instanceof RoutingEconomyProvider)) {
+        if (!runsOnOurLedger(resolved)) {
             return false;
         }
         List<String> foreign = foreignBackedCurrencies(currencies);
@@ -472,6 +476,17 @@ public final class EconomyWiring {
                         "event=wallet_ledger_not_authoritative foreign_currencies={} disabled=exchange,bank,loan",
                         foreign);
         return false;
+    }
+
+    /**
+     * Whether {@code resolved} routes to this plugin's own backends rather than to a foreign economy, looking through
+     * the publishing provider in front of it. The check once named the routing provider alone, and the publisher
+     * would have turned exchange, banks and loans off on every server.
+     */
+    static boolean runsOnOurLedger(EconomyProvider resolved) {
+        EconomyProvider routed =
+                resolved instanceof PublishingEconomyProvider publishing ? publishing.inner() : resolved;
+        return routed instanceof RoutingEconomyProvider;
     }
 
     /**
