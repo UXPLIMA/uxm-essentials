@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
-import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHologramsActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
@@ -105,11 +104,6 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmInvRollbackActions> invRollback() {
         return contexts.find(UxmInvRollbackActions.class, source);
-    }
-
-    @Override
-    public Optional<UxmDiscordLinkActions> discordLink() {
-        return contexts.find(UxmDiscordLinkActions.class, source);
     }
 
     @Override

@@ -41,12 +41,14 @@ class ConfigLayoutFirstRunDriftTest {
     }
 
     @Test
-    void firstRunTreeSurfacesTheDiscordlinkHostConfig(@TempDir Path dir) {
+    void firstRunTreeSurfacesAModuleThatShipsOff(@TempDir Path dir) {
         DefaultResources.writeInto(dir, java.util.logging.Logger.getLogger("t"), "test");
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
-        // discordlink ships off (it needs a bot token to do anything), so what this proves is that the module's own
-        // file is mounted at all: its switch reads back false rather than falling through to the fallback.
-        assertThat(store.getBoolean("modules.discordlink.enabled", true)).isFalse();
-        assertThat(store.getInt("modules.discordlink.code-ttl-seconds", -1)).isEqualTo(600);
+        // invrollback ships off, so what this proves is that the module's own file is mounted at all: its switch
+        // reads back false rather than falling through to the fallback. It used to be discordlink, which left the
+        // plugin on 2026-10-01.
+        assertThat(store.getBoolean("modules.invrollback.enabled", true)).isFalse();
+        assertThat(store.getInt("modules.invrollback.retention.max-per-player", -1))
+                .isEqualTo(10);
     }
 }

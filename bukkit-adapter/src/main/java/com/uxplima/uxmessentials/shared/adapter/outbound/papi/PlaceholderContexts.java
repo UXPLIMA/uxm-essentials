@@ -32,7 +32,6 @@ public final class PlaceholderContexts {
     private final @Nullable VotePlaceholders vote;
     private final @Nullable MessagingPlaceholders messaging;
     private final @Nullable StaffPlaceholders staff;
-    private final @Nullable DiscordlinkPlaceholders discordlink;
     private final @Nullable HologramsPlaceholders holograms;
     private final @Nullable CommunicationPlaceholders communication;
     private final @Nullable ScoreboardPlaceholders scoreboard;
@@ -74,7 +73,6 @@ public final class PlaceholderContexts {
         this.vote = builder.vote;
         this.messaging = builder.messaging;
         this.staff = builder.staff;
-        this.discordlink = builder.discordlink;
         this.holograms = builder.holograms;
         this.communication = builder.communication;
         this.scoreboard = builder.scoreboard;
@@ -185,10 +183,6 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(staff);
     }
 
-    public Optional<DiscordlinkPlaceholders> discordlink() {
-        return Optional.ofNullable(discordlink);
-    }
-
     public Optional<HologramsPlaceholders> holograms() {
         return Optional.ofNullable(holograms);
     }
@@ -288,7 +282,6 @@ public final class PlaceholderContexts {
                 && vote == null
                 && messaging == null
                 && staff == null
-                && discordlink == null
                 && holograms == null
                 && communication == null
                 && scoreboard == null
@@ -314,7 +307,6 @@ public final class PlaceholderContexts {
         private @Nullable VotePlaceholders vote;
         private @Nullable MessagingPlaceholders messaging;
         private @Nullable StaffPlaceholders staff;
-        private @Nullable DiscordlinkPlaceholders discordlink;
         private @Nullable HologramsPlaceholders holograms;
         private @Nullable CommunicationPlaceholders communication;
         private @Nullable ScoreboardPlaceholders scoreboard;
@@ -431,11 +423,6 @@ public final class PlaceholderContexts {
 
         public Builder staff(StaffPlaceholders seam) {
             this.staff = seam;
-            return this;
-        }
-
-        public Builder discordlink(DiscordlinkPlaceholders seam) {
-            this.discordlink = seam;
             return this;
         }
 

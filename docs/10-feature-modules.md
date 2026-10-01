@@ -9,9 +9,9 @@ one.
 
 A feature of uxmEssentials is a bounded context: its own package, its own config file, its own
 commands, listeners and migrations, and its own switch. Homes is one, economy is another,
-thirty four in all today:
+thirty three in all today:
 
-`commandcontrol`, `communication`, `customcommands`, `custommenus`, `discordlink`, `economy`,
+`commandcontrol`, `communication`, `customcommands`, `custommenus`, `economy`,
 `holograms`, `homes`, `invrollback`, `itemworld`, `kits`, `messaging`, `moderation`, `npc`,
 `playerstate`, `playerwarps`, `poses`, `presence`, `ranks`, `regions`, `scoreboard`,
 `security`, `servertweaks`, `skin`, `staff`, `survival`, `teleport`, `trade`, `vanish`,

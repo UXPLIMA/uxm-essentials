@@ -987,30 +987,14 @@ class PlaceholderResolverTest {
     }
 
     @Test
-    void discordlinkPlaceholdersReadLinkedAndId() {
-        FakeDiscordlink linked = new FakeDiscordlink().link(ALICE, "123456789012345678");
-        PlaceholderResolver resolver =
-                resolverWith(PlaceholderContexts.builder().discordlink(linked).build());
-
-        assertThat(resolver.resolve(ALICE, true, "discordlink_linked")).contains("yes");
-        assertThat(resolver.resolve(ALICE, true, "discordlink_id")).contains("123456789012345678");
-        // An unlinked account reports no and dashes the id, both readable offline since the binding is DB-backed.
-        assertThat(resolver.resolve(BOB, false, "discordlink_linked")).contains("no");
-        assertThat(resolver.resolve(BOB, false, "discordlink_id")).contains("-");
-        // The linked account reads identically for an offline requester.
-        assertThat(resolver.resolve(ALICE, false, "discordlink_linked")).contains("yes");
-        assertThat(resolver.resolve(ALICE, false, "discordlink_id")).contains("123456789012345678");
-    }
-
-    @Test
-    void discordlinkDegradesWhenModuleIsDisabled() {
+    void theDiscordLinkPlaceholdersAreNoLongerOurs() {
+        // Account linking left the plugin on 2026-10-01 for a plugin of its own, which answers these keys if it
+        // publishes them. Ours resolve to nothing, so PlaceholderAPI asks whoever does.
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
 
-        assertThat(resolver.resolve(ALICE, true, "discordlink_linked")).contains("-");
-        assertThat(resolver.resolve(ALICE, true, "discordlink_id")).contains("-");
-        // An unknown discordlink_ tail still resolves through the branch to the dash, never the raw token.
-        assertThat(resolver.resolve(ALICE, true, "discordlink_unknown")).contains("-");
+        assertThat(resolver.resolve(ALICE, true, "discordlink_linked")).isEmpty();
+        assertThat(resolver.resolve(ALICE, true, "discordlink_id")).isEmpty();
     }
 
     @Test
@@ -2796,27 +2780,6 @@ class PlaceholderResolverTest {
         @Override
         public Optional<String> board(PlayerRef who) {
             return Optional.ofNullable(boards.get(who));
-        }
-    }
-
-    /** A configurable {@link DiscordlinkPlaceholders} fake: every read returns the value the test seeded. */
-    private static final class FakeDiscordlink implements DiscordlinkPlaceholders {
-
-        private final java.util.Map<PlayerRef, String> ids = new java.util.HashMap<>();
-
-        FakeDiscordlink link(PlayerRef who, String discordId) {
-            ids.put(who, discordId);
-            return this;
-        }
-
-        @Override
-        public boolean linked(PlayerRef who) {
-            return ids.containsKey(who);
-        }
-
-        @Override
-        public Optional<String> discordId(PlayerRef who) {
-            return Optional.ofNullable(ids.get(who));
         }
     }
 

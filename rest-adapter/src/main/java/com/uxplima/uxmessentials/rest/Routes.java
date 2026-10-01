@@ -14,7 +14,6 @@ import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
 import com.uxplima.uxmessentials.rest.route.ActionsFor;
 import com.uxplima.uxmessentials.rest.route.CommandControlRoutes;
-import com.uxplima.uxmessentials.rest.route.DiscordLinkRoutes;
 import com.uxplima.uxmessentials.rest.route.DisplayRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
 import com.uxplima.uxmessentials.rest.route.HologramsRoutes;
@@ -81,7 +80,6 @@ public final class Routes {
                 .add(Route.of("GET", PREFIX + "/status", Scopes.READ, request -> status(api)))
                 .add(Route.of("GET", EVENTS, Scopes.EVENTS, request -> upgradeRequired()))
                 .addAll(CommandControlRoutes.of(api))
-                .addAll(DiscordLinkRoutes.of(api, actions))
                 .addAll(DisplayRoutes.of(actions))
                 .addAll(EconomyRoutes.of(api, actions))
                 .addAll(HologramsRoutes.of(api, actions))
@@ -158,7 +156,6 @@ public final class Routes {
         present.put("messaging", api.messaging().isPresent());
         present.put("ranks", api.ranks().isPresent());
         present.put("trade", api.trade().isPresent());
-        present.put("discordlink", api.discordLink().isPresent());
         present.put("regions", api.regions().isPresent());
         present.put("invrollback", api.invRollback().isPresent());
         present.put("security", api.security().isPresent());

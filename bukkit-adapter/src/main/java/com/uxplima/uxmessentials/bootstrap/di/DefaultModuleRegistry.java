@@ -7,7 +7,6 @@ import com.uxplima.uxmessentials.commandcontrol.application.CommandControlModule
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsModule;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusModule;
-import com.uxplima.uxmessentials.discordlink.application.DiscordlinkModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
 import com.uxplima.uxmessentials.holograms.application.HologramsModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
@@ -133,33 +132,27 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // event ports, plus a console-dispatch port), and like the steady-state features it ships ENABLED but
         // inert until rewards/links are authored, so it lands last after tablist.
         delegate.register(new VoteModule());
-        // discordlink is the 18th context: Discord account linking (/discordlink in game, /link in the bridge).
-        // It carries no hard dependency edge (its only collaborators are the shared persistence DSL, messages,
-        // and the player lookup), and the host exposes its ConfirmLink use case through the ServicesManager so the
-        // optional Discord jar can redeem a code with no compile-time link. Like the steady-state features it ships
-        // ENABLED, so it lands last after vote.
-        delegate.register(new DiscordlinkModule());
-        // nametags is the 19th context. A per-wearer above-head TextDisplay nametag rendered on the Scheduler refresh
+        // nametags is the 18th context. A per-wearer above-head TextDisplay nametag rendered on the Scheduler refresh
         // timer over uxmLib's packet nametag stack. It soft-couples to vanish (vanish-aware viewer culling through
         // the canSee graph, degrading to "everyone can see everyone" when vanish is off), so it carries no hard
         // dependency edge. It ships ENABLED by default with a single plain-name format and hides the vanilla above-head
         // name under it through a shared scoreboard-team coordinator (re-applied after every per-player board switch),
-        // so the default surface is one clean custom nametag per wearer. It lands last after discordlink.
+        // so the default surface is one clean custom nametag per wearer. It lands last after vote.
         delegate.register(new NametagsModule());
-        // staff is the 20th context, a STAFF-MODE-ONLY toolkit (the /staffmode toggle with an item-loss-safe DB-backed
+        // staff is the 19th context, a STAFF-MODE-ONLY toolkit (the /staffmode toggle with an item-loss-safe DB-backed
         // loadout swap, the VANISH + EXAMINE gadget hotbar, and staff chat). The gadgets orchestrate the existing
         // presence/playerstate modules through soft-couple ports that degrade to no-ops when those modules are off, and
         // staff chat fans out through messaging's staff audience, so staff carries no hard dependency edge. It lands
         // last after nametags. Every command and gadget is permission-gated, so a regular player sees nothing change.
         delegate.register(new StaffModule());
-        // npc is the 21st context, server-wide fake-player NPCs (the /npc create/delete/list/move/skin/command
+        // npc is the 20th context, server-wide fake-player NPCs (the /npc create/delete/list/move/skin/command
         // toolkit). Each NPC is rendered to viewers entirely with packets (no real entity) over the uxmLib NPC
         // packet stack; it is DB-persisted (the npc table is in the persistence V38 baseline) so NPCs come back
         // after a restart. It carries no hard dependency edge (its only collaborators are the shared persistence
         // DSL, the Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but
         // inert until an operator creates an NPC, so it lands last after staff.
         delegate.register(new NpcModule());
-        // custommenus is the 22nd context, the operator surface over the Phase-2 menu engine (/menu open/list/reload
+        // custommenus is the 21st context, the operator surface over the Phase-2 menu engine (/menu open/list/reload
         // over operator-authored menus/*.conf). It consumes the always-on engine bindings rather than owning a domain
         // aggregate, carries no hard dependency edge (its only collaborators are the shared menu façade + bindings,
         // built in bootstrap), and like the steady-state features ships ENABLED but inert until an operator authors a
@@ -170,17 +163,17 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // the engine bindings rather than owning an aggregate, carries no hard dependency edge, and ships ENABLED but
         // inert until an operator writes a definition file, so it lands right after custommenus.
         delegate.register(new CustomCommandsModule());
-        // poses is the 23rd context. Built-in GSit-parity sitting and posing (/sit, player-sit, /lay, /bellyflop,
+        // poses is the 22nd context. Built-in GSit-parity sitting and posing (/sit, player-sit, /lay, /bellyflop,
         // /spin, /crawl). It carries no hard dependency edge (its collaborators are the shared Scheduler, messages,
         // permissions, and event ports, plus the claim/region gate it consults through a soft-couple in a later
         // phase), and like the steady-state features it ships ENABLED, so it lands last after custommenus.
         delegate.register(new PoseModule());
-        // survival is the 24th context. Opt-in gameplay mechanics (Phase 1: tree-feller + veinminer), each an
+        // survival is the 23rd context. Opt-in gameplay mechanics (Phase 1: tree-feller + veinminer), each an
         // independently toggleable sub-feature. It carries no hard dependency edge (its collaborators are the shared
         // Scheduler, messages, and event ports), persists nothing (per-player toggles are PDC stamps), and like the
         // steady-state features ships ENABLED, so it lands last after poses.
         delegate.register(new SurvivalModule());
-        // ranks is the 25th context. Rankup/prestige/autorank progression, tracking each player's current rank
+        // ranks is the 24th context. Rankup/prestige/autorank progression, tracking each player's current rank
         // with a DB-backed pointer of our own rather than reading a permission plugin's group. It carries no hard
         // dependency edge in Phase 1 (its collaborators are the shared persistence DSL for the pointer plus the
         // Scheduler, messages and event ports; the economy/permissions/playtime seams it consults on rankup are
@@ -203,7 +196,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // from config), and like the steady-state features ships ENABLED but inert until an operator names commands.
         // It is registered before trade so trade stays last.
         delegate.register(new CommandControlModule());
-        // trade is the 26th context. Secure player-to-player trading (/trade) with a live dual-inventory window and,
+        // trade is the 25th context. Secure player-to-player trading (/trade) with a live dual-inventory window and,
         // in the later phases, staked money and cross-server escrow. It carries no hard dependency edge in Phase 1
         // (its collaborators, the economy trade port and the bus transport, land with the money and cross-server
         // phases), a same-server trade is transient in-memory state (no DB), and like the steady-state features it

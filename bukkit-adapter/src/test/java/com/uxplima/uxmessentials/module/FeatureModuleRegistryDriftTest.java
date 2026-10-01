@@ -67,7 +67,9 @@ class FeatureModuleRegistryDriftTest {
         assertThat(registry.byId(ModuleId.of("scoreboard"))).isPresent();
         assertThat(registry.byId(ModuleId.of("tablist"))).isPresent();
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
-        assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
+        assertThat(registry.byId(ModuleId.of("discordlink")))
+                .describedAs("account linking left the plugin on 2026-10-01")
+                .isEmpty();
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
         assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
         assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
@@ -104,7 +106,6 @@ class FeatureModuleRegistryDriftTest {
                         "scoreboard",
                         "tablist",
                         "vote",
-                        "discordlink",
                         "nametags",
                         "staff",
                         "npc",
@@ -392,7 +393,7 @@ class FeatureModuleRegistryDriftTest {
                 registry.byId(ModuleId.of("vote")).orElseThrow(() -> new AssertionError("vote is not registered"));
 
         // vote is the 17th context: a Votifier-bridged vote-rewards and vote-party feature. The later
-        // discordlink context now lands last, so vote must merely be registered, not last.
+        // nametags context now lands last, so vote must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("vote"))).isPresent();
 
         // It ships DISABLED: nothing here can happen without Votifier and a vote site listing the server, so a fresh
@@ -417,45 +418,12 @@ class FeatureModuleRegistryDriftTest {
     }
 
     @Test
-    void discordlinkShipsDisabledAndPublishesItsSurface() {
-        DefaultModuleRegistry registry = new DefaultModuleRegistry();
-        FeatureModule discordlink = registry.byId(ModuleId.of("discordlink"))
-                .orElseThrow(() -> new AssertionError("discordlink is not registered"));
-
-        // discordlink is the 18th context, Discord account linking, registered after the seventeen prior modules.
-        // The later nametags context now lands last, so discordlink must merely be registered, not last.
-        assertThat(registry.byId(ModuleId.of("discordlink"))).isPresent();
-
-        // It ships DISABLED: linking accounts needs a Discord bot token, so the feature does nothing on an install
-        // that has not configured one. Turning exactly it on adds only it.
-        Set<String> defaults = registry.enabledModules(new FixedConfig(Map.of())).stream()
-                .map(m -> m.id().value())
-                .collect(Collectors.toSet());
-        assertThat(defaults).doesNotContain("discordlink");
-        assertThat(defaults).contains("teleport", "economy");
-        Set<String> on = registry.enabledModules(new FixedConfig(Map.of("modules.discordlink.enabled", true))).stream()
-                .map(m -> m.id().value())
-                .collect(Collectors.toSet());
-        assertThat(on).contains("discordlink", "teleport", "economy");
-        assertThat(on).doesNotContain("vote");
-
-        // Enabled, discordlink contributes exactly /discordlink and /discordunlink (/discordlink status is a
-        // subcommand, not a literal) and owns no extra Flyway location (its discord_links and
-        // discord_link_pending tables are in the persistence V16 baseline, always applied), so it declares no
-        // MigrationSet of its own.
-        Set<String> literals =
-                discordlink.commands().stream().map(CommandSpec::literal).collect(Collectors.toSet());
-        assertThat(literals).containsExactlyInAnyOrder("discordlink", "discordunlink");
-        assertThat(discordlink.migrations()).isEmpty();
-    }
-
-    @Test
     void nametagsShipsDisabledAndPublishesNoCommandSurface() {
         DefaultModuleRegistry registry = new DefaultModuleRegistry();
         FeatureModule nametags = registry.byId(ModuleId.of("nametags"))
                 .orElseThrow(() -> new AssertionError("nametags is not registered"));
 
-        // nametags is the 19th context, a per-wearer above-head TextDisplay nametag on the Scheduler refresh timer.
+        // nametags is the 18th context, a per-wearer above-head TextDisplay nametag on the Scheduler refresh timer.
         // The later staff context now lands last, so nametags must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("nametags"))).isPresent();
 
@@ -485,7 +453,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule staff =
                 registry.byId(ModuleId.of("staff")).orElseThrow(() -> new AssertionError("staff is not registered"));
 
-        // staff is the 20th context, a STAFF-MODE-ONLY toolkit (the /staffmode toggle + gadget hotbar + staff chat).
+        // staff is the 19th context, a STAFF-MODE-ONLY toolkit (the /staffmode toggle + gadget hotbar + staff chat).
         // The later npc context now lands last, so staff must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("staff"))).isPresent();
 
@@ -518,7 +486,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule npc =
                 registry.byId(ModuleId.of("npc")).orElseThrow(() -> new AssertionError("npc is not registered"));
 
-        // npc is the 21st context, server-wide fake-player NPCs behind /npc. The later custommenus context now lands
+        // npc is the 20th context, server-wide fake-player NPCs behind /npc. The later custommenus context now lands
         // last, so npc must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("npc"))).isPresent();
 
@@ -548,7 +516,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule custommenus = registry.byId(ModuleId.of("custommenus"))
                 .orElseThrow(() -> new AssertionError("custommenus is not registered"));
 
-        // custommenus is the 22nd context, the operator surface over the menu engine (/menu). The later poses context
+        // custommenus is the 21st context, the operator surface over the menu engine (/menu). The later poses context
         // now lands last, so custommenus must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("custommenus"))).isPresent();
 
@@ -582,7 +550,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule poses =
                 registry.byId(ModuleId.of("poses")).orElseThrow(() -> new AssertionError("poses is not registered"));
 
-        // poses is the 23rd context: built-in GSit-parity sitting and posing. The later survival context now lands
+        // poses is the 22nd context: built-in GSit-parity sitting and posing. The later survival context now lands
         // last, so poses must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("poses"))).isPresent();
 
@@ -612,7 +580,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule survival = registry.byId(ModuleId.of("survival"))
                 .orElseThrow(() -> new AssertionError("survival is not registered"));
 
-        // survival is the 24th context: opt-in gameplay mechanics (Phase 1: tree-feller + veinminer). The later
+        // survival is the 23rd context: opt-in gameplay mechanics (Phase 1: tree-feller + veinminer). The later
         // ranks context now lands last, so survival must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("survival"))).isPresent();
 
@@ -641,7 +609,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule ranks =
                 registry.byId(ModuleId.of("ranks")).orElseThrow(() -> new AssertionError("ranks is not registered"));
 
-        // ranks is the 25th context: rankup/prestige/autorank progression with a DB-backed rank pointer. The later
+        // ranks is the 24th context: rankup/prestige/autorank progression with a DB-backed rank pointer. The later
         // trade context now lands last, so ranks must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("ranks"))).isPresent();
 
@@ -701,7 +669,7 @@ class FeatureModuleRegistryDriftTest {
         FeatureModule trade =
                 registry.byId(ModuleId.of("trade")).orElseThrow(() -> new AssertionError("trade is not registered"));
 
-        // trade is the 26th context: secure player-to-player trading (/trade). The later villagers context now lands
+        // trade is the 25th context: secure player-to-player trading (/trade). The later villagers context now lands
         // last, so trade must merely be registered, not last.
         assertThat(registry.byId(ModuleId.of("trade"))).isPresent();
 

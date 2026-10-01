@@ -12,7 +12,7 @@
 ![Available for Velocity](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/supported/velocity_vector.svg)
 ![Built with Java 25](https://raw.githubusercontent.com/intergrav/devins-badges/v3/assets/cozy/built-with/java25_vector.svg)
 
-**Paper 26.2+ &nbsp;·&nbsp; Folia ready &nbsp;·&nbsp; 36 modules &nbsp;·&nbsp; [GPL-3.0](LICENSE)**
+**Paper 26.2+ &nbsp;·&nbsp; Folia ready &nbsp;·&nbsp; 35 modules &nbsp;·&nbsp; [GPL-3.0](LICENSE)**
 
 </div>
 
@@ -65,7 +65,7 @@ extensive MockBukkit/JUnit test suite.
 
 - **One platform, done well.** Paper 26.2 and Java 25 only: no legacy cross-version reflection to drag
   around, just the current server API used natively.
-- **Genuinely modular.** Thirty-five feature modules, each toggled on its own. A disabled module instantiates
+- **Genuinely modular.** Thirty-four feature modules, each toggled on its own. A disabled module instantiates
   zero adapters, registers zero commands and listeners, runs zero migrations, and holds zero state.
 - **Configure in-game.** Every module has a management GUI reachable from `/uxmess gui`: edit a hologram, an
   NPC, a warp, a vault, or a punishment by clicking. Every screen in the plugin renders through one data-driven
@@ -113,7 +113,7 @@ Four optional companion jars extend the suite onto other platforms; see
 | `uxmEssentials-<version>.jar` | Paper `plugins/` | The plugin itself (required). |
 | `uxmEssentials-velocity-<version>.jar` | Velocity `plugins/` | Proxy-side bus broker: relays every synced context (homes, warps, economy, vaults, trade, vanish, moderation, votes, and more) across the network. |
 | `uxmEssentials-redis-<version>.jar` | Paper `plugins/` (each backend) | The Redis transport for the cross-server bus: the same sync over Redis pub/sub, with no proxy required. |
-| `uxmEssentials-discord-<version>.jar` | Paper `plugins/` | A JDA bridge for account linking and audit / economy notifications. |
+| `uxmEssentials-discord-<version>.jar` | Paper `plugins/` | A JDA bridge that pushes audit / economy notifications to Discord. |
 | `uxmEssentials-rest-<version>.jar` | Paper `plugins/` | An HTTP + WebSocket API over the developer API: read and write every context from outside the server, with in-game token management. |
 
 ## Modules
@@ -153,7 +153,6 @@ database-backed so they survive rollbacks.
 | **tablist** | Per-player tab name formatting and sorting, animated header / footer, and fixed-slot layouts: filler entries, and roster groups that seat the players in the cells you choose. |
 | **nametags** | Above-head nametags rendered through display entities: per-viewer, vanish-aware, with a separate view-range and cull distance. |
 | **vote** | A full vote-rewards engine: Votifier intake, totals and a leaderboard, a config-driven reward engine, a cross-server vote party with escalation, voting streaks, per-site cooldowns and reminders, multi-channel broadcasts, and Discord webhook notifications. |
-| **discordlink** | Link a Minecraft account to Discord, sync roles, and push audit / economy notifications (with the Discord add-on). |
 | **itemworld** | The everyday item & world utility surface: an `/itemedit` editor (rename, lore, enchants, flags, attributes, durability, custom-model-data, unbreakable), open-shulker-from-inventory, item tools, virtual workstations, world cleanup, powertool, mob / entity controls, time / weather aliases, and admin-fun, split into independently disableable sub-feature groups. |
 | **worlds** | A full multi-world manager: create / import / load / unload / delete (confirm-staged), per-world properties and gamerules, built-in void and flat generators, access gating with economy entry fees, cross-world portals, a world-editor GUI, pre-generation, backup / restore, and idle auto-unload. |
 | **regions** | A WorldGuard region-management GUI (`/regions`): list, create (two-position selection), edit flags, manage members / owners, and set priority. WorldGuard is a soft-dependency; without it the module stays inert. |
@@ -211,7 +210,7 @@ Each module owns its own `enabled` flag at the top of its `config.conf`. Switch 
 nothing at all, no commands, no listeners, no tables:
 
 ```hocon
-# modules/discordlink/config.conf
+# modules/vote/config.conf
 enabled = false
 ```
 
@@ -340,8 +339,8 @@ Either way the sync covers homes, warps, player-warps, economy, vaults, trade, v
 NPCs, the vote party, and the messaging ignore list. With no proxy, no Redis, and no peers the bus degrades cleanly to
 local-only; the single-server path is unchanged. `/uxmess doctor` reports the active transport and its health.
 
-- **Discord**: drop `uxmEssentials-discord-<version>.jar` on a Paper node to bridge account linking and push
-  audit and economy notifications through JDA.
+- **Discord**: drop `uxmEssentials-discord-<version>.jar` on a Paper node to push audit and economy
+  notifications to Discord through JDA.
 
 - **REST**: drop `uxmEssentials-rest-<version>.jar` on a Paper node to expose the developer API over HTTP and a
   WebSocket event stream, with tokens created and revoked in game.

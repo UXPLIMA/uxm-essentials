@@ -16,7 +16,6 @@ import com.google.gson.JsonPrimitive;
 import com.uxplima.uxmessentials.api.view.UxmBackPoint;
 import com.uxplima.uxmessentials.api.view.UxmBaltopEntry;
 import com.uxplima.uxmessentials.api.view.UxmCommandCheck;
-import com.uxplima.uxmessentials.api.view.UxmDiscordLink;
 import com.uxplima.uxmessentials.api.view.UxmHologram;
 import com.uxplima.uxmessentials.api.view.UxmHome;
 import com.uxplima.uxmessentials.api.view.UxmIgnore;
@@ -298,14 +297,6 @@ public final class Views {
         json.add("next", standing.next().map(Views::rank).orElse(JsonNull.INSTANCE));
         json.addProperty("prestige", standing.prestige());
         json.addProperty("at-top", standing.atTop());
-        return json;
-    }
-
-    public static JsonElement discordLink(UxmDiscordLink link) {
-        JsonObject json = new JsonObject();
-        json.addProperty("player-id", link.playerId().toString());
-        json.addProperty("discord-id", link.discordId());
-        json.addProperty("linked-at", link.linkedAt().toString());
         return json;
     }
 

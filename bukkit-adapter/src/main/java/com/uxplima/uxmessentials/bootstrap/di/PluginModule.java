@@ -26,7 +26,6 @@ import org.bukkit.OfflinePlayer;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
 import com.uxplima.uxmessentials.api.action.UxmInvRollbackActions;
@@ -37,8 +36,6 @@ import com.uxplima.uxmessentials.api.action.UxmWarpActions;
 import com.uxplima.uxmessentials.api.audit.AuditFeed;
 import com.uxplima.uxmessentials.api.bukkit.UxmApiHolder;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
-import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
-import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
 import com.uxplima.uxmessentials.api.query.UxmInvRollbackQuery;
@@ -87,9 +84,6 @@ import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandsWiring;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
-import com.uxplima.uxmessentials.discordlink.adapter.DiscordlinkWiring;
-import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkActions;
-import com.uxplima.uxmessentials.discordlink.adapter.outbound.api.DiscordLinkQueries;
 import com.uxplima.uxmessentials.economy.adapter.EconomyWiring;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.ProviderRankEconomy;
@@ -247,7 +241,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWarpsPla
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.ServicesTeleportPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StaffStaffPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreCommunicationPlaceholders;
-import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreDiscordlinkPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePlayerstatePlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePosesPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StorePresencePlaceholders;
@@ -1380,8 +1373,6 @@ public final class PluginModule {
             wireTablist(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
-        } else if (module.id().equals(ModuleId.of("discordlink"))) {
-            wireDiscordlink(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
@@ -3160,59 +3151,6 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.api.action.UxmVoteActions.class,
                 source -> new com.uxplima.uxmessentials.vote.adapter.outbound.api.VoteActions(
                         wired.apiWrites(), lookup, ctx.kernel().scheduler(), source));
-    }
-
-    private static void wireDiscordlink(
-            JavaPlugin plugin,
-            ModuleContext ctx,
-            Persistence persistence,
-            CloseableResources resources,
-            ContextLinks links,
-            GuiLayouts guiLayouts,
-            ManagementGuiRegistry guiRegistry,
-            Menus menus) {
-        // discordlink builds its un-cached jOOQ store over persistence.dsl() (the discord_link_pending and
-        // discord_links tables ship in the persistence V16 baseline, always applied) and the /discordlink and
-        // /discordunlink commands. It registers its ConfirmLink seam into the ServicesManager so the optional
-        // Discord bridge (a separate jar with no compile-time link to this one) can redeem a /link code through
-        // the same use case; the registration is dropped on disable so a reload re-exposes it cleanly. The bridge
-        // looks the service up once its gateway is ready and forwards nothing while it is absent. The link-status
-        // panel consumes the SP0 GUI framework (a GuiText over the shared catalog, the data-folder layout loader)
-        // and registers its /uxmess gui hub entry; /discordlink gui opens the same panel, gated on the GUI node.
-        com.uxplima.uxmessentials.discordlink.application.port.DiscordBridge bridge =
-                new com.uxplima.uxmessentials.discordlink.adapter.outbound.ServicesManagerDiscordBridge(
-                        plugin.getServer().getServicesManager());
-        DiscordlinkWiring.Wired wired = DiscordlinkWiring.wire(ctx, persistence, guiLayouts, bridge, menus);
-        wired.commands().forEach(resources::addCommand);
-        // The discordlink PAPI seam reads the same DB-backed link store the /discordlink commands hold, so a
-        // placeholder matches the binding the player redeemed (and answers for an offline player too).
-        links.placeholders.discordlink(new StoreDiscordlinkPlaceholders(wired.store()));
-        // Both directions of the binding are readable, and the one write a plugin has business doing is the
-        // removal: a binding written without the Discord-side proof would say something untrue.
-        links.queries.register(
-                UxmDiscordLinkQuery.class,
-                new DiscordLinkQueries(wired.store(), ctx.kernel().scheduler()));
-        links.actions.register(
-                UxmDiscordLinkActions.class,
-                source -> new DiscordLinkActions(
-                        wired.unlink(),
-                        ctx.kernel().playerLookup(),
-                        ctx.kernel().scheduler()));
-        plugin.getServer()
-                .getServicesManager()
-                .register(
-                        DiscordLinkConfirmation.class,
-                        wired.confirmation(),
-                        plugin,
-                        org.bukkit.plugin.ServicePriority.Normal);
-        resources.onClose(() -> plugin.getServer().getServicesManager().unregister(wired.confirmation()));
-        // Register the discordlink link-status panel on the /uxmess gui hub, gated by the player-facing GUI node.
-        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
-                "discordlink",
-                com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey.GUI_TITLE,
-                Material.PLAYER_HEAD,
-                "uxmessentials.discord.gui",
-                (player, viewer) -> wired.view().open(player, viewer)));
     }
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */

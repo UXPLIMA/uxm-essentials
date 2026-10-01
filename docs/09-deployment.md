@@ -137,10 +137,6 @@ loop guard means a notice the bridge itself raised is never mirrored twice.
 A bad token does not take the server with it. The bridge self-disables on a connect failure
 and logs the reason.
 
-When the host's `discordlink` module is on, the bridge also registers the `/link` slash
-command players use to confirm the code `/discordlink` gives them in game. That needs no extra
-setup and no privileged intent.
-
 ## 9.5 The REST add-on
 
 `uxmEssentials-rest.jar` publishes the developer API over HTTP. It compiles against the

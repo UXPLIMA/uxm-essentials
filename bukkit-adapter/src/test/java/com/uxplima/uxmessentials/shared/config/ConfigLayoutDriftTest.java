@@ -42,7 +42,6 @@ class ConfigLayoutDriftTest {
             "communication",
             "holograms",
             "vote",
-            "discordlink",
             "poses",
             "survival",
             "ranks",

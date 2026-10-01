@@ -8,7 +8,6 @@ import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessag
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
-import com.uxplima.uxmessentials.discordlink.application.DiscordlinkMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
@@ -75,7 +74,6 @@ public final class MessageKeyCatalog {
             PlayerwarpsMessageKey.values(),
             ScoreboardMessageKey.values(),
             VoteMessageKey.values(),
-            DiscordlinkMessageKey.values(),
             StaffMessageKey.values(),
             NpcMessageKey.values(),
             CustomMenusMessageKey.values(),

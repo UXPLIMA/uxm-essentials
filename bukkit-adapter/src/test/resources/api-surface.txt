@@ -1,5 +1,4 @@
 interface com.uxplima.uxmessentials.api.action.UxmActions
-  Optional discordLink()
   Optional economy()
   Optional holograms()
   Optional homes()
@@ -22,8 +21,6 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional vote()
   Optional warps()
   Optional worlds()
-interface com.uxplima.uxmessentials.api.action.UxmDiscordLinkActions
-  CompletableFuture unlink(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
   CompletableFuture deposit(UUID, BigDecimal)
   CompletableFuture deposit(UUID, BigDecimal, String)
@@ -202,7 +199,6 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void uninstall()
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
   Optional commandControl()
-  Optional discordLink()
   Optional economy()
   Optional holograms()
   Optional homes()
@@ -265,17 +261,6 @@ class com.uxplima.uxmessentials.api.bukkit.event.communication.UxmBroadcastOptOu
   HandlerList getHandlers()
   Instant getAt()
   boolean isOptedOut()
-class com.uxplima.uxmessentials.api.bukkit.event.discordlink.UxmAccountLinkEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
-  <init>(UUID, String, String, Instant)
-  HandlerList getHandlerList()
-  HandlerList getHandlers()
-  Instant getLinkedAt()
-  String getDiscordId()
-class com.uxplima.uxmessentials.api.bukkit.event.discordlink.UxmAccountUnlinkEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
-  <init>(UUID, String, String)
-  HandlerList getHandlerList()
-  HandlerList getHandlers()
-  String getDiscordId()
 class com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankDepositEvent extends com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankEvent
   <init>(UUID, String, String, com.uxplima.uxmessentials.api.view.UxmMoney, com.uxplima.uxmessentials.api.view.UxmMoney)
   HandlerList getHandlerList()
@@ -905,34 +890,9 @@ interface com.uxplima.uxmessentials.api.bukkit.menu.MenuView
   UUID viewerId()
   int page()
   int pageCount()
-interface com.uxplima.uxmessentials.api.link.DiscordBridgePresence
-interface com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome confirm(String, String)
-record com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome
-  <init>(com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result, String)
-  Optional playerNameIfLinked()
-  String playerName()
-  String toString()
-  boolean equals(Object)
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome failure(com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result)
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Outcome linked(String)
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result result()
-  int hashCode()
-enum com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result valueOf(String)
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result[] values()
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result ALREADY_LINKED
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result EXPIRED
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result INVALID
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result LINKED
-  com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation$Result NO_CODE
 interface com.uxplima.uxmessentials.api.query.UxmCommandControlQuery
   CompletableFuture check(UUID, String)
   CompletableFuture isBlocked(UUID, String)
-interface com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery
-  CompletableFuture byDiscordId(String)
-  CompletableFuture isLinked(UUID)
-  CompletableFuture of(UUID)
 interface com.uxplima.uxmessentials.api.query.UxmEconomyQuery
   CompletableFuture balance(UUID)
   CompletableFuture balance(UUID, String)
@@ -1092,14 +1052,6 @@ enum com.uxplima.uxmessentials.api.view.UxmCommandRule
   com.uxplima.uxmessentials.api.view.UxmCommandRule NOT_BLACKLISTED
   com.uxplima.uxmessentials.api.view.UxmCommandRule NOT_WHITELISTED
   com.uxplima.uxmessentials.api.view.UxmCommandRule WHITELISTED
-record com.uxplima.uxmessentials.api.view.UxmDiscordLink
-  <init>(UUID, String, Instant)
-  Instant linkedAt()
-  String discordId()
-  String toString()
-  UUID playerId()
-  boolean equals(Object)
-  int hashCode()
 enum com.uxplima.uxmessentials.api.view.UxmEconomyRejection
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection valueOf(String)
   com.uxplima.uxmessentials.api.view.UxmEconomyRejection[] values()

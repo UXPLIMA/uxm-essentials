@@ -8,7 +8,6 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
 import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
-import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
@@ -170,9 +169,6 @@ public interface UxmEssentialsApi {
 
     /** Reading the trades open right now, or empty when the trade module is switched off. */
     Optional<UxmTradeQuery> trade();
-
-    /** Reading who is linked to which Discord account, or empty when the discordlink module is switched off. */
-    Optional<UxmDiscordLinkQuery> discordLink();
 
     /** Reading what WorldGuard protects, or empty when the regions module is switched off. */
     Optional<UxmRegionsQuery> regions();

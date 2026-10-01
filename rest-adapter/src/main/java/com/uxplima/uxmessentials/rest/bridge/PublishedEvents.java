@@ -5,8 +5,6 @@ import java.util.List;
 import com.uxplima.uxmessentials.api.bukkit.event.UxmEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.communication.UxmAnnouncerReloadEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.communication.UxmBroadcastOptOutEvent;
-import com.uxplima.uxmessentials.api.bukkit.event.discordlink.UxmAccountLinkEvent;
-import com.uxplima.uxmessentials.api.bukkit.event.discordlink.UxmAccountUnlinkEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankDepositEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankWithdrawEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmLoanDisburseEvent;
@@ -110,10 +108,6 @@ public final class PublishedEvents {
             // communication
             UxmAnnouncerReloadEvent.class,
             UxmBroadcastOptOutEvent.class,
-
-            // discordlink
-            UxmAccountLinkEvent.class,
-            UxmAccountUnlinkEvent.class,
 
             // economy
             UxmBankDepositEvent.class,

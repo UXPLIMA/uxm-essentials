@@ -10,7 +10,6 @@ import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.audit.AuditFeed;
-import com.uxplima.uxmessentials.api.link.DiscordLinkConfirmation;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
 
@@ -43,7 +42,6 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
     private final DiscordGateway gateway;
     private final AtomicReference<NotificationForwarder> forwarder = new AtomicReference<>();
     private final AtomicReference<AuditNoticeSubscriber> subscriber = new AtomicReference<>();
-    private final AtomicReference<BridgePresence> presence = new AtomicReference<>();
 
     /** Production constructor: a real JDA gateway. */
     public UxmEssentialsDiscord() {
@@ -67,10 +65,6 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        BridgePresence advertised = presence.getAndSet(null);
-        if (advertised != null) {
-            advertised.withdraw();
-        }
         AuditNoticeSubscriber open = subscriber.getAndSet(null);
         if (open != null) {
             open.stop();
@@ -96,11 +90,10 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
             if (!getServer().getPluginManager().isPluginEnabled(HOST)) {
                 getLogger()
                         .warning("discord bridge connected but uxmEssentials is not enabled on this server: nothing "
-                                + "will be forwarded and /link is dormant");
+                                + "will be forwarded");
                 return;
             }
             startSubscription(config, live);
-            enableLinking();
             getLogger()
                     .info("discord bridge connected; mirroring "
                             + config.channels().size() + " channel(s)");
@@ -131,36 +124,6 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
         RegisteredServiceProvider<AuditFeed> rsp =
                 getServer().getServicesManager().getRegistration(AuditFeed.class);
         return rsp != null ? new HostAuditSource(rsp.getProvider()) : null;
-    }
-
-    /**
-     * Register the {@code /link} slash command behind the host's confirmation seam, looked up via {@code
-     * ServicesManager} (no compile-time link to the host jar). When the host exposes no confirmation: it is
-     * older than the bridge, or the discordlink module is disabled. Linking stays dormant: the bridge runs the
-     * outbound notice mirror unchanged and logs why, exactly like the notification-source dormant path.
-     *
-     * <p>Once linking is live, advertise the bridge's presence back to the host so it knows a {@code /discordlink}
-     * code now has somewhere to be redeemed. Presence is published only here, after a real connect and a found
-     * confirmation seam, so the host's "Discord is configured" signal means exactly "connected and redeemable".
-     */
-    private void enableLinking() {
-        DiscordLinkConfirmation confirmation = lookupConfirmation();
-        if (confirmation == null) {
-            getLogger()
-                    .info("discord bridge connected but the host exposes no link confirmation: /link is "
-                            + "dormant (is uxmEssentials installed with the discordlink module enabled?)");
-            return;
-        }
-        gateway.enableLinking(confirmation);
-        BridgePresence advertised = new BridgePresence(getServer().getServicesManager(), this);
-        advertised.publish();
-        presence.set(advertised);
-    }
-
-    private @Nullable DiscordLinkConfirmation lookupConfirmation() {
-        RegisteredServiceProvider<DiscordLinkConfirmation> rsp =
-                getServer().getServicesManager().getRegistration(DiscordLinkConfirmation.class);
-        return rsp != null ? rsp.getProvider() : null;
     }
 
     private static NotificationRateLimiter rateLimiter(DiscordConfig config) {

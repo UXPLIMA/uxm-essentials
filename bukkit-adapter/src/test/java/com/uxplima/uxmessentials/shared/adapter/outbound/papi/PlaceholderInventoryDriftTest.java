@@ -53,7 +53,6 @@ class PlaceholderInventoryDriftTest {
             "moderation_",
             "messaging_",
             "staff_",
-            "discordlink_",
             "holograms_",
             "communication_",
             "scoreboard_",
@@ -188,7 +187,6 @@ class PlaceholderInventoryDriftTest {
                 .vote(vote())
                 .messaging(messaging())
                 .staff(staff())
-                .discordlink(discordlink())
                 .holograms(() -> 0)
                 .communication(communication())
                 .scoreboard(scoreboard())
@@ -733,20 +731,6 @@ class PlaceholderInventoryDriftTest {
             @Override
             public int onlineStaffCount() {
                 return 0;
-            }
-        };
-    }
-
-    private static DiscordlinkPlaceholders discordlink() {
-        return new DiscordlinkPlaceholders() {
-            @Override
-            public boolean linked(PlayerRef who) {
-                return false;
-            }
-
-            @Override
-            public Optional<String> discordId(PlayerRef who) {
-                return Optional.empty();
             }
         };
     }

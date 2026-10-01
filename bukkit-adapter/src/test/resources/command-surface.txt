@@ -61,8 +61,6 @@ deposit deposit -
 depth depth -
 descend descend -
 dimension dimension dim
-discordlink discordlink -
-discordunlink discordunlink -
 disenchant disenchant -
 disposal disposal trash
 down down -

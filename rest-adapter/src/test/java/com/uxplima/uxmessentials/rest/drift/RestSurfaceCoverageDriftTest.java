@@ -52,7 +52,6 @@ class RestSurfaceCoverageDriftTest {
     private static final Set<String> DELIBERATELY_ABSENT = Set.of(
             // Every one of these is a boolean already present in the payload of the read beside it.
             "UxmCommandControlQuery.isBlocked", // command-check carries "allowed"
-            "UxmDiscordLinkQuery.isLinked", // the link read is the link or null
             "UxmPresenceQuery.isAfk", // the presence read carries "afk"
             "UxmSecurityQuery.isLockedOut", // the security read carries the lockout window
             "UxmTradeQuery.isTrading", // the trade read is the session or null

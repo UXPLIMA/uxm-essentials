@@ -10,7 +10,6 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
-import com.uxplima.uxmessentials.api.query.UxmDiscordLinkQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
 import com.uxplima.uxmessentials.api.query.UxmHomesQuery;
@@ -218,11 +217,6 @@ class FrontDoorTest {
 
         @Override
         public Optional<UxmRegionsQuery> regions() {
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<UxmDiscordLinkQuery> discordLink() {
             return Optional.empty();
         }
 

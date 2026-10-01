@@ -17,9 +17,10 @@ import org.junit.jupiter.api.Test;
 /**
  * The bridge reads the host's {@code :api} classes, never a copy of its own.
  *
- * <p>Paper loads a plugin's own classes first. The bridge carried its own {@code :api}, so the link confirmation the
- * host registered was, to the bridge, a different class with the same name: the lookup came back empty and
- * {@code /link} never worked. The jar no longer carries {@code :api} (the build refuses one), and the manifest joins
+ * <p>Paper loads a plugin's own classes first. The bridge carried its own {@code :api}, so a service the host
+ * registered was, to the bridge, a different class with the same name and the lookup came back empty: that is how
+ * {@code /link} stayed dead until linking left the plugin, and the audit feed would go the same way. The jar no
+ * longer carries {@code :api} (the build refuses one), and the manifest joins
  * the host's classpath, so the one copy is the host's. {@code load: BEFORE} names when the host loads relative to
  * the bridge: a boot on 2026-09-29 loaded a plugin declaring {@code AFTER} ahead of the host.
  */

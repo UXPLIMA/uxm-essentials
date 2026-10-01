@@ -12,7 +12,6 @@ final class SocialPlaceholderKeys {
     private static final ModuleId MESSAGING = ModuleId.of("messaging");
     private static final ModuleId COMMUNICATION = ModuleId.of("communication");
     private static final ModuleId STAFF = ModuleId.of("staff");
-    private static final ModuleId DISCORDLINK = ModuleId.of("discordlink");
     private static final ModuleId MODERATION = ModuleId.of("moderation");
     private static final ModuleId VANISH = ModuleId.of("vanish");
     private static final ModuleId TRADE = ModuleId.of("trade");
@@ -20,7 +19,7 @@ final class SocialPlaceholderKeys {
     private SocialPlaceholderKeys() {}
 
     static List<PlaceholderSpec> all() {
-        return Stream.of(presence(), messaging(), communication(), staff(), discordlink(), moderation(), relational())
+        return Stream.of(presence(), messaging(), communication(), staff(), moderation(), relational())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -158,17 +157,6 @@ final class SocialPlaceholderKeys {
                         "The same connected-staff count, under the spelling a config may prefer.",
                         PlaceholderScope.GLOBAL,
                         STAFF));
-    }
-
-    private static List<PlaceholderSpec> discordlink() {
-        return List.of(
-                PlaceholderSpec.of(
-                        "discordlink_linked",
-                        "Whether the account is bound to a Discord user (yes/no).",
-                        PlaceholderScope.PLAYER,
-                        DISCORDLINK),
-                PlaceholderSpec.of(
-                        "discordlink_id", "The bound Discord user id.", PlaceholderScope.PLAYER, DISCORDLINK));
     }
 
     private static List<PlaceholderSpec> moderation() {

@@ -14,8 +14,8 @@ plugins {
 // bridge only posts text and never touches voice.
 
 // :api is compileOnly. The host jar carries it and paper-plugin.yml joins the host's classpath. A shaded copy was a
-// second class with the same name: the link confirmation the host registered was invisible to the bridge's lookup,
-// and /link never worked on a real server.
+// second class with the same name, and a service the host registers under it is invisible to the bridge's lookup.
+// That kept /link dead on every real server until linking left the plugin on 2026-10-01.
 dependencies {
     implementation(project(":core"))
     compileOnly(project(":api"))

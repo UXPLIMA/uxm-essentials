@@ -14,13 +14,12 @@ final class SocialPermissions {
     private static final ModuleId MESSAGING = ModuleId.of("messaging");
     private static final ModuleId PRESENCE = ModuleId.of("presence");
     private static final ModuleId COMMUNICATION = ModuleId.of("communication");
-    private static final ModuleId DISCORDLINK = ModuleId.of("discordlink");
     private static final ModuleId POSES = ModuleId.of("poses");
 
     private SocialPermissions() {}
 
     static List<PermissionSpec> all() {
-        return Stream.of(messaging(), presence(), communication(), discordlink(), poses())
+        return Stream.of(messaging(), presence(), communication(), poses())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -263,25 +262,6 @@ final class SocialPermissions {
                         "Hot-reload / inspect the communication module (connection messages, announcer, info pages).",
                         PermissionDefault.OP,
                         COMMUNICATION));
-    }
-
-    private static List<PermissionSpec> discordlink() {
-        return List.of(
-                PermissionSpec.of(
-                        "uxmessentials.discord.gui",
-                        "/discordlink gui (and the discordlink entry on the /uxmess gui hub) to open the link-status panel: your binding, a generate-code button, and a confirm-gated unlink.",
-                        PermissionDefault.TRUE,
-                        DISCORDLINK),
-                PermissionSpec.of(
-                        "uxmessentials.discord.link",
-                        "/discordlink (issue a code), /discordlink status (show your binding), and /discordunlink (remove it): all act only on your own account.",
-                        PermissionDefault.TRUE,
-                        DISCORDLINK),
-                PermissionSpec.of(
-                        "uxmessentials.module.discordlink",
-                        "Hot-reload / inspect the discordlink module (account linking and Discord notifications).",
-                        PermissionDefault.OP,
-                        DISCORDLINK));
     }
 
     private static List<PermissionSpec> poses() {
