@@ -137,6 +137,21 @@ class IgnoreCommandPathTest {
         assertThat(sink.keys).doesNotContain(SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
     }
 
+    /**
+     * Whoever can be ignored while offline can be un-ignored while offline. {@code /ignore} found an offline player and
+     * {@code /unignore} looked only at who was online, so a player stayed ignored until the other came back.
+     */
+    @Test
+    void unignoringAnOfflinePlayerWorksLikeIgnoringOne() {
+        PlayerMock owner = addPlayer("Owner");
+        execute(new IgnoreCommand(services, new KeyMessages(), sink, views), owner, "ignore Ghost");
+
+        execute(new UnignoreCommand(services, new KeyMessages(), sink), owner, "unignore Ghost");
+
+        assertThat(ignores.entries).isEmpty();
+        assertThat(sink.keys).doesNotContain(SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
+    }
+
     @Test
     void ignoringANeverSeenNameRepliesUnknownAndWritesNothing() {
         PlayerMock owner = addPlayer("Owner");
@@ -272,6 +287,10 @@ class IgnoreCommandPathTest {
                 NOOP);
     }
 
+    /** The one known offline profile, with one id however often it is looked up, as a real profile has. */
+    private static final PlayerRef GHOST =
+            new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000a057"), "Ghost");
+
     /** Resolves online players against the live mock server; "Ghost" is the one known offline profile. */
     private static final class RecordingLookup implements PlayerLookup {
         private final ServerMock server;
@@ -292,7 +311,7 @@ class IgnoreCommandPathTest {
             if (online.isPresent()) {
                 return online;
             }
-            return name.equals("Ghost") ? Optional.of(new PlayerRef(UUID.randomUUID(), "Ghost")) : Optional.empty();
+            return name.equals("Ghost") ? Optional.of(GHOST) : Optional.empty();
         }
 
         @Override

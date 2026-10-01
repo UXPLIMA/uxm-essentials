@@ -116,7 +116,8 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
         }
         PlayerRef from = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> recipient = services.players().findOnlineByName(name);
+        // Mail is for somebody who is not there, so the recipient may be offline, as /msg resolves one.
+        Optional<PlayerRef> recipient = services.players().findByName(name);
         if (recipient.isEmpty()) {
             notify(from, UNKNOWN_PLAYER, Map.of("player", name));
             return 0;

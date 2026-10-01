@@ -142,6 +142,17 @@ class IgnoreMenuGoldenTest {
         assertThat(ignores.load(viewer).ignores(ref("Mallory"))).isTrue();
     }
 
+    /** A name typed into the window reaches a player who is offline, as {@code /ignore} does; it took only the online. */
+    @Test
+    void addingTheNameOfAnOfflinePlayerIgnoresThem() {
+        PlayerRef ghost = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000a057"), "Ghost");
+        IgnoreListMenu menu = openEngine(new OfflineLookup(ghost));
+
+        menu.addByName(player, "Ghost");
+
+        assertThat(ignores.load(viewer).ignores(ghost)).isTrue();
+    }
+
     /**
      * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
      * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
@@ -176,6 +187,10 @@ class IgnoreMenuGoldenTest {
 
     /** Build the engine, register the ignore bindings + spec, and open the manager for the player. */
     private IgnoreListMenu openEngine() {
+        return openEngine(new OnlineLookup());
+    }
+
+    private IgnoreListMenu openEngine(PlayerLookup lookup) {
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
@@ -184,8 +199,8 @@ class IgnoreMenuGoldenTest {
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
 
-        IgnoreListMenu menu = new IgnoreListMenu(
-                menus, EngineScheduler.of(scheduler), ignores, ignore, unignore, new OnlineLookup(), textInput);
+        IgnoreListMenu menu =
+                new IgnoreListMenu(menus, EngineScheduler.of(scheduler), ignores, ignore, unignore, lookup, textInput);
         menu.register(bindings, dataFolder, NOOP);
         menu.open(player);
         return menu;
@@ -253,6 +268,29 @@ class IgnoreMenuGoldenTest {
             if (entries != null) {
                 entries.remove(ignored.uuid());
             }
+        }
+    }
+
+    /** Knows one player, who has played here and is not online now. */
+    private record OfflineLookup(PlayerRef known) implements PlayerLookup {
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByName(String name) {
+            return known.name().equals(name) ? Optional.of(known) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return known.uuid().equals(uuid) ? Optional.of(known) : Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
         }
     }
 

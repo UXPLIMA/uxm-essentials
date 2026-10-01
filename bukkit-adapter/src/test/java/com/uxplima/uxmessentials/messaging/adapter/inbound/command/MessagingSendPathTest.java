@@ -60,6 +60,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -200,6 +201,24 @@ class MessagingSendPathTest {
         assertThat(sink.keys).contains(MessagingMessageKey.MSG_TARGET_OFFLINE);
         assertThat(sink.keys).doesNotContain(MessagingMessageKey.MSG_RECEIVED, MessagingMessageKey.MSG_SENT);
         assertThat(mail.appended).isEmpty();
+    }
+
+    /**
+     * Mail is for somebody who is not there, so {@code /mail send} reaches an offline player. It looked only at who was
+     * online, and answered that a player who had played before did not exist.
+     */
+    @Test
+    void mailSendReachesAnOfflinePlayer() {
+        PlayerMock alice = server.addPlayer("Alice");
+        alice.setOp(true);
+
+        executeMail(CommandSourceStackMock.from(alice), "mail send Ghost the shop is open");
+
+        assertThat(mail.appended).singleElement().satisfies(item -> {
+            assertThat(item.recipient().name()).isEqualTo("Ghost");
+            assertThat(item.body().value()).isEqualTo("the shop is open");
+        });
+        assertThat(sink.keys).doesNotContain(SharedMessageKey.COMMAND_UNKNOWN_PLAYER);
     }
 
     @Test

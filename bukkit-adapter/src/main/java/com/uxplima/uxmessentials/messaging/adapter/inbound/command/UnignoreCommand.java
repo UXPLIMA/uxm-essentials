@@ -53,7 +53,8 @@ public final class UnignoreCommand extends MessagingCommandSupport implements Co
         }
         PlayerRef owner = ref(sender);
         String name = ctx.getArgument("player", String.class);
-        Optional<PlayerRef> target = services.players().findOnlineByName(name);
+        // Offline-capable, as /ignore resolves it: otherwise a player stayed ignored until the other came back online.
+        Optional<PlayerRef> target = services.players().findByName(name);
         if (target.isEmpty()) {
             notify(owner, UNKNOWN_PLAYER, Map.of("player", name));
             return 0;
