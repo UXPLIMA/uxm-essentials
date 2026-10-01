@@ -265,6 +265,24 @@ class ReadRoutesTest {
         assertThat(Calls.get(api, PLAYER_PATH + "/presence").status()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
+    /**
+     * A missing thing is named as missing. The envelope said {@code "code":"bad-request"} on a 404, so a client that
+     * switches on the code read a fault in its own request, and the message read "no player online with that id like
+     * that".
+     */
+    @Test
+    void aMissingThingSaysNotFoundInPlainWords() {
+        UxmPresenceQuery presence = mock(UxmPresenceQuery.class);
+        when(presence.of(PLAYER)).thenReturn(Optional.empty());
+        UxmEssentialsApi api = mock(UxmEssentialsApi.class);
+        when(api.presence()).thenReturn(Optional.of(presence));
+
+        Calls.Answer answer = Calls.get(api, PLAYER_PATH + "/presence");
+
+        assertThat(answer.code()).isEqualTo("not-found");
+        assertThat(answer.message()).isEqualTo("no player online with that id");
+    }
+
     @Test
     void theAfkListIsWhoeverIsAway() {
         UxmPresenceQuery presence = mock(UxmPresenceQuery.class);

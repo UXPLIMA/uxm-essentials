@@ -189,6 +189,7 @@ public final class RestServer implements AutoCloseable {
 
     private static String codeFor(int status) {
         return switch (status) {
+            case HttpStatus.NOT_FOUND -> "not-found";
             case HttpStatus.METHOD_NOT_ALLOWED -> "wrong-method";
             case HttpStatus.NOT_IMPLEMENTED -> "not-implemented";
             case HttpStatus.PAYLOAD_TOO_LARGE -> "too-large";

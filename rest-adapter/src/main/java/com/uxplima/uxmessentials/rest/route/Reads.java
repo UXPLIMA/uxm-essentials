@@ -75,8 +75,7 @@ public final class Reads {
 
     /** Render {@code value}, or answer {@code 404} saying what was not found. */
     public static <T> HttpResponse found(Optional<T> value, String what, Function<T, JsonElement> render) {
-        return Json.ok(render.apply(
-                value.orElseThrow(() -> new HttpException(HttpStatus.NOT_FOUND, "no " + what + " like that"))));
+        return Json.ok(render.apply(value.orElseThrow(() -> new HttpException(HttpStatus.NOT_FOUND, "no " + what))));
     }
 
     /**
