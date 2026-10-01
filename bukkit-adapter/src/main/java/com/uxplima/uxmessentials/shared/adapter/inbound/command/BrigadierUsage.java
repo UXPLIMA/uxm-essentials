@@ -68,16 +68,19 @@ final class BrigadierUsage {
         return bracketAlternatives(rendered, parentExecutable);
     }
 
-    /** One node's usage text plus its own (optionally bracketed) sub-tree, mirroring smart-usage. */
+    /**
+     * One node's usage text plus its own sub-tree, mirroring smart-usage. An optional node is optional with
+     * everything after it: {@code [<yaw> <pitch>]}, never {@code [<yaw>] <pitch>}.
+     */
     private static String smartUsage(
             CommandNode<CommandSourceStack> node, boolean optional, Predicate<CommandNode<CommandSourceStack>> usable) {
-        String self = optional ? "[" + node.getUsageText() + "]" : node.getUsageText();
-        if (node.getChildren().isEmpty()) {
-            return self;
+        String branch = node.getUsageText();
+        if (!node.getChildren().isEmpty()) {
+            boolean executable = node.getCommand() != null;
+            String deeper = joinChildren(node, executable, usable);
+            branch = deeper.isEmpty() ? branch : branch + SPACE + deeper;
         }
-        boolean executable = node.getCommand() != null;
-        String deeper = joinChildren(node, executable, usable);
-        return deeper.isEmpty() ? self : self + SPACE + deeper;
+        return optional ? "[" + branch + "]" : branch;
     }
 
     /** Join distinct alternative branches; one collapses, several become {@code (a|b)} or {@code [a|b]}. */

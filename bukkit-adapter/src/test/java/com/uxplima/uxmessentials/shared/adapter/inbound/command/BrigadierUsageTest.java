@@ -56,6 +56,23 @@ class BrigadierUsageTest {
         assertThat(BrigadierUsage.of(node)).isEqualTo("<player> <amount> [<currency>]");
     }
 
+    /**
+     * An optional branch is optional as a whole. {@code /tp at <player> <world> <x> <y> <z>} takes a yaw and a pitch
+     * together or neither, and the line read {@code [<yaw>] <pitch>}: the yaw looked optional and the pitch required.
+     */
+    @Test
+    void anOptionalBranchIsBracketedWhole() {
+        LiteralCommandNode<CommandSourceStack> node = Commands.literal("tp")
+                .then(Commands.argument("z", StringArgumentType.word())
+                        .executes(c -> 1)
+                        .then(Commands.argument("yaw", StringArgumentType.word())
+                                .then(Commands.argument("pitch", StringArgumentType.word())
+                                        .executes(c -> 1))))
+                .build();
+
+        assertThat(BrigadierUsage.of(node)).isEqualTo("<z> [<yaw> <pitch>]");
+    }
+
     @Test
     void emptyForAChildlessNode() {
         LiteralCommandNode<CommandSourceStack> node =
