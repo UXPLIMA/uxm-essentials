@@ -192,6 +192,7 @@ public enum ModerationMessageKey implements MessageKey {
     BAD_DURATION("moderation.bad-duration"),
     UNKNOWN_TARGET("moderation.unknown-target"),
     MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked"),
+    MUTED_CHAT_BLOCKED("moderation.muted-chat-blocked"),
 
     // management GUI. The active-punishments list, the per-punishment detail/manage view, and a player's history
     MOD_GUI_LIST_TITLE("moderation.gui.list.title"),

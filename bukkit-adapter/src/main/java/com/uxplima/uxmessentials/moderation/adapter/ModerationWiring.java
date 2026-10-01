@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.CommandSpyL
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.FreezeMoveListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJoinListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
@@ -461,6 +462,11 @@ public final class ModerationWiring {
                         settings.freezeNoticeInterval()),
                 new MutedCommandListener(
                         repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
+                new MutedChatListener(
+                        new RepositoryMutePolicy(repository, clock),
+                        guard::isExempt,
+                        kernel.messages(),
+                        kernel.messageSink()),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
     }
 
