@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
@@ -101,14 +102,47 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
         Location origin = TeleportRefs.location(sender);
         return switch (kind) {
             case TOP -> Optional.of(at(origin, sender.getWorld().getHighestBlockYAt(origin) + 1));
-            case BOTTOM -> Optional.of(at(origin, sender.getWorld().getMinHeight() + 1));
-            case UP -> Optional.of(at(origin, origin.getBlockY() + blocks));
+            case BOTTOM -> bottomTarget(sender, origin);
+            case UP -> upTarget(sender, origin, blocks);
             case JUMP -> jumpTarget(sender, origin);
             case DOWN -> downTarget(sender, origin);
             case ASCEND -> ascendTarget(sender, origin);
             case DESCEND -> descendTarget(sender, origin);
             case THRU -> thruTarget(sender, origin);
         };
+    }
+
+    /**
+     * The lowest space in this column a player can stand in. It used to be the world's floor plus one, which on a
+     * flat world is inside the dirt.
+     */
+    static Optional<Position> bottomTarget(Player sender, Location origin) {
+        World world = sender.getWorld();
+        int x = origin.getBlockX();
+        int z = origin.getBlockZ();
+        for (int y = world.getMinHeight(); y < origin.getBlockY(); y++) {
+            if (standable(world, x, y, z)) {
+                return Optional.of(at(origin, y + 1));
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * {@code blocks} up, standing on a glass block placed there when nothing is. Without the block the player was
+     * put in the air and fell straight back down. Nothing is built past the top of the world.
+     */
+    static Optional<Position> upTarget(Player sender, Location origin, int blocks) {
+        World world = sender.getWorld();
+        int floor = origin.getBlockY() + blocks - 1;
+        if (floor + 2 >= world.getMaxHeight()) {
+            return Optional.empty();
+        }
+        Block under = world.getBlockAt(origin.getBlockX(), floor, origin.getBlockZ());
+        if (under.getType().isAir()) {
+            under.setType(Material.GLASS);
+        }
+        return Optional.of(at(origin, floor + 1));
     }
 
     private static Optional<Position> downTarget(Player sender, Location origin) {
