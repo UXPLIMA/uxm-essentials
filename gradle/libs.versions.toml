@@ -29,7 +29,7 @@ jda            = "5.6.1"
 lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core: Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
 
 # uxmLib, resolved from the organisation repository like every other dependency here
-uxmlib = "0.146.0"                 # com.uxplima.uxmlib: repo.uxplima.com/repository/maven-public
+uxmlib = "0.147.0"                 # com.uxplima.uxmlib: repo.uxplima.com/repository/maven-public
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api: CodeMC repo, NOT Maven Central (verified 2026-05-30)

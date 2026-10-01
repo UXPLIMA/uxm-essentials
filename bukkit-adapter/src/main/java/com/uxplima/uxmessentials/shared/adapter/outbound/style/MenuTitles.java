@@ -3,15 +3,15 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 import java.util.Objects;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmlib.text.style.TitleAlignment;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Centres an inventory title in the chest window. The style canon writes a menu title centred and bare: no colour,
- * no bold, no gradient and no dashes around it, so the window reads as part of the client's own chrome rather than
- * competing with the icons under it. The vanilla client draws the title left-aligned from a fixed origin, so the
- * only way to centre it is to prepend spaces.
+ * Lays an inventory title in the chest window: centred, unless the theme says left. The vanilla client draws the title
+ * left-aligned from a fixed origin, so the only way to centre it is to prepend spaces.
  *
  * <p>The maths is the client's own layout: a chest window is 176 pixels wide and its label is drawn from an
  * origin eight pixels in from the left edge, so the padding that centres a title is the free width either side of
@@ -23,10 +23,10 @@ import org.jspecify.annotations.NullMarked;
  * spaces) to the right, and because the rounding then lands differently for each length, some titles read as
  * centred and others do not.
  *
- * <p>The styling is dropped here rather than trusted to every catalog entry: a title is flattened to its plain
- * text and handed back as one unstyled component, so a key that still carries a colour tag (or a value tag around
- * a name inside it) cannot paint a two-tone title. Centring runs after the title is resolved, so a title carrying
- * a placeholder centres on the text a player actually sees rather than on the template.
+ * <p>The title is drawn as it was written. It was once flattened to plain text here, to keep window titles bare
+ * (docs/14-ui-style), and that broke every title an operator styled: a translated key came out as its raw name and a
+ * resource-pack font was dropped. The shipped titles are bare where they are written instead. A title whose width the
+ * plain letters do not give, a translated key, a pack font or a keybind, is never padded, because the pack lines it up.
  */
 @NullMarked
 public final class MenuTitles {
@@ -41,22 +41,43 @@ public final class MenuTitles {
 
     private static final String SPACE = " ";
 
+    /** Where a title sits until a theme is read, which is the shipped theme's answer. */
+    private static volatile TitleAlignment alignment = TitleAlignment.CENTRE;
+
     private MenuTitles() {}
 
+    /** Where every window title sits from now on, as the theme says: set at enable and on every reload. */
+    public static void useAlignment(TitleAlignment loaded) {
+        alignment = Objects.requireNonNull(loaded, "loaded");
+    }
+
     /**
-     * {@code title} stripped of every colour and decoration and padded so it sits in the middle of the window.
-     * Returns the title unchanged when it is empty, since padding a blank title would show a window titled with
-     * spaces.
+     * {@code title} where the theme puts it: padded into the middle of the window, or as written when the theme says
+     * left. Returns the title unchanged when it is empty, since padding a blank title would show a window titled with
+     * spaces, and when its width cannot be measured.
      */
     public static Component centre(Component title) {
         Objects.requireNonNull(title, "title");
         String plain = PlainTextComponentSerializer.plainText().serialize(title);
-        if (plain.isBlank()) {
+        if (alignment == TitleAlignment.LEFT || plain.isBlank() || !measurable(title)) {
             return title;
         }
         int free = WINDOW_WIDTH - 2 * TITLE_ORIGIN - FontWidths.of(plain);
         int pad = Math.round(free / (2f * SPACE_WIDTH));
-        return Component.text(pad <= 0 ? plain : SPACE.repeat(pad) + plain);
+        return pad <= 0 ? title : Component.text(SPACE.repeat(pad)).append(title);
+    }
+
+    /** Whether every part of {@code component} is literal text in the default font, the only width known here. */
+    private static boolean measurable(Component component) {
+        if (!(component instanceof TextComponent) || component.style().font() != null) {
+            return false;
+        }
+        for (Component child : component.children()) {
+            if (!measurable(child)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /** The plain-text form of {@code title}, for a renderer that needs the string rather than the component. */

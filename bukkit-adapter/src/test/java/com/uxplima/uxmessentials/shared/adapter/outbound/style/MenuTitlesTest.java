@@ -2,17 +2,19 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import net.kyori.adventure.key.Key;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmlib.text.style.TitleAlignment;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pins how a window titles itself: centred, and bare. The canon writes a menu title with no colour, no bold and
- * no dashes around it, and the stripping happens here rather than in the catalog so a key that still carries a
- * colour tag cannot paint a two-tone title.
+ * Pins how a window titles itself: centred unless the theme says left, padded only when its width can be measured,
+ * and drawn with whatever style it was written in. The house look, bare titles, is kept in the shipped catalogues.
  */
 class MenuTitlesTest {
 
@@ -47,19 +49,49 @@ class MenuTitlesTest {
         assertThat(plain).doesNotContain("-");
     }
 
+    /**
+     * What the operator wrote is what the window shows. Titles were once flattened to plain text here, which kept the
+     * house look and broke every title an operator styled: a translated key came out as its raw name and a font from
+     * a resource pack was dropped. The shipped titles are bare where they are written now, which {@code
+     * ShippedWindowTitlesAreBareTest} keeps.
+     */
     @Test
-    void everyColourAndDecorationIsDropped() {
+    void aStyleTheOperatorWroteIsKept() {
         Component painted = Component.text("Home", NamedTextColor.RED)
                 .decorate(TextDecoration.BOLD)
                 .append(Component.text(" Castle", NamedTextColor.AQUA));
 
         Component centred = MenuTitles.centre(painted);
 
-        assertThat(centred.color()).isNull();
-        assertThat(centred.decoration(TextDecoration.BOLD)).isEqualTo(TextDecoration.State.NOT_SET);
-        assertThat(centred.children()).isEmpty();
-        assertThat(PlainTextComponentSerializer.plainText().serialize(centred).strip())
-                .isEqualTo("Home Castle");
+        assertThat(centred.children()).contains(painted);
+        assertThat(PlainTextComponentSerializer.plainText().serialize(centred))
+                .startsWith(" ")
+                .endsWith("Home Castle");
+    }
+
+    /** A title drawn with a resource pack is lined up by the pack, so it is never padded from letters it does not use. */
+    @Test
+    void aTitleDrawnWithAPackIsNotPadded() {
+        Component negativeSpace = Component.translatable("space.-8").append(Component.text("Main Menu"));
+        Component glyph = Component.text(
+                "\uE000", Style.style().font(Key.key("pack", "menus")).build());
+
+        assertThat(MenuTitles.centre(negativeSpace)).isSameAs(negativeSpace);
+        assertThat(MenuTitles.centre(glyph)).isSameAs(glyph);
+    }
+
+    /** A theme that says left leaves every title where the client draws it. */
+    @Test
+    void aLeftThemeLeavesTheTitleAsWritten() {
+        Component title = Component.text("Warps");
+        try {
+            MenuTitles.useAlignment(TitleAlignment.LEFT);
+            assertThat(MenuTitles.centre(title)).isSameAs(title);
+        } finally {
+            MenuTitles.useAlignment(TitleAlignment.CENTRE);
+        }
+        assertThat(PlainTextComponentSerializer.plainText().serialize(MenuTitles.centre(title)))
+                .startsWith(" ");
     }
 
     @Test

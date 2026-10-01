@@ -250,6 +250,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlacehold
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
@@ -458,6 +459,7 @@ public final class PluginModule {
                     // The glyph as well as the colours. Both live in the theme and a reload that moved
                     // one and not the other is how the two drifted apart in the first place.
                     StyleTags.useTitleGlyph(engineTheme.get().glyph("title"));
+                    MenuTitles.useAlignment(engineTheme.get().titleAlignment());
                 },
                 "colours re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.

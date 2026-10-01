@@ -11,10 +11,12 @@ import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissions;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -83,7 +85,9 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         // this plugin ships, which is what every server has seen until now.
         try {
             StyleTags.use(ThemeFile.read(getDataFolder().toPath()));
-            StyleTags.useTitleGlyph(ThemeFile.theme(getDataFolder().toPath()).glyph("title"));
+            Theme theme = ThemeFile.theme(getDataFolder().toPath());
+            StyleTags.useTitleGlyph(theme.glyph("title"));
+            MenuTitles.useAlignment(theme.titleAlignment());
         } catch (RuntimeException unreadableTheme) {
             getLogger().log(Level.WARNING, "using the shipped colours: " + unreadableTheme.getMessage());
         }
