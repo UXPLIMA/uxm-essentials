@@ -1,0 +1,80 @@
+{
+  "formatVersion": "1.1",
+  "component": {
+    "group": "com.uxplima.uxmessentials",
+    "module": "uxmessentials-api",
+    "version": "0.9.0",
+    "attributes": {
+      "org.gradle.status": "release"
+    }
+  },
+  "createdBy": {
+    "gradle": {
+      "version": "9.7.0"
+    }
+  },
+  "variants": [
+    {
+      "name": "apiElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-api"
+      },
+      "files": [
+        {
+          "name": "uxmessentials-api-0.9.0.jar",
+          "url": "uxmessentials-api-0.9.0.jar",
+          "size": 103774,
+          "sha512": "3aab1063a3295cdd461952640b399a8e86d2cbd9781bb760293a0453af853d0f9929321a7a5c3e9e0ee76dd796b2adf3bf72a38b172a242be0ccad74d0191ba7",
+          "sha256": "0ecc60f2167b7e6cb9a3dcb51e63c7c0b6d1b8c9834cd3b35eaa7701cad3bfd4",
+          "sha1": "28c6ec76694ce4c7ba3bc0868a680391c2ff4e37",
+          "md5": "56b9dbbeb4be69c63724e6e3ec7d9127"
+        }
+      ]
+    },
+    {
+      "name": "runtimeElements",
+      "attributes": {
+        "org.gradle.category": "library",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.jvm.version": 25,
+        "org.gradle.libraryelements": "jar",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "uxmessentials-api-0.9.0.jar",
+          "url": "uxmessentials-api-0.9.0.jar",
+          "size": 103774,
+          "sha512": "3aab1063a3295cdd461952640b399a8e86d2cbd9781bb760293a0453af853d0f9929321a7a5c3e9e0ee76dd796b2adf3bf72a38b172a242be0ccad74d0191ba7",
+          "sha256": "0ecc60f2167b7e6cb9a3dcb51e63c7c0b6d1b8c9834cd3b35eaa7701cad3bfd4",
+          "sha1": "28c6ec76694ce4c7ba3bc0868a680391c2ff4e37",
+          "md5": "56b9dbbeb4be69c63724e6e3ec7d9127"
+        }
+      ]
+    },
+    {
+      "name": "sourcesElements",
+      "attributes": {
+        "org.gradle.category": "documentation",
+        "org.gradle.dependency.bundling": "external",
+        "org.gradle.docstype": "sources",
+        "org.gradle.usage": "java-runtime"
+      },
+      "files": [
+        {
+          "name": "uxmessentials-api-0.9.0-sources.jar",
+          "url": "uxmessentials-api-0.9.0-sources.jar",
+          "size": 93382,
+          "sha512": "6c56611cad29ba1d99a0d18fc5d4afd1d914e6a838207eb99a07ae395f5e3a8e06f0aeb04ee63c697983ddc325e6e108cca90458467a1cd22f6441115c280141",
+          "sha256": "d68994f5c876e13e84ead0fce4c0cbb0e1dd3c84b6e1d855dab7dad1b3694139",
+          "sha1": "6024367e52acc821ba6408b43e6f5f080a928897",
+          "md5": "427208c01526ea7878af405560ebca12"
+        }
+      ]
+    }
+  ]
+}
