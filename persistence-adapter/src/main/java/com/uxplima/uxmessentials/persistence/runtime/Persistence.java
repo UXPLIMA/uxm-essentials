@@ -55,7 +55,7 @@ public final class Persistence implements AutoCloseable {
         DatabaseBackend backend = settings.backend();
         HikariDataSource dataSource = DataSourceFactory.create(settings);
         try {
-            new FlywayMigrationRunner(dataSource).migrate(migrationLocations);
+            new FlywayMigrationRunner(dataSource, backend).migrate(migrationLocations);
         } catch (RuntimeException cause) {
             dataSource.close();
             throw cause;

@@ -26,9 +26,23 @@ import org.jspecify.annotations.NullMarked;
 public final class FlywayMigrationRunner {
 
     private final DataSource dataSource;
+    private final DatabaseBackend backend;
 
-    public FlywayMigrationRunner(DataSource dataSource) {
+    public FlywayMigrationRunner(DataSource dataSource, DatabaseBackend backend) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
+        this.backend = Objects.requireNonNull(backend, "backend");
+    }
+
+    /**
+     * What each migration connection runs first. On MySQL and MariaDB it adds {@code ANSI_QUOTES}, so a column named
+     * after a reserved word can be written in double quotes, the one quoting SQLite and PostgreSQL also read as a
+     * name. V65 named a column {@code lines} unquoted, and the plugin stopped there on both servers. Only Flyway's own
+     * connections run this: the queries at runtime keep the server's mode.
+     */
+    public static String initSql(DatabaseBackend backend) {
+        return backend == DatabaseBackend.MARIADB
+                ? "SET SESSION sql_mode = CONCAT_WS(',', NULLIF(@@SESSION.sql_mode, ''), 'ANSI_QUOTES')"
+                : "";
     }
 
     /**
@@ -42,7 +56,8 @@ public final class FlywayMigrationRunner {
                 .dataSource(dataSource)
                 .locations(resolved)
                 .baselineOnMigrate(true)
-                .baselineVersion("0");
+                .baselineVersion("0")
+                .initSql(initSql(backend));
         try {
             Flyway flyway = configuration.load();
             // Realign recorded checksums with the resolved scripts before validating, so a cosmetic edit to

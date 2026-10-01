@@ -19,12 +19,13 @@
 -- TIMESTAMP for the same cross-backend reason V2 documents.
 --
 -- Same portability contract as V1-V64: the DDL stays in the subset SQLite, MySQL/MariaDB and PostgreSQL all
--- accept, with no dialect-specific clause. jOOQ's DDLDatabase parses this file at build time, so the generated
+-- accept, with no dialect-specific clause. MySQL and MariaDB reserve "lines", so the column is in double quotes,
+-- which every backend reads as a name: the migration runner sets ANSI_QUOTES for MySQL. jOOQ's DDLDatabase parses this file at build time, so the generated
 -- CommunicationAnnouncement table matches the runtime schema.
 
 CREATE TABLE communication_announcement (
     id                VARCHAR(64)   NOT NULL,
-    lines             TEXT          NOT NULL,
+    "lines"           TEXT          NOT NULL,
     channels          VARCHAR(255)  NOT NULL,
     enabled           INTEGER       NOT NULL DEFAULT 1,
     display_condition VARCHAR(1024) NOT NULL DEFAULT '',
