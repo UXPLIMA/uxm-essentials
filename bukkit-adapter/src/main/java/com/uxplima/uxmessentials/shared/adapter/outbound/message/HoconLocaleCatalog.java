@@ -87,6 +87,25 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         return Set.copyOf(locales);
     }
 
+    /** The loaded languages and every {@code messages_<lang>.conf} in the messages directory. */
+    @Override
+    public Set<Locale> availableLocales() {
+        Set<Locale> locales = new LinkedHashSet<>(loadedLocales());
+        if (!Files.isDirectory(messagesDir)) {
+            return Set.copyOf(locales);
+        }
+        try (java.util.stream.Stream<Path> files = Files.list(messagesDir)) {
+            files.map(file -> file.getFileName().toString())
+                    .filter(name -> name.startsWith("messages_") && name.endsWith(".conf"))
+                    .map(name -> name.substring("messages_".length(), name.length() - ".conf".length()))
+                    .filter(language -> !language.isEmpty())
+                    .forEach(language -> locales.add(Locale.forLanguageTag(language)));
+        } catch (java.io.IOException unreadable) {
+            log.warn("event=catalog_list_failed dir={} error={}", messagesDir, unreadable.toString());
+        }
+        return Set.copyOf(locales);
+    }
+
     @Override
     public void reload() {
         // Parse every currently loaded locale into a private candidate first. One malformed disk catalog rejects

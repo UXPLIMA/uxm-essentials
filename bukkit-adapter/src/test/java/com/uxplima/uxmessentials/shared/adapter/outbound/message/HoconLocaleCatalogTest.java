@@ -26,6 +26,23 @@ class HoconLocaleCatalogTest {
     private static final MessageKey BUNDLED_ONLY = () -> "security.2fa.enabled";
     private static final MessageKey DISK_ONLY = () -> "custom.disk.key";
 
+    /**
+     * A language is offered because its file is there, not because a player happened to load it first. {@code /lang}
+     * asked the loaded set: on a server no Turkish client had joined, {@code /lang tr} answered "unknown language,
+     * available: en" with twelve catalogues on disk.
+     */
+    @Test
+    void aLanguageWithAFileIsAvailableBeforeAnyoneReadsIt(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("messages_tr.conf"), "\"custom.key\" = \"merhaba\"\n", StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("messages_xx.conf"), "\"custom.key\" = \"hi\"\n", StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("notes.txt"), "not a catalogue", StandardCharsets.UTF_8);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        assertThat(catalog.availableLocales())
+                .extracting(Locale::getLanguage)
+                .containsExactlyInAnyOrder("en", "tr", "xx");
+    }
+
     @Test
     void aKeyPresentOnlyInTheBundledDefaultStillResolvesWhenTheDiskFileLacksIt(@TempDir Path dir) throws Exception {
         // A stale on-disk catalog that predates the bundled one: it declares its own key but not the bundled key.

@@ -24,6 +24,14 @@ public interface LocaleCatalog {
     Set<Locale> loadedLocales();
 
     /**
+     * Every language a player may choose: one with a catalogue the server can read, loaded yet or not. A language
+     * loads on first use, so the loaded set alone named only those somebody had already read.
+     */
+    default Set<Locale> availableLocales() {
+        return loadedLocales();
+    }
+
+    /**
      * Drop every loaded table and re-read the catalogs from disk, so an operator's edit to a
      * {@code messages_<lang>.conf} takes effect without a restart. The swap is atomic per locale: a concurrent
      * lookup sees either the old table or the new one. The default is a no-op for a catalog with nothing to

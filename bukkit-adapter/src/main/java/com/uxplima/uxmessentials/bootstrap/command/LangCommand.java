@@ -40,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Every reply resolves through a {@link SharedMessageKey} and delivers via the {@link MessageSink},
  * so a {@code /lang} confirmation itself renders in the player's now-current locale. {@code /lang tr}
- * validates against {@link LocaleCatalog#loadedLocales()}; an unknown or unloaded code yields
+ * validates against {@link LocaleCatalog#availableLocales()}; a code with no catalogue yields
  * {@link SharedMessageKey#LANG_UNKNOWN}.
  */
 @NullMarked
@@ -114,7 +114,7 @@ public final class LangCommand implements CommandRegistration {
         PlayerRef viewer = BukkitRefs.toRef(player);
         String code = ctx.getArgument("code", String.class);
         Locale requested = Locale.forLanguageTag(code);
-        if (!isLoaded(requested)) {
+        if (!isAvailable(requested)) {
             sink.deliver(
                     viewer,
                     messages.resolve(
@@ -132,11 +132,11 @@ public final class LangCommand implements CommandRegistration {
         return Command.SINGLE_SUCCESS;
     }
 
-    private boolean isLoaded(Locale requested) {
+    private boolean isAvailable(Locale requested) {
         String language = requested.getLanguage();
         return !language.isEmpty()
-                && catalog.loadedLocales().stream()
-                        .anyMatch(loaded -> loaded.getLanguage().equals(language));
+                && catalog.availableLocales().stream()
+                        .anyMatch(available -> available.getLanguage().equals(language));
     }
 
     private String currentName(Player player) {
@@ -146,7 +146,7 @@ public final class LangCommand implements CommandRegistration {
     }
 
     private String availableCodes() {
-        return catalog.loadedLocales().stream()
+        return catalog.availableLocales().stream()
                 .map(Locale::getLanguage)
                 .filter(language -> !language.isEmpty())
                 .sorted()
