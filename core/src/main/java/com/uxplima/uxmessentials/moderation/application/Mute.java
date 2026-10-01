@@ -150,12 +150,17 @@ public final class Mute {
                         "actor", actor.name(),
                         "target", target.name(),
                         "reason", reason.orElse(""),
-                        "duration", effective.map(SanctionDuration::format).orElse("permanent")));
+                        "duration", effective.map(SanctionDuration::format).orElse(SanctionBroadcast.PERMANENT)));
+    }
+
+    /** The word for a sanction with no end, in {@code viewer}'s language: every catalogue translates it. */
+    private String permanent(PlayerRef viewer) {
+        return notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
     }
 
     private void notifyTarget(PlayerRef target, Optional<Duration> effective, Optional<String> reason) {
         Map<String, String> ph = Map.of(
-                "duration", effective.map(SanctionDuration::format).orElse("permanent"),
+                "duration", effective.map(SanctionDuration::format).orElseGet(() -> permanent(target)),
                 "reason", reason.orElse(""));
         notifier.send(target, ModerationMessageKey.MUTE_NOTIFY_TARGET, ph);
     }

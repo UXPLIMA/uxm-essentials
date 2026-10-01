@@ -20,7 +20,6 @@ import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
-import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
@@ -82,20 +81,28 @@ class SanctionSummaryTest {
                         "moderation.sanction.ban-active",
                         "moderation.sanction.warns");
         assertThat(notifier.last("moderation.sanction.jail-active")).containsEntry("jail", "cells");
+        // A sanction with no end reads as the viewer's own word for permanent, not the English one.
+        assertThat(notifier.last("moderation.sanction.mute-active"))
+                .containsEntry("until", "moderation.gui.value.permanent");
         assertThat(notifier.last("moderation.sanction.warns")).containsEntry("count", "1");
     }
 
+    /**
+     * Records the lines delivered, each rendered as its own key, and the placeholders every resolve was given. A
+     * word resolved to fill a placeholder, such as the reader's word for permanent, is resolved but not delivered.
+     */
     private static final class CapturingNotifier {
         private final List<String> keys = new ArrayList<>();
+        private final List<String> resolved = new ArrayList<>();
         private final List<Map<String, String>> placeholders = new ArrayList<>();
 
         Notifier notifier() {
-            return new Notifier(new RecordingMessages(keys, placeholders), new NoopSink());
+            return new Notifier(new RecordingMessages(resolved, placeholders), (viewer, line) -> keys.add(line));
         }
 
         Map<String, String> last(String key) {
-            for (int i = keys.size() - 1; i >= 0; i--) {
-                if (keys.get(i).equals(key)) {
+            for (int i = resolved.size() - 1; i >= 0; i--) {
+                if (resolved.get(i).equals(key)) {
                     return placeholders.get(i);
                 }
             }
@@ -110,10 +117,5 @@ class SanctionSummaryTest {
             placeholders.add(ph);
             return key.key();
         }
-    }
-
-    private static final class NoopSink implements MessageSink {
-        @Override
-        public void deliver(PlayerRef viewer, String renderedText) {}
     }
 }

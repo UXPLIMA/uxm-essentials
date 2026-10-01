@@ -18,10 +18,7 @@ import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.fakes.FakeModerationRepository;
 import com.uxplima.uxmessentials.moderation.fakes.ModerationFakes;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
-import com.uxplima.uxmessentials.shared.application.port.MessageSink;
-import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -108,30 +105,15 @@ class SanctionListsTest {
         assertThat(notifier.keys).containsExactly("moderation.jailedlist-header", "moderation.jailedlist-entry");
     }
 
+    /**
+     * Records the lines delivered, each rendered as its own key. A word resolved to fill a placeholder, such as the
+     * reader's word for permanent, is not a line, so it is not recorded.
+     */
     private static final class CapturingNotifier {
         private final List<String> keys = new ArrayList<>();
 
         Notifier notifier() {
-            return new Notifier(new RecordingMessages(keys), new NoopSink());
+            return new Notifier((viewer, key, placeholders) -> key.key(), (viewer, line) -> keys.add(line));
         }
-    }
-
-    private static final class RecordingMessages implements Messages {
-        private final List<String> keys;
-
-        RecordingMessages(List<String> keys) {
-            this.keys = keys;
-        }
-
-        @Override
-        public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
-            keys.add(key.key());
-            return key.key();
-        }
-    }
-
-    private static final class NoopSink implements MessageSink {
-        @Override
-        public void deliver(PlayerRef viewer, String renderedText) {}
     }
 }

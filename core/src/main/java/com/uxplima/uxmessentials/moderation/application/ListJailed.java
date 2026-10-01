@@ -48,10 +48,10 @@ public final class ListJailed {
             return;
         }
         notifier.send(actor, ModerationMessageKey.JAILEDLIST_HEADER, Map.of("count", Integer.toString(jails.size())));
-        jails.forEach(jail -> notifier.send(actor, ModerationMessageKey.JAILEDLIST_ENTRY, entry(jail)));
+        jails.forEach(jail -> notifier.send(actor, ModerationMessageKey.JAILEDLIST_ENTRY, entry(actor, jail)));
     }
 
-    private Map<String, String> entry(JailEntry jail) {
+    private Map<String, String> entry(PlayerRef viewer, JailEntry jail) {
         String name = players.findByUuid(jail.target())
                 .map(PlayerRef::name)
                 .orElseGet(() -> jail.target().toString());
@@ -60,13 +60,15 @@ public final class ListJailed {
                 "jail", jail.jail(),
                 "issuer", jail.issuer().name(),
                 "reason", jail.reason().orElse(""),
-                "remaining", remaining(jail));
+                "remaining", remaining(viewer, jail));
     }
 
-    private static String remaining(JailEntry jail) {
+    private String remaining(PlayerRef viewer, JailEntry jail) {
         if (jail.remaining().isPresent()) {
             return SanctionDuration.format(jail.remaining().orElseThrow());
         }
-        return jail.until().map(java.time.Instant::toString).orElse("permanent");
+        return jail.until()
+                .map(java.time.Instant::toString)
+                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }

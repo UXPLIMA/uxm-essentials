@@ -10,6 +10,7 @@ import java.util.Map;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -118,6 +119,25 @@ class PermissionSanctionBroadcastTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    /**
+     * A mute with no end is announced as permanent in each reader's language. The use case filled the placeholder
+     * with the English word, and every staff member read it whatever their language.
+     */
+    @Test
+    void aPermanentMuteIsAnnouncedInTheReadersOwnWord() {
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(MockBukkit.createMockPlugin(), RECEIVE, true);
+        List<String> texts = new ArrayList<>();
+        Messages turkish = (viewer, key, values) ->
+                key == ModerationMessageKey.MOD_GUI_VALUE_PERMANENT ? "kalıcı" : "susturuldu " + values.get("duration");
+        SanctionBroadcast inTurkish = new PermissionSanctionBroadcast(
+                server, scheduler, turkish, (viewer, text) -> texts.add(text), "[uxm] ");
+
+        inTurkish.announce(ModerationMessageKey.MOD_BROADCAST_MUTE, Map.of("duration", SanctionBroadcast.PERMANENT));
+
+        assertThat(texts).containsExactly("susturuldu kalıcı");
     }
 
     /** Records which viewers were delivered to, so the perm-gated audience is assertable by UUID. */

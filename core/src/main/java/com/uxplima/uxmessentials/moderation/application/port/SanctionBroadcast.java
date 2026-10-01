@@ -18,6 +18,13 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  */
 public interface SanctionBroadcast {
 
+    /**
+     * The placeholder value for a sanction with no end. The adapter writes it in each reader's own word for
+     * permanent: one announcement goes to readers of every language, so the use case cannot pick the word. The
+     * leading control character keeps a reason a moderator typed from ever matching it.
+     */
+    String PERMANENT = "\u0000permanent";
+
     /** A no-op broadcast: announces nothing. The default a use case runs against when broadcasts are off. */
     SanctionBroadcast NONE = (key, placeholders) -> {};
 

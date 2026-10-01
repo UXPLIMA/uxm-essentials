@@ -43,14 +43,16 @@ public final class ListMutes {
             return;
         }
         notifier.send(actor, ModerationMessageKey.MUTELIST_HEADER, Map.of("count", Integer.toString(mutes.size())));
-        mutes.forEach(mute -> notifier.send(actor, ModerationMessageKey.MUTELIST_ENTRY, entry(mute)));
+        mutes.forEach(mute -> notifier.send(actor, ModerationMessageKey.MUTELIST_ENTRY, entry(actor, mute)));
     }
 
-    private Map<String, String> entry(MuteEntry mute) {
+    private Map<String, String> entry(PlayerRef viewer, MuteEntry mute) {
         String name = players.findByUuid(mute.target())
                 .map(PlayerRef::name)
                 .orElseGet(() -> mute.target().toString());
-        String expires = mute.until().map(java.time.Instant::toString).orElse("permanent");
+        String expires = mute.until()
+                .map(java.time.Instant::toString)
+                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
         return Map.of(
                 "player",
                 name,

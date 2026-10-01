@@ -147,7 +147,11 @@ public final class Jail {
     private void notifyTarget(PlayerRef target, String jail, SanctionDuration.Parsed parsed, Optional<String> reason) {
         Map<String, String> ph = Map.of(
                 "jail", jail,
-                "duration", parsed.duration().map(SanctionDuration::format).orElse("permanent"),
+                "duration",
+                        parsed.duration()
+                                .map(SanctionDuration::format)
+                                .orElseGet(() -> notifier.render(
+                                        target, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of())),
                 "reason", reason.orElse(""));
         notifier.send(target, ModerationMessageKey.JAIL_NOTIFY_TARGET, ph);
     }

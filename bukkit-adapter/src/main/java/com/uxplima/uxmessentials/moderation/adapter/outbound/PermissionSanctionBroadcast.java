@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.adapter.outbound;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -10,6 +11,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -70,15 +72,26 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
         for (Player player : server.getOnlinePlayers()) {
             if (player.hasPermission(RECEIVE_NODE)) {
                 PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
-                sink.deliver(who, messages.resolve(who, key, placeholders));
+                sink.deliver(who, messages.resolve(who, key, readBy(who, placeholders)));
             }
         }
         sendToConsole(key, placeholders);
     }
 
+    /** {@code placeholders} with {@link SanctionBroadcast#PERMANENT} written as {@code reader}'s word for it. */
+    private Map<String, String> readBy(PlayerRef reader, Map<String, String> placeholders) {
+        if (!placeholders.containsValue(PERMANENT)) {
+            return placeholders;
+        }
+        String word = messages.resolve(reader, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
+        Map<String, String> read = new HashMap<>(placeholders);
+        read.replaceAll((name, value) -> PERMANENT.equals(value) ? word : value);
+        return read;
+    }
+
     private void sendToConsole(MessageKey key, Map<String, String> placeholders) {
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        String rendered = messages.resolve(CONSOLE, key, placeholders);
+        String rendered = messages.resolve(CONSOLE, key, readBy(CONSOLE, placeholders));
         server.getConsoleSender().sendMessage(miniMessage.deserialize(rendered, prefix, StyleTags.resolver()));
     }
 }

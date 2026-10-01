@@ -50,7 +50,8 @@ public final class SanctionSummary {
 
     private void mute(PlayerRef actor, MuteState mute, Instant now) {
         if (mute.isActiveAt(now)) {
-            notifier.send(actor, ModerationMessageKey.SANCTION_MUTE_ACTIVE, Map.of("until", until(mute.expiry())));
+            notifier.send(
+                    actor, ModerationMessageKey.SANCTION_MUTE_ACTIVE, Map.of("until", until(actor, mute.expiry())));
         } else {
             notifier.send(actor, ModerationMessageKey.SANCTION_MUTE_NONE);
         }
@@ -61,30 +62,34 @@ public final class SanctionSummary {
             notifier.send(
                     actor,
                     ModerationMessageKey.SANCTION_JAIL_ACTIVE,
-                    Map.of("jail", active.jail(), "until", jailExpiry(active)));
+                    Map.of("jail", active.jail(), "until", jailExpiry(actor, active)));
         } else {
             notifier.send(actor, ModerationMessageKey.SANCTION_JAIL_NONE);
         }
     }
 
-    /** The jail's wall-clock expiry, its remaining online time, or the {@code permanent} marker. */
-    private static String jailExpiry(JailState.Active active) {
+    /** The jail's wall-clock expiry, its remaining online time, or the reader's word for permanent. */
+    private String jailExpiry(PlayerRef viewer, JailState.Active active) {
         if (active.until().isPresent()) {
             return active.until().get().toString();
         }
-        return active.remaining().map(SanctionDuration::format).orElse("permanent");
+        return active.remaining()
+                .map(SanctionDuration::format)
+                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 
     private void ban(PlayerRef actor, TempbanState tempban, Instant now) {
         if (tempban.isActiveAt(now)) {
-            notifier.send(actor, ModerationMessageKey.SANCTION_BAN_ACTIVE, Map.of("until", until(tempban.expiry())));
+            notifier.send(
+                    actor, ModerationMessageKey.SANCTION_BAN_ACTIVE, Map.of("until", until(actor, tempban.expiry())));
         } else {
             notifier.send(actor, ModerationMessageKey.SANCTION_BAN_NONE);
         }
     }
 
     /** A wall-clock expiry rendered as an instant, or the {@code permanent} marker when there is none. */
-    private static String until(Optional<Instant> expiry) {
-        return expiry.map(Instant::toString).orElse("permanent");
+    private String until(PlayerRef viewer, Optional<Instant> expiry) {
+        return expiry.map(Instant::toString)
+                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }
