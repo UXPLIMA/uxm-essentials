@@ -19,6 +19,11 @@ permissions:
 
 jobs:
   release:
+    # The release is GitHub's: the jars hang off a GitHub release, the developer API is a branch of the GitHub
+    # repository, and the store tokens are GitHub secrets. Forgejo runs this repository's CI as a mirror and pulls
+    # every tag with it, so without this line each tag would start a release there that has none of the three and
+    # fails halfway, after the build. On Forgejo the job is skipped instead.
+    if: github.server_url == 'https://github.com'
     runs-on: ubuntu-latest
     env:
       # Read through env rather than straight from secrets so the store steps can ask whether they are set: the
@@ -88,23 +93,33 @@ jobs:
           printf '%s\n' "$notes" > "${RUNNER_TEMP}/release-notes.md"
           cat "${RUNNER_TEMP}/release-notes.md"
 
-      # The absolute URL is not decoration. Forgejo resolves a bare `uses:` name against
-      # data.forgejo.org, which does not carry this action, and it resolves every step in the job before
-      # running any of them -- so a bare name fails the whole job at preparation. uxm-skyblock's run 447
-      # died that way. A URL sends the runner to GitHub for the action.
+      # Through the gh CLI rather than a release action: Forgejo resolves every `uses:` in a workflow it reads,
+      # skipped job or not, against a mirror that does not carry the release actions, and GitHub does not accept
+      # the absolute URL that once worked around that. A tag that already has a release, cut by hand or by an
+      # earlier run, gets its jars replaced and keeps its notes.
       - name: Publish the GitHub release
-        uses: https://github.com/softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.tag || github.ref_name }}
-          name: ${{ inputs.tag || github.ref_name }}
-          body_path: ${{ runner.temp }}/release-notes.md
-          fail_on_unmatched_files: true
-          files: |
-            uxmEssentials/bukkit-adapter/build/libs/uxmEssentials-*.jar
-            uxmEssentials/velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
-            uxmEssentials/discord-adapter/build/libs/uxmEssentials-discord-*.jar
-            uxmEssentials/redis-adapter/build/libs/uxmEssentials-redis-*.jar
-            uxmEssentials/rest-adapter/build/libs/uxmEssentials-rest-*.jar
+        working-directory: uxmEssentials
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          set -euo pipefail
+          jars=(
+            bukkit-adapter/build/libs/uxmEssentials-*.jar
+            velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
+            discord-adapter/build/libs/uxmEssentials-discord-*.jar
+            redis-adapter/build/libs/uxmEssentials-redis-*.jar
+            rest-adapter/build/libs/uxmEssentials-rest-*.jar
+          )
+          for jar in "${jars[@]}"; do
+            [ -f "$jar" ] || { echo "missing release jar: $jar"; exit 1; }
+          done
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "${jars[@]}" --clobber
+          else
+            gh release create "$TAG" "${jars[@]}" --verify-tag --title "$TAG" \
+              --notes-file "${RUNNER_TEMP}/release-notes.md"
+          fi
 
       # The developer API artifacts go to a Maven repository that is just a branch of this repository, served over
       # raw.githubusercontent. Nothing has to be configured for that URL to work, which is the whole point: the
