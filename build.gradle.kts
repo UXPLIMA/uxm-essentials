@@ -5,7 +5,7 @@
 
 allprojects {
     group = "com.uxplima"
-    version = project.findProperty("projectVersion")?.toString() ?: "0.9.1"
+    version = project.findProperty("projectVersion")?.toString() ?: "0.9.0"
 
     repositories {
         // Ahead of the organisation repository on purpose, and only for that: a library change is
