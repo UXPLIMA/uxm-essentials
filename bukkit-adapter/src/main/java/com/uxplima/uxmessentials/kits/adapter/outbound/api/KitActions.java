@@ -73,7 +73,7 @@ public final class KitActions implements UxmKitActions {
         Objects.requireNonNull(kitId, "kitId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the items need somewhere to go"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to receive the kit"));
         }
         Optional<KitDefinition> kit = parse(kitId).flatMap(repository::find);
         if (kit.isEmpty()) {

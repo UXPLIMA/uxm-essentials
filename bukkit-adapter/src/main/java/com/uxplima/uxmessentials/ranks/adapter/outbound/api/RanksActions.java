@@ -100,8 +100,8 @@ public final class RanksActions implements UxmRanksActions {
     private CompletableFuture<UxmOutcome> onPlayer(UUID playerId, Write write) {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
-            return CompletableFuture.completedFuture(UxmOutcome.failed(
-                    UxmFailure.PLAYER_OFFLINE, "a rank requirement can only be checked against a live player"));
+            return CompletableFuture.completedFuture(
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to check the rank against"));
         }
         PlayerRef subject = ApiValues.subject(players, playerId);
         Supplier<UxmOutcome> work = () -> write.apply(subject);

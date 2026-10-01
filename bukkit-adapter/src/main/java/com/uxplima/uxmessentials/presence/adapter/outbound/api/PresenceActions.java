@@ -57,7 +57,7 @@ public final class PresenceActions implements UxmPresenceActions {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "only somebody at a keyboard can be away from it"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef who = ApiValues.subject(players, playerId);
         return AsyncActions.onPlayer(

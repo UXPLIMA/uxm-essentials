@@ -52,7 +52,6 @@ public final class InvRollbackActions implements UxmInvRollbackActions {
         if (outcome instanceof SnapshotRestorer.Outcome.Gone) {
             return UxmOutcome.failed(UxmFailure.NOT_FOUND, "no snapshot with that id is held any more");
         }
-        return UxmOutcome.failed(
-                UxmFailure.PLAYER_OFFLINE, "a snapshot is applied to a live inventory, and they are not online");
+        return UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to receive the snapshot");
     }
 }

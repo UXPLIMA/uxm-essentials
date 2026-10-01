@@ -44,7 +44,7 @@ public final class TablistActions implements UxmTablistActions {
     public CompletableFuture<UxmOutcome> refresh(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         PlayerRef who = ApiValues.subject(players, playerId);
-        UxmOutcome gone = UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "a tab list belongs to a player who is here");
+        UxmOutcome gone = UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online");
         return AsyncActions.onPlayer(
                 scheduler,
                 who,

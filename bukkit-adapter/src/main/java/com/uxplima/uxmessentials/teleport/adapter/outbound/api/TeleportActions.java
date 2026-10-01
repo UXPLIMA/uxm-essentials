@@ -74,7 +74,7 @@ public final class TeleportActions implements UxmTeleportActions {
         Objects.requireNonNull(location, "location");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "there is nobody to move"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         Optional<Position> target = ApiValues.position(worlds, location);
         if (target.isEmpty()) {
@@ -97,7 +97,7 @@ public final class TeleportActions implements UxmTeleportActions {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "there is nobody to return"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef who = ApiValues.subject(players, playerId);
         CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();

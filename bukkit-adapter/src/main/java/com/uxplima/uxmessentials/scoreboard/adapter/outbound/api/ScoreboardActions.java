@@ -96,7 +96,7 @@ public final class ScoreboardActions implements UxmScoreboardActions {
 
     /** Run {@code write} on the thread that owns the player, or answer offline when they are not here. */
     private CompletableFuture<UxmOutcome> onPlayer(PlayerRef who, Function<Player, UxmOutcome> write) {
-        UxmOutcome gone = UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "a sidebar belongs to a player who is here");
+        UxmOutcome gone = UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online");
         return AsyncActions.onPlayer(
                 scheduler,
                 who,

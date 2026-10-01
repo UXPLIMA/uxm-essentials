@@ -42,7 +42,7 @@ public final class VanishActions implements UxmVanishActions {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "there is nobody here to hide"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef who = ApiValues.subject(players, playerId);
         return AsyncActions.onPlayer(

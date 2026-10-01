@@ -75,7 +75,7 @@ public final class VaultActions implements UxmVaultsActions {
         PlayerRef owner = owner(ownerId, index);
         if (!players.isOnline(ownerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "a vault window has to be shown to somebody"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to see the vault"));
         }
         return AsyncActions.perform(scheduler, () -> openVault.open(owner, index))
                 .thenCompose(resolved -> resolved.isErr()

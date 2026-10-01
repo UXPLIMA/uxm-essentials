@@ -190,7 +190,7 @@ public final class ModerationActions implements UxmModerationActions {
         Objects.requireNonNull(targetId, "targetId");
         if (!players.isOnline(targetId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "there is nobody connected to disconnect"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef target = subject(targetId);
         return onServer(() -> outcome(writes.kick().kick(actor(), target, reason, silent)));

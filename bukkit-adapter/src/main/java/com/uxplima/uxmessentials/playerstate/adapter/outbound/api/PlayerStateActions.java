@@ -138,7 +138,7 @@ public final class PlayerStateActions implements UxmPlayerStateActions {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "this is state on a live player"));
+                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef subject = ApiValues.subject(players, playerId);
         Supplier<UxmOutcome> work = () -> write.apply(subject);

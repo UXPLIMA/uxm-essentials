@@ -159,7 +159,7 @@ public final class EconomyActions implements UxmEconomyActions {
     private static UxmFailure failure(TransferError error) {
         return switch (error) {
             case INSUFFICIENT_FUNDS -> UxmFailure.of(UxmFailure.INSUFFICIENT_FUNDS, "the balance does not cover it");
-            case PLAYER_OFFLINE -> UxmFailure.of(UxmFailure.PLAYER_OFFLINE, "the player has to be online for this");
+            case PLAYER_OFFLINE -> UxmFailure.of(UxmFailure.PLAYER_OFFLINE, "the player is not online");
             default ->
                 UxmFailure.of(
                         UxmFailure.REFUSED,
