@@ -4,6 +4,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -17,8 +18,10 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -92,26 +95,25 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
     // The page argument is accepted for command-shape symmetry; the GUI view paginates itself, so it is unused here.
     @SuppressWarnings("unused")
     private int showResolved(CommandContext<CommandSourceStack> ctx, int page) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
-        }
+        CommandSender sender = Sender.audience(ctx.getSource());
         Optional<Currency> currency =
                 services.currencies().find(CurrencyId.of(ctx.getArgument("currency", String.class)));
         if (currency.isEmpty()) {
-            rejectUnknownCurrency(ref(sender));
+            rejectUnknownCurrency(CommandFeedback.refOf(sender));
             return Command.SINGLE_SUCCESS;
         }
-        services.baltopView().open(sender, currency.get());
-        return Command.SINGLE_SUCCESS;
+        return show(ctx, currency.get(), page);
     }
 
-    // The page argument is accepted for command-shape symmetry; the GUI view paginates itself, so it is unused here.
-    @SuppressWarnings("unused")
+    /**
+     * The window for a player, which pages itself, and the page as lines for anybody else. The console was told the
+     * command is for players, though the {@code BalTop} lines were written and wired and nothing sent them.
+     */
     private int show(CommandContext<CommandSourceStack> ctx, Currency currency, int page) {
-        Player sender = player(ctx);
-        if (sender == null) {
-            return 0;
+        if (!(Sender.audience(ctx.getSource()) instanceof Player sender)) {
+            PlayerRef console = CommandFeedback.refOf(Sender.audience(ctx.getSource()));
+            offTick(() -> services.balTop().show(console, currency, page));
+            return Command.SINGLE_SUCCESS;
         }
         services.baltopView().open(sender, currency);
         return Command.SINGLE_SUCCESS;
