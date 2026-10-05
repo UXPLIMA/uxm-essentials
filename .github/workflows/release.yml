@@ -19,14 +19,12 @@ permissions:
 
 jobs:
   release:
-    # This runs in two places. Forgejo mirrors this repository, runs its CI and pulls every tag, and the store tokens
-    # are Forgejo secrets, so on Forgejo a tag builds the jars and sends them to the stores. The GitHub release and
-    # the maven branch belong to GitHub and run only there, which is why those two steps ask where they are. Each
-    # store step checks for the version first, so a tag that reaches both places is published once.
+    # Runs on GitHub only (the Forgejo mirror that also ran it is gone, 2026-10). The `github.server_url` checks
+    # below date from then and are always true here. Each store step checks for the version first, so a re-run
+    # over a tag that is already out publishes nothing twice.
     runs-on: ubuntu-latest
     env:
-      # The GitHub repository, named outright: on Forgejo GITHUB_REPOSITORY is the mirror's own name, and every
-      # link below points at the GitHub release.
+      # The GitHub repository, named outright; every link below points at the GitHub release.
       RELEASE_REPO: UXPLIMA/uxm-essentials
       # Read through env rather than straight from secrets so the store steps can ask whether they are set: the
       # secrets context is not available to a step's `if`. A repository without the tokens still cuts its GitHub
