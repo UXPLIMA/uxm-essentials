@@ -21,7 +21,7 @@ jobs:
   release:
     # Each store step checks for the version first, so a re-run over a tag that is already out publishes nothing
     # twice.
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       # The GitHub repository, named outright; every link below points at the GitHub release.
       RELEASE_REPO: UXPLIMA/uxm-essentials
