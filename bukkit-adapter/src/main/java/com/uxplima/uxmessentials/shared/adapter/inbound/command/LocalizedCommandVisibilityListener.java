@@ -16,6 +16,8 @@ import org.bukkit.event.player.PlayerCommandSendEvent;
 import org.bukkit.event.player.PlayerLocaleChangeEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.application.command.CommandLocales;
 import com.uxplima.uxmessentials.shared.application.command.EffectiveCommand;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
@@ -31,14 +33,19 @@ import org.jspecify.annotations.NullMarked;
 public final class LocalizedCommandVisibilityListener implements Listener {
 
     private final Map<String, Set<String>> localesByAlias;
-    private final LocaleStore overrides;
-    private final Locale serverDefault;
+    private final LocaleResolver resolver;
 
+    /** A listener that follows the client and forces nothing, with {@code serverDefault} as the default. */
     public LocalizedCommandVisibilityListener(
             List<EffectiveCommand> commands, LocaleStore overrides, Locale serverDefault, String commandNamespace) {
+        this(commands, new LocaleResolver(overrides, new ClientLocales(), serverDefault), commandNamespace);
+    }
+
+    /** A listener that reads a player's language by the server's own rules. */
+    public LocalizedCommandVisibilityListener(
+            List<EffectiveCommand> commands, LocaleResolver resolver, String commandNamespace) {
         this.localesByAlias = buildIndex(commands, commandNamespace);
-        this.overrides = Objects.requireNonNull(overrides, "overrides");
-        this.serverDefault = Objects.requireNonNull(serverDefault, "serverDefault");
+        this.resolver = Objects.requireNonNull(resolver, "resolver");
     }
 
     @EventHandler
@@ -53,15 +60,13 @@ public final class LocalizedCommandVisibilityListener implements Listener {
     @EventHandler
     public void onLocaleChange(PlayerLocaleChangeEvent event) {
         Player player = event.getPlayer();
-        if (!localesByAlias.isEmpty()
-                && overrides.override(BukkitRefs.toRef(player)).isEmpty()) {
+        if (!localesByAlias.isEmpty() && resolver.readsTheClient(BukkitRefs.toRef(player))) {
             player.updateCommands();
         }
     }
 
     private Locale resolveLocale(Player player) {
-        Locale resolved = overrides.override(BukkitRefs.toRef(player)).orElseGet(player::locale);
-        return resolved.getLanguage().isEmpty() ? serverDefault : resolved;
+        return resolver.resolveAt(BukkitRefs.toRef(player), player.locale());
     }
 
     private boolean hiddenFor(String sentLabel, Locale locale) {

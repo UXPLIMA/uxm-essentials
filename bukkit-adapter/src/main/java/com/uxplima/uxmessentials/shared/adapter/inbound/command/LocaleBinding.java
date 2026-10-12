@@ -17,12 +17,13 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.application.message.LocaleScope;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -54,14 +55,18 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class LocaleBinding {
 
-    private final LocaleStore overrides;
-    private final Locale serverDefault;
+    private final LocaleResolver resolver;
     private final CommandFeedback feedback;
     private final Logger log;
 
+    /** A binding that follows the client and forces nothing, with {@code serverDefault} as the default. */
     public LocaleBinding(LocaleStore overrides, Locale serverDefault, Messages messages, Logger log) {
-        this.overrides = Objects.requireNonNull(overrides, "overrides");
-        this.serverDefault = Objects.requireNonNull(serverDefault, "serverDefault");
+        this(new LocaleResolver(overrides, new ClientLocales(), serverDefault), messages, log);
+    }
+
+    /** A binding that resolves with the server's own rules, the ones every other line is written by. */
+    public LocaleBinding(LocaleResolver resolver, Messages messages, Logger log) {
+        this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
         this.log = Objects.requireNonNull(log, "log");
     }
@@ -156,13 +161,7 @@ public final class LocaleBinding {
     }
 
     private Locale resolveFor(Player player) {
-        PlayerRef ref = BukkitRefs.toRef(player);
-        Optional<Locale> override = overrides.override(ref);
-        if (override.isPresent()) {
-            return override.get();
-        }
-        Locale client = player.locale();
-        return client.getLanguage().isEmpty() ? serverDefault : client;
+        return resolver.resolveAt(BukkitRefs.toRef(player), player.locale());
     }
 
     /** A {@link CommandRegistration} whose built tree is rebound to carry the locale scope. */

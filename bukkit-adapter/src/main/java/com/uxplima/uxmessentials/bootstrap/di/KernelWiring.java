@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTransl
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
-import com.uxplima.uxmessentials.shared.adapter.outbound.message.PdcLocaleStore;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.SharedLocaleStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.BukkitPermissions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
@@ -49,6 +49,9 @@ import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.text.language.FilePlayerLanguages;
+import com.uxplima.uxmlib.text.language.LanguageSettings;
+import com.uxplima.uxmlib.text.language.SharedLanguage;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import org.jspecify.annotations.NullMarked;
@@ -71,6 +74,15 @@ final class KernelWiring {
     /** The config path for the server-default locale used when a viewer has no override and no client. */
     private static final String DEFAULT_LOCALE_PATH = "messages.default-locale";
 
+    private static final String LANGUAGE_DEFAULT_PATH = "language.default";
+
+    /** The default the shipped config.conf writes, which an update appends to an older file. */
+    private static final String SHIPPED_DEFAULT = "en";
+
+    private static final String LANGUAGE_FOLLOW_CLIENT_PATH = "language.follow-client";
+
+    private static final String LANGUAGE_FORCE_PATH = "language.force";
+
     private static final String SKIN_LOOKUP_PATH = "skins.mojang-lookup";
 
     private KernelWiring() {}
@@ -90,7 +102,7 @@ final class KernelWiring {
      */
     record Kernel(
             KernelPorts ports,
-            LocaleStore localeStore,
+            SharedLocaleStore localeStore,
             LocaleCatalog catalog,
             LocaleResolver resolver,
             java.util.Locale serverDefault,
@@ -158,12 +170,15 @@ final class KernelWiring {
         LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
 
-        LocaleStore localeStore = new PdcLocaleStore(plugin);
-        java.util.Locale serverDefault = serverDefaultLocale(config);
+        SharedLocaleStore localeStore = new SharedLocaleStore(
+                SharedLanguage.onServer(),
+                new org.bukkit.NamespacedKey(plugin, "lang-override"),
+                FilePlayerLanguages.loadedFrom(plugin.getDataFolder().toPath().resolve("languages.conf")),
+                scheduler::async);
+        LanguageSettings language = languageSettings(config, log);
+        java.util.Locale serverDefault = language.defaultLocale();
         LocaleResolver resolver = new LocaleResolver(
-                localeStore,
-                new com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales(),
-                serverDefault);
+                localeStore, new com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales(), language);
         // The translatable-key path (docs/13-i18n §8.2): register every catalog key with Adventure's
         // GlobalTranslator so a Component.translatable("uxmessentials.<key>") renders per the receiving
         // connection's locale. The MessageKey-resolve path stays the primary surface.
@@ -202,9 +217,36 @@ final class KernelWiring {
         return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex);
     }
 
-    private static java.util.Locale serverDefaultLocale(ConfigStore config) {
-        String tag = config.getString(DEFAULT_LOCALE_PATH, java.util.Locale.ENGLISH.toLanguageTag());
-        java.util.Locale parsed = java.util.Locale.forLanguageTag(tag);
+    /**
+     * The {@code language} block, the one every plugin of ours reads.
+     *
+     * <p>A file written before the block existed names its default as {@code messages.default-locale}, and an
+     * update appends the block to it with the shipped {@code default = "en"}. Reading the block first would turn
+     * a German server English on the upgrade, so the old key answers while the block still holds the shipped
+     * default. An operator who writes their own default in the block is read, and the old key they left behind
+     * is named so it can go.
+     */
+    static LanguageSettings languageSettings(ConfigStore config, Logger log) {
+        String legacy = config.getString(DEFAULT_LOCALE_PATH, "").strip();
+        String written = config.getString(LANGUAGE_DEFAULT_PATH, "").strip();
+        boolean shipped = written.isEmpty() || written.equalsIgnoreCase(SHIPPED_DEFAULT);
+        if (!legacy.isEmpty() && !shipped && !legacy.equalsIgnoreCase(written)) {
+            log.warn(
+                    "config.conf names a default language twice: language.default = {} is read, and the old"
+                            + " messages.default-locale = {} is not. Remove the old line.",
+                    written,
+                    legacy);
+        }
+        String tag = shipped && !legacy.isEmpty() ? legacy : written.isEmpty() ? SHIPPED_DEFAULT : written;
+        boolean followClient = config.getBoolean(LANGUAGE_FOLLOW_CLIENT_PATH, true);
+        String forcedTag = config.getString(LANGUAGE_FORCE_PATH, "").strip();
+        java.util.Locale forced = forcedTag.isEmpty() ? null : java.util.Locale.forLanguageTag(forcedTag);
+        boolean forcesOne = forced != null && !forced.getLanguage().isEmpty();
+        return new LanguageSettings(parsedOr(tag), followClient, forcesOne ? forced : null);
+    }
+
+    private static java.util.Locale parsedOr(String tag) {
+        java.util.Locale parsed = java.util.Locale.forLanguageTag(tag.strip());
         return parsed.getLanguage().isEmpty() ? java.util.Locale.ENGLISH : parsed;
     }
 

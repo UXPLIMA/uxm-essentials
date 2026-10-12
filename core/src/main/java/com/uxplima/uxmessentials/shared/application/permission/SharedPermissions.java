@@ -60,6 +60,10 @@ final class SharedPermissions {
                         "/lang to set or clear your personal language override.",
                         PermissionDefault.TRUE),
                 PermissionSpec.shared(
+                        "uxmessentials.lang.others",
+                        "/lang set <player> <language> and /lang reset <player>: set or clear another player's language, online or away.",
+                        PermissionDefault.OP),
+                PermissionSpec.shared(
                         "uxmessentials.update.notify",
                         "Receive the join-time notice when a newer plugin version is available.",
                         PermissionDefault.OP));

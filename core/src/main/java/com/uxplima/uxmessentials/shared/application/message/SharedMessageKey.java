@@ -35,6 +35,14 @@ public enum SharedMessageKey implements MessageKey {
     LANG_SET("lang.set"),
     LANG_RESET("lang.reset"),
     LANG_UNKNOWN("lang.unknown"),
+    // the language the server forces, which nobody chooses past
+    LANG_FORCED("lang.forced"),
+    // an operator setting or clearing another player's language, online or away
+    LANG_SET_PLAYER("lang.set-player"),
+    LANG_SET_PLAYER_AWAY("lang.set-player-away"),
+    LANG_RESET_PLAYER("lang.reset-player"),
+    LANG_RESET_PLAYER_AWAY("lang.reset-player-away"),
+    LANG_FORCED_ANYWAY("lang.forced-anyway"),
     // the code of the language a catalogue is written in, so a name an operator writes per language finds its reader
     LANG_CODE("lang.code"),
 

@@ -12,6 +12,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import com.uxplima.uxmessentials.shared.application.message.LocaleScope;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.text.language.LanguageSettings;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -71,6 +72,57 @@ class LocaleResolverTest {
         clients.forget(ADA.uuid());
 
         assertThat(clients.of(ADA.uuid())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a server that does not follow the client writes in its default, on every thread")
+    void aServerWithOneAudienceIgnoresTheClient() {
+        ClientLocales clients = new ClientLocales();
+        clients.remember(ADA.uuid(), Locale.ENGLISH);
+        LocaleResolver resolver =
+                new LocaleResolver(new Overrides(), clients, new LanguageSettings(Locale.GERMAN, false, null));
+        AtomicReference<Locale> inScope = new AtomicReference<>();
+
+        LocaleScope.runWith(Locale.ENGLISH, () -> inScope.set(resolver.resolve(ADA)));
+
+        assertThat(resolver.resolve(ADA)).isEqualTo(Locale.GERMAN);
+        assertThat(inScope.get()).isEqualTo(Locale.GERMAN);
+        assertThat(resolver.resolveAt(ADA, Locale.ENGLISH)).isEqualTo(Locale.GERMAN);
+    }
+
+    @Test
+    @DisplayName("a player's own choice still wins when the server does not follow the client")
+    void aChoiceWinsWithoutTheClient() {
+        Overrides overrides = new Overrides();
+        overrides.chosen.put(ADA.uuid(), TURKISH);
+        LocaleResolver resolver =
+                new LocaleResolver(overrides, new ClientLocales(), new LanguageSettings(Locale.GERMAN, false, null));
+
+        assertThat(resolver.resolve(ADA)).isEqualTo(TURKISH);
+        assertThat(resolver.resolveAt(ADA, Locale.ENGLISH)).isEqualTo(TURKISH);
+    }
+
+    @Test
+    @DisplayName("a forced language beats a player's choice and the client")
+    void aForcedLanguageBeatsEverything() {
+        Overrides overrides = new Overrides();
+        overrides.chosen.put(ADA.uuid(), TURKISH);
+        ClientLocales clients = new ClientLocales();
+        clients.remember(ADA.uuid(), Locale.ENGLISH);
+        LocaleResolver resolver =
+                new LocaleResolver(overrides, clients, new LanguageSettings(Locale.ENGLISH, true, Locale.GERMAN));
+
+        assertThat(resolver.resolve(ADA)).isEqualTo(Locale.GERMAN);
+        assertThat(resolver.resolveAt(ADA, Locale.ENGLISH)).isEqualTo(Locale.GERMAN);
+    }
+
+    @Test
+    @DisplayName("at the command boundary the client answers when nothing else does")
+    void theBoundaryReadsTheClient() {
+        LocaleResolver resolver = new LocaleResolver(new Overrides(), new ClientLocales(), Locale.ENGLISH);
+
+        assertThat(resolver.resolveAt(ADA, TURKISH)).isEqualTo(TURKISH);
+        assertThat(resolver.resolveAt(ADA, Locale.ROOT)).isEqualTo(Locale.ENGLISH);
     }
 
     /** The persisted {@code /lang} choices. */

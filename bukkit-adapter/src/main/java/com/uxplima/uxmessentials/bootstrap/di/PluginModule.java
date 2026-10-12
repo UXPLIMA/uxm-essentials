@@ -221,6 +221,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHo
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.adapter.outbound.meta.PlayerMeta;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.BukkitServerMetrics;
@@ -272,7 +273,6 @@ import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
-import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
@@ -463,8 +463,7 @@ public final class PluginModule {
                 },
                 "colours re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
-        resources.localeBinding(new LocaleBinding(
-                wiredKernel.localeStore(), wiredKernel.serverDefault(), kernel.messages(), kernel.log()));
+        resources.localeBinding(new LocaleBinding(wiredKernel.resolver(), kernel.messages(), kernel.log()));
         // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected
         // between the catalog and the locale wrap so the usage line resolves in the player's language.
         resources.usageBinding(new UsageBinding(kernel.messages()));
@@ -872,7 +871,13 @@ public final class PluginModule {
         resources.onClose(uxmessCommand::close);
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
         resources.addCommand(new LangCommand(
-                wiredKernel.localeStore(), wiredKernel.catalog(), kernel.messages(), kernel.messageSink()));
+                wiredKernel.localeStore(),
+                wiredKernel.catalog(),
+                kernel.messages(),
+                kernel.messageSink(),
+                wiredKernel.resolver(),
+                kernel.playerLookup(),
+                kernel.scheduler()));
         // /backup reuses the migration importer's data-dir snapshot (a "backup-" prefixed copy of the
         // bundled .conf state), run off-tick through the Scheduler. Operator-level, so it too lives here.
         resources.addCommand(new BackupCommand(
@@ -885,19 +890,19 @@ public final class PluginModule {
         resources.addCommand(new HelpCommand(resources::commands, kernel.messages()));
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
-        applyCatalog(plugin, kernel, wiredKernel.localeStore(), wiredKernel.serverDefault(), resources);
+        applyCatalog(plugin, kernel, wiredKernel.resolver(), resources);
         // The language each client reads, kept for the lines written off the command's thread.
         resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.locale.ClientLocaleListener(
                 wiredKernel.resolver().clients()));
+        // A language an operator set for a player who was away, handed over when they join.
+        resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.locale.SharedLanguageListener(
+                wiredKernel.localeStore()));
+        resources.onClose(wiredKernel.localeStore()::flush);
         return resources;
     }
 
     private static void applyCatalog(
-            JavaPlugin plugin,
-            KernelPorts kernel,
-            LocaleStore localeStore,
-            Locale serverDefault,
-            CloseableResources resources) {
+            JavaPlugin plugin, KernelPorts kernel, LocaleResolver resolver, CloseableResources resources) {
         List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
                 .toList());
@@ -919,8 +924,7 @@ public final class PluginModule {
         resources.catalogBinding(new CatalogBinding(byId));
         resources.addListener(new LocalizedCommandVisibilityListener(
                 resolution.effective(),
-                localeStore,
-                serverDefault,
+                resolver,
                 plugin.getPluginMeta().getName().toLowerCase(Locale.ROOT)));
         // The GUI binding reuses the same resolved map so a command's gui flag and rename agree on one entry.
         resources.guiRootBinding(new GuiRootBinding(byId));
