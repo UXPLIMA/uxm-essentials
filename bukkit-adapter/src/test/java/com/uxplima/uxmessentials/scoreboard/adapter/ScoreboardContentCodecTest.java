@@ -67,6 +67,23 @@ class ScoreboardContentCodecTest {
     }
 
     @Test
+    void theGlobalRefreshTicksDrivesTheSingleBoardShapeAsShipped(@TempDir Path dir) throws Exception {
+        // Issue 3: the shipped file carries both keys, and the top-level one the comment calls global was never read.
+        ConfigurationNode root = load(dir, """
+                refresh-ticks = 100
+                scoreboard {
+                  title = "<gold>T"
+                  lines = [ "a" ]
+                  refresh-ticks = 20
+                }
+                """);
+
+        ScoreboardContentCodec.Parsed parsed = ScoreboardContentCodec.read(root, LOG);
+
+        assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(5L));
+    }
+
+    @Test
     void parsesNamedBoardsWithConditionsAndPriorities(@TempDir Path dir) throws Exception {
         ConfigurationNode root = load(dir, """
                 enabled = true

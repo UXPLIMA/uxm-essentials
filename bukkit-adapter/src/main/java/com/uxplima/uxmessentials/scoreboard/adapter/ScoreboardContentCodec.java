@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.scoreboard.domain.SidebarConfig;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarLine;
 import com.uxplima.uxmessentials.scoreboard.domain.SidebarNumberFormat;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.RefreshCadence;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
@@ -47,7 +48,8 @@ import org.spongepowered.configurate.ConfigurationNode;
  * <p><strong>Single board (back-compat).</strong> When there is no {@code boards { … }} block but a top-level
  * {@code scoreboard { title, lines, … }} block exists, it is wrapped as one board named {@code default} with an
  * always-true condition and priority {@code 0}, reproducing the historical single-board-plus-blacklist behaviour. The
- * global refresh cadence then comes from {@code scoreboard.refresh-ticks}.
+ * global refresh cadence is still the top-level {@code refresh-ticks}, unless only {@code scoreboard.refresh-ticks} was
+ * changed, which is the one this shape read up to 0.10.0: see {@link RefreshCadence#resolve}.
  *
  * <p>Every value is operator content rendered through MiniMessage and the placeholder pipeline later, never a
  * {@code MessageKey}. The parse is tolerant: a board's lines beyond {@link DisplayContent#MAX_LINES} are truncated, an
@@ -98,7 +100,8 @@ final class ScoreboardContentCodec {
             return new Parsed(readBoards(boards, log), animations, refreshInterval(root.node("refresh-ticks")));
         }
         Parsed single = readSingleBoard(root.node("scoreboard"), log);
-        return new Parsed(single.boards(), animations, single.refreshInterval());
+        return new Parsed(
+                single.boards(), animations, RefreshCadence.resolve(root, root.node("scoreboard"), "scoreboard", log));
     }
 
     private static SidebarConfig readBoards(ConfigurationNode boards, Logger log) {
@@ -155,11 +158,7 @@ final class ScoreboardContentCodec {
     }
 
     private static Duration refreshInterval(ConfigurationNode node) {
-        long ticks = node.getLong(DEFAULT_REFRESH_TICKS);
-        if (ticks <= 0L) {
-            ticks = DEFAULT_REFRESH_TICKS;
-        }
-        return Duration.ofMillis(ticks * MILLIS_PER_TICK);
+        return RefreshCadence.of(node);
     }
 
     private static Set<String> worldBlacklist(ConfigurationNode node) {

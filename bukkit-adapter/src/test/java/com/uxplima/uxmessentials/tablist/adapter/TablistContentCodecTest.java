@@ -547,6 +547,23 @@ class TablistContentCodecTest {
     }
 
     @Test
+    void theGlobalRefreshTicksDrivesTheSingleFormatShapeAsShipped(@TempDir Path dir) throws Exception {
+        // The tablist ships the same two keys as the scoreboard of issue 3, and its top-level one was never read
+        // either.
+        ConfigurationNode root = load(dir, """
+                refresh-ticks = 100
+                tablist {
+                  header = [ "<gold>Welcome" ]
+                  refresh-ticks = 20
+                }
+                """);
+
+        TablistContentCodec.Parsed parsed = TablistContentCodec.read(root, LOG);
+
+        assertThat(parsed.refreshInterval()).isEqualTo(Duration.ofSeconds(5L));
+    }
+
+    @Test
     void backCompatWrapsTheTopLevelTablistAsOneDefaultFormat(@TempDir Path dir) throws Exception {
         ConfigurationNode root = load(dir, """
                 enabled = true

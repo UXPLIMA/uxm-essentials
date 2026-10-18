@@ -12,6 +12,7 @@ import java.util.OptionalInt;
 import java.util.Set;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.RefreshCadence;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.display.ConditionParser;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
@@ -60,7 +61,9 @@ import org.spongepowered.configurate.ConfigurationNode;
  * <p><strong>Single tablist (back-compat).</strong> When there is no {@code formats { … }} block but a top-level
  * {@code tablist { header, footer, … }} block exists, it is wrapped as one format named {@code default} with an
  * always-true condition, priority {@code 0}, and no name/order override, reproducing the historical single-tablist
- * behaviour. The global refresh cadence then comes from {@code tablist.refresh-ticks}.
+ * behaviour. The global refresh cadence is still the top-level {@code refresh-ticks}, unless only
+ * {@code tablist.refresh-ticks} was changed, which is the one this shape read up to 0.10.0: see
+ * {@link RefreshCadence#resolve}.
  *
  * <p>An optional top-level {@code animations { <name> { type, frames, interval-ticks, … } }} block declares named
  * animations a header/footer line references as {@code %anim_<name>%}. It is parsed by the shared
@@ -120,7 +123,8 @@ final class TablistContentCodec {
             return new Parsed(readFormats(formats, log), animations, refreshInterval(root.node("refresh-ticks")));
         }
         Parsed single = readSingleFormat(root.node("tablist"));
-        return new Parsed(single.formats(), animations, single.refreshInterval());
+        return new Parsed(
+                single.formats(), animations, RefreshCadence.resolve(root, root.node("tablist"), "tablist", log));
     }
 
     private static TablistFormatConfig readFormats(ConfigurationNode formats, Logger log) {
@@ -369,8 +373,8 @@ final class TablistContentCodec {
 
     /**
      * Back-compat: wrap a top-level {@code tablist { … }} block as the single implicit {@code default} format with an
-     * always-true condition, priority {@code 0}, and no name/order override. A blank block yields no formats. The global
-     * refresh cadence comes from {@code tablist.refresh-ticks}. Animations are read separately by {@link #read} and
+     * always-true condition, priority {@code 0}, and no name/order override. A blank block yields no formats. {@link #read}
+     * resolves the global refresh cadence from both keys. Animations are read separately by {@link #read} and
      * merged in there, so the returned {@code animations} list is always empty.
      */
     private static Parsed readSingleFormat(ConfigurationNode tab) {
@@ -444,11 +448,7 @@ final class TablistContentCodec {
     }
 
     private static Duration refreshInterval(ConfigurationNode node) {
-        long ticks = node.getLong(DEFAULT_REFRESH_TICKS);
-        if (ticks <= 0L) {
-            ticks = DEFAULT_REFRESH_TICKS;
-        }
-        return Duration.ofMillis(ticks * MILLIS_PER_TICK);
+        return RefreshCadence.of(node);
     }
 
     private static Set<String> worldBlacklist(ConfigurationNode node) {
