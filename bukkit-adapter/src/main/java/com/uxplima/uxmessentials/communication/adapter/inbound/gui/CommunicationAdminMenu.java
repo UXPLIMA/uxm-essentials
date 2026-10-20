@@ -194,14 +194,35 @@ public final class CommunicationAdminMenu {
         }
     }
 
-    /** Open the read-only announcer list (the {@code /announce list} surface). */
+    /**
+     * Open the read-only announcer list (the {@code /announce list} surface). The merged list reads the announcement store, which is a database, so it is read off the tick and the list
+     * opens on the viewer's own thread holding that reading. A page turn reads the same snapshot rather than asking
+     * the database again on the tick.
+     */
     private void openAnnouncer(MenuActionContext ctx) {
-        menus.open(ctx.viewer(), ANNOUNCER_SPEC_ID, null);
+        Player viewer = ctx.viewer();
+        scheduler.async(() -> {
+            Listing listing = new Listing(announcerConfig.get().announcements());
+            scheduler.onEntity(BukkitRefs.toRef(viewer), () -> menus.open(viewer, ANNOUNCER_SPEC_ID, listing));
+        });
     }
 
-    /** The announcement list, read fresh from the merged config each open (a config read, no Bukkit API). */
+    /**
+     * The announcement list the window was opened with. A window opened another way, an {@code open:} action in an
+     * operator's own menu file, carries no reading and reads the merged config itself.
+     */
     private List<Announcement> announcements(MenuContext ctx) {
-        return announcerConfig.get().announcements();
+        return ctx.subjectRaw()
+                .filter(Listing.class::isInstance)
+                .map(subject -> ((Listing) subject).announcements())
+                .orElseGet(() -> announcerConfig.get().announcements());
+    }
+
+    /** The announcements as read off the tick when the list was opened. */
+    private record Listing(List<Announcement> announcements) {
+        Listing {
+            announcements = List.copyOf(announcements);
+        }
     }
 
     private String announcementLines(MenuContext ctx) {

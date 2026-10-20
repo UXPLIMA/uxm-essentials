@@ -201,6 +201,31 @@ class AnnouncerTaskTest {
         assertThat(alice.nextComponentMessage()).isNull();
     }
 
+    /**
+     * The merged config reads the announcement store, a database. The global region thread is the server's tick on
+     * Folia and the main thread on Paper, and a slow database there stalls every player, so the rotation reads the
+     * config on its own async tick and the global hop only counts the roster.
+     */
+    @Test
+    void theRotationNeverReadsTheConfigOnTheGlobalThread() {
+        GlobalFlagScheduler global = new GlobalFlagScheduler();
+        List<Boolean> readOnGlobal = new java.util.ArrayList<>();
+        java.util.function.Supplier<AnnouncerConfig> live = () -> {
+            readOnGlobal.add(global.onGlobal);
+            return config(0, chat("a", "<gold>welcome"));
+        };
+        BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
+                new ThrowingSink(), optOut, new ChannelBroadcaster(global, display()), this::context, global);
+        NextAnnouncement next = new NextAnnouncement(() -> live.get().rotating(), new ZeroRandom());
+        AnnouncerTask task = new AnnouncerTask(scheduler, next, broadcaster, live, () -> true);
+
+        task.start();
+        scheduler.drainOne();
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo("welcome");
+        assertThat(readOnGlobal).isNotEmpty().doesNotContain(true);
+    }
+
     private AnnouncerTask task(AnnouncerConfig config) {
         return task(() -> config);
     }
@@ -286,6 +311,42 @@ class AnnouncerTaskTest {
         @Override
         public void deliver(PlayerRef viewer, String renderedText) {
             throw new AssertionError("the rich announcement path must not use the MessageSink");
+        }
+    }
+
+    /** Runs every hop inline and remembers whether the running task is on the global region. */
+    private static final class GlobalFlagScheduler implements Scheduler {
+        private boolean onGlobal;
+
+        @Override
+        public void onGlobal(Runnable task) {
+            boolean outer = onGlobal;
+            onGlobal = true;
+            try {
+                task.run();
+            } finally {
+                onGlobal = outer;
+            }
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
         }
     }
 

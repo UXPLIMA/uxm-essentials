@@ -131,8 +131,11 @@ public final class AnnouncerTask {
         }
         // The roster size feeding the min-players gate is read on the global region thread (Folia forbids reading
         // Bukkit.getOnlinePlayers() off it); the pick and the broadcast run from that same global hop so the gate and
-        // the fan-out see one consistent roster.
-        broadcaster.withOnlineCount(count -> nextAnnouncement.pick(count).ifPresent(broadcaster::broadcast));
+        // the fan-out see one consistent roster. The config is read here first: it merges the announcement store,
+        // a database, and the global region is the server's tick.
+        AnnouncerConfig rotating = nextAnnouncement.current();
+        broadcaster.withOnlineCount(
+                count -> nextAnnouncement.pick(rotating, count).ifPresent(broadcaster::broadcast));
         scheduleDefaultRotation();
     }
 

@@ -42,7 +42,20 @@ public final class NextAnnouncement {
      * with itself.
      */
     public Optional<Announcement> pick(int onlinePlayers) {
-        AnnouncerConfig current = config.get();
+        return pick(current(), onlinePlayers);
+    }
+
+    /**
+     * The live config as the next {@link #pick(AnnouncerConfig, int)} should see it. Reading it may reach a store,
+     * so a caller that picks on a thread where waiting is not allowed reads it first, where it is.
+     */
+    public AnnouncerConfig current() {
+        return Objects.requireNonNull(config.get(), "config");
+    }
+
+    /** {@link #pick(int)} against a config read earlier with {@link #current()}. */
+    public Optional<Announcement> pick(AnnouncerConfig current, int onlinePlayers) {
+        Objects.requireNonNull(current, "current");
         if (!current.shouldFire(onlinePlayers)) {
             return Optional.empty();
         }
