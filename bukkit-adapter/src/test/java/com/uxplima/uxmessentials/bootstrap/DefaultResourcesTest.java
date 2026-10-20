@@ -113,6 +113,29 @@ class DefaultResourcesTest {
         assertThat(Files.readString(dataFolder.resolve("config.conf"))).isEqualTo(afterFirstRun);
     }
 
+    /**
+     * The whole path for a catalog: a server whose English file is exactly what the previous version shipped
+     * reads the corrected line after the update, without anybody editing the file.
+     */
+    @Test
+    void aCatalogLineTheOperatorNeverTouchedIsCorrected(@TempDir Path dataFolder) throws Exception {
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.8");
+        Path catalog = dataFolder.resolve("messages/messages_en.conf");
+        String shipped = Files.readString(catalog);
+        String line = shipped.lines()
+                .filter(l -> l.startsWith("\"world.delete-confirm\""))
+                .findFirst()
+                .orElseThrow();
+        String older = shipped.replace(line, line.replace("<tag:", "<etag:"));
+        Files.writeString(catalog, older);
+        Files.writeString(
+                dataFolder.resolve(DefaultResources.BASELINE_DIR).resolve("messages/messages_en.conf"), older);
+
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
+
+        assertThat(Files.readString(catalog)).isEqualTo(shipped);
+    }
+
     @Test
     void leavesAMalformedFileAloneAndTriesAgainNextTime(@TempDir Path dataFolder) throws Exception {
         String broken = "storage { backend = \n";

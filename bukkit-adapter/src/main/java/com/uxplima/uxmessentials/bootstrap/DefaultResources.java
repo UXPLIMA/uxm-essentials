@@ -253,11 +253,26 @@ final class DefaultResources {
             if (previous.equals(bundled)) {
                 return;
             }
+            updateUntouchedLines(target, resource, bundled, previous, log);
             if (appendNewSettings(target, resource, bundled, previous, version, log)) {
                 write(baseline, bundled);
             }
         } catch (IOException failure) {
             log.warning("could not write default " + resource + ": " + failure.getMessage());
+        }
+    }
+
+    /**
+     * Bring every line the operator never touched to this version's wording. A corrected message used to reach new
+     * servers only, because the append below adds keys and never changes one.
+     */
+    private static void updateUntouchedLines(Path target, String resource, String bundled, String previous, Logger log)
+            throws IOException {
+        String operator = Files.readString(target, StandardCharsets.UTF_8);
+        String updated = BundledDefaultsMerge.updatedLines(bundled, previous, operator);
+        if (!updated.equals(operator)) {
+            Files.writeString(target, updated, StandardCharsets.UTF_8);
+            log.info("updated the shipped lines you had not changed in " + resource);
         }
     }
 

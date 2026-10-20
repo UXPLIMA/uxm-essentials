@@ -102,4 +102,38 @@ class BundledDefaultsMergeTest {
                         () -> BundledDefaultsMerge.newSettings("a = 1\n", "", "a = {{{\n")))
                 .isInstanceOf(ConfigurateException.class);
     }
+
+    /**
+     * A line the operator never touched reads exactly as the previous version shipped it, so a corrected wording
+     * may replace it. Without this a fix to a shipped message reached new servers only: on 2026-10-20 a world
+     * delete still asked its question under a red ERROR on a server that had the corrected jar.
+     */
+    @Test
+    void aShippedLineTheOperatorNeverTouchedTakesTheNewWording() {
+        String baseline = "\"world.delete\" = \"old\"\n\"other\" = \"x\"\n";
+        String bundled = "\"world.delete\" = \"new\"\n\"other\" = \"y\"\n";
+        String operator = "\"world.delete\" = \"old\"\n\"other\" = \"mine\"\n";
+
+        assertThat(BundledDefaultsMerge.updatedLines(bundled, baseline, operator))
+                .isEqualTo("\"world.delete\" = \"new\"\n\"other\" = \"mine\"\n");
+    }
+
+    @Test
+    void aLineTheOperatorRewroteKeepsTheirWording() {
+        String baseline = "\"world.delete\" = \"old\"\n";
+        String bundled = "\"world.delete\" = \"new\"\n";
+        String operator = "\"world.delete\" = \"theirs\"\n";
+
+        assertThat(BundledDefaultsMerge.updatedLines(bundled, baseline, operator))
+                .isEqualTo(operator);
+    }
+
+    @Test
+    void anIndentedLineInsideABlockIsLeftToTheAppend() {
+        String baseline = "storage {\n  backend = \"sqlite\"\n}\n";
+        String bundled = "storage {\n  backend = \"mysql\"\n}\n";
+
+        assertThat(BundledDefaultsMerge.updatedLines(bundled, baseline, baseline))
+                .isEqualTo(baseline);
+    }
 }

@@ -191,8 +191,11 @@ the connecting player, which is the one place a permission can be resolved befor
 
 Replace the jar and start the server. Nothing else is a step.
 
-A file the operator already has is never overwritten: their values, their comments and their
-formatting stay as they left them. What an update adds is the settings that did not exist when
+A file the operator already has keeps every value they changed, with their comments and their
+formatting. Two things reach it from an update. A top-level line they never touched, one that
+still reads exactly as the previous version shipped it, takes the new wording in place: this is
+how a corrected message reaches a server that installed the old one. And the settings that did
+not exist when
 they installed, appended as a commented HOCON block at the end of the file, so a new knob is
 something they can read and edit rather than a default buried in the jar. Which keys count as
 new is decided against the copy of the previously shipped default kept under `.defaults/`, so

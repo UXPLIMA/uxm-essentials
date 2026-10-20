@@ -4,8 +4,16 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -45,6 +53,48 @@ final class BundledDefaultsMerge {
         CommentedConfigurationNode fragment = CommentedConfigurationNode.root();
         collect(parse(bundled), parse(baseline), parse(operator), fragment);
         return fragment.empty() ? Optional.empty() : Optional.of(render(fragment));
+    }
+
+    /** A top-level {@code "key" = value} line, the shape every line of a message catalog has. */
+    private static final Pattern TOP_LEVEL_ENTRY = Pattern.compile("^\"([^\"]+)\"\\s*=.*$");
+
+    /**
+     * {@code operator} with every top-level line the operator never touched brought to this version's wording.
+     *
+     * <p>A line is untouched when it reads exactly as the previous version shipped it. The append in
+     * {@link #newSettings} only ever adds keys, so before this a corrected message reached new servers only and
+     * every existing one kept the old wording forever. A line the operator rewrote, a key that appears twice, and
+     * an indented line inside a block are all left as they are.
+     */
+    static String updatedLines(String bundled, String baseline, String operator) {
+        Map<String, String> was = topLevelLines(baseline);
+        Map<String, String> now = topLevelLines(bundled);
+        List<String> lines = new ArrayList<>(Arrays.asList(operator.split("\n", -1)));
+        for (Map.Entry<String, String> entry : now.entrySet()) {
+            String old = was.get(entry.getKey());
+            if (old == null || old.equals(entry.getValue())) {
+                continue;
+            }
+            int at = lines.indexOf(old);
+            if (at >= 0 && lines.lastIndexOf(old) == at) {
+                lines.set(at, entry.getValue());
+            }
+        }
+        return String.join("\n", lines);
+    }
+
+    /** Each top-level key with its whole line. A key written twice is ambiguous, so it is left out. */
+    private static Map<String, String> topLevelLines(String text) {
+        Map<String, String> lines = new HashMap<>();
+        Set<String> twice = new HashSet<>();
+        for (String line : text.split("\n", -1)) {
+            Matcher entry = TOP_LEVEL_ENTRY.matcher(line);
+            if (entry.matches() && lines.put(entry.group(1), line) != null) {
+                twice.add(entry.group(1));
+            }
+        }
+        lines.keySet().removeAll(twice);
+        return lines;
     }
 
     /** Walks the bundled tree, copying into {@code fragment} every branch that is new in this version. */
