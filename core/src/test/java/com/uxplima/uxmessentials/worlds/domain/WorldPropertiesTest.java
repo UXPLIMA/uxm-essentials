@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.worlds.domain;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.Optional;
+
 import org.junit.jupiter.api.Test;
 
 class WorldPropertiesTest {
@@ -53,9 +55,18 @@ class WorldPropertiesTest {
 
     @Test
     void timeDecodesNonNegativeTicks() {
-        assertThat(WorldProperties.TIME.decode("6000")).contains(6000L);
+        assertThat(WorldProperties.TIME.decode("6000")).contains(Optional.of(6000L));
         assertThat(WorldProperties.TIME.decode("-1")).isEmpty();
         assertThat(WorldProperties.TIME.decode("noon")).isEmpty();
+    }
+
+    /** A time lock can be taken off again, in the same word the weather lock uses. */
+    @Test
+    void timeReleasesItsLockWithNone() {
+        assertThat(WorldProperties.TIME.decode("none")).contains(Optional.empty());
+        assertThat(WorldProperties.TIME.decode("NONE")).contains(Optional.empty());
+        assertThat(WorldProperties.TIME.encode(Optional.empty())).isEqualTo("none");
+        assertThat(WorldProperties.TIME.defaultValue()).isEmpty();
     }
 
     @Test

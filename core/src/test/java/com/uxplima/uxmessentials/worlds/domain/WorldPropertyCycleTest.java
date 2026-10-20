@@ -53,8 +53,17 @@ class WorldPropertyCycleTest {
     void ticksCycleTheirPresets() {
         assertThat(next(WorldProperties.TIME, "0", CycleAction.FORWARD)).isEqualTo("6000");
         assertThat(next(WorldProperties.TIME, "6000", CycleAction.FORWARD)).isEqualTo("12000");
-        assertThat(next(WorldProperties.TIME, "18000", CycleAction.FORWARD)).isEqualTo("0");
-        assertThat(next(WorldProperties.TIME, "0", CycleAction.BACKWARD)).isEqualTo("18000");
+        // "none" sits between the last preset and the first, so the editor can take the lock off.
+        assertThat(next(WorldProperties.TIME, "18000", CycleAction.FORWARD)).isEqualTo("none");
+        assertThat(next(WorldProperties.TIME, "none", CycleAction.FORWARD)).isEqualTo("0");
+        assertThat(next(WorldProperties.TIME, "0", CycleAction.BACKWARD)).isEqualTo("none");
+        assertThat(next(WorldProperties.TIME, "none", CycleAction.BACKWARD)).isEqualTo("18000");
+    }
+
+    /** Clearing the time in the editor releases the lock. It used to lock the world at midnight. */
+    @Test
+    void clearingTheTimeReleasesTheLock() {
+        assertThat(next(WorldProperties.TIME, "6000", CycleAction.CLEAR)).isEqualTo("none");
     }
 
     @Test

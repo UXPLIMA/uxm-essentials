@@ -18,6 +18,8 @@ import java.util.function.Function;
  */
 public final class WorldProperty<T> {
 
+    private static final String NO_LOCK = "none";
+
     private final String key;
     private final T defaultValue;
     private final Function<String, Optional<T>> decode;
@@ -88,20 +90,27 @@ public final class WorldProperty<T> {
                 names);
     }
 
-    static WorldProperty<Long> ofTicks(String key) {
+    /**
+     * A time lock in ticks, or {@code none} for no lock. Without {@code none} a lock, once set, could not be
+     * taken off: every value this decoded was a time to hold, and clearing it in the editor held midnight.
+     */
+    static WorldProperty<Optional<Long>> ofTicks(String key) {
         return new WorldProperty<>(
                 key,
-                0L,
+                Optional.empty(),
                 raw -> {
+                    if (raw.equalsIgnoreCase(NO_LOCK)) {
+                        return Optional.of(Optional.empty());
+                    }
                     try {
                         long ticks = Long.parseLong(raw);
-                        return ticks < 0 ? Optional.empty() : Optional.of(ticks);
+                        return ticks < 0 ? Optional.empty() : Optional.of(Optional.of(ticks));
                     } catch (NumberFormatException notANumber) {
                         return Optional.empty();
                     }
                 },
-                String::valueOf,
-                List.of("0", "6000", "12000", "18000"));
+                value -> value.map(String::valueOf).orElse(NO_LOCK),
+                List.of("0", "6000", "12000", "18000", NO_LOCK));
     }
 
     static WorldProperty<Integer> ofInteger(String key, int def) {

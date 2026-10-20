@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.worlds.adapter.outbound;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 
+import java.util.Optional;
+
 import org.bukkit.Difficulty;
 import org.bukkit.GameRule;
 import org.bukkit.World;
@@ -77,7 +79,7 @@ class BukkitWorldSettingApplierTest {
     @Test
     void lockedTimeFreezesDaylightCycleAndSetsTime() {
         World world = server.getWorld("w");
-        var settings = WorldSettings.defaults().with(WorldProperties.TIME, 6000L);
+        var settings = WorldSettings.defaults().with(WorldProperties.TIME, Optional.of(6000L));
 
         applier.apply(WorldName.of("w"), settings);
 
@@ -92,6 +94,53 @@ class BukkitWorldSettingApplierTest {
         applier.apply(WorldName.of("w"), WorldSettings.defaults());
 
         assertThat(world.getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE)).isTrue();
+    }
+
+    /**
+     * A world nobody locked keeps the cycle its operator set. The applier runs at every start, and it used to
+     * read a missing lock as an order to run the cycle, so a {@code /gamerule} that stopped the clock lasted
+     * until the next restart.
+     */
+    @Test
+    void aTimeNobodyLockedLeavesTheOperatorsCycleAlone() {
+        World world = server.getWorld("w");
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+
+        applier.apply(WorldName.of("w"), WorldSettings.defaults());
+
+        assertThat(world.getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE)).isFalse();
+    }
+
+    @Test
+    void aReleasedTimeLockRunsTheCycleAgain() {
+        World world = server.getWorld("w");
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, false);
+        var settings = WorldSettings.defaults().with(WorldProperties.TIME, Optional.empty());
+
+        applier.apply(WorldName.of("w"), settings);
+
+        assertThat(world.getGameRuleValue(GameRule.DO_DAYLIGHT_CYCLE)).isTrue();
+    }
+
+    @Test
+    void aWeatherNobodyLockedLeavesTheOperatorsCycleAlone() {
+        World world = server.getWorld("w");
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+
+        applier.apply(WorldName.of("w"), WorldSettings.defaults());
+
+        assertThat(world.getGameRuleValue(GameRule.DO_WEATHER_CYCLE)).isFalse();
+    }
+
+    @Test
+    void aReleasedWeatherLockRunsTheCycleAgain() {
+        World world = server.getWorld("w");
+        world.setGameRule(GameRule.DO_WEATHER_CYCLE, false);
+        var settings = WorldSettings.defaults().with(WorldProperties.WEATHER, WeatherLock.NONE);
+
+        applier.apply(WorldName.of("w"), settings);
+
+        assertThat(world.getGameRuleValue(GameRule.DO_WEATHER_CYCLE)).isTrue();
     }
 
     @Test

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.worlds.adapter.outbound;
 import java.util.Arrays;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -65,18 +66,24 @@ public final class BukkitWorldSettingApplier implements WorldSettingApplier {
     // but the typed setGameRule overload still takes it; we keep it until a replacement constant ships.
     @SuppressWarnings("removal")
     private static void applyTime(World world, WorldSettings settings) {
-        if (settings.rawValue(WorldProperties.TIME.key()).isPresent()) {
-            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, Boolean.FALSE);
-            world.setTime(settings.get(WorldProperties.TIME));
-        } else {
-            world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, Boolean.TRUE);
+        // A world nobody locked keeps whatever cycle its operator set. This runs at every start, so treating
+        // a missing lock as "run the clock" undid a /gamerule at each restart.
+        if (settings.rawValue(WorldProperties.TIME.key()).isEmpty()) {
+            return;
         }
+        Optional<Long> lock = settings.get(WorldProperties.TIME);
+        world.setGameRule(GameRule.DO_DAYLIGHT_CYCLE, lock.isEmpty());
+        lock.ifPresent(world::setTime);
     }
 
     // DO_WEATHER_CYCLE is removal-flagged like DO_DAYLIGHT_CYCLE above; the typed setGameRule overload
     // still accepts it, so we keep the constant until Paper ships a registry-backed replacement.
     @SuppressWarnings("removal")
     private static void applyWeather(World world, WorldSettings settings) {
+        // As with the time: no stored lock, no opinion about the cycle.
+        if (settings.rawValue(WorldProperties.WEATHER.key()).isEmpty()) {
+            return;
+        }
         WeatherLock lock = settings.get(WorldProperties.WEATHER);
         if (lock == WeatherLock.NONE) {
             world.setGameRule(GameRule.DO_WEATHER_CYCLE, Boolean.TRUE);
