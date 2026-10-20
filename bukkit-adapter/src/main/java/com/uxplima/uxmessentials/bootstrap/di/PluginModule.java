@@ -3052,6 +3052,7 @@ public final class PluginModule {
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.worldPhase().run("npc spawn", wired::spawnStored);
         links.queries.register(
                 com.uxplima.uxmessentials.api.query.UxmNpcQuery.class,
                 new com.uxplima.uxmessentials.npc.adapter.outbound.api.NpcQueries(

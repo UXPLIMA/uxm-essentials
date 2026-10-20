@@ -174,7 +174,6 @@ public final class NpcWiring {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
         NpcServices services = assemble(kernel, repository, renderer, notifier, quota);
-        spawnStored(repository, renderer);
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
                 kernel.log(),
@@ -335,14 +334,6 @@ public final class NpcWiring {
                 new SetNpcSkinSlim(repository, renderer, notifier));
     }
 
-    private static void spawnStored(NpcRepository repository, NpcRenderer renderer) {
-        // Each render hops onto each viewer's region thread inside the renderer, so this is safe to call straight
-        // from the enable path; a viewer out of range or in another world is simply not shown.
-        for (Npc npc : repository.all()) {
-            renderer.render(npc);
-        }
-    }
-
     /**
      * Everything the npc module contributes once wired: the single Brigadier command, the join/quit/world-change
      * listener, the renderer whose fake players must be removed on stop, and the refresh timer handle.
@@ -375,6 +366,18 @@ public final class NpcWiring {
             Objects.requireNonNull(refreshTask, "refreshTask");
             Objects.requireNonNull(lookTask, "lookTask");
             Objects.requireNonNull(placeholders, "placeholders");
+        }
+
+        /**
+         * Show every stored NPC to the viewers in range. The bootstrap runs this once the worlds exist: the plugin
+         * enables before any world loads, a fake player's entity id comes from a world, and asking for one on the
+         * enable path failed the whole module on every boot that found an NPC in storage. Each render hops onto each
+         * viewer's region thread inside the renderer.
+         */
+        public void spawnStored() {
+            for (Npc npc : repository.all()) {
+                renderer.render(npc);
+            }
         }
 
         /** Cancel the timers, unregister the proxy channel, and remove every shown NPC so nothing is orphaned. */

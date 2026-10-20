@@ -505,6 +505,35 @@ class ArchitectureTest {
             .because("the plugin enables before the worlds exist (load: STARTUP), so wiring that counts or makes "
                     + "worlds silently does nothing; hand it to WorldPhase and it runs once they are up");
 
+    private static final List<String> STORED_ENTITY_RENDERERS = List.of(
+            "com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer",
+            "com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer");
+
+    /**
+     * A stored NPC or hologram is drawn once the worlds exist, through the {@code spawnStored} the bootstrap hands to
+     * {@code WorldPhase}. The NPC wiring drew its NPCs on the enable path instead, where a fake player's entity id has
+     * no world to come from, and every boot that found an NPC in storage lost the whole module.
+     */
+    @ArchTest
+    static final ArchRule wiringDrawsStoredEntitiesOnlyOnceTheWorldsAreUp = classes()
+            .that(areWiringClasses())
+            .should(new ArchCondition<JavaClass>("draw a stored NPC or hologram only from spawnStored") {
+                @Override
+                public void check(JavaClass wiring, com.tngtech.archunit.lang.ConditionEvents events) {
+                    for (JavaMethodCall call : wiring.getMethodCallsFromSelf()) {
+                        if (call.getName().equals("render")
+                                && STORED_ENTITY_RENDERERS.contains(
+                                        call.getTargetOwner().getName())
+                                && !call.getOrigin().getName().equals("spawnStored")) {
+                            events.add(com.tngtech.archunit.lang.SimpleConditionEvent.violated(
+                                    call, call.getDescription()));
+                        }
+                    }
+                }
+            })
+            .because("the plugin enables before the worlds exist (load: STARTUP); draw stored entities in a "
+                    + "spawnStored run through WorldPhase");
+
     /** The classes that run during enable: bootstrap's own wiring and each context's {@code *Wiring}. */
     private static DescribedPredicate<JavaClass> areWiringClasses() {
         return DescribedPredicate.describe("are wiring classes", javaClass -> {
