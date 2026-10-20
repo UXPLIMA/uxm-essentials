@@ -133,6 +133,21 @@ class StyleTagsTest {
         assertThat(colorOfRun(staff, "ꜱᴛᴀꜰꜰᴄʜᴀᴛ")).isEqualTo(StyleTags.accent());
     }
 
+    /**
+     * Small capitals exist for some letters and not for others. A Turkish heading came out as {@code ʟᴏʙɪʏᴇ ʜᴏş}, half
+     * converted, on every one of the eighty seven headings the Turkish catalogue carries. A heading either converts
+     * whole or keeps its letters.
+     */
+    @Test
+    void aHeadingWithALetterThatHasNoSmallCapitalKeepsItsLetters() {
+        PlainTextComponentSerializer text = PlainTextComponentSerializer.plainText();
+        assertThat(text.serialize(parse("<h:'Lobiye hoş geldin'>"))).isEqualTo("Lobiye hoş geldin");
+        assertThat(text.serialize(parse("<h:'Größe'>"))).isEqualTo("Größe");
+        assertThat(text.serialize(parse("<h:'Sezon'>"))).isEqualTo("ꜱᴇᴢᴏɴ");
+        assertThat(text.serialize(parse("<h:'Xbox'>"))).isEqualTo("xʙᴏx");
+        assertThat(text.serialize(parse("<tag:'Işınlanma'> hi"))).startsWith("Işınlanma");
+    }
+
     @Test
     void aHeaderWithNoWheelKeepsTheBrandColour() {
         // The shipped palette names no wheel, so a position asks for an effect the server never set up.

@@ -271,7 +271,7 @@ public final class StyleTags {
     private static TagResolver header(String name, Palette colours) {
         return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
             String text = args.popOr(name + " requires text").value();
-            Component flat = Component.text(SmallCaps.of(text), colours.accent())
+            Component flat = Component.text(smallCapsWhole(text), colours.accent())
                     .decoration(TextDecoration.BOLD, true)
                     .decoration(TextDecoration.ITALIC, false);
             List<TextColor> arc =
@@ -279,13 +279,41 @@ public final class StyleTags {
             return Tag.selfClosingInserting(
                     arc.isEmpty()
                             ? flat
-                            : Gradients.across(Component.text(SmallCaps.of(text)), arc.get(0), arc.get(1))
+                            : Gradients.across(Component.text(smallCapsWhole(text)), arc.get(0), arc.get(1))
                                     .decoration(TextDecoration.ITALIC, false));
         });
     }
 
+    /**
+     * {@code text} in small capitals when every letter in it has one, otherwise as written. Turkish, German and
+     * Polish carry letters with no small capital, and a heading half converted ({@code ʟᴏʙɪʏᴇ ʜᴏş}) reads worse than
+     * one left alone. Letters of a script with no small capitals at all are left alone either way.
+     */
+    static String smallCapsWhole(String text) {
+        String converted = SmallCaps.of(text);
+        boolean changed = false;
+        boolean kept = false;
+        int[] before = text.codePoints().toArray();
+        int[] after = converted.codePoints().toArray();
+        if (before.length != after.length) {
+            return converted;
+        }
+        for (int index = 0; index < before.length; index++) {
+            if (!Character.isLetter(before[index])) {
+                continue;
+            }
+            if (before[index] == after[index]) {
+                // An ASCII letter left as it was is one the typeface draws plainly in small capitals too (x).
+                kept |= before[index] > 0x7F;
+            } else {
+                changed = true;
+            }
+        }
+        return changed && kept ? text : converted;
+    }
+
     private static Component prefix(String label, TextColor colour, Palette colours) {
-        return Component.text(SmallCaps.of(label), colour)
+        return Component.text(smallCapsWhole(label), colour)
                 .decoration(TextDecoration.BOLD, true)
                 .decoration(TextDecoration.ITALIC, false)
                 .append(Component.text(GAP, NamedTextColor.WHITE).decoration(TextDecoration.BOLD, false))
