@@ -42,7 +42,7 @@ public final class CatalogMessages implements Messages {
         Objects.requireNonNull(placeholders, "placeholders");
         Locale locale = locales.resolve(viewer);
         String template = catalog.template(locale, key);
-        return substitute(template, placeholders);
+        return fill(template, placeholders);
     }
 
     /** A {@code {token}} argument in a catalog template; {@code group(1)} is the bare token name. */
@@ -62,7 +62,7 @@ public final class CatalogMessages implements Messages {
      * a value that itself contained a brace token could be substituted again by a later iteration, which made the
      * result depend on map order and let one value rewrite another. It cannot now.
      */
-    private static String substitute(String template, Map<String, String> placeholders) {
+    public static String fill(String template, Map<String, String> placeholders) {
         if (template.indexOf('{') < 0) {
             return template;
         }

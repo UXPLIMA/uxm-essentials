@@ -70,7 +70,7 @@ public final class MenuVocabulary {
                 "message",
                 ctx -> ctx.player()
                         .sendMessage(
-                                StyledText.render(HudText.expand(ctx.player().getUniqueId(), ctx.arg()))));
+                                StyledText.render(HudText.lineFor(ctx.player().getUniqueId(), ctx.arg()))));
         bindings.action("sound", MenuVocabulary::playSound);
     }
 

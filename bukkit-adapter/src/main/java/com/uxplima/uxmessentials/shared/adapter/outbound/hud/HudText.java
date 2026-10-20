@@ -59,17 +59,6 @@ public final class HudText {
         return catalogLines.expand(new PlayerRef(viewer, ""), source);
     }
 
-    /**
-     * {@code source} for {@code viewer} as text ready to parse: an {@code @key} line read in their language, then
-     * their placeholders. A surface that parses with its own resolver calls this rather than {@link #render}.
-     */
-    public static String expand(UUID viewer, String source) {
-        String line = lineFor(viewer, source);
-        return PlaceholderApiSupport.hasPlaceholder(line)
-                ? PlaceholderApiSupport.messageBridge(viewer).apply(line)
-                : line;
-    }
-
     /** Render {@code miniMessageSource} for {@code viewer}: expand its placeholders, then parse the MiniMessage. */
     public static Component render(UUID viewer, String miniMessageSource) {
         Objects.requireNonNull(viewer, "viewer");

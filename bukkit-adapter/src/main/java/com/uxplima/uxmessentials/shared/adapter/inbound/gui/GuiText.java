@@ -8,6 +8,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
@@ -71,30 +72,58 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
-        Reference reference = reference(key, placeholders);
-        String resolved = messages.resolve(BukkitRefs.toRef(viewer), reference.key(), reference.arguments());
-        // An operator's own entry may carry a %papi% placeholder, as a hologram or board line may; the plugin's own
-        // entries reach chat through the same bridge, so a menu reads them the same way.
-        String expanded = PlaceholderApiSupport.hasPlaceholder(resolved)
-                ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(resolved)
-                : resolved;
-        return StyledText.render(expanded);
+        Reference reference = reference(key);
+        PlayerRef who = BukkitRefs.toRef(viewer);
+        String resolved = messages.resolve(who, reference.key(), overlay(reference.arguments(), placeholders));
+        if (!PlaceholderApiSupport.hasPlaceholder(resolved)) {
+            return StyledText.render(resolved);
+        }
+        // An operator's entry may carry a %papi% placeholder, and the order then is the point. The entry and the
+        // operator's own arguments are the operator's words, so their placeholders resolve. The engine's values go in
+        // afterwards as they are: one may be text a player typed, and a %placeholder% in it would otherwise be
+        // answered on somebody else's screen.
+        String template = messages.resolve(who, reference.key(), reference.arguments());
+        String expanded = PlaceholderApiSupport.hasPlaceholder(template)
+                ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(template)
+                : template;
+        return StyledText.render(CatalogMessages.fill(expanded, placeholders));
     }
 
     /**
      * The key and arguments an engine key names. A menu line written as {@code @key name=value} reaches here whole,
-     * after the at sign; the arguments written on the line win over the engine's own values of the same name.
+     * after the at sign, and its arguments fill the entry before the engine's own values can.
      */
-    private static Reference reference(String key, Map<String, String> placeholders) {
+    private static Reference reference(String key) {
         return CatalogLine.parse("@" + key)
-                .filter(line -> !line.arguments().isEmpty())
                 .map(line -> {
-                    Map<String, String> merged = new java.util.HashMap<>(placeholders);
-                    merged.putAll(line.arguments());
                     String named = line.key();
-                    return new Reference(() -> named, merged);
+                    return new Reference(() -> named, line.arguments());
                 })
-                .orElseGet(() -> new Reference(() -> key, placeholders));
+                .orElseGet(() -> new Reference(() -> key, Map.of()));
+    }
+
+    /**
+     * The operator's arguments in front of the engine's values. The engine's map answers a name when asked rather than
+     * listing every value it could give, so this asks it by name too instead of copying it.
+     */
+    private static Map<String, String> overlay(Map<String, String> written, Map<String, String> engine) {
+        if (written.isEmpty()) {
+            return engine;
+        }
+        return new java.util.AbstractMap<>() {
+            @Override
+            public @org.jspecify.annotations.Nullable String get(@org.jspecify.annotations.Nullable Object name) {
+                String own = written.get(name);
+                return own != null ? own : engine.get(name);
+            }
+
+            @Override
+            public java.util.Set<Map.Entry<String, String>> entrySet() {
+                Map<String, String> listed = new java.util.LinkedHashMap<>(engine);
+                listed.putAll(written);
+                return listed.entrySet();
+            }
+        };
     }
 
     private record Reference(MessageKey key, Map<String, String> arguments) {}

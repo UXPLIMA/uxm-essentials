@@ -9,6 +9,7 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 
@@ -19,23 +20,35 @@ import org.mockito.Mockito;
  */
 class GuiTextCatalogLineTest {
 
+    /** A catalogue that fills its {@code {name}} tokens the way the real one does. */
+    private static final GuiText GUI_TEXT = new GuiText((viewer, key, arguments) -> CatalogMessages.fill(
+            Map.of("custom.online", "online {server}", "custom.warp", "warp {warp}")
+                    .getOrDefault(key.key(), key.key()),
+            arguments));
+
     @Test
     void theArgumentsAfterTheKeyFillTheEntry() {
-        GuiText guiText = new GuiText((viewer, key, placeholders) -> key.key() + " " + placeholders.get("server"));
-
-        String shown = plain(guiText.text(viewer(), "custom.online server=skyblock", Map.of()));
-
-        assertThat(shown).isEqualTo("custom.online skyblock");
+        assertThat(plain(GUI_TEXT.text(viewer(), "custom.online server=skyblock", Map.of())))
+                .isEqualTo("online skyblock");
     }
 
     @Test
     void anArgumentWrittenOnTheLineWinsOverTheEnginesOwn() {
-        GuiText guiText = new GuiText((viewer, key, placeholders) -> String.valueOf(placeholders.get("server")));
+        assertThat(plain(GUI_TEXT.text(viewer(), "custom.online server=bedwars", Map.of("server", "engine"))))
+                .isEqualTo("online bedwars");
+        assertThat(plain(GUI_TEXT.text(viewer(), "custom.online", Map.of("server", "engine"))))
+                .isEqualTo("online engine");
+    }
 
-        assertThat(plain(guiText.text(viewer(), "custom.online server=bedwars", Map.of("server", "engine"))))
-                .isEqualTo("bedwars");
-        assertThat(plain(guiText.text(viewer(), "custom.online", Map.of("server", "engine"))))
-                .isEqualTo("engine");
+    /**
+     * An engine value may be text a player typed, a warp name for one. It goes into the line after the placeholders
+     * have run, so a {@code %placeholder%} in it is shown as typed rather than answered on the viewer's screen. With
+     * no server running here, asking the placeholder bridge at all would throw.
+     */
+    @Test
+    void anEngineValueIsNeverReadForPlaceholders() {
+        assertThat(plain(GUI_TEXT.text(viewer(), "custom.warp", Map.of("warp", "%player_ip%"))))
+                .isEqualTo("warp %player_ip%");
     }
 
     private static Player viewer() {
