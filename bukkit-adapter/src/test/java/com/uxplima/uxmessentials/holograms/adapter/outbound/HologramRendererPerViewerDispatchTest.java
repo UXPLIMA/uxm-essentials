@@ -80,18 +80,20 @@ class HologramRendererPerViewerDispatchTest {
 
     /**
      * A viewer's own text is a metadata packet for an entity id, and a client drops one for an entity it has not been
-     * sent yet. The entity reaches a viewer when the server starts tracking it for them, so the text follows a tick
-     * after that, never with it. Sent at once, every viewer read the server's language instead of their own.
+     * sent yet. The server starts tracking an entity as it is added, before the renderer records it, so the lookup
+     * and the send both wait. Sent at once, every viewer read the server's language instead of their own.
      */
     @Test
-    void theOwnTextFollowsTheTrackingByATick() {
+    void theOwnTextWaitsForTheTrackedEntityToBeRecorded() {
         RecordingScheduler scheduler = new RecordingScheduler();
         RecordingPackets packets = new RecordingPackets();
         HologramTextOverrides overrides =
                 overrides(packets, perViewer(Map.of(ALICE, source -> source.replace("%name%", "Alice"))));
+        java.util.concurrent.atomic.AtomicReference<java.util.Optional<Hologram>> recorded =
+                new java.util.concurrent.atomic.AtomicReference<>(java.util.Optional.empty());
 
-        HologramRenderer.sendOwnTextAfterTracking(
-                scheduler, overrides, player(ALICE), ENTITY_ID, hologram("hi %name%"));
+        HologramRenderer.sendOwnTextAfterTracking(scheduler, overrides, player(ALICE), ENTITY_ID, id -> recorded.get());
+        recorded.set(java.util.Optional.of(hologram("hi %name%")));
 
         assertThat(packets.sent).isEmpty();
         assertThat(scheduler.later).hasSize(1);

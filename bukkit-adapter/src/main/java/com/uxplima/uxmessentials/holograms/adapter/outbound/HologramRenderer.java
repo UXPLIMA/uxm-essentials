@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.holograms.adapter.outbound;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -438,33 +439,46 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
 
     /**
      * Send {@code viewer} their own text for the hologram whose text entity they just started tracking. A client
-     * drops metadata for an entity it has not been sent, and the entity is sent as the tracking starts, so the text
-     * goes a tick later. This is what makes a placeholder or an {@code @key} line read right on the first spawn, on
-     * join, and whenever a viewer walks back into range: the copy sent with the spawn itself arrives too early.
+     * drops metadata for an entity it has not been sent, and the server starts tracking an entity as it is added
+     * to the world, before this renderer has even recorded it. So both the lookup and the send wait: the copy sent
+     * with the spawn itself arrived too early and every viewer read the server's language. This is what makes a
+     * placeholder or an {@code @key} line read right on the first spawn, on join, and on a walk back into range.
      */
     public void sendOwnTextOnTracking(Player viewer, int entityId) {
         Objects.requireNonNull(viewer, "viewer");
+        sendOwnTextAfterTracking(
+                scheduler, textOverrides, viewer, entityId, id -> perViewerHologramWithText(viewer, id));
+    }
+
+    private Optional<Hologram> perViewerHologramWithText(Player viewer, int entityId) {
         for (Tracked tracked : live.values()) {
             if (tracked.live().textEntityId() != entityId) {
                 continue;
             }
             Hologram hologram = tracked.hologram();
-            if (textOverrides.hasPerViewerText(hologram)
-                    && viewers.maySee(hologram, viewer, viewers.shownViewersFor(hologram))) {
-                sendOwnTextAfterTracking(scheduler, textOverrides, viewer, entityId, hologram);
-            }
-            return;
+            boolean shown = textOverrides.hasPerViewerText(hologram)
+                    && viewers.maySee(hologram, viewer, viewers.shownViewersFor(hologram));
+            return shown ? Optional.of(hologram) : Optional.empty();
         }
+        return Optional.empty();
     }
 
-    /** The tick's wait and the per-viewer dispatch behind {@link #sendOwnTextOnTracking}. */
+    /** The wait, the deferred lookup and the per-viewer dispatch behind {@link #sendOwnTextOnTracking}. */
     static void sendOwnTextAfterTracking(
-            Scheduler scheduler, HologramTextOverrides textOverrides, Player viewer, int entityId, Hologram hologram) {
+            Scheduler scheduler,
+            HologramTextOverrides textOverrides,
+            Player viewer,
+            int entityId,
+            java.util.function.IntFunction<Optional<Hologram>> lookup) {
         scheduler.laterGlobal(
-                ONE_TICK, () -> dispatchPerViewerText(scheduler, textOverrides, List.of(viewer), entityId, hologram));
+                TRACKING_DELAY,
+                () -> lookup.apply(entityId)
+                        .ifPresent(hologram ->
+                                dispatchPerViewerText(scheduler, textOverrides, List.of(viewer), entityId, hologram)));
     }
 
-    private static final java.time.Duration ONE_TICK = java.time.Duration.ofMillis(50);
+    /** Two ticks: measured on a live server, the client still had no entity for a copy sent one tick in. */
+    private static final java.time.Duration TRACKING_DELAY = java.time.Duration.ofMillis(100);
 
     /**
      * Hop each viewer's per-viewer text resolve onto <em>that viewer's</em> entity thread before resolving and
