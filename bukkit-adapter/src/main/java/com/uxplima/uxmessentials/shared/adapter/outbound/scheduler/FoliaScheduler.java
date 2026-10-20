@@ -34,8 +34,8 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     /**
-     * True once the plugin is disabling. Paper's region schedulers reject new tasks on a disabled plugin, so the
-     * region-dispatch methods short-circuit here. The only work scheduled during teardown is best-effort display
+     * True once the plugin is disabling. Paper's schedulers reject new tasks on a disabled plugin, so the
+     * region-dispatch and the delayed methods short-circuit here. The only work scheduled during teardown is best-effort display
      * cleanup (tablist, scoreboard, open menus), which is unnecessary on a full shutdown because the affected
      * players are being disconnected anyway. On a module hot-reload the plugin stays enabled, so this is false and
      * the cleanup still runs.
@@ -129,6 +129,11 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     public void asyncAfter(Duration delay, Runnable task) {
         Objects.requireNonNull(delay, "delay");
         Objects.requireNonNull(task, "task");
+        // A delayed task asked for while the plugin stops can never run. Paper marks the plugin disabled before
+        // onDisable, so a self-rescheduling loop firing in between used to log a rejected task on every stop.
+        if (disabled()) {
+            return;
+        }
         long millis = Math.max(0L, delay.toMillis());
         Bukkit.getAsyncScheduler()
                 .runDelayed(plugin, ignored -> task.run(), Math.max(1L, millis), TimeUnit.MILLISECONDS);
@@ -140,6 +145,9 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(task, "task");
         // Ticks, floored to one: the global scheduler rejects a zero delay, and the next tick is the soonest
         // anything can run anyway.
+        if (disabled()) {
+            return;
+        }
         long ticks = Math.max(1L, delay.toMillis() / 50L);
         Bukkit.getGlobalRegionScheduler().runDelayed(plugin, ignored -> task.run(), ticks);
     }
@@ -149,6 +157,9 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(initialDelay, "initialDelay");
         Objects.requireNonNull(period, "period");
+        if (disabled()) {
+            return () -> {};
+        }
         // Convert durations to ticks (20 ticks/s); floor to 1 so callers that pass Duration.ZERO
         // still get a valid schedule rather than an API exception.
         long initTicks = Math.max(1L, initialDelay.toMillis() / 50L);

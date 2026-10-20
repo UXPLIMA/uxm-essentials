@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.time.Duration;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.plugin.Plugin;
@@ -47,5 +48,27 @@ class FoliaSchedulerTest {
 
         assertThat(ran).isFalse();
         assertThat(retired).isFalse();
+    }
+
+    /**
+     * Paper marks a plugin disabled before it calls {@code onDisable}, so a self-rescheduling loop that fires in
+     * between asks for its next run on a disabled plugin. The wallet writer's flush loop did that on every stop
+     * and logged an {@code IllegalPluginAccessException}. A delayed task can never run after the plugin stops, so
+     * declining it is the whole answer; the writer's own stop drains what was pending.
+     */
+    @Test
+    void delayedWorkIsDeclinedWhileThePluginIsDisabled() throws Exception {
+        Plugin plugin = mock(Plugin.class);
+        when(plugin.isEnabled()).thenReturn(false);
+        FoliaScheduler scheduler = new FoliaScheduler(plugin);
+        AtomicBoolean ran = new AtomicBoolean(false);
+
+        scheduler.asyncAfter(Duration.ofSeconds(1), () -> ran.set(true));
+        scheduler.laterGlobal(Duration.ofSeconds(1), () -> ran.set(true));
+        scheduler
+                .repeatGlobal(() -> ran.set(true), Duration.ZERO, Duration.ofSeconds(1))
+                .close();
+
+        assertThat(ran).isFalse();
     }
 }
