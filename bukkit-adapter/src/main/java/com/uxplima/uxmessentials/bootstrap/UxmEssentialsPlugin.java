@@ -50,19 +50,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
 
     @Override
     public void onEnable() {
-        getLogger().info("╔══════════════════════════════════════════════════════════╗");
-        getLogger().info("║                                                          ║");
-        getLogger().info("║   ██╗   ██╗██╗  ██╗███╗   ███╗                           ║");
-        getLogger().info("║   ██║   ██║╚██╗██╔╝████╗ ████║                           ║");
-        getLogger().info("║   ██║   ██║ ╚███╔╝ ██╔████╔██║                           ║");
-        getLogger().info("║   ██║   ██║ ██╔██╗ ██║╚██╔╝██║                           ║");
-        getLogger().info("║   ╚██████╔╝██╔╝ ██╗██║ ╚═╝ ██║                           ║");
-        getLogger().info("║    ╚═════╝ ╚═╝  ╚═╝╚═╝     ╚═╝                           ║");
-        getLogger().info("║                                                          ║");
-        getLogger().info("║   Essentials v" + getPluginMeta().getVersion() + "                                      ║");
-        getLogger().info("║   Author: uxplima                                        ║");
-        getLogger().info("║                                                          ║");
-        getLogger().info("╚══════════════════════════════════════════════════════════╝");
+        StartupBanner.lines(getPluginMeta().getVersion()).forEach(getLogger()::info);
 
         long startTime = System.currentTimeMillis();
 
