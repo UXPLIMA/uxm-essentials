@@ -17,6 +17,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
@@ -25,10 +26,12 @@ import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
 import com.uxplima.uxmessentials.shared.application.health.RepairResult;
 import com.uxplima.uxmessentials.shared.application.health.RepairStatus;
 import com.uxplima.uxmessentials.shared.application.health.RepairableHealthCheck;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadReport;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
@@ -68,55 +71,11 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private static final String PERMISSION_RELOAD = "uxmessentials.admin.reload";
     private static final String PERMISSION_DOCTOR_REPAIR = "uxmessentials.admin.doctor.repair";
 
-    private static final String STATUS_HEADER = "uxmEssentials: modules";
-    private static final String STATUS_NO_MODULES = "No feature modules are registered yet.";
-    private static final String HELP_HEADER = "uxmEssentials commands:";
-    private static final String HELP_STATUS = "/uxmess status: list modules and their enable state";
-    private static final String HELP_DOCTOR =
-            "/uxmess doctor [repair [confirm]]: inspect health; confirmed repair fixes only safe orphan data";
-    private static final String HELP_HELP = "/uxmess help: show this help";
-    private static final String HELP_GUI = "/uxmess gui: open the module management hub";
-    private static final String HELP_RELOAD =
-            "/uxmess reload [module]: re-read the config and message files, all or scoped to one module";
-    private static final String HELP_IMPORT = "/uxmess import <source> [--dry-run]: import legacy data";
-    private static final String HELP_PERMISSIONS =
-            "/uxmess permissions [area] [page]: read the permission catalogue, export writes it to a file";
-    private static final String HELP_PLACEHOLDERS =
-            "/uxmess placeholders [area] [page]: read the placeholder catalogue, export writes it to a file";
+    /** The arguments of the import line, which are command syntax and the same in every language. */
+    private static final String IMPORT_ARGUMENTS = "<source> [--dry-run]";
 
-    private static final String DOCTOR_HEADER = "uxmEssentials: health checks";
-    private static final String DOCTOR_RUNNING = "Running health checks off-tick…";
-    private static final String DOCTOR_FAILURE = "One or more checks FAILED; see the lines above.";
-    private static final String DOCTOR_RUNNING_ALREADY =
-            "A doctor or repair run is already active; this request was not started.";
-    private static final String DOCTOR_REPAIR_PREVIEW =
-            "Preview only: no data changed. Review /uxmess doctor, then run /uxmess doctor repair confirm.";
-    private static final String DOCTOR_REPAIR_HEADER = "uxmEssentials: safe data repair";
-    private static final String DOCTOR_REPAIR_STARTED =
-            "Running confirmed repairs off-tick; parent and missing-world location records are retained.";
-    private static final String DOCTOR_CLOSED = "Plugin shutdown is in progress; this request was not started.";
-    private static final String DOCTOR_OK = "[OK] ";
-    private static final String DOCTOR_WARN = "[WARN] ";
-    private static final String DOCTOR_FAIL = "[FAIL] ";
-    private static final String DOCTOR_REPAIRED = "[REPAIRED] ";
-    private static final String DOCTOR_UNCHANGED = "[UNCHANGED] ";
-    private static final String WARN = "<#ffcc66>";
-    private static final String RELOAD_HEADER = "uxmEssentials reload";
-    private static final String RELOAD_RUNNING = "Reload is already running; this request was not started.";
-    private static final String RELOAD_STARTED = "Reading and validating files off-tick…";
-    private static final String RELOAD_RESTART = "[RESTART] ";
-    private static final String RELOAD_FAILURE =
-            "One or more steps FAILED; each failed step kept its last-known-good values.";
-    private static final String RELOAD_UNKNOWN = "Unknown module: ";
-    private static final String STATE_ENABLED = ": enabled";
-    private static final String STATE_DISABLED = ": disabled";
-
+    /** Escapes data, a module id or a check's own message, before it is placed in a catalogue line. */
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-    private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
-    private static final String HEADER_END = "</gradient>";
-    private static final String BODY = "<#aeb8c4>";
-    private static final String SUCCESS = "<#57e389>";
-    private static final String ERROR = "<#ff6b6b>";
 
     private final ModuleRegistry registry;
     private final ConfigStore config;
@@ -130,6 +89,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private final AtomicBoolean reloadInProgress = new AtomicBoolean();
     private final AtomicBoolean doctorInProgress = new AtomicBoolean();
     private final AtomicBoolean closed = new AtomicBoolean();
+    private final CommandFeedback feedback;
 
     public UxmessCommand(
             ModuleRegistry registry,
@@ -140,7 +100,8 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
             PlaceholdersSubcommand placeholdersNode,
             Scheduler scheduler,
             List<HealthCheck> healthChecks,
-            List<ReloadTask> reloadTasks) {
+            List<ReloadTask> reloadTasks,
+            Messages messages) {
         this.registry = Objects.requireNonNull(registry, "registry");
         this.config = Objects.requireNonNull(config, "config");
         this.importNode = Objects.requireNonNull(importNode, "importNode");
@@ -150,6 +111,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.healthChecks = List.copyOf(Objects.requireNonNull(healthChecks, "healthChecks"));
         this.reloadTasks = List.copyOf(Objects.requireNonNull(reloadTasks, "reloadTasks"));
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     @Override
@@ -215,10 +177,10 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private int runStatus(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        sendHeader(sender, STATUS_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_STATUS_HEADER);
         List<FeatureModule> modules = registry.all();
         if (modules.isEmpty()) {
-            sendBody(sender, STATUS_NO_MODULES);
+            feedback.send(sender, SharedMessageKey.ADMIN_STATUS_NONE);
             return Command.SINGLE_SUCCESS;
         }
         for (FeatureModule module : modules) {
@@ -230,15 +192,15 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private int runDoctor(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
         if (closed.get()) {
-            send(sender, ERROR, DOCTOR_CLOSED);
+            feedback.send(sender, SharedMessageKey.ADMIN_CLOSED);
             return 0;
         }
         if (!doctorInProgress.compareAndSet(false, true)) {
-            send(sender, WARN, DOCTOR_RUNNING_ALREADY);
+            feedback.send(sender, SharedMessageKey.ADMIN_DOCTOR_BUSY);
             return 0;
         }
-        sendHeader(sender, DOCTOR_HEADER);
-        sendBody(sender, DOCTOR_RUNNING);
+        feedback.send(sender, SharedMessageKey.ADMIN_DOCTOR_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_DOCTOR_RUNNING);
         // The database probe acquires a connection, so the whole run goes off-tick; the rendered lines bridge
         // back to the global region for delivery, mirroring the other off-tick bootstrap commands.
         try {
@@ -259,23 +221,23 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private int runRepairPreview(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        sendHeader(sender, DOCTOR_REPAIR_HEADER);
-        sendBody(sender, DOCTOR_REPAIR_PREVIEW);
+        feedback.send(sender, SharedMessageKey.ADMIN_REPAIR_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_REPAIR_PREVIEW);
         return Command.SINGLE_SUCCESS;
     }
 
     private int runRepairConfirmed(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
         if (closed.get()) {
-            send(sender, ERROR, DOCTOR_CLOSED);
+            feedback.send(sender, SharedMessageKey.ADMIN_CLOSED);
             return 0;
         }
         if (!doctorInProgress.compareAndSet(false, true)) {
-            send(sender, WARN, DOCTOR_RUNNING_ALREADY);
+            feedback.send(sender, SharedMessageKey.ADMIN_DOCTOR_BUSY);
             return 0;
         }
-        sendHeader(sender, DOCTOR_REPAIR_HEADER);
-        sendBody(sender, DOCTOR_REPAIR_STARTED);
+        feedback.send(sender, SharedMessageKey.ADMIN_REPAIR_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_REPAIR_STARTED);
         try {
             scheduler.async(() -> {
                 if (closed.get()) {
@@ -318,16 +280,13 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
             sendCheckLine(sender, entry);
         }
         if (report.hasFailure()) {
-            send(sender, ERROR, DOCTOR_FAILURE);
+            feedback.send(sender, SharedMessageKey.ADMIN_DOCTOR_FAILURE);
         }
         long ok = healthCount(report, HealthStatus.OK);
         long warn = healthCount(report, HealthStatus.WARN);
         long failed = healthCount(report, HealthStatus.FAIL);
         String result = failed > 0 ? "FAILED" : warn > 0 ? "WARN" : "SUCCESS";
-        send(
-                sender,
-                failed > 0 ? ERROR : warn > 0 ? WARN : SUCCESS,
-                "Result: " + result + " command=doctor ok=" + ok + " warn=" + warn + " failed=" + failed);
+        result(sender, result + " command=doctor ok=" + ok + " warn=" + warn + " failed=" + failed);
     }
 
     private static long healthCount(HealthReport report, HealthStatus status) {
@@ -338,29 +297,22 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private void renderRepairs(CommandSender sender, List<RepairEntry> entries) {
         for (RepairEntry entry : entries) {
-            String tag =
+            SharedMessageKey key =
                     switch (entry.result().status()) {
-                        case REPAIRED -> DOCTOR_REPAIRED;
-                        case UNCHANGED -> DOCTOR_UNCHANGED;
-                        case FAILED -> DOCTOR_FAIL;
+                        case REPAIRED -> SharedMessageKey.ADMIN_CHECK_REPAIRED;
+                        case UNCHANGED -> SharedMessageKey.ADMIN_CHECK_UNCHANGED;
+                        case FAILED -> SharedMessageKey.ADMIN_CHECK_FAIL;
                     };
-            String colour =
-                    switch (entry.result().status()) {
-                        case REPAIRED -> SUCCESS;
-                        case UNCHANGED -> BODY;
-                        case FAILED -> ERROR;
-                    };
-            send(sender, colour, tag + entry.name() + ": " + entry.result().message());
+            checkLine(sender, key, entry.name(), entry.result().message());
         }
         long repaired = repairCount(entries, RepairStatus.REPAIRED);
         long unchanged = repairCount(entries, RepairStatus.UNCHANGED);
         long failed = repairCount(entries, RepairStatus.FAILED);
         String result = failed > 0 ? "FAILED" : "SUCCESS";
-        send(
+        result(
                 sender,
-                failed > 0 ? ERROR : SUCCESS,
-                "Result: " + result + " command=doctor.repair repaired=" + repaired + " unchanged=" + unchanged
-                        + " failed=" + failed);
+                result + " command=doctor.repair repaired=" + repaired + " unchanged=" + unchanged + " failed="
+                        + failed);
     }
 
     private static long repairCount(List<RepairEntry> entries, RepairStatus status) {
@@ -369,39 +321,44 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
                 .count();
     }
 
-    private static void sendCheckLine(CommandSender sender, HealthReport.Entry entry) {
-        HealthStatus status = entry.result().status();
-        String line = tag(status) + entry.name() + ": " + entry.result().message();
-        send(sender, palette(status), line);
+    private void sendCheckLine(CommandSender sender, HealthReport.Entry entry) {
+        SharedMessageKey key =
+                switch (entry.result().status()) {
+                    case OK -> SharedMessageKey.ADMIN_CHECK_OK;
+                    case WARN -> SharedMessageKey.ADMIN_CHECK_WARN;
+                    case FAIL -> SharedMessageKey.ADMIN_CHECK_FAIL;
+                };
+        checkLine(sender, key, entry.name(), entry.result().message());
     }
 
-    private static String tag(HealthStatus status) {
-        return switch (status) {
-            case OK -> DOCTOR_OK;
-            case WARN -> DOCTOR_WARN;
-            case FAIL -> DOCTOR_FAIL;
-        };
+    /** One check, repair or reload step: its name and its own message are data, so both are escaped. */
+    private void checkLine(CommandSender sender, SharedMessageKey key, String name, String message) {
+        feedback.send(sender, key, Map.of("name", escape(name), "message", escape(message)));
     }
 
-    private static String palette(HealthStatus status) {
-        return switch (status) {
-            case OK -> SUCCESS;
-            case WARN -> WARN;
-            case FAIL -> ERROR;
-        };
+    /**
+     * The machine-readable summary a script greps for. It is a format, not a sentence, so it is the same in every
+     * language: {@code Result: <state> command=<name> <counter>=<n>}.
+     */
+    private void result(CommandSender sender, String summary) {
+        feedback.send(sender, SharedMessageKey.ADMIN_RESULT, Map.of("line", escape(resultLine(summary))));
+    }
+
+    private static String resultLine(String summary) {
+        return "Result: " + summary;
     }
 
     private int runHelp(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        sendHeader(sender, HELP_HEADER);
-        sendBody(sender, HELP_STATUS);
-        sendBody(sender, HELP_DOCTOR);
-        sendBody(sender, HELP_HELP);
-        sendBody(sender, HELP_GUI);
-        sendBody(sender, HELP_RELOAD);
-        sendBody(sender, HELP_IMPORT);
-        sendBody(sender, HELP_PERMISSIONS);
-        sendBody(sender, HELP_PLACEHOLDERS);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_STATUS);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_DOCTOR);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_HELP);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_GUI);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_RELOAD);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_IMPORT, Map.of("args", escape(IMPORT_ARGUMENTS)));
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_PERMISSIONS);
+        feedback.send(sender, SharedMessageKey.ADMIN_HELP_PLACEHOLDERS);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -414,7 +371,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         String requested = ctx.getArgument("module", String.class);
         FeatureModule module = resolve(requested);
         if (module == null) {
-            send(sender, ERROR, RELOAD_UNKNOWN + requested);
+            feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_UNKNOWN, Map.of("module", escape(requested)));
             return 0;
         }
         return runReload(sender, module.id());
@@ -427,15 +384,15 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
      */
     private int runReload(CommandSender sender, @Nullable ModuleId only) {
         if (closed.get()) {
-            send(sender, ERROR, DOCTOR_CLOSED);
+            feedback.send(sender, SharedMessageKey.ADMIN_CLOSED);
             return 0;
         }
         if (!reloadInProgress.compareAndSet(false, true)) {
-            send(sender, WARN, RELOAD_RUNNING);
+            feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_BUSY);
             return 0;
         }
-        sendHeader(sender, RELOAD_HEADER);
-        sendBody(sender, RELOAD_STARTED);
+        feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_HEADER);
+        feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_STARTED);
         long startedNanos = System.nanoTime();
         Map<ModuleId, Boolean> enabledBefore = enabledStates();
         try {
@@ -526,29 +483,32 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private void renderReload(CommandSender sender, ReloadReport report, long elapsedMillis) {
         for (ReloadReport.Entry entry : report.entries()) {
-            ReloadStatus status = entry.result().status();
-            send(
-                    sender,
-                    reloadPalette(status),
-                    reloadTag(status) + entry.name() + ": " + entry.result().message());
+            SharedMessageKey key =
+                    switch (entry.result().status()) {
+                        case APPLIED -> SharedMessageKey.ADMIN_CHECK_OK;
+                        case RESTART_REQUIRED -> SharedMessageKey.ADMIN_CHECK_RESTART;
+                        case FAILED -> SharedMessageKey.ADMIN_CHECK_FAIL;
+                    };
+            checkLine(sender, key, entry.name(), entry.result().message());
         }
         if (report.hasFailure()) {
-            send(sender, ERROR, RELOAD_FAILURE);
+            feedback.send(sender, SharedMessageKey.ADMIN_RELOAD_FAILURE);
         }
         long applied = count(report, ReloadStatus.APPLIED);
         long restart = count(report, ReloadStatus.RESTART_REQUIRED);
         long failed = count(report, ReloadStatus.FAILED);
-        String palette = failed > 0 ? ERROR : restart > 0 ? WARN : SUCCESS;
-        send(
+        feedback.send(
                 sender,
-                palette,
-                "Summary: %d applied, %d restart-required, %d failed in %d ms."
-                        .formatted(applied, restart, failed, elapsedMillis));
+                SharedMessageKey.ADMIN_RELOAD_SUMMARY,
+                Map.of(
+                        "applied", String.valueOf(applied),
+                        "restart", String.valueOf(restart),
+                        "failed", String.valueOf(failed),
+                        "ms", String.valueOf(elapsedMillis)));
         String result = failed > 0 ? "FAILED" : restart > 0 ? "RESTART_REQUIRED" : "SUCCESS";
-        send(
+        result(
                 sender,
-                palette,
-                "Result: " + result + " command=reload applied=" + applied + " restart=" + restart + " failed=" + failed
+                result + " command=reload applied=" + applied + " restart=" + restart + " failed=" + failed
                         + " elapsedMs=" + elapsedMillis);
     }
 
@@ -558,40 +518,10 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
                 .count();
     }
 
-    private static String reloadTag(ReloadStatus status) {
-        return switch (status) {
-            case APPLIED -> DOCTOR_OK;
-            case RESTART_REQUIRED -> RELOAD_RESTART;
-            case FAILED -> DOCTOR_FAIL;
-        };
-    }
-
-    private static String reloadPalette(ReloadStatus status) {
-        return switch (status) {
-            case APPLIED -> SUCCESS;
-            case RESTART_REQUIRED -> WARN;
-            case FAILED -> ERROR;
-        };
-    }
-
     private void sendModuleLine(CommandSender sender, FeatureModule module) {
-        boolean on = module.enabled(config);
-        String state = on ? STATE_ENABLED : STATE_DISABLED;
-        String colour = on ? SUCCESS : ERROR;
-        sender.sendMessage(MINI_MESSAGE.deserialize(BODY + escape(module.id().value()) + colour + escape(state)));
-    }
-
-    private static void sendHeader(CommandSender sender, String text) {
-        sender.sendMessage(MINI_MESSAGE.deserialize(HEADER + escape(text) + HEADER_END));
-    }
-
-    private static void sendBody(CommandSender sender, String text) {
-        send(sender, BODY, text);
-    }
-
-    /** Render plain operator text under a palette colour, escaping any markup-like characters in it. */
-    private static void send(CommandSender sender, String palette, String text) {
-        sender.sendMessage(MINI_MESSAGE.deserialize(palette + escape(text)));
+        SharedMessageKey key =
+                module.enabled(config) ? SharedMessageKey.ADMIN_STATUS_ON : SharedMessageKey.ADMIN_STATUS_OFF;
+        feedback.send(sender, key, Map.of("module", escape(module.id().value())));
     }
 
     private static String escape(String text) {

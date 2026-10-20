@@ -866,11 +866,12 @@ public final class PluginModule {
                 config,
                 importNode,
                 guiNode,
-                new PermissionsSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
-                new PlaceholdersSubcommand(plugin.getDataFolder().toPath(), kernel.log()),
+                new PermissionsSubcommand(plugin.getDataFolder().toPath(), kernel.log(), kernel.messages()),
+                new PlaceholdersSubcommand(plugin.getDataFolder().toPath(), kernel.log(), kernel.messages()),
                 kernel.scheduler(),
                 healthChecks,
-                resources.reloadTasks());
+                resources.reloadTasks(),
+                kernel.messages());
         resources.addCommand(uxmessCommand);
         resources.onClose(uxmessCommand::close);
         // /lang is cross-cutting (not a feature context), so it is wired here in the bootstrap surface.
@@ -887,7 +888,8 @@ public final class PluginModule {
         resources.addCommand(new BackupCommand(
                 new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), "backup", kernel.log()),
                 kernel.scheduler(),
-                kernel.log()));
+                kernel.log(),
+                kernel.messages()));
         // /help is cross-cutting too. It reads the same resolved, module-filtered registration set the plugin
         // publishes (supplied lazily so it reflects every catalog rename and disable) and filters it per the
         // sender's own permission. The supplier is evaluated on each invocation, well after wiring completes.
@@ -989,7 +991,7 @@ public final class PluginModule {
                 kernel.log(),
                 auditChannel,
                 module.enabled(config));
-        return new MigrationImportNode(service);
+        return new MigrationImportNode(service, kernel.messages());
     }
 
     private static List<HealthCheck> healthChecks(

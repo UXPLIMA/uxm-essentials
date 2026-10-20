@@ -126,9 +126,14 @@ class ReloadCommandSurfaceTest {
         List<String> plain = lines.getAllValues().stream()
                 .map(PlainTextComponentSerializer.plainText()::serialize)
                 .toList();
-        assertThat(plain).anyMatch(line -> line.startsWith("[RESTART] module wiring:"));
-        assertThat(plain).anyMatch(line -> line.contains("1 restart-required"));
-        assertThat(plain).anyMatch(line -> line.startsWith("Result: RESTART_REQUIRED command=reload"));
+        // The lines are catalogue keys now, read in the operator's language; the test's Messages echoes each key and
+        // its placeholders, so the step, the count and the machine-readable result are all still read here.
+        assertThat(plain)
+                .anyMatch(line -> line.startsWith("admin.check.restart") && line.contains("name=module wiring"));
+        assertThat(plain).anyMatch(line -> line.startsWith("admin.reload.summary") && line.contains("restart=1"));
+        assertThat(plain)
+                .anyMatch(line ->
+                        line.startsWith("admin.result") && line.contains("Result: RESTART_REQUIRED command=reload"));
     }
 
     @Test
@@ -161,23 +166,26 @@ class ReloadCommandSurfaceTest {
         return new UxmessCommand(
                 registry,
                 config,
-                new MigrationImportNode(service),
+                new MigrationImportNode(service, messages()),
                 guiNode(),
                 permissionsNode(),
                 placeholdersNode(),
                 scheduler,
                 List.of(),
-                tasks);
+                tasks,
+                messages());
     }
 
     /** A permissions node pointed at a scratch folder: this guard never runs its export. */
     private static PermissionsSubcommand permissionsNode() {
-        return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
+        return new PermissionsSubcommand(
+                Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class), messages());
     }
 
     /** A placeholders node pointed at a scratch folder: this guard never runs its export either. */
     private static PlaceholdersSubcommand placeholdersNode() {
-        return new PlaceholdersSubcommand(Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class));
+        return new PlaceholdersSubcommand(
+                Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class), messages());
     }
 
     /** A minimal /uxmess gui node: this surface guard only runs the reload child, never opens the hub. */
@@ -211,6 +219,7 @@ class ReloadCommandSurfaceTest {
     private static CommandSourceStack sourceStack(CommandSender sender) {
         CommandSourceStack source = Mockito.mock(CommandSourceStack.class);
         Mockito.when(source.getSender()).thenReturn(sender);
+        Mockito.when(sender.getName()).thenReturn("CONSOLE");
         return source;
     }
 
@@ -280,5 +289,10 @@ class ReloadCommandSurfaceTest {
         public void asyncAfter(Duration delay, Runnable task) {
             pending.add(task);
         }
+    }
+
+    /** Answers with the key and its placeholders, so a test reads which catalogue line a reply used. */
+    private static Messages messages() {
+        return (viewer, key, placeholders) -> key.key() + placeholders;
     }
 }

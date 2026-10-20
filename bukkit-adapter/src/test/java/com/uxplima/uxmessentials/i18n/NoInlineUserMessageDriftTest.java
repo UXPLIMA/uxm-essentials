@@ -38,7 +38,23 @@ class NoInlineUserMessageDriftTest {
                     + "|Component\\.text\\s*\\(\\s*\""
                     + "|String\\.format\\s*\\(\\s*\"");
 
-    private static final List<String> SCANNED_PACKAGES = List.of("domain", "application", "adapter");
+    /**
+     * A sentence handed to a send or reply helper of the class's own, inline or through a constant. The first pattern
+     * only saw the server's own primitives, so the admin commands under {@code bootstrap/} wrapped them in a helper,
+     * kept every sentence in a constant, and answered every operator in English for as long as the guard ran.
+     */
+    private static final Pattern HELPER_CALL = Pattern.compile("\\b(?:send\\w*|reply)\\s*\\(");
+
+    private static final Pattern PROSE_LITERAL = Pattern.compile("\"[A-Za-z][^\"]*\\s[^\"]*\"");
+
+    private static final Pattern PROSE_CONSTANT =
+            Pattern.compile("static\\s+final\\s+String\\s+(\\w+)\\s*=\\s*(\"[A-Za-z][^\"]*\\s[^\"]*\")\\s*;");
+
+    /** A logger line is for the console, so its literal is cut out before a statement is read for sentences. */
+    private static final Pattern LOGGER_LITERAL =
+            Pattern.compile("\\b(?:log|logger|LOG|LOGGER)\\.\\w+\\s*\\(\\s*\"(?:[^\"\\\\]|\\\\.)*\"");
+
+    private static final List<String> SCANNED_PACKAGES = List.of("domain", "application", "adapter", "bootstrap");
 
     @Test
     void productionSourceHasNoInlineUserFacingLiterals() {
@@ -69,6 +85,52 @@ class NoInlineUserMessageDriftTest {
                 .isFalse();
         assertThat(matches("log.info(\"module {} loaded\", id);")).isFalse();
         assertThat(matches("Component.text(label + state)")).isFalse();
+        // A sentence reaching a helper of the class's own, inline or through a constant, is flagged too.
+        assertThat(helperViolations("send(sender, BODY, \"Reload is already running.\");"))
+                .isNotEmpty();
+        assertThat(
+                        helperViolations(
+                                "private static final String DONE = \"Backup written to \";\nsend(\n sender,\n OK,\n DONE + where);"))
+                .isNotEmpty();
+        assertThat(helperViolations(
+                        "feedback.send(sender, SharedMessageKey.ADMIN_BACKUP_DONE, Map.of(\"location\", where));"))
+                .isEmpty();
+        assertThat(helperViolations(
+                        "target.sendEmbed(embed).whenComplete((s, e) -> log.debug(\"Discord notice failed\", e));"))
+                .isEmpty();
+        assertThat(helperViolations("log.error(\"could not write the export\", failed);"))
+                .isEmpty();
+        assertThat(helperViolations("private static final String DESCRIPTION = \"Snapshot the data.\";"))
+                .isEmpty();
+    }
+
+    /**
+     * Every statement that calls a send or reply helper and carries a sentence: as a literal, or as the name of a
+     * constant that holds one. Statements, not lines, because a call is often written across several lines.
+     */
+    private static List<String> helperViolations(String source) {
+        List<String> prose = new ArrayList<>();
+        Matcher constant = PROSE_CONSTANT.matcher(source);
+        while (constant.find()) {
+            prose.add(constant.group(1));
+        }
+        List<String> found = new ArrayList<>();
+        for (String raw : source.split(";", -1)) {
+            String statement = LOGGER_LITERAL.matcher(raw).replaceAll("");
+            if (!HELPER_CALL.matcher(statement).find()
+                    || PROSE_CONSTANT.matcher(statement + ";").find()) {
+                continue;
+            }
+            boolean sentence = PROSE_LITERAL.matcher(statement).find()
+                    || prose.stream()
+                            .anyMatch(name -> Pattern.compile("\\b" + name + "\\b")
+                                    .matcher(statement)
+                                    .find());
+            if (sentence) {
+                found.add(statement.strip().replaceAll("\\s+", " "));
+            }
+        }
+        return found;
     }
 
     private static boolean matches(String line) {
@@ -103,6 +165,13 @@ class NoInlineUserMessageDriftTest {
             if (matcher.find() && !line.stripLeading().startsWith("//")) {
                 violations.add(path + ":" + (i + 1) + "  " + line.strip());
             }
+        }
+        List<String> code = lines.stream()
+                .filter(line -> !line.stripLeading().startsWith("//")
+                        && !line.stripLeading().startsWith("*"))
+                .toList();
+        for (String statement : helperViolations(String.join("\n", code))) {
+            violations.add(path + "  " + statement);
         }
     }
 

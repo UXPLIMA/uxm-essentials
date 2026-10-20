@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -20,10 +21,13 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -45,19 +49,19 @@ public final class PermissionsSubcommand {
 
     private static final String PERMISSION = "uxmessentials.admin.permissions";
 
+    /** The arguments the hint shows, which are command syntax and the same in every language. */
+    private static final String ARGUMENTS = "<area> [page]";
+
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-    private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
-    private static final String HEADER_END = "</gradient>";
-    private static final String BODY = "<#aeb8c4>";
-    private static final String SUCCESS = "<#57e389>";
-    private static final String ERROR = "<#ff6b6b>";
 
     private final Path dataFolder;
     private final Logger logger;
+    private final CommandFeedback feedback;
 
-    public PermissionsSubcommand(Path dataFolder, Logger logger) {
+    public PermissionsSubcommand(Path dataFolder, Logger logger, Messages messages) {
         this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder");
         this.logger = Objects.requireNonNull(logger, "logger");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The {@code permissions} literal node, for attaching under {@code /uxmess}. */
@@ -79,12 +83,12 @@ public final class PermissionsSubcommand {
 
     private int runAreas(CommandContext<CommandSourceStack> context) {
         CommandSender sender = Sender.audience(context.getSource());
-        send(
+        feedback.send(
                 sender,
-                HEADER,
-                "uxmEssentials permissions: " + PermissionCatalog.all().size() + " nodes");
-        PermissionCatalogRenderer.areas().forEach(line -> send(sender, BODY, line));
-        send(sender, BODY, "/uxmess permissions <area> [page] to read one, export to write them to a file.");
+                SharedMessageKey.ADMIN_PERMISSIONS_HEADER,
+                Map.of("count", String.valueOf(PermissionCatalog.all().size())));
+        PermissionCatalogRenderer.areas().forEach(line -> line(sender, line));
+        feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_HINT, Map.of("args", escape(ARGUMENTS)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -94,15 +98,24 @@ public final class PermissionsSubcommand {
         PermissionCatalogRenderer.Page rendered = PermissionCatalogRenderer.page(asked, page);
         if (rendered.empty()) {
             Optional<String> nearest = PermissionCatalogRenderer.suggest(asked);
-            send(
-                    sender,
-                    ERROR,
-                    nearest.map(area -> "No area '" + asked + "'; did you mean " + area + "?")
-                            .orElse("No area '" + asked + "'; run /uxmess permissions for the list."));
+            if (nearest.isPresent()) {
+                feedback.send(
+                        sender,
+                        SharedMessageKey.ADMIN_CATALOG_DID_YOU_MEAN,
+                        Map.of("area", escape(asked), "nearest", escape(nearest.get())));
+            } else {
+                feedback.send(sender, SharedMessageKey.ADMIN_PERMISSIONS_NO_AREA, Map.of("area", escape(asked)));
+            }
             return 0;
         }
-        send(sender, HEADER, rendered.area() + " permissions (page " + rendered.number() + "/" + rendered.of() + ")");
-        rendered.lines().forEach(line -> send(sender, BODY, line));
+        feedback.send(
+                sender,
+                SharedMessageKey.ADMIN_PERMISSIONS_PAGE,
+                Map.of(
+                        "area", escape(rendered.area()),
+                        "page", String.valueOf(rendered.number()),
+                        "pages", String.valueOf(rendered.of())));
+        rendered.lines().forEach(line -> line(sender, line));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -114,17 +127,19 @@ public final class PermissionsSubcommand {
             Files.writeString(target, PermissionCatalogRenderer.markdown(), StandardCharsets.UTF_8);
         } catch (IOException failed) {
             logger.error("could not write the permission export to " + target, failed);
-            send(sender, ERROR, "Could not write " + EXPORT_FILE + "; see the console for why.");
+            feedback.send(sender, SharedMessageKey.ADMIN_CATALOG_WRITE_FAILED, Map.of("file", escape(EXPORT_FILE)));
             return 0;
         }
-        send(sender, SUCCESS, "Wrote " + PermissionCatalog.all().size() + " nodes to " + target + ".");
+        feedback.send(
+                sender,
+                SharedMessageKey.ADMIN_PERMISSIONS_EXPORTED,
+                Map.of("count", String.valueOf(PermissionCatalog.all().size()), "file", escape(target.toString())));
         return Command.SINGLE_SUCCESS;
     }
 
-    private static void send(CommandSender sender, String palette, String text) {
-        String open = palette.equals(HEADER) ? HEADER : palette;
-        String close = palette.equals(HEADER) ? HEADER_END : "";
-        sender.sendMessage(MINI_MESSAGE.deserialize(open + escape(text) + close));
+    /** One line of the catalogue, which is data: its words are the catalogue's own, in English. */
+    private void line(CommandSender sender, String line) {
+        feedback.send(sender, SharedMessageKey.ADMIN_LINE, Map.of("line", escape(line)));
     }
 
     /** Node text is data, not markup: a description must never be read as MiniMessage. */

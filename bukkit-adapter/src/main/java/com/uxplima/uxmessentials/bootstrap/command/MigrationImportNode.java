@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.bootstrap.command;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -19,7 +20,10 @@ import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -40,24 +44,17 @@ import org.jspecify.annotations.NullMarked;
 public final class MigrationImportNode {
 
     private static final String PERMISSION_IMPORT = "uxmessentials.admin.import";
-    private static final String LIST_HEADER = "Built import sources:";
-    private static final String NO_SOURCE = "Usage: /uxmess import <source> [--dry-run]. Built sources: ";
-    private static final String UNKNOWN_SOURCE = "Unknown import source: ";
-    private static final String STARTED = "Import dispatched off-tick for source ";
-    private static final String DRY_PREFIX = " (dry-run)";
-    private static final String DISABLED = "The migration module is disabled. Enable it in modules.conf for a cutover.";
+    /** The arguments the usage line shows, which are command syntax and the same in every language. */
+    static final String ARGUMENTS = "<source> [--dry-run]";
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-    private static final String HEADER = "<gradient:#4aa3ff:#9b6bff>";
-    private static final String HEADER_END = "</gradient>";
-    private static final String BODY = "<#aeb8c4>";
-    private static final String SUCCESS = "<#57e389>";
-    private static final String ERROR = "<#ff6b6b>";
 
     private final MigrationImportService service;
+    private final CommandFeedback feedback;
 
-    public MigrationImportNode(MigrationImportService service) {
+    public MigrationImportNode(MigrationImportService service, Messages messages) {
         this.service = Objects.requireNonNull(service, "service");
+        this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
     }
 
     /** The {@code import} literal node, ready to be attached under the {@code /uxmess} root. */
@@ -87,49 +84,55 @@ public final class MigrationImportNode {
     }
 
     private int runUsage(CommandContext<CommandSourceStack> ctx) {
-        reply(ctx, BODY, NO_SOURCE + joinedBuiltIds());
+        feedback.send(
+                Sender.audience(ctx.getSource()),
+                SharedMessageKey.ADMIN_IMPORT_USAGE,
+                Map.of("args", escape(ARGUMENTS), "sources", escape(joinedBuiltIds())));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runList(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        sender.sendMessage(MINI_MESSAGE.deserialize(HEADER + escape(LIST_HEADER) + HEADER_END));
+        feedback.send(sender, SharedMessageKey.ADMIN_IMPORT_HEADER);
         for (SourceDescriptor descriptor : service.builtSources()) {
-            sender.sendMessage(MINI_MESSAGE.deserialize(BODY + escape(describe(descriptor))));
+            feedback.send(
+                    sender,
+                    SharedMessageKey.ADMIN_IMPORT_SOURCE,
+                    Map.of(
+                            "source", escape(descriptor.sourceId().value()),
+                            "name", escape(descriptor.displayName()),
+                            "surfaces", escape(String.join(", ", descriptor.surfaces()))));
         }
         return Command.SINGLE_SUCCESS;
     }
 
     private int dispatch(CommandContext<CommandSourceStack> ctx, ImportMode mode) {
+        CommandSender sender = Sender.audience(ctx.getSource());
         if (!service.enabled()) {
-            reply(ctx, ERROR, DISABLED);
+            feedback.send(sender, SharedMessageKey.ADMIN_IMPORT_DISABLED);
             return 0;
         }
         String raw = ctx.getArgument("source", String.class);
         Optional<SourceId> resolved = service.resolve(raw);
         if (resolved.isEmpty()) {
-            reply(ctx, ERROR, UNKNOWN_SOURCE + raw + ". Built sources: " + joinedBuiltIds());
+            feedback.send(
+                    sender,
+                    SharedMessageKey.ADMIN_IMPORT_UNKNOWN,
+                    Map.of("source", escape(raw), "sources", escape(joinedBuiltIds())));
             return 0;
         }
-        String actor = Sender.audience(ctx.getSource()).getName();
-        service.dispatch(actor, resolved.get(), mode);
-        reply(ctx, SUCCESS, STARTED + resolved.get().value() + (mode.isDryRun() ? DRY_PREFIX : ""));
+        service.dispatch(sender.getName(), resolved.get(), mode);
+        feedback.send(
+                sender,
+                mode.isDryRun() ? SharedMessageKey.ADMIN_IMPORT_STARTED_DRY : SharedMessageKey.ADMIN_IMPORT_STARTED,
+                Map.of("source", escape(resolved.get().value())));
         return Command.SINGLE_SUCCESS;
-    }
-
-    private static String describe(SourceDescriptor descriptor) {
-        return descriptor.sourceId().value() + ", " + descriptor.displayName() + " ["
-                + String.join(", ", descriptor.surfaces()) + "]";
     }
 
     private String joinedBuiltIds() {
         List<String> ids =
                 service.builtSourceIds().stream().map(SourceId::value).toList();
         return String.join(", ", ids);
-    }
-
-    private static void reply(CommandContext<CommandSourceStack> ctx, String palette, String message) {
-        Sender.audience(ctx.getSource()).sendMessage(MINI_MESSAGE.deserialize(palette + escape(message)));
     }
 
     private static String escape(String text) {

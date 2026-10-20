@@ -10,6 +10,7 @@ import java.time.Duration;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.shared.application.command.CommandId;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -28,7 +29,7 @@ class BackupCommandSurfaceTest {
     @Test
     void backupRegistersUnderItsLiteral() {
         DataDirBackupSnapshot snapshot = new DataDirBackupSnapshot(Path.of("ignored"), "backup", noopLog());
-        BackupCommand command = new BackupCommand(snapshot, new InlineScheduler(), noopLog());
+        BackupCommand command = new BackupCommand(snapshot, new InlineScheduler(), noopLog(), messages());
         assertThat(command.build().getLiteral()).isEqualTo("backup");
     }
 
@@ -101,5 +102,10 @@ class BackupCommandSurfaceTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    /** Answers with the key and its placeholders, so a test reads which catalogue line a reply used. */
+    private static Messages messages() {
+        return (viewer, key, placeholders) -> key.key() + placeholders;
     }
 }

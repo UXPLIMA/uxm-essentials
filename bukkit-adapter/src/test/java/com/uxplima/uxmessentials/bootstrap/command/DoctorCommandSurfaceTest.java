@@ -84,6 +84,30 @@ class DoctorCommandSurfaceTest {
         assertThat(result).isEqualTo(com.mojang.brigadier.Command.SINGLE_SUCCESS);
     }
 
+    /**
+     * The doctor answers in catalogue lines, so an operator reads it in their own language. Every line it wrote was
+     * an English constant until 2026-10-20, and the inline-message guard could not see them.
+     */
+    @Test
+    void theDoctorAnswersInCatalogueLines() throws Exception {
+        UxmessCommand command = command(List.of(okCheck()));
+        CommandSourceStack source = sourceStack();
+
+        command.build().getChild("doctor").getCommand().run(contextFor(source));
+
+        org.mockito.ArgumentCaptor<net.kyori.adventure.text.Component> sent =
+                org.mockito.ArgumentCaptor.forClass(net.kyori.adventure.text.Component.class);
+        Mockito.verify(source.getSender(), Mockito.atLeastOnce()).sendMessage(sent.capture());
+        List<String> lines = sent.getAllValues().stream()
+                .map(net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()::serialize)
+                .toList();
+        assertThat(lines)
+                .anyMatch(line -> line.startsWith("admin.doctor.header"))
+                .anyMatch(line -> line.startsWith("admin.doctor.running"))
+                .anyMatch(line -> line.startsWith("admin.check.ok"))
+                .anyMatch(line -> line.startsWith("admin.result") && line.contains("command=doctor ok=1"));
+    }
+
     @Test
     void repairPreviewMutatesNothingAndConfirmRunsTheIdempotentRepair() throws Exception {
         AtomicInteger repairs = new AtomicInteger();
@@ -123,23 +147,26 @@ class DoctorCommandSurfaceTest {
         return new UxmessCommand(
                 registry,
                 config,
-                new MigrationImportNode(service),
+                new MigrationImportNode(service, messages()),
                 guiNode(),
                 permissionsNode(),
                 placeholdersNode(),
                 new InlineScheduler(),
                 checks,
-                List.of());
+                List.of(),
+                messages());
     }
 
     /** A permissions node pointed at a scratch folder: this guard never runs its export. */
     private static PermissionsSubcommand permissionsNode() {
-        return new PermissionsSubcommand(Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class));
+        return new PermissionsSubcommand(
+                Path.of("build", "tmp", "permissions-guard"), Mockito.mock(Logger.class), messages());
     }
 
     /** A placeholders node pointed at a scratch folder: this guard never runs its export either. */
     private static PlaceholdersSubcommand placeholdersNode() {
-        return new PlaceholdersSubcommand(Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class));
+        return new PlaceholdersSubcommand(
+                Path.of("build", "tmp", "placeholders-guard"), Mockito.mock(Logger.class), messages());
     }
 
     /** A minimal /uxmess gui node: this surface guard only inspects the doctor child, never opens the hub. */
@@ -184,6 +211,7 @@ class DoctorCommandSurfaceTest {
         CommandSourceStack source = Mockito.mock(CommandSourceStack.class);
         org.bukkit.command.CommandSender sender = Mockito.mock(org.bukkit.command.CommandSender.class);
         Mockito.when(source.getSender()).thenReturn(sender);
+        Mockito.when(sender.getName()).thenReturn("CONSOLE");
         return source;
     }
 
@@ -213,5 +241,10 @@ class DoctorCommandSurfaceTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    /** Answers with the key and its placeholders, so a test reads which catalogue line a reply used. */
+    private static Messages messages() {
+        return (viewer, key, placeholders) -> key.key() + placeholders;
     }
 }

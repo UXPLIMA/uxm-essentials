@@ -41,9 +41,10 @@ why a new source is a new `parse/` package and not a change to the pipeline.
 `dry-run` literal and the flag are equivalent.
 
 The handler hands the run to the bounded executor off tick and returns immediately, so the
-console is never blocked by an import. Its acknowledgements are plain operator text rather
-than catalogue keys: an import is run from a console or by an admin reading a diagnostic,
-never by a player.
+console is never blocked by an import. Its acknowledgements are catalogue lines under
+`admin.import.*`, read in the language of whoever ran it. They were plain English until
+2026-10-20, on the reasoning that only a console runs an import; an admin in the game is a
+player too, and reads their own language everywhere else.
 
 ## 12.4 One record's failure is one record
 
