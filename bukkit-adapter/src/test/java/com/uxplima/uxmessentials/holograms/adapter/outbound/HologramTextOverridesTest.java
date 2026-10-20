@@ -192,6 +192,39 @@ class HologramTextOverridesTest {
         assertThat(packets.sends).isEmpty();
     }
 
+    /**
+     * A line naming a catalogue entry reads in each viewer's language, so the hologram renders per viewer even with
+     * no placeholder on it, and the entry's own {@code {player}} and {@code %papi%} are read for that viewer.
+     */
+    @Test
+    void aCatalogLineReadsInEachViewersLanguage() {
+        com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText.useCatalogLines(
+                new com.uxplima.uxmessentials.shared.application.message.CatalogLines(
+                        (viewer, key, arguments) -> (viewer.uuid().equals(ALICE) ? "Katil {player} " : "Join {player} ")
+                                + "%count_" + arguments.get("server") + "%",
+                        java.util.Set.of("custom.join")::contains));
+        try {
+            FakeDisplayTextPackets packets = new FakeDisplayTextPackets();
+            HologramTextOverrides overrides = overrides(
+                    packets,
+                    perViewer(Map.of(
+                            ALICE, s -> s.replace("%count_skyblock%", "4"),
+                            BOB, s -> s.replace("%count_skyblock%", "4"))));
+            Hologram join = text("join", "@custom.join server=skyblock");
+
+            assertThat(overrides.hasPerViewerText(join)).isTrue();
+            overrides.sendOverride(player(ALICE, "Ayse"), ENTITY_ID, join);
+            overrides.sendOverride(player(BOB, "Bob"), ENTITY_ID, join);
+
+            assertThat(plain(packets.textFor(ALICE))).isEqualTo("Katil Ayse 4");
+            assertThat(plain(packets.textFor(BOB))).isEqualTo("Join Bob 4");
+            assertThat(overrides.hasPerViewerText(text("own", "@everyone"))).isFalse();
+        } finally {
+            com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText.useCatalogLines(
+                    com.uxplima.uxmessentials.shared.application.message.CatalogLines.none());
+        }
+    }
+
     // --- fixtures -------------------------------------------------------------------------------------------
 
     private static HologramTextOverrides overrides(Function<UUID, UnaryOperator<String>> bridges) {

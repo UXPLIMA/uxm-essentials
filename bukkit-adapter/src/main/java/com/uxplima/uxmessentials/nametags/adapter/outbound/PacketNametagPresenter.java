@@ -317,7 +317,8 @@ public final class PacketNametagPresenter {
         long frame = animations.tick();
         List<Component> rendered = new ArrayList<>(format.lines().size());
         for (String line : format.lines()) {
-            String withName = line.replace("{player}", wearer.getName());
+            // A nametag is one text every viewer reads, so an @key line is read in the wearer's language.
+            String withName = HudText.lineFor(wearer.getUniqueId(), line).replace("{player}", wearer.getName());
             rendered.add(HudText.render(wearer.getUniqueId(), animations.resolve(withName, frame)));
         }
         return rendered;

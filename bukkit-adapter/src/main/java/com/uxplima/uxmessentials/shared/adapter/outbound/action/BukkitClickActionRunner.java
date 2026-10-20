@@ -326,9 +326,12 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
                 Objects.requireNonNull(viewer.getLocation(), "viewer location"), sound, spec.volume(), spec.pitch());
     }
 
-    /** Resolve a value to a component for the viewer: built-in tokens, then the PAPI + MiniMessage transform. */
+    /**
+     * Resolve a value to a component for the viewer: an {@code @key} value read in their language, built-in tokens,
+     * then the PAPI + MiniMessage transform.
+     */
     private static Component component(Player viewer, String source) {
-        String withTokens = BuiltinTokens.apply(viewer, source);
+        String withTokens = BuiltinTokens.apply(viewer, HudText.lineFor(viewer.getUniqueId(), source));
         return HudText.render(viewer.getUniqueId(), withTokens);
     }
 

@@ -414,7 +414,8 @@ public final class TablistRenderer {
         // PlaceholderAPI
         // bridge and MiniMessage, so the shipped header/footer/name-format show real values with or without
         // PlaceholderAPI. The animation %anim_<name>% pass runs first so a frame may itself carry tokens.
-        String withTokens = BuiltinTokens.apply(player, animations.resolve(source, tick));
+        String line = HudText.lineFor(player.getUniqueId(), source);
+        String withTokens = BuiltinTokens.apply(player, animations.resolve(line, tick));
         return HudText.render(player.getUniqueId(), withTokens);
     }
 }

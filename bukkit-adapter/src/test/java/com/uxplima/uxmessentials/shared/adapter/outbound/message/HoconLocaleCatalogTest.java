@@ -43,6 +43,24 @@ class HoconLocaleCatalogTest {
                 .containsExactlyInAnyOrder("en", "tr", "xx");
     }
 
+    /**
+     * An operator line names a catalogue entry by its key, and only a key some catalogue holds counts as one, so a
+     * line that merely opens with an at sign keeps its words. A key written in one language only still counts
+     * before anyone has read that language.
+     */
+    @Test
+    void aKeyIsDeclaredWhenAnyCatalogueHoldsIt(@TempDir Path dir) throws Exception {
+        Files.writeString(dir.resolve("messages_en.conf"), "\"custom.join\" = \"Join\"\n", StandardCharsets.UTF_8);
+        Files.writeString(dir.resolve("messages_tr.conf"), "\"custom.only-tr\" = \"Katil\"\n", StandardCharsets.UTF_8);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+
+        assertThat(catalog.declares("custom.join")).isTrue();
+        assertThat(catalog.declares(BUNDLED_ONLY.key())).isTrue();
+        assertThat(catalog.declares("custom.only-tr")).isTrue();
+        assertThat(catalog.declares("everyone")).isFalse();
+        assertThat(catalog.declares("meta.small-caps")).isFalse();
+    }
+
     @Test
     void aKeyPresentOnlyInTheBundledDefaultStillResolvesWhenTheDiskFileLacksIt(@TempDir Path dir) throws Exception {
         // A stale on-disk catalog that predates the bundled one: it declares its own key but not the bundled key.

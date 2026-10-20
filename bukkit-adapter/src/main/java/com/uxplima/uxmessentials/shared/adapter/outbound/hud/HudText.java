@@ -8,6 +8,8 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -16,19 +18,63 @@ import org.jspecify.annotations.NullMarked;
  * {@link MiniMessage} parse, the same two-step transform the message sink applies. Operator content may therefore
  * embed third-party placeholders. Every source string is raw operator MiniMessage, never a {@code MessageKey}, so
  * nothing here is parity-checked.
+ *
+ * <p>A line written as {@code @key name=value} names a catalogue entry instead, and reads in the viewer's language
+ * ({@link CatalogLines}). The entry stands in for the line before anything else runs, so a surface with tokens of
+ * its own calls {@link #lineFor} first and the entry's {@code {player}} or {@code %papi%} is read as if the operator
+ * had written it on the line.
  */
 @NullMarked
 public final class HudText {
 
     private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
+    /** The catalogue the operator's {@code @key} lines read from: none until the kernel is wired. */
+    private static volatile CatalogLines catalogLines = CatalogLines.none();
+
     private HudText() {}
+
+    /** Read {@code @key} lines from {@code lines} from now on. */
+    public static void useCatalogLines(CatalogLines lines) {
+        catalogLines = Objects.requireNonNull(lines, "lines");
+    }
+
+    /** Whether {@code source} names a catalogue entry, so a surface that shares one text knows to draw it per viewer. */
+    public static boolean isCatalogLine(String source) {
+        return catalogLines.isCatalogLine(source);
+    }
+
+    /**
+     * {@code source} in the server's own language when it names a catalogue entry, for a text drawn once for
+     * everybody before each viewer's own copy reaches them.
+     */
+    public static String lineForEverybody(String source) {
+        return lineFor(PlayerRef.SYSTEM_UUID, source);
+    }
+
+    /** {@code source} in {@code viewer}'s language when it names a catalogue entry, otherwise as written. */
+    public static String lineFor(UUID viewer, String source) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(source, "source");
+        return catalogLines.expand(new PlayerRef(viewer, ""), source);
+    }
+
+    /**
+     * {@code source} for {@code viewer} as text ready to parse: an {@code @key} line read in their language, then
+     * their placeholders. A surface that parses with its own resolver calls this rather than {@link #render}.
+     */
+    public static String expand(UUID viewer, String source) {
+        String line = lineFor(viewer, source);
+        return PlaceholderApiSupport.hasPlaceholder(line)
+                ? PlaceholderApiSupport.messageBridge(viewer).apply(line)
+                : line;
+    }
 
     /** Render {@code miniMessageSource} for {@code viewer}: expand its placeholders, then parse the MiniMessage. */
     public static Component render(UUID viewer, String miniMessageSource) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
-        String expanded = PlaceholderApiSupport.messageBridge(viewer).apply(miniMessageSource);
+        String expanded = PlaceholderApiSupport.messageBridge(viewer).apply(lineFor(viewer, miniMessageSource));
         return parse(expanded);
     }
 

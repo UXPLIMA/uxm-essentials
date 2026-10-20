@@ -8,7 +8,9 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -68,8 +70,34 @@ public final class GuiText implements com.uxplima.uxmlib.gui.GuiText {
     public Component text(Player viewer, String key, Map<String, String> placeholders) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(key, "key");
-        return text(BukkitRefs.toRef(viewer), () -> key, placeholders);
+        Objects.requireNonNull(placeholders, "placeholders");
+        Reference reference = reference(key, placeholders);
+        String resolved = messages.resolve(BukkitRefs.toRef(viewer), reference.key(), reference.arguments());
+        // An operator's own entry may carry a %papi% placeholder, as a hologram or board line may; the plugin's own
+        // entries reach chat through the same bridge, so a menu reads them the same way.
+        String expanded = PlaceholderApiSupport.hasPlaceholder(resolved)
+                ? PlaceholderApiSupport.messageBridge(viewer.getUniqueId()).apply(resolved)
+                : resolved;
+        return StyledText.render(expanded);
     }
+
+    /**
+     * The key and arguments an engine key names. A menu line written as {@code @key name=value} reaches here whole,
+     * after the at sign; the arguments written on the line win over the engine's own values of the same name.
+     */
+    private static Reference reference(String key, Map<String, String> placeholders) {
+        return CatalogLine.parse("@" + key)
+                .filter(line -> !line.arguments().isEmpty())
+                .map(line -> {
+                    Map<String, String> merged = new java.util.HashMap<>(placeholders);
+                    merged.putAll(line.arguments());
+                    String named = line.key();
+                    return new Reference(() -> named, merged);
+                })
+                .orElseGet(() -> new Reference(() -> key, placeholders));
+    }
+
+    private record Reference(MessageKey key, Map<String, String> arguments) {}
 
     /** The engine's unprefixed lookup, which strips the same brand token {@link #unprefixedText} does. */
     @Override

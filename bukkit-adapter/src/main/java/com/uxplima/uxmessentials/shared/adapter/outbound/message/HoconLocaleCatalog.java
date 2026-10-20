@@ -53,6 +53,9 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     private final Path messagesDir;
     private final AtomicReference<Map<String, Map<String, String>>> byLanguage;
 
+    /** Whether {@link #declares} has read in every language once since the last reload. */
+    private volatile boolean everyLanguageLoaded;
+
     /**
      * @param messagesDir the on-disk {@code messages} directory; a {@code messages_<lang>.conf}
      *     present there is layered over the bundled copy as a per-key override, so operator edits take effect
@@ -87,6 +90,36 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         return Set.copyOf(locales);
     }
 
+    /**
+     * Read in every language there is a catalogue for, not only the loaded ones: an operator who writes a key in
+     * Turkish alone still means it before a Turkish player has joined. The languages load once, on the first key
+     * no loaded table holds, so a line that names nothing does not list the folder on every render.
+     */
+    @Override
+    public boolean declares(String key) {
+        Objects.requireNonNull(key, "key");
+        if (anyLoadedTableHolds(key)) {
+            return true;
+        }
+        if (everyLanguageLoaded) {
+            return false;
+        }
+        for (Locale locale : availableLocales()) {
+            tableFor(locale.getLanguage());
+        }
+        everyLanguageLoaded = true;
+        return anyLoadedTableHolds(key);
+    }
+
+    private boolean anyLoadedTableHolds(String key) {
+        for (Map<String, String> table : snapshot().values()) {
+            if (table.containsKey(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** The loaded languages and every {@code messages_<lang>.conf} in the messages directory. */
     @Override
     public Set<Locale> availableLocales() {
@@ -117,6 +150,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         }
         candidate.computeIfAbsent(Locale.ENGLISH.getLanguage(), language -> loadLanguage(language, true));
         byLanguage.set(Map.copyOf(candidate));
+        everyLanguageLoaded = false;
     }
 
     private Map<String, String> tableFor(String language) {

@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.communication.domain.PlaceholderBindings;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -39,7 +40,8 @@ public final class BukkitInfoSender {
         Objects.requireNonNull(lines, "lines");
         PlaceholderBindings bindings = PlaceholderBindings.empty().with("player", viewer.name());
         for (String line : lines) {
-            sink.deliver(viewer, bindings.apply(line));
+            // An @key line reads in this reader's language; its {player} is filled like a line written out.
+            sink.deliver(viewer, bindings.apply(HudText.lineFor(viewer.uuid(), line)));
         }
     }
 }

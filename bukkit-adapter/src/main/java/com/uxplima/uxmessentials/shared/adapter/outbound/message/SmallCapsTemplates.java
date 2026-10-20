@@ -46,6 +46,10 @@ public final class SmallCapsTemplates {
                 int end = span(template, index, current == '<' ? '>' : '}');
                 out.append(template, index, end);
                 index = end;
+            } else if (placeholderEnd(template, index) > 0) {
+                int end = placeholderEnd(template, index);
+                out.append(template, index, end);
+                index = end;
             } else {
                 int end = prose(template, index);
                 out.append(SmallCaps.of(template.substring(index, end)));
@@ -61,11 +65,36 @@ public final class SmallCapsTemplates {
         return close < 0 ? template.length() : close + 1;
     }
 
+    /**
+     * The end of the {@code %placeholder%} opened at {@code from}, past its closing sign, or -1 when the sign opens
+     * none. A placeholder is read by another plugin after this runs, and {@code %ᴘʟᴀʏᴇʀ_ɴᴀᴍᴇ%} names nothing there,
+     * so its spelling stays. A per cent sign in prose ({@code 50% off}) is followed by a space and is not one.
+     */
+    private static int placeholderEnd(String template, int from) {
+        if (template.charAt(from) != '%') {
+            return -1;
+        }
+        for (int index = from + 1; index < template.length(); index++) {
+            char current = template.charAt(index);
+            if (current == '%') {
+                return index > from + 1 ? index + 1 : -1;
+            }
+            if (!isPlaceholderCharacter(current)) {
+                return -1;
+            }
+        }
+        return -1;
+    }
+
+    private static boolean isPlaceholderCharacter(char current) {
+        return Character.isLetterOrDigit(current) || "_:.-{}".indexOf(current) >= 0;
+    }
+
     /** The end of the run of ordinary text starting at {@code from}. */
     private static int prose(String template, int from) {
         for (int index = from; index < template.length(); index++) {
             char current = template.charAt(index);
-            if (current == '<' || current == '{') {
+            if (current == '<' || current == '{' || (index > from && placeholderEnd(template, index) > 0)) {
                 return index;
             }
         }

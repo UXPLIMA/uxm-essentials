@@ -15,6 +15,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.display.DisplayTextPackets;
@@ -67,8 +68,8 @@ public final class HologramTextOverrides {
     /**
      * Whether {@code hologram} needs per-viewer text: a {@link HologramType#TEXT} hologram that is either
      * multi-page (each viewer sees their own current page over the shared display) or has at least one line
-     * carrying a {@code %...%} placeholder token or a built-in {@code {player}}/{@code {page}}/{@code {pages}}
-     * token. Item and block holograms render the model only (v1), so their label lines are never a per-viewer
+     * carrying a {@code %...%} placeholder token, a built-in {@code {player}}/{@code {page}}/{@code {pages}}
+     * token, or an {@code @key} catalogue line, which reads in each viewer's own language. Item and block holograms render the model only (v1), so their label lines are never a per-viewer
      * target.
      */
     boolean hasPerViewerText(Hologram hologram) {
@@ -80,7 +81,9 @@ public final class HologramTextOverrides {
             return true;
         }
         for (HologramLine line : hologram.lines()) {
-            if (PlaceholderApiSupport.hasPlaceholder(line.value()) || HologramTokens.hasToken(line.value())) {
+            if (PlaceholderApiSupport.hasPlaceholder(line.value())
+                    || HologramTokens.hasToken(line.value())
+                    || HudText.isCatalogLine(line.value())) {
                 return true;
             }
         }
@@ -126,7 +129,9 @@ public final class HologramTextOverrides {
         java.util.List<HologramLine> lines = hologram.isMultiPage() ? hologram.pageLines(page) : hologram.lines();
         java.util.List<Component> resolved = new java.util.ArrayList<>(lines.size());
         for (HologramLine line : lines) {
-            String tokens = HologramTokens.resolve(line.value(), viewer.getName(), page + 1, pages);
+            // An @key line is the catalogue entry in this viewer's language, and its own tokens resolve as if written.
+            String written = HudText.lineFor(uuid, line.value());
+            String tokens = HologramTokens.resolve(written, viewer.getName(), page + 1, pages);
             // The per-viewer path renders a static frame, so an inline animation directive is stripped rather than
             // shown literally: animation and per-viewer placeholders do not combine (the placeholder wins).
             String source = HologramAnimations.stripDirective(bridge.apply(tokens));

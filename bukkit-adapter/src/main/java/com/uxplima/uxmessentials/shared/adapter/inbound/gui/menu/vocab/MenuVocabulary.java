@@ -16,6 +16,7 @@ import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -65,7 +66,11 @@ public final class MenuVocabulary {
         });
         bindings.action("command", ctx -> ctx.player().performCommand(ctx.arg()));
         bindings.action("console", consoleAction(allowConsole, log));
-        bindings.action("message", ctx -> ctx.player().sendMessage(StyledText.render(ctx.arg())));
+        bindings.action(
+                "message",
+                ctx -> ctx.player()
+                        .sendMessage(
+                                StyledText.render(HudText.expand(ctx.player().getUniqueId(), ctx.arg()))));
         bindings.action("sound", MenuVocabulary::playSound);
     }
 

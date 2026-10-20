@@ -59,4 +59,17 @@ class SmallCapsTemplatesTest {
         assertThat(SmallCapsTemplates.apply("<body>Ваш скин изменён.</body>"))
                 .isEqualTo("<body>Ваш скин изменён.</body>");
     }
+
+    /** A placeholder another plugin reads afterwards keeps its spelling, or it names nothing there. */
+    @Test
+    void aPlaceholderApiTokenKeepsItsSpelling() {
+        assertThat(SmallCapsTemplates.apply("online: %bungee_skyblock% of %server_max_players%"))
+                .isEqualTo("ᴏɴʟɪɴᴇ: %bungee_skyblock% ᴏꜰ %server_max_players%");
+        assertThat(SmallCapsTemplates.apply("players %bungee_{server}%")).isEqualTo("ᴘʟᴀʏᴇʀꜱ %bungee_{server}%");
+    }
+
+    @Test
+    void aPerCentSignInProseIsProse() {
+        assertThat(SmallCapsTemplates.apply("50% off, 20% more")).isEqualTo("50% ᴏꜰꜰ, 20% ᴍᴏʀᴇ");
+    }
 }

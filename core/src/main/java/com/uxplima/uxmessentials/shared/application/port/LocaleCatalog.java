@@ -24,6 +24,12 @@ public interface LocaleCatalog {
     Set<Locale> loadedLocales();
 
     /**
+     * Whether some catalogue holds {@code key}: the bundled one or a file the operator wrote, in any language. This is
+     * what tells a line naming a catalogue entry from a line that merely opens with an at sign.
+     */
+    boolean declares(String key);
+
+    /**
      * Every language a player may choose: one with a catalogue the server can read, loaded yet or not. A language
      * loads on first use, so the loaded set alone named only those somebody had already read.
      */

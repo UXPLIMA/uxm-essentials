@@ -237,7 +237,7 @@ public final class ScoreboardRenderer {
     }
 
     private String expand(Player player, String source, long tick) {
-        String animated = animations.resolve(source, tick);
+        String animated = animations.resolve(HudText.lineFor(player.getUniqueId(), source), tick);
         String builtins = BuiltinTokens.apply(player, animated);
         return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(builtins);
     }

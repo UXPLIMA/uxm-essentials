@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.ConfigurateConfigStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.cooldown.PdcCooldowns;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLocator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MojangSkins;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
+import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
@@ -200,12 +202,17 @@ final class KernelWiring {
         MojangSkins mojangSkins =
                 new MojangSkins(scheduler, log, new HttpClientFetcher(log), config.getBoolean(SKIN_LOOKUP_PATH, true));
 
+        CatalogMessages messages = new CatalogMessages(catalog, resolver);
+        // An operator's @key line, on a hologram, a board, a menu or a click action, reads from this same catalogue
+        // in the viewer's language. The catalogue re-reads itself on reload, so this is set once.
+        HudText.useCatalogLines(new CatalogLines(messages, catalog::declares));
+
         KernelPorts ports = new KernelPorts(
                 scheduler,
                 permissions,
                 new PdcCooldowns(plugin, permissions, Clock.systemUTC()),
                 new SchedulerWarmups(scheduler, permissions),
-                new CatalogMessages(catalog, resolver),
+                messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
                 new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex),
                 new BukkitWorldLookup(),

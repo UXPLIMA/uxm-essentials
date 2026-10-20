@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.hologram.Holograms;
@@ -151,7 +152,10 @@ final class HologramSpawns {
             Hologram hologram, UnaryOperator<String> placeholders, MiniMessage miniMessage, TagResolver globalTags) {
         Holograms.Builder builder = Holograms.builder();
         for (HologramLine line : hologram.lines()) {
-            builder.line(miniMessage.deserialize(placeholders.apply(line.value()), globalTags));
+            // The shared entity is drawn once for everybody, so an @key line reads in the server's language here and
+            // each viewer's own language arrives with their override.
+            builder.line(
+                    miniMessage.deserialize(placeholders.apply(HudText.lineForEverybody(line.value())), globalTags));
         }
         HologramAppearances.apply(builder, hologram.appearance());
         Rotation rotation = hologram.rotation();
