@@ -605,12 +605,16 @@ public final class PluginModule {
         // Floodgate, Geyser or Cumulus. Both are threaded into the façade so the open choke-point can redirect a
         // Bedrock viewer to a native SimpleForm; the detector is also held on resources.bedrock() for any other
         // consumer. A Java viewer (isBedrock false) opens the chest exactly as before.
-        BedrockDetector bedrock = BedrockDetector.forServer(plugin.getServer());
+        // This plugin enables at STARTUP, before Floodgate whatever load order it declares, so a choice made here
+        // was NONE for the life of the server. The resolving pair asks again on each use until a backend answers,
+        // and the line operators read is written once the server has finished loading.
+        BedrockDetector bedrock = BedrockDetector.resolving(plugin.getServer());
         resources.bedrock(bedrock);
-        kernel.log().info("event=bedrock_detector backend={}", bedrock.backend());
-        BedrockScreen bedrockScreen = BedrockScreen.forServer(plugin.getServer());
+        BedrockScreen bedrockScreen = BedrockScreen.resolving(plugin.getServer());
         resources.bedrockScreen(bedrockScreen);
-        kernel.log().info("event=bedrock_screen backend={}", bedrockScreen == BedrockScreen.NONE ? "none" : "cumulus");
+        resources
+                .worldPhase()
+                .run("bedrock report", () -> kernel.log().info("event=bedrock_detector backend={}", bedrock.backend()));
         Menus menus = new Menus(
                 menuRenderer,
                 new PaperScheduler(plugin),

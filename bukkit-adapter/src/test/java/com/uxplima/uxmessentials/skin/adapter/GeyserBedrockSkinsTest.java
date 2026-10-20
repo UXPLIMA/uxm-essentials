@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpFetcher;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -90,8 +91,26 @@ class GeyserBedrockSkinsTest {
                 .isNull();
     }
 
+    /**
+     * Whether a Bedrock backend is there is asked on each lookup. uxmEssentials enables before Floodgate, so an
+     * answer kept from its own enable said "none" for the life of the server.
+     */
+    @Test
+    void aBackendThatEnablesLaterIsUsed() {
+        FakeFetcher fetcher = new FakeFetcher(Map.of(GeyserBedrockSkins.SKIN_ENDPOINT + XUID, PAYLOAD));
+        AtomicBoolean backend = new AtomicBoolean(false);
+        GeyserBedrockSkins skins =
+                new GeyserBedrockSkins(player -> Optional.of(XUID), fetcher, new NoopLogger(), 2, backend::get);
+        assertThat(skins.available()).isFalse();
+
+        backend.set(true);
+
+        assertThat(skins.available()).isTrue();
+        assertThat(skins.byPlayer(PLAYER)).isPresent();
+    }
+
     private GeyserBedrockSkins skins(FakeFetcher fetcher, Optional<String> xuid, boolean available) {
-        return new GeyserBedrockSkins(player -> xuid, fetcher, new NoopLogger(), 2, available);
+        return new GeyserBedrockSkins(player -> xuid, fetcher, new NoopLogger(), 2, () -> available);
     }
 
     /** A fetcher answering from a fixed map and recording every uri it was asked for. */

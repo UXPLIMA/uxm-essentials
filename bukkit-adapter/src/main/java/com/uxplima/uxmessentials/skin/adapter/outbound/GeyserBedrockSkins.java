@@ -4,6 +4,7 @@ import java.net.URI;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
 import com.google.gson.JsonElement;
@@ -38,16 +39,18 @@ public final class GeyserBedrockSkins implements BedrockSkins {
     private final HttpFetcher fetcher;
     private final Logger log;
     private final int retries;
-    private final boolean available;
+    private final BooleanSupplier available;
 
     /**
      * @param xuids how a player's Xbox id is resolved; {@link Optional#empty()} for a Java player
      * @param fetcher the HTTP seam
      * @param log where a failed lookup is reported
      * @param retries how many times a failed request is retried before it is given up
-     * @param available whether a Bedrock backend is installed at all
+     * @param available whether a Bedrock backend is installed at all, asked on each lookup: this plugin enables
+     *     before Floodgate, so an answer kept from its own enable would say none for the life of the server
      */
-    public GeyserBedrockSkins(XuidLookup xuids, HttpFetcher fetcher, Logger log, int retries, boolean available) {
+    public GeyserBedrockSkins(
+            XuidLookup xuids, HttpFetcher fetcher, Logger log, int retries, BooleanSupplier available) {
         this.xuids = Objects.requireNonNull(xuids, "xuids");
         this.fetcher = Objects.requireNonNull(fetcher, "fetcher");
         this.log = Objects.requireNonNull(log, "log");
@@ -55,13 +58,13 @@ public final class GeyserBedrockSkins implements BedrockSkins {
             throw new IllegalArgumentException("retries must not be negative: " + retries);
         }
         this.retries = retries;
-        this.available = available;
+        this.available = Objects.requireNonNull(available, "available");
     }
 
     @Override
     public Optional<SkinTexture> byPlayer(UUID player) {
         Objects.requireNonNull(player, "player");
-        if (!available) {
+        if (!available.getAsBoolean()) {
             return Optional.empty();
         }
         return xuids.xuidOf(player).flatMap(this::fetch);
@@ -69,7 +72,7 @@ public final class GeyserBedrockSkins implements BedrockSkins {
 
     @Override
     public boolean available() {
-        return available;
+        return available.getAsBoolean();
     }
 
     /** The signed texture Geyser holds for {@code xuid}, retried a bounded number of times. */

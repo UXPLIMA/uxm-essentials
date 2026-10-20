@@ -83,7 +83,7 @@ public final class SkinWiring {
                 new HttpClientFetcher(kernel.log()),
                 kernel.log(),
                 config.bedrockRetries(),
-                config.bedrockSource() && bedrock != BedrockDetector.NONE);
+                () -> config.bedrockSource() && !"none".equals(bedrock.backend()));
 
         DressLogin dressLogin = new DressLogin(repository, kernel.skins(), bedrockSkins, config, kernel.log());
         SetSkin setSkin = new SetSkin(
