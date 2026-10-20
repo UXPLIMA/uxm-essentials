@@ -36,4 +36,17 @@ class NpcStateCommandsTest {
         assertThat(NpcStateCommands.sentinelBlocks("48")).isNull();
         assertThat(NpcStateCommands.sentinelBlocks("default")).isNull();
     }
+
+    /**
+     * The words that hide a label and the words that reset it are read by the NPC's appearance, the one place every
+     * surface shares. The command turned {@code none} into "no value" before the appearance saw it, so {@code /npc
+     * displayname guide none} showed the id over the head instead of hiding it.
+     */
+    @Test
+    void theDisplayNameWordsReachTheAppearanceAsTyped() {
+        assertThat(NpcStateCommands.displayNameValue("none")).isEqualTo("none");
+        assertThat(NpcStateCommands.displayNameValue("  clear ")).isEqualTo("clear");
+        assertThat(NpcStateCommands.displayNameValue("reset")).isEqualTo("reset");
+        assertThat(NpcStateCommands.displayNameValue("<gold>Town Guide")).isEqualTo("<gold>Town Guide");
+    }
 }

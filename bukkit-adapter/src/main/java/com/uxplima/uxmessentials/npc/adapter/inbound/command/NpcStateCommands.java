@@ -110,10 +110,17 @@ final class NpcStateCommands extends NpcCommandSupport {
     }
 
     private int displayName(CommandContext<CommandSourceStack> ctx) {
-        String text = ctx.getArgument("text", String.class).strip();
-        String resolved = text.equalsIgnoreCase("none") || text.isBlank() ? null : text;
-        services.displayName().setDisplayName(actor(ctx), nameArg(ctx), resolved);
+        String text = displayNameValue(ctx.getArgument("text", String.class));
+        services.displayName().setDisplayName(actor(ctx), nameArg(ctx), text);
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * The typed text as the appearance should read it. The hide words ({@code none}, {@code clear}) and the reset
+     * words ({@code default}, {@code reset}) are the appearance's to interpret, the same for the editor and the API.
+     */
+    static String displayNameValue(String typed) {
+        return typed.strip();
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> cooldownNode() {
