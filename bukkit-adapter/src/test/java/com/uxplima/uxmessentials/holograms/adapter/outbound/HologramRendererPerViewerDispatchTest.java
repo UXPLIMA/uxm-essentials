@@ -78,6 +78,28 @@ class HologramRendererPerViewerDispatchTest {
         assertThat(packets.sent).isEmpty();
     }
 
+    /**
+     * A viewer's own text is a metadata packet for an entity id, and a client drops one for an entity it has not been
+     * sent yet. The entity reaches a viewer when the server starts tracking it for them, so the text follows a tick
+     * after that, never with it. Sent at once, every viewer read the server's language instead of their own.
+     */
+    @Test
+    void theOwnTextFollowsTheTrackingByATick() {
+        RecordingScheduler scheduler = new RecordingScheduler();
+        RecordingPackets packets = new RecordingPackets();
+        HologramTextOverrides overrides =
+                overrides(packets, perViewer(Map.of(ALICE, source -> source.replace("%name%", "Alice"))));
+
+        HologramRenderer.sendOwnTextAfterTracking(
+                scheduler, overrides, player(ALICE), ENTITY_ID, hologram("hi %name%"));
+
+        assertThat(packets.sent).isEmpty();
+        assertThat(scheduler.later).hasSize(1);
+        scheduler.later.get(0).run();
+        assertThat(packets.textFor(ALICE)).isEqualTo("hi Alice");
+        assertThat(scheduler.entityHops).containsExactly(ALICE);
+    }
+
     // --- fixtures ---------------------------------------------------------------------------------------------
 
     private static HologramTextOverrides overrides(
@@ -133,6 +155,12 @@ class HologramRendererPerViewerDispatchTest {
     private static final class RecordingScheduler implements Scheduler {
 
         private final List<UUID> entityHops = new ArrayList<>();
+        private final List<Runnable> later = new ArrayList<>();
+
+        @Override
+        public void laterGlobal(Duration delay, Runnable task) {
+            later.add(task);
+        }
 
         @Override
         public void onGlobal(Runnable task) {

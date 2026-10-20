@@ -437,6 +437,36 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
     }
 
     /**
+     * Send {@code viewer} their own text for the hologram whose text entity they just started tracking. A client
+     * drops metadata for an entity it has not been sent, and the entity is sent as the tracking starts, so the text
+     * goes a tick later. This is what makes a placeholder or an {@code @key} line read right on the first spawn, on
+     * join, and whenever a viewer walks back into range: the copy sent with the spawn itself arrives too early.
+     */
+    public void sendOwnTextOnTracking(Player viewer, int entityId) {
+        Objects.requireNonNull(viewer, "viewer");
+        for (Tracked tracked : live.values()) {
+            if (tracked.live().textEntityId() != entityId) {
+                continue;
+            }
+            Hologram hologram = tracked.hologram();
+            if (textOverrides.hasPerViewerText(hologram)
+                    && viewers.maySee(hologram, viewer, viewers.shownViewersFor(hologram))) {
+                sendOwnTextAfterTracking(scheduler, textOverrides, viewer, entityId, hologram);
+            }
+            return;
+        }
+    }
+
+    /** The tick's wait and the per-viewer dispatch behind {@link #sendOwnTextOnTracking}. */
+    static void sendOwnTextAfterTracking(
+            Scheduler scheduler, HologramTextOverrides textOverrides, Player viewer, int entityId, Hologram hologram) {
+        scheduler.laterGlobal(
+                ONE_TICK, () -> dispatchPerViewerText(scheduler, textOverrides, List.of(viewer), entityId, hologram));
+    }
+
+    private static final java.time.Duration ONE_TICK = java.time.Duration.ofMillis(50);
+
+    /**
      * Hop each viewer's per-viewer text resolve onto <em>that viewer's</em> entity thread before resolving and
      * sending the override. Resolving a player-relative {@code %papi%} token reads the viewer's live entity
      * state, which under Folia is only safe to touch from the entity's owning thread: never the hologram's

@@ -33,4 +33,12 @@ public final class HologramVisibilityListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         renderer.recomputeVisibilityFor(event.getPlayer());
     }
+
+    /** A text hologram reached a viewer: their own copy of its text follows, once the client knows the entity. */
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    public void onTrack(io.papermc.paper.event.player.PlayerTrackEntityEvent event) {
+        if (event.getEntity() instanceof org.bukkit.entity.TextDisplay display) {
+            renderer.sendOwnTextOnTracking(event.getPlayer(), display.getEntityId());
+        }
+    }
 }
