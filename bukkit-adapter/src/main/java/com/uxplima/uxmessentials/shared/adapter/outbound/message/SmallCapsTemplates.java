@@ -28,6 +28,12 @@ public final class SmallCapsTemplates {
 
     private static final String PLAIN_CLOSE = "</plain>";
 
+    /**
+     * The tags whose quoted argument is words written with the prose: a heading. A label is left to the tag that
+     * draws it, which converts it whole and also reads it to pick its colour.
+     */
+    private static final java.util.List<String> WORD_TAGS = java.util.List.of("<h:'");
+
     private SmallCapsTemplates() {}
 
     /** {@code template} with its prose in small capitals, everything else exactly as it was written. */
@@ -41,6 +47,10 @@ public final class SmallCapsTemplates {
                 int close = template.indexOf(PLAIN_CLOSE, index);
                 int end = close < 0 ? template.length() : close + PLAIN_CLOSE.length();
                 out.append(template, index, end);
+                index = end;
+            } else if (current == '<' && isWordTag(template, index)) {
+                int end = span(template, index, '>');
+                out.append(wordsInSmallCaps(template.substring(index, end)));
                 index = end;
             } else if (current == '<' || current == '{') {
                 int end = span(template, index, current == '<' ? '>' : '}');
@@ -57,6 +67,39 @@ public final class SmallCapsTemplates {
             }
         }
         return out.toString();
+    }
+
+    /**
+     * Whether the tag opened at {@code from} is a heading. Its words are written with the prose, so a catalogue in
+     * small capitals has its headings in them too.
+     */
+    private static boolean isWordTag(String template, int from) {
+        for (String name : WORD_TAGS) {
+            if (template.startsWith(name, from)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * {@code tag} with the words inside its quotes through the same pass as the prose, so a placeholder there keeps
+     * its spelling, and everything outside the quotes as written.
+     */
+    private static String wordsInSmallCaps(String tag) {
+        StringBuilder out = new StringBuilder(tag.length());
+        int open = tag.indexOf('\'');
+        int from = 0;
+        while (open >= 0) {
+            int close = tag.indexOf('\'', open + 1);
+            if (close < 0) {
+                break;
+            }
+            out.append(tag, from, open + 1).append(apply(tag.substring(open + 1, close)));
+            from = close;
+            open = tag.indexOf('\'', close + 1);
+        }
+        return out.append(tag, from, tag.length()).toString();
     }
 
     /** The end of the markup or placeholder span opened at {@code from}, past its closing character. */

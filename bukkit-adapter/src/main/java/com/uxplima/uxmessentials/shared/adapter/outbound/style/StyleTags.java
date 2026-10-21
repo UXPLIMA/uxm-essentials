@@ -285,9 +285,10 @@ public final class StyleTags {
     }
 
     /**
-     * {@code text} in small capitals when every letter in it has one, otherwise as written. Turkish, German and
-     * Polish carry letters with no small capital, and a heading half converted ({@code ʟᴏʙɪʏᴇ ʜᴏş}) reads worse than
-     * one left alone. Letters of a script with no small capitals at all are left alone either way.
+     * {@code text} in small capitals when every letter in it has one, otherwise as written. A catalogue written in
+     * small capitals has its headings converted when it loads, keeping the letters that have none, so this rule is
+     * for the others: in a German or Polish catalogue a heading half converted reads worse than one left alone.
+     * Letters of a script with no small capitals at all are left alone either way.
      */
     static String smallCapsWhole(String text) {
         String converted = SmallCaps.of(text);

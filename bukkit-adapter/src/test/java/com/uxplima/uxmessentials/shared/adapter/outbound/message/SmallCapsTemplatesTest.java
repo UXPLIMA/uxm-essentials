@@ -72,4 +72,19 @@ class SmallCapsTemplatesTest {
     void aPerCentSignInProseIsProse() {
         assertThat(SmallCapsTemplates.apply("50% off, 20% more")).isEqualTo("50% ᴏꜰꜰ, 20% ᴍᴏʀᴇ");
     }
+
+    /**
+     * A catalogue written in small capitals writes its headings in them too. The heading tag converted its own words
+     * only when every letter had a small capital, so a Turkish heading stayed plain beside small-capital prose. The
+     * words a heading carries convert with the prose. A label is left to its tag, which converts it whole and reads
+     * it to pick its colour.
+     */
+    @Test
+    void aHeadingConvertsWithTheProse() {
+        assertThat(SmallCapsTemplates.apply("<h:'Lobiye hoş geldin':3> <tag:'LOBİ'> <etag:'HATA'> Selam"))
+                .isEqualTo("<h:'ʟᴏʙɪʏᴇ ʜᴏş ɢᴇʟᴅɪɴ':3> <tag:'LOBİ'> <etag:'HATA'> ꜱᴇʟᴀᴍ");
+        assertThat(SmallCapsTemplates.apply("<gradient:'#ff6b6b':'#c01c28'>x</gradient>"))
+                .isEqualTo("<gradient:'#ff6b6b':'#c01c28'>x</gradient>");
+        assertThat(SmallCapsTemplates.apply("<h:'Merhaba {player}'>")).isEqualTo("<h:'ᴍᴇʀʜᴀʙᴀ {player}'>");
+    }
 }
