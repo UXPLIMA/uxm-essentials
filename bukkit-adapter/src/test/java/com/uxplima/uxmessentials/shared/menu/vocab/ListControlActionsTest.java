@@ -33,8 +33,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.bedrock.BedrockDetector;
-import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
@@ -298,31 +296,15 @@ class ListControlActionsTest {
         FakePagedSource source = new FakePagedSource(request -> PagedResult.of(pageRows(request.page()), TOTAL));
         PagedListSourceRegistry paged = new PagedListSourceRegistry();
         paged.register("pw:browse", source);
-        Menus menus = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                null,
-                null,
-                null,
-                BedrockDetector.NONE,
-                BedrockScreen.NONE,
-                paged);
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .pagedLists(paged)
+                .build();
         menus.registerSpec("browse", new MenuSpecLoader().parse(HOCON));
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                null,
-                0L,
-                System::currentTimeMillis,
-                paged,
-                prompt);
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .pagedLists(paged)
+                .textPrompt(prompt)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
         menus.open(player, "browse", null, 0, args);
         scheduler.drainAsync();

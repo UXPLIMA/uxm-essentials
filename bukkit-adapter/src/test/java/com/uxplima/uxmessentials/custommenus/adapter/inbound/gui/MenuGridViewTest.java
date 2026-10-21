@@ -105,16 +105,15 @@ class MenuGridViewTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         MenuRenderer renderer = new MenuRenderer(
                 new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders()), bindings.conditions());
-        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
 
         loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, NOOP);

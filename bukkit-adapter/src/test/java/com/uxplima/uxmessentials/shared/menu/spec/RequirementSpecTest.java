@@ -91,7 +91,7 @@ class RequirementSpecTest {
     @Test
     void requirementForReturnsTheAnyBlockWhenOnlyAnyIsSet() {
         RequirementSpec any = new RequirementSpec(List.of(req("a:1")), 1, List.of(Ref.parse("deny-any")));
-        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.ANY, any));
+        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.ANY, any), Map.of(), Map.of());
         assertThat(click.requirementFor(ClickKind.RIGHT)).isEqualTo(any);
     }
 
@@ -99,7 +99,8 @@ class RequirementSpecTest {
     void requirementForMergesTheKindBlockWithTheAnyBlock() {
         RequirementSpec left = new RequirementSpec(List.of(req("left-a:1")), 2, List.of(Ref.parse("deny-left")));
         RequirementSpec any = new RequirementSpec(List.of(req("any-a:1")), 1, List.of(Ref.parse("deny-any")));
-        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.LEFT, left, ClickKind.ANY, any));
+        ClickSpec click =
+                new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.LEFT, left, ClickKind.ANY, any), Map.of(), Map.of());
 
         RequirementSpec merged = click.requirementFor(ClickKind.LEFT);
 
@@ -113,7 +114,7 @@ class RequirementSpecTest {
     @Test
     void requirementForDoesNotDoubleMergeTheAnyBlockWithItself() {
         RequirementSpec any = new RequirementSpec(List.of(req("any-a:1")), 1, List.of(Ref.parse("deny-any")));
-        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.ANY, any));
+        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(ClickKind.ANY, any), Map.of(), Map.of());
         assertThat(click.requirementFor(ClickKind.ANY)).isEqualTo(any);
     }
 

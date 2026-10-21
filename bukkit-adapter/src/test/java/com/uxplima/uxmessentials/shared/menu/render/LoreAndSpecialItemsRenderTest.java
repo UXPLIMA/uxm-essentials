@@ -39,6 +39,7 @@ import com.uxplima.uxmlib.menu.spec.ItemType;
 import com.uxplima.uxmlib.menu.spec.LoreMode;
 import com.uxplima.uxmlib.menu.spec.MenuItemSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
+import com.uxplima.uxmlib.menu.spec.RequirementSpec;
 import com.uxplima.uxmlib.menu.spec.SlotSet;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -217,11 +218,13 @@ class LoreAndSpecialItemsRenderTest {
                 lore,
                 new ItemDecor(1, Optional.empty(), false, List.of()),
                 mode,
-                List.of(),
+                RequirementSpec.NONE,
                 new ClickSpec(Map.of(), Map.of()),
                 false,
                 Optional.empty(),
-                ItemType.NONE);
+                ItemType.NONE,
+                Optional.empty(),
+                0);
     }
 
     private static List<String> plainLore(ItemStack item) {

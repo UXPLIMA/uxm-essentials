@@ -307,11 +307,12 @@ class PlaytimeCommandPathTest {
                 guiText, ThemeFile::shippedTheme, new com.uxplima.uxmlib.menu.binding.PlaceholderRegistry());
         var renderer = new com.uxplima.uxmlib.menu.render.MenuRenderer(
                 itemRenderer, new com.uxplima.uxmlib.menu.binding.ConditionRegistry());
-        return new com.uxplima.uxmlib.menu.Menus(
-                renderer,
-                EngineScheduler.of(new SyncScheduler()),
-                new com.uxplima.uxmlib.menu.binding.ListSourceRegistry(),
-                editorRenderer);
+        return com.uxplima.uxmlib.menu.Menus.builder(
+                        renderer,
+                        EngineScheduler.of(new SyncScheduler()),
+                        new com.uxplima.uxmlib.menu.binding.ListSourceRegistry())
+                .editorRenderer(editorRenderer)
+                .build();
     }
 
     /** The same mock service bundle as {@link #setUp}, with the real show/reset use cases wired. */

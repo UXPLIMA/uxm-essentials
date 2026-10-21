@@ -6,7 +6,6 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.ChannelRegistrationRewriter;
 import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmlib.pipeline.PacketAction;
 import com.uxplima.uxmlib.pipeline.PacketListener;
 import com.uxplima.uxmlib.pipeline.PacketVerdict;
 import org.jspecify.annotations.NullMarked;
@@ -44,13 +43,7 @@ public final class ChannelHideListener implements PacketListener {
     }
 
     @Override
-    public PacketAction onSend(@Nullable UUID player, Object packet) {
-        // The rewrite path is in onSendVerdict; a plain pass keeps the pass/cancel-only contract correct.
-        return PacketAction.PASS;
-    }
-
-    @Override
-    public PacketVerdict onSendVerdict(@Nullable UUID player, Object packet) {
+    public PacketVerdict onSend(@Nullable UUID player, Object packet) {
         try {
             return rewriter.rewrite(packet, policy);
         } catch (RuntimeException failure) {

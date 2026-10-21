@@ -196,16 +196,9 @@ class MenuEventGoldenTest {
 
     private Menus bedrockMenus(BedrockScreen screen) {
         BedrockDetector everyoneBedrock = uuid -> true;
-        Menus bedrock = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                null,
-                null,
-                null,
-                everyoneBedrock,
-                screen);
+        Menus bedrock = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .bedrock(everyoneBedrock, screen)
+                .build();
         bedrock.registerSpec("menu", loader.parse(SPEC));
         return bedrock;
     }

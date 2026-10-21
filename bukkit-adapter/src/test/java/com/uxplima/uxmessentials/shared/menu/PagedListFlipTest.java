@@ -36,8 +36,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.bedrock.BedrockDetector;
-import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
 import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
@@ -339,32 +337,20 @@ class PagedListFlipTest {
     }
 
     private Menus menus(ListSourceRegistry lists, PagedListSourceRegistry paged) {
-        return new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                lists,
-                null,
-                null,
-                null,
-                null,
-                BedrockDetector.NONE,
-                BedrockScreen.NONE,
-                paged);
+        return Menus.builder(renderer, EngineScheduler.of(scheduler), lists)
+                .pagedLists(paged)
+                .build();
     }
 
     private void installListener(PagedListSourceRegistry paged) {
-        MenuListener listener = new MenuListener(
-                renderer,
-                new com.uxplima.uxmlib.menu.binding.ActionRegistry(),
-                new ConditionRegistry(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                null,
-                0L,
-                System::currentTimeMillis,
-                paged);
+        MenuListener listener = MenuListener.builder(
+                        renderer,
+                        new com.uxplima.uxmlib.menu.binding.ActionRegistry(),
+                        new ConditionRegistry(),
+                        EngineScheduler.of(scheduler),
+                        plugin)
+                .pagedLists(paged)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

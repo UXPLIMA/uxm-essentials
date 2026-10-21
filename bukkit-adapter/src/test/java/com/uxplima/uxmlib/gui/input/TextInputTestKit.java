@@ -15,6 +15,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.bedrock.BedrockDetector;
+import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.gui.anvil.AnvilInput;
 
 /**
@@ -62,7 +64,16 @@ public final class TextInputTestKit {
         AnvilTextBackend anvilBackend = new AnvilTextBackend(new AnvilInput(plugin));
         ChatTextBackend chatBackend = new ChatTextBackend(plugin);
         TextInput textInput = new TextInput(
-                settings, guiText, EngineScheduler.of(scheduler), anvilBackend, chatBackend, EngineLog.of(log));
+                settings,
+                guiText,
+                EngineScheduler.of(scheduler),
+                anvilBackend,
+                chatBackend,
+                BedrockDetector.NONE,
+                BedrockScreen.NONE,
+                null,
+                null,
+                EngineLog.of(log));
         return new Installed(textInput, chatBackend);
     }
 

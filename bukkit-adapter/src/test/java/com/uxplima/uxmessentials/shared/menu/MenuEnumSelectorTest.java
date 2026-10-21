@@ -91,16 +91,15 @@ class MenuEnumSelectorTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry(), editorRenderer);
-        MenuListener listener = new MenuListener(
-                renderer,
-                new ActionRegistry(),
-                new ConditionRegistry(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener listener = MenuListener.builder(
+                        renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(scheduler), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 
@@ -148,16 +147,15 @@ class MenuEnumSelectorTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        Menus leakMenus = new Menus(renderer, EngineScheduler.of(recording), new ListSourceRegistry(), editorRenderer);
-        MenuListener leakListener = new MenuListener(
-                renderer,
-                new ActionRegistry(),
-                new ConditionRegistry(),
-                EngineScheduler.of(recording),
-                plugin,
-                editorRenderer,
-                leakMenus.selectorOpener(),
-                leakMenus.confirmOpener());
+        Menus leakMenus = Menus.builder(renderer, EngineScheduler.of(recording), new ListSourceRegistry())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener leakListener = MenuListener.builder(
+                        renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(recording), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(leakMenus.selectorOpener())
+                .confirmOpener(leakMenus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(leakListener, plugin);
 
         leakMenus.openEditor(player, editorSpec(), widget);

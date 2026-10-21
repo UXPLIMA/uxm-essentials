@@ -62,7 +62,7 @@ class ClickBranchTest {
     @Test
     void elseForReturnsTheHeadBranchWhenPresent() {
         ClickBranch head = new ClickBranch(RequirementSpec.NONE, List.of(Ref.parse("record-note:c")), Optional.empty());
-        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(), Map.of(ClickKind.LEFT, head));
+        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(), Map.of(ClickKind.LEFT, head), Map.of());
 
         assertThat(click.elseFor(ClickKind.LEFT)).contains(head);
     }
@@ -70,7 +70,7 @@ class ClickBranchTest {
     @Test
     void elseForReturnsEmptyWhenTheGestureHasNoChain() {
         ClickBranch head = new ClickBranch(RequirementSpec.NONE, List.of(Ref.parse("record-note:c")), Optional.empty());
-        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(), Map.of(ClickKind.LEFT, head));
+        ClickSpec click = new ClickSpec(Map.of(), Map.of(), Map.of(), Map.of(ClickKind.LEFT, head), Map.of());
 
         assertThat(click.elseFor(ClickKind.RIGHT))
                 .as("the else-chain is per-kind and never merged with ANY, so RIGHT has none")
@@ -82,7 +82,9 @@ class ClickBranchTest {
         ClickSpec click = new ClickSpec(
                 Map.of(ClickKind.LEFT, List.of(Ref.parse("close"))),
                 Map.of(),
-                Map.of(ClickKind.LEFT, RequirementSpec.NONE));
+                Map.of(ClickKind.LEFT, RequirementSpec.NONE),
+                Map.of(),
+                Map.of());
 
         assertThat(click.orElse()).isEmpty();
         assertThat(click.elseFor(ClickKind.LEFT)).isEmpty();

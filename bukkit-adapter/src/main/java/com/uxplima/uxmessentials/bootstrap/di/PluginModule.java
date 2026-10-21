@@ -615,17 +615,13 @@ public final class PluginModule {
         resources
                 .worldPhase()
                 .run("bedrock report", () -> kernel.log().info("event=bedrock_detector backend={}", bedrock.backend()));
-        Menus menus = new Menus(
-                menuRenderer,
-                new PaperScheduler(plugin),
-                menuBindings.lists(),
-                menuEditorRenderer,
-                menuBindings.actions(),
-                menuBindings.conditions(),
-                lastMenu,
-                bedrock,
-                bedrockScreen,
-                menuBindings.pagedLists());
+        Menus menus = Menus.builder(menuRenderer, new PaperScheduler(plugin), menuBindings.lists())
+                .editorRenderer(menuEditorRenderer)
+                .openRegistries(menuBindings.actions(), menuBindings.conditions())
+                .lastMenu(lastMenu)
+                .bedrock(bedrock, bedrockScreen)
+                .pagedLists(menuBindings.pagedLists())
+                .build();
         resources.addListener(new LastMenuCleanupListener(lastMenu));
         // Defence-in-depth over the engine's cancel-all-clicks invariant: strip a marked menu display item that ever
         // escapes into a player's real inventory (close-sweep + join-sweep). A separate listener from the menu router,
@@ -650,20 +646,20 @@ public final class PluginModule {
             }
             seam.promptResolved(player, key, prompt, initialText, onSubmit, onCancel);
         };
-        MenuListener menuListener = new MenuListener(
-                menuRenderer,
-                menuBindings.actions(),
-                menuBindings.conditions(),
-                new PaperScheduler(plugin),
-                plugin,
-                menuEditorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener(),
-                menuClickCooldownMs,
-                System::currentTimeMillis,
-                menuBindings.pagedLists(),
-                menuTextPrompt,
-                menuBindings.contents());
+        MenuListener menuListener = MenuListener.builder(
+                        menuRenderer,
+                        menuBindings.actions(),
+                        menuBindings.conditions(),
+                        new PaperScheduler(plugin),
+                        plugin)
+                .editorRenderer(menuEditorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .clickCooldown(menuClickCooldownMs, System::currentTimeMillis)
+                .pagedLists(menuBindings.pagedLists())
+                .textPrompt(menuTextPrompt)
+                .contents(menuBindings.contents())
+                .build();
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via
         // modules/custommenus/config.conf (allow-console). Our own code-registered feature menus are unrestricted

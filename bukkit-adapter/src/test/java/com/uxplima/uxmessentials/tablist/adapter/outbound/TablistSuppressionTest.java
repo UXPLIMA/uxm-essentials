@@ -79,17 +79,16 @@ class TablistSuppressionTest {
         Object packet = "a-player-info-update";
 
         // Active viewer + a packet the rewriter rewrites -> REWRITE carrying the replacement.
-        PacketVerdict rewritten = listener.onSendVerdict(active.getUniqueId(), packet);
+        PacketVerdict rewritten = listener.onSend(active.getUniqueId(), packet);
         assertThat(rewritten.replacement()).isSameAs(sentinel);
 
         // A viewer NOT in suppress mode -> PASS (no rewrite), even for the same packet.
-        assertThat(listener.onSendVerdict(inactive.getUniqueId(), packet).replacement())
+        assertThat(listener.onSend(inactive.getUniqueId(), packet).replacement())
                 .isNull();
-        assertThat(listener.onSendVerdict(inactive.getUniqueId(), packet).cancels())
-                .isFalse();
+        assertThat(listener.onSend(inactive.getUniqueId(), packet).cancels()).isFalse();
 
         // A null owner (pre-login) -> PASS.
-        assertThat(listener.onSendVerdict(null, packet).replacement()).isNull();
+        assertThat(listener.onSend(null, packet).replacement()).isNull();
     }
 
     @Test
@@ -106,7 +105,7 @@ class TablistSuppressionTest {
                 (p, s) -> null);
         suppression.apply(viewer, true, Set.of());
 
-        PacketVerdict verdict = single(registry).onSendVerdict(viewer.getUniqueId(), "not-a-player-info");
+        PacketVerdict verdict = single(registry).onSend(viewer.getUniqueId(), "not-a-player-info");
 
         assertThat(verdict.replacement()).isNull();
         assertThat(verdict.cancels()).isFalse();
@@ -266,7 +265,7 @@ class TablistSuppressionTest {
 
         PacketListener listener = single(registry);
         PacketVerdict[] verdict = new PacketVerdict[1];
-        assertThatCode(() -> verdict[0] = listener.onSendVerdict(viewer.getUniqueId(), "player-info"))
+        assertThatCode(() -> verdict[0] = listener.onSend(viewer.getUniqueId(), "player-info"))
                 .doesNotThrowAnyException();
 
         // The throw is fail-soft: the verdict passes the original packet, and the fault is logged off-thread.

@@ -78,7 +78,9 @@ class BackStackGoldenTest {
         scheduler = new SyncScheduler();
         loader = new MenuSpecLoader();
         lastMenu = new LastMenu();
-        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), null, null, null, lastMenu);
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .lastMenu(lastMenu)
+                .build();
         MenuVocabulary.registerActions(bindings, menus, true, new RecordingLogger());
         menus.registerSpec("a", loader.parse(A_HOCON));
         menus.registerSpec("b", loader.parse(B_HOCON));

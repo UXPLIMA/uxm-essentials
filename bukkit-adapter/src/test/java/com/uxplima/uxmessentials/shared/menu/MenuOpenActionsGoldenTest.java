@@ -117,13 +117,9 @@ class MenuOpenActionsGoldenTest {
         scheduler = new SyncScheduler();
         // The production constructor: the façade is handed the action + condition registries so an open runs
         // open-actions and gates on open-requirement, the same registries the click listener resolves against.
-        menus = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                bindings.actions(),
-                bindings.conditions());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .build();
         loader = new MenuSpecLoader();
     }
 

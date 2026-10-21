@@ -118,13 +118,9 @@ class MenuArgumentConditionGoldenTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         scheduler = new SyncScheduler();
-        menus = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                bindings.actions(),
-                bindings.conditions());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .build();
         loader = new MenuSpecLoader();
         MenuListener listener = new MenuListener(
                 renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);

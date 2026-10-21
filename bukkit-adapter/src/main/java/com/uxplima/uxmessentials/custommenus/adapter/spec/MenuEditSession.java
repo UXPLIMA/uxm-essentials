@@ -521,6 +521,7 @@ public final class MenuEditSession {
                 clickCooldownMs,
                 bottomInventory,
                 chestOnly,
-                Optional.ofNullable(bedrock));
+                Optional.ofNullable(bedrock),
+                Map.of());
     }
 }

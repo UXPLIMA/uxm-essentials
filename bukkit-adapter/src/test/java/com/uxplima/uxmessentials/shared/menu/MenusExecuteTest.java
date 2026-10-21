@@ -107,14 +107,9 @@ class MenusExecuteTest {
 
     /** An engine wired with {@code bindings}' action/condition registries and a synchronous scheduler. */
     private Menus engine(MenuBindings bindings) {
-        return new Menus(
-                renderer(),
-                EngineScheduler.of(new SyncScheduler()),
-                new ListSourceRegistry(),
-                null,
-                bindings.actions(),
-                bindings.conditions(),
-                null);
+        return Menus.builder(renderer(), EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .build();
     }
 
     private static MenuRenderer renderer() {

@@ -60,7 +60,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
 import com.uxplima.uxmlib.menu.render.EditorRenderer;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
@@ -262,21 +261,17 @@ class PwarpPeopleMenuTest {
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
-        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .editorRenderer(editorRenderer)
+                .build();
         prompt = new RecordingPrompt();
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener(),
-                0L,
-                System::currentTimeMillis,
-                new PagedListSourceRegistry(),
-                prompt);
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .textPrompt(prompt)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
         Notifier notifier = new Notifier(new KeyMessages(), noopSink());
         menu = new PlayerWarpPeopleMenu(

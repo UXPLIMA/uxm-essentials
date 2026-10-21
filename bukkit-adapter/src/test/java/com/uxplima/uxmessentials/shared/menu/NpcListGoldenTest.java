@@ -229,16 +229,15 @@ class NpcListGoldenTest {
         MenuBindings bindings = new MenuBindings();
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, bindings.placeholders());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
-        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener());
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
 
         listMenu(menus).register(bindings, dataFolder, NOOP);

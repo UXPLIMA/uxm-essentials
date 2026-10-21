@@ -64,13 +64,9 @@ class MenuActionRunnerTest {
         GuiText guiText = new GuiText(new KeyMessages());
         MenuRenderer renderer = new MenuRenderer(
                 new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry()), new ConditionRegistry());
-        menus = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                new ListSourceRegistry(),
-                null,
-                registry.registry(),
-                new ConditionRegistry());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry())
+                .openRegistries(registry.registry(), new ConditionRegistry())
+                .build();
     }
 
     @AfterEach

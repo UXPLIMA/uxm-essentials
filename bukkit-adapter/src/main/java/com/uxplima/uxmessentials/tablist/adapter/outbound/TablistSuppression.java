@@ -16,7 +16,6 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoUpdates;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
-import com.uxplima.uxmlib.pipeline.PacketAction;
 import com.uxplima.uxmlib.pipeline.PacketListener;
 import com.uxplima.uxmlib.pipeline.PacketListenerRegistry;
 import com.uxplima.uxmlib.pipeline.PacketVerdict;
@@ -269,13 +268,7 @@ public final class TablistSuppression {
     private final class SuppressListener implements PacketListener {
 
         @Override
-        public PacketAction onSend(@Nullable UUID viewerId, Object packet) {
-            // The rewrite path is in onSendVerdict; a plain pass keeps a non-rewriting caller correct.
-            return PacketAction.PASS;
-        }
-
-        @Override
-        public PacketVerdict onSendVerdict(@Nullable UUID viewerId, Object packet) {
+        public PacketVerdict onSend(@Nullable UUID viewerId, Object packet) {
             if (viewerId == null || !active.contains(viewerId)) {
                 return PacketVerdict.pass();
             }

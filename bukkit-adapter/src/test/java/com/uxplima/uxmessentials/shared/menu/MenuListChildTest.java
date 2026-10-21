@@ -214,16 +214,15 @@ class MenuListChildTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        menus = new Menus(renderer, EngineScheduler.of(sched), new ListSourceRegistry(), editorRenderer);
-        MenuListener listener = new MenuListener(
-                renderer,
-                new ActionRegistry(),
-                new ConditionRegistry(),
-                EngineScheduler.of(sched),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener());
+        menus = Menus.builder(renderer, EngineScheduler.of(sched), new ListSourceRegistry())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener listener = MenuListener.builder(
+                        renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(sched), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

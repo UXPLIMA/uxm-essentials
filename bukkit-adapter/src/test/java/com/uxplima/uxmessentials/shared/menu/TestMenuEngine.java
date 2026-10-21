@@ -77,20 +77,11 @@ public final class TestMenuEngine {
 
     /** Build the click listener over {@code plugin} and register it so a dispatched click is routed. */
     public void installListener(Plugin plugin) {
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                null,
-                0L,
-                System::currentTimeMillis,
-                new com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry(),
-                null,
-                bindings.contents());
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .pagedLists(new com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry())
+                .contents(bindings.contents())
+                .build();
         plugin.getServer().getPluginManager().registerEvents(listener, plugin);
     }
 }

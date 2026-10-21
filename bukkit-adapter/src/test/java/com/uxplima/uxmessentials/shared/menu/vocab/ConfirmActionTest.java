@@ -27,7 +27,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
 import com.uxplima.uxmlib.menu.property.ConfirmOpener;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
@@ -72,19 +71,10 @@ class ConfirmActionTest {
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         confirm = new RecordingConfirm();
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                confirm,
-                0L,
-                System::currentTimeMillis,
-                new PagedListSourceRegistry(),
-                null);
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .confirmOpener(confirm)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

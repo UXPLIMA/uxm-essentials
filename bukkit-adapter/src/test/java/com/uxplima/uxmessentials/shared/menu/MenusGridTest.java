@@ -235,7 +235,12 @@ class MenusGridTest {
                 List.of(),
                 new ItemDecor(1, Optional.empty(), false, List.of()),
                 List.<com.uxplima.uxmlib.menu.spec.Ref>of(),
-                new ClickSpec(Map.<ClickKind, List<com.uxplima.uxmlib.menu.spec.Ref>>of(), Map.of()),
+                new ClickSpec(
+                        Map.<ClickKind, List<com.uxplima.uxmlib.menu.spec.Ref>>of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of()),
                 false,
                 Optional.empty(),
                 ItemType.NONE);

@@ -67,7 +67,9 @@ class MenuPapiSourceGoldenTest {
         Scheduler scheduler = new SyncScheduler();
         MenuSpecLoader loader = new MenuSpecLoader();
         lastMenu = new LastMenu();
-        menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists(), null, null, null, lastMenu);
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .lastMenu(lastMenu)
+                .build();
         menus.registerSpec("browse", loader.parse(BROWSE_HOCON));
         menus.registerSpec("argmenu", loader.parse(ARG_HOCON));
 

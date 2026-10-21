@@ -212,17 +212,10 @@ class ClickKindCooldownGoldenTest {
     }
 
     private void install(long defaultCooldownMs) {
-        MenuListener listener = new MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                null,
-                defaultCooldownMs,
-                this::now);
+        MenuListener listener = MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .clickCooldown(defaultCooldownMs, this::now)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

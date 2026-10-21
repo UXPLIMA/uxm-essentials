@@ -348,6 +348,8 @@ class ItemRendererTest {
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
+                DataComponents.NONE,
                 Optional.empty()));
     }
 

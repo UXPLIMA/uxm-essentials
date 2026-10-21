@@ -162,16 +162,11 @@ class BedrockNavigationGoldenTest {
 
     /** The production-shaped façade: the action/condition registries, a real reopen tracker, the fake detector/screen. */
     private Menus engine() {
-        Menus menus = new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                bindings.actions(),
-                bindings.conditions(),
-                new LastMenu(),
-                detector,
-                screen);
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .lastMenu(new LastMenu())
+                .bedrock(detector, screen)
+                .build();
         // The generic vocab (back/open) resolves through the very engine it drives; registering after construction is
         // fine because the engine holds the same registry instance this writes to.
         MenuVocabulary.registerActions(bindings, menus, false, new NoopLogger());

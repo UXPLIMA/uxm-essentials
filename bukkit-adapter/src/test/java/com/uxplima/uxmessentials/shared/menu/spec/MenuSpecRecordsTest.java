@@ -130,7 +130,10 @@ class MenuSpecRecordsTest {
                 Optional.empty(),
                 Map.of(),
                 0L,
-                true);
+                true,
+                false,
+                Optional.empty(),
+                Map.of());
     }
 
     /** A six-row plain chest carrying {@code items}: its slot-fit bound is 54. */
@@ -150,7 +153,11 @@ class MenuSpecRecordsTest {
                         Map.of(),
                         java.util.Optional.empty(),
                         Map.of(),
-                        -1L))
+                        -1L,
+                        false,
+                        false,
+                        Optional.empty(),
+                        Map.of()))
                 .isInstanceOf(IllegalArgumentException.class);
     }
 }

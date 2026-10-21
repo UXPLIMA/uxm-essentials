@@ -118,14 +118,10 @@ class MenuCommandTest {
             executedFor.set(c.player().getName());
             executedArg.set(c.arg());
         });
-        menus = new Menus(
-                renderer,
-                EngineScheduler.of(new SyncScheduler()),
-                new ListSourceRegistry(),
-                null,
-                bindings.actions(),
-                bindings.conditions(),
-                lastMenu);
+        menus = Menus.builder(renderer, EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .lastMenu(lastMenu)
+                .build();
         loader = new CustomMenuLoader(new MenuSpecLoader(), bindings, menus, new NoopLogger());
         MenuSpec spec = new MenuSpecLoader().parse(SPEC_HOCON);
         menus.registerSpec("shop", spec);

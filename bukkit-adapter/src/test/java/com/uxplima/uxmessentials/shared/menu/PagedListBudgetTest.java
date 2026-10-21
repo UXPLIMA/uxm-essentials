@@ -19,8 +19,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmlib.bedrock.BedrockDetector;
-import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.ConditionRegistry;
 import com.uxplima.uxmlib.menu.binding.ListSourceRegistry;
@@ -151,17 +149,9 @@ class PagedListBudgetTest {
     private Inventory openTop(BudgetSource source) {
         PagedListSourceRegistry paged = new PagedListSourceRegistry();
         paged.register("pw:browse", source);
-        Menus menus = new Menus(
-                renderer,
-                EngineScheduler.of(new SyncScheduler()),
-                new ListSourceRegistry(),
-                null,
-                null,
-                null,
-                null,
-                BedrockDetector.NONE,
-                BedrockScreen.NONE,
-                paged);
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(new SyncScheduler()), new ListSourceRegistry())
+                .pagedLists(paged)
+                .build();
         menus.registerSpec("test", new MenuSpecLoader().parse(PAGED_HOCON));
         menus.open(player, "test", null);
         return player.getOpenInventory().getTopInventory();

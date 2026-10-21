@@ -412,8 +412,9 @@ class CommunicationAdapterTest {
                 bindings.conditions());
         com.uxplima.uxmlib.menu.render.EditorRenderer editorRenderer =
                 new com.uxplima.uxmlib.menu.render.EditorRenderer(guiText, ThemeFile::shippedTheme);
-        return new com.uxplima.uxmlib.menu.Menus(
-                renderer, EngineScheduler.of(scheduler), bindings.lists(), editorRenderer);
+        return com.uxplima.uxmlib.menu.Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .editorRenderer(editorRenderer)
+                .build();
     }
 
     private BukkitAnnouncerBroadcaster announcerBroadcaster() {

@@ -182,6 +182,8 @@ class BedrockInputFormTest {
                 chatBackend,
                 detector,
                 screen,
+                null,
+                null,
                 EngineLog.of(log));
     }
 

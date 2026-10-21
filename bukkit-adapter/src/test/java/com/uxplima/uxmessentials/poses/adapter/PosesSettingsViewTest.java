@@ -150,16 +150,15 @@ class PosesSettingsViewTest {
         EditorRenderer editorRenderer = new EditorRenderer(guiText, ThemeFile::shippedTheme);
         ItemRenderer itemRenderer = new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry());
         MenuRenderer renderer = new MenuRenderer(itemRenderer, new ConditionRegistry());
-        Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry(), editorRenderer);
-        MenuListener listener = new MenuListener(
-                renderer,
-                new ActionRegistry(),
-                new ConditionRegistry(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                editorRenderer,
-                menus.selectorOpener(),
-                menus.confirmOpener());
+        Menus menus = Menus.builder(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry())
+                .editorRenderer(editorRenderer)
+                .build();
+        MenuListener listener = MenuListener.builder(
+                        renderer, new ActionRegistry(), new ConditionRegistry(), EngineScheduler.of(scheduler), plugin)
+                .editorRenderer(editorRenderer)
+                .selectorOpener(menus.selectorOpener())
+                .confirmOpener(menus.confirmOpener())
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
         return menus;
     }

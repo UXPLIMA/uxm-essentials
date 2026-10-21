@@ -28,7 +28,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.gui.input.InputMode;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.binding.PagedListSourceRegistry;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import com.uxplima.uxmlib.menu.runtime.MenuTextPrompt;
@@ -73,19 +72,10 @@ class InputActionTest {
         MenuRenderer renderer = new MenuRenderer(itemRenderer, bindings.conditions());
         menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
         prompt = new RecordingPrompt();
-        com.uxplima.uxmlib.menu.runtime.MenuListener listener = new com.uxplima.uxmlib.menu.runtime.MenuListener(
-                renderer,
-                bindings.actions(),
-                bindings.conditions(),
-                EngineScheduler.of(scheduler),
-                plugin,
-                null,
-                null,
-                null,
-                0L,
-                System::currentTimeMillis,
-                new PagedListSourceRegistry(),
-                prompt);
+        com.uxplima.uxmlib.menu.runtime.MenuListener listener = com.uxplima.uxmlib.menu.runtime.MenuListener.builder(
+                        renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin)
+                .textPrompt(prompt)
+                .build();
         server.getPluginManager().registerEvents(listener, plugin);
     }
 

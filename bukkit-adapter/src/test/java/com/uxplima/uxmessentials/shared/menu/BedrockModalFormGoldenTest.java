@@ -163,16 +163,10 @@ class BedrockModalFormGoldenTest {
 
     /** The production-shaped façade: the confirm renderer, plus the fake detector and screen. */
     private Menus engine() {
-        return new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                bindings.actions(),
-                bindings.conditions(),
-                null,
-                detector,
-                screen);
+        return Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .bedrock(detector, screen)
+                .build();
     }
 
     /** Whether the viewer is looking at one of this engine's chest windows. A gated/redirected confirm never opens one. */

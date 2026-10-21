@@ -73,8 +73,9 @@ class PinKeypadReopenLoopTest {
         GuiText guiText = new GuiText(new KeyMessages());
         MenuRenderer renderer = new MenuRenderer(
                 new ItemRenderer(guiText, ThemeFile::shippedTheme, new PlaceholderRegistry()), new ConditionRegistry());
-        menus = new Menus(
-                renderer, EngineScheduler.of(scheduler), new ListSourceRegistry(), null, null, new ConditionRegistry());
+        menus = Menus.builder(renderer, EngineScheduler.of(scheduler), new ListSourceRegistry())
+                .openRegistries(null, new ConditionRegistry())
+                .build();
         Logger log = new SilentLogger();
         menus.registerSpec(
                 PinKeypadView.CREATE_SPEC_ID,

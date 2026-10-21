@@ -196,16 +196,10 @@ class BedrockCustomFormGoldenTest {
 
     /** The production-shaped façade: action registry threaded in, plus the fake detector and screen. */
     private Menus engine() {
-        return new Menus(
-                renderer,
-                EngineScheduler.of(scheduler),
-                bindings.lists(),
-                null,
-                bindings.actions(),
-                bindings.conditions(),
-                null,
-                detector,
-                screen);
+        return Menus.builder(renderer, EngineScheduler.of(scheduler), bindings.lists())
+                .openRegistries(bindings.actions(), bindings.conditions())
+                .bedrock(detector, screen)
+                .build();
     }
 
     private void open(Menus menus, String specId) {

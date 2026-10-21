@@ -13,9 +13,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.packet.scoreboard.ScoreboardPacketEvents;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
-import com.uxplima.uxmlib.pipeline.PacketAction;
 import com.uxplima.uxmlib.pipeline.PacketListenerRegistry;
 import com.uxplima.uxmlib.pipeline.PacketPipeline;
+import com.uxplima.uxmlib.pipeline.PacketVerdict;
 import org.jspecify.annotations.NullMarked;
 
 /** Connects the renderer's ownership state machine to outbound scoreboard packets without cancelling foreign traffic. */
@@ -41,7 +41,7 @@ public final class ScoreboardOwnership {
                     }
                 }
             }
-            return PacketAction.PASS;
+            return PacketVerdict.pass();
         });
         this.pipeline = new PacketPipeline(
                 Objects.requireNonNull(channels, "channels"),
