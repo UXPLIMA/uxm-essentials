@@ -9,8 +9,12 @@ import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
-import com.uxplima.uxmlib.text.style.TitleAlignment;
+import com.uxplima.uxmlib.text.GlyphWidthTable;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.junit.jupiter.api.Test;
+import org.spongepowered.configurate.CommentedConfigurationNode;
+import org.spongepowered.configurate.ConfigurationNode;
+import org.spongepowered.configurate.serialize.SerializationException;
 
 /**
  * Pins how a window titles itself: centred unless the theme says left, padded only when its width can be measured,
@@ -20,7 +24,7 @@ class MenuTitlesTest {
 
     @Test
     void aTitleIsPaddedIntoTheMiddleOfTheWindow() {
-        Component centred = MenuTitles.centre(Component.text("Warps"));
+        Component centred = StyledText.title(Component.text("Warps"));
 
         String plain = PlainTextComponentSerializer.plainText().serialize(centred);
         assertThat(plain).startsWith(" ").endsWith("Warps");
@@ -32,9 +36,9 @@ class MenuTitlesTest {
         // The client draws a chest label from an origin eight pixels inside a window 176 wide, so a title is
         // centred when half the free width either side of it, less that origin, is spent on spaces.
         for (String title : new String[] {"Warps", "Management hub", "A", "The longest title a window holds"}) {
-            String plain = PlainTextComponentSerializer.plainText().serialize(MenuTitles.centre(Component.text(title)));
+            String plain = PlainTextComponentSerializer.plainText().serialize(StyledText.title(Component.text(title)));
             int pad = plain.length() - plain.stripLeading().length();
-            int centre = 8 + 4 * pad + FontWidths.of(title) / 2;
+            int centre = 8 + 4 * pad + GlyphWidthTable.widthOf(title, false) / 2;
 
             assertThat(Math.abs(centre - 88))
                     .as("title '%s' sits at %d", title, centre)
@@ -44,7 +48,7 @@ class MenuTitlesTest {
 
     @Test
     void noDashesAreWrappedAroundIt() {
-        String plain = PlainTextComponentSerializer.plainText().serialize(MenuTitles.centre(Component.text("Warps")));
+        String plain = PlainTextComponentSerializer.plainText().serialize(StyledText.title(Component.text("Warps")));
 
         assertThat(plain).doesNotContain("-");
     }
@@ -61,7 +65,7 @@ class MenuTitlesTest {
                 .decorate(TextDecoration.BOLD)
                 .append(Component.text(" Castle", NamedTextColor.AQUA));
 
-        Component centred = MenuTitles.centre(painted);
+        Component centred = StyledText.title(painted);
 
         assertThat(centred.children()).contains(painted);
         assertThat(PlainTextComponentSerializer.plainText().serialize(centred))
@@ -76,21 +80,21 @@ class MenuTitlesTest {
         Component glyph = Component.text(
                 "\uE000", Style.style().font(Key.key("pack", "menus")).build());
 
-        assertThat(MenuTitles.centre(negativeSpace)).isSameAs(negativeSpace);
-        assertThat(MenuTitles.centre(glyph)).isSameAs(glyph);
+        assertThat(StyledText.title(negativeSpace)).isSameAs(negativeSpace);
+        assertThat(StyledText.title(glyph)).isSameAs(glyph);
     }
 
     /** A theme that says left leaves every title where the client draws it. */
     @Test
-    void aLeftThemeLeavesTheTitleAsWritten() {
+    void aLeftThemeLeavesTheTitleAsWritten() throws SerializationException {
         Component title = Component.text("Warps");
         try {
-            MenuTitles.useAlignment(TitleAlignment.LEFT);
-            assertThat(MenuTitles.centre(title)).isSameAs(title);
+            StyleTags.use(Theme.from(leftTitles()));
+            assertThat(StyledText.title(title)).isSameAs(title);
         } finally {
-            MenuTitles.useAlignment(TitleAlignment.CENTRE);
+            StyleTags.use(ThemeFile.shippedTheme());
         }
-        assertThat(PlainTextComponentSerializer.plainText().serialize(MenuTitles.centre(title)))
+        assertThat(PlainTextComponentSerializer.plainText().serialize(StyledText.title(title)))
                 .startsWith(" ");
     }
 
@@ -98,6 +102,12 @@ class MenuTitlesTest {
     void aBlankTitleIsHandedBackUntouchedRatherThanPaddedIntoSpaces() {
         Component blank = Component.empty();
 
-        assertThat(MenuTitles.centre(blank)).isSameAs(blank);
+        assertThat(StyledText.title(blank)).isSameAs(blank);
+    }
+
+    private static ConfigurationNode leftTitles() throws SerializationException {
+        ConfigurationNode node = CommentedConfigurationNode.root();
+        node.node("menu-titles").set("left");
+        return node;
     }
 }

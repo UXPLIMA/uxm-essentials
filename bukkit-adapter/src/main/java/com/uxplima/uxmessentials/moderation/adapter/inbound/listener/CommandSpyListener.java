@@ -9,8 +9,6 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.CommandSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -30,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  * spying the listener short-circuits before resolving the runner, so an idle server pays nothing.
  *
  * <p>The runner's name and the command they typed are player-controlled and flow into a MiniMessage template
- * downstream, so both are run through {@link MiniMessage#escapeTags} here before substitution, otherwise a
+ * downstream, so both are run through {@link StyledText#escape} here before substitution, otherwise a
  * player could type a command containing MiniMessage markup (including a clickable {@code run_command}) and
  * have it rendered, and clicked, in staff chat.
  */

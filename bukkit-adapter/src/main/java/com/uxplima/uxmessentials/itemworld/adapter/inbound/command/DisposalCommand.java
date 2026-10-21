@@ -16,7 +16,6 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.Guis;
@@ -80,7 +79,7 @@ public final class DisposalCommand extends ItemworldCommandSupport implements Co
     private Component title(PlayerRef viewer) {
         // Centred and bare, like every other window title: this one opens a real container rather than a menu, so
         // it does not pass through the engine that would otherwise do it.
-        return MenuTitles.centre(StyledText.render(
-                services.kernel().messages().resolve(viewer, ItemworldMessageKey.DISPOSAL_TITLE, Map.of())));
+        return StyledText.title(
+                services.kernel().messages().resolve(viewer, ItemworldMessageKey.DISPOSAL_TITLE, Map.of()));
     }
 }

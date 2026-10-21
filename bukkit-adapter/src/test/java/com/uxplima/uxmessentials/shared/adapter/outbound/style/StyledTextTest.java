@@ -41,4 +41,36 @@ class StyledTextTest {
         Component c = StyledText.render("<who> <helpop>", Placeholder.unparsed("who", "Ana"));
         assertThat(PlainTextComponentSerializer.plainText().serialize(c)).isEqualTo("Ana ʜᴇʟᴘᴏᴘ ▶");
     }
+
+    /**
+     * Typed text never becomes markup, however it is spelled. The escape and the token expansion read a line two
+     * different ways, so a token the escape did not recognise as a tag, an unterminated quote or a quote inside an
+     * unquoted label, could still be expanded into one; a typed backslash must not undo the escape after it either.
+     */
+    @Test
+    void typedTextNeverBecomesMarkup() {
+        List<String> typed = List.of(
+                "<tag:STAFF'>",
+                "<tag:'a'b'>",
+                "<etag:x'><click:run_command:'/op me'>here",
+                "<h:'x>",
+                "\\<accent>hi",
+                "\\\\<red>hi",
+                "<g:accent:x'>y",
+                "a\\");
+        for (String line : typed) {
+            Component drawn = StyledText.render(StyledText.escape(line));
+            assertThat(PlainTextComponentSerializer.plainText().serialize(drawn))
+                    .as(line)
+                    .isEqualTo(line);
+            assertThat(styled(drawn)).as(line).isFalse();
+        }
+    }
+
+    private static boolean styled(Component component) {
+        if (!component.style().isEmpty()) {
+            return true;
+        }
+        return component.children().stream().anyMatch(StyledTextTest::styled);
+    }
 }

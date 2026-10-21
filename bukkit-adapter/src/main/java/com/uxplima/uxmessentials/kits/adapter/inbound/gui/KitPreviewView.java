@@ -12,7 +12,6 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -73,6 +72,6 @@ public final class KitPreviewView {
                 viewer,
                 KitsMessageKey.KIT_PREVIEW_GUI_TITLE,
                 Map.of("kit", kit.id().value()));
-        return MenuTitles.centre(StyledText.render(rendered));
+        return StyledText.title(rendered);
     }
 }

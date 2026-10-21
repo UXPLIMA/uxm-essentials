@@ -69,7 +69,7 @@ class UsageBindingTest {
                 .doesNotThrowAnyException();
 
         assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
-        assertThat(messages.lastPlaceholders)
+        assertThat(drawn(messages.lastPlaceholders))
                 .containsEntry("command", "gamemode")
                 .containsEntry("usage", "<mode> [<player>]")
                 .containsEntry("description", "Set game mode.");
@@ -113,7 +113,7 @@ class UsageBindingTest {
                 .doesNotThrowAnyException();
 
         assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
-        assertThat(messages.lastPlaceholders)
+        assertThat(drawn(messages.lastPlaceholders))
                 .containsEntry("command", "warp create")
                 .containsEntry("usage", "<name>");
     }
@@ -214,7 +214,9 @@ class UsageBindingTest {
         dispatch(wrapped, "eco", CommandSourceStackMock.from(player));
 
         assertThat(messages.lastKey).isEqualTo(SharedMessageKey.COMMAND_USAGE);
-        assertThat(messages.lastPlaceholders).containsEntry("command", "eco").containsEntry("usage", "give <amount>");
+        assertThat(drawn(messages.lastPlaceholders))
+                .containsEntry("command", "eco")
+                .containsEntry("usage", "give <amount>");
         assertThat(nextPlainMessage(player)).isEqualTo("screen opened");
     }
 
@@ -352,6 +354,16 @@ class UsageBindingTest {
         public String description() {
             return "Home base.";
         }
+    }
+
+    /** Each value as the player reads it once the line is drawn: the escaping that keeps it text is not part of it. */
+    private static Map<String, String> drawn(Map<String, String> placeholders) {
+        Map<String, String> read = new java.util.HashMap<>();
+        placeholders.forEach((name, value) -> read.put(
+                name,
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText.render(value))));
+        return read;
     }
 
     /** Echoes the resolved key suffix and placeholders so the usage reply is assertable. */

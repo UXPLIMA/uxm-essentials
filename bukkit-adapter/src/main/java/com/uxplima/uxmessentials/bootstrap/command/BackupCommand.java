@@ -9,14 +9,13 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,9 +43,8 @@ public final class BackupCommand implements CommandRegistration {
     private static final String DESCRIPTION = "Snapshot the plugin's data directory on demand.";
 
     /** Escapes a path, which is data and may hold any character, before it is placed in a catalogue line. */
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-
     private final DataDirBackupSnapshot snapshot;
+
     private final Scheduler scheduler;
     private final Logger log;
     private final CommandFeedback feedback;
@@ -86,7 +84,7 @@ public final class BackupCommand implements CommandRegistration {
                 feedback.send(
                         sender,
                         SharedMessageKey.ADMIN_BACKUP_DONE,
-                        Map.of("location", MINI_MESSAGE.escapeTags(location.toString())));
+                        Map.of("location", StyledText.escape(location.toString())));
                 feedback.send(sender, SharedMessageKey.ADMIN_BACKUP_SCOPE);
             });
         } catch (RuntimeException failure) {

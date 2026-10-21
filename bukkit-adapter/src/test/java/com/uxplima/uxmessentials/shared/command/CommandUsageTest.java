@@ -46,7 +46,7 @@ class CommandUsageTest {
 
         CommandUsage.send(messages, server.addPlayer("Ayse"), "pay", "<player> <amount> [currency]", "Pay money");
 
-        assertThat(messages.placeholders)
+        assertThat(drawn(messages.placeholders))
                 .containsEntry("command", "pay")
                 .containsEntry("usage", "<player> <amount> [currency]")
                 .containsEntry("description", "Başka bir oyuncuya para gönder.");
@@ -72,6 +72,16 @@ class CommandUsageTest {
         assertThat(messages.placeholders.get("usage"))
                 .isNotEqualTo("(clear|<value>)")
                 .contains("value");
+    }
+
+    /** Each value as the player reads it once the line is drawn: the escaping that keeps it text is not part of it. */
+    private static Map<String, String> drawn(Map<String, String> placeholders) {
+        Map<String, String> read = new java.util.HashMap<>();
+        placeholders.forEach((name, value) -> read.put(
+                name,
+                net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText()
+                        .serialize(com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText.render(value))));
+        return read;
     }
 
     private static final class Recording implements Messages {

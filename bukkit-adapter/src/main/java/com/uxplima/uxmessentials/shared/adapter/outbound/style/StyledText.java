@@ -1,19 +1,14 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
 import java.util.Objects;
-import java.util.Set;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.Context;
-import net.kyori.adventure.text.minimessage.MiniMessage;
-import net.kyori.adventure.text.minimessage.tag.Tag;
-import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmlib.gui.style.MenuTitles;
 import com.uxplima.uxmlib.text.Text;
 import com.uxplima.uxmlib.text.style.StyleTokens;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Turns a line into what a client is shown: the library's style tokens expanded with the theme in use, then parsed
@@ -26,24 +21,6 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class StyledText {
-
-    /** The tokens a heading or a prefix is written with, which the library expands. */
-    private static final Set<String> LABEL_TOKENS = Set.of("tag", "etag", "h", "g");
-
-    /** Every name a line could style with: a role of the theme, a label token, or a tag of this plugin. */
-    private static final TagResolver STYLE_NAMES = new TagResolver() {
-        @Override
-        public @Nullable Tag resolve(String name, ArgumentQueue arguments, Context ctx) {
-            return null;
-        }
-
-        @Override
-        public boolean has(String name) {
-            return StyleTags.theme().hasColour(name)
-                    || LABEL_TOKENS.contains(name)
-                    || StyleTags.resolver().has(name);
-        }
-    };
 
     private StyledText() {}
 
@@ -61,11 +38,38 @@ public final class StyledText {
     }
 
     /**
-     * {@code text} with every tag it could style with escaped, so a name or a message somebody typed reads as typed
-     * when it is put into a line: {@code <accent>} in a chat message is the word, not the colour.
+     * {@code source} drawn as a window title: rendered as any line is, then placed where the theme puts titles, by the
+     * library's {@link MenuTitles}, so a window of this plugin lines up with a window of every other.
+     */
+    public static Component title(String source) {
+        return title(render(source));
+    }
+
+    /** {@code drawn} placed where the theme puts window titles. */
+    public static Component title(Component drawn) {
+        Objects.requireNonNull(drawn, "drawn");
+        return MenuTitles.lay(drawn, StyleTags.theme().titleAlignment());
+    }
+
+    /**
+     * {@code text} as typed, safe to put into a line: a name or a message somebody wrote reads as written, and
+     * {@code <accent>} or {@code <click:...>} in it is the words, not the style.
+     *
+     * <p>Every {@code <} and every backslash is escaped, whatever follows it. Escaping only what parses as a tag is not
+     * enough, because a line is read twice, by the token expansion and then by the parser, and the two disagree about
+     * a malformed tag: an unterminated quote the parser passed over as text was expanded into markup, and a click
+     * written after it ran.
      */
     public static String escape(String text) {
         Objects.requireNonNull(text, "text");
-        return MiniMessage.miniMessage().escapeTags(text, STYLE_NAMES);
+        StringBuilder escaped = new StringBuilder(text.length() + 8);
+        for (int i = 0; i < text.length(); i++) {
+            char character = text.charAt(i);
+            if (character == '<' || character == '\\') {
+                escaped.append('\\');
+            }
+            escaped.append(character);
+        }
+        return escaped.toString();
     }
 }

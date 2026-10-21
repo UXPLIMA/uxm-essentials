@@ -11,7 +11,6 @@ import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
@@ -74,7 +73,6 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         try {
             Theme theme = ThemeFile.theme(getDataFolder().toPath());
             StyleTags.use(theme);
-            MenuTitles.useAlignment(theme.titleAlignment());
         } catch (RuntimeException unreadableTheme) {
             getLogger().log(Level.WARNING, "using the shipped colours: " + unreadableTheme.getMessage());
         }

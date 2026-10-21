@@ -251,7 +251,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlacehold
 import com.uxplima.uxmessentials.shared.adapter.outbound.playerdata.CachingPlayerDataStore;
 import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClientProtocol;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
@@ -452,9 +451,9 @@ public final class PluginModule {
                 "theme",
                 () -> {
                     engineTheme.reload();
-                    // One theme for every reader: the lines, the glyph a tile opens with, and the menu engine.
+                    // One theme for every reader: the lines, where a window title sits, the glyph a tile opens with,
+                    // and the menu engine.
                     StyleTags.use(engineTheme.get());
-                    MenuTitles.useAlignment(engineTheme.get().titleAlignment());
                 },
                 "colours re-read from disk"));
         resources.addReloadTask(
