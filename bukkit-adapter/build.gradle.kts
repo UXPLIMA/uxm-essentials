@@ -128,6 +128,10 @@ dependencies {
     }
 
     testImplementation(libs.mockbukkit)
+    // The packet hologram's test kit: a recording packet sink and a probe that reads back what a client holds.
+    testImplementation(testFixtures(libs.uxmlib.packet)) {
+        exclude(group = "org.spongepowered")
+    }
     testImplementation(libs.archunit.junit)
     testImplementation(libs.paper.api)
     testImplementation(libs.vault.api) // the migration live-feed tests stub a Vault Economy provider
