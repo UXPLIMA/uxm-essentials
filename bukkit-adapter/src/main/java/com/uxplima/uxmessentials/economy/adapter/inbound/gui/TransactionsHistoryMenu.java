@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.menu.Menus;
@@ -74,7 +75,8 @@ public final class TransactionsHistoryMenu {
         // The player and bank titles each take one argument; both read the subject's single title argument, and only
         // the token the active title key names is filled: the other simply goes unused.
         bindings.placeholder("history_player", ctx -> subject(ctx).titleArg());
-        bindings.placeholder("history_bank", ctx -> subject(ctx).titleArg());
+        bindings.placeholder(
+                "history_bank", ctx -> StyledText.escape(subject(ctx).titleArg()));
         bindings.placeholder("history_icon", ctx -> iconMaterial(entry(ctx)));
         bindings.placeholder("history_type_key", ctx -> typeKey(entry(ctx)));
         bindings.placeholder("history_id", ctx -> Long.toString(entry(ctx).id()));

@@ -90,7 +90,7 @@ public final class BankListMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("economy:banks", ctx -> subject(ctx).banks());
-        bindings.placeholder("bank_name", ctx -> entry(ctx).name());
+        bindings.placeholder("bank_name", ctx -> StyledText.escape(entry(ctx).name()));
         bindings.placeholder("bank_id", ctx -> entry(ctx).id());
         bindings.placeholder("bank_balance", ctx -> balanceText(entry(ctx)));
         bindings.placeholder("bank_creator", ctx -> entry(ctx).creator().name());
@@ -180,7 +180,7 @@ public final class BankListMenu {
                     player.sendMessage(text(
                             viewer,
                             EconomyMessageKey.BANK_CREATE_SUCCESS,
-                            Map.of("id", bank.id(), "name", bank.name())));
+                            Map.of("id", bank.id(), "name", StyledText.escape(bank.name()))));
                 } else {
                     player.sendMessage(text(viewer, res.errorOrThrow().messageKey(), Map.of()));
                 }

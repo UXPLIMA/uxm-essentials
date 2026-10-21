@@ -87,7 +87,9 @@ public final class BankActionsMenu {
         Objects.requireNonNull(bindings, "bindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
-        bindings.placeholder("bank_actions_name", ctx -> subject(ctx).bank().name());
+        bindings.placeholder(
+                "bank_actions_name",
+                ctx -> StyledText.escape(subject(ctx).bank().name()));
         bindings.action("economy:bank-deposit", ctx -> promptTransfer(ctx, true));
         bindings.action("economy:bank-deposit-withdraw", ctx -> promptTransfer(ctx, false));
         bindings.action("economy:bank-members", this::openMembers);
@@ -134,7 +136,7 @@ public final class BankActionsMenu {
         String inputKey = deposit ? "bank.deposit" : "bank.withdraw";
         textInput.prompt(
                 player,
-                InputRequest.of(inputKey, promptKey.key(), Map.of("bank", bank.name())),
+                InputRequest.of(inputKey, promptKey.key(), Map.of("bank", StyledText.escape(bank.name()))),
                 input -> applyTransfer(player, viewer, bank, input, deposit),
                 () -> navigation.get().bankListMenu().open(player));
     }

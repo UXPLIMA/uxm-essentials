@@ -141,6 +141,18 @@ class BankListGoldenTest {
         assertThat(engine).isEqualTo(baseline);
     }
 
+    /**
+     * A bank's name is what its creator typed, and every member reads it: it shows as typed, never as markup, so one
+     * player cannot paint or rewrite the line another player's window shows.
+     */
+    @Test
+    void aBankNameReadsAsTypedInAnotherPlayersWindow() {
+        String typed = "<red>Official</red> <tag:'STAFF'>";
+        seedBanks(bankFor("eEa12523", typed));
+
+        assertThat(snapshotEngine().values()).extracting(Snapshot::name).contains(typed);
+    }
+
     @Test
     void clickingABankThroughTheEngineOpensThatBanksActionsHub() {
         seedBanks(bankFor("eEa12523", "Vault"));

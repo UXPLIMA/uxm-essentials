@@ -93,7 +93,8 @@ public final class BankMembersMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("economy:bank-members", ctx -> subject(ctx).members());
-        bindings.placeholder("bank_members_title", ctx -> subject(ctx).name());
+        bindings.placeholder(
+                "bank_members_title", ctx -> StyledText.escape(subject(ctx).name()));
         bindings.placeholder("bank_member", ctx -> member(ctx).player().name());
         bindings.placeholder("bank_member_role", ctx -> member(ctx).role().name());
         bindings.condition(
