@@ -166,8 +166,11 @@ public final class HologramsWiring {
                 HologramRepositories.cachedConcrete(persistence);
         HologramRepository repository =
                 com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.repository(cached, bus.publisher());
-        HologramManager manager = new HologramManager();
+        // Each hologram carries this plugin's name, so one a crash left standing is taken down as its chunk loads
+        // rather than gathering company over every restart. Another plugin's displays are never touched.
+        HologramManager manager = new HologramManager(plugin.getName());
         manager.installLifecycleListener(plugin);
+        manager.sweepLeftoversAsTheyLoad(plugin);
         // A hologram is one shared TextDisplay. Its broadcast text resolves placeholders server-globally (online,
         // time, TPS); the identity transform when PlaceholderAPI is absent, so a default server pays nothing. On
         // top of that base, a line embedding a placeholder additionally renders per viewer through the text-override
