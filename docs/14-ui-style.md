@@ -13,6 +13,11 @@ The palette is `theme.conf`, and it is shared with the other plugins of this fam
 second plugin a server installs finds the file the first one wrote. Nothing hardcodes a
 colour, and nothing writes a legacy colour code.
 
+A tile title is painted in the family of the colour its catalogue line gave it. The four
+families are gradients in that file: `tile` for anything neutral, `tile-money` for the good
+colour, `tile-danger` for the bad one and `tile-attention` for the warn one. A server that
+names none of them gets ramps made from its own roles. A server that writes one keeps it.
+
 ## 14.2 MiniMessage, and no legacy codes
 
 Every line a player reads is MiniMessage, and every one of them comes out of the catalogue.

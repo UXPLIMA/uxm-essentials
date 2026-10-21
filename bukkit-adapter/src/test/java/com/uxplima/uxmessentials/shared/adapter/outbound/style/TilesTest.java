@@ -5,9 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.util.List;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -48,7 +51,7 @@ class TilesTest {
                 Tiles.titled(TITLE.color(StyleTags.value()), List.of(CRUMB)).get(0);
         Component title = head.children().get(1);
 
-        assertThat(title.children().get(0).color()).isEqualTo(StyleTags.accent());
+        assertThat(firstLetterColour(title, null)).isEqualTo(StyleTags.accent());
     }
 
     @Test
@@ -80,5 +83,20 @@ class TilesTest {
 
     private static String plain(Component component) {
         return PlainTextComponentSerializer.plainText().serialize(component);
+    }
+
+    /** The colour the first letter of {@code component} is drawn in, inherited from its parents as a client reads it. */
+    private static @Nullable TextColor firstLetterColour(Component component, @Nullable TextColor inherited) {
+        TextColor colour = component.color() != null ? component.color() : inherited;
+        if (component instanceof TextComponent text && !text.content().isBlank()) {
+            return colour;
+        }
+        for (Component child : component.children()) {
+            TextColor found = firstLetterColour(child, colour);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 }

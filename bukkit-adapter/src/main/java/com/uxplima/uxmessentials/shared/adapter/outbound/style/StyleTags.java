@@ -126,27 +126,17 @@ public final class StyleTags {
 
     /** The lighter half of the money ramp. */
     public static TextColor emerald() {
-        return next(good(), "emerald");
+        return ThemeFile.lighter(theme, good(), "emerald");
     }
 
     /** The lighter half of the denial ramp. */
     public static TextColor rose() {
-        return next(bad(), "rose");
+        return ThemeFile.lighter(theme, bad(), "rose");
     }
 
     /** The lighter half of the attention ramp. */
     public static TextColor yellow() {
-        return next(gold(), "yellow");
-    }
-
-    /**
-     * The colour after {@code colour} on the theme's wheel, so a ramp runs inside one family of the server's own
-     * colours; the {@code fallback} role when the wheel does not hold the colour.
-     */
-    private static TextColor next(TextColor colour, String fallback) {
-        java.util.List<TextColor> wheel = theme.wheel();
-        int at = wheel.indexOf(colour);
-        return at < 0 ? theme.colour(fallback) : wheel.get((at + 1) % wheel.size());
+        return ThemeFile.lighter(theme, gold(), "yellow");
     }
 
     /**

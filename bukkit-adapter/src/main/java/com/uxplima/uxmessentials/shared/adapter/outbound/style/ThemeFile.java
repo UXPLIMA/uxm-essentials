@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+import net.kyori.adventure.text.format.TextColor;
+
 import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -48,6 +50,18 @@ public final class ThemeFile {
     /** The colour of every role this plugin ships, which an operator's file overrides role by role. */
     private static final Map<String, String> SHIPPED_COLOURS = shippedColours();
 
+    /** The ramp a tile title is painted in when it arrived uncoloured or in a reading colour. */
+    public static final String TILE = "tile";
+
+    /** The ramp of a tile title that arrived in the good colour: money and success. */
+    public static final String TILE_MONEY = "tile-money";
+
+    /** The ramp of a tile title that arrived in the bad colour: denial and danger. */
+    public static final String TILE_DANGER = "tile-danger";
+
+    /** The ramp of a tile title that arrived in the warn colour: attention. */
+    public static final String TILE_ATTENTION = "tile-attention";
+
     private ThemeFile() {}
 
     /** The shared file, worked out from this plugin's data folder. */
@@ -74,7 +88,7 @@ public final class ThemeFile {
             ConfigurationNode merged = node(dataFolder.resolve(FILE));
             merged.mergeFrom(node(shared(dataFolder)));
             merged.mergeFrom(shippedLook());
-            return Theme.from(merged);
+            return complete(merged);
         } catch (ConfigurateException unreadable) {
             throw new IllegalStateException(
                     "cannot read " + shared(dataFolder) + ": " + unreadable.getMessage(), unreadable);
@@ -105,15 +119,57 @@ public final class ThemeFile {
             ConfigurationNode merged = node(dataFolder.resolve(FILE));
             merged.mergeFrom(node(shared(dataFolder)));
             merged.mergeFrom(shippedLook());
-            return Theme.from(merged);
+            return complete(merged);
         } catch (ConfigurateException unreadable) {
-            return Theme.from(shippedLook());
+            return shippedTheme();
         }
     }
 
     /** The shipped look on its own, for a caller with no data folder to read from (a test, a fixture). */
     public static Theme shippedTheme() {
-        return Theme.from(shippedLook());
+        try {
+            return complete(shippedLook());
+        } catch (SerializationException impossible) {
+            throw new IllegalStateException("cannot complete the shipped look", impossible);
+        }
+    }
+
+    /**
+     * The colour after {@code colour} on the theme's wheel, so a ramp stays inside one family of the server's own
+     * colours, or the {@code fallback} role when the wheel does not hold it.
+     */
+    public static TextColor lighter(Theme theme, TextColor colour, String fallback) {
+        Objects.requireNonNull(theme, "theme");
+        Objects.requireNonNull(colour, "colour");
+        Objects.requireNonNull(fallback, "fallback");
+        List<TextColor> wheel = theme.wheel();
+        int at = wheel.indexOf(colour);
+        return at < 0 ? theme.colour(fallback) : wheel.get((at + 1) % wheel.size());
+    }
+
+    /**
+     * {@code merged} read as a theme, with the four tile title ramps filled in from its own colours where the file
+     * names none: a tile title is painted in the family of the colour it arrived in, so each family needs a ramp, and
+     * each ramp follows the roles the server chose. An operator who writes one of the four gradients keeps it.
+     */
+    private static Theme complete(ConfigurationNode merged) throws SerializationException {
+        Theme first = Theme.from(merged);
+        TextColor good = first.colour("good");
+        TextColor bad = first.colour("bad");
+        TextColor warn = first.colour("warn");
+        ramp(merged, TILE, first.colour("accent"), first.colour("value"));
+        ramp(merged, TILE_MONEY, lighter(first, good, "emerald"), good);
+        ramp(merged, TILE_DANGER, bad, lighter(first, bad, "rose"));
+        ramp(merged, TILE_ATTENTION, warn, lighter(first, warn, "yellow"));
+        return Theme.from(merged);
+    }
+
+    private static void ramp(ConfigurationNode merged, String name, TextColor from, TextColor to)
+            throws SerializationException {
+        ConfigurationNode gradient = merged.node("gradients", name);
+        if (gradient.virtual() || gradient.empty()) {
+            gradient.setList(String.class, List.of(from.asHexString(), to.asHexString()));
+        }
     }
 
     /**
