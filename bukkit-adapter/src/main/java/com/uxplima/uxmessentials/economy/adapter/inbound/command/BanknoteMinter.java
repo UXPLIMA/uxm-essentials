@@ -15,13 +15,12 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.BanknoteStore;
 import com.uxplima.uxmessentials.economy.domain.Banknote;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -43,7 +42,6 @@ final class BanknoteMinter {
     private final NamespacedKey valueKey;
     private final NamespacedKey currencyKey;
     private final NamespacedKey tokenKey;
-    private final MiniMessage miniMessage;
     private final Messages messages;
     private final BanknoteStore banknoteStore;
 
@@ -52,7 +50,6 @@ final class BanknoteMinter {
         this.valueKey = new NamespacedKey(plugin, "banknote_value");
         this.currencyKey = new NamespacedKey(plugin, "banknote_currency");
         this.tokenKey = new NamespacedKey(plugin, "banknote_token");
-        this.miniMessage = MiniMessage.miniMessage();
         this.messages = Objects.requireNonNull(messages, "messages");
         this.banknoteStore = Objects.requireNonNull(banknoteStore, "banknoteStore");
     }
@@ -102,8 +99,7 @@ final class BanknoteMinter {
 
     /** Resolve an item name/lore line in the recipient's locale and parse it to a non-italic Component. */
     private Component itemText(PlayerRef recipient, EconomyMessageKey key, Map<String, String> placeholders) {
-        return miniMessage
-                .deserialize(messages.resolve(recipient, key, placeholders), StyleTags.resolver())
+        return StyledText.render(messages.resolve(recipient, key, placeholders))
                 .decoration(TextDecoration.ITALIC, false);
     }
 }

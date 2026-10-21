@@ -12,14 +12,12 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.health.HealthCheck;
 import com.uxplima.uxmessentials.shared.application.health.HealthReport;
 import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
@@ -75,9 +73,8 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private static final String IMPORT_ARGUMENTS = "<source> [--dry-run]";
 
     /** Escapes data, a module id or a check's own message, before it is placed in a catalogue line. */
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
-
     private final ModuleRegistry registry;
+
     private final ConfigStore config;
     private final MigrationImportNode importNode;
     private final GuiSubcommand guiNode;
@@ -525,7 +522,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     }
 
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
+        return StyledText.escape(text);
     }
 
     private @Nullable FeatureModule resolve(String requested) {

@@ -9,7 +9,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -28,8 +28,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class HudText {
-
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     /** The catalogue the operator's {@code @key} lines read from: none until the kernel is wired. */
     private static volatile CatalogLines catalogLines = CatalogLines.none();
@@ -86,6 +84,6 @@ public final class HudText {
     /** Parse already-expanded operator MiniMessage without running PlaceholderAPI a second time. */
     public static Component parse(String miniMessageSource) {
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
-        return MINI_MESSAGE.deserialize(miniMessageSource, StyleTags.resolver());
+        return StyledText.render(miniMessageSource);
     }
 }

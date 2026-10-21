@@ -8,14 +8,12 @@ import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -90,7 +88,7 @@ abstract class MessagingCommandSupport {
         if (!sender.hasPermission(COLOUR)) {
             // Against the theme's tags too, because the body is parsed with them: escaping MiniMessage's own
             // alone let a player write <tag:'STAFF'> and hand the receiver a staff badge.
-            text = MiniMessage.miniMessage().escapeTags(text, StyleTags.resolver());
+            text = StyledText.escape(text);
         }
         try {
             return MessageBody.of(text);

@@ -13,7 +13,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,7 +42,6 @@ import org.jspecify.annotations.NullMarked;
 public final class BukkitMessageSink implements MessageSink {
 
     private final Scheduler scheduler;
-    private final MiniMessage miniMessage;
     private final String prefixTemplate;
     private final Function<UUID, UnaryOperator<String>> preParse;
 
@@ -58,7 +57,6 @@ public final class BukkitMessageSink implements MessageSink {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.prefixTemplate = Objects.requireNonNull(prefixTemplate, "prefixTemplate");
         this.preParse = Objects.requireNonNull(preParse, "preParse");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     @Override
@@ -67,7 +65,7 @@ public final class BukkitMessageSink implements MessageSink {
         Objects.requireNonNull(renderedText, "renderedText");
         String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Component component = miniMessage.deserialize(expanded, prefix, StyleTags.resolver());
+        Component component = StyledText.render(expanded, prefix);
         if (viewer.isSystem()) {
             scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
             return;

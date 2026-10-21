@@ -2,26 +2,23 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.List;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import org.junit.jupiter.api.Test;
-import org.spongepowered.configurate.CommentedConfigurationNode;
-import org.spongepowered.configurate.ConfigurationNode;
+import org.junit.jupiter.api.io.TempDir;
 
 class StyleTagsTest {
 
-    private final MiniMessage mini = MiniMessage.miniMessage();
-
     private Component parse(String src) {
-        return mini.deserialize(src, StyleTags.resolver());
+        return StyledText.render(src);
     }
 
     private TextColor firstColor(Component root) {
@@ -113,12 +110,17 @@ class StyleTagsTest {
         assertThat(colorOfRun(parse("<tag:'BANK'> hi"), "ʙᴀɴᴋ")).isEqualTo(StyleTags.good());
     }
 
+    /**
+     * An error prefix shows the word its line writes, in the denial colour. It used to drop the label and write
+     * "error" in English for every language; each catalogue now writes its own error word there, which
+     * {@code EveryRefusalReadsAsAnErrorTest} keeps to one word per language.
+     */
     @Test
-    void etagRendersTheRedErrorWordWhicheverModuleRaisedIt() {
-        Component c = parse("<etag:'ECONOMY'> oops");
+    void etagRendersTheErrorWordItsLineWritesInRed() {
+        Component c = parse("<etag:'HATA'> oops");
         String plain = PlainTextComponentSerializer.plainText().serialize(c);
-        assertThat(plain).isEqualTo("ᴇʀʀᴏʀ ▶ oops");
-        assertThat(colorOfRun(c, "ᴇʀʀᴏʀ")).isEqualTo(StyleTags.bad());
+        assertThat(plain).isEqualTo("ʜᴀᴛᴀ ▶ oops");
+        assertThat(colorOfRun(c, "ʜᴀᴛᴀ")).isEqualTo(StyleTags.bad());
     }
 
     @Test
@@ -155,10 +157,10 @@ class StyleTagsTest {
     }
 
     @Test
-    void aHeaderTakesTheArcTheWheelHoldsAtItsPosition() throws Exception {
-        ConfigurationNode node = CommentedConfigurationNode.root();
-        node.node("wheel").setList(String.class, List.of("#ff6b8b", "#4ecca3", "#48cae4"));
-        StyleTags.use(Palette.from(node));
+    void aHeaderTakesTheArcTheWheelHoldsAtItsPosition(@TempDir Path plugins) throws Exception {
+        Path dataFolder = Files.createDirectories(plugins.resolve("uxmEssentials"));
+        Files.writeString(dataFolder.resolve("theme.conf"), "wheel = [\"#ff6b8b\", \"#4ecca3\", \"#48cae4\"]\n");
+        StyleTags.use(ThemeFile.read(dataFolder));
         try {
             Component first = parse("<h:'Home Panel':1>");
             assertThat(PlainTextComponentSerializer.plainText().serialize(first))
@@ -168,7 +170,7 @@ class StyleTagsTest {
             // A second position reads as a second heading rather than as the same one repeated.
             assertThat(firstColor(parse("<h:'Home Panel':2>"))).isEqualTo(TextColor.color(0x48cae4));
         } finally {
-            StyleTags.use(Palette.shipped());
+            StyleTags.use(ThemeFile.shippedTheme());
         }
     }
 

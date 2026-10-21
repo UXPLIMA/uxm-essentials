@@ -9,9 +9,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -32,17 +31,15 @@ import org.jspecify.annotations.Nullable;
 public final class StaffGadgetItems {
 
     private final NamespacedKey key;
-    private final MiniMessage miniMessage;
 
     public StaffGadgetItems(Plugin plugin) {
         this.key = new NamespacedKey(Objects.requireNonNull(plugin, "plugin"), "staff-gadget");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Build the hotbar item for {@code spec}, tagged with its gadget kind so a right-click resolves it. */
     public ItemStack build(StaffSettings.GadgetSpec spec) {
         Objects.requireNonNull(spec, "spec");
-        Component name = miniMessage.deserialize(spec.name(), StyleTags.resolver());
+        Component name = StyledText.render(spec.name());
         return ItemBuilder.of(spec.material())
                 .name(name)
                 .editPersistentData(container -> container.set(

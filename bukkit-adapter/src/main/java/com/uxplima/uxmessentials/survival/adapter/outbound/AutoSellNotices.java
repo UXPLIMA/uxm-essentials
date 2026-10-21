@@ -15,10 +15,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,7 +56,6 @@ public final class AutoSellNotices {
     private final SurvivalSales sales;
     private final SaleNotice mode;
     private final Duration window;
-    private final MiniMessage miniMessage;
     private final Map<UUID, Pooled> pooled = new ConcurrentHashMap<>();
 
     public AutoSellNotices(
@@ -73,7 +71,6 @@ public final class AutoSellNotices {
         this.sales = Objects.requireNonNull(sales, "sales");
         this.mode = Objects.requireNonNull(mode, "mode");
         this.window = Duration.ofSeconds(Math.max(0, intervalSeconds));
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /**
@@ -132,7 +129,7 @@ public final class AutoSellNotices {
                 ? SurvivalMessageKey.SURVIVAL_AUTOSELL_SOLD
                 : SurvivalMessageKey.SURVIVAL_AUTOSELL_SOLD_BAR;
         String line = messages.resolve(viewer, key, Map.of("items", list.toString(), "amount", sales.format(total)));
-        Component rendered = miniMessage.deserialize(line, StyleTags.resolver());
+        Component rendered = StyledText.render(line);
         if (mode == SaleNotice.CHAT) {
             live.sendMessage(rendered);
         } else {

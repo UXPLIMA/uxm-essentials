@@ -24,11 +24,10 @@ import net.kyori.adventure.text.TextComponent;
 import net.kyori.adventure.text.TranslatableComponent;
 import net.kyori.adventure.text.format.Style;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -100,9 +99,8 @@ final class EveryLineRendersAsRecordedTest {
 
     private static String render(HoconLocaleCatalog catalog, MessageKey key, Locale locale) {
         String prefix = catalog.template(Locale.ENGLISH, PREFIX);
-        Component component = MiniMessage.miniMessage()
-                .deserialize(catalog.template(locale, key), Placeholder.parsed("prefix", prefix), StyleTags.resolver());
-        return drawn(component);
+        // The way a chat line reaches a player: through the one render every sink uses.
+        return drawn(StyledText.render(catalog.template(locale, key), Placeholder.parsed("prefix", prefix)));
     }
 
     /** The runs of text {@code component} draws, each with its effective style, adjacent equal styles merged. */

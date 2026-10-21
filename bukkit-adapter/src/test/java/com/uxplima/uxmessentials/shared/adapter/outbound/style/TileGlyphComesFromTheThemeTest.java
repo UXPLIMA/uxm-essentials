@@ -2,6 +2,10 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.List;
 
 import net.kyori.adventure.text.Component;
@@ -10,6 +14,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The glyph in front of a tile title is the one the theme names.
@@ -24,15 +29,18 @@ import org.junit.jupiter.api.Test;
  */
 class TileGlyphComesFromTheThemeTest {
 
+    @TempDir
+    Path plugins;
+
     @AfterEach
     void restore() {
-        StyleTags.useTitleGlyph(ThemeFile.titleGlyph());
+        StyleTags.use(ThemeFile.shippedTheme());
     }
 
     @Test
     @DisplayName("a titled tile draws the glyph the theme names")
-    void atitledTileUsesTheThemeGlyph() {
-        StyleTags.useTitleGlyph("✦");
+    void atitledTileUsesTheThemeGlyph() throws IOException {
+        useGlyph("✦");
 
         List<Component> lore = Tiles.titled(Component.text("Warps"), List.of(Component.text("Go somewhere")));
 
@@ -44,8 +52,8 @@ class TileGlyphComesFromTheThemeTest {
 
     @Test
     @DisplayName("the one line form draws it too, because both are one tile")
-    void theoneLineFormUsesItToo() {
-        StyleTags.useTitleGlyph("✦");
+    void theoneLineFormUsesItToo() throws IOException {
+        useGlyph("✦");
 
         Component lore = Tiles.titled(Component.text("Warps"), Component.text("Go somewhere"));
 
@@ -55,11 +63,19 @@ class TileGlyphComesFromTheThemeTest {
     @Test
     @DisplayName("a server that names no glyph gets the shipped diamond")
     void theshippedGlyphIsTheDiamond() {
-        StyleTags.useTitleGlyph(ThemeFile.titleGlyph());
+        StyleTags.use(ThemeFile.shippedTheme());
 
         List<Component> lore = Tiles.titled(Component.text("Warps"), List.of(Component.text("Go somewhere")));
 
         assertThat(plain(lore.get(0))).contains("◆");
+    }
+
+    /** A server whose own theme file names {@code glyph} for a tile title. */
+    private void useGlyph(String glyph) throws IOException {
+        Path dataFolder = Files.createDirectories(plugins.resolve("uxmEssentials"));
+        Files.writeString(
+                dataFolder.resolve("theme.conf"), "glyphs { title = \"" + glyph + "\" }\n", StandardCharsets.UTF_8);
+        StyleTags.use(ThemeFile.read(dataFolder));
     }
 
     private static String plain(Component component) {

@@ -13,7 +13,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
@@ -22,6 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -139,9 +139,9 @@ class BukkitInventoryCalculationsTest {
 
     @Test
     void restyledDenominationName_resolvesMoneyTokenThroughProductionResolver() {
-        // Mirrors the production parse in BukkitInventoryCalculations#createItemStack: the same MiniMessage
-        // instance and the same StyleTags resolver the wired item-name path now uses.
-        Component name = MiniMessage.miniMessage().deserialize("<money>Emerald</money>", StyleTags.resolver());
+        // Mirrors the production parse in BukkitInventoryCalculations#createItemStack, which draws the name
+        // through the one render every line takes.
+        Component name = StyledText.render("<money>Emerald</money>");
 
         assertThat(name.color()).isEqualTo(StyleTags.money());
 

@@ -13,15 +13,13 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalogRenderer;
@@ -49,8 +47,6 @@ public final class PlaceholdersSubcommand {
 
     /** The arguments the hint shows, which are command syntax and the same in every language. */
     private static final String ARGUMENTS = "<area> [page]";
-
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     private final Path dataFolder;
     private final Logger logger;
@@ -142,6 +138,6 @@ public final class PlaceholdersSubcommand {
 
     /** A key and its description are data, not markup: neither may be read as MiniMessage. */
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
+        return StyledText.escape(text);
     }
 }

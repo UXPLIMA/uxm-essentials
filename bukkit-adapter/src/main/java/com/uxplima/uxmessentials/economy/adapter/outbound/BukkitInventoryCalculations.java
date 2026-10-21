@@ -8,13 +8,11 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.NullMarked;
@@ -28,8 +26,6 @@ import org.jspecify.annotations.NullMarked;
 // config still carries a single legacy int id, so the int accessors stay until that config model is widened.
 @SuppressWarnings("deprecation")
 public final class BukkitInventoryCalculations {
-
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     /**
      * Checks if the given item stack matches the denomination's material and custom model data.
@@ -261,8 +257,7 @@ public final class BukkitInventoryCalculations {
             }
             // The denomination display name is an operator-configured MiniMessage template carrying palette
             // tokens (resolved through StyleTags), never legacy section/ampersand colour codes.
-            meta.displayName(MINI_MESSAGE
-                    .deserialize(denom.displayName(), StyleTags.resolver())
+            meta.displayName(StyledText.render(denom.displayName())
                     .decoration(net.kyori.adventure.text.format.TextDecoration.ITALIC, false));
             item.setItemMeta(meta);
         }

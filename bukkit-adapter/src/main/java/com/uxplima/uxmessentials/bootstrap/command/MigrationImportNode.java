@@ -10,8 +10,6 @@ import org.bukkit.command.CommandSender;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -21,7 +19,7 @@ import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.convert.SourceDescriptor;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
@@ -46,8 +44,6 @@ public final class MigrationImportNode {
     private static final String PERMISSION_IMPORT = "uxmessentials.admin.import";
     /** The arguments the usage line shows, which are command syntax and the same in every language. */
     static final String ARGUMENTS = "<source> [--dry-run]";
-
-    private static final MiniMessage MINI_MESSAGE = MiniMessage.miniMessage();
 
     private final MigrationImportService service;
     private final CommandFeedback feedback;
@@ -136,6 +132,6 @@ public final class MigrationImportNode {
     }
 
     private static String escape(String text) {
-        return MINI_MESSAGE.escapeTags(text, StyleTags.resolver());
+        return StyledText.escape(text);
     }
 }

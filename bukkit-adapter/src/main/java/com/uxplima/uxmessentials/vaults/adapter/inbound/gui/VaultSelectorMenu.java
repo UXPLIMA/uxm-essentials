@@ -10,12 +10,10 @@ import java.util.stream.Collectors;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -79,7 +77,6 @@ public final class VaultSelectorMenu {
     private final VaultNotifier notifier;
     private final VaultChargeSettings chargeSettings;
     private final VaultSelectorSettings settings;
-    private final MiniMessage miniMessage;
 
     public VaultSelectorMenu(
             Menus menus,
@@ -104,7 +101,6 @@ public final class VaultSelectorMenu {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.chargeSettings = Objects.requireNonNull(chargeSettings, "chargeSettings");
         this.settings = Objects.requireNonNull(settings, "settings");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Register the bindings the spec names and the spec itself; called once at vaults wiring time. */
@@ -225,7 +221,7 @@ public final class VaultSelectorMenu {
     /** Clamp the stored name to a sane menu width and escape MiniMessage tags so it cannot inject markup. */
     private String displaySafe(String name) {
         String clamped = name.length() > MAX_DISPLAY_NAME ? name.substring(0, MAX_DISPLAY_NAME) : name;
-        return miniMessage.escapeTags(clamped, StyleTags.resolver());
+        return StyledText.escape(clamped);
     }
 
     private String resolve(PlayerRef viewer, MessageKey key, String token, String value) {

@@ -72,9 +72,8 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         // runs of ours, then this plugin's own file over it. A server that wrote neither keeps the colours
         // this plugin ships, which is what every server has seen until now.
         try {
-            StyleTags.use(ThemeFile.read(getDataFolder().toPath()));
             Theme theme = ThemeFile.theme(getDataFolder().toPath());
-            StyleTags.useTitleGlyph(theme.glyph("title"));
+            StyleTags.use(theme);
             MenuTitles.useAlignment(theme.titleAlignment());
         } catch (RuntimeException unreadableTheme) {
             getLogger().log(Level.WARNING, "using the shipped colours: " + unreadableTheme.getMessage());

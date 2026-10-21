@@ -7,13 +7,12 @@ import java.util.Objects;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -48,7 +47,6 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
     private final Messages messages;
     private final MessageSink sink;
     private final String prefixTemplate;
-    private final MiniMessage miniMessage;
 
     public PermissionSanctionBroadcast(
             Server server, Scheduler scheduler, Messages messages, MessageSink sink, String prefixTemplate) {
@@ -57,7 +55,6 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.prefixTemplate = Objects.requireNonNull(prefixTemplate, "prefixTemplate");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     @Override
@@ -92,6 +89,6 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
     private void sendToConsole(MessageKey key, Map<String, String> placeholders) {
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
         String rendered = messages.resolve(CONSOLE, key, readBy(CONSOLE, placeholders));
-        server.getConsoleSender().sendMessage(miniMessage.deserialize(rendered, prefix, StyleTags.resolver()));
+        server.getConsoleSender().sendMessage(StyledText.render(rendered, prefix));
     }
 }

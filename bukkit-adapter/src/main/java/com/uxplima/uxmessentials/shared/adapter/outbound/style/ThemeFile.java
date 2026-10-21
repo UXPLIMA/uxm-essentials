@@ -6,8 +6,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-import net.kyori.adventure.text.format.TextColor;
-
 import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -47,6 +45,9 @@ public final class ThemeFile {
         return TITLE_GLYPH;
     }
 
+    /** The colour of every role this plugin ships, which an operator's file overrides role by role. */
+    private static final Map<String, String> SHIPPED_COLOURS = shippedColours();
+
     private ThemeFile() {}
 
     /** The shared file, worked out from this plugin's data folder. */
@@ -58,27 +59,22 @@ public final class ThemeFile {
     }
 
     /**
-     * The palette for {@code dataFolder}: the shared file with this plugin's own file over it.
+     * The look for {@code dataFolder}, with a file that cannot be read reported rather than passed over.
      *
-     * @throws ConfigurateException when a file exists and cannot be read, which an operator has to see
+     * <p>This is the shape enabling and reloading want: an operator who broke the file must read why, and the step
+     * is already wrapped in a reporter that turns a thrown failure into a line they read. The menu engine reads
+     * through {@link #theme} instead, which never fails a window over a colour.
+     *
+     * @throws IllegalStateException when a file exists and cannot be read
      * @throws IllegalArgumentException when a file holds something that is not a colour
      */
-    public static Palette load(Path dataFolder) throws ConfigurateException {
+    public static Theme read(Path dataFolder) {
         Objects.requireNonNull(dataFolder, "dataFolder");
-        ConfigurationNode merged = node(dataFolder.resolve(FILE));
-        merged.mergeFrom(node(shared(dataFolder)));
-        return merged.empty() ? Palette.shipped() : Palette.from(merged);
-    }
-
-    /**
-     * The palette for {@code dataFolder}, with an unreadable file reported as an unchecked failure.
-     *
-     * <p>This is the shape a reload step wants: the step is already wrapped in a reporter that turns a thrown
-     * failure into a line an operator reads, so a checked exception here would only be caught and rethrown.
-     */
-    public static Palette read(Path dataFolder) {
         try {
-            return load(dataFolder);
+            ConfigurationNode merged = node(dataFolder.resolve(FILE));
+            merged.mergeFrom(node(shared(dataFolder)));
+            merged.mergeFrom(shippedLook());
+            return Theme.from(merged);
         } catch (ConfigurateException unreadable) {
             throw new IllegalStateException(
                     "cannot read " + shared(dataFolder) + ": " + unreadable.getMessage(), unreadable);
@@ -100,8 +96,8 @@ public final class ThemeFile {
      * being a static somewhere inside a tile helper and becomes a value handed over on purpose.
      *
      * <p>An unreadable file yields the shipped look rather than throwing: the colours a window is drawn in must
-     * never be the reason a menu fails to open, and {@link #read} already fails loudly on the same file for the
-     * operator's benefit.
+     * never be the reason a menu fails to open, and {@link #read} fails loudly on the same file for the operator's
+     * benefit.
      */
     public static Theme theme(Path dataFolder) {
         Objects.requireNonNull(dataFolder, "dataFolder");
@@ -128,8 +124,8 @@ public final class ThemeFile {
     private static ConfigurationNode shippedLook() {
         CommentedConfigurationNode root = CommentedConfigurationNode.root();
         try {
-            for (Map.Entry<String, TextColor> role : Palette.shipped().roles().entrySet()) {
-                root.node("roles", role.getKey()).set(role.getValue().asHexString());
+            for (Map.Entry<String, String> role : SHIPPED_COLOURS.entrySet()) {
+                root.node("roles", role.getKey()).set(role.getValue());
             }
             root.node("glyphs", "title").set(TITLE_GLYPH);
             root.node("glyphs", "separator").set(SEPARATOR_GLYPH);
@@ -150,5 +146,33 @@ public final class ThemeFile {
             return CommentedConfigurationNode.root();
         }
         return HoconConfigurationLoader.builder().path(file).build().load();
+    }
+
+    private static Map<String, String> shippedColours() {
+        Map<String, String> colours = new java.util.LinkedHashMap<>();
+        colours.put("accent", "#38b6ff");
+        colours.put("value", "#8fd9ff");
+        colours.put("body", "#ffffff");
+        colours.put("subtext", "#dde8f0");
+        colours.put("muted", "#93a4b3");
+        colours.put("dim", "#6b7886");
+        colours.put("icon", "#8a93a1");
+        colours.put("crumb", "#565f6b");
+        colours.put("good", "#5be38c");
+        colours.put("bad", "#ff6b6b");
+        colours.put("warn", "#ffc93c");
+        colours.put("money", "#ffc93c");
+        colours.put("level", "#ffc93c");
+        colours.put("cta", "#ffc93c");
+        colours.put("info", "#4fd6e8");
+        colours.put("rank", "#b68cff");
+        colours.put("event", "#ff8fd0");
+        // A plain title carries the reading colour rather than a colour of its own.
+        colours.put("title", "#ffffff");
+        // The lighter half of each ramp, used when the file names no wheel to take a neighbour from.
+        colours.put("emerald", "#45d9a6");
+        colours.put("rose", "#ff7aa8");
+        colours.put("yellow", "#ffe15c");
+        return Map.copyOf(colours);
     }
 }

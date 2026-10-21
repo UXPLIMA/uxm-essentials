@@ -253,7 +253,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.protocol.ViaVersionClie
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.MenuTitles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.command.CommandCatalog;
@@ -452,11 +451,9 @@ public final class PluginModule {
         resources.addReloadTask(ReloadTask.kernel(
                 "theme",
                 () -> {
-                    StyleTags.use(ThemeFile.read(themeFolder));
                     engineTheme.reload();
-                    // The glyph as well as the colours. Both live in the theme and a reload that moved
-                    // one and not the other is how the two drifted apart in the first place.
-                    StyleTags.useTitleGlyph(engineTheme.get().glyph("title"));
+                    // One theme for every reader: the lines, the glyph a tile opens with, and the menu engine.
+                    StyleTags.use(engineTheme.get());
                     MenuTitles.useAlignment(engineTheme.get().titleAlignment());
                 },
                 "colours re-read from disk"));

@@ -9,8 +9,6 @@ import org.bukkit.entity.Player;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
@@ -23,7 +21,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -37,12 +35,10 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
 
     private static final String PERMISSION = "uxmessentials.economy.exchange";
     private final Messages messages;
-    private final MiniMessage miniMessage;
 
     public ExchangeCommand(EconomyServices services, Messages messages) {
         super(services, messages);
         this.messages = messages;
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     @Override
@@ -159,7 +155,6 @@ public final class ExchangeCommand extends EconomyCommandSupport implements Comm
 
     /** Resolve {@code key} in the viewer's locale and send it; the catalog line carries its own contextual tag. */
     private void send(Player player, PlayerRef viewerRef, EconomyMessageKey key, Map<String, String> placeholders) {
-        player.sendMessage(
-                miniMessage.deserialize(messages.resolve(viewerRef, key, placeholders), StyleTags.resolver()));
+        player.sendMessage(StyledText.render(messages.resolve(viewerRef, key, placeholders)));
     }
 }

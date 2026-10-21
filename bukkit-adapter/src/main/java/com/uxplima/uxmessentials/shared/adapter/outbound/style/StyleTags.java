@@ -1,323 +1,166 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
-import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
-import java.util.Set;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextColor;
-import net.kyori.adventure.text.format.TextDecoration;
-import net.kyori.adventure.text.minimessage.Context;
 import net.kyori.adventure.text.minimessage.tag.Tag;
-import net.kyori.adventure.text.minimessage.tag.resolver.ArgumentQueue;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
-import com.uxplima.uxmlib.text.style.SmallCaps;
+import com.uxplima.uxmlib.text.Text;
+import com.uxplima.uxmlib.text.style.StyleTokens;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The project palette as MiniMessage tags. Solid-colour tags ({@code <accent>}, {@code <body>}, …) wrap their
- * content; the prefix and header tags take a quoted argument and are self-closing.
+ * The look every line is drawn in, and the few tags this plugin adds to the library's.
  *
- * <p>Colour carries meaning, never decoration: the brand accent, a value, the reading colours, and the three
- * reflexes for outcome, denial and attention. The colours themselves live in {@link Palette}, which reads
- * them from the server's theme file, so nothing outside that class names a hex.
+ * <p>The tokens a line is written with ({@code <accent>}, {@code <tag:'HOME'>}, {@code <h:'…'>}) are the library's:
+ * {@link StyleTokens} turns each into what a client is sent, with the {@link Theme} held here. A catalogue line is
+ * styled once when its language is read; a line an operator wrote in a menu, a hologram or a kit is styled when it is
+ * drawn, through {@link StyledText}. What this class adds is what only this plugin speaks: {@code <helpop>} and
+ * {@code <staffchat>}, the two staff channels, each with a label of its own so they read apart, and
+ * {@code <plain>}, the marker a line keeps ordinary letters with, which carries no style here.
  *
- * <p>{@code <tag:'HOME'>} renders the category prefix a chat line opens with: the label in small capitals, bold,
- * coloured by what the category is about (money categories green, everything else sky), then the dim triangle.
- * {@code <etag:'…'>} ignores its label and renders the red error word, because a denial reads as an error
- * whichever module raised it. {@code <helpop>} and {@code <staffchat>} are the two channels that keep their own
- * label so they read apart from each other. {@code <h:'…'>} is the bold sky header a lore block opens with.
- * The resolver is immutable and cached; callers add it at every MiniMessage parse.
+ * <p>The look of a server is one value for the whole process, read when the plugin enables and again when an operator
+ * reloads it, so it is held here rather than threaded through every class that writes a line. It is volatile, so a
+ * reload on one thread is seen by a line drawn on any other.
  */
 @NullMarked
 public final class StyleTags {
 
-    /**
-     * The colours in use, and the resolver built from them.
-     *
-     * <p>The look of a server is one value for the whole process, read once when the plugin enables and
-     * again when an operator reloads it, so it is held here rather than threaded through every class that
-     * writes a line. Both fields are replaced together in {@link #use(Palette)}, and both are volatile, so a
-     * reload on the main thread is seen by a message rendered on any other.
-     */
-    private static volatile Palette palette = Palette.shipped();
-
-    private static volatile TagResolver resolver = build(palette);
-
-    private static final String SEPARATOR = "▶";
-
-    private static final String GAP = " ";
-
-    private static final String ERROR_LABEL = "error";
-
-    /**
-     * The categories whose prefix is green rather than the brand colour. Money is the one subject the palette
-     * gives its own prefix colour to, so a line that moves a balance is recognisable before it is read.
-     */
-    private static final Set<String> MONEY_CATEGORIES = Set.of("economy", "bank", "loan", "trade", "vault");
-
-    /** What a tile title is drawn with until a theme is read, which is what this plugin ships. */
-    private static volatile String titleGlyph = ThemeFile.titleGlyph();
+    private static volatile Theme theme = ThemeFile.shippedTheme();
+    private static volatile TagResolver resolver = build(theme);
 
     private StyleTags() {}
 
-    /** The colours every line is painted with. */
-    public static Palette palette() {
-        return palette;
+    /** The look in use. */
+    public static Theme theme() {
+        return theme;
     }
 
-    /**
-     * The glyph a tile title is drawn with, which the theme owns.
-     *
-     * <p>{@link Tiles} held it as a constant of its own until 2026-09-22, so an operator who changed
-     * {@code glyphs.title} changed it for every tile uxmLib draws and for none of the tiles this plugin
-     * draws itself. One setting, two glyphs, on one server.
-     */
-    public static String titleGlyph() {
-        return titleGlyph;
-    }
-
-    /** Take the glyph a server wrote down, alongside {@link #use(Palette)} and on the same reload. */
-    public static void useTitleGlyph(String glyph) {
-        Objects.requireNonNull(glyph, "glyph");
-        titleGlyph = glyph;
-    }
-
-    /**
-     * Take the colours a server wrote down. Called once when the plugin enables, and again on a reload.
-     *
-     * <p>The resolver is rebuilt here rather than per parse, because a server's own role is a tag of its own
-     * and the resolver is the only place that list exists.
-     */
-    public static void use(Palette loaded) {
+    /** Draw every line with {@code loaded} from now on. */
+    public static void use(Theme loaded) {
         Objects.requireNonNull(loaded, "loaded");
-        palette = loaded;
+        theme = loaded;
         resolver = build(loaded);
     }
 
+    /** The glyph a tile title opens with. */
+    public static String titleGlyph() {
+        return theme.glyph("title");
+    }
+
+    /** The tags this plugin adds, for a parse of a line the library's tokens have already been expanded in. */
     public static TagResolver resolver() {
         return resolver;
     }
 
     public static TextColor accent() {
-        return palette.accent();
+        return theme.colour("accent");
     }
 
     public static TextColor value() {
-        return palette.value();
+        return theme.colour("value");
     }
 
     public static TextColor body() {
-        return palette.body();
+        return theme.colour("body");
     }
 
     public static TextColor subtext() {
-        return palette.subtext();
+        return theme.colour("subtext");
     }
 
     public static TextColor muted() {
-        return palette.muted();
+        return theme.colour("muted");
     }
 
     public static TextColor dim() {
-        return palette.dim();
+        return theme.colour("dim");
     }
 
     public static TextColor icon() {
-        return palette.icon();
+        return theme.colour("icon");
     }
 
     public static TextColor crumb() {
-        return palette.crumb();
+        return theme.colour("crumb");
     }
 
     public static TextColor good() {
-        return palette.good();
+        return theme.colour("good");
     }
 
     public static TextColor bad() {
-        return palette.bad();
+        return theme.colour("bad");
     }
 
     public static TextColor gold() {
-        return palette.gold();
+        return theme.colour("warn");
     }
 
     public static TextColor money() {
-        return palette.money();
+        return theme.colour("money");
     }
 
     public static TextColor level() {
-        return palette.level();
+        return theme.colour("level");
     }
 
     public static TextColor cta() {
-        return palette.cta();
+        return theme.colour("cta");
     }
 
     public static TextColor info() {
-        return palette.info();
+        return theme.colour("info");
     }
 
     public static TextColor rank() {
-        return palette.rank();
+        return theme.colour("rank");
     }
 
     public static TextColor event() {
-        return palette.event();
+        return theme.colour("event");
     }
 
-    /** The lighter half of the positive ramp. */
+    /** The lighter half of the money ramp. */
     public static TextColor emerald() {
-        return palette.emerald();
+        return next(good(), "emerald");
     }
 
     /** The lighter half of the denial ramp. */
     public static TextColor rose() {
-        return palette.rose();
+        return next(bad(), "rose");
     }
 
     /** The lighter half of the attention ramp. */
     public static TextColor yellow() {
-        return palette.yellow();
-    }
-
-    /** The colour a header reads in. */
-    public static TextColor header() {
-        return palette.accent();
-    }
-
-    /** The colour a plain title reads in. */
-    public static TextColor title() {
-        return palette.role("title");
+        return next(gold(), "yellow");
     }
 
     /**
-     * The resolver for {@code colours}: one tag per role, then the tags that insert text of their own.
-     *
-     * <p>The role list comes from the palette rather than from this class, so a role a server invented is a
-     * tag the same day it is written, and a role dropped from a later version of this file keeps working for
-     * the server that still writes it.
+     * The colour after {@code colour} on the theme's wheel, so a ramp runs inside one family of the server's own
+     * colours; the {@code fallback} role when the wheel does not hold the colour.
      */
-    private static TagResolver build(Palette colours) {
-        TagResolver.Builder builder = TagResolver.builder();
-        colours.roles().forEach((role, colour) -> builder.resolver(Placeholder.styling(role, colour)));
-        return builder.resolvers(
-                        // Carries no style of its own: it marks the text a catalog line wants left in
-                        // ordinary letters, which the typography pass reads before MiniMessage sees it.
-                        Placeholder.styling("plain"),
-                        categoryPrefix("tag", colours),
-                        errorPrefix("etag", colours),
-                        labelledPrefix("helpop", "helpop", colours),
-                        labelledPrefix("staffchat", "staffchat", colours),
-                        header("h", colours))
-                .build();
+    private static TextColor next(TextColor colour, String fallback) {
+        java.util.List<TextColor> wheel = theme.wheel();
+        int at = wheel.indexOf(colour);
+        return at < 0 ? theme.colour(fallback) : wheel.get((at + 1) % wheel.size());
     }
 
     /**
-     * The category prefix: the label the catalog key carries, in small capitals and bold, then the dim
-     * triangle. The label colour comes from what the category is about rather than from the module that
-     * raised the line, so every money movement reads green and every other feature reads in the brand
-     * colour. The separator carries no trailing space; the single gap before the body comes from the catalog
-     * key.
+     * The plugin's own tags. Each staff channel is a category prefix with a label of its own, drawn by the library
+     * exactly as a {@code <tag:'…'>} is, so the two channels look like every other prefix and read apart.
      */
-    private static TagResolver categoryPrefix(String name, Palette colours) {
-        return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            String label = args.popOr("").value();
-            TextColor colour =
-                    MONEY_CATEGORIES.contains(label.toLowerCase(Locale.ROOT)) ? colours.good() : colours.accent();
-            return Tag.selfClosingInserting(prefix(label, colour, colours));
-        });
-    }
-
-    /**
-     * The denial prefix. The label argument is popped and ignored: a refusal reads as an error whichever
-     * module raised it, and the red word plus the dim triangle is the whole signal, which is why an error
-     * line carries no trailing cross either.
-     */
-    private static TagResolver errorPrefix(String name, Palette colours) {
-        return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            args.popOr("");
-            return Tag.selfClosingInserting(prefix(ERROR_LABEL, colours.bad(), colours));
-        });
-    }
-
-    /**
-     * A channel prefix that keeps its own constant label instead of taking one from the catalog. The two
-     * staff channels need to be told apart at a glance, so each names itself rather than sharing a category
-     * word.
-     */
-    private static TagResolver labelledPrefix(String name, String label, Palette colours) {
+    private static TagResolver build(Theme look) {
         return TagResolver.resolver(
-                name,
-                (ArgumentQueue args, Context ctx) ->
-                        Tag.selfClosingInserting(prefix(label, colours.accent(), colours)));
+                // Carries no style of its own: it marks text the letters pass leaves in ordinary letters.
+                Placeholder.styling("plain"), channel("helpop", look), channel("staffchat", look));
     }
 
-    /**
-     * The bold header a lore block opens with, and the heading a banner chat line uses: the label in small
-     * capitals and bold.
-     *
-     * <p>It reads in the brand colour unless the line names a position on the theme's wheel,
-     * {@code <h:'Warps':3>}, and then it is painted across that arc. A file with several headings on one
-     * screen gives each of them a position, so they differ from each other without any of them naming a
-     * colour. A position on a theme whose wheel is shorter than two colours falls back to the brand colour,
-     * which is what a server that never asked for the effect should see.
-     */
-    private static TagResolver header(String name, Palette colours) {
-        return TagResolver.resolver(name, (ArgumentQueue args, Context ctx) -> {
-            String text = args.popOr(name + " requires text").value();
-            Component flat = Component.text(smallCapsWhole(text), colours.accent())
-                    .decoration(TextDecoration.BOLD, true)
-                    .decoration(TextDecoration.ITALIC, false);
-            List<TextColor> arc =
-                    args.hasNext() ? colours.arc(args.pop().asInt().orElse(0)) : List.of();
-            return Tag.selfClosingInserting(
-                    arc.isEmpty()
-                            ? flat
-                            : Gradients.across(Component.text(smallCapsWhole(text)), arc.get(0), arc.get(1))
-                                    .decoration(TextDecoration.ITALIC, false));
-        });
-    }
-
-    /**
-     * {@code text} in small capitals when every letter in it has one, otherwise as written. A catalogue written in
-     * small capitals has its headings converted when it loads, keeping the letters that have none, so this rule is
-     * for the others: in a German or Polish catalogue a heading half converted reads worse than one left alone.
-     * Letters of a script with no small capitals at all are left alone either way.
-     */
-    static String smallCapsWhole(String text) {
-        String converted = SmallCaps.of(text);
-        boolean changed = false;
-        boolean kept = false;
-        int[] before = text.codePoints().toArray();
-        int[] after = converted.codePoints().toArray();
-        if (before.length != after.length) {
-            return converted;
-        }
-        for (int index = 0; index < before.length; index++) {
-            if (!Character.isLetter(before[index])) {
-                continue;
-            }
-            if (before[index] == after[index]) {
-                // An ASCII letter left as it was is one the typeface draws plainly in small capitals too (x).
-                kept |= before[index] > 0x7F;
-            } else {
-                changed = true;
-            }
-        }
-        return changed && kept ? text : converted;
-    }
-
-    private static Component prefix(String label, TextColor colour, Palette colours) {
-        return Component.text(smallCapsWhole(label), colour)
-                .decoration(TextDecoration.BOLD, true)
-                .decoration(TextDecoration.ITALIC, false)
-                .append(Component.text(GAP, NamedTextColor.WHITE).decoration(TextDecoration.BOLD, false))
-                .append(Component.text(SEPARATOR, colours.dim()).decoration(TextDecoration.BOLD, false));
+    private static TagResolver channel(String name, Theme look) {
+        return TagResolver.resolver(
+                name, Tag.selfClosingInserting(Text.mini(StyleTokens.expand("<tag:'" + name + "'>", look, false))));
     }
 }

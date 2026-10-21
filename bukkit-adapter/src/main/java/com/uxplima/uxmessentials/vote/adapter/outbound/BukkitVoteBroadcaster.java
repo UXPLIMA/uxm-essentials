@@ -10,13 +10,12 @@ import org.bukkit.entity.Player;
 
 import net.kyori.adventure.bossbar.BossBar;
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelDisplay;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -49,7 +48,6 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
     private final BroadcastVisibility visibility;
     private final ChannelBroadcaster channels;
     private final @Nullable Sound sound;
-    private final MiniMessage miniMessage;
 
     public BukkitVoteBroadcaster(
             Scheduler scheduler, Messages messages, BroadcastVisibility visibility, BroadcastDisplay display) {
@@ -59,7 +57,6 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
         this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.channels = new ChannelBroadcaster(scheduler, display.toChannelDisplay());
         this.sound = display.sound();
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     @Override
@@ -82,7 +79,7 @@ public final class BukkitVoteBroadcaster implements VoteBroadcaster {
         }
         String rendered = messages.resolve(who, key, placeholders);
         TagResolver prefix = Placeholder.parsed("prefix", messages.resolve(who, PREFIX, Map.of()));
-        return miniMessage.deserialize(rendered, prefix, StyleTags.resolver());
+        return StyledText.render(rendered, prefix);
     }
 
     /**

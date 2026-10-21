@@ -8,10 +8,9 @@ import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -40,7 +39,6 @@ public final class VanishActionBar {
     private final Messages messages;
     private final VanishStore store;
     private final VanishConfig config;
-    private final MiniMessage miniMessage;
 
     public VanishActionBar(
             Server server, Scheduler scheduler, Messages messages, VanishStore store, VanishConfig config) {
@@ -49,7 +47,6 @@ public final class VanishActionBar {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.store = Objects.requireNonNull(store, "store");
         this.config = Objects.requireNonNull(config, "config");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Re-send the indicator to every currently-vanished online player; the repeating task drives this each tick. */
@@ -96,8 +93,7 @@ public final class VanishActionBar {
         if (player == null || !player.isOnline()) {
             return;
         }
-        Component line = miniMessage.deserialize(
-                messages.resolve(who, VanishMessageKey.VANISH_ACTIONBAR, Map.of()), StyleTags.resolver());
+        Component line = StyledText.render(messages.resolve(who, VanishMessageKey.VANISH_ACTIONBAR, Map.of()));
         player.sendActionBar(line);
     }
 }

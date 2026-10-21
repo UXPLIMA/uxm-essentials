@@ -7,12 +7,11 @@ import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -37,11 +36,9 @@ public final class CommandFeedback {
     private static final MessageKey PREFIX = () -> "prefix";
 
     private final Messages messages;
-    private final MiniMessage miniMessage;
 
     public CommandFeedback(Messages messages) {
         this.messages = Objects.requireNonNull(messages, "messages");
-        this.miniMessage = MiniMessage.miniMessage();
     }
 
     /** Send the usage line for {@code command}, described the way the catalogue describes it. */
@@ -74,7 +71,7 @@ public final class CommandFeedback {
 
     private Component parse(PlayerRef viewer, String rendered) {
         TagResolver prefix = Placeholder.parsed("prefix", messages.resolve(viewer, PREFIX, Map.of()));
-        return miniMessage.deserialize(rendered, prefix, StyleTags.resolver());
+        return StyledText.render(rendered, prefix);
     }
 
     /**

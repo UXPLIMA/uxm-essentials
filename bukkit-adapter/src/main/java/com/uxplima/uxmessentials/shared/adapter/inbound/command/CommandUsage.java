@@ -6,10 +6,8 @@ import java.util.Objects;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import net.kyori.adventure.text.minimessage.MiniMessage;
-
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -44,16 +42,15 @@ public final class CommandUsage {
         // The three values are text and never markup: the usage is syntax, and an argument named after a colour
         // role, <value>, was read as that colour and vanished from the line. Escaped against the theme's roles too,
         // because MiniMessage has never heard of them.
-        MiniMessage words = MiniMessage.miniMessage();
         PlayerRef reader =
                 sender instanceof Player player ? BukkitRefs.toRef(player) : PlayerRef.system(sender.getName());
         String described = CommandDescriptions.of(messages, reader, root(command), english);
         Map<String, String> placeholders = Map.of(
-                "command", words.escapeTags(command, StyleTags.resolver()),
-                "usage", words.escapeTags(usage, StyleTags.resolver()),
-                "description", words.escapeTags(described, StyleTags.resolver()));
+                "command", StyledText.escape(command),
+                "usage", StyledText.escape(usage),
+                "description", StyledText.escape(described));
         String rendered = messages.resolve(reader, SharedMessageKey.COMMAND_USAGE, placeholders);
-        sender.sendMessage(words.deserialize(rendered, StyleTags.resolver()));
+        sender.sendMessage(StyledText.render(rendered));
     }
 
     private static String root(String command) {
