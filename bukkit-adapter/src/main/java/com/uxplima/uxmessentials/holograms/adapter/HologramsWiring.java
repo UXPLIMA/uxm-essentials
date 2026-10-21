@@ -106,6 +106,7 @@ import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
+import com.uxplima.uxmlib.packet.display.HologramPackets;
 import com.uxplima.uxmlib.packet.display.PacketHologramClicks;
 import com.uxplima.uxmlib.packet.display.internal.NmsHologramPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
@@ -225,8 +226,9 @@ public final class HologramsWiring {
                 repository::find, rendererHolder::cyclePage, actionRunner, System::currentTimeMillis);
         // The one place a Mojang mapped class is named: a hologram is sent to each client and never spawned, so its
         // packets are built behind an interface the rest of the plugin talks to.
+        HologramPackets packets = new NmsHologramPackets(new PacketSender(new ChannelResolver()));
         PacketHologramView renderer = new PacketHologramView(
-                new NmsHologramPackets(new PacketSender(new ChannelResolver())),
+                packets,
                 frames,
                 kernel.scheduler(),
                 kernel.log(),
@@ -256,12 +258,13 @@ public final class HologramsWiring {
         HologramQuitListener quitListener = new HologramQuitListener(renderer);
         plugin.getServer().getPluginManager().registerEvents(quitListener, plugin);
         // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
-        // registered, so a default server spawns no floating-number entities and the listener costs nothing.
+        // registered, so a default server sends no floating numbers and the listener costs nothing.
         DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
         if (damageIndicators.enabled()) {
             plugin.getServer()
                     .getPluginManager()
-                    .registerEvents(new DamageIndicatorListener(damageIndicators, kernel.scheduler()), plugin);
+                    .registerEvents(
+                            new DamageIndicatorListener(damageIndicators, kernel.scheduler(), frames, packets), plugin);
         }
         // A viewer's language and page are read on every frame, so nothing has to watch them: the refresh only
         // reads placeholders and leaderboards again for the holograms that ask for it.

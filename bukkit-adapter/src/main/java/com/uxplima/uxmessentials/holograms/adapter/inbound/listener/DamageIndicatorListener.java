@@ -1,16 +1,15 @@
 package com.uxplima.uxmessentials.holograms.adapter.inbound.listener;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.bukkit.Location;
-import org.bukkit.World;
 import org.bukkit.entity.Display;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
-import org.bukkit.entity.TextDisplay;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageByEntityEvent;
@@ -23,28 +22,43 @@ import com.uxplima.uxmessentials.holograms.adapter.outbound.DamageIndicatorConfi
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.packet.display.HologramAppearance;
+import com.uxplima.uxmlib.packet.display.HologramPackets;
+import com.uxplima.uxmlib.packet.display.PacketHologram;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Spawns a short-lived floating number at an entity when it is hurt or healed (the damage-indicator feature, off
  * by default). On a combat hit it shows the final damage. In the crit format when the attacker's state matches a
  * vanilla critical hit, and on a heal it shows the gained health, gated per victim kind (players / mobs) by the
- * {@link DamageIndicatorConfig}. The indicator is an ephemeral, non-persistent {@link TextDisplay} spawned on the
- * event's region thread and removed after the configured duration: the removal waits off-thread, then hops back
- * onto the entity's region thread (Folia) so the despawn is always region-correct, mirroring how the renderer
- * removes its display entities. No per-tick rise/fade. The indicator simply pops and is removed (the scheduler
- * port carries no per-region repeating task), and nothing is persisted, so a crash leaves no stray entity.
+ * {@link DamageIndicatorConfig}. The indicator is a packet hologram: sent to the players near the entity and never
+ * spawned, so the world holds no entity for it and a crash or a chunk unload cannot leave one behind. It is taken
+ * back after the configured duration: the removal waits off-thread, then hops back onto the anchor's region thread
+ * (Folia), the thread the hologram's own frames run on. No per-tick rise or fade: the indicator simply pops and goes.
  */
 @NullMarked
 public final class DamageIndicatorListener implements Listener {
 
     private final DamageIndicatorConfig config;
     private final Scheduler scheduler;
+    private final com.uxplima.uxmlib.scheduler.Scheduler frames;
+    private final HologramPackets packets;
     private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
-    public DamageIndicatorListener(DamageIndicatorConfig config, Scheduler scheduler) {
+    /**
+     * @param scheduler this plugin's port, which times the removal
+     * @param frames the library's scheduler, which runs each indicator's frames on its anchor's region
+     * @param packets the packets an indicator is sent with
+     */
+    public DamageIndicatorListener(
+            DamageIndicatorConfig config,
+            Scheduler scheduler,
+            com.uxplima.uxmlib.scheduler.Scheduler frames,
+            HologramPackets packets) {
         this.config = Objects.requireNonNull(config, "config");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.frames = Objects.requireNonNull(frames, "frames");
+        this.packets = Objects.requireNonNull(packets, "packets");
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -94,18 +108,19 @@ public final class DamageIndicatorListener implements Listener {
 
     private void spawn(Entity victim, String source) {
         Component text = miniMessage.deserialize(source);
-        World world = victim.getWorld();
         ThreadLocalRandom random = ThreadLocalRandom.current();
         Location at = victim.getLocation()
                 .add(random.nextDouble(-0.3, 0.3), victim.getHeight() + 0.4, random.nextDouble(-0.3, 0.3));
-        TextDisplay display = world.spawn(at, TextDisplay.class, spawned -> {
-            spawned.text(text);
-            spawned.setBillboard(Display.Billboard.CENTER);
-            spawned.setSeeThrough(true);
-            spawned.setPersistent(false);
-        });
+        PacketHologram indicator = PacketHologram.show(
+                packets,
+                frames,
+                at,
+                HologramAppearance.defaults()
+                        .withBillboard(Display.Billboard.CENTER)
+                        .withSeeThrough(true),
+                viewer -> List.of(text));
         Position pos = BukkitRefs.toPosition(at);
         scheduler.asyncAfter(
-                Duration.ofMillis(config.durationTicks() * 50L), () -> scheduler.onRegion(pos, display::remove));
+                Duration.ofMillis(config.durationTicks() * 50L), () -> scheduler.onRegion(pos, indicator::remove));
     }
 }
