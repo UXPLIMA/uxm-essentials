@@ -1,18 +1,23 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.hud;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The shared render transform for operator-authored HUD content (scoreboard sidebar lines, tablist header/footer):
@@ -34,6 +39,11 @@ public final class HudText {
 
     /** Each viewer's language: one answer for everybody until the kernel is wired. */
     private static volatile Function<UUID, Locale> languages = viewer -> Locale.ROOT;
+
+    /** How many parsed lines are kept before the set starts over. */
+    private static final int PARSED_LIMIT = 4096;
+
+    private static volatile Parsed parsed = new Parsed(StyleTags.theme(), new ConcurrentHashMap<>());
 
     private HudText() {}
 
@@ -81,9 +91,31 @@ public final class HudText {
         return parse(expanded);
     }
 
-    /** Parse already-expanded operator MiniMessage without running PlaceholderAPI a second time. */
+    /**
+     * Parse already-expanded operator MiniMessage without running PlaceholderAPI a second time. A text is parsed once
+     * for the theme in use: every sidebar and tab list is drawn each second and most lines read the same for every
+     * viewer, so parsing each again was most of a HUD's cost. A new theme starts a new set.
+     */
     public static Component parse(String miniMessageSource) {
         Objects.requireNonNull(miniMessageSource, "miniMessageSource");
-        return StyledText.render(miniMessageSource);
+        Theme theme = StyleTags.theme();
+        Parsed held = parsed;
+        if (held.theme() != theme) {
+            held = new Parsed(theme, new ConcurrentHashMap<>());
+            parsed = held;
+        }
+        @Nullable Component line = held.lines().get(miniMessageSource);
+        if (line == null) {
+            line = StyledText.render(miniMessageSource);
+            if (held.lines().size() >= PARSED_LIMIT) {
+                // Lines that carry a clock or a count change every second; start over rather than grow without end.
+                held.lines().clear();
+            }
+            held.lines().put(miniMessageSource, line);
+        }
+        return line;
     }
+
+    /** The lines parsed for one theme. A render that raced a reload writes into a set nobody reads again. */
+    private record Parsed(Theme theme, Map<String, Component> lines) {}
 }

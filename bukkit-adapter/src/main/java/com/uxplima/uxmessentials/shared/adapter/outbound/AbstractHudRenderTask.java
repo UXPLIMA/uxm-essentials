@@ -32,6 +32,11 @@ import org.jspecify.annotations.NullMarked;
  * once per tick on the loop thread (stepping every named animation to the tick's frame) before the per-player
  * fan-out. Each player then renders against the same captured frame, so an animation advances at most once per
  * tick no matter how many viewers are online and never flickers between viewers within a tick.
+ *
+ * <p>The roster is spread over the interval. The loop runs in slices of about {@link #SLICE}, and each player has
+ * a fixed slice taken from their id, so every player still renders once per interval but never all on one tick: a
+ * whole roster rendered at once cost a tick close to a millisecond per player. The animation clock steps on the
+ * first slice of each interval.
  */
 @NullMarked
 public abstract class AbstractHudRenderTask {
@@ -42,6 +47,12 @@ public abstract class AbstractHudRenderTask {
     private final Supplier<Duration> interval;
     private final BooleanSupplier running;
     private final Set<UUID> pendingPlayers = ConcurrentHashMap.newKeySet();
+
+    /** The slice of the interval the next loop tick serves. Only the loop touches it, one tick at a time. */
+    private int slice;
+
+    /** About one server tick: the finest step worth spreading the roster over. */
+    static final Duration SLICE = Duration.ofMillis(50);
 
     protected AbstractHudRenderTask(
             Scheduler scheduler,
@@ -83,7 +94,8 @@ public abstract class AbstractHudRenderTask {
         if (!running.getAsBoolean()) {
             return;
         }
-        scheduler.asyncAfter(Objects.requireNonNull(interval.get(), "interval"), this::tick);
+        Duration every = Objects.requireNonNull(interval.get(), "interval");
+        scheduler.asyncAfter(every.dividedBy(slicesIn(every)), this::tick);
     }
 
     private void tick() {
@@ -91,17 +103,29 @@ public abstract class AbstractHudRenderTask {
             return;
         }
         try {
-            // Advance the global animation clock once, on this loop thread, before fanning out. Every per-player
-            // render below then reads the same frame for this tick.
-            animations.advance();
+            int slices = slicesIn(Objects.requireNonNull(interval.get(), "interval"));
+            int current = slice % slices;
+            slice = (current + 1) % slices;
+            if (current == 0) {
+                // Advance the global animation clock once per interval, on this loop thread, before fanning out.
+                // Every render in this interval then reads the same frame.
+                animations.advance();
+            }
             for (Player player : Bukkit.getOnlinePlayers()) {
-                enqueue(player);
+                if (Math.floorMod(player.getUniqueId().hashCode(), slices) == current) {
+                    enqueue(player);
+                }
             }
         } catch (RuntimeException failure) {
             // A throwing tick must not skip the reschedule below, or the HUD would freeze until a reload.
             log.error(tickFailureMessage(), failure);
         }
         scheduleNext();
+    }
+
+    /** How many slices of about {@link #SLICE} the interval holds, at least one. */
+    private static int slicesIn(Duration every) {
+        return (int) Math.max(1, Math.min(Integer.MAX_VALUE, every.toMillis() / SLICE.toMillis()));
     }
 
     private void enqueue(Player player) {
