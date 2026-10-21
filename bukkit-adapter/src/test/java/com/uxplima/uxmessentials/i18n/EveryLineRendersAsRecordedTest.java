@@ -19,9 +19,13 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.KeybindComponent;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.TranslatableComponent;
+import net.kyori.adventure.text.format.Style;
+import net.kyori.adventure.text.format.TextDecoration;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
-import net.kyori.adventure.text.serializer.gson.GsonComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
@@ -34,7 +38,11 @@ import org.junit.jupiter.api.io.TempDir;
 /**
  * Every line of every shipped catalogue renders to the component it rendered to when this file was recorded.
  *
- * <p>The record is a hash of each line's component, as a client would be sent it, in each of the twelve languages.
+ * <p>The record is a hash of what a client draws for each line, in each of the twelve languages: every run of text
+ * with the style it is drawn in, inherited from its parents, with an unset decoration read as off the way chat reads
+ * it, and the colour of a run that is only spaces left out because a space draws none. Two components built
+ * differently that draw the same are the same line; a colour, a letter, a decoration, a
+ * click or a hover that changes is a different one.
  * It exists so the text pipeline can be moved without a player seeing a difference: a line that renders differently
  * names its key and its language, and the new component is printed so the change can be judged rather than guessed.
  * A change that is meant is recorded again with {@code RECORD_RENDERED_LINES=true} in the environment, and the diff of the record
@@ -85,7 +93,77 @@ final class EveryLineRendersAsRecordedTest {
         String prefix = catalog.template(Locale.ENGLISH, PREFIX);
         Component component = MiniMessage.miniMessage()
                 .deserialize(catalog.template(locale, key), Placeholder.parsed("prefix", prefix), StyleTags.resolver());
-        return GsonComponentSerializer.gson().serialize(component);
+        return drawn(component);
+    }
+
+    /** The runs of text {@code component} draws, each with its effective style, adjacent equal styles merged. */
+    static String drawn(Component component) {
+        List<String[]> runs = new ArrayList<>();
+        collect(component, Style.empty(), runs);
+        StringBuilder out = new StringBuilder();
+        String[] open = null;
+        for (String[] run : runs) {
+            if (run[1].isEmpty()) {
+                continue;
+            }
+            if (open != null && open[0].equals(run[0])) {
+                open[1] = open[1] + run[1];
+                continue;
+            }
+            if (open != null) {
+                out.append('[').append(open[0]).append(']').append(open[1]);
+            }
+            open = run.clone();
+        }
+        if (open != null) {
+            out.append('[').append(open[0]).append(']').append(open[1]);
+        }
+        return out.toString();
+    }
+
+    private static void collect(Component component, Style inherited, List<String[]> runs) {
+        Style style = inherited.merge(component.style(), Style.Merge.Strategy.ALWAYS);
+        String text =
+                switch (component) {
+                    case TextComponent plain -> plain.content();
+                    case TranslatableComponent translatable -> "{translate:" + translatable.key() + "}";
+                    case KeybindComponent keybind -> "{key:" + keybind.keybind() + "}";
+                    default -> "{" + component.getClass().getSimpleName() + "}";
+                };
+        // A space draws no colour, so its colour is not part of what a player sees; its bold and font still are,
+        // because they change how wide it is.
+        Style seen = !text.isEmpty() && text.isBlank() ? style.color(null) : style;
+        runs.add(new String[] {describe(seen), text});
+        for (Component child : component.children()) {
+            collect(child, style, runs);
+        }
+    }
+
+    private static String describe(Style style) {
+        StringBuilder out = new StringBuilder();
+        out.append(style.color() == null ? "-" : style.color().asHexString());
+        for (TextDecoration decoration : TextDecoration.values()) {
+            if (style.decoration(decoration) == TextDecoration.State.TRUE) {
+                out.append(',').append(decoration.name().toLowerCase(Locale.ROOT));
+            }
+        }
+        if (style.font() != null) {
+            out.append(",font=").append(style.font().asString());
+        }
+        if (style.clickEvent() != null) {
+            out.append(",click=")
+                    .append(style.clickEvent().action())
+                    .append(':')
+                    .append(style.clickEvent().payload());
+        }
+        if (style.hoverEvent() != null) {
+            Object value = style.hoverEvent().value();
+            out.append(",hover=").append(value instanceof Component shown ? drawn(shown) : String.valueOf(value));
+        }
+        if (style.insertion() != null) {
+            out.append(",insert=").append(style.insertion());
+        }
+        return out.toString();
     }
 
     /** Each recorded line that differs now: its key, the languages that changed, and what they render to now. */
