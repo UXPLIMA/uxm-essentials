@@ -16,9 +16,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * A purely in-memory {@link SpawnDirectory}: per-world spawns, the singleton main spawn, named spawns, and
- * mirror redirects held in concurrent maps with no durable backing. The durable jOOQ store is the production
- * binding; this implementation is the embedded fallback the wiring would use if persistence were unavailable
- * and the seam the command-path test drives so the resolution chain can be exercised without a database.
+ * mirror redirects held in concurrent maps with no durable backing. The durable jOOQ store is the only production
+ * binding; this is the seam the command-path and join tests drive so the resolution chain can be exercised without
+ * a database, which is why it lives with the tests.
  *
  * <p>This implementation carries no vanilla-world fallback. {@link #defaultSpawn} returns only the operator
  * set per-world spawn, the same as {@link #operatorSpawn}, so it satisfies the no-vanilla contract the
