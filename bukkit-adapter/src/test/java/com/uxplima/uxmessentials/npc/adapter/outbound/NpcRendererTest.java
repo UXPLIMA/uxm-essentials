@@ -279,6 +279,74 @@ class NpcRendererTest {
     }
 
     @Test
+    void lookTickHopsOnceToAViewerHoweverManyNpcsLookAtThem() {
+        // One hop per viewer, not one per viewer and NPC: on a lobby with a row of looking NPCs and thirty players,
+        // the per-pair hop scheduled over a thousand tasks a second.
+        PlayerMock viewer = server.addPlayer();
+        CountingEntityScheduler scheduler = new CountingEntityScheduler();
+        NpcRenderer renderer = newRenderer(scheduler, new NoopLogger());
+        for (String name : List.of("guide", "trader", "keeper")) {
+            renderer.render(Npc.create(
+                    NpcName.of(name),
+                    com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toPosition(
+                            locationOf(viewer).add(2.0, 0, 0)),
+                    null,
+                    Instant.ofEpochMilli(1_000)));
+        }
+        int looksBefore = packets.looksSentTo(viewer.getUniqueId()).size();
+        scheduler.entityHops = 0;
+
+        renderer.lookTick();
+
+        assertThat(scheduler.entityHops).isEqualTo(1);
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksBefore + 6);
+    }
+
+    @Test
+    void lookTickSendsNothingNewToAViewerWhoHasNotMoved() {
+        // An NPC already facing a viewer who stands still keeps facing them: two packets per NPC per viewer several
+        // times a second said nothing new.
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        renderer.render(npcAt(viewer, 2.0));
+        renderer.lookTick();
+        int looksAfterFirst = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksAfterFirst);
+    }
+
+    @Test
+    void lookTickTurnsTheNpcAgainOnceTheViewerMoves() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        renderer.render(npcAt(viewer, 2.0));
+        renderer.lookTick();
+        int looksAfterFirst = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        viewer.teleport(locationOf(viewer).add(0, 0, 3.0));
+        renderer.lookTick();
+
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksAfterFirst + 2);
+    }
+
+    @Test
+    void lookTickTurnsAnNpcThatWasSpawnedAgainForTheViewer() {
+        // A spawn starts the NPC at its stored rotation, so what this viewer was last sent no longer holds.
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        renderer.render(npc(locationOf(viewer).add(2.0, 0, 0), new NpcSkin("oldtex", "oldsig")));
+        renderer.lookTick();
+        renderer.render(npc(locationOf(viewer).add(2.0, 0, 0), new NpcSkin("newtex", "newsig")));
+        int looksAfterRespawn = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksAfterRespawn + 2);
+    }
+
+    @Test
     void lookTickIgnoresAnNpcWithLookAtPlayerOff() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
@@ -2381,6 +2449,17 @@ class NpcRendererTest {
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+    }
+
+    /** A scheduler that runs every hop inline and counts the hops to a player's entity thread. */
+    private static final class CountingEntityScheduler extends InlineScheduler {
+        private int entityHops;
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            entityHops++;
             task.run();
         }
     }

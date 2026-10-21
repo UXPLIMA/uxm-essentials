@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.npc.adapter.outbound;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -69,6 +71,12 @@ public final class NpcRenderer implements NpcView {
     private final Map<UUID, Set<String>> shownTo = new ConcurrentHashMap<>();
     private final Map<Integer, String> nameByEntityId = new ConcurrentHashMap<>();
 
+    /**
+     * The look each viewer was last sent per NPC entity id, as the packet carries it: yaw and pitch in 256 steps.
+     * A look that would say the same is not sent again.
+     */
+    private final Map<UUID, Map<Integer, Integer>> lastLook = new ConcurrentHashMap<>();
+
     public NpcRenderer(
             NpcPackets packets, NpcViewSpawner spawner, Scheduler scheduler, double renderRange, double lookRange) {
         this.packets = Objects.requireNonNull(packets, "packets");
@@ -123,6 +131,7 @@ public final class NpcRenderer implements NpcView {
     public void forget(Player viewer) {
         Objects.requireNonNull(viewer, "viewer");
         shownTo.remove(viewer.getUniqueId());
+        lastLook.remove(viewer.getUniqueId());
     }
 
     /**
@@ -147,6 +156,7 @@ public final class NpcRenderer implements NpcView {
         }
         live.clear();
         shownTo.clear();
+        lastLook.clear();
         nameByEntityId.clear();
         spawner.forgetAll();
     }
@@ -178,28 +188,59 @@ public final class NpcRenderer implements NpcView {
      * facing.
      */
     public void lookTick() {
+        List<RenderedNpc> looking = new ArrayList<>();
+        for (RenderedNpc rendered : live.values()) {
+            if (rendered.npc().lookAtPlayer()) {
+                looking.add(rendered);
+            }
+        }
+        if (looking.isEmpty()) {
+            return;
+        }
+        // One hop per viewer, which turns every NPC that faces them: a hop per viewer and NPC scheduled over a
+        // thousand tasks a second on a lobby with a row of NPCs and thirty players.
         for (Player viewer : Bukkit.getOnlinePlayers()) {
-            for (RenderedNpc rendered : live.values()) {
-                if (rendered.npc().lookAtPlayer()) {
+            scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+                for (RenderedNpc rendered : looking) {
                     aimAtViewer(viewer, rendered);
                 }
-            }
+            });
         }
     }
 
+    /** An angle as the client is sent it: one of 256 steps of a turn. */
+    private static int angleStep(float degrees) {
+        return (int) Math.floor(degrees * 256.0F / 360.0F) & 0xFF;
+    }
+
+    /**
+     * Forget what {@code viewer} was last sent for one NPC once it is removed: every spawn for a viewer follows a
+     * removal or a viewer that is new, so the next spawn starts from the stored rotation with nothing remembered.
+     */
+    private void forgetLook(UUID viewer, int entityId) {
+        Map<Integer, Integer> looks = lastLook.get(viewer);
+        if (looks != null) {
+            looks.remove(entityId);
+        }
+    }
+
+    /** Turn one NPC to face {@code viewer}. Reads the live viewer location, so it runs on the viewer's thread. */
     private void aimAtViewer(Player viewer, RenderedNpc rendered) {
-        // Reads the live viewer location, so it must run on the viewer's region thread alongside the send.
-        scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
-            if (!isShown(viewer, rendered) || !inLookRange(viewer, rendered.npc())) {
-                return;
-            }
-            Location eye = viewer.getEyeLocation();
-            Position at = rendered.npc().location();
-            LookAngles look = LookAngles.facing(
-                    at.x(), at.y() + EYE_HEIGHT, at.z(), eye.getX(), eye.getY(), eye.getZ(), at.yaw());
-            packets.send(viewer, packets.headLook(rendered.entityId(), look.yaw()));
-            packets.send(viewer, packets.bodyLook(rendered.entityId(), look.yaw(), look.pitch()));
-        });
+        if (!isShown(viewer, rendered) || !inLookRange(viewer, rendered.npc())) {
+            return;
+        }
+        Location eye = viewer.getEyeLocation();
+        Position at = rendered.npc().location();
+        LookAngles look =
+                LookAngles.facing(at.x(), at.y() + EYE_HEIGHT, at.z(), eye.getX(), eye.getY(), eye.getZ(), at.yaw());
+        int packed = (angleStep(look.yaw()) << 8) | angleStep(look.pitch());
+        Integer previous = lastLook.computeIfAbsent(viewer.getUniqueId(), id -> new ConcurrentHashMap<>())
+                .put(rendered.entityId(), packed);
+        if (previous != null && previous == packed) {
+            return;
+        }
+        packets.send(viewer, packets.headLook(rendered.entityId(), look.yaw()));
+        packets.send(viewer, packets.bodyLook(rendered.entityId(), look.yaw(), look.pitch()));
     }
 
     private boolean isShown(Player viewer, RenderedNpc rendered) {
@@ -278,6 +319,7 @@ public final class NpcRenderer implements NpcView {
         if (shown == null || !shown.remove(rendered.npc().name().value())) {
             return;
         }
+        forgetLook(viewer.getUniqueId(), rendered.entityId());
         packets.send(viewer, packets.remove(rendered.entityId()));
         packets.send(viewer, packets.tabRemove(rendered.profileId()));
         // The glow-colour team is client-side scoreboard state that outlives the despawned entity, so drop it here
