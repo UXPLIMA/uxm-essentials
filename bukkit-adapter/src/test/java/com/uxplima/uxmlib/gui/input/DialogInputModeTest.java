@@ -153,10 +153,10 @@ class DialogInputModeTest {
         // catalogues carry, so the words still arrive without a catalogue edit; that fallback is what this pins.
         assertThat(fake.submitLabel)
                 .as("the submit button is resolved for this viewer through the message catalog")
-                .isEqualTo(guiText.text(viewer, GuiMessageKey.INPUT_DIALOG_SUBMIT));
+                .isEqualTo(guiText.text(viewer, GuiMessageKey.INPUT_SUBMIT));
         assertThat(fake.cancelLabel)
                 .as("the cancel button is resolved for this viewer through the message catalog")
-                .isEqualTo(guiText.text(viewer, GuiMessageKey.INPUT_DIALOG_CANCEL));
+                .isEqualTo(guiText.text(viewer, GuiMessageKey.INPUT_CANCEL));
     }
 
     @Test
@@ -261,8 +261,8 @@ class DialogInputModeTest {
 
         /** The keys this catalogue answers, mirroring the pair the shipped locale files carry. */
         private static final Map<String, String> WRITTEN = Map.of(
-                GuiMessageKey.INPUT_DIALOG_SUBMIT.key(), "Confirm",
-                GuiMessageKey.INPUT_DIALOG_CANCEL.key(), "Cancel");
+                GuiMessageKey.INPUT_SUBMIT.key(), "Confirm",
+                GuiMessageKey.INPUT_CANCEL.key(), "Cancel");
 
         @Override
         public String resolve(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
