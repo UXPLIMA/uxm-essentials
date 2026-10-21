@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -22,10 +23,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class ClearHologramActions {
 
     private final HologramRepository repository;
+    private final HologramView view;
     private final Notifier notifier;
 
-    public ClearHologramActions(HologramRepository repository, Notifier notifier) {
+    public ClearHologramActions(HologramRepository repository, HologramView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
@@ -38,7 +41,10 @@ public final class ClearHologramActions {
             notifier.send(actor, HologramError.NOT_FOUND.messageKey(), Map.of("name", name.value()));
             return Result.err(HologramError.NOT_FOUND);
         }
-        repository.save(existing.get().withActionsCleared());
+        Hologram updated = existing.get().withActionsCleared();
+        repository.save(updated);
+        // With no action left the hologram may lose its click box, so it is drawn again.
+        view.render(updated);
         notifier.send(actor, HologramsMessageKey.HOLOGRAM_ACTION_CLEARED, Map.of("name", name.value()));
         return Result.ok();
     }

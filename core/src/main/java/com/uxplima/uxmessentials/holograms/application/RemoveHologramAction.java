@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -23,10 +24,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class RemoveHologramAction {
 
     private final HologramRepository repository;
+    private final HologramView view;
     private final Notifier notifier;
 
-    public RemoveHologramAction(HologramRepository repository, Notifier notifier) {
+    public RemoveHologramAction(HologramRepository repository, HologramView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
@@ -48,7 +51,10 @@ public final class RemoveHologramAction {
                     Map.of("name", name.value(), "index", Integer.toString(index1Based)));
             return Result.err(HologramError.ACTION_INDEX_OUT_OF_RANGE);
         }
-        repository.save(hologram.withActionRemovedAt(zeroBased));
+        Hologram updated = hologram.withActionRemovedAt(zeroBased);
+        repository.save(updated);
+        // A last action leaving takes the hologram's click box away, so it is drawn again.
+        view.render(updated);
         notifier.send(
                 actor,
                 HologramsMessageKey.HOLOGRAM_ACTION_REMOVED,

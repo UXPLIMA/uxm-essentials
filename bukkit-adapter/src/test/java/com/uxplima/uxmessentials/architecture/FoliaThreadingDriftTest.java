@@ -123,9 +123,6 @@ class FoliaThreadingDriftTest {
                 "GLOBAL: baltop online-ref snapshot resolved via onGlobal");
         allow.put(pkg + "economy.adapter.outbound.SalaryTask", "GLOBAL: salary fan-out inside scheduler.onGlobal");
         allow.put(
-                pkg + "holograms.adapter.HologramsWiring",
-                "GLOBAL: the language watch reads the online players inside its global timer, then hops to each");
-        allow.put(
                 pkg + "itemworld.adapter.inbound.command.GiveAllCommand",
                 "GLOBAL: /giveall distribution wrapped in scheduler.onGlobal");
         allow.put(
@@ -315,9 +312,6 @@ class FoliaThreadingDriftTest {
         allow.put(
                 pkg + "nametags.adapter.outbound.PacketNametagPresenter",
                 "RENDER_SCAN: eligible-viewer cull read on the wearer's region thread, no foreign mutation");
-        allow.put(
-                pkg + "holograms.adapter.outbound.HologramViewers",
-                "RENDER_SCAN: visibility scan on the hologram's region thread, show/hide on the shared entity");
         allow.put(
                 pkg + "presence.adapter.outbound.BukkitPresenceAudience",
                 "RENDER_SCAN: AFK audience scanned per-entity (auto-sweep) or on the /afk command thread, no inline mutation");

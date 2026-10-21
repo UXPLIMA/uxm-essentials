@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -26,10 +27,12 @@ import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 public final class InsertHologramAction {
 
     private final HologramRepository repository;
+    private final HologramView view;
     private final Notifier notifier;
 
-    public InsertHologramAction(HologramRepository repository, Notifier notifier) {
+    public InsertHologramAction(HologramRepository repository, HologramView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
@@ -54,7 +57,10 @@ public final class InsertHologramAction {
             return Result.err(HologramError.ACTION_INDEX_OUT_OF_RANGE);
         }
         int position = after ? index1Based : index1Based - 1;
-        repository.save(hologram.withActionInsertedAt(position, action));
+        Hologram updated = hologram.withActionInsertedAt(position, action);
+        repository.save(updated);
+        // A first action gives the hologram a click box, so it is drawn again.
+        view.render(updated);
         notifier.send(
                 actor,
                 HologramsMessageKey.HOLOGRAM_ACTION_INSERTED,

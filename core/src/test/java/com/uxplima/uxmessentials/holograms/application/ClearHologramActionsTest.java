@@ -31,13 +31,15 @@ class ClearHologramActionsTest {
     private FakeHologramRepository repository;
     private CapturingSink sink;
     private ClearHologramActions clear;
+    private HologramTestSupport.RecordingView view;
     private PlayerRef actor;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHologramRepository();
+        view = new HologramTestSupport.RecordingView();
         sink = new CapturingSink();
-        clear = new ClearHologramActions(repository, new Notifier(new HologramTestSupport.KeyMessages(), sink));
+        clear = new ClearHologramActions(repository, view, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
@@ -52,6 +54,8 @@ class ClearHologramActionsTest {
         assertThat(updated.actions()).isEmpty();
         assertThat(updated.hasActions()).isFalse();
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_ACTION_CLEARED.key());
+        // A first action gives the hologram a click box and a last one takes it away, so it is drawn again.
+        assertThat(view.rendered).containsExactly(updated);
     }
 
     @Test
@@ -60,6 +64,7 @@ class ClearHologramActionsTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(HologramError.NOT_FOUND);
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_NOT_FOUND.key());
+        assertThat(view.rendered).isEmpty();
     }
 
     private Hologram withTwoActions(String name) {

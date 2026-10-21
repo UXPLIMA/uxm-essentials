@@ -178,6 +178,23 @@ class HologramViewerTextTest {
     }
 
     @Test
+    void aSharedLineResolvesTheServersGlobalTags() {
+        HologramViewerText text =
+                viewerText(perViewer(Map.of()), () -> Placeholder.parsed("greeting", "Hi"), new HologramPageState());
+
+        assertThat(plain(text.sharedText(text("hi", "<greeting> world"), UnaryOperator.identity(), 0)))
+                .isEqualTo("Hi world");
+    }
+
+    @Test
+    void aSharedLineWithNothingToResolveIsLeftAsWritten() {
+        HologramViewerText text = viewerText(perViewer(Map.of()));
+
+        assertThat(plain(text.sharedText(text("hi", "Welcome"), UnaryOperator.identity(), 0)))
+                .isEqualTo("Welcome");
+    }
+
+    @Test
     void aSharedHologramReadsTheSameForEverybodyThroughTheGlobalBridge() {
         HologramViewerText text = viewerText(perViewer(Map.of()));
         Hologram hologram = text("online", "online: %server_online%");

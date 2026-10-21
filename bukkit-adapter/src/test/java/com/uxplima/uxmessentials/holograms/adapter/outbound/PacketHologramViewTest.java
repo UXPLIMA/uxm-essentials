@@ -107,7 +107,6 @@ class PacketHologramViewTest {
                 TagResolver::empty,
                 pages);
         HologramViewers viewers = new HologramViewers(
-                MockBukkit.createMockPlugin(),
                 new GrantedPermissions(),
                 name -> manual.getOrDefault(name.value(), Set.of()),
                 name -> blacklist.getOrDefault(name.value(), Set.of()));
@@ -570,8 +569,7 @@ class PacketHologramViewTest {
                         TagResolver::empty,
                         pages),
                 globalBridge,
-                new HologramViewers(
-                        MockBukkit.createMockPlugin(), new GrantedPermissions(), name -> Set.of(), name -> Set.of()),
+                new HologramViewers(new GrantedPermissions(), name -> Set.of(), name -> Set.of()),
                 npc -> Optional.empty(),
                 new LeaderboardProviders(Map.of()),
                 pages,

@@ -507,7 +507,7 @@ class ArchitectureTest {
 
     private static final List<String> STORED_ENTITY_RENDERERS = List.of(
             "com.uxplima.uxmessentials.npc.adapter.outbound.NpcRenderer",
-            "com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer");
+            "com.uxplima.uxmessentials.holograms.adapter.outbound.PacketHologramView");
 
     /**
      * A stored NPC or hologram is drawn once the worlds exist, through the {@code spawnStored} the bootstrap hands to

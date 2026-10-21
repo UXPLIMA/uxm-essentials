@@ -451,12 +451,12 @@ class HologramGuiTest {
                 new ListHologramPages(repository, notifier),
                 new SetHologramGrowUp(repository, view, notifier),
                 new ManageHologramBlacklist(repository, view, notifier),
-                new AddHologramAction(repository, notifier),
-                new InsertHologramAction(repository, notifier),
+                new AddHologramAction(repository, view, notifier),
+                new InsertHologramAction(repository, view, notifier),
                 new SetHologramAction(repository, notifier),
                 new MoveHologramAction(repository, notifier),
-                new RemoveHologramAction(repository, notifier),
-                new ClearHologramActions(repository, notifier),
+                new RemoveHologramAction(repository, view, notifier),
+                new ClearHologramActions(repository, view, notifier),
                 new ListHologramActions(repository, notifier));
     }
 

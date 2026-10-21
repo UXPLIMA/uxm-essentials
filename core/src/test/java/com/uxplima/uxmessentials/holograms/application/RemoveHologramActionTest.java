@@ -31,13 +31,15 @@ class RemoveHologramActionTest {
     private FakeHologramRepository repository;
     private CapturingSink sink;
     private RemoveHologramAction remove;
+    private HologramTestSupport.RecordingView view;
     private PlayerRef actor;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHologramRepository();
+        view = new HologramTestSupport.RecordingView();
         sink = new CapturingSink();
-        remove = new RemoveHologramAction(repository, new Notifier(new HologramTestSupport.KeyMessages(), sink));
+        remove = new RemoveHologramAction(repository, view, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
@@ -52,6 +54,8 @@ class RemoveHologramActionTest {
         assertThat(updated.actions()).hasSize(1);
         assertThat(updated.actions().get(0).value()).isEqualTo("second");
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_ACTION_REMOVED.key());
+        // A first action gives the hologram a click box and a last one takes it away, so it is drawn again.
+        assertThat(view.rendered).containsExactly(updated);
     }
 
     @Test
@@ -62,6 +66,7 @@ class RemoveHologramActionTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(HologramError.ACTION_INDEX_OUT_OF_RANGE);
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_ACTION_INDEX_INVALID.key());
+        assertThat(view.rendered).isEmpty();
     }
 
     @Test
@@ -70,6 +75,7 @@ class RemoveHologramActionTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(HologramError.NOT_FOUND);
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_NOT_FOUND.key());
+        assertThat(view.rendered).isEmpty();
     }
 
     private Hologram withTwoActions(String name) {

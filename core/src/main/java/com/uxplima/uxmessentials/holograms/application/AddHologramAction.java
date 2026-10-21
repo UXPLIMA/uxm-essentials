@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -24,10 +25,12 @@ import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 public final class AddHologramAction {
 
     private final HologramRepository repository;
+    private final HologramView view;
     private final Notifier notifier;
 
-    public AddHologramAction(HologramRepository repository, Notifier notifier) {
+    public AddHologramAction(HologramRepository repository, HologramView view, Notifier notifier) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
@@ -43,6 +46,8 @@ public final class AddHologramAction {
         }
         Hologram updated = existing.get().withActionAdded(action);
         repository.save(updated);
+        // A first action gives the hologram a click box, so it is drawn again.
+        view.render(updated);
         notifier.send(
                 actor,
                 HologramsMessageKey.HOLOGRAM_ACTION_ADDED,

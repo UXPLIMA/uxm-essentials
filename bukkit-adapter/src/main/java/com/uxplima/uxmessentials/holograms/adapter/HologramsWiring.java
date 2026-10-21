@@ -11,6 +11,9 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.function.UnaryOperator;
 
+import org.bukkit.entity.Player;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -20,16 +23,16 @@ import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorSub
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorView;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.DamageIndicatorListener;
-import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickListener;
-import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramVisibilityListener;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickHandler;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramQuitListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.DamageIndicatorConfig;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramPageState;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRefreshTask;
-import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramRenderer;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramSymbols;
-import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramTextOverrides;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewerText;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.HologramViewers;
+import com.uxplima.uxmessentials.holograms.adapter.outbound.PacketHologramView;
 import com.uxplima.uxmessentials.holograms.application.AddHologramAction;
 import com.uxplima.uxmessentials.holograms.application.AddHologramLine;
 import com.uxplima.uxmessentials.holograms.application.AddHologramPage;
@@ -69,6 +72,7 @@ import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
+import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
@@ -85,7 +89,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunne
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
-import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
@@ -103,34 +106,27 @@ import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.packet.display.DisplayTextPackets;
-import com.uxplima.uxmlib.packet.display.internal.NmsDisplayTextPackets;
+import com.uxplima.uxmlib.packet.display.PacketHologramClicks;
+import com.uxplima.uxmlib.packet.display.internal.NmsHologramPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketSender;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
-import com.uxplima.uxmlib.scheduler.TaskHandle;
-import com.uxplima.uxmlib.text.message.LanguageWatch;
 import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the holograms context's adapters and use cases over the injected kernel ports, the persistence
- * DSL, and the uxmLib native-Display hologram API, and produces the Brigadier command the plugin registers.
- * This is the one place the holograms context is wired: nothing else news up its classes.
+ * DSL, and the uxmLib packet hologram, and produces the Brigadier command the plugin registers. This is the one
+ * place the holograms context is wired: nothing else news up its classes.
  *
  * <p>The repository is the jOOQ adapter behind a Caffeine read-cache decorator (write-through at the
- * delegate, invalidate in the cache). The renderer holds a fresh {@link HologramManager}; the uxmLib lifecycle
- * listener is installed once here so per-player viewer caches stay honest. On wire, every stored hologram is
- * spawned (each on its own region thread through the kernel {@code Scheduler}) so a restart brings the
- * holograms back exactly as configured. On stop the {@code Wired} bundle despawns them all so no display
- * entity is orphaned across a reload.
+ * delegate, invalidate in the cache). Once the worlds exist every stored hologram is drawn, for each viewer, with
+ * packets, so a restart brings the holograms back exactly as configured and nothing is left in the world to lose.
+ * On stop the {@code Wired} bundle takes them off every client.
  */
 @NullMarked
 public final class HologramsWiring {
-
-    /** How often each viewer's language is asked again. Short, because the viewer is looking at the hologram. */
-    private static final java.time.Duration LANGUAGE_WATCH = java.time.Duration.ofSeconds(1L);
 
     private HologramsWiring() {}
 
@@ -172,13 +168,11 @@ public final class HologramsWiring {
                 HologramRepositories.cachedConcrete(persistence);
         HologramRepository repository =
                 com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.repository(cached, bus.publisher());
-        // Each hologram carries this plugin's name, so one a crash left standing is taken down as its chunk loads
-        // rather than gathering company over every restart. Another plugin's displays are never touched. Builds
-        // before the name was written left holograms that carry none; they stood under the live one and showed
-        // through it once a viewer read another language, so this plugin takes those as its own leftovers too.
-        HologramManager manager = new HologramManager(plugin.getName()).adoptUnownedLeftovers();
-        manager.installLifecycleListener(plugin);
-        manager.sweepLeftoversAsTheyLoad(plugin);
+        // A hologram is drawn with packets now and spawns nothing, but builds before that spawned a display entity
+        // for each one, and a crash or an old shutdown could leave those standing. Each carries this plugin's name,
+        // or none in the oldest builds, so they are taken down as their chunks load. Another plugin's displays are
+        // never touched.
+        new HologramManager(plugin.getName()).adoptUnownedLeftovers().sweepLeftoversAsTheyLoad(plugin);
         // A hologram is one shared TextDisplay. Its broadcast text resolves placeholders server-globally (online,
         // time, TPS); the identity transform when PlaceholderAPI is absent, so a default server pays nothing. On
         // top of that base, a line embedding a placeholder additionally renders per viewer through the text-override
@@ -191,15 +185,10 @@ public final class HologramsWiring {
         HologramSymbols symbols = HologramSymbols.fromConfig(ctx.config());
         Function<UUID, UnaryOperator<String>> perViewerBridge =
                 viewer -> symbols.wrap(PlaceholderApiSupport.messageBridge(viewer));
-        HologramTextOverrides textOverrides = new HologramTextOverrides(
-                perViewerTextPackets(),
-                perViewerBridge,
-                MiniMessage.miniMessage(),
-                MiniPlaceholdersSupport::globalResolver,
-                pageState,
-                kernel.log());
+        HologramViewerText viewerText = new HologramViewerText(
+                perViewerBridge, MiniMessage.miniMessage(), MiniPlaceholdersSupport::globalResolver, pageState);
         HologramViewers viewers =
-                new HologramViewers(plugin, kernel.permissions(), repository::manualViewers, repository::blacklisted);
+                new HologramViewers(kernel.permissions(), repository::manualViewers, repository::blacklisted);
         // The NPC-link seam: a locator over the npc context's stored set kept current by the domain-event bus,
         // re-anchoring a linked hologram when its NPC moves or is removed. The locator reads the npc persistence
         // directly (the npc table ships in the persistence V38 baseline, always applied), so a hologram may link to
@@ -210,35 +199,6 @@ public final class HologramsWiring {
         RendererHolder rendererHolder = new RendererHolder();
         EventDrivenNpcLocator npcLocator =
                 new EventDrivenNpcLocator(npcRepository, name -> rendererHolder.reanchor(name));
-        HologramRenderer renderer = new HologramRenderer(
-                plugin,
-                manager,
-                kernel.scheduler(),
-                kernel.log(),
-                symbols.wrap(PlaceholderApiSupport.globalBridge()),
-                MiniPlaceholdersSupport::globalResolver,
-                viewers,
-                textOverrides,
-                npcLocator,
-                leaderboards,
-                pageState);
-        rendererHolder.set(renderer);
-        // Close the cross-server loop: a remote hologram change reloads exactly that hologram into the same cache
-        // the commands and renderer read, then re-renders (or despawns) the live display through the renderer
-        // the same render path the local edit runs, hopped onto the right region thread by the renderer itself.
-        // With the bus disabled the publisher is a no-op and this listener is never invoked, so the single-server
-        // path is unchanged.
-        bus.registry()
-                .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.listener(
-                        cached, renderer, kernel.scheduler()));
-        InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
-        Consumer<DomainEvent> npcSubscriber = npcLocator;
-        events.subscribe(npcSubscriber);
-        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
-        HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
-        // A joining player must pick up the permission-gated holograms they qualify for at once, not after a
-        // refresh tick; this listener re-evaluates only the gated holograms for that one player.
-        plugin.getServer().getPluginManager().registerEvents(new HologramVisibilityListener(renderer), plugin);
         // The shared click-action engine: a hologram's chain runs through the same BukkitClickActionRunner npc uses,
         // built over the shared filtered command runner. Holograms ship no blocked-commands config key, so the
         // blocklist is empty (a transparent pass-through: an operator-owned fixture, no command filtering needed yet).
@@ -256,9 +216,45 @@ public final class HologramsWiring {
                 HologramsMessageKey.HOLOGRAM_ACTION_COST_DENIED,
                 SerializedItems::decode,
                 kernel.log());
-        HologramClickListener clickListener =
-                new HologramClickListener(plugin, repository, renderer, actionRunner, kernel.scheduler());
-        plugin.getServer().getPluginManager().registerEvents(clickListener, plugin);
+        // A click on a hologram's box reaches the server as a click on an entity it does not know. The router answers
+        // it for the hologram whose box it is, on the clicking player's own thread.
+        PaperScheduler frames = new PaperScheduler(plugin);
+        PacketHologramClicks clicks = new PacketHologramClicks(frames);
+        plugin.getServer().getPluginManager().registerEvents(clicks, plugin);
+        HologramClickHandler clickHandler = new HologramClickHandler(
+                repository::find, rendererHolder::cyclePage, actionRunner, System::currentTimeMillis);
+        // The one place a Mojang mapped class is named: a hologram is sent to each client and never spawned, so its
+        // packets are built behind an interface the rest of the plugin talks to.
+        PacketHologramView renderer = new PacketHologramView(
+                new NmsHologramPackets(new PacketSender(new ChannelResolver())),
+                frames,
+                kernel.scheduler(),
+                kernel.log(),
+                viewerText,
+                symbols.wrap(PlaceholderApiSupport.globalBridge()),
+                viewers,
+                npcLocator,
+                leaderboards,
+                pageState,
+                clicks,
+                clickHandler);
+        rendererHolder.set(renderer);
+        // Close the cross-server loop: a remote hologram change reloads exactly that hologram into the same cache
+        // the commands and renderer read, then re-renders (or despawns) the live display through the renderer
+        // the same render path the local edit runs, hopped onto the right region thread by the renderer itself.
+        // With the bus disabled the publisher is a no-op and this listener is never invoked, so the single-server
+        // path is unchanged.
+        bus.registry()
+                .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.listener(
+                        cached, renderer, kernel.scheduler()));
+        InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
+        Consumer<DomainEvent> npcSubscriber = npcLocator;
+        events.subscribe(npcSubscriber);
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
+        HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
+        // What was resolved for a player is dropped as they leave, so it does not outlive them.
+        HologramQuitListener quitListener = new HologramQuitListener(renderer);
+        plugin.getServer().getPluginManager().registerEvents(quitListener, plugin);
         // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
         // registered, so a default server spawns no floating-number entities and the listener costs nothing.
         DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
@@ -267,20 +263,9 @@ public final class HologramsWiring {
                     .getPluginManager()
                     .registerEvents(new DamageIndicatorListener(damageIndicators, kernel.scheduler()), plugin);
         }
-        AutoCloseable refreshing = scheduleRefresh(kernel.scheduler(), repository, renderer, kernel.log());
-        // A viewer who changes language reads every hologram they see in the new one. Their own text went out when
-        // they started tracking each display, so one that never refreshes kept the old language until they walked
-        // away and back. Closed with the refresh timer on stop.
-        TaskHandle languageWatch = LanguageWatch.follow(
-                new PaperScheduler(plugin),
-                viewer -> HudText.languageOf(viewer.getUniqueId()),
-                LANGUAGE_WATCH,
-                () -> plugin.getServer().getOnlinePlayers(),
-                renderer::resendOwnText);
-        AutoCloseable refreshTask = () -> {
-            refreshing.close();
-            languageWatch.cancel();
-        };
+        // A viewer's language and page are read on every frame, so nothing has to watch them: the refresh only
+        // reads placeholders and leaderboards again for the holograms that ask for it.
+        AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer, kernel.log());
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database, safe on the tick thread.
         java.util.function.Supplier<java.util.List<String>> hologramNames = () -> repository.all().stream()
@@ -326,7 +311,8 @@ public final class HologramsWiring {
                 events,
                 npcSubscriber,
                 connector,
-                listMenu);
+                listMenu,
+                List.of(clicks, quitListener));
     }
 
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
@@ -357,32 +343,29 @@ public final class HologramsWiring {
      */
     private static final class RendererHolder {
 
-        private @Nullable HologramRenderer renderer;
+        private @Nullable PacketHologramView renderer;
 
-        void set(HologramRenderer renderer) {
+        void set(PacketHologramView renderer) {
             this.renderer = Objects.requireNonNull(renderer, "renderer");
         }
 
         void reanchor(String npcName) {
-            HologramRenderer current = renderer;
+            PacketHologramView current = renderer;
             if (current != null) {
                 current.reanchorLinkedTo(npcName);
             }
         }
-    }
 
-    /**
-     * Build the lib per-viewer text-override packet port: the channel resolver finds each viewer's Netty channel,
-     * the sender writes to it, and the NMS port builds the {@code ClientboundSetEntityDataPacket} that overrides
-     * one viewer's copy of a shared display's text. The same stack the nametags and tablist contexts use; it is a
-     * no-op send for a viewer whose channel cannot be resolved.
-     */
-    private static DisplayTextPackets perViewerTextPackets() {
-        return new NmsDisplayTextPackets(new PacketSender(new ChannelResolver()));
+        void cyclePage(Player viewer, HologramName name) {
+            PacketHologramView current = renderer;
+            if (current != null) {
+                current.cyclePage(viewer, name);
+            }
+        }
     }
 
     private static AutoCloseable scheduleRefresh(
-            Scheduler scheduler, HologramRepository repository, HologramRenderer renderer, Logger log) {
+            Scheduler scheduler, HologramRepository repository, PacketHologramView renderer, Logger log) {
         // A single global timer ticks every second and re-renders only the holograms whose interval is due, so
         // a server with no refreshing hologram pays just the empty iteration. The handle is closed on stop.
         HologramRefreshTask task = new HologramRefreshTask(repository::all, renderer::refresh, log, REFRESH_BASE_TICKS);
@@ -392,7 +375,7 @@ public final class HologramsWiring {
     private static HologramServices assemble(
             KernelPorts kernel,
             HologramRepository repository,
-            HologramRenderer renderer,
+            PacketHologramView renderer,
             Notifier notifier,
             LinkedNpcLocator npcLocator) {
         Clock clock = Clock.systemUTC();
@@ -426,12 +409,12 @@ public final class HologramsWiring {
                 new ListHologramPages(repository, notifier),
                 new SetHologramGrowUp(repository, renderer, notifier),
                 new ManageHologramBlacklist(repository, renderer, notifier),
-                new AddHologramAction(repository, notifier),
-                new InsertHologramAction(repository, notifier),
+                new AddHologramAction(repository, renderer, notifier),
+                new InsertHologramAction(repository, renderer, notifier),
                 new SetHologramAction(repository, notifier),
                 new MoveHologramAction(repository, notifier),
-                new RemoveHologramAction(repository, notifier),
-                new ClearHologramActions(repository, notifier),
+                new RemoveHologramAction(repository, renderer, notifier),
+                new ClearHologramActions(repository, renderer, notifier),
                 new ListHologramActions(repository, notifier));
     }
 
@@ -447,17 +430,19 @@ public final class HologramsWiring {
      * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
      * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
      * @param listMenu the management-GUI list, opened by /hologram (no args) and the /uxmess gui hub entry
+     * @param listeners the click router and the quit hook, unregistered on stop so a re-wire does not answer twice
      */
     public record Wired(
             List<CommandRegistration> commands,
-            HologramRenderer renderer,
+            PacketHologramView renderer,
             HologramRepository repository,
             HologramServices services,
             AutoCloseable refreshTask,
             InProcessDomainEventPublisher events,
             Consumer<DomainEvent> npcSubscriber,
             BukkitServerConnector connector,
-            HologramListMenu listMenu) {
+            HologramListMenu listMenu,
+            List<Listener> listeners) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -469,6 +454,7 @@ public final class HologramsWiring {
             Objects.requireNonNull(npcSubscriber, "npcSubscriber");
             Objects.requireNonNull(connector, "connector");
             Objects.requireNonNull(listMenu, "listMenu");
+            listeners = List.copyOf(listeners);
         }
 
         /**
@@ -477,7 +463,7 @@ public final class HologramsWiring {
          * <p>Called once the worlds exist, not during wiring. The plugin enables at {@code load: STARTUP}, so on
          * the wiring thread {@code Bukkit.getWorld(uid)} answers null for every hologram on the server and the
          * renderer would skip each one with a "world not loaded" warning that blames the operator's data rather
-         * than the startup order. Each render still hops onto the hologram's own region thread inside the renderer.
+         * than the startup order.
          */
         public void spawnStored() {
             for (Hologram hologram : repository.all()) {
@@ -486,13 +472,14 @@ public final class HologramsWiring {
         }
 
         /**
-         * Cancel the refresh timer, drop the npc-link subscription, unregister the proxy connect channel, and
-         * despawn every spawned hologram.
+         * Cancel the refresh timer, drop the npc-link subscription, unregister the proxy connect channel and the
+         * listeners, and take every hologram off every client.
          */
         public void stop() {
             events.unsubscribe(npcSubscriber);
             closeQuietly(refreshTask);
             connector.close();
+            listeners.forEach(HandlerList::unregisterAll);
             renderer.despawnAll();
         }
 

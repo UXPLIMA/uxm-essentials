@@ -1,8 +1,7 @@
 /**
- * The holograms context's outbound adapter: {@code HologramRenderer} realises the core {@code HologramView}
- * port over the uxmLib native-Display hologram API, mapping each domain hologram to one live multi-line
- * {@code TextDisplay}. Every spawn / re-render / despawn hops onto the owning region thread (Folia) through
- * the kernel {@code Scheduler} port; an unloaded world is skipped with a warning.
+ * The holograms context's outbound adapter: {@code PacketHologramView} realises the core {@code HologramView} port
+ * by drawing each stored hologram for every viewer with packets, through the uxmLib packet hologram. Nothing is
+ * spawned in the world; an unloaded world is skipped with a warning.
  */
 @org.jspecify.annotations.NullMarked
 package com.uxplima.uxmessentials.holograms.adapter.outbound;

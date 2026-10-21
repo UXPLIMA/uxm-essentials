@@ -32,13 +32,15 @@ class InsertHologramActionTest {
     private FakeHologramRepository repository;
     private CapturingSink sink;
     private InsertHologramAction insert;
+    private HologramTestSupport.RecordingView view;
     private PlayerRef actor;
 
     @BeforeEach
     void setUp() {
         repository = new FakeHologramRepository();
+        view = new HologramTestSupport.RecordingView();
         sink = new CapturingSink();
-        insert = new InsertHologramAction(repository, new Notifier(new HologramTestSupport.KeyMessages(), sink));
+        insert = new InsertHologramAction(repository, view, new Notifier(new HologramTestSupport.KeyMessages(), sink));
         actor = new PlayerRef(UUID.randomUUID(), "Operator");
     }
 
@@ -53,6 +55,8 @@ class InsertHologramActionTest {
         assertThat(updated.actions()).hasSize(3);
         assertThat(updated.actions().get(0).value()).isEqualTo("inserted");
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_ACTION_INSERTED.key());
+        // A first action gives the hologram a click box and a last one takes it away, so it is drawn again.
+        assertThat(view.rendered).containsExactly(updated);
     }
 
     @Test
@@ -73,6 +77,7 @@ class InsertHologramActionTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(HologramError.ACTION_INDEX_OUT_OF_RANGE);
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_ACTION_INDEX_INVALID.key());
+        assertThat(view.rendered).isEmpty();
     }
 
     @Test
@@ -81,6 +86,7 @@ class InsertHologramActionTest {
 
         assertThat(result.errorOrThrow()).isEqualTo(HologramError.NOT_FOUND);
         assertThat(sink.textFor(actor)).contains(HologramsMessageKey.HOLOGRAM_NOT_FOUND.key());
+        assertThat(view.rendered).isEmpty();
     }
 
     private Hologram withTwoActions(String name) {
