@@ -31,6 +31,7 @@ class HudTextTest {
     @AfterEach
     void forgetTheCatalogue() {
         HudText.useCatalogLines(CatalogLines.none());
+        HudText.useLanguages(viewer -> java.util.Locale.ROOT);
         MockBukkit.unmock();
     }
 
@@ -59,6 +60,17 @@ class HudTextTest {
     @Test
     void withNoCatalogueTheLineIsTheOperatorsWords() {
         assertThat(plain(HudText.render(TURKISH, "@custom.join"))).isEqualTo("@custom.join");
+    }
+
+    /** The language a viewer reads, so a surface drawn per viewer can tell when to draw it again. */
+    @Test
+    void aViewersLanguageIsAskedOfTheKernelsResolver() {
+        java.util.UUID turkish = java.util.UUID.randomUUID();
+        HudText.useLanguages(
+                viewer -> viewer.equals(turkish) ? java.util.Locale.forLanguageTag("tr") : java.util.Locale.ENGLISH);
+
+        assertThat(HudText.languageOf(turkish)).isEqualTo(java.util.Locale.forLanguageTag("tr"));
+        assertThat(HudText.languageOf(java.util.UUID.randomUUID())).isEqualTo(java.util.Locale.ENGLISH);
     }
 
     private static String plain(net.kyori.adventure.text.Component component) {

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -448,6 +449,38 @@ public final class HologramRenderer implements HologramView, HologramPageCycler 
         Objects.requireNonNull(viewer, "viewer");
         sendOwnTextAfterTracking(
                 scheduler, textOverrides, viewer, entityId, id -> perViewerHologramWithText(viewer, id));
+    }
+
+    /**
+     * Send {@code viewer} their own text again for every hologram they may see, for a viewer who changed language.
+     * Their text went out once, when they started tracking each display, so a hologram that never refreshes kept
+     * the old language until they walked away and back. A display they are not tracking drops the packet, and the
+     * tracking path sends them the right text when they walk in.
+     */
+    public void resendOwnText(Player viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        List<Integer> entityIds = new ArrayList<>();
+        for (Tracked tracked : live.values()) {
+            int entityId = tracked.live().textEntityId();
+            if (entityId != RenderedHologram.NO_ENTITY) {
+                entityIds.add(entityId);
+            }
+        }
+        resendOwnText(scheduler, textOverrides, viewer, entityIds, id -> perViewerHologramWithText(viewer, id));
+    }
+
+    /** The per-display dispatch behind {@link #resendOwnText(Player)}. */
+    static void resendOwnText(
+            Scheduler scheduler,
+            HologramTextOverrides textOverrides,
+            Player viewer,
+            List<Integer> entityIds,
+            java.util.function.IntFunction<Optional<Hologram>> lookup) {
+        for (int entityId : entityIds) {
+            lookup.apply(entityId)
+                    .ifPresent(hologram ->
+                            dispatchPerViewerText(scheduler, textOverrides, List.of(viewer), entityId, hologram));
+        }
     }
 
     private Optional<Hologram> perViewerHologramWithText(Player viewer, int entityId) {

@@ -102,6 +102,31 @@ class HologramRendererPerViewerDispatchTest {
         assertThat(scheduler.entityHops).containsExactly(ALICE);
     }
 
+    /**
+     * A viewer who changes language reads what they already see in the new one. Their own text went out once, when
+     * they started tracking each hologram, so a hologram that never refreshes kept the old language until they
+     * walked away and back. Every hologram they may see is sent again; one they may not is skipped.
+     */
+    @Test
+    void aViewerWhoChangedLanguageIsSentTheirOwnTextForEveryHologramTheySee() {
+        RecordingScheduler scheduler = new RecordingScheduler();
+        RecordingPackets packets = new RecordingPackets();
+        HologramTextOverrides overrides =
+                overrides(packets, perViewer(Map.of(ALICE, source -> source.replace("%name%", "Alice"))));
+        Map<Integer, Hologram> seen = Map.of(ENTITY_ID, hologram("hi %name%"));
+
+        HologramRenderer.resendOwnText(
+                scheduler,
+                overrides,
+                player(ALICE),
+                List.of(ENTITY_ID, ENTITY_ID + 1),
+                id -> java.util.Optional.ofNullable(seen.get(id)));
+
+        assertThat(scheduler.entityHops).containsExactly(ALICE);
+        assertThat(packets.textFor(ALICE)).isEqualTo("hi Alice");
+        assertThat(packets.sent).hasSize(1);
+    }
+
     // --- fixtures ---------------------------------------------------------------------------------------------
 
     private static HologramTextOverrides overrides(

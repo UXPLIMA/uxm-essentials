@@ -85,6 +85,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunne
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTeleporter;
@@ -107,6 +108,8 @@ import com.uxplima.uxmlib.packet.display.internal.NmsDisplayTextPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketSender;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.scheduler.TaskHandle;
+import com.uxplima.uxmlib.text.message.LanguageWatch;
 import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -125,6 +128,9 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class HologramsWiring {
+
+    /** How often each viewer's language is asked again. Short, because the viewer is looking at the hologram. */
+    private static final java.time.Duration LANGUAGE_WATCH = java.time.Duration.ofSeconds(1L);
 
     private HologramsWiring() {}
 
@@ -261,7 +267,20 @@ public final class HologramsWiring {
                     .getPluginManager()
                     .registerEvents(new DamageIndicatorListener(damageIndicators, kernel.scheduler()), plugin);
         }
-        AutoCloseable refreshTask = scheduleRefresh(kernel.scheduler(), repository, renderer, kernel.log());
+        AutoCloseable refreshing = scheduleRefresh(kernel.scheduler(), repository, renderer, kernel.log());
+        // A viewer who changes language reads every hologram they see in the new one. Their own text went out when
+        // they started tracking each display, so one that never refreshes kept the old language until they walked
+        // away and back. Closed with the refresh timer on stop.
+        TaskHandle languageWatch = LanguageWatch.follow(
+                new PaperScheduler(plugin),
+                viewer -> HudText.languageOf(viewer.getUniqueId()),
+                LANGUAGE_WATCH,
+                () -> plugin.getServer().getOnlinePlayers(),
+                renderer::resendOwnText);
+        AutoCloseable refreshTask = () -> {
+            refreshing.close();
+            languageWatch.cancel();
+        };
         // The cached repository's all() is the authoritative in-memory set after the one warm load, so reading
         // names off it per keystroke is allocation-light and never touches the database, safe on the tick thread.
         java.util.function.Supplier<java.util.List<String>> hologramNames = () -> repository.all().stream()

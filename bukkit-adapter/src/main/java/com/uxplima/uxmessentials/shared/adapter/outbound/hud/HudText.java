@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.hud;
 
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.Function;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
@@ -32,7 +34,21 @@ public final class HudText {
     /** The catalogue the operator's {@code @key} lines read from: none until the kernel is wired. */
     private static volatile CatalogLines catalogLines = CatalogLines.none();
 
+    /** Each viewer's language: one answer for everybody until the kernel is wired. */
+    private static volatile Function<UUID, Locale> languages = viewer -> Locale.ROOT;
+
     private HudText() {}
+
+    /** Ask {@code resolver} for a viewer's language from now on. */
+    public static void useLanguages(Function<UUID, Locale> resolver) {
+        languages = Objects.requireNonNull(resolver, "resolver");
+    }
+
+    /** The language {@code viewer} reads, so a text drawn per viewer can tell when to draw it again. */
+    public static Locale languageOf(UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        return languages.apply(viewer);
+    }
 
     /** Read {@code @key} lines from {@code lines} from now on. */
     public static void useCatalogLines(CatalogLines lines) {

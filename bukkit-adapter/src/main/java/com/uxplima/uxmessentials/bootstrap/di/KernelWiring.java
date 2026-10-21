@@ -206,6 +206,10 @@ final class KernelWiring {
         // An operator's @key line, on a hologram, a board, a menu or a click action, reads from this same catalogue
         // in the viewer's language. The catalogue re-reads itself on reload, so this is set once.
         HudText.useCatalogLines(new CatalogLines(messages, catalog::declares));
+        // The same resolver answers which language a viewer reads, so a hologram drawn per viewer is drawn again
+        // when that answer changes.
+        HudText.useLanguages(
+                viewer -> resolver.resolve(new com.uxplima.uxmessentials.shared.domain.PlayerRef(viewer, "")));
 
         KernelPorts ports = new KernelPorts(
                 scheduler,
