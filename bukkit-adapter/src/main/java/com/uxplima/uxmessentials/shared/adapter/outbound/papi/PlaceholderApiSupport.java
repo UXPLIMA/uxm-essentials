@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
@@ -70,8 +71,20 @@ public final class PlaceholderApiSupport {
     }
 
     private static String expand(java.util.UUID viewer, String source) {
+        return expand(viewer, source, PlaceholderAPI::setPlaceholders);
+    }
+
+    /**
+     * {@code source} with its placeholders filled by {@code fill}, or {@code source} itself when it holds none:
+     * PlaceholderAPI scans every text it is handed with a regular expression, and most HUD lines carry no
+     * placeholder. Package-private: a test supplies the filler.
+     */
+    static String expand(java.util.UUID viewer, String source, BiFunction<OfflinePlayer, String, String> fill) {
+        if (!hasPlaceholder(source)) {
+            return source;
+        }
         OfflinePlayer player = Bukkit.getOfflinePlayer(viewer);
-        return PlaceholderAPI.setPlaceholders(player, source);
+        return fill.apply(player, source);
     }
 
     /**
@@ -85,7 +98,7 @@ public final class PlaceholderApiSupport {
         if (!isPresent()) {
             return UnaryOperator.identity();
         }
-        return source -> PlaceholderAPI.setPlaceholders((OfflinePlayer) null, source);
+        return source -> hasPlaceholder(source) ? PlaceholderAPI.setPlaceholders((OfflinePlayer) null, source) : source;
     }
 
     /** Whether {@code source} embeds a PlaceholderAPI token ({@code %...%}) the bridge would expand. */
