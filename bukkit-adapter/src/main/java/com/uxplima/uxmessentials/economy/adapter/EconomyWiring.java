@@ -448,7 +448,8 @@ public final class EconomyWiring {
                 maintenanceTask,
                 bankInterestTask,
                 services.walletView(),
-                services.ecoAdmin());
+                services.ecoAdmin(),
+                settings.allowNonAtomicRecurring());
     }
 
     /**
@@ -745,6 +746,8 @@ public final class EconomyWiring {
      * @param amountFormat the operator-selected amount format the {@code balance_formatted} placeholder uses
      * @param walletView the wallet dashboard the {@code /wallet} command and the management hub both open
      * @param admin the eco-admin use case, which is also what a published API write runs
+     * @param allowNonAtomicRecurring whether a charge on a timer may run on a backend that cannot guard its take,
+     *     which the modules that bill on a timer ask before they start
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -768,7 +771,8 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.adapter.outbound.EconomyMaintenanceTask maintenanceTask,
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
             WalletPanelMenu walletView,
-            EcoAdmin admin) {
+            EcoAdmin admin,
+            boolean allowNonAtomicRecurring) {
 
         public Wired {
             commands = List.copyOf(commands);

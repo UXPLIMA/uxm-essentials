@@ -2114,6 +2114,7 @@ public final class PluginModule {
         links.economyCurrency = wired.defaultCurrency();
         links.economyCurrencies = wired.currencies();
         links.economyBackends = wired.backends();
+        links.economyAllowsNonAtomicRecurring = wired.allowNonAtomicRecurring();
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.start();
@@ -2860,7 +2861,8 @@ public final class PluginModule {
                 menuBindings,
                 links.economyProvider,
                 links.economyCurrencies,
-                links.economyBackends);
+                links.economyBackends,
+                links.economyAllowsNonAtomicRecurring);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.worldPhase().run("player-warp legacy migration", wired.legacyMigration());
@@ -3176,6 +3178,8 @@ public final class PluginModule {
                 economyCurrencies;
         private com.uxplima.uxmessentials.economy.application.port.@org.jspecify.annotations.Nullable CurrencyBackendRegistry
                 economyBackends;
+        // The economy module's allow-nonatomic-recurring, which player-warp rent asks before its sweep starts.
+        private boolean economyAllowsNonAtomicRecurring;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;

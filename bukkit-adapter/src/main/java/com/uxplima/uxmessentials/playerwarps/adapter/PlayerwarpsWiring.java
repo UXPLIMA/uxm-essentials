@@ -11,8 +11,10 @@ import java.util.Set;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.economy.application.RecurringChargePolicy;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
+import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy;
@@ -145,7 +147,8 @@ public final class PlayerwarpsWiring {
             MenuBindings menuBindings,
             @org.jspecify.annotations.Nullable EconomyProvider economyProvider,
             @org.jspecify.annotations.Nullable CurrencyRegistry economyCurrencies,
-            @org.jspecify.annotations.Nullable CurrencyBackendRegistry economyBackends) {
+            @org.jspecify.annotations.Nullable CurrencyBackendRegistry economyBackends,
+            boolean allowNonAtomicRecurring) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -435,7 +438,15 @@ public final class PlayerwarpsWiring {
         // owner's wallet), suspends then archives the unpaid, and mails owners a heads-up before their term lapses.
         // Disabled, or with no economy to charge against, it is null and nothing is scheduled: a disabled sub-group
         // schedules no task and charges nothing.
-        RentSweep rentSweep = buildRentSweep(ctx, persistence, kernel, repository, economy);
+        RentSweep rentSweep = buildRentSweep(
+                ctx,
+                persistence,
+                kernel,
+                repository,
+                economy,
+                economyCurrencies,
+                economyBackends,
+                allowNonAtomicRecurring);
         // The sponsor expiry sweep: a config-gated, off-tick, batched sweep that frees the slot of every lapsed
         // sponsorship and stamps its post-expiry cooldown. Disabled (the sub-group off, or economy absent so it was
         // forced off) it is null and nothing is scheduled.
@@ -459,7 +470,9 @@ public final class PlayerwarpsWiring {
     /**
      * Build the rent sweep when the {@code rent} sub-group is on and there is an economy to charge against, else
      * {@code null}. Rent with no economy provider could only ever suspend every warp, so it is left off with an
-     * operator warning rather than silently starving the network. The mail seam is a fresh {@link JooqMailRepository}
+     * operator warning rather than silently starving the network. Rent is a charge on a timer, so its currency passes
+     * the economy module's recurring charge gate first, and a currency on a backend that cannot guard its take keeps
+     * the sweep off unless the operator allowed it. The mail seam is a fresh {@link JooqMailRepository}
      * over the always-present messaging {@code mail} table, so an offline owner still gets their reminder.
      */
     private static @org.jspecify.annotations.Nullable RentSweep buildRentSweep(
@@ -467,13 +480,19 @@ public final class PlayerwarpsWiring {
             Persistence persistence,
             KernelPorts kernel,
             PlayerWarpRepository repository,
-            Optional<PlayerWarpEconomy> economy) {
+            Optional<PlayerWarpEconomy> economy,
+            @org.jspecify.annotations.Nullable CurrencyRegistry currencies,
+            @org.jspecify.annotations.Nullable CurrencyBackendRegistry backends,
+            boolean allowNonAtomicRecurring) {
         RentConfig config = rentConfig(ctx);
         if (!config.enabled()) {
             return null;
         }
-        if (economy.isEmpty()) {
+        if (economy.isEmpty() || currencies == null || backends == null) {
             kernel.log().warn("event=playerwarp_rent_no_economy detail=rent_enabled_but_economy_absent_sweep_off");
+            return null;
+        }
+        if (!rentChargeAccepted(config.currencyId(), currencies, backends, allowNonAtomicRecurring, kernel.log())) {
             return null;
         }
         Clock clock = Clock.systemUTC();
@@ -483,6 +502,26 @@ public final class PlayerwarpsWiring {
         RentReminders reminders = new RentReminders(repository, mailer, config, clock);
         Duration interval = Duration.ofMinutes(Math.max(1L, ctx.config().getLong("rent.check-interval-minutes", 60L)));
         return new RentSweep(repository, settle, reminders, config, kernel.scheduler(), interval, clock, kernel.log());
+    }
+
+    /**
+     * Whether rent may be charged in {@code currencyId}: the recurring charge gate the economy module states, which a
+     * sweep on a backend that cannot guard its take must pass. A refusal is logged with the gate's own reason, which
+     * names the currency, its backend and the setting that lifts it, and the sweep stays off.
+     */
+    static boolean rentChargeAccepted(
+            String currencyId,
+            CurrencyRegistry currencies,
+            CurrencyBackendRegistry backends,
+            boolean allowNonAtomic,
+            com.uxplima.uxmessentials.shared.application.port.Logger log) {
+        try {
+            RecurringChargePolicy.validate(currencies, backends, Set.of(CurrencyId.of(currencyId)), allowNonAtomic);
+            return true;
+        } catch (IllegalStateException refused) {
+            log.error("event=playerwarp_rent_refused currency=" + currencyId + " detail=sweep_off", refused);
+            return false;
+        }
     }
 
     /**
