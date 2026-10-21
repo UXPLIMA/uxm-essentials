@@ -19,8 +19,12 @@ import org.junit.jupiter.api.Test;
  */
 final class TimeAndWeatherSpeakAsTheWorldTest {
 
-    private static final List<String> TIME_AND_WEATHER =
-            List.of("itemworld.time.set", "itemworld.weather.set", "itemworld.bad-time", "itemworld.bad-weather");
+    private static final List<String> TIME_AND_WEATHER = List.of("itemworld.time.set", "itemworld.weather.set");
+
+    /** The refusals of the same commands: an error line reads as an error, so it carries the error word instead. */
+    private static final List<String> TIME_AND_WEATHER_REFUSALS =
+            List.of("itemworld.bad-time", "itemworld.bad-weather");
+
     private static final String A_WORLD_LINE = "world.created";
     private static final Pattern TAG = Pattern.compile("^<e?tag:'([^']*)'>");
 
@@ -34,6 +38,11 @@ final class TimeAndWeatherSpeakAsTheWorldTest {
             for (String key : TIME_AND_WEATHER) {
                 if (!world.equals(tag(lines.get(key)))) {
                     wrong.add(language + " " + key);
+                }
+            }
+            for (String key : TIME_AND_WEATHER_REFUSALS) {
+                if (!lines.get(key).startsWith("<etag:")) {
+                    wrong.add(language + " " + key + " is not an error line");
                 }
             }
         }

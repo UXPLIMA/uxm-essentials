@@ -59,7 +59,10 @@ final class EveryLineRendersAsRecordedTest {
 
     @Test
     void everyLineRendersAsRecorded() throws IOException {
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(new QuietLogger(), noOperatorFiles);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                new QuietLogger(),
+                noOperatorFiles,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
         List<String> languages =
                 CatalogKeys.shippedLanguages().stream().sorted().toList();
         Map<String, String> rendered = new TreeMap<>();
@@ -86,7 +89,13 @@ final class EveryLineRendersAsRecordedTest {
         assertThat(recorded).as("the record exists and is not empty").hasSizeGreaterThan(1000);
         assertThat(lines.get(0)).as("the languages the record was made in").isEqualTo(recorded.get(0));
         List<String> changed = changes(recorded, lines, languages, json);
-        assertThat(changed).as("lines that no longer render as recorded").isEmpty();
+        // Every change goes to the test's output, which the report keeps whole; the message names the first few.
+        changed.forEach(System.out::println);
+        assertThat(changed)
+                .as(
+                        "%d lines no longer render as recorded, the first: %s",
+                        changed.size(), changed.stream().limit(5).toList())
+                .isEmpty();
     }
 
     private static String render(HoconLocaleCatalog catalog, MessageKey key, Locale locale) {

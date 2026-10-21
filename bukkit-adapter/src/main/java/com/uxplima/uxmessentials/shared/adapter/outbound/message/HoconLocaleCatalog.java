@@ -12,10 +12,14 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.text.style.StyleTokens;
+import com.uxplima.uxmlib.text.style.Theme;
+import com.uxplima.uxmlib.text.style.Typography;
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurateException;
 import org.spongepowered.configurate.ConfigurationNode;
@@ -51,6 +55,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
 
     private final Logger log;
     private final Path messagesDir;
+    private final Supplier<Theme> theme;
     private final AtomicReference<Map<String, Map<String, String>>> byLanguage;
 
     /** Whether {@link #declares} has read in every language once since the last reload. */
@@ -60,10 +65,13 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
      * @param messagesDir the on-disk {@code messages} directory; a {@code messages_<lang>.conf}
      *     present there is layered over the bundled copy as a per-key override, so operator edits take effect
      *     while a key present only in the bundled default still resolves.
+     * @param theme the look every line is styled with when its language is read; a reload of the theme takes effect
+     *     on the next reload of the catalog
      */
-    public HoconLocaleCatalog(Logger log, Path messagesDir) {
+    public HoconLocaleCatalog(Logger log, Path messagesDir, Supplier<Theme> theme) {
         this.log = Objects.requireNonNull(log, "log");
         this.messagesDir = Objects.requireNonNull(messagesDir, "messagesDir");
+        this.theme = Objects.requireNonNull(theme, "theme");
         this.byLanguage = new AtomicReference<>(
                 Map.of(Locale.ENGLISH.getLanguage(), loadLanguage(Locale.ENGLISH.getLanguage(), false)));
     }
@@ -184,12 +192,13 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     }
 
     /**
-     * The table a caller sees: the {@code meta.} settings are consumed here, and when this catalog asks for the
-     * small-capital typography its text is converted once, now, rather than on every message it renders. A
-     * catalog whose language has no small capitals (Cyrillic, Chinese, Japanese, Korean) or whose letters would
-     * only half convert (Turkish, German, Polish) simply leaves the setting off and keeps its own letters.
+     * The table a caller sees: the {@code meta.} settings are consumed here, and every line is styled once, now,
+     * rather than on every message it renders: its letters, in small capitals when this catalog asks for them, and
+     * its tokens, each role a colour and each label a prefix or a heading. A catalog whose language has no small
+     * capitals (Cyrillic, Chinese, Japanese, Korean) leaves the setting off and keeps its own letters.
      */
-    private static Map<String, String> styled(Map<String, String> merged, String language) {
+    private Map<String, String> styled(Map<String, String> merged, String language) {
+        Theme look = theme.get();
         boolean smallCaps = Boolean.parseBoolean(merged.getOrDefault(
                 SMALL_CAPS_KEY, String.valueOf(Locale.ENGLISH.getLanguage().equals(language))));
         Map<String, String> table = new java.util.HashMap<>(merged.size());
@@ -197,7 +206,8 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
             if (entry.getKey().startsWith(META_PREFIX)) {
                 continue;
             }
-            table.put(entry.getKey(), smallCaps ? SmallCapsTemplates.apply(entry.getValue()) : entry.getValue());
+            table.put(
+                    entry.getKey(), StyleTokens.expand(Typography.apply(entry.getValue(), smallCaps), look, smallCaps));
         }
         return Map.copyOf(table);
     }

@@ -36,7 +36,10 @@ class HoconLocaleCatalogTest {
         Files.writeString(dir.resolve("messages_tr.conf"), "\"custom.key\" = \"merhaba\"\n", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("messages_xx.conf"), "\"custom.key\" = \"hi\"\n", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("notes.txt"), "not a catalogue", StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         assertThat(catalog.availableLocales())
                 .extracting(Locale::getLanguage)
@@ -52,7 +55,10 @@ class HoconLocaleCatalogTest {
     void aKeyIsDeclaredWhenAnyCatalogueHoldsIt(@TempDir Path dir) throws Exception {
         Files.writeString(dir.resolve("messages_en.conf"), "\"custom.join\" = \"Join\"\n", StandardCharsets.UTF_8);
         Files.writeString(dir.resolve("messages_tr.conf"), "\"custom.only-tr\" = \"Katil\"\n", StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         assertThat(catalog.declares("custom.join")).isTrue();
         assertThat(catalog.declares(BUNDLED_ONLY.key())).isTrue();
@@ -66,7 +72,10 @@ class HoconLocaleCatalogTest {
         // A stale on-disk catalog that predates the bundled one: it declares its own key but not the bundled key.
         Files.writeString(
                 dir.resolve("messages_en.conf"), "\"custom.disk.key\" = \"on disk only\"\n", StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         // The bundled default is the base layer, so a key only the bundled catalog carries resolves to real text
         // (not the raw key name it would fall back to if only the disk file were read).
@@ -82,7 +91,10 @@ class HoconLocaleCatalogTest {
                 dir.resolve("messages_tr.conf"),
                 "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"yetkin yok\"\n",
                 StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         assertThat(catalog.template(Locale.forLanguageTag("tr"), DISK_ONLY)).isEqualTo("yetkin yok");
     }
@@ -93,7 +105,10 @@ class HoconLocaleCatalogTest {
                 dir.resolve("messages_de.conf"),
                 "\"meta.small-caps\" = \"true\"\n\"custom.disk.key\" = \"nur auf der platte\"\n",
                 StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         assertThat(catalog.template(Locale.GERMAN, DISK_ONLY)).isEqualTo("ɴᴜʀ ᴀᴜꜰ ᴅᴇʀ ᴘʟᴀᴛᴛᴇ");
     }
@@ -104,7 +119,10 @@ class HoconLocaleCatalogTest {
                 dir.resolve("messages_en.conf"),
                 "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"on disk only\"\n",
                 StandardCharsets.UTF_8);
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         assertThat(catalog.template(Locale.ENGLISH, () -> "meta.small-caps")).isEqualTo("meta.small-caps");
     }
@@ -113,7 +131,10 @@ class HoconLocaleCatalogTest {
     void malformedReloadKeepsEveryLastKnownGoodCatalog(@TempDir Path dir) throws Exception {
         Path english = dir.resolve("messages_en.conf");
         Files.writeString(english, "\"meta.small-caps\" = \"false\"\n\"custom.disk.key\" = \"before\"\n");
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
 
         Files.writeString(english, "\"custom.disk.key\" = \"broken\n");
 

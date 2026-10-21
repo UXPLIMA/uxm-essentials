@@ -60,7 +60,10 @@ class TwoFactorEnrollmentClickToCopyTest {
     }
 
     private static Component render(Path dir, MessageKey key, String placeholder, String value) {
-        HoconLocaleCatalog catalog = new HoconLocaleCatalog(mock(Logger.class), dir);
+        HoconLocaleCatalog catalog = new HoconLocaleCatalog(
+                mock(Logger.class),
+                dir,
+                com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile::shippedTheme);
         String template = catalog.template(Locale.ENGLISH, key);
         // Mirror CatalogMessages: literal placeholder substitution before the MiniMessage parse.
         return StyledText.render(template.replace("{" + placeholder + "}", value));

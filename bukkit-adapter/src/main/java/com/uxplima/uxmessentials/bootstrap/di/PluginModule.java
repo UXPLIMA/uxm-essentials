@@ -430,7 +430,11 @@ public final class PluginModule {
         Logger log = plugin.getLogger();
         com.uxplima.uxmessentials.shared.application.port.Logger kernelLog = KernelWiring.logger(plugin);
         ConfigStore config = KernelWiring.loadConfig(plugin, kernelLog);
-        KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog);
+        // The colours, from the file the server shares with the other plugins it runs of ours. Read before the
+        // catalog, because the catalog styles every line with them when it reads a language.
+        Path themeFolder = plugin.getDataFolder().toPath();
+        EngineTheme engineTheme = new EngineTheme(themeFolder);
+        KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog, engineTheme);
         KernelPorts kernel = wiredKernel.ports();
         ModuleRegistry registry = new DefaultModuleRegistry();
         // The hand-wired hub registry every module's management GUI plugs into. Built once here and handed to
@@ -441,15 +445,9 @@ public final class PluginModule {
         // step registered later therefore reads the fresh tree, never the one it was wired from. Both are pure
         // file re-reads, which is what lets the whole run go off-tick.
         resources.addReloadTask(ReloadTask.kernel("config", config::reload, "re-read from disk"));
-        resources.addReloadTask(
-                ReloadTask.kernel("messages", wiredKernel.catalog()::reload, "catalogs re-read from disk"));
-        // The colours, from the file the server shares with the other plugins it runs of ours. A third kernel
-        // step rather than part of the config step: the theme is its own file, and an operator who changes one
-        // colour should see the reason for a failure named as the theme rather than as the config.
-        Path themeFolder = plugin.getDataFolder().toPath();
-        // The same file read a second time, as the type uxmLib's renderers ask for. Held rather than re-read per
-        // render, and refreshed by the same reload step, so a colour change reaches both readers in one hop.
-        EngineTheme engineTheme = new EngineTheme(themeFolder);
+        // The theme is its own step rather than part of the config step: it is its own file, and an operator who
+        // changes one colour should see the reason for a failure named as the theme rather than as the config. It
+        // runs before the messages step, which styles every line with the colours this one has just read.
         resources.engineTheme(engineTheme);
         resources.addReloadTask(ReloadTask.kernel(
                 "theme",
@@ -462,6 +460,8 @@ public final class PluginModule {
                     MenuTitles.useAlignment(engineTheme.get().titleAlignment());
                 },
                 "colours re-read from disk"));
+        resources.addReloadTask(
+                ReloadTask.kernel("messages", wiredKernel.catalog()::reload, "catalogs re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
         resources.localeBinding(new LocaleBinding(wiredKernel.resolver(), kernel.messages(), kernel.log()));
         // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected

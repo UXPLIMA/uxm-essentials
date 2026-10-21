@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.style;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -34,6 +35,12 @@ public final class ThemeFile {
 
     /** The character a tile's title line opens with; the library ships none, and this plugin has always drawn one. */
     private static final String TITLE_GLYPH = "\u25C6";
+
+    /** The glyph between a message's category word and its sentence. */
+    private static final String SEPARATOR_GLYPH = "▶";
+
+    /** The categories whose prefix reads in the good colour: every one a balance moves under. */
+    private static final List<String> MONEY_CATEGORIES = List.of("economy", "bank", "loan", "trade", "vault");
 
     /** The glyph this plugin ships for a tile title, which a theme may replace. */
     public static String titleGlyph() {
@@ -125,6 +132,13 @@ public final class ThemeFile {
                 root.node("roles", role.getKey()).set(role.getValue().asHexString());
             }
             root.node("glyphs", "title").set(TITLE_GLYPH);
+            root.node("glyphs", "separator").set(SEPARATOR_GLYPH);
+            // Every money movement reads in the good colour, whichever feature raised it.
+            for (String money : MONEY_CATEGORIES) {
+                root.node("prefix", "categories", money).set("good");
+            }
+            // A heading reads in small capitals in every language whose letters all have one.
+            root.node("label-small-caps").set("whole");
         } catch (SerializationException impossible) {
             throw new IllegalStateException("cannot write the shipped look", impossible);
         }

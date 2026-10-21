@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
@@ -54,6 +55,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.text.language.FilePlayerLanguages;
 import com.uxplima.uxmlib.text.language.LanguageSettings;
 import com.uxplima.uxmlib.text.language.SharedLanguage;
+import com.uxplima.uxmlib.text.style.Theme;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.LuckPermsProvider;
 import org.jspecify.annotations.NullMarked;
@@ -161,15 +163,16 @@ final class KernelWiring {
     }
 
     /** Build every shared outbound port plus the i18n collaborators, and bundle them for wiring. */
-    static Kernel wire(Plugin plugin, ConfigStore config, Logger log) {
+    static Kernel wire(Plugin plugin, ConfigStore config, Logger log, Supplier<Theme> theme) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(theme, "theme");
 
         Scheduler scheduler = new FoliaScheduler(plugin);
         Permissions permissions = new BukkitPermissions(metaSource(log));
         Path messagesDir = plugin.getDataFolder().toPath().resolve("messages");
-        LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir);
+        LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir, theme);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
 
         SharedLocaleStore localeStore = new SharedLocaleStore(
