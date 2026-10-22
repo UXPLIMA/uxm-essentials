@@ -184,8 +184,8 @@ public final class NpcRenderer implements NpcView {
      * Re-aim every looking NPC at its nearby viewers (the look tick). For each online viewer and each NPC the
      * viewer is currently shown, if the NPC has look-at-player on and the viewer is within the look range, send
      * that viewer head- and body-look packets turning the fake player toward the viewer's eyes, a per-viewer
-     * rotation, so each viewer sees the NPC face them. Disabled or out-of-range NPCs are left at their fixed
-     * facing.
+     * rotation, so each viewer sees the NPC face them. An NPC whose viewer walked out of the look range turns back
+     * to the facing it was placed with; one with look-at-player off is never turned.
      */
     public void lookTick() {
         List<RenderedNpc> looking = new ArrayList<>();
@@ -226,7 +226,11 @@ public final class NpcRenderer implements NpcView {
 
     /** Turn one NPC to face {@code viewer}. Reads the live viewer location, so it runs on the viewer's thread. */
     private void aimAtViewer(Player viewer, RenderedNpc rendered) {
-        if (!isShown(viewer, rendered) || !inLookRange(viewer, rendered.npc())) {
+        if (!isShown(viewer, rendered)) {
+            return;
+        }
+        if (!inLookRange(viewer, rendered.npc())) {
+            turnBack(viewer, rendered);
             return;
         }
         Location eye = viewer.getEyeLocation();
@@ -241,6 +245,21 @@ public final class NpcRenderer implements NpcView {
         }
         packets.send(viewer, packets.headLook(rendered.entityId(), look.yaw()));
         packets.send(viewer, packets.bodyLook(rendered.entityId(), look.yaw(), look.pitch()));
+    }
+
+    /**
+     * Turn an NPC that was facing {@code viewer} back to the facing it was placed with, once, when the viewer leaves
+     * its look range. Without it the NPC kept looking at the spot the viewer left. Forgetting the look means a viewer
+     * who comes back is aimed at again.
+     */
+    private void turnBack(Player viewer, RenderedNpc rendered) {
+        Map<Integer, Integer> looks = lastLook.get(viewer.getUniqueId());
+        if (looks == null || looks.remove(rendered.entityId()) == null) {
+            return;
+        }
+        Position at = rendered.npc().location();
+        packets.send(viewer, packets.headLook(rendered.entityId(), at.yaw()));
+        packets.send(viewer, packets.bodyLook(rendered.entityId(), at.yaw(), at.pitch()));
     }
 
     private boolean isShown(Player viewer, RenderedNpc rendered) {

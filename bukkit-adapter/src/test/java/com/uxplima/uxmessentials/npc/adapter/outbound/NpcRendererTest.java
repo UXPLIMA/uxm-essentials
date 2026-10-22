@@ -347,6 +347,48 @@ class NpcRendererTest {
     }
 
     @Test
+    void lookTickTurnsAnNpcBackToItsPlacedFacingOnceTheViewerLeavesTheLookRange() {
+        // A viewer who walked away left the NPC looking at the spot where they last stood, so a row of NPCs stared
+        // sideways at nothing until somebody came close again.
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        org.bukkit.Location placed = locationOf(viewer).add(2.0, 0, 0);
+        placed.setYaw(-90f); // facing away from the viewer, so the turn back cannot pass for a look at them
+        placed.setPitch(10f);
+        renderer.render(npc(placed, null));
+        renderer.lookTick();
+        int looksWhileFacing = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        viewer.teleport(locationOf(viewer).add(0, 0, 25.0)); // past the 16-block look range, inside the 48 render range
+        renderer.lookTick();
+
+        List<RecordingNpcPackets.Look> looks = packets.looksSentTo(viewer.getUniqueId());
+        assertThat(looks).hasSize(looksWhileFacing + 2);
+        assertThat(looks.subList(looksWhileFacing, looks.size()))
+                .allSatisfy(look -> assertThat(look.yaw()).isEqualTo(-90f));
+        assertThat(looks.getLast().pitch()).isEqualTo(10f);
+    }
+
+    @Test
+    void lookTickTurnsAnNpcBackOnlyOnceAndAimsAgainWhenTheViewerReturns() {
+        PlayerMock viewer = server.addPlayer();
+        NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
+        org.bukkit.Location home = locationOf(viewer);
+        renderer.render(npc(home.clone().add(2.0, 0, 0), null));
+        renderer.lookTick();
+        viewer.teleport(home.clone().add(0, 0, 25.0));
+        renderer.lookTick();
+        int looksAfterTurningBack = packets.looksSentTo(viewer.getUniqueId()).size();
+
+        renderer.lookTick();
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksAfterTurningBack);
+
+        viewer.teleport(home);
+        renderer.lookTick();
+        assertThat(packets.looksSentTo(viewer.getUniqueId())).hasSize(looksAfterTurningBack + 2);
+    }
+
+    @Test
     void lookTickIgnoresAnNpcWithLookAtPlayerOff() {
         PlayerMock viewer = server.addPlayer();
         NpcRenderer renderer = newRenderer(new InlineScheduler(), new NoopLogger());
