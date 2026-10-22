@@ -40,6 +40,41 @@ class ShippedConfigReaderTest {
     }
 
     @Test
+    void aKeyWithNoCommentOfItsOwnTakesTheCommentAboveItsBlock() {
+        // The shipped moderation file explains its freeze block once, above "freeze {", and its one key carries no
+        // comment of its own; the page showed an empty description for it.
+        List<DocsData.Setting> settings = ShippedConfigReader.parse(List.of(
+                "# A frozen player who walks is told why, at most once every interval.",
+                "freeze {",
+                "  notice-interval-seconds = 3",
+                "  # Its own words win.",
+                "  explained = true",
+                "}"));
+
+        assertThat(settings)
+                .containsExactly(
+                        new DocsData.Setting(
+                                "freeze.notice-interval-seconds",
+                                "3",
+                                "A frozen player who walks is told why, at most once every interval."),
+                        new DocsData.Setting("freeze.explained", "true", "Its own words win."));
+    }
+
+    @Test
+    void anInheritedCommentIsItsFirstSentenceOnly() {
+        // One block comment explains five keys; repeated whole on every row, a table becomes a wall of the same text.
+        List<DocsData.Setting> settings = ShippedConfigReader.parse(List.of(
+                "# Floating damage numbers. Off by default; turn enabled on to show them.",
+                "damage-indicators {",
+                "  enabled = false",
+                "}"));
+
+        assertThat(settings)
+                .containsExactly(
+                        new DocsData.Setting("damage-indicators.enabled", "false", "Floating damage numbers."));
+    }
+
+    @Test
     void readsTheMembersOfAOneLineObject() {
         List<DocsData.Setting> settings = ShippedConfigReader.parse(
                 List.of("generators {", "  void { biome = \"plains\" }", "  flat { biome = \"desert\" }", "}"));

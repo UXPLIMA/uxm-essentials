@@ -37,6 +37,8 @@ final class ShippedConfigReader {
     static List<DocsData.Setting> parse(List<String> lines) {
         List<DocsData.Setting> settings = new ArrayList<>();
         Deque<String> path = new ArrayDeque<>();
+        // The comment above each open block, innermost last: a key with no comment of its own is explained by it.
+        Deque<String> blockComments = new ArrayDeque<>();
         List<String> comment = new ArrayList<>();
         int listDepth = 0;
         for (String raw : lines) {
@@ -55,11 +57,14 @@ final class ShippedConfigReader {
             }
             if (line.equals("}")) {
                 path.pollLast();
+                blockComments.pollLast();
                 comment.clear();
                 continue;
             }
             if (line.endsWith("{")) {
                 path.addLast(line.substring(0, line.length() - 1).strip());
+                blockComments.addLast(
+                        comment.isEmpty() ? inherited(blockComments) : firstSentence(String.join(" ", comment)));
                 comment.clear();
                 continue;
             }
@@ -88,9 +93,9 @@ final class ShippedConfigReader {
             String rest = line.substring(equals + 1);
             int hash = rest.indexOf('#');
             String value = (hash < 0 ? rest : rest.substring(0, hash)).strip();
-            String description = hash < 0
-                    ? String.join(" ", comment)
-                    : rest.substring(hash + 1).strip();
+            String description = hash >= 0
+                    ? rest.substring(hash + 1).strip()
+                    : comment.isEmpty() ? inherited(blockComments) : String.join(" ", comment);
             if (value.equals("[")) {
                 listDepth = 1;
                 value = "[...]";
@@ -99,6 +104,21 @@ final class ShippedConfigReader {
             comment.clear();
         }
         return List.copyOf(settings);
+    }
+
+    /**
+     * What a key with no comment of its own borrows from its block: the block comment's first sentence, which names
+     * what the block is for. The whole comment repeated on every row of a five-key block buries the table.
+     */
+    private static String firstSentence(String comment) {
+        int stop = comment.indexOf(". ");
+        return stop < 0 ? comment : comment.substring(0, stop + 1);
+    }
+
+    /** The comment of the innermost open block, or nothing outside every block. */
+    private static String inherited(Deque<String> blockComments) {
+        String innermost = blockComments.peekLast();
+        return innermost == null ? "" : innermost;
     }
 
     /** Splits the members of a one-line object ({@code void { biome = "plains" }}) on their commas. */
