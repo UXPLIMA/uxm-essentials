@@ -102,19 +102,28 @@ public final class AdvancementMessageListener implements Listener {
         this.locale = Objects.requireNonNull(locale, "locale");
     }
 
+    /**
+     * Clear the vanilla line of an advancement this module announces, before any other plugin reads the outcome. It is
+     * cleared in both surviving outcomes, a vanished earner or our own notice, so a chat log or a bridge listening at
+     * MONITOR never sees a line that is not shown.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST)
+    public void onAdvancementReplaceTheLine(PlayerAdvancementDoneEvent event) {
+        if (announces(config.get(), event)) {
+            event.message(null);
+        }
+    }
+
+    /** Send this module's own notice, once every plugin has had its say about the advancement. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onAdvancement(PlayerAdvancementDoneEvent event) {
         AdvancementNoticeConfig cfg = config.get();
+        if (!announces(cfg, event)) {
+            return;
+        }
         Player earner = event.getPlayer();
         String key = event.getAdvancement().getKey().toString();
         @Nullable AdvancementDisplay display = event.getAdvancement().getDisplay();
-        boolean announceable = display != null && display.doesAnnounceToChat();
-        if (!AdvancementFilter.shouldAnnounce(cfg, key, isRecipe(key), announceable)) {
-            return;
-        }
-        // The vanilla line is cleared in both surviving outcomes (vanished earner, or our own broadcast), so clear it
-        // here on the firing thread: the event mutation must be applied synchronously before this handler returns.
-        event.message(null);
         // The vanish check enumerates the roster and reads every other player's canSee, which only the global region
         // can read consistently on Folia; the broadcast decision rides the same hop so a vanished earner is suppressed
         // there rather than after a cross-region read. Per-recipient delivery hops onEntity inside the broadcaster.
@@ -127,6 +136,14 @@ public final class AdvancementMessageListener implements Listener {
             @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
             channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
         });
+    }
+
+    /** Whether this module announces {@code event}'s advancement, which both halves ask the same way. */
+    private static boolean announces(AdvancementNoticeConfig cfg, PlayerAdvancementDoneEvent event) {
+        String key = event.getAdvancement().getKey().toString();
+        @Nullable AdvancementDisplay display = event.getAdvancement().getDisplay();
+        boolean announceable = display != null && display.doesAnnounceToChat();
+        return AdvancementFilter.shouldAnnounce(cfg, key, isRecipe(key), announceable);
     }
 
     /** The per-viewer notice, or {@code null} to skip a viewer who has opted out of broadcasts. */

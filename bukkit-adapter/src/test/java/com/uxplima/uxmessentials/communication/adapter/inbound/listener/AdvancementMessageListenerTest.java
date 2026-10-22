@@ -17,6 +17,9 @@ import java.util.function.Predicate;
 import org.bukkit.NamespacedKey;
 import org.bukkit.advancement.Advancement;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerAdvancementDoneEvent;
 
 import io.papermc.paper.advancement.AdvancementDisplay;
@@ -113,6 +116,36 @@ class AdvancementMessageListenerTest {
         assertThat(PLAIN.serialize(received(viewer))).isEqualTo("Earner earned [The End?]");
         // The earner is also an online recipient and receives the broadcast.
         assertThat(PLAIN.serialize(received(earner))).isEqualTo("Earner earned [The End?]");
+    }
+
+    @Test
+    void aReaderOfTheOutcomeSeesTheVanillaLineAlreadyReplaced() {
+        // A plugin watching how the advancement ended, a chat log or a Discord bridge, listens at MONITOR. The
+        // vanilla line our notice replaces is cleared before any of them reads, whatever order they registered in.
+        OutcomeReader reader = new OutcomeReader();
+        server.getPluginManager().registerEvents(reader, MockBukkit.createMockPlugin());
+
+        fire(
+                enabled("<yellow>{player} earned [{title}]"),
+                AdvancementMessageListenerTest::never,
+                advancement("minecraft:end/kill_dragon", true, "The End?", "Kill the dragon"));
+
+        assertThat(reader.read).isTrue();
+        assertThat(reader.message).isNull();
+    }
+
+    /** A plugin that reads the finished advancement event, registered before this one. */
+    public static final class OutcomeReader implements Listener {
+
+        boolean read;
+
+        @Nullable Component message;
+
+        @EventHandler(priority = EventPriority.MONITOR)
+        public void onAdvancement(PlayerAdvancementDoneEvent event) {
+            read = true;
+            message = event.message();
+        }
     }
 
     @Test
@@ -325,7 +358,9 @@ class AdvancementMessageListenerTest {
         AdvancementMessageListener listener =
                 new AdvancementMessageListener(() -> cfg, channels, optOut, vanished, scheduler, Locale.ENGLISH);
         PlayerAdvancementDoneEvent event = new PlayerAdvancementDoneEvent(earner, advancement, Component.text(VANILLA));
-        listener.onAdvancement(event);
+        // Through the server's own event bus, so each half of the listener runs at the priority it declares.
+        server.getPluginManager().registerEvents(listener, MockBukkit.createMockPlugin());
+        server.getPluginManager().callEvent(event);
         return event;
     }
 
