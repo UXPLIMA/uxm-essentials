@@ -164,6 +164,11 @@ final class SharedPlaceholderKeys {
                         "The address the player is connected from, without the port.",
                         PlaceholderScope.SESSION),
                 PlaceholderSpec.shared("player_locale", "The client's language, as en_us.", PlaceholderScope.SESSION),
+                PlaceholderSpec.shared(
+                        "player_language",
+                        "The language the player reads in, as tr or pt_br: the forced one, else their /lang choice,"
+                                + " else their client's.",
+                        PlaceholderScope.SESSION),
                 PlaceholderSpec.shared("player_gamemode", "The game mode the player is in.", PlaceholderScope.SESSION),
                 PlaceholderSpec.shared(
                         "player_flying", "Whether the player is flying right now (yes/no).", PlaceholderScope.SESSION),

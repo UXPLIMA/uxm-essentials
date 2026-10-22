@@ -11,6 +11,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
+import java.util.function.Function;
 
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -55,9 +56,20 @@ public final class BukkitPlayerFacts implements PlayerFactsPlaceholders {
     private static final long MILLIS_PER_TICK = 50L;
 
     private final Server server;
+    private final Function<PlayerRef, Locale> languages;
 
-    public BukkitPlayerFacts(Server server) {
+    /**
+     * @param languages the language a player reads in, from the same resolver every message of the plugin asks, so
+     *     the placeholder and the chat never disagree
+     */
+    public BukkitPlayerFacts(Server server, Function<PlayerRef, Locale> languages) {
         this.server = Objects.requireNonNull(server, "server");
+        this.languages = Objects.requireNonNull(languages, "languages");
+    }
+
+    @Override
+    public Optional<Locale> language(PlayerRef who) {
+        return Optional.of(languages.apply(Objects.requireNonNull(who, "who")));
     }
 
     @Override

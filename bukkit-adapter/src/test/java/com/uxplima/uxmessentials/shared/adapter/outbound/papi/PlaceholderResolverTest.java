@@ -1547,6 +1547,40 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void theLanguageKeyIsTheLanguageThePlayerReadsNotTheClients() {
+        // A Turkish reader on an English client: player_locale answers the client, player_language what they read.
+        FakePlayerFacts facts = new FakePlayerFacts()
+                .identity(new PlayerFactsPlaceholders.Identity(
+                        "Alice",
+                        "Alice",
+                        "0b5f3f42-0000-0000-0000-000000000001",
+                        Optional.empty(),
+                        "en_us",
+                        "survival",
+                        false,
+                        false,
+                        0.1f,
+                        0.2f,
+                        Optional.empty(),
+                        Optional.empty()))
+                .language(java.util.Locale.forLanguageTag("tr"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_locale")).contains("en_us");
+        assertThat(resolver.resolve(ALICE, true, "player_language")).contains("tr");
+    }
+
+    @Test
+    void aRegionalLanguageReadsWithItsRegion() {
+        FakePlayerFacts facts = new FakePlayerFacts().language(java.util.Locale.forLanguageTag("pt-BR"));
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().playerFacts(facts).build());
+
+        assertThat(resolver.resolve(ALICE, true, "player_language")).contains("pt_br");
+    }
+
+    @Test
     void theVitalKeysRenderTheBodyAndItsShare() {
         FakePlayerFacts facts = new FakePlayerFacts()
                 .vitals(new PlayerFactsPlaceholders.Vitals(15.0, 20.0, 18, 4.5f, 200, 300, 12.0, 4.0, true));
@@ -2122,6 +2156,17 @@ class PlaceholderResolverTest {
         private @Nullable Identity identity;
         private @Nullable Vitals vitals;
         private @Nullable Where where;
+        private java.util.@Nullable Locale language;
+
+        FakePlayerFacts language(java.util.Locale reads) {
+            this.language = reads;
+            return this;
+        }
+
+        @Override
+        public Optional<java.util.Locale> language(PlayerRef who) {
+            return Optional.ofNullable(language);
+        }
 
         FakePlayerFacts session(Session live) {
             this.session = live;

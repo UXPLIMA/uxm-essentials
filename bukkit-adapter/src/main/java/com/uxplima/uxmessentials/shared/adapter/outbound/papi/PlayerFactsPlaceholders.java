@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
@@ -37,6 +38,15 @@ public interface PlayerFactsPlaceholders {
 
     /** Who the player is to the server, or empty when they are not connected. */
     Optional<Identity> identity(PlayerRef who);
+
+    /**
+     * The language the player reads in: the server's forced language, else the one they chose with {@code /lang}, else
+     * their client's, else the default. {@link Identity#locale()} is only the client's, which a player who chose
+     * another language does not read. Empty where nothing resolves languages.
+     */
+    default Optional<Locale> language(PlayerRef who) {
+        return Optional.empty();
+    }
 
     /** How the player's body is doing, or empty when they are not connected. */
     Optional<Vitals> vitals(PlayerRef who);

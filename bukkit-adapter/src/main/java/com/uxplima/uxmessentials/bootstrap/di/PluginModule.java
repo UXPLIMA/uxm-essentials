@@ -16,6 +16,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -822,7 +823,8 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 menuCurrencyBackends,
-                menuTextInputRef);
+                menuTextInputRef,
+                wiredKernel.resolver()::resolve);
         bus.start();
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
         // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
@@ -1099,7 +1101,8 @@ public final class PluginModule {
             Menus menus,
             MenuBindings menuBindings,
             AtomicReference<EconomyBackends> menuCurrencyBackends,
-            AtomicReference<TextInput> menuTextInputRef) {
+            AtomicReference<TextInput> menuTextInputRef,
+            Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks(auditChannel, queries, actions);
@@ -1195,7 +1198,7 @@ public final class PluginModule {
         links.placeholders.players(kernel.playerLookup());
         // The account facts (ping, first join, playtime, the item in hand) are the server's own, not any
         // module's, so they are wired here too and keep answering with every feature switched off.
-        links.placeholders.playerFacts(new BukkitPlayerFacts(plugin.getServer()));
+        links.placeholders.playerFacts(new BukkitPlayerFacts(plugin.getServer(), languages));
         // The generic cooldown family reads the same kernel gate every command-control rule stamps, so a label an
         // operator invented is readable from a scoreboard without the plugin knowing about it in advance.
         links.placeholders.cooldowns(kernel.cooldowns());

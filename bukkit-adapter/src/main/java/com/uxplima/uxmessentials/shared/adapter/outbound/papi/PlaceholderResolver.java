@@ -321,6 +321,9 @@ public final class PlaceholderResolver {
             return EMPTY;
         }
         PlayerFactsPlaceholders facts = seam.get();
+        if (tail.equals("language")) {
+            return facts.language(who).map(PlaceholderResolver::languageCode).orElse(EMPTY);
+        }
         Optional<String> fromAccount = accountFact(facts, who, tail);
         if (fromAccount.isPresent()) {
             return fromAccount.get();
@@ -342,6 +345,11 @@ public final class PlaceholderResolver {
             return fromStatistic.get();
         }
         return facts.session(who).map(session -> sessionFact(session, tail)).orElse(EMPTY);
+    }
+
+    /** A language as player_locale writes one: lower case, the region after an underscore, so {@code pt_br}. */
+    private static String languageCode(Locale language) {
+        return language.toLanguageTag().toLowerCase(Locale.ROOT).replace('-', '_');
     }
 
     /** The keys that read who the player is, which answer with the account name and id even when offline. */
