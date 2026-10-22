@@ -124,6 +124,22 @@ class HologramClickHandlerTest {
         return new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi");
     }
 
+    @Test
+    void aClickLongPastItsCooldownIsNotKept() {
+        // The cooldown is a quarter of a second, and it once kept every player who ever clicked a hologram, for as
+        // long as the server ran. Two hundred players clicking once, then one more click a second later, leaves
+        // only the click that can still matter.
+        stored.put("guide", text("guide"));
+        for (int i = 0; i < 200; i++) {
+            handler.clicked(player(), HologramName.of("guide"), false);
+        }
+        now.addAndGet(1_000);
+
+        handler.clicked(player(), HologramName.of("guide"), false);
+
+        assertThat(handler.remembered()).isEqualTo(1);
+    }
+
     private Player player() {
         UUID id = UUID.randomUUID();
         return (Player) java.lang.reflect.Proxy.newProxyInstance(

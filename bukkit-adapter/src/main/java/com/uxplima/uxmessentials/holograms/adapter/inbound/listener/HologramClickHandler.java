@@ -29,6 +29,9 @@ import org.jspecify.annotations.Nullable;
 public final class HologramClickHandler implements PacketHologramView.ClickHandler {
 
     private static final long COOLDOWN_MS = 250L;
+    // A click older than the cooldown answers nothing, so past this many remembered clicks the old ones go. Below
+    // it a sweep is not worth its walk; above it the map holds only the clicks of the last quarter second.
+    private static final int SWEEP_ABOVE = 64;
 
     private final Function<HologramName, Optional<Hologram>> holograms;
     private final HologramPageCycler pageCycler;
@@ -99,10 +102,18 @@ public final class HologramClickHandler implements PacketHologramView.ClickHandl
         return Primary.NONE;
     }
 
+    /** How many clicks this handler is holding on to. */
+    int remembered() {
+        return lastClick.size();
+    }
+
     /** True when this player clicked inside the cooldown; records the click time otherwise. */
     private boolean onCooldown(UUID player) {
         long now = clock.getAsLong();
         Long previous = lastClick.put(player, now);
+        if (lastClick.size() > SWEEP_ABOVE) {
+            lastClick.values().removeIf(at -> now - at >= COOLDOWN_MS);
+        }
         return previous != null && now - previous < COOLDOWN_MS;
     }
 }
