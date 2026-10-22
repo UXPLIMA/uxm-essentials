@@ -25,6 +25,15 @@ public interface ChatPlaceholderExpander {
     /** {@code text} with {@code who}'s {@code %token%} placeholders expanded, or {@code text} unchanged when none apply. */
     String expand(UUID who, String text);
 
+    /**
+     * {@code text} with its relational {@code %rel_...%} placeholders filled for {@code reader} reading what
+     * {@code speaker} said. The chat line is drawn once for every reader, so a value that depends on who reads it
+     * (a tag in the reader's language) is filled here and not with the speaker's own placeholders.
+     */
+    default String expandRelational(UUID reader, UUID speaker, String text) {
+        return text;
+    }
+
     /** An expander that returns the text unchanged: the fallback when PlaceholderAPI is not installed. */
     static ChatPlaceholderExpander identity() {
         return (who, text) -> text;
@@ -35,10 +44,19 @@ public interface ChatPlaceholderExpander {
         if (!PlaceholderApiSupport.isPresent()) {
             return identity();
         }
-        return (who, text) -> {
-            Objects.requireNonNull(who, "who");
-            Objects.requireNonNull(text, "text");
-            return PlaceholderApiSupport.messageBridge(who).apply(text);
+        return new ChatPlaceholderExpander() {
+            @Override
+            public String expand(UUID who, String text) {
+                Objects.requireNonNull(who, "who");
+                Objects.requireNonNull(text, "text");
+                return PlaceholderApiSupport.messageBridge(who).apply(text);
+            }
+
+            @Override
+            public String expandRelational(UUID reader, UUID speaker, String text) {
+                Objects.requireNonNull(text, "text");
+                return PlaceholderApiSupport.relationalBridge(reader, speaker).apply(text);
+            }
         };
     }
 }

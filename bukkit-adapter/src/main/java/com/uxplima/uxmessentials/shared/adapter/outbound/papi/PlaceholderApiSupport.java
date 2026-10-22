@@ -7,6 +7,7 @@ import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import me.clip.placeholderapi.PlaceholderAPI;
@@ -85,6 +86,34 @@ public final class PlaceholderApiSupport {
         }
         OfflinePlayer player = Bukkit.getOfflinePlayer(viewer);
         return fill.apply(player, source);
+    }
+
+    /**
+     * The transform that fills the relational placeholders ({@code %rel_...%}) of a text drawn for {@code viewer}
+     * about {@code target}: a chat line or a tab row is drawn once for every reader, so a value that depends on who
+     * reads it belongs there. The identity when PlaceholderAPI is absent, when the text holds no relational
+     * placeholder, or when either player is not online, because the relation needs both.
+     */
+    public static UnaryOperator<String> relationalBridge(java.util.UUID viewer, java.util.UUID target) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(target, "target");
+        if (!isPresent()) {
+            return UnaryOperator.identity();
+        }
+        return source -> {
+            if (!hasRelational(source)) {
+                return source;
+            }
+            Player one = Bukkit.getPlayer(viewer);
+            Player two = Bukkit.getPlayer(target);
+            return one == null || two == null ? source : PlaceholderAPI.setRelationalPlaceholders(one, two, source);
+        };
+    }
+
+    /** Whether {@code source} holds a relational placeholder, whose value depends on who reads the text. */
+    public static boolean hasRelational(String source) {
+        Objects.requireNonNull(source, "source");
+        return source.contains("%rel_");
     }
 
     /**

@@ -451,7 +451,11 @@ public final class TablistRenderer {
         String line = readerNames == null
                 ? HudText.lineFor(reader, source)
                 : readerNames.withAffixes(target.getUniqueId(), source, reader);
-        String withTokens = BuiltinTokens.apply(target, animations.resolve(line, tick));
+        // The server's own copy has no reader, so a relational value in it reads as the target would read it.
+        UUID relationalReader = PlayerRef.SYSTEM_UUID.equals(reader) ? target.getUniqueId() : reader;
+        String related = PlaceholderApiSupport.relationalBridge(relationalReader, target.getUniqueId())
+                .apply(line);
+        String withTokens = BuiltinTokens.apply(target, animations.resolve(related, tick));
         return HudText.render(target.getUniqueId(), withTokens);
     }
 }

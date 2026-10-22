@@ -52,6 +52,9 @@ public final class ReaderNames {
 
     static final String SUFFIX_TOKEN = "{suffix}";
 
+    /** How a relational placeholder starts: its value depends on who reads it, a tag in the reader's language. */
+    private static final String RELATIONAL = "%rel_";
+
     /** Puts the interceptor on a viewer's connection and takes it off again. */
     @FunctionalInterface
     public interface Gate {
@@ -144,7 +147,7 @@ public final class ReaderNames {
 
     /** Whether {@code target}'s name drawn from {@code source} reads differently for different readers. */
     public boolean dependsOnReader(UUID target, String source) {
-        if (isLine.test(source)) {
+        if (isLine.test(source) || source.contains(RELATIONAL)) {
             return true;
         }
         Affix affix = affixes.apply(target);

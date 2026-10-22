@@ -104,7 +104,9 @@ public final class ChatFormatListener implements Listener {
                 parseMessage,
                 current.nameHover(),
                 current.nameClick(),
-                affixLines);
+                affixLines,
+                expander,
+                speaker.getUniqueId());
         event.renderer((source, sourceDisplayName, message, viewer) ->
                 rendering.render(sourceDisplayName, message, readerOf(viewer)));
     }
@@ -129,13 +131,17 @@ public final class ChatFormatListener implements Listener {
             boolean parseMessage,
             String nameHover,
             String nameClick,
-            BiFunction<UUID, String, String> affixLines) {
+            BiFunction<UUID, String, String> affixLines,
+            ChatPlaceholderExpander expander,
+            UUID speaker) {
 
         Component render(Component displayName, Component message, UUID reader) {
             String raw = Text.plain(message);
             TagResolver messageTag = parseMessage ? Text.parsed("message", raw) : Text.placeholder("message", raw);
+            // The console has no language of its own; it reads a relational value as the speaker would.
+            UUID relationalReader = PlayerRef.SYSTEM_UUID.equals(reader) ? speaker : reader;
             return StyledText.render(
-                    format,
+                    expander.expandRelational(relationalReader, speaker, format),
                     affixTag("prefix", affixLines.apply(reader, prefix)),
                     affixTag("suffix", affixLines.apply(reader, suffix)),
                     Text.component("display_name", decorate(displayName)),

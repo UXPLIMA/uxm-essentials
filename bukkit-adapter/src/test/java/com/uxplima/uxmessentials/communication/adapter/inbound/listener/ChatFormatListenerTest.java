@@ -212,6 +212,32 @@ class ChatFormatListenerTest {
         assertThat(PLAIN.serialize(forConsole)).isEqualTo("[SERVER OWNER] Alice: hi");
     }
 
+    @Test
+    void aRelationalPlaceholderInTheFormatIsFilledForEachReader() {
+        PlayerMock reader = server.addPlayer("Bob");
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "%rel_tag%<display_name>: <message>", Map.of(), false, "", "");
+        ChatPlaceholderExpander relational = new ChatPlaceholderExpander() {
+            @Override
+            public String expand(UUID who, String text) {
+                return text;
+            }
+
+            @Override
+            public String expandRelational(UUID readerId, UUID speakerId, String text) {
+                String tag = readerId.equals(reader.getUniqueId()) ? "[EFSANE] " : "[LEGEND] ";
+                return speakerId.equals(speaker.getUniqueId()) ? text.replace("%rel_tag%", tag) : text;
+            }
+        };
+        ChatRenderer renderer = render(policy, ChatMeta.empty(), relational);
+
+        Component forSpeaker = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), speaker);
+        Component forReader = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), reader);
+
+        assertThat(PLAIN.serialize(forSpeaker)).isEqualTo("[LEGEND] Alice: hi");
+        assertThat(PLAIN.serialize(forReader)).isEqualTo("[EFSANE] Alice: hi");
+    }
+
     /** Run the listener with {@code policy} + {@code meta} and hand back the renderer it installed on the event. */
     private ChatRenderer render(ChatFormatPolicy policy, ChatMeta meta) {
         return render(policy, meta, ChatPlaceholderExpander.identity());

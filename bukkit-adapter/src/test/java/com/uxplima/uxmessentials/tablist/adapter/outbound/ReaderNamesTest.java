@@ -179,6 +179,7 @@ class ReaderNamesTest {
         assertThat(names.dependsOnReader(owner, "{player}")).isFalse();
         assertThat(names.dependsOnReader(plain, "{prefix}{player}")).isFalse();
         assertThat(names.dependsOnReader(plain, "@custom.tab.name")).isTrue();
+        assertThat(names.dependsOnReader(plain, "%rel_uxmtags_tag%{player}")).isTrue();
     }
 
     @Test
