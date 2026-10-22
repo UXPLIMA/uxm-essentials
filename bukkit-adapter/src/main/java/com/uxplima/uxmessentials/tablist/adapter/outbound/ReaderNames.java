@@ -140,11 +140,6 @@ public final class ReaderNames {
         Objects.requireNonNull(registry, "registry").register(new NameListener());
     }
 
-    /** {@code target}'s prefix and suffix, read live so a rank change shows on the next paint. */
-    Affix affixOf(UUID target) {
-        return affixes.apply(target);
-    }
-
     /** Whether {@code target}'s name drawn from {@code source} reads differently for different readers. */
     public boolean dependsOnReader(UUID target, String source) {
         if (isLine.test(source) || source.contains(RELATIONAL)) {

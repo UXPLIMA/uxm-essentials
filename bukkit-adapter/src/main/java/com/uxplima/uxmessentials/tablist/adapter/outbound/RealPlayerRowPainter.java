@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
-import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
@@ -77,7 +76,7 @@ final class RealPlayerRowPainter {
      * and keeps the project's "every player-keyed map is concurrent" convention; every mutation otherwise runs on the
      * player's region/entity thread.
      */
-    private final Map<UUID, AppliedName> appliedNameFormat = new ConcurrentHashMap<>();
+    private final Map<UUID, DrawnName> appliedNameFormat = new ConcurrentHashMap<>();
 
     /** The last sort order applied to each player, keyed by player UUID. An absent key means no order is applied. */
     private final Map<UUID, Integer> appliedOrder = new ConcurrentHashMap<>();
@@ -249,15 +248,17 @@ final class RealPlayerRowPainter {
         }
         UUID uuid = player.getUniqueId();
         int order = sortOrder.orElse(0);
-        AppliedSkin desired = new AppliedSkin(nameKey(player, nameFormat.orElse("")), order, skinSource);
+        DrawnName drawn = nameFormat.isPresent()
+                ? drawName(player, nameFormat.get(), tick)
+                : new DrawnName("", displayName(player), Map.of());
+        AppliedSkin desired = new AppliedSkin(drawn, order, skinSource);
         if (desired.equals(appliedSkin.get(uuid))) {
             return;
         }
         // Taking ownership of the row through packets, so drop any native name/order set for the player.
         resetNameAndOrder(player);
-        Component name =
-                nameFormat.map(source -> drawName(player, source, tick)).orElse(displayName(player));
-        broadcast(packets.addOrUpdate(new TabEntry(uuid, name, order, skin.get(), player.getName())));
+        holdOrRelease(uuid, drawn);
+        broadcast(packets.addOrUpdate(new TabEntry(uuid, drawn.everybody(), order, skin.get(), player.getName())));
         appliedSkin.put(uuid, desired);
     }
 
@@ -265,10 +266,10 @@ final class RealPlayerRowPainter {
      * Reconcile the player's tab-list name with the selected format's {@link TablistFormat#nameFormat()}. Applies only
      * when the name changed from the last value applied: a steady-state tick re-sends nothing (the setter
      * pushes a client update every call). An absent name format on a player who currently has one resets it to vanilla.
-     * The tracking keys on the raw source, the player's prefix and suffix, and the languages it was drawn in, not on the
-     * rendered name, so an {@code %anim_<name>%} token resolves to the frame current when the operator last changed the
-     * format rather than re-sending the name every animation tick, while a rank change or a reader in a language the
-     * name was not drawn in yet draws it again.
+     * The name is drawn on every paint and sent only when the drawing differs from the last one sent. A value the
+     * format shows through a token or a placeholder (a worn tag, a rank, a world, an animation frame) changes the name
+     * without changing the format text, and keying on the text alone kept such a change off the tab until the player
+     * joined again.
      */
     private void applyNameFormat(Player player, Optional<String> nameFormat, long tick) {
         UUID uuid = player.getUniqueId();
@@ -279,13 +280,14 @@ final class RealPlayerRowPainter {
             }
             return;
         }
-        String source = nameFormat.get();
-        AppliedName desired = nameKey(player, source);
-        if (desired.equals(appliedNameFormat.get(uuid))) {
+        DrawnName drawn = drawName(player, nameFormat.get(), tick);
+        if (drawn.equals(appliedNameFormat.get(uuid))) {
             return;
         }
-        player.playerListName(drawName(player, source, tick));
-        appliedNameFormat.put(uuid, desired);
+        // The copies are held before the setter runs, so the update it sends is already rewritten for each viewer.
+        holdOrRelease(uuid, drawn);
+        player.playerListName(drawn.everybody());
+        appliedNameFormat.put(uuid, drawn);
     }
 
     /**
@@ -353,16 +355,14 @@ final class RealPlayerRowPainter {
     }
 
     /**
-     * Draw {@code player}'s name. A name that reads the same for everybody is drawn once. A name that shows a catalogue
-     * line is drawn once for each language online and held, so every viewer's packet carries their own copy, and the
-     * server keeps the copy in its own language for a viewer the copies do not cover yet. The copies are held before
-     * the caller sets the list name, so the update that setter sends is already rewritten.
+     * Draw {@code player}'s name. A name that reads the same for everybody is drawn once. A name that reads differently
+     * per reader (a catalogue line, or a relational placeholder) is drawn once for each language online, and the
+     * server keeps the copy in its own language for a viewer the copies do not cover yet.
      */
-    private Component drawName(Player player, String source, long tick) {
+    private DrawnName drawName(Player player, String source, long tick) {
         UUID uuid = player.getUniqueId();
         if (readerNames == null || !readerNames.dependsOnReader(uuid, source)) {
-            release(uuid);
-            return renderName(player, source, tick);
+            return new DrawnName(source, renderName(player, source, tick), Map.of());
         }
         Map<Locale, Component> byLanguage = new HashMap<>();
         readerNames
@@ -370,21 +370,19 @@ final class RealPlayerRowPainter {
                 .forEach((language, reader) ->
                         byLanguage.put(language, nameRenderer.render(player, source, tick, reader)));
         Component everybody = nameRenderer.render(player, source, tick, PlayerRef.SYSTEM_UUID);
-        readerNames.hold(uuid, everybody, byLanguage);
-        return everybody;
+        return new DrawnName(source, everybody, Map.copyOf(byLanguage));
     }
 
-    /** What a drawn name depends on, so a tick that changes none of it draws nothing. */
-    private AppliedName nameKey(Player player, String source) {
+    /** Hand the per-reader copies to the interceptor, or take them back for a name every reader reads alike. */
+    private void holdOrRelease(UUID uuid, DrawnName drawn) {
         if (readerNames == null) {
-            return new AppliedName(source, ReaderNames.Affix.NONE, Set.of());
+            return;
         }
-        UUID uuid = player.getUniqueId();
-        ReaderNames.Affix affix = readerNames.affixOf(uuid);
-        Set<Locale> languages = readerNames.dependsOnReader(uuid, source)
-                ? Set.copyOf(readerNames.readersByLanguage(viewers.get()).keySet())
-                : Set.of();
-        return new AppliedName(source, affix, languages);
+        if (drawn.byLanguage().isEmpty()) {
+            readerNames.release(uuid);
+        } else {
+            readerNames.hold(uuid, drawn.everybody(), drawn.byLanguage());
+        }
     }
 
     private void release(UUID uuid) {
@@ -399,12 +397,15 @@ final class RealPlayerRowPainter {
     }
 
     /**
-     * The skin row last painted for a player: the name-format source, sort order, and skin source. Two paints with an
+     * The skin row last painted for a player: the drawn name, sort order, and skin source. Two paints with an
      * equal tuple are the same row, so the packet is not re-sent. This is what keeps a real online player's entry from
      * being re-added every refresh tick (the flicker guard). A change in any field re-paints.
      */
-    private record AppliedSkin(AppliedName name, int order, TablistSkinSource skinSource) {}
+    private record AppliedSkin(DrawnName name, int order, TablistSkinSource skinSource) {}
 
-    /** A name source with the prefix and suffix it showed and the reader languages it was drawn in. */
-    private record AppliedName(String source, ReaderNames.Affix affix, Set<Locale> languages) {}
+    /**
+     * A name as drawn: the format it came from, the server's own copy, and one copy per reader language when it reads
+     * differently per reader (empty when everybody reads the same).
+     */
+    private record DrawnName(String source, Component everybody, Map<Locale, Component> byLanguage) {}
 }

@@ -148,6 +148,26 @@ class TablistRendererTest {
     }
 
     @Test
+    void aNameIsDrawnAgainWhenAValueItShowsChangesThoughItsFormatDoesNot() {
+        // A worn tag, a rank or a world reaches the name through a token or a placeholder, and none of them changes
+        // the format text. The name used to be drawn only when the format text changed, so a tag put on stayed
+        // missing from the tab until the player joined again.
+        server.addSimpleWorld("world");
+        org.bukkit.World other = server.addSimpleWorld("arena");
+        PlayerMock player = server.addPlayer();
+        TablistRenderer renderer = renderer(new TablistFormatConfig(
+                List.of(format("default", DisplayCondition.always(), 0, "{world} {player}", 7))));
+
+        renderer.renderFor(player);
+        String before = plain(player.playerListName());
+        player.teleport(other.getSpawnLocation());
+        renderer.renderFor(player);
+
+        assertThat(before).doesNotStartWith("arena");
+        assertThat(plain(player.playerListName())).isEqualTo("arena " + player.getName());
+    }
+
+    @Test
     void noMatchingFormatResetsNameAndOrder() {
         PlayerMock player = server.addPlayer();
         AtomicReference<TablistFormatConfig> ref = new AtomicReference<>(new TablistFormatConfig(
