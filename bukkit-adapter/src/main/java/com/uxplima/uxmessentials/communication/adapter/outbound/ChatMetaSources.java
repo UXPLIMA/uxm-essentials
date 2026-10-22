@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.communication.adapter.outbound;
 
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
 
 import org.bukkit.Server;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.LuckPermsAccess;
 import net.luckperms.api.LuckPermsProvider;
 import org.jspecify.annotations.NullMarked;
@@ -18,6 +21,15 @@ import org.jspecify.annotations.NullMarked;
 public final class ChatMetaSources {
 
     private ChatMetaSources() {}
+
+    /** Each player's chat prefix and suffix, the ones a {@code {prefix}} or {@code {suffix}} token of a HUD line shows. */
+    public static Function<UUID, ReaderText.Affix> affixes(Server server) {
+        ChatMetaSource meta = create(server);
+        return who -> {
+            ChatMeta held = meta.metaFor(who);
+            return new ReaderText.Affix(held.prefix(), held.suffix());
+        };
+    }
 
     /** The LuckPerms-backed source when LuckPerms is installed, otherwise the empty fallback. */
     public static ChatMetaSource create(Server server) {

@@ -20,6 +20,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.AnimationSpec;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
@@ -107,16 +108,19 @@ class TablistRendererTest {
         PlayerMock owner = server.addPlayer("Owner");
         PlayerMock turk = server.addPlayer("Turk");
         Locale turkish = Locale.forLanguageTag("tr");
-        Map<UUID, ReaderNames.Affix> affixes = new HashMap<>();
-        affixes.put(owner.getUniqueId(), new ReaderNames.Affix("@custom.rank.owner", ""));
+        Map<UUID, ReaderText.Affix> affixes = new HashMap<>();
+        affixes.put(owner.getUniqueId(), new ReaderText.Affix("@custom.rank.owner", ""));
         PacketListenerRegistry registry = new PacketListenerRegistry();
-        ReaderNames names = new ReaderNames(
-                id -> id.equals(turk.getUniqueId()) ? turkish : Locale.ENGLISH,
+        ReaderText text = new ReaderText(
                 line -> line.startsWith("@"),
                 (reader, line) -> !line.equals("@custom.rank.owner")
                         ? line
                         : reader.equals(turk.getUniqueId()) ? "[KURUCU] " : "[OWNER] ",
-                id -> affixes.getOrDefault(id, ReaderNames.Affix.NONE),
+                id -> affixes.getOrDefault(id, ReaderText.Affix.NONE),
+                (reader, target) -> java.util.function.UnaryOperator.identity());
+        ReaderNames names = new ReaderNames(
+                text,
+                id -> id.equals(turk.getUniqueId()) ? turkish : Locale.ENGLISH,
                 id -> true,
                 registry,
                 null,
@@ -140,7 +144,7 @@ class TablistRendererTest {
         assertThat(plain(owner.playerListName())).isEqualTo("[OWNER] Owner");
         assertThat(nameSentTo(registry, turk, owner)).isEqualTo("[KURUCU] Owner");
 
-        affixes.put(owner.getUniqueId(), new ReaderNames.Affix("<red>[VIP]</red> ", ""));
+        affixes.put(owner.getUniqueId(), new ReaderText.Affix("<red>[VIP]</red> ", ""));
         renderer.renderFor(owner);
 
         assertThat(plain(owner.playerListName())).isEqualTo("[VIP] Owner");

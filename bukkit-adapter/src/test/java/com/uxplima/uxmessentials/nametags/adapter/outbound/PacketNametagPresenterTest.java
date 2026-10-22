@@ -11,12 +11,14 @@ import java.util.OptionalInt;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.nametags.domain.NametagAppearance;
@@ -24,11 +26,13 @@ import com.uxplima.uxmessentials.nametags.domain.NametagConfig;
 import com.uxplima.uxmessentials.nametags.domain.NametagFormat;
 import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmlib.nametag.Appearance;
 import com.uxplima.uxmlib.nametag.NametagPackets;
 import com.uxplima.uxmlib.nametag.NametagRenderer;
+import com.uxplima.uxmlib.nametag.PerViewerText;
 import com.uxplima.uxmlib.scheduler.Scheduler;
 import com.uxplima.uxmlib.scheduler.TaskHandle;
 import org.junit.jupiter.api.AfterEach;
@@ -65,6 +69,36 @@ class PacketNametagPresenterTest {
     @AfterEach
     void tearDown() {
         MockBukkit.unmock();
+    }
+
+    @Test
+    void aRankWrittenAsACatalogueLineIsDrawnInEachViewersLanguage() {
+        PlayerMock wearer = server.addPlayer("Owner");
+        PlayerMock turk = server.addPlayer("Turk");
+        PlayerMock brit = server.addPlayer("Brit");
+        ReaderText ranks = new ReaderText(
+                line -> line.startsWith("@"),
+                (reader, line) -> !line.equals("@custom.rank.owner")
+                        ? line
+                        : reader.equals(turk.getUniqueId()) ? "[KURUCU] " : "[OWNER] ",
+                id -> id.equals(wearer.getUniqueId())
+                        ? new ReaderText.Affix("@custom.rank.owner", "")
+                        : ReaderText.Affix.NONE,
+                (reader, target) -> UnaryOperator.identity());
+        NametagFormat format = new NametagFormat(
+                "ranked",
+                DisplayCondition.always(),
+                0,
+                List.of("{prefix}{player}"),
+                appearance(OptionalDouble.empty()),
+                NametagVisibility.alwaysVisible());
+        PacketNametagPresenter presenter = presenter(
+                new NametagConfig(List.of(format)), alwaysVisible(), new PlayerTeamCoordinator(), false, ranks);
+
+        PerViewerText text = presenter.perViewerText(format, wearer);
+
+        assertThat(plain(text.linesFor(turk.getUniqueId()))).containsExactly("[KURUCU] Owner");
+        assertThat(plain(text.linesFor(brit.getUniqueId()))).containsExactly("[OWNER] Owner");
     }
 
     @Test
@@ -398,6 +432,15 @@ class PacketNametagPresenterTest {
 
     private PacketNametagPresenter presenter(
             NametagConfig config, NametagVanish vanish, PlayerTeamCoordinator coordinator, boolean hideVanillaName) {
+        return presenter(config, vanish, coordinator, hideVanillaName, AS_WRITTEN);
+    }
+
+    private PacketNametagPresenter presenter(
+            NametagConfig config,
+            NametagVanish vanish,
+            PlayerTeamCoordinator coordinator,
+            boolean hideVanillaName,
+            ReaderText readerText) {
         // Never obstructed: the default appearance does not fade through blocks anyway, so the line-of-sight check is
         // not even invoked, but a benign fake keeps the wiring explicit.
         NametagRenderer libRenderer = new NametagRenderer(packets, scheduler, (player, entity) -> false);
@@ -408,7 +451,21 @@ class PacketNametagPresenterTest {
                 vanish,
                 () -> Duration.ofSeconds(1),
                 coordinator,
-                () -> hideVanillaName);
+                () -> hideVanillaName,
+                readerText);
+    }
+
+    /** Every line as written: a server whose catalogue names nothing and with no prefixes. */
+    private static final ReaderText AS_WRITTEN = new ReaderText(
+            line -> false,
+            (reader, line) -> line,
+            id -> ReaderText.Affix.NONE,
+            (reader, target) -> UnaryOperator.identity());
+
+    private static List<String> plain(List<Component> lines) {
+        return lines.stream()
+                .map(line -> PlainTextComponentSerializer.plainText().serialize(line))
+                .toList();
     }
 
     private static NametagConfig singleFormat(String name, DisplayCondition condition) {

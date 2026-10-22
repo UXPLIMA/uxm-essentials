@@ -664,6 +664,14 @@ public final class PlaceholderResolver {
                 Optional.of(bool(contexts.trade()
                         .map(seam -> seam.isTradingWith(viewer, target))
                         .orElse(false)));
+            case "prefix" ->
+                Optional.of(contexts.communication()
+                        .map(seam -> seam.prefix(target, viewer))
+                        .orElse(""));
+            case "suffix" ->
+                Optional.of(contexts.communication()
+                        .map(seam -> seam.suffix(target, viewer))
+                        .orElse(""));
             default -> Optional.empty();
         };
     }
@@ -1455,10 +1463,13 @@ public final class PlaceholderResolver {
     private String communication(PlayerRef who, boolean online, String key) {
         Optional<CommunicationPlaceholders> seam = contexts.communication();
         if (seam.isEmpty()) {
-            return EMPTY;
+            // A prefix sits in front of a name, so an absent one is nothing at all rather than the dash.
+            return key.equals("prefix") || key.equals("suffix") ? "" : EMPTY;
         }
         CommunicationPlaceholders communication = seam.get();
         return switch (key) {
+            case "prefix" -> communication.prefix(who, who);
+            case "suffix" -> communication.suffix(who, who);
             case "chat_enabled" -> bool(communication.chatEnabled());
             case "broadcasts" -> online ? bool(communication.receivesBroadcasts(who)) : EMPTY;
             default -> EMPTY;

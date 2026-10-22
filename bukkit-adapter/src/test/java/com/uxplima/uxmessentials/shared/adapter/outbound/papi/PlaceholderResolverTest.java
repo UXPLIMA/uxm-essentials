@@ -1171,6 +1171,31 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void theChatPrefixReadsInTheLanguageOfWhoeverReadsIt() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .communication(new FakeCommunication())
+                .build());
+
+        // The plain form knows only the player, so it reads in theirs; the relational one in the viewer's.
+        assertThat(resolver.resolve(ALICE, true, "communication_prefix")).contains("[OWNER] ");
+        assertThat(resolver.resolve(ALICE, true, "communication_suffix")).contains(" *");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "prefix")).contains("[KURUCU] ");
+        assertThat(resolver.resolveRelational(ALICE, ALICE, "prefix")).contains("[OWNER] ");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "suffix")).contains(" *");
+        // A player with no prefix reads nothing, not the dash: a dash would sit in front of their name.
+        assertThat(resolver.resolveRelational(ALICE, BOB, "prefix")).contains("");
+    }
+
+    @Test
+    void aChatPrefixWithNoCommunicationModuleIsEmptyNotTheDash() {
+        PlaceholderResolver resolver =
+                resolverWith(PlaceholderContexts.builder().build());
+
+        assertThat(resolver.resolve(ALICE, true, "communication_prefix")).contains("");
+        assertThat(resolver.resolveRelational(BOB, ALICE, "prefix")).contains("");
+    }
+
+    @Test
     void communicationDegradesWhenModuleIsDisabled() {
         PlaceholderResolver resolver =
                 resolverWith(PlaceholderContexts.builder().build());
@@ -2856,6 +2881,17 @@ class PlaceholderResolverTest {
         @Override
         public boolean receivesBroadcasts(PlayerRef who) {
             return receiving.contains(who);
+        }
+
+        @Override
+        public String prefix(PlayerRef who, PlayerRef reader) {
+            // A rank written as a catalogue line, in the two languages Alice and Bob read.
+            return who.equals(ALICE) ? (reader.equals(BOB) ? "[KURUCU] " : "[OWNER] ") : "";
+        }
+
+        @Override
+        public String suffix(PlayerRef who, PlayerRef reader) {
+            return who.equals(ALICE) ? " *" : "";
         }
     }
 

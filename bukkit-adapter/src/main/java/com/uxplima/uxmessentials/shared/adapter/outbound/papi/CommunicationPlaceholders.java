@@ -20,4 +20,17 @@ public interface CommunicationPlaceholders {
 
     /** Whether {@code who} currently receives the rotating announcer broadcasts (the {@code /broadcasttoggle} state). */
     boolean receivesBroadcasts(PlayerRef who);
+
+    /**
+     * {@code who}'s chat prefix as {@code reader} reads it: a prefix written as a catalogue line
+     * ({@code @custom.rank.owner}) is that line in the reader's language. Empty when they have none.
+     */
+    default String prefix(PlayerRef who, PlayerRef reader) {
+        return "";
+    }
+
+    /** {@code who}'s chat suffix as {@code reader} reads it, the same way as {@link #prefix}. */
+    default String suffix(PlayerRef who, PlayerRef reader) {
+        return "";
+    }
 }

@@ -82,6 +82,7 @@ import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlWiring;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.RulesCommandControlPlaceholders;
 import com.uxplima.uxmessentials.communication.adapter.CommunicationWiring;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.communication.application.port.AnnouncementStore;
 import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandsWiring;
 import com.uxplima.uxmessentials.custommenus.adapter.CustomMenusWiring;
@@ -219,6 +220,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
@@ -2733,7 +2735,8 @@ public final class PluginModule {
         wired.startBackgroundWork();
         // The communication PAPI seam reads the same global chat lock /togglechat flips and the per-player announcer
         // subscription /broadcasttoggle flips, so a placeholder matches the live chat state and the player's opt-in.
-        links.placeholders.communication(new StoreCommunicationPlaceholders(wired.chatLock(), wired.optOutStore()));
+        links.placeholders.communication(new StoreCommunicationPlaceholders(
+                wired.chatLock(), wired.optOutStore(), ChatMetaSources.affixes(plugin.getServer()), HudText::lineFor));
         // communication is genuinely re-readable at runtime: the announcer rotates over a supplier that re-reads the
         // settings each tick, so re-reading the files and re-arming the override loops is enough for the new schedule
         // to take effect. /uxmess reload communication runs the same path /announce reload does.

@@ -9,14 +9,15 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoAction;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
@@ -44,11 +45,9 @@ class ReaderNamesTest {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
     private static final Locale TURKISH = Locale.forLanguageTag("tr");
-    private static final String OWNER_LINE = "@custom.rank.owner";
 
     private ServerMock server;
     private final Map<UUID, Locale> languages = new HashMap<>();
-    private final Map<UUID, ReaderNames.Affix> affixes = new HashMap<>();
 
     @BeforeEach
     void setUp() {
@@ -138,10 +137,8 @@ class ReaderNamesTest {
         RecordingPackets packets = new RecordingPackets();
         RecordingGate gate = new RecordingGate();
         ReaderNames names = new ReaderNames(
+                text(),
                 id -> languages.getOrDefault(id, Locale.ENGLISH),
-                line -> line.startsWith("@"),
-                (reader, line) -> line,
-                id -> affixes.getOrDefault(id, ReaderNames.Affix.NONE),
                 gate,
                 new PacketListenerRegistry(),
                 packets,
@@ -168,44 +165,6 @@ class ReaderNamesTest {
     }
 
     @Test
-    void aNameDependsOnItsReaderOnlyWhenItOrAnAffixItShowsNamesACatalogueLine() {
-        UUID owner = UUID.randomUUID();
-        UUID plain = UUID.randomUUID();
-        affixes.put(owner, new ReaderNames.Affix(OWNER_LINE, ""));
-        affixes.put(plain, new ReaderNames.Affix("<red>[VIP] ", ""));
-        ReaderNames names = names(new PacketListenerRegistry(), null);
-
-        assertThat(names.dependsOnReader(owner, "{prefix}{player}")).isTrue();
-        assertThat(names.dependsOnReader(owner, "{player}")).isFalse();
-        assertThat(names.dependsOnReader(plain, "{prefix}{player}")).isFalse();
-        assertThat(names.dependsOnReader(plain, "@custom.tab.name")).isTrue();
-        assertThat(names.dependsOnReader(plain, "%rel_uxmtags_tag%{player}")).isTrue();
-    }
-
-    @Test
-    void theAffixTokensReadInTheReadersLanguage() {
-        UUID owner = UUID.randomUUID();
-        UUID vip = UUID.randomUUID();
-        UUID turk = UUID.randomUUID();
-        affixes.put(owner, new ReaderNames.Affix(OWNER_LINE, " *"));
-        affixes.put(vip, new ReaderNames.Affix("<red>[VIP]</red> ", ""));
-        ReaderNames names = new ReaderNames(
-                id -> Locale.ENGLISH,
-                line -> line.startsWith("@"),
-                (reader, line) -> line.equals(OWNER_LINE) ? (reader.equals(turk) ? "[KURUCU] " : "[OWNER] ") : line,
-                id -> affixes.getOrDefault(id, ReaderNames.Affix.NONE),
-                new RecordingGate(),
-                new PacketListenerRegistry(),
-                null,
-                new QuietLogger());
-
-        assertThat(names.withAffixes(owner, "{prefix}{player}{suffix}", turk)).isEqualTo("[KURUCU] {player} *");
-        assertThat(names.withAffixes(owner, "{prefix}{player}", PlayerRef.SYSTEM_UUID))
-                .isEqualTo("[OWNER] {player}");
-        assertThat(names.withAffixes(vip, "{prefix}{player}", turk)).isEqualTo("<red>[VIP]</red> {player}");
-    }
-
-    @Test
     void oneReaderStandsForEachLanguageOnline() {
         PlayerMock first = server.addPlayer("First");
         PlayerMock second = server.addPlayer("Second");
@@ -222,12 +181,18 @@ class ReaderNamesTest {
         assertThat(readers.get(Locale.ENGLISH)).isEqualTo(third.getUniqueId());
     }
 
-    private ReaderNames names(PacketListenerRegistry registry, @Nullable PlayerInfoPackets packets) {
-        return new ReaderNames(
-                id -> languages.getOrDefault(id, Locale.ENGLISH),
+    private static ReaderText text() {
+        return new ReaderText(
                 line -> line.startsWith("@"),
                 (reader, line) -> line,
-                id -> affixes.getOrDefault(id, ReaderNames.Affix.NONE),
+                id -> ReaderText.Affix.NONE,
+                (reader, target) -> UnaryOperator.identity());
+    }
+
+    private ReaderNames names(PacketListenerRegistry registry, @Nullable PlayerInfoPackets packets) {
+        return new ReaderNames(
+                text(),
+                id -> languages.getOrDefault(id, Locale.ENGLISH),
                 new RecordingGate(),
                 registry,
                 packets,

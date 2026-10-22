@@ -361,7 +361,7 @@ final class RealPlayerRowPainter {
      */
     private DrawnName drawName(Player player, String source, long tick) {
         UUID uuid = player.getUniqueId();
-        if (readerNames == null || !readerNames.dependsOnReader(uuid, source)) {
+        if (readerNames == null || !readerNames.text().dependsOnReader(uuid, source)) {
             return new DrawnName(source, renderName(player, source, tick), Map.of());
         }
         Map<Locale, Component> byLanguage = new HashMap<>();

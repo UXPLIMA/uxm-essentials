@@ -24,6 +24,7 @@ import net.kyori.adventure.text.JoinConfiguration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -140,6 +141,9 @@ public final class TablistRenderer {
      * packets to their own copy; {@code null} where no packet pipeline is wired, and every name then reads the same.
      */
     private final @Nullable ReaderNames readerNames;
+
+    /** How a text is drawn for one reader where no reader names are wired: lines and relational values, no affixes. */
+    private static final ReaderText HUD_TEXT = ReaderText.forServer(who -> ReaderText.Affix.NONE);
 
     /** Build a renderer with the full packet path. {@code viewers} supplies who a skin packet is broadcast to. */
     public TablistRenderer(
@@ -448,14 +452,9 @@ public final class TablistRenderer {
      * without PlaceholderAPI. The animation %anim_<name>% pass runs first so a frame may itself carry tokens.
      */
     private Component renderName(Player target, String source, long tick, UUID reader) {
-        String line = readerNames == null
-                ? HudText.lineFor(reader, source)
-                : readerNames.withAffixes(target.getUniqueId(), source, reader);
-        // The server's own copy has no reader, so a relational value in it reads as the target would read it.
-        UUID relationalReader = PlayerRef.SYSTEM_UUID.equals(reader) ? target.getUniqueId() : reader;
-        String related = PlaceholderApiSupport.relationalBridge(relationalReader, target.getUniqueId())
-                .apply(line);
-        String withTokens = BuiltinTokens.apply(target, animations.resolve(related, tick));
+        ReaderText text = readerNames == null ? HUD_TEXT : readerNames.text();
+        String line = text.forReader(target.getUniqueId(), source, reader);
+        String withTokens = BuiltinTokens.apply(target, animations.resolve(line, tick));
         return HudText.render(target.getUniqueId(), withTokens);
     }
 }

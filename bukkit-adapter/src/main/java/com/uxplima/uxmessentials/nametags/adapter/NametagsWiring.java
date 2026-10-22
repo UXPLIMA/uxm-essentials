@@ -8,12 +8,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.nametags.adapter.inbound.listener.NametagLifecycleListener;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.NametagRenderTask;
 import com.uxplima.uxmessentials.nametags.adapter.outbound.PacketNametagPresenter;
 import com.uxplima.uxmessentials.nametags.application.port.NametagVanish;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -89,7 +91,8 @@ public final class NametagsWiring {
                 vanish,
                 settings::refreshInterval,
                 teams,
-                settings::hideVanillaName);
+                settings::hideVanillaName,
+                ReaderText.forServer(ChatMetaSources.affixes(plugin.getServer())));
         NametagRenderTask renderTask = new NametagRenderTask(
                 kernel.scheduler(), presenter, animations, kernel.log(), settings::refreshInterval, running::get);
         Runnable reload = () -> {

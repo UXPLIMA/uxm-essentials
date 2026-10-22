@@ -54,7 +54,18 @@ final class SocialPlaceholderKeys {
                         "trading",
                         "Whether the two are the sides of the same live trade (yes/no).",
                         PlaceholderScope.RELATIONAL,
-                        TRADE));
+                        TRADE),
+                PlaceholderSpec.of(
+                        "prefix",
+                        "The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's"
+                                + " language.",
+                        PlaceholderScope.RELATIONAL,
+                        COMMUNICATION),
+                PlaceholderSpec.of(
+                        "suffix",
+                        "The chat suffix of the player the line is about, read the same way.",
+                        PlaceholderScope.RELATIONAL,
+                        COMMUNICATION));
     }
 
     private static List<PlaceholderSpec> presence() {
@@ -142,6 +153,16 @@ final class SocialPlaceholderKeys {
                 PlaceholderSpec.of(
                         "communication_broadcasts",
                         "Whether the player receives the rotating announcements (yes/no).",
+                        PlaceholderScope.SESSION,
+                        COMMUNICATION),
+                PlaceholderSpec.of(
+                        "communication_prefix",
+                        "The player's chat prefix, a catalogue-line prefix read in the player's own language.",
+                        PlaceholderScope.SESSION,
+                        COMMUNICATION),
+                PlaceholderSpec.of(
+                        "communication_suffix",
+                        "The player's chat suffix, read the same way.",
                         PlaceholderScope.SESSION,
                         COMMUNICATION));
     }

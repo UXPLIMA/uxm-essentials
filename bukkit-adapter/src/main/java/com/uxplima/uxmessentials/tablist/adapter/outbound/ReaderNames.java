@@ -10,14 +10,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiFunction;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 import org.bukkit.entity.Player;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoAction;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
@@ -47,14 +46,6 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class ReaderNames {
 
-    /** The prefix and suffix tokens a tab name format may show. */
-    static final String PREFIX_TOKEN = "{prefix}";
-
-    static final String SUFFIX_TOKEN = "{suffix}";
-
-    /** How a relational placeholder starts: its value depends on who reads it, a tag in the reader's language. */
-    private static final String RELATIONAL = "%rel_";
-
     /** Puts the interceptor on a viewer's connection and takes it off again. */
     @FunctionalInterface
     public interface Gate {
@@ -71,24 +62,11 @@ public final class ReaderNames {
         @Nullable Object rewrite(Object packet, PlayerInfoTransformer transformer);
     }
 
-    /** A player's prefix and suffix as the permission plugin holds them, before any catalogue line is read. */
-    public record Affix(String prefix, String suffix) {
-
-        public static final Affix NONE = new Affix("", "");
-
-        public Affix {
-            Objects.requireNonNull(prefix, "prefix");
-            Objects.requireNonNull(suffix, "suffix");
-        }
-    }
-
     /** The copies of one player's name: the server's own, and one per language a reader was drawn for. */
     private record Held(Component everybody, Map<Locale, Component> byLanguage) {}
 
+    private final ReaderText text;
     private final Function<UUID, Locale> languages;
-    private final Predicate<String> isLine;
-    private final BiFunction<UUID, String, String> lines;
-    private final Function<UUID, Affix> affixes;
     private final Gate gate;
     private final @Nullable PlayerInfoPackets packets;
     private final Logger log;
@@ -100,39 +78,31 @@ public final class ReaderNames {
     private final Map<UUID, Locale> watched = new ConcurrentHashMap<>();
 
     /**
+     * @param text how a name is drawn for one reader
      * @param languages the language a player reads
-     * @param isLine whether a text names a catalogue line
-     * @param lines a catalogue line in one reader's language, any other text as written
-     * @param affixes a player's prefix and suffix
      * @param packets the display-name packet a viewer who changes language is sent, or {@code null} when the server
      *     cannot build one and the names follow on the next change instead
      */
     public ReaderNames(
+            ReaderText text,
             Function<UUID, Locale> languages,
-            Predicate<String> isLine,
-            BiFunction<UUID, String, String> lines,
-            Function<UUID, Affix> affixes,
             Gate gate,
             PacketListenerRegistry registry,
             @Nullable PlayerInfoPackets packets,
             Logger log) {
-        this(languages, isLine, lines, affixes, gate, registry, packets, log, PlayerInfoUpdates::rewrite);
+        this(text, languages, gate, registry, packets, log, PlayerInfoUpdates::rewrite);
     }
 
     ReaderNames(
+            ReaderText text,
             Function<UUID, Locale> languages,
-            Predicate<String> isLine,
-            BiFunction<UUID, String, String> lines,
-            Function<UUID, Affix> affixes,
             Gate gate,
             PacketListenerRegistry registry,
             @Nullable PlayerInfoPackets packets,
             Logger log,
             Rewriter rewriter) {
+        this.text = Objects.requireNonNull(text, "text");
         this.languages = Objects.requireNonNull(languages, "languages");
-        this.isLine = Objects.requireNonNull(isLine, "isLine");
-        this.lines = Objects.requireNonNull(lines, "lines");
-        this.affixes = Objects.requireNonNull(affixes, "affixes");
         this.gate = Objects.requireNonNull(gate, "gate");
         this.packets = packets;
         this.log = Objects.requireNonNull(log, "log");
@@ -140,25 +110,9 @@ public final class ReaderNames {
         Objects.requireNonNull(registry, "registry").register(new NameListener());
     }
 
-    /** Whether {@code target}'s name drawn from {@code source} reads differently for different readers. */
-    public boolean dependsOnReader(UUID target, String source) {
-        if (isLine.test(source) || source.contains(RELATIONAL)) {
-            return true;
-        }
-        Affix affix = affixes.apply(target);
-        return (source.contains(PREFIX_TOKEN) && isLine.test(affix.prefix()))
-                || (source.contains(SUFFIX_TOKEN) && isLine.test(affix.suffix()));
-    }
-
-    /** {@code source} in {@code reader}'s language, with {@code target}'s prefix and suffix tokens filled for them. */
-    public String withAffixes(UUID target, String source, UUID reader) {
-        String line = lines.apply(reader, source);
-        if (!line.contains(PREFIX_TOKEN) && !line.contains(SUFFIX_TOKEN)) {
-            return line;
-        }
-        Affix affix = affixes.apply(target);
-        return line.replace(PREFIX_TOKEN, lines.apply(reader, affix.prefix()))
-                .replace(SUFFIX_TOKEN, lines.apply(reader, affix.suffix()));
+    /** How a name is drawn for one reader. */
+    public ReaderText text() {
+        return text;
     }
 
     /** One reader for each language among {@code viewers}: a name drawn for that reader reads right for all of them. */

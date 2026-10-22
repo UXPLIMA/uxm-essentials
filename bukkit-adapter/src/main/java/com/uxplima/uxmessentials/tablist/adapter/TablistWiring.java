@@ -10,13 +10,12 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMeta;
-import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -108,15 +107,9 @@ public final class TablistWiring {
                 namesRegistry,
                 "uxmessentials:tablist-names",
                 fault -> kernel.log().error("tablist names listener fault", fault));
-        ChatMetaSource meta = ChatMetaSources.create(plugin.getServer());
         ReaderNames readerNames = new ReaderNames(
+                ReaderText.forServer(ChatMetaSources.affixes(plugin.getServer())),
                 HudText::languageOf,
-                HudText::isCatalogLine,
-                HudText::lineFor,
-                who -> {
-                    ChatMeta held = meta.metaFor(who);
-                    return new ReaderNames.Affix(held.prefix(), held.suffix());
-                },
                 new NamesGate(namesPipeline),
                 namesRegistry,
                 packets instanceof PlayerInfoPackets batch ? batch : null,

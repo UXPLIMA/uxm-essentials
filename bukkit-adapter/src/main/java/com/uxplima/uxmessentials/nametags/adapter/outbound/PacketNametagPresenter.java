@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.nametags.domain.NametagVisibility;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.team.PlayerTeamCoordinator;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -78,6 +79,10 @@ public final class PacketNametagPresenter {
     private final Supplier<Duration> refreshPeriod;
     private final PlayerTeamCoordinator teams;
     private final BooleanSupplier hideVanillaName;
+
+    /** How a line about the wearer reads for one viewer: catalogue lines, prefix and suffix, relational values. */
+    private final ReaderText readerText;
+
     private final Map<UUID, Tracked> live = new ConcurrentHashMap<>();
 
     /**
@@ -110,7 +115,8 @@ public final class PacketNametagPresenter {
             NametagVanish vanish,
             Supplier<Duration> refreshPeriod,
             PlayerTeamCoordinator teams,
-            BooleanSupplier hideVanillaName) {
+            BooleanSupplier hideVanillaName,
+            ReaderText readerText) {
         this.config = Objects.requireNonNull(config, "config");
         this.libRenderer = Objects.requireNonNull(libRenderer, "libRenderer");
         this.animations = Objects.requireNonNull(animations, "animations");
@@ -118,6 +124,7 @@ public final class PacketNametagPresenter {
         this.refreshPeriod = Objects.requireNonNull(refreshPeriod, "refreshPeriod");
         this.teams = Objects.requireNonNull(teams, "teams");
         this.hideVanillaName = Objects.requireNonNull(hideVanillaName, "hideVanillaName");
+        this.readerText = Objects.requireNonNull(readerText, "readerText");
     }
 
     /** Show {@code wearer}'s nametag from the selected format. Must run on the wearer's region thread. */
@@ -143,14 +150,12 @@ public final class PacketNametagPresenter {
         NametagFormat format = selected.get();
         Appearance appearance = NametagAppearanceMapper.toAppearance(format.appearance());
         // One line cache per wearer-show: the lib loop calls the per-viewer text callback once per viewer each refresh,
-        // and every viewer resolves to identical lines for a given animation frame today, so the cache parses the frame
-        // once and hands the same list to every viewer until the frame advances.
-        LineCache lineCache = new LineCache();
+        // and lines that read the same for every viewer are parsed once a frame and handed to every viewer.
         NametagHandle handle = libRenderer.show(
                 wearer,
                 appearance,
                 viewerSupplier(wearer, format),
-                perViewerText(format, wearer, lineCache),
+                perViewerText(format, wearer),
                 Objects.requireNonNull(refreshPeriod.get(), "refreshPeriod"));
         live.put(wearer.getUniqueId(), new Tracked(handle, format));
         // With a custom nametag now live, hide the vanilla above-head name globally (a team with NEVER name-tag
@@ -301,24 +306,34 @@ public final class PacketNametagPresenter {
         return selected;
     }
 
-    // The per-viewer text the lib re-asks for every refresh: resolve the wearer's lines for this specific viewer,
-    // reading the live animation frame at call time so the lib's refresh loop animates without a plugin render loop.
-    // The lines carry no relational (viewer-aware) placeholder today, so every viewer resolves to identical text and
-    // the
-    // per-wearer LineCache parses each frame once and replays it to every viewer. The resolution still flows through
-    // the
-    // per-viewer callback so a relational placeholder added later needs no wiring change. That change would bypass the
-    // cache for the placeholder-bearing lines and thread the viewer into the PAPI bridge.
-    private PerViewerText perViewerText(NametagFormat format, Player wearer, LineCache lineCache) {
-        return viewer -> lineCache.linesFor(animations.tick(), () -> renderLines(format, wearer));
+    // The per-viewer text the lib re-asks for every refresh, reading the live animation frame at call time so the lib's
+    // refresh loop animates without a plugin render loop. Lines that read the same for every viewer are parsed once a
+    // frame by the per-wearer LineCache and replayed to every viewer. A line that reads differently per viewer (a
+    // catalogue line, a rank written as one behind {prefix}, a relational placeholder) is drawn for each viewer. The
+    // choice is made on each call, so a rank given while the nametag is up is read on the next refresh.
+    PerViewerText perViewerText(NametagFormat format, Player wearer) {
+        LineCache lineCache = new LineCache();
+        UUID wearerId = wearer.getUniqueId();
+        return viewer -> dependsOnViewer(format, wearerId)
+                ? renderLines(format, wearer, viewer)
+                : lineCache.linesFor(animations.tick(), () -> renderLines(format, wearer, wearerId));
     }
 
-    private List<Component> renderLines(NametagFormat format, Player wearer) {
+    private boolean dependsOnViewer(NametagFormat format, UUID wearerId) {
+        for (String line : format.lines()) {
+            if (readerText.dependsOnReader(wearerId, line)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<Component> renderLines(NametagFormat format, Player wearer, UUID reader) {
         long frame = animations.tick();
         List<Component> rendered = new ArrayList<>(format.lines().size());
         for (String line : format.lines()) {
-            // A nametag is one text every viewer reads, so an @key line is read in the wearer's language.
-            String withName = HudText.lineFor(wearer.getUniqueId(), line).replace("{player}", wearer.getName());
+            String withName =
+                    readerText.forReader(wearer.getUniqueId(), line, reader).replace("{player}", wearer.getName());
             rendered.add(HudText.render(wearer.getUniqueId(), animations.resolve(withName, frame)));
         }
         return rendered;
