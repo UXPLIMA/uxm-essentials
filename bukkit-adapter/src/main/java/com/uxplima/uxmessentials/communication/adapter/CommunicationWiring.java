@@ -48,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -271,7 +272,7 @@ public final class CommunicationWiring {
                 new ChatLockListener(chatLock, notifier),
                 // Registered at NORMAL, before the ChatLock at HIGH: a locked chat is cancelled there and a
                 // cancelled event never reaches the renderer, so the format can never override the lock.
-                new ChatFormatListener(settings::chatFormatPolicy, chatMeta, chatPlaceholders));
+                new ChatFormatListener(settings::chatFormatPolicy, chatMeta, chatPlaceholders, HudText::lineFor));
     }
 
     /**

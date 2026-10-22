@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.BiFunction;
 
 import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMeta;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -106,8 +108,11 @@ class ChatFormatListenerTest {
     @Test
     void aDisabledPolicyInstallsNoRenderer() {
         ChatFormatPolicy policy = ChatFormatPolicy.disabled();
-        ChatFormatListener listener =
-                new ChatFormatListener(() -> policy, source(ChatMeta.empty()), ChatPlaceholderExpander.identity());
+        ChatFormatListener listener = new ChatFormatListener(
+                () -> policy,
+                source(ChatMeta.empty()),
+                ChatPlaceholderExpander.identity(),
+                ChatFormatListenerTest::asWritten);
         AsyncChatEvent event = mock(AsyncChatEvent.class);
         when(event.getPlayer()).thenReturn(speaker);
 
@@ -176,6 +181,37 @@ class ChatFormatListenerTest {
         assertThat(PLAIN.serialize(line)).isEqualTo("%papi_tag% Alice: hi");
     }
 
+    @Test
+    void aPrefixThatNamesACatalogueLineReadsInEachReadersOwnLanguage() {
+        PlayerMock reader = server.addPlayer("Bob");
+        BiFunction<UUID, String, String> lines = (viewer, line) -> {
+            if (!line.equals("@custom.rank.owner")) {
+                return line;
+            }
+            if (viewer.equals(reader.getUniqueId())) {
+                return "[KURUCU] ";
+            }
+            return viewer.equals(PlayerRef.SYSTEM_UUID) ? "[SERVER OWNER] " : "[OWNER] ";
+        };
+        ChatFormatPolicy policy =
+                new ChatFormatPolicy(true, "<prefix><display_name>: <message>", Map.of(), false, "", "");
+        ChatFormatListener listener = new ChatFormatListener(
+                () -> policy,
+                source(new ChatMeta("@custom.rank.owner", "", Optional.empty())),
+                ChatPlaceholderExpander.identity(),
+                lines);
+        ChatRenderer renderer = installed(listener);
+
+        Component forSpeaker = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), speaker);
+        Component forReader = renderer.render(speaker, Component.text("Alice"), Component.text("hi"), reader);
+        Component forConsole =
+                renderer.render(speaker, Component.text("Alice"), Component.text("hi"), server.getConsoleSender());
+
+        assertThat(PLAIN.serialize(forSpeaker)).isEqualTo("[OWNER] Alice: hi");
+        assertThat(PLAIN.serialize(forReader)).isEqualTo("[KURUCU] Alice: hi");
+        assertThat(PLAIN.serialize(forConsole)).isEqualTo("[SERVER OWNER] Alice: hi");
+    }
+
     /** Run the listener with {@code policy} + {@code meta} and hand back the renderer it installed on the event. */
     private ChatRenderer render(ChatFormatPolicy policy, ChatMeta meta) {
         return render(policy, meta, ChatPlaceholderExpander.identity());
@@ -183,7 +219,12 @@ class ChatFormatListenerTest {
 
     /** Run the listener with {@code policy} + {@code meta} + a specific PlaceholderAPI seam, returning the renderer. */
     private ChatRenderer render(ChatFormatPolicy policy, ChatMeta meta, ChatPlaceholderExpander expander) {
-        ChatFormatListener listener = new ChatFormatListener(() -> policy, source(meta), expander);
+        return installed(
+                new ChatFormatListener(() -> policy, source(meta), expander, ChatFormatListenerTest::asWritten));
+    }
+
+    /** Run {@code listener} on one chat line and hand back the renderer it installed on the event. */
+    private ChatRenderer installed(ChatFormatListener listener) {
         AsyncChatEvent event = mock(AsyncChatEvent.class);
         when(event.getPlayer()).thenReturn(speaker);
 
@@ -192,6 +233,11 @@ class ChatFormatListenerTest {
         ArgumentCaptor<ChatRenderer> captor = ArgumentCaptor.forClass(ChatRenderer.class);
         verify(event).renderer(captor.capture());
         return captor.getValue();
+    }
+
+    /** Every affix as written, as on a server whose catalogue names none of them. */
+    private static String asWritten(UUID reader, String affix) {
+        return affix;
     }
 
     private static ChatMetaSource source(ChatMeta meta) {

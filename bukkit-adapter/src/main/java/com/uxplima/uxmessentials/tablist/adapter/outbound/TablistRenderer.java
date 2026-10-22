@@ -135,6 +135,12 @@ public final class TablistRenderer {
      */
     private final @Nullable TablistSuppression suppression;
 
+    /**
+     * Holds the copies of a name that shows a catalogue line, one per language online, and rewrites each viewer's
+     * packets to their own copy; {@code null} where no packet pipeline is wired, and every name then reads the same.
+     */
+    private final @Nullable ReaderNames readerNames;
+
     /** Build a renderer with the full packet path. {@code viewers} supplies who a skin packet is broadcast to. */
     public TablistRenderer(
             Supplier<TablistFormatConfig> formats,
@@ -155,6 +161,19 @@ public final class TablistRenderer {
             Supplier<? extends Collection<? extends Player>> viewers,
             Scheduler scheduler,
             @Nullable TablistSuppression suppression) {
+        this(formats, animations, packets, skinResolver, viewers, scheduler, suppression, null);
+    }
+
+    /** Build a renderer with the full packet path, TAB-C suppression, and names drawn in each reader's language. */
+    public TablistRenderer(
+            Supplier<TablistFormatConfig> formats,
+            AnimationRegistry animations,
+            TabListPackets packets,
+            TablistSkinResolver skinResolver,
+            Supplier<? extends Collection<? extends Player>> viewers,
+            Scheduler scheduler,
+            @Nullable TablistSuppression suppression,
+            @Nullable ReaderNames readerNames) {
         this.formats = Objects.requireNonNull(formats, "formats");
         this.animations = Objects.requireNonNull(animations, "animations");
         Objects.requireNonNull(packets, "packets");
@@ -163,10 +182,11 @@ public final class TablistRenderer {
         Objects.requireNonNull(scheduler, "scheduler");
         this.tablist = new Tablist();
         this.roster = viewers;
-        this.rowPainter =
-                new RealPlayerRowPainter(packets, skinResolver, this::render, animations::tick, viewers, scheduler);
+        this.rowPainter = new RealPlayerRowPainter(
+                packets, skinResolver, this::renderName, animations::tick, viewers, scheduler, readerNames);
         this.fillerPainter = new FillerPainter(packets, skinResolver, this::render);
         this.suppression = suppression;
+        this.readerNames = readerNames;
     }
 
     /** Build a renderer whose viewers are every online player, the production fan-out. */
@@ -182,6 +202,10 @@ public final class TablistRenderer {
     /** Render (or clear) {@code player}'s tablist from the selected format. Must run on the player's region thread. */
     public void renderFor(Player player) {
         Objects.requireNonNull(player, "player");
+        // Every viewer reads the other players' names in their own language, whatever format they see themselves.
+        if (readerNames != null) {
+            readerNames.watch(player);
+        }
         ConditionContext ctx = conditionContext(player);
         // Capture the global animation tick once for this paint, so the header, footer, and name format all read the
         // same frame: the render task steps the clock once per loop tick before this fan-out.
@@ -359,6 +383,9 @@ public final class TablistRenderer {
         // is a no-op, so revert is skipped: only the tracking is forgotten so a relog re-paints from scratch.
         fillerPainter.forget(player);
         rowPainter.forget(player);
+        if (readerNames != null) {
+            readerNames.forget(player);
+        }
         // Drop the suppress tracking and eject the interceptor without a relist packet to the closing channel.
         if (suppression != null) {
             suppression.forget(player);
@@ -410,12 +437,21 @@ public final class TablistRenderer {
     }
 
     private Component render(Player player, String source, long tick) {
-        // Built-in {tokens} ({player}, {online}, {world}, …) resolve here off the live player, BEFORE the
-        // PlaceholderAPI
-        // bridge and MiniMessage, so the shipped header/footer/name-format show real values with or without
-        // PlaceholderAPI. The animation %anim_<name>% pass runs first so a frame may itself carry tokens.
-        String line = HudText.lineFor(player.getUniqueId(), source);
-        String withTokens = BuiltinTokens.apply(player, animations.resolve(line, tick));
-        return HudText.render(player.getUniqueId(), withTokens);
+        return renderName(player, source, tick, player.getUniqueId());
+    }
+
+    /**
+     * Render {@code source} about {@code target} as {@code reader} reads it. A catalogue line, and the target's
+     * {@code {prefix}} and {@code {suffix}} when they name one, are read in the reader's language; everything else is
+     * read off the target. Built-in {tokens} ({player}, {online}, {world}, …) resolve here off the live player, BEFORE
+     * the PlaceholderAPI bridge and MiniMessage, so the shipped header/footer/name-format show real values with or
+     * without PlaceholderAPI. The animation %anim_<name>% pass runs first so a frame may itself carry tokens.
+     */
+    private Component renderName(Player target, String source, long tick, UUID reader) {
+        String line = readerNames == null
+                ? HudText.lineFor(reader, source)
+                : readerNames.withAffixes(target.getUniqueId(), source, reader);
+        String withTokens = BuiltinTokens.apply(target, animations.resolve(line, tick));
+        return HudText.render(target.getUniqueId(), withTokens);
     }
 }

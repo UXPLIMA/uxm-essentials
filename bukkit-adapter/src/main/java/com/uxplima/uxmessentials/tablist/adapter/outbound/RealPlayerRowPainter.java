@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.tablist.adapter.outbound;
 
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalInt;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
@@ -17,7 +20,6 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.tablist.adapter.outbound.FillerPainter.TextRenderer;
 import com.uxplima.uxmessentials.tablist.domain.TablistFormat;
 import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
@@ -54,18 +56,28 @@ final class RealPlayerRowPainter {
 
     private final TabListPackets packets;
     private final TablistSkinResolver skinResolver;
-    private final TextRenderer textRenderer;
+    private final NameRenderer nameRenderer;
+    private final @Nullable ReaderNames readerNames;
     private final LongSupplier tickSource;
     private final Supplier<? extends Collection<? extends Player>> viewers;
     private final Scheduler scheduler;
 
     /**
-     * The last name-format source string applied to each player's list name, keyed by player UUID. An absent key means
+     * Draws a name format for one target as one reader reads it. The reader decides the language of any catalogue line
+     * the name shows; everything else (the target's name, world, PlaceholderAPI values) is read off the target.
+     */
+    @FunctionalInterface
+    interface NameRenderer {
+        Component render(Player target, String source, long tick, UUID reader);
+    }
+
+    /**
+     * The last name applied to each player's list name, keyed by player UUID. An absent key means
      * no name format is applied (vanilla list name). A {@link ConcurrentHashMap} guards the connect-while-rendering race
      * and keeps the project's "every player-keyed map is concurrent" convention; every mutation otherwise runs on the
      * player's region/entity thread.
      */
-    private final Map<UUID, String> appliedNameFormat = new ConcurrentHashMap<>();
+    private final Map<UUID, AppliedName> appliedNameFormat = new ConcurrentHashMap<>();
 
     /** The last sort order applied to each player, keyed by player UUID. An absent key means no order is applied. */
     private final Map<UUID, Integer> appliedOrder = new ConcurrentHashMap<>();
@@ -80,13 +92,15 @@ final class RealPlayerRowPainter {
     RealPlayerRowPainter(
             TabListPackets packets,
             TablistSkinResolver skinResolver,
-            TextRenderer textRenderer,
+            NameRenderer nameRenderer,
             LongSupplier tickSource,
             Supplier<? extends Collection<? extends Player>> viewers,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            @Nullable ReaderNames readerNames) {
         this.packets = Objects.requireNonNull(packets, "packets");
         this.skinResolver = Objects.requireNonNull(skinResolver, "skinResolver");
-        this.textRenderer = Objects.requireNonNull(textRenderer, "textRenderer");
+        this.nameRenderer = Objects.requireNonNull(nameRenderer, "nameRenderer");
+        this.readerNames = readerNames;
         this.tickSource = Objects.requireNonNull(tickSource, "tickSource");
         this.viewers = Objects.requireNonNull(viewers, "viewers");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -148,7 +162,7 @@ final class RealPlayerRowPainter {
             // Rebuilding the entry reads the TARGET's live name and world (through the name renderer); on Folia those
             // belong to the target's region thread, not the joiner's. Hop to the target's entity thread to build the
             // TabEntry, then send the finished packet to the joiner from there: the channel send is thread-agnostic.
-            scheduler.onEntity(new PlayerRef(targetId, skin.nameSource()), () -> {
+            scheduler.onEntity(new PlayerRef(targetId, skin.name().source()), () -> {
                 Player target = Bukkit.getPlayer(targetId);
                 if (target != null && target.isOnline()) {
                     repaintSkinFor(viewerId, target, skin);
@@ -170,6 +184,7 @@ final class RealPlayerRowPainter {
     void forget(Player player) {
         UUID uuid = player.getUniqueId();
         appliedSkin.remove(uuid);
+        release(uuid);
         resetNameAndOrder(player);
     }
 
@@ -190,8 +205,8 @@ final class RealPlayerRowPainter {
             return;
         }
         long tick = tickSource.getAsLong();
-        Component name =
-                painted.nameSource().isEmpty() ? displayName(target) : renderName(target, painted.nameSource(), tick);
+        String source = painted.name().source();
+        Component name = source.isEmpty() ? displayName(target) : renderName(target, source, tick);
         TabEntry entry = new TabEntry(target.getUniqueId(), name, painted.order(), skin.get(), target.getName());
         packets.send(viewer, packets.addOrUpdate(entry));
     }
@@ -233,41 +248,44 @@ final class RealPlayerRowPainter {
             return;
         }
         UUID uuid = player.getUniqueId();
-        String nameSource = nameFormat.orElse("");
         int order = sortOrder.orElse(0);
-        AppliedSkin desired = new AppliedSkin(nameSource, order, skinSource);
+        AppliedSkin desired = new AppliedSkin(nameKey(player, nameFormat.orElse("")), order, skinSource);
         if (desired.equals(appliedSkin.get(uuid))) {
             return;
         }
         // Taking ownership of the row through packets, so drop any native name/order set for the player.
         resetNameAndOrder(player);
         Component name =
-                nameFormat.map(source -> renderName(player, source, tick)).orElse(displayName(player));
+                nameFormat.map(source -> drawName(player, source, tick)).orElse(displayName(player));
         broadcast(packets.addOrUpdate(new TabEntry(uuid, name, order, skin.get(), player.getName())));
         appliedSkin.put(uuid, desired);
     }
 
     /**
      * Reconcile the player's tab-list name with the selected format's {@link TablistFormat#nameFormat()}. Applies only
-     * when the source string changed from the last value applied: a steady-state tick re-sends nothing (the setter
+     * when the name changed from the last value applied: a steady-state tick re-sends nothing (the setter
      * pushes a client update every call). An absent name format on a player who currently has one resets it to vanilla.
-     * The tracking keys on the raw source, not the rendered name, so an {@code %anim_<name>%} token resolves to the frame
-     * current when the operator last changed the format rather than re-sending the name every animation tick.
+     * The tracking keys on the raw source, the player's prefix and suffix, and the languages it was drawn in, not on the
+     * rendered name, so an {@code %anim_<name>%} token resolves to the frame current when the operator last changed the
+     * format rather than re-sending the name every animation tick, while a rank change or a reader in a language the
+     * name was not drawn in yet draws it again.
      */
     private void applyNameFormat(Player player, Optional<String> nameFormat, long tick) {
         UUID uuid = player.getUniqueId();
         if (nameFormat.isEmpty()) {
             if (appliedNameFormat.remove(uuid) != null) {
+                release(uuid);
                 player.playerListName(null);
             }
             return;
         }
         String source = nameFormat.get();
-        if (source.equals(appliedNameFormat.get(uuid))) {
+        AppliedName desired = nameKey(player, source);
+        if (desired.equals(appliedNameFormat.get(uuid))) {
             return;
         }
-        player.playerListName(renderName(player, source, tick));
-        appliedNameFormat.put(uuid, source);
+        player.playerListName(drawName(player, source, tick));
+        appliedNameFormat.put(uuid, desired);
     }
 
     /**
@@ -301,6 +319,7 @@ final class RealPlayerRowPainter {
         if (appliedSkin.remove(uuid) == null) {
             return;
         }
+        release(uuid);
         TabSkin own = skinResolver
                 .resolve(new TablistSkinSource.PlayerName(player.getName()))
                 .orElse(null);
@@ -311,6 +330,7 @@ final class RealPlayerRowPainter {
     private void resetNameAndOrder(Player player) {
         UUID uuid = player.getUniqueId();
         if (appliedNameFormat.remove(uuid) != null) {
+            release(uuid);
             player.playerListName(null);
         }
         if (appliedOrder.remove(uuid) != null) {
@@ -327,10 +347,50 @@ final class RealPlayerRowPainter {
 
     private Component renderName(Player player, String source, long tick) {
         // A name format renders through the same pipeline as the header/footer; the {player} convenience token is one
-        // of
-        // the built-in tokens resolved inside the shared renderer (along with {online}, {world}, …) off the live
-        // player.
-        return textRenderer.render(player, source, tick);
+        // of the built-in tokens resolved inside the shared renderer (along with {online}, {world}, …) off the live
+        // player. The packet interceptor turns a name held per reader into the joiner's own copy on the way out.
+        return nameRenderer.render(player, source, tick, player.getUniqueId());
+    }
+
+    /**
+     * Draw {@code player}'s name. A name that reads the same for everybody is drawn once. A name that shows a catalogue
+     * line is drawn once for each language online and held, so every viewer's packet carries their own copy, and the
+     * server keeps the copy in its own language for a viewer the copies do not cover yet. The copies are held before
+     * the caller sets the list name, so the update that setter sends is already rewritten.
+     */
+    private Component drawName(Player player, String source, long tick) {
+        UUID uuid = player.getUniqueId();
+        if (readerNames == null || !readerNames.dependsOnReader(uuid, source)) {
+            release(uuid);
+            return renderName(player, source, tick);
+        }
+        Map<Locale, Component> byLanguage = new HashMap<>();
+        readerNames
+                .readersByLanguage(viewers.get())
+                .forEach((language, reader) ->
+                        byLanguage.put(language, nameRenderer.render(player, source, tick, reader)));
+        Component everybody = nameRenderer.render(player, source, tick, PlayerRef.SYSTEM_UUID);
+        readerNames.hold(uuid, everybody, byLanguage);
+        return everybody;
+    }
+
+    /** What a drawn name depends on, so a tick that changes none of it draws nothing. */
+    private AppliedName nameKey(Player player, String source) {
+        if (readerNames == null) {
+            return new AppliedName(source, ReaderNames.Affix.NONE, Set.of());
+        }
+        UUID uuid = player.getUniqueId();
+        ReaderNames.Affix affix = readerNames.affixOf(uuid);
+        Set<Locale> languages = readerNames.dependsOnReader(uuid, source)
+                ? Set.copyOf(readerNames.readersByLanguage(viewers.get()).keySet())
+                : Set.of();
+        return new AppliedName(source, affix, languages);
+    }
+
+    private void release(UUID uuid) {
+        if (readerNames != null) {
+            readerNames.release(uuid);
+        }
     }
 
     /** The player's plain name as a component: the fallback display when a skin row carries no name format. */
@@ -343,5 +403,8 @@ final class RealPlayerRowPainter {
      * equal tuple are the same row, so the packet is not re-sent. This is what keeps a real online player's entry from
      * being re-added every refresh tick (the flicker guard). A change in any field re-paints.
      */
-    private record AppliedSkin(String nameSource, int order, TablistSkinSource skinSource) {}
+    private record AppliedSkin(AppliedName name, int order, TablistSkinSource skinSource) {}
+
+    /** A name source with the prefix and suffix it showed and the reader languages it was drawn in. */
+    private record AppliedName(String source, ReaderNames.Affix affix, Set<Locale> languages) {}
 }

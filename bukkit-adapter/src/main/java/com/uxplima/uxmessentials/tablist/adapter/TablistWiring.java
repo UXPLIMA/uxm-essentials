@@ -10,20 +10,26 @@ import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMeta;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
+import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSources;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.tablist.adapter.inbound.listener.TablistConnectionListener;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.BukkitMojangProfileSource;
+import com.uxplima.uxmessentials.tablist.adapter.outbound.ReaderNames;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderTask;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistRenderer;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSkinResolver;
 import com.uxplima.uxmessentials.tablist.adapter.outbound.TablistSuppression;
 import com.uxplima.uxmlib.hud.Tablist;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.internal.NmsTabListPackets;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
@@ -93,6 +99,28 @@ public final class TablistWiring {
                 packets,
                 Bukkit::getOnlinePlayers,
                 kernel.log());
+        // A name that shows a catalogue line (a rank written as @custom.rank.owner) is held in every language online
+        // and
+        // rewritten on its way to each viewer, through a pipeline of its own beside the suppress one.
+        PacketListenerRegistry namesRegistry = new PacketListenerRegistry();
+        PacketPipeline namesPipeline = new PacketPipeline(
+                new ChannelResolver(),
+                namesRegistry,
+                "uxmessentials:tablist-names",
+                fault -> kernel.log().error("tablist names listener fault", fault));
+        ChatMetaSource meta = ChatMetaSources.create(plugin.getServer());
+        ReaderNames readerNames = new ReaderNames(
+                HudText::languageOf,
+                HudText::isCatalogLine,
+                HudText::lineFor,
+                who -> {
+                    ChatMeta held = meta.metaFor(who);
+                    return new ReaderNames.Affix(held.prefix(), held.suffix());
+                },
+                new NamesGate(namesPipeline),
+                namesRegistry,
+                packets instanceof PlayerInfoPackets batch ? batch : null,
+                kernel.log());
         TablistRenderer renderer = new TablistRenderer(
                 settings::formats,
                 animations,
@@ -100,7 +128,8 @@ public final class TablistWiring {
                 skinResolver,
                 Bukkit::getOnlinePlayers,
                 kernel.scheduler(),
-                suppression);
+                suppression,
+                readerNames);
         TablistRenderTask renderTask = new TablistRenderTask(
                 kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);
         Runnable reload = () -> {
@@ -112,6 +141,24 @@ public final class TablistWiring {
         List<CommandRegistration> commands = List.of();
         List<Listener> listeners = List.of(new TablistConnectionListener(renderer));
         return new Wired(commands, listeners, renderer, renderTask, running, kernel.scheduler(), reload);
+    }
+
+    /** Bridges {@link ReaderNames}' connection seam onto uxmLib's {@link PacketPipeline} inject/eject. */
+    private record NamesGate(PacketPipeline pipeline) implements ReaderNames.Gate {
+
+        private NamesGate {
+            Objects.requireNonNull(pipeline, "pipeline");
+        }
+
+        @Override
+        public boolean inject(Player viewer) {
+            return pipeline.inject(viewer);
+        }
+
+        @Override
+        public boolean eject(Player viewer) {
+            return pipeline.eject(viewer);
+        }
     }
 
     /** Bridges {@link TablistSuppression}'s connection seam onto uxmLib's {@link PacketPipeline} inject/eject. */

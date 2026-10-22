@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.BiFunction;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -10,6 +12,7 @@ import org.bukkit.event.Listener;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 
+import net.kyori.adventure.audience.Audience;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -22,6 +25,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderE
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.LegacyChatCodes;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.text.Text;
 import org.jspecify.annotations.NullMarked;
 
@@ -60,12 +64,21 @@ public final class ChatFormatListener implements Listener {
     private final Supplier<ChatFormatPolicy> policy;
     private final ChatMetaSource metaSource;
     private final ChatPlaceholderExpander expander;
+    private final BiFunction<UUID, String, String> affixLines;
 
+    /**
+     * @param affixLines turns a prefix or suffix that names a catalogue line ({@code @key}) into that line in one
+     *     reader's language, and returns any other affix as written
+     */
     public ChatFormatListener(
-            Supplier<ChatFormatPolicy> policy, ChatMetaSource metaSource, ChatPlaceholderExpander expander) {
+            Supplier<ChatFormatPolicy> policy,
+            ChatMetaSource metaSource,
+            ChatPlaceholderExpander expander,
+            BiFunction<UUID, String, String> affixLines) {
         this.policy = Objects.requireNonNull(policy, "policy");
         this.metaSource = Objects.requireNonNull(metaSource, "metaSource");
         this.expander = Objects.requireNonNull(expander, "expander");
+        this.affixLines = Objects.requireNonNull(affixLines, "affixLines");
     }
 
     /** Install the format renderer for this line unless chat formatting is disabled. */
@@ -90,14 +103,22 @@ public final class ChatFormatListener implements Listener {
                 speaker.getWorld().getName(),
                 parseMessage,
                 current.nameHover(),
-                current.nameClick());
-        event.renderer((source, sourceDisplayName, message, viewer) -> rendering.render(sourceDisplayName, message));
+                current.nameClick(),
+                affixLines);
+        event.renderer((source, sourceDisplayName, message, viewer) ->
+                rendering.render(sourceDisplayName, message, readerOf(viewer)));
+    }
+
+    /** Whose language a line is drawn in: a player reads their own, the console reads the server's. */
+    private static UUID readerOf(Audience viewer) {
+        return viewer instanceof Player player ? player.getUniqueId() : PlayerRef.SYSTEM_UUID;
     }
 
     /**
      * The immutable snapshot the renderer assembles a line from. Captured on the listener thread so the renderer
-     * (which the server may invoke once per viewer) reads no live Bukkit state: only the event-supplied
-     * display-name and message components plus these captured strings.
+     * (which the server invokes once per viewer) reads no live Bukkit state: only the event-supplied
+     * display-name and message components plus these captured strings. A prefix or suffix written as a catalogue
+     * line is the one part read per viewer, so each reader sees a rank in their own language.
      */
     private record Rendering(
             String format,
@@ -107,15 +128,16 @@ public final class ChatFormatListener implements Listener {
             String world,
             boolean parseMessage,
             String nameHover,
-            String nameClick) {
+            String nameClick,
+            BiFunction<UUID, String, String> affixLines) {
 
-        Component render(Component displayName, Component message) {
+        Component render(Component displayName, Component message, UUID reader) {
             String raw = Text.plain(message);
             TagResolver messageTag = parseMessage ? Text.parsed("message", raw) : Text.placeholder("message", raw);
             return StyledText.render(
                     format,
-                    affixTag("prefix", prefix),
-                    affixTag("suffix", suffix),
+                    affixTag("prefix", affixLines.apply(reader, prefix)),
+                    affixTag("suffix", affixLines.apply(reader, suffix)),
                     Text.component("display_name", decorate(displayName)),
                     Text.placeholder("name", name),
                     Text.placeholder("world", world),

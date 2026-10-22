@@ -5,7 +5,10 @@ import static org.assertj.core.api.Assertions.assertThatCode;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Set;
@@ -28,13 +31,17 @@ import com.uxplima.uxmessentials.tablist.domain.TablistLayout;
 import com.uxplima.uxmessentials.tablist.domain.TablistRosterGroup;
 import com.uxplima.uxmessentials.tablist.domain.TablistSkinSource;
 import com.uxplima.uxmessentials.tablist.domain.TablistSlotRange;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoAction;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoEntry;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoGameMode;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoPackets;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoState;
+import com.uxplima.uxmlib.packet.tablist.PlayerInfoTransformer;
 import com.uxplima.uxmlib.packet.tablist.PlayerInfoValue;
 import com.uxplima.uxmlib.packet.tablist.TabEntry;
 import com.uxplima.uxmlib.packet.tablist.TabListPackets;
 import com.uxplima.uxmlib.packet.tablist.TabSkin;
+import com.uxplima.uxmlib.pipeline.PacketListenerRegistry;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -93,6 +100,51 @@ class TablistRendererTest {
         // The default format set no name/order, so the regular player keeps the vanilla list name and order 0.
         assertThat(plain(regular.playerListName())).isEqualTo(regular.getName());
         assertThat(regular.getPlayerListOrder()).isZero();
+    }
+
+    @Test
+    void aRankWrittenAsACatalogueLineIsDrawnInEveryReadersLanguageAndAgainWhenTheRankChanges() {
+        PlayerMock owner = server.addPlayer("Owner");
+        PlayerMock turk = server.addPlayer("Turk");
+        Locale turkish = Locale.forLanguageTag("tr");
+        Map<UUID, ReaderNames.Affix> affixes = new HashMap<>();
+        affixes.put(owner.getUniqueId(), new ReaderNames.Affix("@custom.rank.owner", ""));
+        PacketListenerRegistry registry = new PacketListenerRegistry();
+        ReaderNames names = new ReaderNames(
+                id -> id.equals(turk.getUniqueId()) ? turkish : Locale.ENGLISH,
+                line -> line.startsWith("@"),
+                (reader, line) -> !line.equals("@custom.rank.owner")
+                        ? line
+                        : reader.equals(turk.getUniqueId()) ? "[KURUCU] " : "[OWNER] ",
+                id -> affixes.getOrDefault(id, ReaderNames.Affix.NONE),
+                id -> true,
+                registry,
+                null,
+                new QuietLogger(),
+                TablistRendererTest::applyToOneEntry);
+        TablistRenderer renderer = new TablistRenderer(
+                new AtomicReference<>(new TablistFormatConfig(List.of(nameOnlyFormat("all", "{prefix}{player}", null))))
+                        ::get,
+                new AnimationRegistry(List.of()),
+                new RecordingPackets(),
+                new TablistSkinResolver(new FakeProfiles(), new InlineScheduler()),
+                server::getOnlinePlayers,
+                new InlineScheduler(),
+                null,
+                names);
+
+        renderer.renderFor(turk);
+        renderer.renderFor(owner);
+
+        // The server's own copy is the one every packet starts from; the Turkish reader's packet carries theirs.
+        assertThat(plain(owner.playerListName())).isEqualTo("[OWNER] Owner");
+        assertThat(nameSentTo(registry, turk, owner)).isEqualTo("[KURUCU] Owner");
+
+        affixes.put(owner.getUniqueId(), new ReaderNames.Affix("<red>[VIP]</red> ", ""));
+        renderer.renderFor(owner);
+
+        assertThat(plain(owner.playerListName())).isEqualTo("[VIP] Owner");
+        assertThat(nameSentTo(registry, turk, owner)).isEqualTo("as sent");
     }
 
     @Test
@@ -1239,6 +1291,46 @@ class TablistRendererTest {
         public void asyncAfter(Duration delay, Runnable task) {
             task.run();
         }
+    }
+
+    /** The name {@code viewer} is sent for {@code target}, or "as sent" when the listener let the packet through. */
+    private static String nameSentTo(PacketListenerRegistry registry, PlayerMock viewer, PlayerMock target) {
+        PlayerInfoState state = new PlayerInfoState(
+                target.getUniqueId(), true, 0, PlayerInfoGameMode.SURVIVAL, Component.text("as sent"), true, 0);
+        Object replacement = registry.snapshot()
+                .get(0)
+                .onSend(viewer.getUniqueId(), new OneEntry(state, Set.of(PlayerInfoAction.UPDATE_DISPLAY_NAME)))
+                .replacement();
+        if (replacement == null) {
+            return "as sent";
+        }
+        Component name = ((PlayerInfoState) replacement).displayName();
+        return name == null ? "" : plain(name);
+    }
+
+    /** The NMS-free stand-in for the uxmLib rewrite: one entry, transformed, or null when nothing changed. */
+    private static @Nullable Object applyToOneEntry(Object packet, PlayerInfoTransformer transformer) {
+        if (!(packet instanceof OneEntry entry)) {
+            return null;
+        }
+        PlayerInfoState out = transformer.transform(entry.state(), entry.actions());
+        return out.equals(entry.state()) ? null : out;
+    }
+
+    private record OneEntry(PlayerInfoState state, Set<PlayerInfoAction> actions) {}
+
+    private static final class QuietLogger implements com.uxplima.uxmessentials.shared.application.port.Logger {
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     private TablistRenderer renderer(TablistFormatConfig config) {
