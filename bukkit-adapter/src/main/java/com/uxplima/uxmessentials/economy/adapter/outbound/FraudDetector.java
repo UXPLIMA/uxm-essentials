@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
@@ -37,8 +38,15 @@ public final class FraudDetector implements EconomyAudit {
     private final BigDecimal velocityLimit;
 
     private final HttpClient httpClient;
+    private final LongSupplier clock;
     private final ConcurrentHashMap<UUID, List<TransactionRecord>> transactionHistory = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Long> lastAlertTime = new ConcurrentHashMap<>();
+
+    /** How long one velocity alert keeps the next one for the same player quiet. */
+    private static final long ALERT_QUIET_MS = 60_000L;
+    // Past this many players remembered, the ones whose trades and alerts have all aged out go. Below it a sweep is
+    // not worth its walk; above it the maps hold only the players who traded inside the period.
+    private static final int SWEEP_ABOVE = 64;
 
     private record TransactionRecord(long timestamp, BigDecimal amount) {}
 
@@ -50,6 +58,27 @@ public final class FraudDetector implements EconomyAudit {
             BigDecimal singleTransactionLimit,
             long velocityPeriodSeconds,
             BigDecimal velocityLimit) {
+        this(
+                delegate,
+                log,
+                enabled,
+                webhookUrl,
+                singleTransactionLimit,
+                velocityPeriodSeconds,
+                velocityLimit,
+                System::currentTimeMillis);
+    }
+
+    /** The same, with the clock in milliseconds handed in, so a test can move time instead of waiting for it. */
+    FraudDetector(
+            EconomyAudit delegate,
+            Logger log,
+            boolean enabled,
+            String webhookUrl,
+            BigDecimal singleTransactionLimit,
+            long velocityPeriodSeconds,
+            BigDecimal velocityLimit,
+            LongSupplier clock) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.log = Objects.requireNonNull(log, "log");
         this.enabled = enabled;
@@ -58,6 +87,18 @@ public final class FraudDetector implements EconomyAudit {
         this.velocityPeriodMs = velocityPeriodSeconds * 1000L;
         this.velocityLimit = Objects.requireNonNull(velocityLimit, "velocityLimit");
         this.httpClient = HttpClient.newBuilder().build();
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /** How many players' trades and alert times this detector is holding on to. */
+    int remembered() {
+        return transactionHistory.size() + lastAlertTime.size();
+    }
+
+    /** How many trades of {@code player} still count toward the velocity limit. */
+    int historyOf(UUID player) {
+        List<TransactionRecord> list = transactionHistory.get(player);
+        return list == null ? 0 : list.size();
     }
 
     @Override
@@ -134,7 +175,7 @@ public final class FraudDetector implements EconomyAudit {
     }
 
     private void checkVelocity(PlayerRef player, BigDecimal amount, String action, String reason) {
-        long now = System.currentTimeMillis();
+        long now = clock.getAsLong();
         UUID uuid = player.uuid();
 
         transactionHistory.compute(uuid, (k, list) -> {
@@ -152,9 +193,8 @@ public final class FraudDetector implements EconomyAudit {
             }
 
             if (sum.compareTo(velocityLimit) >= 0) {
-                // Rate-limit alerts to once per minute per player
                 long lastAlert = lastAlertTime.getOrDefault(uuid, 0L);
-                if (now - lastAlert > 60000L) {
+                if (now - lastAlert > ALERT_QUIET_MS) {
                     lastAlertTime.put(uuid, now);
                     String msg = "**High Transaction Velocity Alert**\n" + "**Player:** "
                             + player.name() + " (" + player.uuid() + ")\n" + "**Action:** "
@@ -174,6 +214,23 @@ public final class FraudDetector implements EconomyAudit {
             }
             return list;
         });
+        if (transactionHistory.size() + lastAlertTime.size() > SWEEP_ABOVE) {
+            forgetAgedOut(now);
+        }
+    }
+
+    /**
+     * Drop every player whose trades have all left the period and whose alert quiet time has run out. Each history is
+     * trimmed inside its own {@code computeIfPresent}, the same lock a trade takes, so the sweep never races one.
+     */
+    private void forgetAgedOut(long now) {
+        for (UUID player : transactionHistory.keySet()) {
+            transactionHistory.computeIfPresent(player, (k, list) -> {
+                list.removeIf(rec -> now - rec.timestamp > velocityPeriodMs);
+                return list.isEmpty() ? null : list;
+            });
+        }
+        lastAlertTime.values().removeIf(at -> now - at > ALERT_QUIET_MS);
     }
 
     private void sendAlert(String content) {
