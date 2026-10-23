@@ -1,11 +1,12 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.lookup;
 
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -29,15 +30,24 @@ import org.jspecify.annotations.Nullable;
  * {@link #backWith} attaches one afterwards. Until then the index is a pure in-memory map, which is harmless: no
  * player can have joined yet.
  *
+ * <p>The index holds the {@code warmLimit} most recently seen names and lets the least recently seen one go when a
+ * new one arrives past it. The window used to bound the warm only, so a long-running server held every name it
+ * had ever seen.
+ *
  * <h2>Concurrency</h2>
- * Ownership: <b>concurrent-collection</b>. The map is a {@link ConcurrentHashMap} keyed by the lower-cased name;
- * the repository reference is an {@link AtomicReference} written once at enable. No database call is made inside a
- * critical section.
+ * Ownership: <b>lock</b>. The map is a {@link LinkedHashMap} in the order names were last seen, and every read and
+ * write of it is one short critical section on {@code lock}; the repository reference is an {@link
+ * AtomicReference} written once at enable. No database call is made inside a critical section.
  */
 @NullMarked
 public final class CachingPlayerNameIndex implements PlayerNameIndex {
 
-    private final ConcurrentHashMap<String, PlayerName> byLowerName = new ConcurrentHashMap<>();
+    private final Object lock = new Object();
+    private final LinkedHashMap<String, PlayerName> byLowerName = new LinkedHashMap<>();
+
+    /** How many names are held. Unbounded until the store is attached, before which nobody can have joined. */
+    private volatile int limit = Integer.MAX_VALUE;
+
     private final AtomicReference<@Nullable PlayerNameRepository> repository = new AtomicReference<>();
     private final Scheduler scheduler;
     private final Logger log;
@@ -54,13 +64,14 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
     public void backWith(PlayerNameRepository store, int warmLimit) {
         Objects.requireNonNull(store, "store");
         repository.set(store);
+        limit = Math.max(1, warmLimit);
         List<PlayerName> recent = store.loadRecent(warmLimit);
         // Oldest first, so a newer row for the same lower-cased name overwrites an older one and the last write
         // wins. Two accounts can share a lower-cased name: a name change on an online-mode server, two case
         // variants of one name on an offline-mode one.
         for (int i = recent.size() - 1; i >= 0; i--) {
             PlayerName row = recent.get(i);
-            byLowerName.put(row.name().toLowerCase(Locale.ROOT), row);
+            remember(row.name().toLowerCase(Locale.ROOT), row);
         }
         log.info("event=name_index_warmed rows={}", String.valueOf(recent.size()));
     }
@@ -72,7 +83,10 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         if (key.isEmpty()) {
             return Optional.empty();
         }
-        PlayerName found = byLowerName.get(key);
+        PlayerName found;
+        synchronized (lock) {
+            found = byLowerName.get(key);
+        }
         return found == null ? Optional.empty() : Optional.of(found.ref());
     }
 
@@ -85,11 +99,24 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
             return;
         }
         PlayerName row = new PlayerName(uuid, trimmed, System.currentTimeMillis());
-        byLowerName.put(trimmed.toLowerCase(Locale.ROOT), row);
+        remember(trimmed.toLowerCase(Locale.ROOT), row);
         PlayerNameRepository store = repository.get();
         if (store == null) {
             return;
         }
         scheduler.async(() -> store.upsert(row));
+    }
+
+    /** Put a name last in the order seen, and let the least recently seen go past the limit. */
+    private void remember(String key, PlayerName row) {
+        synchronized (lock) {
+            byLowerName.remove(key);
+            byLowerName.put(key, row);
+            Iterator<String> oldest = byLowerName.keySet().iterator();
+            while (byLowerName.size() > limit && oldest.hasNext()) {
+                oldest.next();
+                oldest.remove();
+            }
+        }
     }
 }

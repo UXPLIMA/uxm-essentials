@@ -126,6 +126,34 @@ class CachingPlayerNameIndexTest {
     }
 
     /** A repository that serves the warm from {@link #rows} newest first and collects every write. */
+    @Test
+    void holdsNoMoreNamesThanItsSizeAndLetsTheLeastRecentlySeenGo() {
+        // The window the operator sets was applied to the warm only, and every name seen after enable was kept
+        // for good, so a long-running server held every player who ever joined.
+        index.backWith(repository, 2);
+        UUID first = UUID.randomUUID();
+        index.record(first, "First");
+        index.record(UUID.randomUUID(), "Second");
+        index.record(UUID.randomUUID(), "Third");
+
+        assertThat(index.byName("first")).isEmpty();
+        assertThat(index.byName("second")).isPresent();
+        assertThat(index.byName("third")).isPresent();
+    }
+
+    @Test
+    void aNameSeenAgainIsTheMostRecentOne() {
+        index.backWith(repository, 2);
+        UUID first = UUID.randomUUID();
+        index.record(first, "First");
+        index.record(UUID.randomUUID(), "Second");
+        index.record(first, "First");
+        index.record(UUID.randomUUID(), "Third");
+
+        assertThat(index.byName("first")).contains(new PlayerRef(first, "First"));
+        assertThat(index.byName("second")).isEmpty();
+    }
+
     private static final class RecordingRepository implements PlayerNameRepository {
 
         private final List<PlayerName> rows = new ArrayList<>();
