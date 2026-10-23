@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorSub
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramEditorView;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.DamageIndicatorListener;
+import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramAimListener;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramClickHandler;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.listener.HologramQuitListener;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.DamageIndicatorConfig;
@@ -135,6 +136,9 @@ public final class HologramsWiring {
     private static final Duration REFRESH_BASE = Duration.ofSeconds(1);
 
     private static final int REFRESH_BASE_TICKS = 20;
+
+    /** How far off a hologram answers a click when the config does not say: a board read from across a path. */
+    private static final double DEFAULT_CLICK_REACH = 8.0;
 
     /** Build the holograms adapters and use cases, and spawn the stored holograms. */
     public static Wired wire(
@@ -257,6 +261,11 @@ public final class HologramsWiring {
         // What was resolved for a player is dropped as they leave, so it does not outlive them.
         HologramQuitListener quitListener = new HologramQuitListener(renderer);
         plugin.getServer().getPluginManager().registerEvents(quitListener, plugin);
+        // A client sends a click on a box only within its own reach, closer than a board is read from, so the
+        // server works out what a click further off was aimed at.
+        HologramAimListener aimListener = new HologramAimListener(
+                renderer::aimedAt, clickHandler, ctx.config().getDouble("click-reach", DEFAULT_CLICK_REACH));
+        plugin.getServer().getPluginManager().registerEvents(aimListener, plugin);
         // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
         // registered, so a default server sends no floating numbers and the listener costs nothing.
         DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
@@ -315,7 +324,7 @@ public final class HologramsWiring {
                 npcSubscriber,
                 connector,
                 listMenu,
-                List.of(clicks, quitListener));
+                List.of(clicks, quitListener, aimListener));
     }
 
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
@@ -433,7 +442,7 @@ public final class HologramsWiring {
      * @param npcSubscriber the npc-link locator subscription, unsubscribed on stop so it does not outlive a reload
      * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
      * @param listMenu the management-GUI list, opened by /hologram (no args) and the /uxmess gui hub entry
-     * @param listeners the click router and the quit hook, unregistered on stop so a re-wire does not answer twice
+     * @param listeners the click router, the far click and the quit hook, unregistered on stop so a re-wire does not answer twice
      */
     public record Wired(
             List<CommandRegistration> commands,

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -498,6 +499,66 @@ class PacketHologramViewTest {
         assertThat(boxesSentTo(alice)).isEmpty();
     }
 
+    /** A client sends a click only within three blocks, so a look from further off is worked out by the server. */
+    @Test
+    void aLookFromAcrossTheSquareFindsAClickableHologram() {
+        view.render(text("portal", "click me").withClickCommand("spawn"));
+        frame();
+        lookFrom(alice, -8, 64.1, -90f);
+
+        assertThat(view.aimedAt(alice, 12)).hasValueSatisfying(aimed -> {
+            assertThat(aimed.name().value()).isEqualTo("portal");
+            assertThat(aimed.distance()).isCloseTo(8.0, within(0.01));
+        });
+    }
+
+    @Test
+    void aLookAwayOrOutOfReachFindsNothing() {
+        view.render(text("portal", "click me").withClickCommand("spawn"));
+        frame();
+
+        lookFrom(alice, -8, 64.1, 90f);
+        assertThat(view.aimedAt(alice, 12)).isEmpty();
+        lookFrom(alice, -8, 64.1, -90f);
+        assertThat(view.aimedAt(alice, 6)).isEmpty();
+    }
+
+    @Test
+    void aHologramNothingHappensOnIsNeverAimedAt() {
+        view.render(text("plain", "just words"));
+        frame();
+        lookFrom(alice, -8, 64.1, -90f);
+
+        assertThat(view.aimedAt(alice, 12)).isEmpty();
+    }
+
+    /** The text is drawn raised and scaled, so a look is matched against the text where it is drawn. */
+    @Test
+    void aRaisedHologramIsAimedAtWhereItIsDrawn() {
+        Hologram raised = text("portal", "click me").withClickCommand("spawn");
+        raised = raised.withAppearance(raised.appearance().withTranslation(0f, 3f, 0f));
+        view.render(raised);
+        frame();
+
+        lookFrom(alice, -8, 64.1, -90f);
+        assertThat(view.aimedAt(alice, 12)).isEmpty();
+        lookFrom(alice, -8, 67.1, -90f);
+        assertThat(view.aimedAt(alice, 12)).isPresent();
+    }
+
+    /** The box a close click lands on stands where the raised text is drawn, not on the anchor below it. */
+    @Test
+    void theClickBoxRisesWithTheText() {
+        Hologram raised = text("portal", "click me").withClickCommand("spawn");
+        raised = raised.withAppearance(raised.appearance().withTranslation(0f, 3f, 0f));
+        view.render(raised);
+        frame();
+
+        assertThat(boxSpawnsOf(alice))
+                .last()
+                .satisfies(box -> assertThat(box.y()).isCloseTo(67.0, within(0.001)));
+    }
+
     // -- refresh ----------------------------------------------------------------------------------------------
 
     @Test
@@ -618,6 +679,21 @@ class PacketHologramViewTest {
         return spawns.stream()
                 .filter(spawn -> !spawn.entityTypeKey().equals("interaction"))
                 .toList();
+    }
+
+    private List<FakeHologramPackets.Spawn> boxSpawnsOf(Player viewer) {
+        List<FakeHologramPackets.Spawn> spawns = new ArrayList<>();
+        for (Object packet : packets.packetsFor(viewer)) {
+            collect(packet, FakeHologramPackets.Spawn.class, spawns);
+        }
+        return spawns.stream()
+                .filter(spawn -> spawn.entityTypeKey().equals("interaction"))
+                .toList();
+    }
+
+    /** Stand {@code viewer} with their eyes at {@code eyeY}, looking level along {@code yaw}. */
+    private void lookFrom(PlayerMock viewer, double x, double eyeY, float yaw) {
+        viewer.teleport(new Location(world, x, eyeY - viewer.getEyeHeight(), 0, yaw, 0f));
     }
 
     private List<FakeHologramPackets.InteractionSize> boxesSentTo(Player viewer) {

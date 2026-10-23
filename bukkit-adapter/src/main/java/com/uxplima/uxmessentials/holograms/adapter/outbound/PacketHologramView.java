@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalDouble;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -18,6 +20,7 @@ import org.bukkit.block.data.BlockData;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.Vector;
 
 import net.kyori.adventure.text.Component;
 
@@ -25,11 +28,13 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
+import com.uxplima.uxmessentials.holograms.domain.Billboard;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
 import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
+import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -209,6 +214,32 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         }
     }
 
+    /** A hologram a look crosses, and how far along the look, in blocks from the eye. */
+    public record Aimed(HologramName name, double distance) {}
+
+    /**
+     * The clickable hologram {@code viewer} is looking at within {@code reach} blocks, the nearest when the look
+     * crosses several. Only a hologram drawn for the viewer counts, matched against the text as they read it.
+     * Called on the viewer's own thread.
+     */
+    public Optional<Aimed> aimedAt(Player viewer, double reach) {
+        Objects.requireNonNull(viewer, "viewer");
+        Location eye = viewer.getEyeLocation();
+        Vector look = eye.getDirection();
+        UUID world = viewer.getWorld().getUID();
+        @Nullable Aimed nearest = null;
+        for (Live hologram : live.values()) {
+            if (!clickable(hologram.shown) || !hologram.anchor.world().uid().equals(world)) {
+                continue;
+            }
+            OptionalDouble along = hologram.hit(viewer, eye, look, reach);
+            if (along.isPresent() && (nearest == null || along.getAsDouble() < nearest.distance())) {
+                nearest = new Aimed(hologram.shown.name(), along.getAsDouble());
+            }
+        }
+        return Optional.ofNullable(nearest);
+    }
+
     private void show(Hologram hologram) {
         Position anchor = anchorFor(hologram, linkedNpcs);
         World world = Bukkit.getWorld(anchor.world().uid());
@@ -244,7 +275,11 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         next.attach(drawn);
         drawn.setAudience(next::mayView);
         if (clickable(hologram)) {
-            drawn.setClickBox(BOX_WIDTH, boxHeight(hologram));
+            Transform transform = hologram.appearance().transform();
+            drawn.setClickBox(
+                    BOX_WIDTH * transform.scaleX(),
+                    boxHeight(hologram) * transform.scaleY(),
+                    -transform.translationY());
             HologramName name = hologram.name();
             clicks.register(drawn, (player, attack) -> onClick.clicked(player, name, attack));
         }
@@ -319,6 +354,12 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         at.setYaw(anchor.yaw() + hologram.rotation().yaw());
         at.setPitch(anchor.pitch() + hologram.rotation().pitch());
         return at;
+    }
+
+    /** The height the text's lowest line is drawn at: the anchor, raised for a grow-up hologram and by its offset. */
+    private static double footOf(Hologram hologram, Position anchor) {
+        double foot = anchor.y() + hologram.appearance().transform().translationY();
+        return hologram.growUp() ? foot + hologram.lineCount() * LINE_HEIGHT : foot;
     }
 
     /** A box is drawn for a hologram a click does something on: a command, an action, or a page to turn. */
@@ -440,6 +481,66 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
                 resolveFor(viewer, key);
             }
             return held != null && held.text() != null;
+        }
+
+        /** How far along the look from {@code eye} it meets this hologram as {@code viewer} is drawn it, if it does. */
+        OptionalDouble hit(Player viewer, Location eye, Vector look, double reach) {
+            Hologram current = shown;
+            if (viewers.isBlacklisted(current, viewer)
+                    || !viewers.maySee(current, viewer, viewers.shownViewersFor(current))) {
+                return OptionalDouble.empty();
+            }
+            HologramAim.@Nullable Panel panel = panelFor(viewer, current);
+            if (panel == null) {
+                return OptionalDouble.empty();
+            }
+            Billboard billboard = current.appearance().billboard();
+            if (billboard == Billboard.CENTER || billboard == Billboard.VERTICAL) {
+                return HologramAim.hit(
+                        eye.getX(), eye.getY(), eye.getZ(), look.getX(), look.getY(), look.getZ(), panel, reach);
+            }
+            // A board that keeps its facing faces the way it was placed, turned by its stored rotation.
+            double yaw = Math.toRadians(anchor.yaw() + current.rotation().yaw());
+            return HologramAim.hitFacing(
+                    eye.getX(),
+                    eye.getY(),
+                    eye.getZ(),
+                    look.getX(),
+                    look.getY(),
+                    look.getZ(),
+                    panel,
+                    -Math.sin(yaw),
+                    Math.cos(yaw),
+                    reach);
+        }
+
+        /** The text as {@code viewer} reads it, as a panel; none while their text is not resolved yet. */
+        private HologramAim.@Nullable Panel panelFor(Player viewer, Hologram current) {
+            Transform transform = current.appearance().transform();
+            double foot = footOf(current, anchor);
+            if (model != null) {
+                double size = MODEL_BOX * transform.scaleY();
+                return new HologramAim.Panel(
+                        anchor.x(), anchor.z(), foot - size / 2, size, MODEL_BOX * transform.scaleX() / 2);
+            }
+            @Nullable Component words;
+            if (perViewer) {
+                @Nullable ViewerText held = texts.get(viewer.getUniqueId());
+                words = held == null ? null : held.text();
+            } else {
+                // Read as last drawn, never resolved here: resolving runs placeholders, which belong on the
+                // hologram's own thread, and this is the clicking player's.
+                @Nullable SharedText drawnText = shared;
+                words = drawnText == null ? null : drawnText.text();
+            }
+            if (words == null) {
+                return null;
+            }
+            int pixels = Math.min(
+                    HologramAim.widestLinePixels(words), current.appearance().lineWidth());
+            double halfWidth = pixels * HologramAim.BLOCKS_PER_PIXEL * transform.scaleX() / 2;
+            double height = HologramAim.lineCount(words) * LINE_HEIGHT * transform.scaleY();
+            return new HologramAim.Panel(anchor.x(), anchor.z(), foot, height, halfWidth);
         }
 
         /** The lines {@code viewer} is drawn: the model, the shared text, or their own text. */
