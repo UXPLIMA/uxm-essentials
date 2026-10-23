@@ -205,6 +205,17 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         hologram.updateSoon();
     }
 
+    /**
+     * Resolve every hologram's words again for everybody looking at it, and draw them. A viewer's words are kept
+     * until the hologram changes, so a catalogue or a theme read again reaches a hologram nobody refreshes only
+     * through this. Safe off the tick: it moves each hologram's frame and asks its own thread to draw.
+     */
+    public void redrawAll() {
+        for (Live hologram : live.values()) {
+            hologram.advance(hologram.shown);
+        }
+    }
+
     /** Forget what was resolved for {@code viewer}, who left the server. */
     public void forget(UUID viewer) {
         Objects.requireNonNull(viewer, "viewer");

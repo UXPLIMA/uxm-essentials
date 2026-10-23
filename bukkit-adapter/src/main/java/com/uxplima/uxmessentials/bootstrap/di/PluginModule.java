@@ -2796,6 +2796,11 @@ public final class PluginModule {
                 menuBindings);
         wired.commands().forEach(resources::addCommand);
         resources.worldPhase().run("hologram spawn", wired::spawnStored);
+        // A viewer keeps the words they were drawn until the hologram changes, so the catalogue and the theme a
+        // reload has just read reach a hologram nobody refreshes only when every hologram is drawn again. A kernel
+        // step, so it runs on every reload, and registered after both, so it draws what they have just read.
+        resources.addReloadTask(ReloadTask.kernel(
+                "hologram words", wired.renderer()::redrawAll, "every hologram drawn again in the new words"));
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));

@@ -10,11 +10,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Location;
@@ -557,6 +559,31 @@ class PacketHologramViewTest {
         assertThat(boxSpawnsOf(alice))
                 .last()
                 .satisfies(box -> assertThat(box.y()).isCloseTo(67.0, within(0.001)));
+    }
+
+    /**
+     * A catalogue edited and reloaded reaches a hologram nobody refreshes. The words a viewer holds were kept until
+     * the hologram changed, so a reworded or recoloured line stayed as it was for everybody already looking at it.
+     */
+    @Test
+    void aRedrawReadsTheCatalogueAgainForEveryViewer() {
+        AtomicReference<String> word = new AtomicReference<>("Join");
+        HudText.useCatalogLines(new CatalogLines(
+                (viewer, key, arguments) -> Objects.requireNonNull(word.get()), Set.of("lobby.join")::contains));
+        view.render(text("join", "@lobby.join"));
+        frame();
+        word.set("Enter");
+        frames.tick();
+        assertThat(heldText(alice)).as("nothing has told the hologram yet").isEqualTo("Join");
+
+        view.redrawAll();
+        scheduler.runAll();
+        frames.tick();
+        scheduler.runAll();
+        frames.tick();
+
+        assertThat(heldText(alice)).isEqualTo("Enter");
+        assertThat(heldText(bob)).isEqualTo("Enter");
     }
 
     // -- refresh ----------------------------------------------------------------------------------------------
