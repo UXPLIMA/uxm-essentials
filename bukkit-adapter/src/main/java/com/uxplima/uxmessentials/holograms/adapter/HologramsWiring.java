@@ -137,8 +137,8 @@ public final class HologramsWiring {
 
     private static final int REFRESH_BASE_TICKS = 20;
 
-    /** How far off a hologram answers a click when the config does not say: a board read from across a path. */
-    private static final double DEFAULT_CLICK_REACH = 8.0;
+    /** How far off a hologram answers a click when the config does not say: a board read from across a square. */
+    private static final double DEFAULT_CLICK_REACH = 12.0;
 
     /** Build the holograms adapters and use cases, and spawn the stored holograms. */
     public static Wired wire(
