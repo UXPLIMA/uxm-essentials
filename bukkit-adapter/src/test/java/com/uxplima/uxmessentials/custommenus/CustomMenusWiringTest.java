@@ -17,10 +17,13 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.MenuVocab
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineScheduler;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -170,6 +173,33 @@ class CustomMenusWiringTest {
         // two opener listeners rather than being skipped as a malformed menu spec.
         assertThat(wired.menuNames().get()).containsExactly("hub");
         assertThat(wired.listeners()).hasSize(4); // opener interact + join + swap + edit-lock
+    }
+
+    @Test
+    void theReloadHandedBackReadsAMenuWrittenAfterStartup(@TempDir Path dataFolder) throws Exception {
+        Path menus = Files.createDirectories(dataFolder.resolve("menus"));
+
+        CustomMenusWiring.Wired wired = CustomMenusWiring.wire(
+                plugin,
+                menus(),
+                bindings(),
+                dataFolder,
+                log(),
+                scheduler(),
+                messages(),
+                guiText(),
+                ThemeFile::shippedTheme,
+                new GuiLayouts(dataFolder, log()),
+                textInput(),
+                new ManagementGuiRegistry());
+        Files.writeString(menus.resolve("links.conf"), "rows = 1\nitems { x { slot = 0, material = STONE } }\n");
+
+        // /uxmess reload runs this, so an operator's new menu opens without a second command.
+        ReloadResult result = wired.reloadTask(ModuleId.of("custommenus")).run();
+
+        assertThat(result.status()).isEqualTo(ReloadStatus.APPLIED);
+        assertThat(result.message()).contains("1 loaded", "0 skipped");
+        assertThat(wired.menuNames().get()).containsExactly("links");
     }
 
     /** The generic vocabulary registry exactly as PluginModule installs it at startup (console dispatch off). */

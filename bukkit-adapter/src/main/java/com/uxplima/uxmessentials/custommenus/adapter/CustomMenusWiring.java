@@ -48,9 +48,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
+import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -334,7 +337,7 @@ public final class CustomMenusWiring {
                 new MenuOpenerJoinListener(openerSupplier, openerItems),
                 new MenuSwapListener(menus, swapMenuSupplier, nameSupplier),
                 new MenuEditLockListener(editLocks));
-        return new Wired(commands, nameSupplier, listeners);
+        return new Wired(commands, nameSupplier, listeners, reload);
     }
 
     /** {@code current} with {@code name} appended when absent, as a fresh immutable list; unchanged when already present. */
@@ -382,15 +385,44 @@ public final class CustomMenusWiring {
     /**
      * The wired custommenus adapters handed back to bootstrap: the {@code /menu} command (plus any open commands),
      * the loaded-menu-names supplier (so a later consumer, e.g. a management hub entry, can read the current set),
-     * and the opener-item and off-hand-swap listeners. There is no stop hook: the loader registers specs into the
-     * shared engine, which the bootstrap tears down centrally on disable.
+     * the opener-item and off-hand-swap listeners, and the reload {@code /menu reload} runs, so {@code /uxmess reload}
+     * re-reads the same files. There is no stop hook: the loader registers specs into the shared engine, which the
+     * bootstrap tears down centrally on disable.
      */
     public record Wired(
-            List<CommandRegistration> commands, Supplier<List<String>> menuNames, List<Listener> listeners) {
+            List<CommandRegistration> commands,
+            Supplier<List<String>> menuNames,
+            List<Listener> listeners,
+            Supplier<CustomMenuLoader.LoadResult> reload) {
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(menuNames, "menuNames");
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(reload, "reload");
+        }
+
+        /** The {@code /uxmess reload} task for {@code module}: the same reload, reported with the counts it read. */
+        public ReloadTask reloadTask(ModuleId module) {
+            Objects.requireNonNull(module, "module");
+            Supplier<CustomMenuLoader.LoadResult> run = reload;
+            return new ReloadTask() {
+                @Override
+                public String name() {
+                    return module.value();
+                }
+
+                @Override
+                public Optional<ModuleId> module() {
+                    return Optional.of(module);
+                }
+
+                @Override
+                public ReloadResult run() {
+                    CustomMenuLoader.LoadResult result = run.get();
+                    return ReloadResult.applied("menus re-read from disk: " + result.loaded() + " loaded, "
+                            + result.skipped().size() + " skipped");
+                }
+            };
         }
     }
 }

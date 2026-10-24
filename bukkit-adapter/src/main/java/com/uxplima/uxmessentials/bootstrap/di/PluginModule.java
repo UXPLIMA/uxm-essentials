@@ -1851,6 +1851,9 @@ public final class PluginModule {
                 guiRegistry);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // /uxmess reload runs what /menu reload runs. Without it the module had no live hook, so the reload told an
+        // operator who had just written a menu to restart, and the menu stayed unknown until a second command.
+        resources.addReloadTask(wired.reloadTask(ctx.moduleId()));
         // The doctor's windows line reads this: how many of the operator's own menus the engine accepted. It is
         // published rather than counted there because the health checks are built before module wiring runs and
         // because a /menu reload changes the answer.
