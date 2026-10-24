@@ -16,8 +16,8 @@
 -- dialect-specific clause. jOOQ's DDLDatabase parses this file alongside V1-V8 at
 -- build time, so the generated HomeMain table and record appear.
 
-CREATE TABLE home_main (
+CREATE TABLE ${prefix}home_main (
     owner  VARCHAR(36) NOT NULL,
     name   VARCHAR(64) NOT NULL,
-    CONSTRAINT pk_home_main PRIMARY KEY (owner)
+    CONSTRAINT ${prefix}pk_home_main PRIMARY KEY (owner)
 );

@@ -1,7 +1,14 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import javax.sql.DataSource;
 
@@ -28,10 +35,21 @@ public final class FlywayMigrationRunner {
 
     private final DataSource dataSource;
     private final DatabaseBackend backend;
+    private final String tablePrefix;
 
-    public FlywayMigrationRunner(DataSource dataSource, DatabaseBackend backend) {
+    /** A table the first migration creates, so its bare name marks an install that ran without a prefix. */
+    private static final String BARE_MARKER_TABLE = "homes";
+
+    /** @param tablePrefix written into every name the migrations create, and in front of the history table */
+    public FlywayMigrationRunner(DataSource dataSource, DatabaseBackend backend, String tablePrefix) {
         this.dataSource = Objects.requireNonNull(dataSource, "dataSource");
         this.backend = Objects.requireNonNull(backend, "backend");
+        this.tablePrefix = Objects.requireNonNull(tablePrefix, "tablePrefix");
+    }
+
+    /** The table Flyway records what it ran in. A file without a prefix keeps Flyway's own name. */
+    public static String historyTable(String tablePrefix) {
+        return tablePrefix + "flyway_schema_history";
     }
 
     /**
@@ -52,13 +70,18 @@ public final class FlywayMigrationRunner {
      */
     public void migrate(List<String> locations) {
         Objects.requireNonNull(locations, "locations");
+        refuseAPrefixOverBareTables();
         String[] resolved = locations.isEmpty() ? new String[] {"classpath:db/migration"} : prefix(locations);
         FluentConfiguration configuration = Flyway.configure(getClass().getClassLoader())
                 .dataSource(dataSource)
                 .locations(resolved)
                 .baselineOnMigrate(true)
                 .baselineVersion("0")
-                .initSql(initSql(backend));
+                .initSql(initSql(backend))
+                // Every name in the scripts is written as ${prefix}name. The repair below realigns the recorded
+                // checksums of an install that ran them before the placeholder was written in.
+                .placeholders(Map.of("prefix", tablePrefix))
+                .table(historyTable(tablePrefix));
         try {
             Flyway flyway = configuration.load();
             // Flyway's log, without the warning MariaDB writes for every named primary key: see QuietFlywayLog. Set as
@@ -74,6 +97,39 @@ public final class FlywayMigrationRunner {
         } catch (FlywayException cause) {
             throw new PersistenceException("database migration failed for locations " + locations, cause);
         }
+    }
+
+    /**
+     * Stop when a prefix is written over a database that already holds this plugin's tables under their bare names.
+     * Those are an install that ran before the prefix was chosen; migrating would build an empty schema beside them,
+     * and every home, balance and warp would seem gone.
+     */
+    private void refuseAPrefixOverBareTables() {
+        if (tablePrefix.isEmpty()) {
+            return;
+        }
+        Set<String> tables = tableNames();
+        if (!tables.contains(historyTable(tablePrefix).toLowerCase(Locale.ROOT))
+                && tables.contains(historyTable(""))
+                && tables.contains(BARE_MARKER_TABLE)) {
+            throw new PersistenceException("storage.table-prefix is '" + tablePrefix + "', and this database already"
+                    + " holds uxmEssentials tables without a prefix. Write table-prefix = \"\" to keep using them.");
+        }
+    }
+
+    private Set<String> tableNames() {
+        Set<String> names = new HashSet<>();
+        try (Connection connection = dataSource.getConnection();
+                ResultSet rows = connection
+                        .getMetaData()
+                        .getTables(connection.getCatalog(), connection.getSchema(), "%", new String[] {"TABLE"})) {
+            while (rows.next()) {
+                names.add(rows.getString("TABLE_NAME").toLowerCase(Locale.ROOT));
+            }
+        } catch (SQLException unreadable) {
+            throw new PersistenceException("could not list the tables of the database", unreadable);
+        }
+        return names;
     }
 
     private static String[] prefix(List<String> locations) {

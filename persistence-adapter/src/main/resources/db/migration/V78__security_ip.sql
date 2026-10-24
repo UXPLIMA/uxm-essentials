@@ -9,12 +9,12 @@
 -- carries one row per distinct address and one address carries one row per account. `last_seen` is the epoch-millis
 -- the link was last observed, in a BIGINT so there is no dialect-specific datetime handling. jOOQ's DDLDatabase
 -- parses this file alongside V1-V77 at build time, so the generated classes always match the runtime schema.
-CREATE TABLE security_ip (
+CREATE TABLE ${prefix}security_ip (
     uuid       VARCHAR(36) NOT NULL,
     ip_token   VARCHAR(64) NOT NULL,
     last_seen  BIGINT      NOT NULL,
-    CONSTRAINT pk_security_ip PRIMARY KEY (uuid, ip_token)
+    CONSTRAINT ${prefix}pk_security_ip PRIMARY KEY (uuid, ip_token)
 );
 
 -- The alt lookup and the per-IP account cap both query by ip_token, so index it for the same-address fan-out.
-CREATE INDEX idx_security_ip_token ON security_ip (ip_token);
+CREATE INDEX ${prefix}idx_security_ip_token ON ${prefix}security_ip (ip_token);

@@ -53,6 +53,20 @@ class BundledDefaultsMergeTest {
         assertThat(added.get()).contains("type").contains("pool-size");
     }
 
+    /**
+     * The table prefix ships for a new install only. Appended to an install that ran without one, it would point
+     * the plugin at an empty set of tables and every home, balance and warp would seem gone.
+     */
+    @Test
+    void theTablePrefixIsNeverAppended() throws Exception {
+        Optional<String> added = BundledDefaultsMerge.newSettings(
+                "storage {\n  type = \"sqlite\"\n  table-prefix = \"uxmessentials_\"\n}\n",
+                "storage {\n  type = \"sqlite\"\n}\n",
+                "storage {\n  type = \"mysql\"\n}\n");
+
+        assertThat(added).isEmpty();
+    }
+
     @Test
     void leavesASettingTheOperatorDeletedDeleted() throws Exception {
         // b was in the default the operator installed from, so its absence is their edit, not our new key.

@@ -5,4 +5,4 @@
 --
 --   entity_type   the Bukkit entity-type name shown by an ENTITY hologram, or NULL for other types
 
-ALTER TABLE holograms ADD COLUMN entity_type VARCHAR(64);
+ALTER TABLE ${prefix}holograms ADD COLUMN entity_type VARCHAR(64);

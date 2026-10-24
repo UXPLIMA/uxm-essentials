@@ -8,6 +8,6 @@
 --   visibility_permission  the node a player must hold for PERMISSION mode (NULL = none / not gated)
 --   visibility_distance    the visibility radius in blocks, 0/NULL = unlimited (vanilla tracking range)
 
-ALTER TABLE holograms ADD COLUMN visibility_mode VARCHAR(16);
-ALTER TABLE holograms ADD COLUMN visibility_permission VARCHAR(128);
-ALTER TABLE holograms ADD COLUMN visibility_distance INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN visibility_mode VARCHAR(16);
+ALTER TABLE ${prefix}holograms ADD COLUMN visibility_permission VARCHAR(128);
+ALTER TABLE ${prefix}holograms ADD COLUMN visibility_distance INT;

@@ -20,18 +20,18 @@
 -- clause. last_seen is epoch milliseconds as a BIGINT, matching every other
 -- timestamp in this schema.
 
-CREATE TABLE player_names (
+CREATE TABLE ${prefix}player_names (
     uuid        VARCHAR(36) NOT NULL,
     name        VARCHAR(16) NOT NULL,
     lower_name  VARCHAR(16) NOT NULL,
     last_seen   BIGINT      NOT NULL,
-    CONSTRAINT pk_player_names PRIMARY KEY (uuid)
+    CONSTRAINT ${prefix}pk_player_names PRIMARY KEY (uuid)
 );
 
 -- The enable-time warm reads the most recently seen rows first and stops at the
 -- configured cap, so last_seen leads this index.
-CREATE INDEX idx_player_names_last_seen ON player_names (last_seen);
+CREATE INDEX ${prefix}idx_player_names_last_seen ON ${prefix}player_names (last_seen);
 
 -- The by-name read that the warm cannot serve (a name outside the cap) scans this
 -- one rather than the whole table.
-CREATE INDEX idx_player_names_lower_name ON player_names (lower_name);
+CREATE INDEX ${prefix}idx_player_names_lower_name ON ${prefix}player_names (lower_name);

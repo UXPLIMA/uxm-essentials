@@ -17,11 +17,11 @@
 -- alongside V1-V46 at build time, so the generated NpcTypeData table and record appear with no extra
 -- configuration.
 
-CREATE TABLE npc_type_data (
+CREATE TABLE ${prefix}npc_type_data (
     npc_name    VARCHAR(64) NOT NULL,
     data_key    VARCHAR(32) NOT NULL,
     data_value  VARCHAR(64) NOT NULL,
-    CONSTRAINT pk_npc_type_data PRIMARY KEY (npc_name, data_key)
+    CONSTRAINT ${prefix}pk_npc_type_data PRIMARY KEY (npc_name, data_key)
 );
 
-CREATE INDEX idx_npc_type_data_npc ON npc_type_data (npc_name);
+CREATE INDEX ${prefix}idx_npc_type_data_npc ON ${prefix}npc_type_data (npc_name);

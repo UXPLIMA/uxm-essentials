@@ -9,6 +9,6 @@
 -- subset accepted by SQLite (default), MySQL/MariaDB, and PostgreSQL. jOOQ's DDLDatabase
 -- parses this file alongside V1-V26 at build time.
 
-ALTER TABLE vote_totals ADD COLUMN current_streak BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE vote_totals ADD COLUMN best_streak    BIGINT NOT NULL DEFAULT 0;
-ALTER TABLE vote_totals ADD COLUMN streak_day_key BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}vote_totals ADD COLUMN current_streak BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}vote_totals ADD COLUMN best_streak    BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}vote_totals ADD COLUMN streak_day_key BIGINT NOT NULL DEFAULT 0;

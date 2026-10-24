@@ -23,7 +23,7 @@
 -- which every backend reads as a name: the migration runner sets ANSI_QUOTES for MySQL. jOOQ's DDLDatabase parses this file at build time, so the generated
 -- CommunicationAnnouncement table matches the runtime schema.
 
-CREATE TABLE communication_announcement (
+CREATE TABLE ${prefix}communication_announcement (
     id                VARCHAR(64)   NOT NULL,
     "lines"           TEXT          NOT NULL,
     channels          VARCHAR(255)  NOT NULL,
@@ -32,10 +32,10 @@ CREATE TABLE communication_announcement (
     sound             VARCHAR(255),
     interval_seconds  BIGINT,
     updated_at        BIGINT        NOT NULL DEFAULT 0,
-    CONSTRAINT pk_communication_announcement PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_communication_announcement PRIMARY KEY (id)
 );
 
 -- The editor list reads every row ordered by id, and the announcer's merge reads only the enabled rows; the
 -- leading enabled column lets the index serve the enabled filter, with id second so the ordered scan reads
 -- straight off it.
-CREATE INDEX idx_communication_announcement_enabled_id ON communication_announcement (enabled, id);
+CREATE INDEX ${prefix}idx_communication_announcement_enabled_id ON ${prefix}communication_announcement (enabled, id);

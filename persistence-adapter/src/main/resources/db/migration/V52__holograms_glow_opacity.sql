@@ -9,5 +9,5 @@
 --   glow_argb      the glowing-outline colour as a packed ARGB int (NULL = no glow)
 --   text_opacity   the text opacity 0-255 (NULL = the vanilla fully-opaque text)
 
-ALTER TABLE holograms ADD COLUMN glow_argb INT;
-ALTER TABLE holograms ADD COLUMN text_opacity INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN glow_argb INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN text_opacity INT;

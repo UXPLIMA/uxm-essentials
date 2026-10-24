@@ -29,10 +29,16 @@ dependencies {
     testImplementation(libs.caffeine)
     testImplementation(libs.gson)
 
+    // jOOQ's render settings carry XML binding annotations. The compiler reads them when it reads the settings
+    // classes and warns, under -Werror, that the annotation types are missing. Nothing runs them.
+    compileOnly(libs.jakarta.xml.bind)
+
     // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase.
     // It is needed only on the codegen classpath, never at runtime.
     jooqCodegen(libs.jooq.meta.ext)
 
+    // One empty database on each backend, in containers, for the tests tagged real-database.
+    testImplementation(libs.uxmlib.storage.testing)
     testImplementation(libs.tc.junit)
     testImplementation(libs.tc.postgres) // network-backend integration tests
     testImplementation(libs.tc.mysql) // network-backend integration tests
@@ -46,9 +52,15 @@ jooq {
             database {
                 name = "org.jooq.meta.extensions.ddl.DDLDatabase"
                 properties {
+                    // The migrations write every name under the ${prefix} placeholder that Flyway fills in at
+                    // startup. The parser reads a copy with the placeholder taken out, so the generated names are
+                    // the bare ones and the prefix is added when a query is rendered.
                     property {
                         key = "scripts"
-                        value = "src/main/resources/db/migration/*.sql"
+                        value = layout.buildDirectory
+                            .dir("ddl")
+                            .get()
+                            .asFile.path + "/*.sql"
                     }
                     // Parse the scripts the way Flyway lays them out: numbered files
                     // applied in version order, semicolon-delimited statements. The glob
@@ -96,6 +108,19 @@ sourceSets {
     }
 }
 
+val bareMigrations =
+    tasks.register<Sync>("bareMigrations") {
+        from("src/main/resources/db/migration")
+        include("*.sql")
+        into(layout.buildDirectory.dir("ddl"))
+        filter { line -> line.replace("\${prefix}", "") }
+    }
+
+tasks.named("jooqCodegen") {
+    dependsOn(bareMigrations)
+    inputs.files(bareMigrations)
+}
+
 tasks.named<JavaCompile>("compileJava") {
     dependsOn(tasks.named("jooqCodegen"))
 }
@@ -116,3 +141,21 @@ spotless {
         targetExclude("build/generated-src/**")
     }
 }
+
+// The real-database tests need a container runtime and take seconds each, so they run in a task of their own.
+tasks.test { useJUnitPlatform { excludeTags("real-database") } }
+
+val databaseTest =
+    tasks.register<Test>("databaseTest") {
+        description = "Runs the storage tests on SQLite, MySQL, MariaDB and PostgreSQL."
+        group = "verification"
+        testClassesDirs =
+            sourceSets.test
+                .get()
+                .output.classesDirs
+        classpath = sourceSets.test.get().runtimeClasspath
+        useJUnitPlatform { includeTags("real-database") }
+        shouldRunAfter(tasks.test)
+    }
+
+tasks.check { dependsOn(databaseTest) }

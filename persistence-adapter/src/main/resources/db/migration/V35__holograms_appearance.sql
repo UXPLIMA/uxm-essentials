@@ -17,12 +17,12 @@
 --   view_range         the view-distance multiplier (NULL = 1.0)
 --   refresh_interval_ticks  how often the live entity re-renders, 0/NULL = static (rendered once)
 
-ALTER TABLE holograms ADD COLUMN billboard VARCHAR(16);
-ALTER TABLE holograms ADD COLUMN background_argb INT;
-ALTER TABLE holograms ADD COLUMN text_shadow SMALLINT;
-ALTER TABLE holograms ADD COLUMN brightness_block INT;
-ALTER TABLE holograms ADD COLUMN brightness_sky INT;
-ALTER TABLE holograms ADD COLUMN scale REAL;
-ALTER TABLE holograms ADD COLUMN line_width INT;
-ALTER TABLE holograms ADD COLUMN view_range REAL;
-ALTER TABLE holograms ADD COLUMN refresh_interval_ticks INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN billboard VARCHAR(16);
+ALTER TABLE ${prefix}holograms ADD COLUMN background_argb INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN text_shadow SMALLINT;
+ALTER TABLE ${prefix}holograms ADD COLUMN brightness_block INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN brightness_sky INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN scale REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN line_width INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN view_range REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN refresh_interval_ticks INT;

@@ -7,4 +7,4 @@
 -- (the default), MySQL/MariaDB and PostgreSQL all accept, parsed by jOOQ's DDLDatabase at build time so the
 -- generated Holograms record gains the column with no extra configuration.
 
-ALTER TABLE holograms ADD COLUMN grow_up SMALLINT;
+ALTER TABLE ${prefix}holograms ADD COLUMN grow_up SMALLINT;

@@ -22,7 +22,7 @@
 -- clause. jOOQ's DDLDatabase parses this file alongside V1-V12 at build time, so the generated
 -- Holograms and HologramLines tables and records appear with no extra configuration.
 
-CREATE TABLE holograms (
+CREATE TABLE ${prefix}holograms (
     name        VARCHAR(64)      NOT NULL,
     world       VARCHAR(36)      NOT NULL,
     world_name  VARCHAR(128)     NOT NULL,
@@ -32,14 +32,14 @@ CREATE TABLE holograms (
     yaw         REAL             NOT NULL,
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_holograms PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_holograms PRIMARY KEY (name)
 );
 
-CREATE TABLE hologram_lines (
+CREATE TABLE ${prefix}hologram_lines (
     hologram  VARCHAR(64)  NOT NULL,
     idx       INT          NOT NULL,
     text      VARCHAR(512) NOT NULL,
-    CONSTRAINT pk_hologram_lines PRIMARY KEY (hologram, idx)
+    CONSTRAINT ${prefix}pk_hologram_lines PRIMARY KEY (hologram, idx)
 );
 
-CREATE INDEX idx_hologram_lines_hologram ON hologram_lines (hologram);
+CREATE INDEX ${prefix}idx_hologram_lines_hologram ON ${prefix}hologram_lines (hologram);

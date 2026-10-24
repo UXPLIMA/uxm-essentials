@@ -13,9 +13,9 @@
 -- a non-NULL one a /tempwarn. jOOQ's DDLDatabase parses this file alongside V1-V6
 -- at build time, so the generated ModerationWarnsRecord gains the column.
 
-ALTER TABLE moderation_warns ADD COLUMN expires_at BIGINT;
+ALTER TABLE ${prefix}moderation_warns ADD COLUMN expires_at BIGINT;
 
 -- Serves the lapsed-warning filter at the /warns read (… AND (expires_at IS NULL
 -- OR expires_at > ?)). A standing warn (NULL expires_at) sorts out of this index
 -- and is never treated as lapsed.
-CREATE INDEX idx_moderation_warns_expires ON moderation_warns (expires_at);
+CREATE INDEX ${prefix}idx_moderation_warns_expires ON ${prefix}moderation_warns (expires_at);

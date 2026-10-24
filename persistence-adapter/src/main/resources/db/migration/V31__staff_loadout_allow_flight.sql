@@ -9,4 +9,4 @@
 -- an orphaned row from before this migration recovers as flight-not-allowed, the safe default.
 -- jOOQ's DDLDatabase parses this file alongside V1-V30 at build time, so the generated
 -- STAFF_LOADOUT class always matches the runtime schema.
-ALTER TABLE staff_loadout ADD COLUMN allow_flight SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}staff_loadout ADD COLUMN allow_flight SMALLINT NOT NULL DEFAULT 0;

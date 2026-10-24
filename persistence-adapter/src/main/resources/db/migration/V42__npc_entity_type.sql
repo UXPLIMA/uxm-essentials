@@ -13,4 +13,4 @@
 -- DDLDatabase parses this file alongside V1-V41 at build time, so the generated Npc record gains the entity_type
 -- column with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN entity_type VARCHAR(64) NOT NULL DEFAULT 'PLAYER';
+ALTER TABLE ${prefix}npc ADD COLUMN entity_type VARCHAR(64) NOT NULL DEFAULT 'PLAYER';

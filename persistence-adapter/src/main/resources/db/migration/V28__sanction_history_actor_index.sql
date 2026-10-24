@@ -15,4 +15,4 @@
 -- the same contract as V1-V27. jOOQ's DDLDatabase parses this file alongside the
 -- earlier migrations at build time.
 
-CREATE INDEX idx_moderation_sanction_history_actor ON moderation_sanction_history (actor);
+CREATE INDEX ${prefix}idx_moderation_sanction_history_actor ON ${prefix}moderation_sanction_history (actor);

@@ -15,5 +15,5 @@
 -- Same portability contract as V1-V81: plain DELETE statements every supported
 -- dialect accepts, and no schema change, so the generated jOOQ classes are
 -- unaffected.
-DELETE FROM security_trusted;
-DELETE FROM security_ip;
+DELETE FROM ${prefix}security_trusted;
+DELETE FROM ${prefix}security_ip;

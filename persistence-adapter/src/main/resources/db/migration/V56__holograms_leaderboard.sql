@@ -7,5 +7,5 @@
 --   leaderboard_provider   the data-source id ('balance', …) a leaderboard hologram shows, or NULL = not a leaderboard
 --   leaderboard_limit      how many top rows the leaderboard shows (NULL only when provider is NULL)
 
-ALTER TABLE holograms ADD COLUMN leaderboard_provider VARCHAR(64);
-ALTER TABLE holograms ADD COLUMN leaderboard_limit INT;
+ALTER TABLE ${prefix}holograms ADD COLUMN leaderboard_provider VARCHAR(64);
+ALTER TABLE ${prefix}holograms ADD COLUMN leaderboard_limit INT;

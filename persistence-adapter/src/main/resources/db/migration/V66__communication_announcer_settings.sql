@@ -16,11 +16,11 @@
 -- with no dialect-specific clause. jOOQ's DDLDatabase parses this file at build time, so the generated
 -- CommunicationAnnouncerSettings table matches the runtime schema.
 
-CREATE TABLE communication_announcer_settings (
+CREATE TABLE ${prefix}communication_announcer_settings (
     id                  SMALLINT NOT NULL PRIMARY KEY,
     interval_seconds    BIGINT   NOT NULL DEFAULT -1,
     min_online_players  BIGINT   NOT NULL DEFAULT -1,
     updated_at          BIGINT   NOT NULL DEFAULT 0
 );
 
-INSERT INTO communication_announcer_settings (id, interval_seconds, min_online_players, updated_at) VALUES (0, -1, -1, 0);
+INSERT INTO ${prefix}communication_announcer_settings (id, interval_seconds, min_online_players, updated_at) VALUES (0, -1, -1, 0);

@@ -17,7 +17,7 @@
 -- `texture_sign` its Yggdrasil signature, nullable because an unsigned texture is legal;
 -- `applied_at` is the instant the choice was made, as epoch milliseconds in a BIGINT so there
 -- is no dialect-specific datetime handling.
-CREATE TABLE player_skins (
+CREATE TABLE ${prefix}player_skins (
     player_uuid   VARCHAR(36)  NOT NULL,
     source_type   VARCHAR(16)  NOT NULL,
     source_value  VARCHAR(512) NOT NULL,
@@ -25,5 +25,5 @@ CREATE TABLE player_skins (
     texture_value TEXT         NOT NULL,
     texture_sign  TEXT,
     applied_at    BIGINT       NOT NULL,
-    CONSTRAINT pk_player_skins PRIMARY KEY (player_uuid)
+    CONSTRAINT ${prefix}pk_player_skins PRIMARY KEY (player_uuid)
 );

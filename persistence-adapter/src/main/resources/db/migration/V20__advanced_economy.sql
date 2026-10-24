@@ -16,26 +16,26 @@
 -- A shared joint bank: a named pooled balance in one currency with a creator and
 -- a member roster. The balance is DB-backed (the economy hard invariant) so it
 -- survives a world rollback like a wallet balance does.
-CREATE TABLE economy_shared_banks (
+CREATE TABLE ${prefix}economy_shared_banks (
     id           VARCHAR(36)    NOT NULL,
     name         VARCHAR(64)    NOT NULL,
     balance      DECIMAL(20, 4) NOT NULL,
     currency     VARCHAR(32)    NOT NULL,
     creator_uuid VARCHAR(36)    NOT NULL,
     created_at   BIGINT         NOT NULL,
-    CONSTRAINT pk_economy_shared_banks PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_economy_shared_banks PRIMARY KEY (id)
 );
 
 -- The bank roster: one row per (bank, player) with the player's role. Cascades
 -- conceptually with its bank. The repository clears and rewrites the roster on
 -- save and deletes it on bank delete.
-CREATE TABLE economy_bank_members (
+CREATE TABLE ${prefix}economy_bank_members (
     bank_id     VARCHAR(36)    NOT NULL,
     player_uuid VARCHAR(36)    NOT NULL,
     role        VARCHAR(16)    NOT NULL,
-    CONSTRAINT pk_economy_bank_members PRIMARY KEY (bank_id, player_uuid),
-    CONSTRAINT fk_economy_bank_members_bank FOREIGN KEY (bank_id)
-        REFERENCES economy_shared_banks (id)
+    CONSTRAINT ${prefix}pk_economy_bank_members PRIMARY KEY (bank_id, player_uuid),
+    CONSTRAINT ${prefix}fk_economy_bank_members_bank FOREIGN KEY (bank_id)
+        REFERENCES ${prefix}economy_shared_banks (id)
 );
 
 -- An outstanding player loan: principal and remaining (the amount column) are
@@ -48,7 +48,7 @@ CREATE TABLE economy_bank_members (
 -- fraction with up to eight fractional digits (a 6-dp score fraction times the
 -- configured span), so a narrower scale would truncate it and the rate shown after
 -- a reload would disagree with the rate the loan actually charges.
-CREATE TABLE economy_loans (
+CREATE TABLE ${prefix}economy_loans (
     id                     VARCHAR(36)    NOT NULL,
     player_uuid            VARCHAR(36)    NOT NULL,
     principal              DECIMAL(20, 4) NOT NULL,
@@ -59,32 +59,32 @@ CREATE TABLE economy_loans (
     installment_amount     DECIMAL(20, 4) NOT NULL,
     taken_at               BIGINT         NOT NULL,
     next_payment_at        BIGINT         NOT NULL,
-    CONSTRAINT pk_economy_loans PRIMARY KEY (id),
-    CONSTRAINT fk_economy_loans_player FOREIGN KEY (player_uuid)
-        REFERENCES economy_owners (owner)
+    CONSTRAINT ${prefix}pk_economy_loans PRIMARY KEY (id),
+    CONSTRAINT ${prefix}fk_economy_loans_player FOREIGN KEY (player_uuid)
+        REFERENCES ${prefix}economy_owners (owner)
 );
 
 -- A player's credit score (0-1000), driving loan eligibility. One row per player,
 -- foreign-keyed to economy_owners.
-CREATE TABLE economy_credit_scores (
+CREATE TABLE ${prefix}economy_credit_scores (
     player_uuid  VARCHAR(36) NOT NULL,
     score        INT         NOT NULL DEFAULT 100,
     last_updated BIGINT      NOT NULL,
-    CONSTRAINT pk_economy_credit_scores PRIMARY KEY (player_uuid),
-    CONSTRAINT fk_economy_credit_scores_player FOREIGN KEY (player_uuid)
-        REFERENCES economy_owners (owner)
+    CONSTRAINT ${prefix}pk_economy_credit_scores PRIMARY KEY (player_uuid),
+    CONSTRAINT ${prefix}fk_economy_credit_scores_player FOREIGN KEY (player_uuid)
+        REFERENCES ${prefix}economy_owners (owner)
 );
 
 -- The anti-dupe registry of live physical banknotes (checks): a banknote is only
 -- redeemable while its token row exists, and redeem deletes the row atomically so
 -- a duplicated item cannot be cashed twice.
-CREATE TABLE economy_active_banknotes (
+CREATE TABLE ${prefix}economy_active_banknotes (
     token      VARCHAR(36)    NOT NULL,
     amount     DECIMAL(20, 4) NOT NULL,
     currency   VARCHAR(32)    NOT NULL,
     created_at BIGINT         NOT NULL,
-    CONSTRAINT pk_economy_active_banknotes PRIMARY KEY (token)
+    CONSTRAINT ${prefix}pk_economy_active_banknotes PRIMARY KEY (token)
 );
 
-CREATE INDEX idx_economy_loans_player ON economy_loans (player_uuid);
-CREATE INDEX idx_economy_bank_members_player ON economy_bank_members (player_uuid);
+CREATE INDEX ${prefix}idx_economy_loans_player ON ${prefix}economy_loans (player_uuid);
+CREATE INDEX ${prefix}idx_economy_bank_members_player ON ${prefix}economy_bank_members (player_uuid);

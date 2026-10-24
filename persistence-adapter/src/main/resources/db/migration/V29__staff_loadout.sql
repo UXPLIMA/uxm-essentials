@@ -33,7 +33,7 @@
 -- offhand and potion_effects are the base64-encoded serialized regions, the opaque
 -- payload; held_slot/exp_level/exp_progress/game_mode/flying are the captured scalars;
 -- entered_at is the epoch-millis of the capture.
-CREATE TABLE staff_loadout (
+CREATE TABLE ${prefix}staff_loadout (
     player         VARCHAR(36)  NOT NULL,
     inventory      TEXT         NOT NULL,
     armor          TEXT         NOT NULL,
@@ -45,5 +45,5 @@ CREATE TABLE staff_loadout (
     game_mode      VARCHAR(16)  NOT NULL,
     flying         SMALLINT     NOT NULL,
     entered_at     BIGINT       NOT NULL,
-    CONSTRAINT pk_staff_loadout PRIMARY KEY (player)
+    CONSTRAINT ${prefix}pk_staff_loadout PRIMARY KEY (player)
 );

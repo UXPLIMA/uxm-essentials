@@ -9,4 +9,4 @@
 --
 --   owner_uuid   the creating player's UUID; NULL = no owner (server/console-created)
 
-ALTER TABLE npc ADD COLUMN owner_uuid VARCHAR(36);
+ALTER TABLE ${prefix}npc ADD COLUMN owner_uuid VARCHAR(36);

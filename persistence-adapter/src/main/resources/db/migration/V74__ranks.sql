@@ -21,10 +21,10 @@
 -- times the player has reset the ladder from the top, defaulting to 0 for a player
 -- who has never prestiged. `updated_at` is the epoch-millis of the last write,
 -- usable for auditing and housekeeping.
-CREATE TABLE player_ranks (
+CREATE TABLE ${prefix}player_ranks (
     uuid        VARCHAR(36)  NOT NULL,
     rank_id     VARCHAR(64)  NOT NULL,
     prestige    INT          NOT NULL DEFAULT 0,
     updated_at  BIGINT       NOT NULL,
-    CONSTRAINT pk_player_ranks PRIMARY KEY (uuid)
+    CONSTRAINT ${prefix}pk_player_ranks PRIMARY KEY (uuid)
 );

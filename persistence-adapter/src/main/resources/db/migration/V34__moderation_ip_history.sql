@@ -11,14 +11,14 @@
 -- duplicate, so a player's history is the set of distinct addresses they have ever used. jOOQ's DDLDatabase
 -- parses this file alongside V1-V33 at build time, so the generated MODERATION_IP_HISTORY class always
 -- matches the runtime schema.
-CREATE TABLE moderation_ip_history (
+CREATE TABLE ${prefix}moderation_ip_history (
     uuid        VARCHAR(36)  NOT NULL,
     ip          VARCHAR(45)  NOT NULL,
     first_seen  BIGINT       NOT NULL,
     last_seen   BIGINT       NOT NULL,
-    CONSTRAINT pk_moderation_ip_history PRIMARY KEY (uuid, ip)
+    CONSTRAINT ${prefix}pk_moderation_ip_history PRIMARY KEY (uuid, ip)
 );
 
 -- Serves the broadened alt-detection lookup (other UUIDs whose history contains one of a target's known
 -- addresses) and the STRICT IP-ban fan-out, both of which match by address rather than by player.
-CREATE INDEX idx_moderation_ip_history_ip ON moderation_ip_history (ip);
+CREATE INDEX ${prefix}idx_moderation_ip_history_ip ON ${prefix}moderation_ip_history (ip);

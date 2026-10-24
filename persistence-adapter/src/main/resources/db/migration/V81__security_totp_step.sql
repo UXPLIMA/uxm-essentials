@@ -11,4 +11,4 @@
 -- which is where every existing row starts; the first successful code fills it in.
 -- jOOQ's DDLDatabase parses this file alongside V1-V80 at build time, so the
 -- generated classes always match the runtime schema.
-ALTER TABLE security_2fa ADD COLUMN last_totp_step BIGINT;
+ALTER TABLE ${prefix}security_2fa ADD COLUMN last_totp_step BIGINT;

@@ -9,6 +9,6 @@
 --   item_material  the Material name an ITEM hologram shows (NULL for TEXT / BLOCK)
 --   block_data     the BlockData string a BLOCK hologram shows (NULL for TEXT / ITEM)
 
-ALTER TABLE holograms ADD COLUMN type VARCHAR(16);
-ALTER TABLE holograms ADD COLUMN item_material VARCHAR(128);
-ALTER TABLE holograms ADD COLUMN block_data VARCHAR(256);
+ALTER TABLE ${prefix}holograms ADD COLUMN type VARCHAR(16);
+ALTER TABLE ${prefix}holograms ADD COLUMN item_material VARCHAR(128);
+ALTER TABLE ${prefix}holograms ADD COLUMN block_data VARCHAR(256);

@@ -19,13 +19,13 @@
 -- MySQL/MariaDB and PostgreSQL all accept, with no dialect-specific clause. jOOQ's DDLDatabase parses this file
 -- alongside V1-V40 at build time, so the generated NpcAction table and record appear with no extra configuration.
 
-CREATE TABLE npc_action (
+CREATE TABLE ${prefix}npc_action (
     npc_name       VARCHAR(64)  NOT NULL,
     ordinal        INT          NOT NULL,
     click_trigger  VARCHAR(16)  NOT NULL,
     type           VARCHAR(32)  NOT NULL,
     value          VARCHAR(512) NOT NULL,
-    CONSTRAINT pk_npc_action PRIMARY KEY (npc_name, ordinal)
+    CONSTRAINT ${prefix}pk_npc_action PRIMARY KEY (npc_name, ordinal)
 );
 
-CREATE INDEX idx_npc_action_npc ON npc_action (npc_name);
+CREATE INDEX ${prefix}idx_npc_action_npc ON ${prefix}npc_action (npc_name);

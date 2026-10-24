@@ -8,4 +8,4 @@
 -- jOOQ's DDLDatabase parses this ALTER alongside V1-V38 at build time, so the generated Npc record gains the
 -- look_at_player column with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN look_at_player SMALLINT NOT NULL DEFAULT 1;
+ALTER TABLE ${prefix}npc ADD COLUMN look_at_player SMALLINT NOT NULL DEFAULT 1;

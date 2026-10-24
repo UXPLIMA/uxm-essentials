@@ -12,12 +12,12 @@
 -- rows alongside the name row in one transaction). jOOQ's DDLDatabase parses this alongside V1-V56 at build
 -- time, so the generated HologramPages table and record appear with no extra configuration.
 
-CREATE TABLE hologram_pages (
+CREATE TABLE ${prefix}hologram_pages (
     hologram    VARCHAR(64)  NOT NULL,
     page_index  INT          NOT NULL,
     idx         INT          NOT NULL,
     text        VARCHAR(512) NOT NULL,
-    CONSTRAINT pk_hologram_pages PRIMARY KEY (hologram, page_index, idx)
+    CONSTRAINT ${prefix}pk_hologram_pages PRIMARY KEY (hologram, page_index, idx)
 );
 
-CREATE INDEX idx_hologram_pages_hologram ON hologram_pages (hologram);
+CREATE INDEX ${prefix}idx_hologram_pages_hologram ON ${prefix}hologram_pages (hologram);

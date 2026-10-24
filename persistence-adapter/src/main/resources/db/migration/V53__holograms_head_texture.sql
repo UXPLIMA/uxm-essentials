@@ -6,4 +6,4 @@
 --
 --   head_texture   the base64 "textures" property value of the head's skin (NULL for non-HEAD holograms)
 
-ALTER TABLE holograms ADD COLUMN head_texture TEXT;
+ALTER TABLE ${prefix}holograms ADD COLUMN head_texture TEXT;

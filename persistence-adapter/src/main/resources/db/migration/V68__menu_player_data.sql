@@ -16,13 +16,13 @@
 -- natural length bound and a plain string round-trips byte-identically across all three backends (see V6, which
 -- stores base64 in a TEXT column for the same reason).
 
-CREATE TABLE menu_player_data (
+CREATE TABLE ${prefix}menu_player_data (
     uuid        VARCHAR(36)   NOT NULL,
     data_key    VARCHAR(128)  NOT NULL,
     data_value  TEXT          NOT NULL,
-    CONSTRAINT pk_menu_player_data PRIMARY KEY (uuid, data_key)
+    CONSTRAINT ${prefix}pk_menu_player_data PRIMARY KEY (uuid, data_key)
 );
 
 -- A player's whole row set is loaded in one scan on join (load-on-join cache warm), so the leading uuid column lets
 -- the index serve that load directly.
-CREATE INDEX idx_menu_player_data_uuid ON menu_player_data (uuid);
+CREATE INDEX ${prefix}idx_menu_player_data_uuid ON ${prefix}menu_player_data (uuid);

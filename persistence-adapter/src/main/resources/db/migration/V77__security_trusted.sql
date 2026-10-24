@@ -9,9 +9,9 @@
 -- carry several trusted devices, one row each. `until` is the epoch-millis the trust expires at, in a BIGINT so there
 -- is no dialect-specific datetime handling. jOOQ's DDLDatabase parses this file alongside V1-V76 at build time, so the
 -- generated classes always match the runtime schema.
-CREATE TABLE security_trusted (
+CREATE TABLE ${prefix}security_trusted (
     uuid     VARCHAR(36) NOT NULL,
     ip_hash  VARCHAR(64) NOT NULL,
     until    BIGINT      NOT NULL,
-    CONSTRAINT pk_security_trusted PRIMARY KEY (uuid, ip_hash)
+    CONSTRAINT ${prefix}pk_security_trusted PRIMARY KEY (uuid, ip_hash)
 );

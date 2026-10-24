@@ -19,10 +19,10 @@
 -- no dialect-specific clause. jOOQ's DDLDatabase parses this file alongside V1-V11 at
 -- build time, so the generated EconomyWorthOverrides table and record appear.
 
-CREATE TABLE economy_worth_overrides (
+CREATE TABLE ${prefix}economy_worth_overrides (
     material    VARCHAR(64)    NOT NULL,
     price       DECIMAL(20, 4) NOT NULL,
     defined_by  VARCHAR(36),
     updated_at  BIGINT         NOT NULL,
-    CONSTRAINT pk_economy_worth_overrides PRIMARY KEY (material)
+    CONSTRAINT ${prefix}pk_economy_worth_overrides PRIMARY KEY (material)
 );

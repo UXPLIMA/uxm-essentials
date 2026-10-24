@@ -32,7 +32,7 @@ class PersistenceIntegrityHealthCheckTest {
         Files.createDirectories(worldContainer.resolve("world"));
         persistence = Persistence.open(new SqliteConfig(), data, List.of("db/migration"), new NoopLogger());
         check = new PersistenceIntegrityHealthCheck(
-                persistence.dsl(), name -> Files.isDirectory(worldContainer.resolve(name)));
+                persistence.dsl(), name -> Files.isDirectory(worldContainer.resolve(name)), "");
     }
 
     @AfterEach

@@ -20,10 +20,10 @@
 -- verification needs the secret back and so it cannot be a one-way hash; it is
 -- never stored or logged in plaintext. Both are NULL until the matching factor is
 -- enrolled. `enrolled_at` is the epoch-millis of the first enrolment.
-CREATE TABLE security_2fa (
+CREATE TABLE ${prefix}security_2fa (
     uuid             VARCHAR(36)   NOT NULL,
     pin_hash         VARCHAR(255),
     totp_secret_enc  VARCHAR(255),
     enrolled_at      BIGINT        NOT NULL,
-    CONSTRAINT pk_security_2fa PRIMARY KEY (uuid)
+    CONSTRAINT ${prefix}pk_security_2fa PRIMARY KEY (uuid)
 );

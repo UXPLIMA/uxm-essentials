@@ -12,4 +12,4 @@
 --
 --   linked_npc_name   the canonical name of the NPC the hologram follows; NULL = not linked
 
-ALTER TABLE holograms ADD COLUMN linked_npc_name VARCHAR(64);
+ALTER TABLE ${prefix}holograms ADD COLUMN linked_npc_name VARCHAR(64);

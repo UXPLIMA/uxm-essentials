@@ -16,9 +16,9 @@
 -- (default), MySQL/MariaDB, and PostgreSQL. No dialect-specific clause; jOOQ's
 -- DDLDatabase parses this file alongside V1-V25 at build time.
 
-CREATE TABLE vote_site_cooldown (
+CREATE TABLE ${prefix}vote_site_cooldown (
     player       VARCHAR(36)  NOT NULL,
     site_name    VARCHAR(64)  NOT NULL,
     last_vote_at BIGINT       NOT NULL,
-    CONSTRAINT pk_vote_site_cooldown PRIMARY KEY (player, site_name)
+    CONSTRAINT ${prefix}pk_vote_site_cooldown PRIMARY KEY (player, site_name)
 );

@@ -31,13 +31,13 @@
 -- as epoch milliseconds in a BIGINT so there is no dialect-specific datetime handling;
 -- `contents` is the base64-encoded serialized inventory (main + armor + offhand, and the ender
 -- chest when configured), the opaque payload, nullable for an empty capture.
-CREATE TABLE inv_snapshots (
+CREATE TABLE ${prefix}inv_snapshots (
     id          VARCHAR(36)  NOT NULL,
     owner       VARCHAR(36)  NOT NULL,
     cause       VARCHAR(16)  NOT NULL,
     created_at  BIGINT       NOT NULL,
     contents    TEXT,
-    CONSTRAINT pk_inv_snapshots PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_inv_snapshots PRIMARY KEY (id)
 );
 
 -- Serves the per-owner snapshot listing (the restore GUI reads a player's snapshots newest
@@ -45,4 +45,4 @@ CREATE TABLE inv_snapshots (
 -- owner's rows by recency to keep the newest N, and deleteOlderThan filters on created_at. The
 -- leading owner column scopes the scan to one player and the trailing created_at backs the
 -- recency ordering.
-CREATE INDEX idx_inv_snapshots_owner ON inv_snapshots (owner, created_at);
+CREATE INDEX ${prefix}idx_inv_snapshots_owner ON ${prefix}inv_snapshots (owner, created_at);

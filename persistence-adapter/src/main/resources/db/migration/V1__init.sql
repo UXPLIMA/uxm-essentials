@@ -12,7 +12,7 @@
 -- DDLDatabase, so the generated classes always match the migration that creates
 -- the tables at runtime.
 
-CREATE TABLE homes (
+CREATE TABLE ${prefix}homes (
     owner       VARCHAR(36)      NOT NULL,
     name        VARCHAR(64)      NOT NULL,
     world       VARCHAR(36)      NOT NULL,
@@ -23,12 +23,12 @@ CREATE TABLE homes (
     yaw         REAL             NOT NULL,
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_homes PRIMARY KEY (owner, name)
+    CONSTRAINT ${prefix}pk_homes PRIMARY KEY (owner, name)
 );
 
-CREATE INDEX idx_homes_owner ON homes (owner);
+CREATE INDEX ${prefix}idx_homes_owner ON ${prefix}homes (owner);
 
-CREATE TABLE warps (
+CREATE TABLE ${prefix}warps (
     name                VARCHAR(64)      NOT NULL,
     world               VARCHAR(36)      NOT NULL,
     world_name          VARCHAR(128)     NOT NULL,
@@ -41,5 +41,5 @@ CREATE TABLE warps (
     created_at          BIGINT           NOT NULL,
     cost                DECIMAL(20, 4),
     required_permission VARCHAR(128),
-    CONSTRAINT pk_warps PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_warps PRIMARY KEY (name)
 );

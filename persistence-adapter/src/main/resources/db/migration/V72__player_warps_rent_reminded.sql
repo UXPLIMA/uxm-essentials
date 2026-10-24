@@ -7,4 +7,4 @@
 -- Additive, portable DDL only: a plain ADD COLUMN with a constant default, no dialect clause and no ON DELETE
 -- CASCADE, so it parses identically on SQLite (default), MySQL/MariaDB, and PostgreSQL, and through the jOOQ
 -- DDLDatabase the code generator parses at build time.
-ALTER TABLE player_warps ADD COLUMN rent_reminded_stage INT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}player_warps ADD COLUMN rent_reminded_stage INT NOT NULL DEFAULT 0;

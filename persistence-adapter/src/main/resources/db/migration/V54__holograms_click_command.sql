@@ -6,4 +6,4 @@
 --
 --   click_command   the command run (as the clicking player) when the hologram is clicked, or NULL = not clickable
 
-ALTER TABLE holograms ADD COLUMN click_command TEXT;
+ALTER TABLE ${prefix}holograms ADD COLUMN click_command TEXT;

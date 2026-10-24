@@ -4,7 +4,7 @@
 -- when the key no longer matches the current window, so leaderboards show the
 -- current period without a scheduled job. Alltime never resets.
 
-CREATE TABLE vote_totals (
+CREATE TABLE ${prefix}vote_totals (
     player     VARCHAR(36) NOT NULL,
     alltime    BIGINT      NOT NULL DEFAULT 0,
     daily      BIGINT      NOT NULL DEFAULT 0,
@@ -13,9 +13,9 @@ CREATE TABLE vote_totals (
     day_key    BIGINT      NOT NULL DEFAULT 0,
     week_key   BIGINT      NOT NULL DEFAULT 0,
     month_key  BIGINT      NOT NULL DEFAULT 0,
-    CONSTRAINT pk_vote_totals PRIMARY KEY (player)
+    CONSTRAINT ${prefix}pk_vote_totals PRIMARY KEY (player)
 );
-CREATE INDEX idx_vote_totals_alltime ON vote_totals (alltime);
-CREATE INDEX idx_vote_totals_monthly ON vote_totals (monthly);
-CREATE INDEX idx_vote_totals_weekly  ON vote_totals (weekly);
-CREATE INDEX idx_vote_totals_daily   ON vote_totals (daily);
+CREATE INDEX ${prefix}idx_vote_totals_alltime ON ${prefix}vote_totals (alltime);
+CREATE INDEX ${prefix}idx_vote_totals_monthly ON ${prefix}vote_totals (monthly);
+CREATE INDEX ${prefix}idx_vote_totals_weekly  ON ${prefix}vote_totals (weekly);
+CREATE INDEX ${prefix}idx_vote_totals_daily   ON ${prefix}vote_totals (daily);

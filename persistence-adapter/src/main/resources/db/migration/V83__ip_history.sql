@@ -12,24 +12,24 @@
 -- Same portability contract as V1-V82: VARCHAR(36) uuids, VARCHAR(45) for the widest IPv6 literal, instants as
 -- epoch-millis BIGINTs, no dialect-specific datetime handling. jOOQ's DDLDatabase parses this file alongside its
 -- predecessors at build time, so the generated IP_HISTORY class always matches the runtime schema.
-CREATE TABLE ip_history (
+CREATE TABLE ${prefix}ip_history (
     uuid        VARCHAR(36) NOT NULL,
     ip_token    VARCHAR(64) NOT NULL,
     ip          VARCHAR(45),
     first_seen  BIGINT      NOT NULL,
     last_seen   BIGINT      NOT NULL,
-    CONSTRAINT pk_ip_history PRIMARY KEY (uuid, ip_token)
+    CONSTRAINT ${prefix}pk_ip_history PRIMARY KEY (uuid, ip_token)
 );
 
 -- The alt lookups and the per-address account cap all match by token, so index the fan-out side.
-CREATE INDEX idx_ip_history_token ON ip_history (ip_token);
+CREATE INDEX ${prefix}idx_ip_history_token ON ${prefix}ip_history (ip_token);
 
 -- Carry the security tokens over as they are: the address behind them was never stored, so their `ip` stays
 -- empty and `first_seen` can only be what the old row knew.
-INSERT INTO ip_history (uuid, ip_token, ip, first_seen, last_seen)
-SELECT uuid, ip_token, NULL, last_seen, last_seen FROM security_ip;
+INSERT INTO ${prefix}ip_history (uuid, ip_token, ip, first_seen, last_seen)
+SELECT uuid, ip_token, NULL, last_seen, last_seen FROM ${prefix}security_ip;
 
-DROP TABLE security_ip;
+DROP TABLE ${prefix}security_ip;
 
 -- moderation_ip_history is deliberately left in place and untouched here: its addresses can only be tokenised
 -- with the server's key, which SQL has no access to. The plugin folds those rows in on the next enable and

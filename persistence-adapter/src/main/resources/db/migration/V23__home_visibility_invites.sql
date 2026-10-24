@@ -3,12 +3,12 @@
 -- by its owner and any player on its invite list. Existing homes are all private
 -- after this migration (public = 0), which is the safe conservative default.
 
-ALTER TABLE homes ADD COLUMN public INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}homes ADD COLUMN public INTEGER NOT NULL DEFAULT 0;
 
-CREATE TABLE home_invites (
+CREATE TABLE ${prefix}home_invites (
     owner    VARCHAR(36) NOT NULL,
     slot     INTEGER     NOT NULL,
     invited  VARCHAR(36) NOT NULL,
-    CONSTRAINT pk_home_invites PRIMARY KEY (owner, slot, invited)
+    CONSTRAINT ${prefix}pk_home_invites PRIMARY KEY (owner, slot, invited)
 );
-CREATE INDEX idx_home_invites_owner ON home_invites (owner);
+CREATE INDEX ${prefix}idx_home_invites_owner ON ${prefix}home_invites (owner);

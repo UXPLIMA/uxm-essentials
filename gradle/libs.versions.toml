@@ -29,7 +29,7 @@ jda            = "5.6.1"
 lettuce        = "7.6.0.RELEASE" # io.lettuce:lettuce-core: Maven Central; the Redis bus transport ships in the uxmEssentials-redis companion jar
 
 # uxmLib, resolved from the organisation repository like every other dependency here
-uxmlib = "0.205.0"                 # com.uxplima.uxmlib (workspace .m2 and the Nexus)
+uxmlib = "0.206.0"                 # com.uxplima.uxmlib (workspace .m2 and the Nexus)
 
 # economy provider integrations (see docs/11-economy-integration.md, docs/adr/0004)
 treasury       = "1.2.0"        # me.lokka30:treasury-api: CodeMC repo, NOT Maven Central (verified 2026-05-30)
@@ -59,6 +59,7 @@ assertj        = "3.27.3"
 mockito        = "5.23.0"
 mockbukkit     = "4.116.1"      # org.mockbukkit.mockbukkit:mockbukkit-v26.2 (Maven Central, verified 2026-08-19); MC-version-specific artifact, see [libraries]
 testcontainers = "1.20.4"
+jakarta-xml-bind = "4.0.0"
 jqwik          = "1.9.3"
 archunit       = "1.4.2"      # com.tngtech.archunit: Maven Central (verified 2026-06-24); 1.3.0's bundled ASM rejects Java 25 (class v69) bytecode and silently imports zero classes, defeating every fence; 1.4.2 bundles ASM 9.8 (supports V25)
 
@@ -103,6 +104,7 @@ luckperms-api     = { module = "net.luckperms:api",                             
 jda               = { module = "net.dv8tion:JDA",                                version.ref = "jda" }
 lettuce           = { module = "io.lettuce:lettuce-core",                        version.ref = "lettuce" }
 uxmlib-redis      = { module = "com.uxplima.uxmlib:uxmlib-redis",                version.ref = "uxmlib" }
+uxmlib-storage-testing = { module = "com.uxplima.uxmlib:uxmlib-storage-testing", version.ref = "uxmlib" }
 uxmlib-command   = { module = "com.uxplima.uxmlib:uxmlib-command",            version.ref = "uxmlib" }
 uxmlib-gui       = { module = "com.uxplima.uxmlib:uxmlib-gui",                version.ref = "uxmlib" }
 uxmlib-bedrock   = { module = "com.uxplima.uxmlib:uxmlib-bedrock",            version.ref = "uxmlib" }
@@ -146,6 +148,7 @@ assertj           = { module = "org.assertj:assertj-core",                      
 mockito-core      = { module = "org.mockito:mockito-core",                       version.ref = "mockito" }
 mockito-jupiter   = { module = "org.mockito:mockito-junit-jupiter",              version.ref = "mockito" }
 mockbukkit        = { module = "org.mockbukkit.mockbukkit:mockbukkit-v26.2",    version.ref = "mockbukkit" }
+jakarta-xml-bind  = { module = "jakarta.xml.bind:jakarta.xml.bind-api",          version.ref = "jakarta-xml-bind" }
 testcontainers    = { module = "org.testcontainers:testcontainers",              version.ref = "testcontainers" }
 tc-junit          = { module = "org.testcontainers:junit-jupiter",               version.ref = "testcontainers" }
 tc-postgres       = { module = "org.testcontainers:postgresql",                  version.ref = "testcontainers" }

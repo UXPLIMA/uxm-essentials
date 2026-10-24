@@ -6,5 +6,5 @@
 --
 -- Same portability contract as V1-V84: a plain DROP TABLE, which SQLite, MySQL/MariaDB and PostgreSQL all accept,
 -- and which takes each table's own indexes with it.
-DROP TABLE discord_link_pending;
-DROP TABLE discord_links;
+DROP TABLE ${prefix}discord_link_pending;
+DROP TABLE ${prefix}discord_links;

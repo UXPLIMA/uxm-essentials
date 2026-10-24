@@ -15,10 +15,10 @@
 -- MySQL/MariaDB and PostgreSQL all accept, with no dialect-specific clause. jOOQ's DDLDatabase parses this file
 -- at build time, so the generated HologramBlacklist table and record appear with no extra configuration.
 
-CREATE TABLE hologram_blacklist (
+CREATE TABLE ${prefix}hologram_blacklist (
     hologram_name  VARCHAR(64)  NOT NULL,
     player_uuid    VARCHAR(36)  NOT NULL,
-    CONSTRAINT pk_hologram_blacklist PRIMARY KEY (hologram_name, player_uuid)
+    CONSTRAINT ${prefix}pk_hologram_blacklist PRIMARY KEY (hologram_name, player_uuid)
 );
 
-CREATE INDEX idx_hologram_blacklist_hologram ON hologram_blacklist (hologram_name);
+CREATE INDEX ${prefix}idx_hologram_blacklist_hologram ON ${prefix}hologram_blacklist (hologram_name);

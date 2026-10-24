@@ -12,5 +12,5 @@
 --   rotation_yaw    the display spin about the vertical axis, in degrees (0 = unrotated)
 --   rotation_pitch  the display spin about the horizontal axis, in degrees (0 = unrotated)
 
-ALTER TABLE holograms ADD COLUMN rotation_yaw REAL NOT NULL DEFAULT 0;
-ALTER TABLE holograms ADD COLUMN rotation_pitch REAL NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}holograms ADD COLUMN rotation_yaw REAL NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}holograms ADD COLUMN rotation_pitch REAL NOT NULL DEFAULT 0;

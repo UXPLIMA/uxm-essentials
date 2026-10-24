@@ -26,16 +26,16 @@
 -- session history. jOOQ's DDLDatabase parses this file at build time, so the
 -- generated PlayerstatePlaytime table matches the runtime schema.
 
-CREATE TABLE playerstate_playtime (
+CREATE TABLE ${prefix}playerstate_playtime (
     uuid            VARCHAR(36)  NOT NULL,
     day             VARCHAR(10)  NOT NULL,
     active_seconds  BIGINT       NOT NULL DEFAULT 0,
     afk_seconds     BIGINT       NOT NULL DEFAULT 0,
-    CONSTRAINT pk_playerstate_playtime PRIMARY KEY (uuid, day)
+    CONSTRAINT ${prefix}pk_playerstate_playtime PRIMARY KEY (uuid, day)
 );
 
 -- The summary queries scan a player's rows over a small date range (today, the last
 -- 7 days, the last 30 days, all-time), so the leading uuid column lets the index
 -- serve every one of them, with day second so the range predicate reads straight
 -- off the index.
-CREATE INDEX idx_playerstate_playtime_uuid_day ON playerstate_playtime (uuid, day);
+CREATE INDEX ${prefix}idx_playerstate_playtime_uuid_day ON ${prefix}playerstate_playtime (uuid, day);

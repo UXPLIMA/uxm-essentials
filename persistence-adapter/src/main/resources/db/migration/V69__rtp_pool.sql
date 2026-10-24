@@ -23,14 +23,14 @@
 -- this file alongside the rest at build time, so the generated RtpPool table and record appear with no
 -- extra configuration.
 
-CREATE TABLE rtp_pool (
+CREATE TABLE ${prefix}rtp_pool (
     id            BIGINT       NOT NULL,
     world_uuid    VARCHAR(36)  NOT NULL,
     x             INTEGER      NOT NULL,
     z             INTEGER      NOT NULL,
     biome         VARCHAR(128),
     validated_at  BIGINT       NOT NULL,
-    CONSTRAINT pk_rtp_pool PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_rtp_pool PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_rtp_pool_world ON rtp_pool (world_uuid);
+CREATE INDEX ${prefix}idx_rtp_pool_world ON ${prefix}rtp_pool (world_uuid);

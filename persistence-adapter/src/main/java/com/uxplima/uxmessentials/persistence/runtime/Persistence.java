@@ -30,11 +30,13 @@ public final class Persistence implements AutoCloseable {
     private final HikariDataSource dataSource;
     private final DSLContext dsl;
     private final DatabaseBackend backend;
+    private final String tablePrefix;
 
-    private Persistence(HikariDataSource dataSource, DSLContext dsl, DatabaseBackend backend) {
+    private Persistence(HikariDataSource dataSource, DSLContext dsl, DatabaseBackend backend, String tablePrefix) {
         this.dataSource = dataSource;
         this.dsl = dsl;
         this.backend = backend;
+        this.tablePrefix = tablePrefix;
     }
 
     /**
@@ -53,15 +55,20 @@ public final class Persistence implements AutoCloseable {
         Objects.requireNonNull(log, "log");
         DatabaseSettings settings = new DatabaseSettings(config, dataFolder);
         DatabaseBackend backend = settings.backend();
+        String tablePrefix = settings.tablePrefix();
         HikariDataSource dataSource = DataSourceFactory.create(settings);
         try {
-            new FlywayMigrationRunner(dataSource, backend).migrate(migrationLocations);
+            new FlywayMigrationRunner(dataSource, backend, tablePrefix).migrate(migrationLocations);
         } catch (RuntimeException cause) {
             dataSource.close();
             throw cause;
         }
         log.info("persistence opened on {} backend", backend.jdbcSubprotocol());
-        return new Persistence(dataSource, DslContextProvider.create(dataSource, backend.dialect()), backend);
+        return new Persistence(
+                dataSource,
+                DslContextProvider.create(dataSource, backend.dialect(), tablePrefix),
+                backend,
+                tablePrefix);
     }
 
     /** The shared jOOQ context every repository binds to. */
@@ -76,7 +83,7 @@ public final class Persistence implements AutoCloseable {
 
     /** Build the cross-context integrity check without leaking jOOQ into the bootstrap adapter. */
     public RepairableHealthCheck integrityCheck(java.util.function.Predicate<String> worldExists) {
-        return new PersistenceIntegrityHealthCheck(dsl, worldExists);
+        return new PersistenceIntegrityHealthCheck(dsl, worldExists, tablePrefix);
     }
 
     /**
@@ -98,10 +105,11 @@ public final class Persistence implements AutoCloseable {
 
     private Optional<String> appliedVersion() {
         try {
-            // The order Flyway applied them in, not the largest version: the column is text, and as text "9"
+            // The bare name: the context writes the table prefix in front of every table it renders. The order
+            // Flyway applied them in, not the largest version: the column is text, and as text "9"
             // sorts after "85", so a database on V85 reported itself as v9.
             Record1<Object> row = dsl.select(DSL.field("version"))
-                    .from(DSL.table("flyway_schema_history"))
+                    .from(DSL.table(DSL.name(FlywayMigrationRunner.historyTable(""))))
                     .where(DSL.field("success").eq(true))
                     .and(DSL.field("version").isNotNull())
                     .orderBy(DSL.field("installed_rank").desc())

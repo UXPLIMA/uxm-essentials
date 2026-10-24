@@ -21,18 +21,18 @@
 -- V1-V14 at build time, so the generated VoteParty and VoteQueue tables and records appear with no extra
 -- configuration.
 
-CREATE TABLE vote_party (
+CREATE TABLE ${prefix}vote_party (
     id     INT NOT NULL,
     count  INT NOT NULL,
-    CONSTRAINT pk_vote_party PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_vote_party PRIMARY KEY (id)
 );
 
-CREATE TABLE vote_queue (
+CREATE TABLE ${prefix}vote_queue (
     player     VARCHAR(36)  NOT NULL,
     idx        INT          NOT NULL,
     command    VARCHAR(512) NOT NULL,
     queued_at  BIGINT       NOT NULL,
-    CONSTRAINT pk_vote_queue PRIMARY KEY (player, idx)
+    CONSTRAINT ${prefix}pk_vote_queue PRIMARY KEY (player, idx)
 );
 
-CREATE INDEX idx_vote_queue_player ON vote_queue (player);
+CREATE INDEX ${prefix}idx_vote_queue_player ON ${prefix}vote_queue (player);

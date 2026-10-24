@@ -21,20 +21,20 @@
 -- BIGINT, the identifiers VARCHAR. jOOQ's DDLDatabase parses this file alongside V1-V15 at build time, so
 -- the generated DiscordLinkPending and DiscordLinks tables and records appear with no extra configuration.
 
-CREATE TABLE discord_link_pending (
+CREATE TABLE ${prefix}discord_link_pending (
     player      VARCHAR(36) NOT NULL,
     code        VARCHAR(16) NOT NULL,
     expires_at  BIGINT      NOT NULL,
-    CONSTRAINT pk_discord_link_pending PRIMARY KEY (player)
+    CONSTRAINT ${prefix}pk_discord_link_pending PRIMARY KEY (player)
 );
 
-CREATE UNIQUE INDEX idx_discord_link_pending_code ON discord_link_pending (code);
+CREATE UNIQUE INDEX ${prefix}idx_discord_link_pending_code ON ${prefix}discord_link_pending (code);
 
-CREATE TABLE discord_links (
+CREATE TABLE ${prefix}discord_links (
     player      VARCHAR(36) NOT NULL,
     discord_id  VARCHAR(32) NOT NULL,
     linked_at   BIGINT      NOT NULL,
-    CONSTRAINT pk_discord_links PRIMARY KEY (player)
+    CONSTRAINT ${prefix}pk_discord_links PRIMARY KEY (player)
 );
 
-CREATE UNIQUE INDEX idx_discord_links_discord ON discord_links (discord_id);
+CREATE UNIQUE INDEX ${prefix}idx_discord_links_discord ON ${prefix}discord_links (discord_id);

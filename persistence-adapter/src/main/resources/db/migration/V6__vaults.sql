@@ -34,17 +34,17 @@
 -- by the admin /vault <player> audit and usable for housekeeping. `contents` is
 -- the base64-encoded serialized ItemStack[], the opaque payload, nullable so a
 -- freshly allocated empty vault needs no blob.
-CREATE TABLE vaults (
+CREATE TABLE ${prefix}vaults (
     owner         VARCHAR(36)  NOT NULL,
     idx           INT          NOT NULL,
     size          SMALLINT     NOT NULL,
     last_touched  BIGINT       NOT NULL,
     contents      TEXT,
-    CONSTRAINT pk_vaults PRIMARY KEY (owner, idx)
+    CONSTRAINT ${prefix}pk_vaults PRIMARY KEY (owner, idx)
 );
 
 -- Serves the per-owner vault listing (the /vault index menu reads every vault a
 -- player owns, ORDER BY idx) and the admin /vault <player> lookup. The leading
 -- owner column scopes the scan to one player; the composite primary key already
 -- covers (owner, idx) point reads, so this index backs the owner-only range read.
-CREATE INDEX idx_vaults_owner ON vaults (owner);
+CREATE INDEX ${prefix}idx_vaults_owner ON ${prefix}vaults (owner);

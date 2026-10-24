@@ -23,7 +23,7 @@
 -- V1-V10 at build time, so the generated ModerationSanctionHistory table and record
 -- appear.
 
-CREATE TABLE moderation_sanction_history (
+CREATE TABLE ${prefix}moderation_sanction_history (
     id          BIGINT       NOT NULL,
     action      VARCHAR(16)  NOT NULL,
     target      VARCHAR(36)  NOT NULL,
@@ -33,11 +33,11 @@ CREATE TABLE moderation_sanction_history (
     ip          VARCHAR(45),
     expires_at  BIGINT,
     ts          BIGINT       NOT NULL,
-    CONSTRAINT pk_moderation_sanction_history PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_moderation_sanction_history PRIMARY KEY (id)
 );
 
 -- Serves /banhistory and /mutehistory newest-first per target (… WHERE target = ?
 -- AND action IN (…) ORDER BY ts DESC). The leading `target` scopes the index to one
 -- player's history; the descending `ts` lets the engine read the ordering off the
 -- index without a sort.
-CREATE INDEX idx_moderation_sanction_history_target ON moderation_sanction_history (target, ts DESC);
+CREATE INDEX ${prefix}idx_moderation_sanction_history_target ON ${prefix}moderation_sanction_history (target, ts DESC);

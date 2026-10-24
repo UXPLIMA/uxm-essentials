@@ -21,9 +21,9 @@
 -- backends accept. jOOQ's DDLDatabase parses this file alongside V1-V44 at build time, so the generated Npc
 -- record gains the new TEXT columns (still mapped to String) with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN equip_mainhand_b64 TEXT;
-ALTER TABLE npc ADD COLUMN equip_offhand_b64  TEXT;
-ALTER TABLE npc ADD COLUMN equip_head_b64     TEXT;
-ALTER TABLE npc ADD COLUMN equip_chest_b64    TEXT;
-ALTER TABLE npc ADD COLUMN equip_legs_b64     TEXT;
-ALTER TABLE npc ADD COLUMN equip_feet_b64     TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_mainhand_b64 TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_offhand_b64  TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_head_b64     TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_chest_b64    TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_legs_b64     TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN equip_feet_b64     TEXT;

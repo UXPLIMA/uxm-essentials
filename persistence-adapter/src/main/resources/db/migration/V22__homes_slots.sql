@@ -12,7 +12,7 @@
 -- data is silently lost. updated_at is seeded from created_at so all pre-migration homes have a valid
 -- timestamp without requiring a wall-clock call.
 
-CREATE TABLE homes_new (
+CREATE TABLE ${prefix}homes_new (
     owner       VARCHAR(36)      NOT NULL,
     slot        INTEGER          NOT NULL,
     label       VARCHAR(64),
@@ -26,12 +26,12 @@ CREATE TABLE homes_new (
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
     updated_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_homes_new PRIMARY KEY (owner, slot)
+    CONSTRAINT ${prefix}pk_homes_new PRIMARY KEY (owner, slot)
 );
 
-INSERT INTO homes_new (owner, slot, label, icon, world, world_name, x, y, z, yaw, pitch, created_at, updated_at)
+INSERT INTO ${prefix}homes_new (owner, slot, label, icon, world, world_name, x, y, z, yaw, pitch, created_at, updated_at)
 SELECT h.owner,
-       (SELECT COUNT(*) FROM homes AS h2
+       (SELECT COUNT(*) FROM ${prefix}homes AS h2
          WHERE h2.owner = h.owner
            AND (h2.created_at < h.created_at OR (h2.created_at = h.created_at AND h2.name < h.name))) AS slot,
        h.name,
@@ -45,10 +45,10 @@ SELECT h.owner,
        h.pitch,
        h.created_at,
        h.created_at
-FROM homes AS h;
+FROM ${prefix}homes AS h;
 
-DROP TABLE homes;
-ALTER TABLE homes_new RENAME TO homes;
-CREATE INDEX idx_homes_owner ON homes (owner);
+DROP TABLE ${prefix}homes;
+ALTER TABLE ${prefix}homes_new RENAME TO ${prefix}homes;
+CREATE INDEX ${prefix}idx_homes_owner ON ${prefix}homes (owner);
 
-DROP TABLE home_main;
+DROP TABLE ${prefix}home_main;

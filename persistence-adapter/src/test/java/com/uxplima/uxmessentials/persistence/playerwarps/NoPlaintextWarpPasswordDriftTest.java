@@ -76,7 +76,8 @@ class NoPlaintextWarpPasswordDriftTest {
     private static String readMigration() {
         try (InputStream in = NoPlaintextWarpPasswordDriftTest.class.getResourceAsStream(MIGRATION)) {
             assertThat(in).as("V70 migration must be on the classpath").isNotNull();
-            return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+            // Read as the script runs on a server that names no prefix.
+            return new String(in.readAllBytes(), StandardCharsets.UTF_8).replace("${prefix}", "");
         } catch (IOException e) {
             throw new AssertionError("could not read " + MIGRATION, e);
         }

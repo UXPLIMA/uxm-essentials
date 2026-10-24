@@ -19,12 +19,12 @@
 --   shadow_radius     the display drop-shadow radius on the ground; NULL = the vanilla shadow
 --   shadow_strength   the display drop-shadow strength; NULL = the vanilla shadow
 
-ALTER TABLE holograms ADD COLUMN text_alignment VARCHAR(16);
-ALTER TABLE holograms ADD COLUMN see_through SMALLINT;
-ALTER TABLE holograms ADD COLUMN scale_y REAL;
-ALTER TABLE holograms ADD COLUMN scale_z REAL;
-ALTER TABLE holograms ADD COLUMN translation_x REAL;
-ALTER TABLE holograms ADD COLUMN translation_y REAL;
-ALTER TABLE holograms ADD COLUMN translation_z REAL;
-ALTER TABLE holograms ADD COLUMN shadow_radius REAL;
-ALTER TABLE holograms ADD COLUMN shadow_strength REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN text_alignment VARCHAR(16);
+ALTER TABLE ${prefix}holograms ADD COLUMN see_through SMALLINT;
+ALTER TABLE ${prefix}holograms ADD COLUMN scale_y REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN scale_z REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN translation_x REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN translation_y REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN translation_z REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN shadow_radius REAL;
+ALTER TABLE ${prefix}holograms ADD COLUMN shadow_strength REAL;

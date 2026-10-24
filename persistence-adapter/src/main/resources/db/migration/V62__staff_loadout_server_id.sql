@@ -22,7 +22,7 @@
 -- server_id is 'server-1', so the join-recovery path still finds and restores it. A multi-server
 -- install was already clobbering these rows before this fix, so no correct state is lost there.
 
-CREATE TABLE staff_loadout_new (
+CREATE TABLE ${prefix}staff_loadout_new (
     player          VARCHAR(36)  NOT NULL,
     server_id       VARCHAR(64)  NOT NULL,
     inventory       TEXT         NOT NULL,
@@ -37,10 +37,10 @@ CREATE TABLE staff_loadout_new (
     vanished_before SMALLINT     NOT NULL DEFAULT 0,
     allow_flight    SMALLINT     NOT NULL DEFAULT 0,
     entered_at      BIGINT       NOT NULL,
-    CONSTRAINT pk_staff_loadout_new PRIMARY KEY (player, server_id)
+    CONSTRAINT ${prefix}pk_staff_loadout_new PRIMARY KEY (player, server_id)
 );
 
-INSERT INTO staff_loadout_new (player, server_id, inventory, armor, offhand, potion_effects,
+INSERT INTO ${prefix}staff_loadout_new (player, server_id, inventory, armor, offhand, potion_effects,
                                held_slot, exp_level, exp_progress, game_mode, flying,
                                vanished_before, allow_flight, entered_at)
 SELECT player,
@@ -57,7 +57,7 @@ SELECT player,
        vanished_before,
        allow_flight,
        entered_at
-FROM staff_loadout;
+FROM ${prefix}staff_loadout;
 
-DROP TABLE staff_loadout;
-ALTER TABLE staff_loadout_new RENAME TO staff_loadout;
+DROP TABLE ${prefix}staff_loadout;
+ALTER TABLE ${prefix}staff_loadout_new RENAME TO ${prefix}staff_loadout;

@@ -14,11 +14,11 @@
 -- backends accept. jOOQ's DDLDatabase parses this file alongside V1-V39 at build time, so the generated Npc
 -- record gains the new columns with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN equip_mainhand VARCHAR(64);
-ALTER TABLE npc ADD COLUMN equip_offhand  VARCHAR(64);
-ALTER TABLE npc ADD COLUMN equip_head     VARCHAR(64);
-ALTER TABLE npc ADD COLUMN equip_chest    VARCHAR(64);
-ALTER TABLE npc ADD COLUMN equip_legs     VARCHAR(64);
-ALTER TABLE npc ADD COLUMN equip_feet     VARCHAR(64);
-ALTER TABLE npc ADD COLUMN glowing        SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN glow_color     VARCHAR(16);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_mainhand VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_offhand  VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_head     VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_chest    VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_legs     VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN equip_feet     VARCHAR(64);
+ALTER TABLE ${prefix}npc ADD COLUMN glowing        SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN glow_color     VARCHAR(16);

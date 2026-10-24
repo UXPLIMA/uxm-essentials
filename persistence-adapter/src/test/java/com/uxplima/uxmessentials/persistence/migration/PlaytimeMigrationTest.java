@@ -92,6 +92,7 @@ class PlaytimeMigrationTest {
     private void migrateTo(String version) {
         Flyway.configure(getClass().getClassLoader())
                 .dataSource(dataSource)
+                .placeholders(java.util.Map.of("prefix", ""))
                 .locations(MIGRATIONS_LOCATION)
                 .baselineOnMigrate(true)
                 .baselineVersion("0")

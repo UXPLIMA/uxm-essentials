@@ -15,11 +15,11 @@
 -- Owner identity, materialised by ensureUserExists() before any offline-target
 -- write so a /pay or admin give to a never-joined player cannot violate a foreign
 -- key. One row per owner; the per-currency balance rows reference it.
-CREATE TABLE economy_owners (
+CREATE TABLE ${prefix}economy_owners (
     owner       VARCHAR(36)  NOT NULL,
     name        VARCHAR(16)  NOT NULL,
     created_at  BIGINT       NOT NULL,
-    CONSTRAINT pk_economy_owners PRIMARY KEY (owner)
+    CONSTRAINT ${prefix}pk_economy_owners PRIMARY KEY (owner)
 );
 
 -- One balance per (owner, currency): the Wallet aggregate is a map from Currency
@@ -27,20 +27,20 @@ CREATE TABLE economy_owners (
 -- currencies it has actually held, the rows stay sparse. The guarded debit
 -- (UPDATE ... WHERE owner = ? AND currency = ? AND amount >= ?) compares against
 -- the amount column, so it must be a real DECIMAL, never text or float.
-CREATE TABLE wallet_balances (
+CREATE TABLE ${prefix}wallet_balances (
     owner     VARCHAR(36)    NOT NULL,
     currency  VARCHAR(32)    NOT NULL,
     amount    DECIMAL(20, 4) NOT NULL,
-    CONSTRAINT pk_wallet_balances PRIMARY KEY (owner, currency),
-    CONSTRAINT fk_wallet_balances_owner FOREIGN KEY (owner)
-        REFERENCES economy_owners (owner)
+    CONSTRAINT ${prefix}pk_wallet_balances PRIMARY KEY (owner, currency),
+    CONSTRAINT ${prefix}fk_wallet_balances_owner FOREIGN KEY (owner)
+        REFERENCES ${prefix}economy_owners (owner)
 );
 
 -- Ranks /baltop descending by balance within one currency, bounded by LIMIT. The
 -- leading currency column lets the index serve a single-currency leaderboard; the
 -- descending amount column lets the engine read the ranking straight off the
 -- index without a sort.
-CREATE INDEX idx_wallet_balances_baltop ON wallet_balances (currency, amount DESC);
+CREATE INDEX ${prefix}idx_wallet_balances_baltop ON ${prefix}wallet_balances (currency, amount DESC);
 
 -- Append-only transaction history (the ledger). Every applied or refused money
 -- move is one row: a transfer carries both sides, a single-sided credit/debit
@@ -48,7 +48,7 @@ CREATE INDEX idx_wallet_balances_baltop ON wallet_balances (currency, amount DES
 -- names (EconomyReason) so an audit review can GROUP BY them. This table is only
 -- ever inserted into and read back, never updated, so the batch-INSERT flush
 -- path (append-only telemetry, not the debounced settle) owns it.
-CREATE TABLE transactions (
+CREATE TABLE ${prefix}transactions (
     id          BIGINT         NOT NULL,
     ts          BIGINT         NOT NULL,
     from_owner  VARCHAR(36),
@@ -57,9 +57,9 @@ CREATE TABLE transactions (
     amount      DECIMAL(20, 4) NOT NULL,
     type        VARCHAR(32)    NOT NULL,
     reason      VARCHAR(32)    NOT NULL,
-    CONSTRAINT pk_transactions PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_transactions PRIMARY KEY (id)
 );
 
-CREATE INDEX idx_transactions_from ON transactions (from_owner, ts);
-CREATE INDEX idx_transactions_to ON transactions (to_owner, ts);
-CREATE INDEX idx_transactions_currency ON transactions (currency, ts);
+CREATE INDEX ${prefix}idx_transactions_from ON ${prefix}transactions (from_owner, ts);
+CREATE INDEX ${prefix}idx_transactions_to ON ${prefix}transactions (to_owner, ts);
+CREATE INDEX ${prefix}idx_transactions_currency ON ${prefix}transactions (currency, ts);

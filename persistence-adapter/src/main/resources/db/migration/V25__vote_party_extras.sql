@@ -18,10 +18,10 @@
 -- (default), MySQL/MariaDB, and PostgreSQL. No dialect-specific clause; jOOQ's DDLDatabase
 -- parses this file alongside V1 to V24 at build time.
 
-CREATE TABLE vote_party_participants (
+CREATE TABLE ${prefix}vote_party_participants (
     player VARCHAR(36) NOT NULL,
-    CONSTRAINT pk_vote_party_participants PRIMARY KEY (player)
+    CONSTRAINT ${prefix}pk_vote_party_participants PRIMARY KEY (player)
 );
 
-ALTER TABLE vote_party ADD COLUMN period_key         BIGINT  NOT NULL DEFAULT 0;
-ALTER TABLE vote_party ADD COLUMN threshold_override INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}vote_party ADD COLUMN period_key         BIGINT  NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}vote_party ADD COLUMN threshold_override INTEGER NOT NULL DEFAULT 0;

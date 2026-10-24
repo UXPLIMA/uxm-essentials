@@ -50,6 +50,13 @@ final class BundledDefaultsMerge {
             List.of("storage", "type"), "backend",
             List.of("storage", "pool-size"), "read-pool-size");
 
+    /**
+     * Settings that ship for a new install and are never added to an existing file. The table prefix is one: an
+     * install that ran without it keeps its tables under their bare names, and a prefix appended to its file would
+     * point the plugin at an empty set of tables.
+     */
+    private static final Set<List<Object>> NEVER_APPENDED = Set.of(List.of("storage", "table-prefix"));
+
     private BundledDefaultsMerge() {}
 
     /**
@@ -126,7 +133,9 @@ final class BundledDefaultsMerge {
                 if (child.isMap() && theirs.isMap()) {
                     collect(child, baseline.node(key), theirs, fragment.node(key), at);
                 }
-            } else if (baseline.node(key).virtual() && !writtenUnderFormerName(operator, at)) {
+            } else if (baseline.node(key).virtual()
+                    && !writtenUnderFormerName(operator, at)
+                    && !NEVER_APPENDED.contains(at)) {
                 copy(child, fragment.node(key));
             }
         }

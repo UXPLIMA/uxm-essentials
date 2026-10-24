@@ -16,10 +16,10 @@
 -- alongside V1-V43 at build time, so the generated HologramManualViewer table and record appear with no extra
 -- configuration.
 
-CREATE TABLE hologram_manual_viewer (
+CREATE TABLE ${prefix}hologram_manual_viewer (
     hologram_name  VARCHAR(64)  NOT NULL,
     player_uuid    VARCHAR(36)  NOT NULL,
-    CONSTRAINT pk_hologram_manual_viewer PRIMARY KEY (hologram_name, player_uuid)
+    CONSTRAINT ${prefix}pk_hologram_manual_viewer PRIMARY KEY (hologram_name, player_uuid)
 );
 
-CREATE INDEX idx_hologram_manual_viewer_hologram ON hologram_manual_viewer (hologram_name);
+CREATE INDEX ${prefix}idx_hologram_manual_viewer_hologram ON ${prefix}hologram_manual_viewer (hologram_name);

@@ -27,7 +27,7 @@
 -- build time, so the generated TeleportSpawns, TeleportMainSpawn, TeleportNamedSpawns
 -- and TeleportSpawnMirrors tables and records appear.
 
-CREATE TABLE teleport_spawns (
+CREATE TABLE ${prefix}teleport_spawns (
     world       VARCHAR(36)      NOT NULL,
     world_name  VARCHAR(128)     NOT NULL,
     x           DOUBLE PRECISION NOT NULL,
@@ -36,10 +36,10 @@ CREATE TABLE teleport_spawns (
     yaw         REAL             NOT NULL,
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_teleport_spawns PRIMARY KEY (world)
+    CONSTRAINT ${prefix}pk_teleport_spawns PRIMARY KEY (world)
 );
 
-CREATE TABLE teleport_main_spawn (
+CREATE TABLE ${prefix}teleport_main_spawn (
     id          INTEGER          NOT NULL,
     world       VARCHAR(36)      NOT NULL,
     world_name  VARCHAR(128)     NOT NULL,
@@ -49,10 +49,10 @@ CREATE TABLE teleport_main_spawn (
     yaw         REAL             NOT NULL,
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_teleport_main_spawn PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_teleport_main_spawn PRIMARY KEY (id)
 );
 
-CREATE TABLE teleport_named_spawns (
+CREATE TABLE ${prefix}teleport_named_spawns (
     name        VARCHAR(64)      NOT NULL,
     world       VARCHAR(36)      NOT NULL,
     world_name  VARCHAR(128)     NOT NULL,
@@ -62,16 +62,16 @@ CREATE TABLE teleport_named_spawns (
     yaw         REAL             NOT NULL,
     pitch       REAL             NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_teleport_named_spawns PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_teleport_named_spawns PRIMARY KEY (name)
 );
 
 -- The mirror is the SpawnMirror domain record verbatim: a source world uid redirected
 -- to a target world uid. The world names are not stored. They are resolved from the
 -- live world lookup at read time, the same way the moderation gate resolves a world,
 -- so a renamed world folder never leaves a stale name behind.
-CREATE TABLE teleport_spawn_mirrors (
+CREATE TABLE ${prefix}teleport_spawn_mirrors (
     source_world  VARCHAR(36)  NOT NULL,
     target_world  VARCHAR(36)  NOT NULL,
     created_at    BIGINT       NOT NULL,
-    CONSTRAINT pk_teleport_spawn_mirrors PRIMARY KEY (source_world)
+    CONSTRAINT ${prefix}pk_teleport_spawn_mirrors PRIMARY KEY (source_world)
 );

@@ -16,4 +16,4 @@
 -- dialect-specific clause. jOOQ's DDLDatabase parses this file alongside the rest
 -- at build time, so the generated EconomyWorthOverrides table gains the column.
 
-ALTER TABLE economy_worth_overrides ADD COLUMN currency VARCHAR(36) DEFAULT 'default' NOT NULL;
+ALTER TABLE ${prefix}economy_worth_overrides ADD COLUMN currency VARCHAR(36) DEFAULT 'default' NOT NULL;

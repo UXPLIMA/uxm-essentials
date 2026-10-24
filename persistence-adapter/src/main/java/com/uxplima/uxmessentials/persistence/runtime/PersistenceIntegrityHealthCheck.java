@@ -85,9 +85,16 @@ public final class PersistenceIntegrityHealthCheck implements RepairableHealthCh
      */
     private final Predicate<String> worldExists;
 
-    public PersistenceIntegrityHealthCheck(DSLContext dsl, Predicate<String> worldExists) {
+    /**
+     * Written in front of every table name. The lists above name the tables without it, and the context renders
+     * it, so it is needed only to read the names the database lists back.
+     */
+    private final String tablePrefix;
+
+    public PersistenceIntegrityHealthCheck(DSLContext dsl, Predicate<String> worldExists, String tablePrefix) {
         this.dsl = Objects.requireNonNull(dsl, "dsl");
         this.worldExists = Objects.requireNonNull(worldExists, "worldExists");
+        this.tablePrefix = Objects.requireNonNull(tablePrefix, "tablePrefix");
     }
 
     @Override
@@ -210,9 +217,16 @@ public final class PersistenceIntegrityHealthCheck implements RepairableHealthCh
         return Set.copyOf(missing);
     }
 
-    private static Set<String> availableTables(DSLContext scope) {
+    /** The tables of this schema, by the names the lists above give them: the prefix is taken off. */
+    private Set<String> availableTables(DSLContext scope) {
+        String prefix = tablePrefix.toLowerCase(Locale.ROOT);
         Set<String> names = new HashSet<>();
-        scope.meta().getTables().forEach(table -> names.add(table.getName().toLowerCase(Locale.ROOT)));
+        scope.meta().getTables().forEach(table -> {
+            String name = table.getName().toLowerCase(Locale.ROOT);
+            if (name.startsWith(prefix)) {
+                names.add(name.substring(prefix.length()));
+            }
+        });
         return Set.copyOf(names);
     }
 

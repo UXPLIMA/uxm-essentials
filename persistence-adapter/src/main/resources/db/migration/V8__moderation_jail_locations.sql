@@ -16,7 +16,7 @@
 -- dialect-specific clause. jOOQ's DDLDatabase parses this file alongside V1-V7 at
 -- build time, so the generated ModerationJailLocations table and record appear.
 
-CREATE TABLE moderation_jail_locations (
+CREATE TABLE ${prefix}moderation_jail_locations (
     name        VARCHAR(64)      NOT NULL,
     world       VARCHAR(36)      NOT NULL,
     world_name  VARCHAR(128)     NOT NULL,
@@ -27,5 +27,5 @@ CREATE TABLE moderation_jail_locations (
     pitch       REAL             NOT NULL,
     defined_by  VARCHAR(36),
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_moderation_jail_locations PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_moderation_jail_locations PRIMARY KEY (name)
 );

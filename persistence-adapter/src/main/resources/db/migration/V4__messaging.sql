@@ -22,7 +22,7 @@
 -- uuid) still renders a name and a since-renamed sender still shows the name at
 -- send time. is_read is the read flag; sent_at drives mail expiry and the
 -- newest-first listing.
-CREATE TABLE mail (
+CREATE TABLE ${prefix}mail (
     id           BIGINT       NOT NULL,
     recipient    VARCHAR(36)  NOT NULL,
     sender       VARCHAR(36),
@@ -30,23 +30,23 @@ CREATE TABLE mail (
     body         VARCHAR(256) NOT NULL,
     sent_at      BIGINT       NOT NULL,
     is_read      SMALLINT     NOT NULL,
-    CONSTRAINT pk_mail PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_mail PRIMARY KEY (id)
 );
 
 -- Serves the per-recipient mailbox read newest-first and bounds the expiry sweep
 -- (DELETE ... WHERE sent_at < ?). The leading recipient column lets the index
 -- serve one mailbox; the descending sent_at column lets the engine read the
 -- ordering straight off the index without a sort.
-CREATE INDEX idx_mail_recipient ON mail (recipient, sent_at DESC);
+CREATE INDEX ${prefix}idx_mail_recipient ON ${prefix}mail (recipient, sent_at DESC);
 
 -- One row per (owner, ignored): the ignore list is persistent and ignore-aware
 -- /msg resolution and the async chat-mute path both read it. scope keeps the
 -- stable enum name (e.g. the kind of traffic ignored) as a first-class column so
 -- a future per-scope query needs no migration. The composite primary key makes
 -- a duplicate /ignore idempotent at the database.
-CREATE TABLE ignores (
+CREATE TABLE ${prefix}ignores (
     owner    VARCHAR(36) NOT NULL,
     ignored  VARCHAR(36) NOT NULL,
     scope    VARCHAR(32) NOT NULL,
-    CONSTRAINT pk_ignores PRIMARY KEY (owner, ignored)
+    CONSTRAINT ${prefix}pk_ignores PRIMARY KEY (owner, ignored)
 );

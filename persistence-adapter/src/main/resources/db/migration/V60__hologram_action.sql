@@ -20,13 +20,13 @@
 -- this file alongside V1-V59 at build time, so the generated HologramAction table and record appear with no
 -- extra configuration.
 
-CREATE TABLE hologram_action (
+CREATE TABLE ${prefix}hologram_action (
     hologram_name  VARCHAR(64)  NOT NULL,
     ordinal        INT          NOT NULL,
     click_trigger  VARCHAR(16)  NOT NULL,
     type           VARCHAR(32)  NOT NULL,
     value          VARCHAR(512) NOT NULL,
-    CONSTRAINT pk_hologram_action PRIMARY KEY (hologram_name, ordinal)
+    CONSTRAINT ${prefix}pk_hologram_action PRIMARY KEY (hologram_name, ordinal)
 );
 
-CREATE INDEX idx_hologram_action_hologram ON hologram_action (hologram_name);
+CREATE INDEX ${prefix}idx_hologram_action_hologram ON ${prefix}hologram_action (hologram_name);

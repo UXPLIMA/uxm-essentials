@@ -27,6 +27,12 @@ public final class DatabaseSettings {
 
     private static final String SQLITE_FILE_NAME = "uxmessentials.db";
 
+    /**
+     * Letters, digits and underscores, at most fifteen of them. The longest index name of the schema is 48
+     * characters, and PostgreSQL cuts a name at 63 without failing, so a longer prefix could make two names one.
+     */
+    private static final java.util.regex.Pattern PREFIX = java.util.regex.Pattern.compile("[A-Za-z0-9_]{0,15}");
+
     private final ConfigStore config;
     private final Path dataFolder;
 
@@ -46,6 +52,21 @@ public final class DatabaseSettings {
         }
         return DatabaseBackend.fromToken(
                 config.getString("storage.type", config.getString("storage.backend", "sqlite")));
+    }
+
+    /**
+     * Written in front of every table, index and key name, so two plugins, or two copies of this one, can share a
+     * database. A file that names none keeps the bare names every install before it was written under.
+     *
+     * @throws IllegalArgumentException when it is not a bare word of at most fifteen characters
+     */
+    public String tablePrefix() {
+        String prefix = config.getString("storage.table-prefix", "");
+        if (!PREFIX.matcher(prefix).matches()) {
+            throw new IllegalArgumentException("storage.table-prefix may hold only letters, digits and underscores,"
+                    + " at most 15 of them, got '" + prefix + "'");
+        }
+        return prefix;
     }
 
     /** The SQLite database file under the plugin data folder. */

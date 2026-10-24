@@ -44,7 +44,9 @@ class EveryColumnTypeIsPortableTest {
                     .toList()) {
                 List<String> lines = Files.readAllLines(script);
                 for (int i = 0; i < lines.size(); i++) {
-                    Matcher column = COLUMN.matcher(lines.get(i).replaceAll("--.*", ""));
+                    // Read as the script runs on a server that names no prefix.
+                    Matcher column =
+                            COLUMN.matcher(lines.get(i).replace("${prefix}", "").replaceAll("--.*", ""));
                     if (!column.find() || NOT_A_TYPE.contains(column.group(1))) {
                         continue;
                     }

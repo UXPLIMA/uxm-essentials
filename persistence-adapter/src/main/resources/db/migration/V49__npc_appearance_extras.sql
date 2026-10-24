@@ -20,14 +20,14 @@
 -- DDLDatabase parses this file alongside V1-V47 at build time, so the generated Npc record gains the new columns
 -- with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN display_name                TEXT;
-ALTER TABLE npc ADD COLUMN skin_slim                   SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN mirror_skin                 SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN collidable                  SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN show_in_tab                 SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN on_fire                     SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN invisible                   SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN silent                      SMALLINT NOT NULL DEFAULT 0;
-ALTER TABLE npc ADD COLUMN view_distance               REAL;
-ALTER TABLE npc ADD COLUMN turn_distance               REAL;
-ALTER TABLE npc ADD COLUMN interaction_cooldown_millis BIGINT   NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN display_name                TEXT;
+ALTER TABLE ${prefix}npc ADD COLUMN skin_slim                   SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN mirror_skin                 SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN collidable                  SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN show_in_tab                 SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN on_fire                     SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN invisible                   SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN silent                      SMALLINT NOT NULL DEFAULT 0;
+ALTER TABLE ${prefix}npc ADD COLUMN view_distance               REAL;
+ALTER TABLE ${prefix}npc ADD COLUMN turn_distance               REAL;
+ALTER TABLE ${prefix}npc ADD COLUMN interaction_cooldown_millis BIGINT   NOT NULL DEFAULT 0;

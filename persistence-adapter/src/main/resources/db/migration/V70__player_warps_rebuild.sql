@@ -15,10 +15,10 @@
 -- collide there. A distinct name on the new table sidesteps the clash on every backend (MySQL, which scopes
 -- them per table, never saw a clash either way) without a non-portable DROP of the legacy identifiers.
 
-ALTER TABLE player_warps RENAME TO player_warps_v1_legacy;
-ALTER TABLE player_warp_ratings RENAME TO player_warp_ratings_v1_legacy;
+ALTER TABLE ${prefix}player_warps RENAME TO ${prefix}player_warps_v1_legacy;
+ALTER TABLE ${prefix}player_warp_ratings RENAME TO ${prefix}player_warp_ratings_v1_legacy;
 
-CREATE TABLE player_warps (
+CREATE TABLE ${prefix}player_warps (
     id                  BIGINT         NOT NULL,
     name                VARCHAR(32)    NOT NULL,
     display_name        VARCHAR(128),
@@ -64,94 +64,94 @@ CREATE TABLE player_warps (
     arrival_particle    VARCHAR(128),
     created_at          BIGINT         NOT NULL,
     updated_at          BIGINT         NOT NULL,
-    CONSTRAINT pk_player_warps_v2 PRIMARY KEY (id),
-    CONSTRAINT uq_player_warps_name UNIQUE (name)
+    CONSTRAINT ${prefix}pk_player_warps_v2 PRIMARY KEY (id),
+    CONSTRAINT ${prefix}uq_player_warps_name UNIQUE (name)
 );
 
-CREATE INDEX idx_player_warps_by_owner ON player_warps (owner);
-CREATE INDEX idx_player_warps_status_access ON player_warps (status, access);
-CREATE INDEX idx_player_warps_status_score ON player_warps (status, rating_score);
-CREATE INDEX idx_player_warps_status_visits ON player_warps (status, visit_count);
-CREATE INDEX idx_player_warps_status_created ON player_warps (status, created_at);
-CREATE INDEX idx_player_warps_sponsored ON player_warps (sponsored_until);
-CREATE INDEX idx_player_warps_rent ON player_warps (rent_paid_until);
+CREATE INDEX ${prefix}idx_player_warps_by_owner ON ${prefix}player_warps (owner);
+CREATE INDEX ${prefix}idx_player_warps_status_access ON ${prefix}player_warps (status, access);
+CREATE INDEX ${prefix}idx_player_warps_status_score ON ${prefix}player_warps (status, rating_score);
+CREATE INDEX ${prefix}idx_player_warps_status_visits ON ${prefix}player_warps (status, visit_count);
+CREATE INDEX ${prefix}idx_player_warps_status_created ON ${prefix}player_warps (status, created_at);
+CREATE INDEX ${prefix}idx_player_warps_sponsored ON ${prefix}player_warps (sponsored_until);
+CREATE INDEX ${prefix}idx_player_warps_rent ON ${prefix}player_warps (rent_paid_until);
 
-CREATE TABLE player_warp_ratings (
+CREATE TABLE ${prefix}player_warp_ratings (
     warp_id     BIGINT      NOT NULL,
     player_uuid VARCHAR(36) NOT NULL,
     stars       INT         NOT NULL,
     rated_at    BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_ratings PRIMARY KEY (warp_id, player_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_ratings PRIMARY KEY (warp_id, player_uuid)
 );
-CREATE INDEX idx_player_warp_ratings_warp ON player_warp_ratings (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_ratings_warp ON ${prefix}player_warp_ratings (warp_id);
 
-CREATE TABLE player_warp_visits (
+CREATE TABLE ${prefix}player_warp_visits (
     warp_id      BIGINT      NOT NULL,
     visitor_uuid VARCHAR(36) NOT NULL,
     first_at     BIGINT      NOT NULL,
     last_at      BIGINT      NOT NULL,
     visit_count  BIGINT      NOT NULL DEFAULT 0,
-    CONSTRAINT pk_player_warp_visits PRIMARY KEY (warp_id, visitor_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_visits PRIMARY KEY (warp_id, visitor_uuid)
 );
-CREATE INDEX idx_player_warp_visits_warp ON player_warp_visits (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_visits_warp ON ${prefix}player_warp_visits (warp_id);
 
-CREATE TABLE player_warp_bans (
+CREATE TABLE ${prefix}player_warp_bans (
     warp_id      BIGINT      NOT NULL,
     player_uuid  VARCHAR(36) NOT NULL,
     banned_until BIGINT,
     reason       VARCHAR(256),
     banned_by    VARCHAR(36),
     banned_at    BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_bans PRIMARY KEY (warp_id, player_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_bans PRIMARY KEY (warp_id, player_uuid)
 );
-CREATE INDEX idx_player_warp_bans_warp ON player_warp_bans (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_bans_warp ON ${prefix}player_warp_bans (warp_id);
 
-CREATE TABLE player_warp_whitelist (
+CREATE TABLE ${prefix}player_warp_whitelist (
     warp_id     BIGINT      NOT NULL,
     player_uuid VARCHAR(36) NOT NULL,
     added_at    BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_whitelist PRIMARY KEY (warp_id, player_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_whitelist PRIMARY KEY (warp_id, player_uuid)
 );
-CREATE INDEX idx_player_warp_whitelist_warp ON player_warp_whitelist (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_whitelist_warp ON ${prefix}player_warp_whitelist (warp_id);
 
-CREATE TABLE player_warp_members (
+CREATE TABLE ${prefix}player_warp_members (
     warp_id     BIGINT      NOT NULL,
     player_uuid VARCHAR(36) NOT NULL,
     role        VARCHAR(16) NOT NULL,
     added_at    BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_members PRIMARY KEY (warp_id, player_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_members PRIMARY KEY (warp_id, player_uuid)
 );
-CREATE INDEX idx_player_warp_members_warp ON player_warp_members (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_members_warp ON ${prefix}player_warp_members (warp_id);
 
-CREATE TABLE player_warp_favourites (
+CREATE TABLE ${prefix}player_warp_favourites (
     player_uuid VARCHAR(36) NOT NULL,
     warp_id     BIGINT      NOT NULL,
     added_at    BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_favourites PRIMARY KEY (player_uuid, warp_id)
+    CONSTRAINT ${prefix}pk_player_warp_favourites PRIMARY KEY (player_uuid, warp_id)
 );
-CREATE INDEX idx_player_warp_favourites_warp ON player_warp_favourites (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_favourites_warp ON ${prefix}player_warp_favourites (warp_id);
 
-CREATE TABLE player_warp_payments (
+CREATE TABLE ${prefix}player_warp_payments (
     warp_id      BIGINT         NOT NULL,
     player_uuid  VARCHAR(36)    NOT NULL,
     amount       DECIMAL(20, 4) NOT NULL,
     currency     VARCHAR(32)    NOT NULL,
     paid_at      BIGINT         NOT NULL,
-    CONSTRAINT pk_player_warp_payments PRIMARY KEY (warp_id, player_uuid, paid_at)
+    CONSTRAINT ${prefix}pk_player_warp_payments PRIMARY KEY (warp_id, player_uuid, paid_at)
 );
-CREATE INDEX idx_player_warp_payments_warp ON player_warp_payments (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_payments_warp ON ${prefix}player_warp_payments (warp_id);
 
-CREATE TABLE player_warp_rating_rewards (
+CREATE TABLE ${prefix}player_warp_rating_rewards (
     subject_uuid VARCHAR(36) NOT NULL,
     warp_id      BIGINT      NOT NULL,
     reward_id    VARCHAR(64) NOT NULL,
     kind         VARCHAR(16) NOT NULL,
     awarded_at   BIGINT      NOT NULL,
-    CONSTRAINT pk_player_warp_rating_rewards PRIMARY KEY (subject_uuid, warp_id, reward_id)
+    CONSTRAINT ${prefix}pk_player_warp_rating_rewards PRIMARY KEY (subject_uuid, warp_id, reward_id)
 );
-CREATE INDEX idx_player_warp_rating_rewards_warp ON player_warp_rating_rewards (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_rating_rewards_warp ON ${prefix}player_warp_rating_rewards (warp_id);
 
-CREATE TABLE player_warp_pending_teleports (
+CREATE TABLE ${prefix}player_warp_pending_teleports (
     player_uuid   VARCHAR(36)    NOT NULL,
     warp_id       BIGINT         NOT NULL,
     target_server VARCHAR(64)    NOT NULL,
@@ -159,6 +159,6 @@ CREATE TABLE player_warp_pending_teleports (
     requested_at  BIGINT         NOT NULL,
     paid_amount   DECIMAL(20, 4),
     paid_currency VARCHAR(32),
-    CONSTRAINT pk_player_warp_pending_teleports PRIMARY KEY (player_uuid)
+    CONSTRAINT ${prefix}pk_player_warp_pending_teleports PRIMARY KEY (player_uuid)
 );
-CREATE INDEX idx_player_warp_pending_teleports_warp ON player_warp_pending_teleports (warp_id);
+CREATE INDEX ${prefix}idx_player_warp_pending_teleports_warp ON ${prefix}player_warp_pending_teleports (warp_id);

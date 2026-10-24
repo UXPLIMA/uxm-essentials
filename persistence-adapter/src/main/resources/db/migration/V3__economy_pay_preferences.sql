@@ -8,8 +8,8 @@
 -- a row means the player has never run /paytoggle and takes the configured
 -- economy.pay.toggle-default.
 
-CREATE TABLE economy_pay_preferences (
+CREATE TABLE ${prefix}economy_pay_preferences (
     owner        VARCHAR(36) NOT NULL,
     accepts_pay  SMALLINT    NOT NULL,
-    CONSTRAINT pk_economy_pay_preferences PRIMARY KEY (owner)
+    CONSTRAINT ${prefix}pk_economy_pay_preferences PRIMARY KEY (owner)
 );

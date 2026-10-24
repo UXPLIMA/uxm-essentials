@@ -23,7 +23,7 @@
 -- this file alongside V1-V37 at build time, so the generated Npc table and record appear with no extra
 -- configuration.
 
-CREATE TABLE npc (
+CREATE TABLE ${prefix}npc (
     name            VARCHAR(64)      NOT NULL,
     world           VARCHAR(36)      NOT NULL,
     world_name      VARCHAR(128)     NOT NULL,
@@ -36,5 +36,5 @@ CREATE TABLE npc (
     skin_signature  TEXT,
     click_command   VARCHAR(256),
     created_at      BIGINT           NOT NULL,
-    CONSTRAINT pk_npc PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_npc PRIMARY KEY (name)
 );

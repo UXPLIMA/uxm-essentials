@@ -53,6 +53,7 @@ storage {
   username = "uxmessentials"
   password = ""
   pool-size = 8                 # network backends only; SQLite is a single writer
+  table-prefix = "uxmessentials_"   # in front of every table; chosen before the first start
   connection-timeout-ms = 5000
   local-only = false            # true keeps this one server on the SQLite file above
 }
@@ -64,6 +65,13 @@ as the events. SQLite is right for one server and wrong for several.
 The block is spelled the way every plugin of the family spells it. A file written before that
 says `backend` and `read-pool-size`; the plugin rewrites no operator's file, so it still reads
 those two when `type` and `pool-size` are not written, and the new name wins when both are.
+
+`table-prefix` is written in front of every table, index and key, so two plugins, or two copies
+of this one, can share a database. A new install ships with `uxmessentials_`. A server that ran
+before the prefix existed has no `table-prefix` line, keeps its tables under their bare names, and
+an update never adds the line to its file. Writing a prefix over such a database stops the plugin
+with a message rather than start on an empty set of tables: to move one, rename the tables first.
+At most 15 letters, digits and underscores, so every index name fits PostgreSQL's 63.
 
 `local-only = true` keeps one server of a network on its own SQLite file, whatever `type` says.
 It is for the server that has no business in the shared data, a creative world or a build

@@ -64,6 +64,7 @@ class DiscordLinksDropMigrationTest {
     private void migrateTo(String version) {
         Flyway.configure(getClass().getClassLoader())
                 .dataSource(dataSource)
+                .placeholders(java.util.Map.of("prefix", ""))
                 .locations("classpath:db/migration")
                 .baselineOnMigrate(true)
                 .baselineVersion("0")

@@ -9,7 +9,7 @@
 -- amounts per currency; both are empty when nothing of that kind was staked. Money is DECIMAL-scale text, amounts a
 -- DECIMAL-derived string, and created_at an epoch-millis BIGINT, matching V1-V74. phase drives the commit:
 -- HELD (refundable) -> COMMITTED (the atomic point of no return, both rows flip together) -> CLAIMED (delivered).
-CREATE TABLE trade_escrow (
+CREATE TABLE ${prefix}trade_escrow (
     trade_id            VARCHAR(36)  NOT NULL,
     owner_uuid          VARCHAR(36)  NOT NULL,
     owner_name          VARCHAR(64)  NOT NULL,
@@ -22,7 +22,7 @@ CREATE TABLE trade_escrow (
     money               TEXT,
     phase               VARCHAR(16)  NOT NULL,
     created_at          BIGINT       NOT NULL,
-    CONSTRAINT pk_trade_escrow PRIMARY KEY (trade_id, owner_uuid)
+    CONSTRAINT ${prefix}pk_trade_escrow PRIMARY KEY (trade_id, owner_uuid)
 );
 
-CREATE INDEX idx_trade_escrow_owner ON trade_escrow (owner_uuid);
+CREATE INDEX ${prefix}idx_trade_escrow_owner ON ${prefix}trade_escrow (owner_uuid);

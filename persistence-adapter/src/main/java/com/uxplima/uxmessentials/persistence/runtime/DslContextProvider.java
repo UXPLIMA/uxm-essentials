@@ -1,11 +1,16 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
 import java.util.Objects;
+import java.util.regex.Pattern;
 
 import javax.sql.DataSource;
 
 import org.jooq.DSLContext;
 import org.jooq.SQLDialect;
+import org.jooq.conf.MappedSchema;
+import org.jooq.conf.MappedTable;
+import org.jooq.conf.RenderMapping;
+import org.jooq.conf.Settings;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
@@ -23,12 +28,26 @@ public final class DslContextProvider {
 
     private DslContextProvider() {}
 
-    /** Create a shared {@link DSLContext} bound to {@code dataSource}, rendering in {@code dialect}. */
-    public static DSLContext create(DataSource dataSource, SQLDialect dialect) {
+    /**
+     * Create a shared {@link DSLContext} bound to {@code dataSource}, rendering in {@code dialect}. The generated
+     * tables carry their bare names, and {@code tablePrefix} is written in front of each when a query is rendered.
+     */
+    public static DSLContext create(DataSource dataSource, SQLDialect dialect, String tablePrefix) {
         Objects.requireNonNull(dataSource, "dataSource");
         Objects.requireNonNull(dialect, "dialect");
+        Objects.requireNonNull(tablePrefix, "tablePrefix");
         silenceJooqBanner();
-        return DSL.using(dataSource, dialect);
+        if (tablePrefix.isEmpty()) {
+            return DSL.using(dataSource, dialect);
+        }
+        Settings settings = new Settings()
+                .withRenderMapping(new RenderMapping()
+                        .withSchemata(new MappedSchema()
+                                .withInput("")
+                                .withTables(new MappedTable()
+                                        .withInputExpression(Pattern.compile("(.+)"))
+                                        .withOutput(tablePrefix + "$1"))));
+        return DSL.using(dataSource, dialect, settings);
     }
 
     /**

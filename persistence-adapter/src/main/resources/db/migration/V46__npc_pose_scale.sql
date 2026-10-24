@@ -14,5 +14,5 @@
 -- DDLDatabase parses this file alongside V1-V45 at build time, so the generated Npc record gains the pose and
 -- scale columns with no extra configuration.
 
-ALTER TABLE npc ADD COLUMN pose  VARCHAR(32) NOT NULL DEFAULT 'STANDING';
-ALTER TABLE npc ADD COLUMN scale REAL        NOT NULL DEFAULT 1.0;
+ALTER TABLE ${prefix}npc ADD COLUMN pose  VARCHAR(32) NOT NULL DEFAULT 'STANDING';
+ALTER TABLE ${prefix}npc ADD COLUMN scale REAL        NOT NULL DEFAULT 1.0;

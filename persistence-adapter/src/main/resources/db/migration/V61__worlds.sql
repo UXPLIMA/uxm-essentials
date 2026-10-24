@@ -1,7 +1,7 @@
 -- V61__worlds.sql, world-management metadata (sub-project A).
 -- Portable subset (SQLite default / MySQL / PostgreSQL): UUID as VARCHAR(36), instant as BIGINT
 -- epoch-ms, boolean as INT 0/1. World files stay on disk; this is the managed metadata only.
-CREATE TABLE world (
+CREATE TABLE ${prefix}world (
     name                VARCHAR(64)  NOT NULL,
     uid                 VARCHAR(36),
     environment         VARCHAR(16)  NOT NULL,
@@ -15,14 +15,14 @@ CREATE TABLE world (
     adopted             INT          NOT NULL,
     created_at          BIGINT       NOT NULL,
     created_by          VARCHAR(36),
-    CONSTRAINT pk_world PRIMARY KEY (name)
+    CONSTRAINT ${prefix}pk_world PRIMARY KEY (name)
 );
 
 -- Open-ended per-world property + gamerule store. Created now (schema future-proof); written by
 -- sub-project B. Referential cleanup on world delete is performed in application code.
-CREATE TABLE world_setting (
+CREATE TABLE ${prefix}world_setting (
     world_name    VARCHAR(64)  NOT NULL,
     setting_key   VARCHAR(64)  NOT NULL,
     setting_value VARCHAR(512) NOT NULL,
-    CONSTRAINT pk_world_setting PRIMARY KEY (world_name, setting_key)
+    CONSTRAINT ${prefix}pk_world_setting PRIMARY KEY (world_name, setting_key)
 );

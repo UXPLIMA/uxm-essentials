@@ -12,9 +12,9 @@
 -- fresh database always finds it (not-locked, the safe default) without an upsert.
 -- jOOQ's DDLDatabase parses this file alongside V1-V32 at build time, so the
 -- generated MODERATION_LOCKDOWN class always matches the runtime schema.
-CREATE TABLE moderation_lockdown (
+CREATE TABLE ${prefix}moderation_lockdown (
     id      SMALLINT NOT NULL PRIMARY KEY,
     enabled SMALLINT NOT NULL DEFAULT 0
 );
 
-INSERT INTO moderation_lockdown (id, enabled) VALUES (0, 0);
+INSERT INTO ${prefix}moderation_lockdown (id, enabled) VALUES (0, 0);

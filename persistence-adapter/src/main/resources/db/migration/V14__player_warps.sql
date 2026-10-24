@@ -17,7 +17,7 @@
 -- DDLDatabase parses this file alongside V1-V13 at build time, so the generated PlayerWarps table and
 -- record appear with no extra configuration.
 
-CREATE TABLE player_warps (
+CREATE TABLE ${prefix}player_warps (
     owner       VARCHAR(36)      NOT NULL,
     name        VARCHAR(64)      NOT NULL,
     world       VARCHAR(36)      NOT NULL,
@@ -29,9 +29,9 @@ CREATE TABLE player_warps (
     pitch       REAL             NOT NULL,
     is_public   INT              NOT NULL,
     created_at  BIGINT           NOT NULL,
-    CONSTRAINT pk_player_warps PRIMARY KEY (owner, name)
+    CONSTRAINT ${prefix}pk_player_warps PRIMARY KEY (owner, name)
 );
 
-CREATE INDEX idx_player_warps_owner ON player_warps (owner);
+CREATE INDEX ${prefix}idx_player_warps_owner ON ${prefix}player_warps (owner);
 
-CREATE INDEX idx_player_warps_public ON player_warps (is_public);
+CREATE INDEX ${prefix}idx_player_warps_public ON ${prefix}player_warps (is_public);

@@ -42,6 +42,7 @@ class DefaultResourcesTest {
 
         assertThat(config.getString("storage.type", "?")).isEqualTo("sqlite");
         assertThat(config.getInt("storage.pool-size", -1)).isEqualTo(8);
+        assertThat(config.getString("storage.table-prefix", "?")).isEqualTo("uxmessentials_");
         assertThat(config.getString("storage.file", "?")).isEqualTo("uxmessentials.db");
         assertThat(config.getString("language.default", "?")).isEqualTo("en");
         assertThat(config.getBoolean("language.follow-client", false)).isTrue();
