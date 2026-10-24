@@ -37,6 +37,10 @@ dependencies {
     // It is needed only on the codegen classpath, never at runtime.
     jooqCodegen(libs.jooq.meta.ext)
 
+    // The copy of a SQLite file's rows into a network database is the library's. Hikari and the drivers are
+    // here already, so only its own classes come along.
+    implementation(libs.uxmlib.storage) { isTransitive = false }
+
     // One empty database on each backend, in containers, for the tests tagged real-database.
     testImplementation(libs.uxmlib.storage.testing)
     testImplementation(libs.tc.junit)

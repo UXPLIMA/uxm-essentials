@@ -56,6 +56,7 @@ storage {
   table-prefix = "uxmessentials_"   # in front of every table; chosen before the first start
   connection-timeout-ms = 5000
   local-only = false            # true keeps this one server on the SQLite file above
+  copy-from-file = false        # true copies the SQLite file into an empty network database at start
 }
 ```
 
@@ -77,6 +78,11 @@ At most 15 letters, digits and underscores, so every index name fits PostgreSQL'
 It is for the server that has no business in the shared data, a creative world or a build
 server: the block stays the same on every server and that one sets this line. Its players' homes,
 money and mail are its own, so leave the cross-server bus off on it as well.
+
+`copy-from-file = true` carries the rows of the SQLite file into the network database. Set it with
+the new `type` and restart once: the schema is built, the file is brought up to date, and every
+table is copied into the empty tables in one transaction. The log says how many rows came across.
+Tables that already hold rows are left alone, so a later start copies nothing twice.
 
 Turning a feature off is per module, in its own `modules/<name>/config.conf`. A module that is
 off registers no listener and no command.

@@ -82,9 +82,44 @@ final class SchemaOnEveryServerTest {
         }
     }
 
+    @EveryBackend
+    void aMoveOffTheFileBringsItsRowsWhenTheBlockAsks(RealDatabase database) {
+        PlayerRef owner = new PlayerRef(UUID.randomUUID(), "Alice");
+        try (database) {
+            try (Persistence file = openFile(database, "t_")) {
+                new JooqVaultRepository(file.dsl())
+                        .save(Vault.of(
+                                VaultId.of(owner, 1),
+                                new VaultSize(3),
+                                VaultContents.empty(),
+                                null,
+                                null,
+                                Instant.EPOCH));
+            }
+
+            try (Persistence moved = open(database, "t_", Map.of("storage.copy-from-file", "true"))) {
+                assertThat(new JooqVaultRepository(moved.dsl()).find(VaultId.of(owner, 1)))
+                        .isPresent();
+            }
+        }
+    }
+
+    /** The SQLite file this plugin keeps in the folder, whatever backend the database runs on. */
+    private static Persistence openFile(RealDatabase database, String prefix) {
+        return Persistence.open(
+                new Written(Map.of("storage.type", "sqlite", "storage.table-prefix", prefix)),
+                database.dataFolder(),
+                List.of("db/migration"),
+                new Silent());
+    }
+
     private static Persistence open(RealDatabase database, String prefix) {
+        return open(database, prefix, Map.of());
+    }
+
+    private static Persistence open(RealDatabase database, String prefix, Map<String, String> more) {
         StorageSettings storage = database.settings();
-        Map<String, String> values = new HashMap<>();
+        Map<String, String> values = new HashMap<>(more);
         values.put("storage.type", storage.backend().id());
         values.put("storage.host", storage.host());
         values.put("storage.port", String.valueOf(storage.port()));

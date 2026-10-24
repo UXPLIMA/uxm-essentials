@@ -69,6 +69,14 @@ public final class DatabaseSettings {
         return prefix;
     }
 
+    /**
+     * Whether the start copies the rows of the SQLite file into the network database it names, once its tables are
+     * migrated. Tables that already hold rows are left alone, so leaving it on copies nothing twice.
+     */
+    public boolean copyFromFile() {
+        return config.getBoolean("storage.copy-from-file", false);
+    }
+
     /** The SQLite database file under the plugin data folder. */
     public Path sqliteFile() {
         String name = config.getString("storage.file", SQLITE_FILE_NAME);

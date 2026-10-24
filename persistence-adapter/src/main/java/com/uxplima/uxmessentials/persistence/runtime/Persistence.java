@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -8,6 +10,9 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.application.health.RepairableHealthCheck;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmlib.storage.sql.Database;
+import com.uxplima.uxmlib.storage.sql.Dialect;
+import com.uxplima.uxmlib.storage.sql.StorageCopy;
 import com.zaxxer.hikari.HikariDataSource;
 import org.jooq.DSLContext;
 import org.jooq.Record1;
@@ -58,7 +63,11 @@ public final class Persistence implements AutoCloseable {
         String tablePrefix = settings.tablePrefix();
         HikariDataSource dataSource = DataSourceFactory.create(settings);
         try {
-            new FlywayMigrationRunner(dataSource, backend, tablePrefix).migrate(migrationLocations);
+            if (backend != DatabaseBackend.SQLITE && settings.copyFromFile()) {
+                migrateFillingFromFile(config, dataFolder, dataSource, backend, tablePrefix, migrationLocations, log);
+            } else {
+                new FlywayMigrationRunner(dataSource, backend, tablePrefix).migrate(migrationLocations);
+            }
         } catch (RuntimeException cause) {
             dataSource.close();
             throw cause;
@@ -69,6 +78,54 @@ public final class Persistence implements AutoCloseable {
                 DslContextProvider.create(dataSource, backend.dialect(), tablePrefix),
                 backend,
                 tablePrefix);
+    }
+
+    /**
+     * Migrate the network database, and fill it from the SQLite file the block names when this start is the one that
+     * built the schema there. None of the file's tables in the database before the migration is what says so: the
+     * tables then hold only the rows the migrations seed, and the file's own rows replace them in one transaction. A
+     * database that had the schema before is left alone, so the key left on copies nothing twice.
+     */
+    private static void migrateFillingFromFile(
+            ConfigStore config,
+            Path dataFolder,
+            HikariDataSource target,
+            DatabaseBackend backend,
+            String tablePrefix,
+            List<String> migrationLocations,
+            Logger log) {
+        FlywayMigrationRunner targetMigrations = new FlywayMigrationRunner(target, backend, tablePrefix);
+        DatabaseSettings local = new DatabaseSettings(new LocalOnly(config), dataFolder);
+        Path file = local.sqliteFile();
+        // Opening a SQLite pool creates the file, and an empty one left behind would read as rows that vanished.
+        if (!Files.isRegularFile(file)) {
+            targetMigrations.migrate(migrationLocations);
+            log.warn("storage.copy-from-file found no {} to copy from", file.getFileName());
+            return;
+        }
+        Database into = Database.adopt(target, Dialect.fromJdbcUrl("jdbc:" + backend.jdbcSubprotocol() + ":"));
+        try (HikariDataSource source = DataSourceFactory.create(local)) {
+            new FlywayMigrationRunner(source, DatabaseBackend.SQLITE, tablePrefix).migrate(migrationLocations);
+            Database from = Database.adopt(source, Dialect.SQLITE);
+            boolean fresh = Collections.disjoint(
+                    StorageCopy.tablesUnder(from, tablePrefix), StorageCopy.tablesUnder(into, tablePrefix));
+            targetMigrations.migrate(migrationLocations);
+            if (!fresh) {
+                log.info("storage.copy-from-file copied nothing: the tables were in the database before this start."
+                        + " Set it to false.");
+                return;
+            }
+            StorageCopy.Copied copied = StorageCopy.refill(from, into, tablePrefix);
+            log.info(
+                    "storage.copy-from-file copied {} rows from {}. Set it to false.",
+                    copied.total(),
+                    file.getFileName());
+        } catch (StorageCopy.Refused refused) {
+            log.warn(
+                    "storage.copy-from-file copied nothing ({} on {}); see the storage page",
+                    refused.reason(),
+                    refused.table());
+        }
     }
 
     /** The shared jOOQ context every repository binds to. */
@@ -143,5 +200,24 @@ public final class Persistence implements AutoCloseable {
     @Override
     public void close() {
         dataSource.close();
+    }
+
+    /** The block as a server that keeps its rows on the SQLite file reads it. */
+    private record LocalOnly(ConfigStore config) implements ConfigStore {
+
+        @Override
+        public boolean getBoolean(String path, boolean fallback) {
+            return path.equals("storage.local-only") || config.getBoolean(path, fallback);
+        }
+
+        @Override
+        public String getString(String path, String fallback) {
+            return config.getString(path, fallback);
+        }
+
+        @Override
+        public int getInt(String path, int fallback) {
+            return config.getInt(path, fallback);
+        }
     }
 }

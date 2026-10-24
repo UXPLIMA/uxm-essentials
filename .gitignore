@@ -12,6 +12,10 @@ buildSrc/build/
 # The one jar that stays: the wrapper, which is how a clone builds without a Gradle install.
 !gradle/wrapper/gradle-wrapper.jar
 
+# The Kotlin compiler's session state, written beside buildSrc on each build. Machine local.
+.kotlin/
+*/.kotlin/
+
 # Binaries and secrets never enter version control.
 *.zip
 *.tar.gz
