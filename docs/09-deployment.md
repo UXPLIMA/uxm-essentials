@@ -54,6 +54,7 @@ storage {
   password = ""
   pool-size = 8                 # network backends only; SQLite is a single writer
   connection-timeout-ms = 5000
+  local-only = false            # true keeps this one server on the SQLite file above
 }
 ```
 
@@ -63,6 +64,11 @@ as the events. SQLite is right for one server and wrong for several.
 The block is spelled the way every plugin of the family spells it. A file written before that
 says `backend` and `read-pool-size`; the plugin rewrites no operator's file, so it still reads
 those two when `type` and `pool-size` are not written, and the new name wins when both are.
+
+`local-only = true` keeps one server of a network on its own SQLite file, whatever `type` says.
+It is for the server that has no business in the shared data, a creative world or a build
+server: the block stays the same on every server and that one sets this line. Its players' homes,
+money and mail are its own, so leave the cross-server bus off on it as well.
 
 Turning a feature off is per module, in its own `modules/<name>/config.conf`. A module that is
 off registers no listener and no command.

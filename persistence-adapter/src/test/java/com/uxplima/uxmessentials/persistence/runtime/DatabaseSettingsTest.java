@@ -65,6 +65,18 @@ final class DatabaseSettingsTest {
                 .isEqualTo(3307);
     }
 
+    @Test
+    @DisplayName("local-only keeps this one server on its SQLite file, whatever the block names")
+    void localOnlyKeepsTheServerOnItsFile() {
+        DatabaseSettings settings =
+                settings(Map.of("storage.type", "postgresql", "storage.host", "network", "storage.local-only", "true"));
+
+        assertThat(settings.backend()).isEqualTo(DatabaseBackend.SQLITE);
+        assertThat(settings(Map.of("storage.type", "postgresql", "storage.local-only", "false"))
+                        .backend())
+                .isEqualTo(DatabaseBackend.POSTGRES);
+    }
+
     private static DatabaseSettings settings(Map<String, String> values) {
         return new DatabaseSettings(new Written(values), FOLDER);
     }

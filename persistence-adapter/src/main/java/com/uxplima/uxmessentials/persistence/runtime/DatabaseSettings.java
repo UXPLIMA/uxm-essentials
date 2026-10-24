@@ -14,7 +14,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>The keys, relative to {@code storage}, are the ones every plugin of the family reads: {@code type}
  * (sqlite|mysql|mariadb|postgresql, any other word refused), the network coordinates
  * {@code host}/{@code port}/{@code database}/{@code username}/{@code password}, {@code pool-size} for a network
- * backend, and {@code connection-timeout-ms}. SQLite needs none of the network coordinates: its file lives under the
+ * backend, {@code connection-timeout-ms}, and {@code local-only} for the one server of a network that keeps its own
+ * rows. SQLite needs none of the network coordinates: its file lives under the
  * plugin data folder.
  *
  * <p>A file written before the family agreed on those names says {@code backend} and {@code read-pool-size}, and
@@ -34,8 +35,15 @@ public final class DatabaseSettings {
         this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder");
     }
 
-    /** The selected backend; defaults to {@link DatabaseBackend#SQLITE}. */
+    /**
+     * The selected backend; defaults to {@link DatabaseBackend#SQLITE}. {@code storage.local-only} keeps this one
+     * server on its SQLite file whatever the block names, so a network can carry the same block on every server and
+     * the creative or build server sets one line.
+     */
     public DatabaseBackend backend() {
+        if (config.getBoolean("storage.local-only", false)) {
+            return DatabaseBackend.SQLITE;
+        }
         return DatabaseBackend.fromToken(
                 config.getString("storage.type", config.getString("storage.backend", "sqlite")));
     }
