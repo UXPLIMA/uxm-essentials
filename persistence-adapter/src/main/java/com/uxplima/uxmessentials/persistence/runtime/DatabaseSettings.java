@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
  * rather than dotted paths so the config keys live in one place; every getter carries a default so a
  * minimal config yields the embedded-SQLite backend with no operator action.
  *
- * <p>The keys, relative to {@code storage}: {@code backend} (sqlite|mysql|postgres), the network
+ * <p>The keys, relative to {@code storage}: {@code backend} (sqlite|mysql|mariadb|postgresql, any other word refused), the network
  * coordinates {@code host}/{@code port}/{@code database}/{@code username}/{@code password}, and the
  * pool sizes {@code read-pool-size} (network backends) and {@code connection-timeout-ms}. SQLite needs
  * none of the network coordinates: its file lives under the plugin data folder.

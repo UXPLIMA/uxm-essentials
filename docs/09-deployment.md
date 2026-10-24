@@ -45,7 +45,7 @@ needs no database server. The `storage` block chooses otherwise:
 
 ```hocon
 storage {
-  backend = "sqlite"            # sqlite | mysql | postgres
+  backend = "sqlite"            # sqlite | mysql | mariadb | postgresql. Any other word stops the plugin
   file    = "uxmessentials.db"  # SQLite only
   host    = "localhost"
   port    = 3306                # 3306 for mysql, 5432 for postgres

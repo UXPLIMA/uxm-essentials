@@ -72,14 +72,20 @@ public enum DatabaseBackend {
 
     /**
      * Resolve a backend from a config token. Recognises {@code sqlite}, {@code mysql}/{@code mariadb},
-     * and {@code postgres}/{@code postgresql}; anything else falls back to the SQLite default rather
-     * than failing, so a typo degrades to the safe embedded backend instead of refusing to enable.
+     * and {@code postgres}/{@code postgresql}. Anything else stops the plugin. A typo that fell back to
+     * SQLite would start a network server on an empty file of its own, apart from the rest of the network,
+     * with only a log line to say so.
+     *
+     * @throws IllegalArgumentException for a word that names no backend
      */
     public static DatabaseBackend fromToken(String token) {
         return switch (token.trim().toLowerCase(Locale.ROOT)) {
+            case "sqlite" -> SQLITE;
             case "mysql", "mariadb" -> MARIADB;
             case "postgres", "postgresql", "psql" -> POSTGRES;
-            default -> SQLITE;
+            default ->
+                throw new IllegalArgumentException("storage.backend names no database: '" + token
+                        + "'. Write sqlite, mysql, mariadb or postgresql.");
         };
     }
 }
