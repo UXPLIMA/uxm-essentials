@@ -185,8 +185,9 @@ class HologramListGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -206,7 +207,9 @@ class HologramListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.ARMOR_STAND, "alpha"));
         baseline.put(1, new Snapshot(Material.ARMOR_STAND, "beta"));
+        baseline.put(48, new Snapshot(Material.ARROW, "hologram.gui.list.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "hologram.gui.list.create"));
+        baseline.put(50, new Snapshot(Material.ARROW, "hologram.gui.list.next"));
         return baseline;
     }
 

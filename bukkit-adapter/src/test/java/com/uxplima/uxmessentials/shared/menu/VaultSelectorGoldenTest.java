@@ -151,8 +151,9 @@ class VaultSelectorGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -177,6 +178,8 @@ class VaultSelectorGoldenTest {
         baseline.put(2, new Snapshot(Material.CHEST, "vaults.selector.entry.name"));
         baseline.put(3, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, "vaults.selector.locked.name"));
         baseline.put(4, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, "vaults.selector.locked.name"));
+        baseline.put(21, new Snapshot(Material.ARROW, "vaults.selector.prev"));
+        baseline.put(23, new Snapshot(Material.ARROW, "vaults.selector.next"));
         return baseline;
     }
 

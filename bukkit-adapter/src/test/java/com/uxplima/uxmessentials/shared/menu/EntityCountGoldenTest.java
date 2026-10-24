@@ -92,8 +92,9 @@ class EntityCountGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -119,6 +120,8 @@ class EntityCountGoldenTest {
         for (int slot = 45; slot < 54; slot++) {
             baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
         }
+        baseline.put(48, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.prev"));
+        baseline.put(50, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.next"));
         return baseline;
     }
 

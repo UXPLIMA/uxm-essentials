@@ -146,8 +146,9 @@ class BankMembersListGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -168,8 +169,10 @@ class BankMembersListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "Alice"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "Bob"));
+        baseline.put(45, new Snapshot(Material.ARROW, "bank.members-gui-prev"));
         baseline.put(47, new Snapshot(Material.ARROW, "bank.members-gui-back"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "bank.members-gui-add"));
+        baseline.put(53, new Snapshot(Material.ARROW, "bank.members-gui-next"));
         return baseline;
     }
 

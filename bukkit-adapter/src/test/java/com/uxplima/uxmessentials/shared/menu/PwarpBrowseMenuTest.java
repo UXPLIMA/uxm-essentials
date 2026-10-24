@@ -155,12 +155,12 @@ class PwarpBrowseMenuTest {
         assertThat(filledContentSlots(inv)).isEqualTo(PAGE_SIZE);
         assertThat(inv.getItem(0).getType()).isEqualTo(Material.ENDER_PEARL);
         assertThat(plainName(inv.getItem(0))).isEqualTo("warp0");
-        // The bottom row is the control bar: sort / search / scope buttons and the page arrows. This is the first of
-        // several pages, so the next arrow shows and the previous one, with no page before it, does not.
+        // The bottom row is the control bar: sort / search / scope buttons and the page arrows. Both arrows are drawn
+        // on every page (uxmLib 0.211.0); on this first page the previous one has no page to turn to.
         assertThat(inv.getItem(45).getType()).isEqualTo(Material.COMPARATOR);
         assertThat(inv.getItem(46).getType()).isEqualTo(Material.SPYGLASS);
         assertThat(inv.getItem(47).getType()).isEqualTo(Material.WRITABLE_BOOK);
-        assertThat(inv.getItem(48).getType()).isNotEqualTo(Material.ARROW);
+        assertThat(inv.getItem(48).getType()).isEqualTo(Material.ARROW);
         assertThat(PageArrows.declaredIn("modules/playerwarps/gui/pwarp-browse.conf"))
                 .containsEntry(48, "ARROW pwarp.gui.browse.prev");
         assertThat(inv.getItem(49).getType()).isEqualTo(Material.BOOKSHELF);
@@ -237,9 +237,10 @@ class PwarpBrowseMenuTest {
         browse.seed(List.of());
         Inventory inv = open();
 
-        // The centred placeholder is the only content tile; the rest of the grid stays empty.
+        // The centred placeholder is the only content tile; the rest of the grid shows the dark backdrop under it.
         assertThat(inv.getItem(22).getType()).isEqualTo(Material.BARRIER);
         assertThat(filledContentSlots(inv)).isEqualTo(1);
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -373,11 +374,12 @@ class PwarpBrowseMenuTest {
         server.getPluginManager().callEvent(event);
     }
 
+    /** The grid cells that hold a tile, rather than the dark backdrop a cell with no warp shows. */
     private static int filledContentSlots(Inventory inv) {
         int filled = 0;
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             ItemStack item = inv.getItem(slot);
-            if (item != null && !item.getType().isAir()) {
+            if (item != null && !item.getType().isAir() && item.getType() != Material.BLACK_STAINED_GLASS_PANE) {
                 filled++;
             }
         }

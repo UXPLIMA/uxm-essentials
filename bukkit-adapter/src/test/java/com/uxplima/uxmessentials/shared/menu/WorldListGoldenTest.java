@@ -167,8 +167,9 @@ class WorldListGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -188,7 +189,9 @@ class WorldListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.GRASS_BLOCK, "alpha"));
         baseline.put(1, new Snapshot(Material.NETHERRACK, "beta"));
+        baseline.put(48, new Snapshot(Material.ARROW, "world.editor.nav.prev"));
         baseline.put(49, new Snapshot(Material.NETHER_STAR, "world.editor.create.button-name"));
+        baseline.put(50, new Snapshot(Material.ARROW, "world.editor.nav.next"));
         return baseline;
     }
 

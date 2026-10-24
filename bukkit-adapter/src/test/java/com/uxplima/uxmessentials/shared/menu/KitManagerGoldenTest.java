@@ -143,8 +143,9 @@ class KitManagerGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -165,6 +166,8 @@ class KitManagerGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.CHEST, "alpha"));
         baseline.put(1, new Snapshot(Material.CHEST, "beta"));
+        baseline.put(45, new Snapshot(Material.ARROW, "kit.menu.prev"));
+        baseline.put(46, new Snapshot(Material.ARROW, "kit.menu.next"));
         baseline.put(49, new Snapshot(Material.EMERALD_BLOCK, "kit.editor.create-button.name"));
         baseline.put(51, new Snapshot(Material.BOOK, "kit.editor.category.manager-title"));
         baseline.put(53, new Snapshot(Material.BARRIER, "kit.editor.close-button.name"));

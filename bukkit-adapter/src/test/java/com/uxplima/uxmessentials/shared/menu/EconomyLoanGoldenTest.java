@@ -222,11 +222,8 @@ class EconomyLoanGoldenTest {
         for (int slot = 0; slot < 27; slot++) {
             baseline.put(slot, new Snapshot(FILLER, ""));
         }
-        // The loan strip's content slots 11..16 hold no loan in this one-loan fixture; the list runtime clears them,
-        // so they read as empty (skipped by the snapshot) rather than filler.
-        for (int slot = LOAN_FIRST_SLOT + 1; slot <= 16; slot++) {
-            baseline.remove(slot);
-        }
+        // The loan strip's content slots 11..16 hold no loan in this one-loan fixture. Until uxmLib 0.211.0 the list
+        // cleared them to holes; now the filler covers them like every other slot nothing drew, so they stay filler.
         baseline.put(PROFILE_SLOT, new Snapshot(Material.SUNFLOWER, "loan.gui-profile-name"));
         baseline.put(LOAN_FIRST_SLOT, new Snapshot(Material.BOOK, "loan.gui-loan-name"));
         baseline.put(REQUEST_SLOT, new Snapshot(Material.EMERALD_BLOCK, "loan.gui-request-name"));

@@ -134,8 +134,9 @@ class PlayerPickerGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -175,6 +176,8 @@ class PlayerPickerGoldenTest {
         for (int slot = 0; slot < onThisPage; slot++) {
             baseline.put(slot, new Snapshot(Material.PLAYER_HEAD, GuiMessageKey.PLAYER_PICKER_HEAD_NAME.key()));
         }
+        baseline.put(PREV_SLOT, new Snapshot(Material.ARROW, GuiMessageKey.PLAYER_PICKER_PREV.key()));
+        baseline.put(NEXT_SLOT, new Snapshot(Material.ARROW, GuiMessageKey.PLAYER_PICKER_NEXT.key()));
         baseline.put(OFFLINE_SLOT, new Snapshot(Material.NAME_TAG, GuiMessageKey.PLAYER_PICKER_CUSTOM.key()));
         baseline.put(FIRST_FOOTER_SLOT, new Snapshot(Material.BOOK, Key.FOOTER_A_NAME.key()));
         baseline.put(SECOND_FOOTER_SLOT, new Snapshot(Material.CHEST, Key.FOOTER_B_NAME.key()));

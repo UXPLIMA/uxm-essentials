@@ -138,8 +138,9 @@ class CurrencyPickerGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -164,6 +165,11 @@ class CurrencyPickerGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.SUNFLOWER, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_NAME.key()));
         baseline.put(1, new Snapshot(Material.GOLD_INGOT, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_NAME.key()));
+        baseline.put(
+                PREV_SLOT,
+                new Snapshot(Material.ARROW, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_PICKER_PREVIOUS.key()));
+        baseline.put(
+                NEXT_SLOT, new Snapshot(Material.ARROW, EconomyMessageKey.ECO_ADMIN_GUI_CURRENCY_PICKER_NEXT.key()));
         return baseline;
     }
 

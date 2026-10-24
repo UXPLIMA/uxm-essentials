@@ -162,12 +162,12 @@ class VoteSitesMenuTest {
         // Votable site renders with the configured votable material, the cooled-down one with the cooldown material.
         assertThat(top.getItem(0).getType()).isEqualTo(Material.EMERALD_BLOCK);
         assertThat(top.getItem(1).getType()).isEqualTo(Material.REDSTONE_BLOCK);
-        // The bottom-row corners carry the file's two page arrows, drawn only with a page to turn to (uxmLib
-        // 0.119.0). Two sites fit one page, so the corners show the filler under them.
+        // The bottom-row corners carry the file's two page arrows, drawn on every page (uxmLib 0.211.0) even though
+        // two sites fit one page and neither turns one.
         assertThat(PageArrows.declaredIn("modules/vote/gui/vote-sites.conf"))
                 .containsExactlyInAnyOrderEntriesOf(Map.of(18, "ARROW vote.gui.prev", 26, "ARROW vote.gui.next"));
-        assertThat(top.getItem(18).getType()).isNotEqualTo(Material.ARROW);
-        assertThat(top.getItem(26).getType()).isNotEqualTo(Material.ARROW);
+        assertThat(top.getItem(18).getType()).isEqualTo(Material.ARROW);
+        assertThat(top.getItem(26).getType()).isEqualTo(Material.ARROW);
     }
 
     @Test

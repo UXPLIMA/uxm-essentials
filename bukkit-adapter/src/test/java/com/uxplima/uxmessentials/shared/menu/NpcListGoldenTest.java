@@ -191,8 +191,9 @@ class NpcListGoldenTest {
     }
 
     /**
-     * The page arrows the old view drew are the window file's, at the same slots and in the same words. uxmLib 0.119.0
-     * draws an arrow only when it has a page to turn to, so the one-page grid above no longer shows them.
+     * The page arrows the old view drew are the window file's, at the same slots and in the same words. From uxmLib
+     * 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden; since 0.211.0 it is drawn on every page again, so
+     * the grid above shows them too.
      */
     @Test
     void thePageArrowsAreTheWindowFiles() {
@@ -212,7 +213,9 @@ class NpcListGoldenTest {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         baseline.put(0, new Snapshot(Material.PLAYER_HEAD, "alpha"));
         baseline.put(1, new Snapshot(Material.PLAYER_HEAD, "beta"));
+        baseline.put(48, new Snapshot(Material.ARROW, "npc.gui.list.prev"));
         baseline.put(49, new Snapshot(Material.LIME_DYE, "npc.gui.list.create"));
+        baseline.put(50, new Snapshot(Material.ARROW, "npc.gui.list.next"));
         return baseline;
     }
 

@@ -15,9 +15,10 @@ import com.uxplima.uxmlib.menu.spec.MenuSpecLoader;
  * The page arrows a shipped window file declares, for the golden tests that used to read them off a drawn window.
  *
  * <p>Each golden test froze the grid an old hand-built view drew, and those views drew a previous and a next arrow
- * on every page, the only page included. uxmLib 0.119.0 draws an arrow only when it has a page to turn to, so a
- * one-page fixture no longer shows them. The arrows are still the window's, at the same slots, with the same icon and
- * the same words, and this reads them from the file so a golden test still holds all three.
+ * on every page, the only page included. From uxmLib 0.119.0 to 0.210.0 an arrow with no page to turn to was hidden,
+ * so a one-page fixture did not show them; since 0.211.0 they are drawn on every page again. The arrows are the
+ * window's, at the same slots, with the same icon and the same words, and this reads them from the file so a golden
+ * test holds all three.
  */
 public final class PageArrows {
 
