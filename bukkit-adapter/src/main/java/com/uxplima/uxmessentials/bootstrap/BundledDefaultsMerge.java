@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.CommentedConfigurationNode;
@@ -40,6 +41,15 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 @NullMarked
 final class BundledDefaultsMerge {
 
+    /**
+     * Settings this version ships under a new name, each with the name it had before. A file that still writes the
+     * old name has the setting, so the new name is not appended to it: the storage keys are read new name first,
+     * and an appended {@code type = "sqlite"} would win over the operator's {@code backend = "mysql"}.
+     */
+    private static final Map<List<Object>, String> FORMER_NAMES = Map.of(
+            List.of("storage", "type"), "backend",
+            List.of("storage", "pool-size"), "read-pool-size");
+
     private BundledDefaultsMerge() {}
 
     /**
@@ -51,7 +61,7 @@ final class BundledDefaultsMerge {
      */
     static Optional<String> newSettings(String bundled, String baseline, String operator) throws ConfigurateException {
         CommentedConfigurationNode fragment = CommentedConfigurationNode.root();
-        collect(parse(bundled), parse(baseline), parse(operator), fragment);
+        collect(parse(bundled), parse(baseline), parse(operator), fragment, List.of());
         return fragment.empty() ? Optional.empty() : Optional.of(render(fragment));
     }
 
@@ -102,22 +112,30 @@ final class BundledDefaultsMerge {
             CommentedConfigurationNode bundled,
             CommentedConfigurationNode baseline,
             CommentedConfigurationNode operator,
-            CommentedConfigurationNode fragment) {
+            CommentedConfigurationNode fragment,
+            List<Object> path) {
         for (Map.Entry<Object, CommentedConfigurationNode> entry :
                 bundled.childrenMap().entrySet()) {
             Object key = entry.getKey();
             CommentedConfigurationNode child = entry.getValue();
             CommentedConfigurationNode theirs = operator.node(key);
+            List<Object> at = Stream.concat(path.stream(), Stream.of(key)).toList();
             if (!theirs.virtual()) {
                 // They have it. Only a block can still be missing something inside it, and only if they kept it
                 // a block; a scalar where we ship an object is left alone rather than replaced.
                 if (child.isMap() && theirs.isMap()) {
-                    collect(child, baseline.node(key), theirs, fragment.node(key));
+                    collect(child, baseline.node(key), theirs, fragment.node(key), at);
                 }
-            } else if (baseline.node(key).virtual()) {
+            } else if (baseline.node(key).virtual() && !writtenUnderFormerName(operator, at)) {
                 copy(child, fragment.node(key));
             }
         }
+    }
+
+    /** Whether the operator's block holds the setting at {@code path} under the name it had before. */
+    private static boolean writtenUnderFormerName(CommentedConfigurationNode operator, List<Object> path) {
+        String former = FORMER_NAMES.get(path);
+        return former != null && !operator.node(former).virtual();
     }
 
     /** Deep-copies {@code from} into {@code to}, comments included, so an appended block reads like the file. */

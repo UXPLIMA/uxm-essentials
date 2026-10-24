@@ -45,20 +45,24 @@ needs no database server. The `storage` block chooses otherwise:
 
 ```hocon
 storage {
-  backend = "sqlite"            # sqlite | mysql | mariadb | postgresql. Any other word stops the plugin
+  type    = "sqlite"            # sqlite | mysql | mariadb | postgresql. Any other word stops the plugin
   file    = "uxmessentials.db"  # SQLite only
   host    = "localhost"
-  port    = 3306                # 3306 for mysql, 5432 for postgres
+  port    = 0                   # 0 is the database's own: 3306 for mysql, 5432 for postgresql
   database = "uxmessentials"
   username = "uxmessentials"
   password = ""
-  read-pool-size = 8            # network backends only; SQLite is a single writer
+  pool-size = 8                 # network backends only; SQLite is a single writer
   connection-timeout-ms = 5000
 }
 ```
 
 A network backend is what a network of servers needs, because Path B shares the data as well
 as the events. SQLite is right for one server and wrong for several.
+
+The block is spelled the way every plugin of the family spells it. A file written before that
+says `backend` and `read-pool-size`; the plugin rewrites no operator's file, so it still reads
+those two when `type` and `pool-size` are not written, and the new name wins when both are.
 
 Turning a feature off is per module, in its own `modules/<name>/config.conf`. A module that is
 off registers no listener and no command.

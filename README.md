@@ -277,7 +277,7 @@ nodes that share one database:
 ```hocon
 # config.conf
 storage {
-  backend = "sqlite"            # sqlite (default) | mysql | mariadb | postgresql
+  type = "sqlite"               # sqlite (default) | mysql | mariadb | postgresql
   # mysql { host = "..."  database = "uxm"  username = "..."  password = "..." }
 }
 ```

@@ -30,14 +30,14 @@ class ConfigLayoutTest {
 
     @Test
     void mountsModuleConfigAndSiblingFilesUnderModulesPath(@TempDir Path dir) throws Exception {
-        Files.writeString(dir.resolve("config.conf"), "storage { backend = \"sqlite\" }\n");
+        Files.writeString(dir.resolve("config.conf"), "storage { type = \"sqlite\" }\n");
         Path teleport = Files.createDirectories(dir.resolve("modules/teleport"));
         Files.writeString(teleport.resolve("config.conf"), "enabled = true\ndefault-warmup = 7\n");
         Files.writeString(teleport.resolve("rtp.conf"), "min-radius = 250\nmax-radius = 9000\n");
 
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
 
-        assertThat(store.getString("storage.backend", "x")).isEqualTo("sqlite");
+        assertThat(store.getString("storage.type", "x")).isEqualTo("sqlite");
         assertThat(store.getBoolean("modules.teleport.enabled", false)).isTrue();
         assertThat(store.getInt("modules.teleport.default-warmup", 0)).isEqualTo(7);
         assertThat(store.getInt("modules.teleport.rtp.min-radius", 0)).isEqualTo(250);
@@ -59,13 +59,13 @@ class ConfigLayoutTest {
 
     @Test
     void malformedReloadKeepsTheLastKnownGoodTree(@TempDir Path dir) throws Exception {
-        Files.writeString(dir.resolve("config.conf"), "storage { backend = \"sqlite\" }\n");
+        Files.writeString(dir.resolve("config.conf"), "storage { type = \"sqlite\" }\n");
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
 
-        Files.writeString(dir.resolve("config.conf"), "storage { backend = \"broken\"\n");
+        Files.writeString(dir.resolve("config.conf"), "storage { type = \"broken\"\n");
 
         assertThatThrownBy(store::reload).isInstanceOf(IllegalStateException.class);
-        assertThat(store.getString("storage.backend", "missing")).isEqualTo("sqlite");
+        assertThat(store.getString("storage.type", "missing")).isEqualTo("sqlite");
     }
 
     @Test

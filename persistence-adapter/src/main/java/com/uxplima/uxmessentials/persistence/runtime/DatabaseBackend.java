@@ -84,8 +84,8 @@ public enum DatabaseBackend {
             case "mysql", "mariadb" -> MARIADB;
             case "postgres", "postgresql", "psql" -> POSTGRES;
             default ->
-                throw new IllegalArgumentException("storage.backend names no database: '" + token
-                        + "'. Write sqlite, mysql, mariadb or postgresql.");
+                throw new IllegalArgumentException(
+                        "storage.type names no database: '" + token + "'. Write sqlite, mysql, mariadb or postgresql.");
         };
     }
 }

@@ -27,6 +27,32 @@ class BundledDefaultsMergeTest {
         assertThat(added.get()).contains("b").doesNotContain("a");
     }
 
+    /**
+     * A setting this version names differently is not new to a file that still writes it under the old name. The
+     * renamed storage keys are the case: an appended {@code type = "sqlite"} would win over the operator's
+     * {@code backend = "mysql"} and start a network on a SQLite file of its own.
+     */
+    @Test
+    void aSettingWrittenUnderItsFormerNameIsNotAppended() throws Exception {
+        Optional<String> added = BundledDefaultsMerge.newSettings(
+                "storage {\n  type = \"sqlite\"\n  pool-size = 8\n}\n",
+                "storage {\n  backend = \"sqlite\"\n  read-pool-size = 8\n}\n",
+                "storage {\n  backend = \"mysql\"\n  read-pool-size = 4\n}\n");
+
+        assertThat(added).isEmpty();
+    }
+
+    @Test
+    void aRenamedSettingTheOperatorNeverWroteIsAppended() throws Exception {
+        Optional<String> added = BundledDefaultsMerge.newSettings(
+                "storage {\n  type = \"sqlite\"\n  pool-size = 8\n}\n",
+                "storage {\n  backend = \"sqlite\"\n  read-pool-size = 8\n}\n",
+                "storage {\n  host = \"db\"\n}\n");
+
+        assertThat(added).isPresent();
+        assertThat(added.get()).contains("type").contains("pool-size");
+    }
+
     @Test
     void leavesASettingTheOperatorDeletedDeleted() throws Exception {
         // b was in the default the operator installed from, so its absence is their edit, not our new key.

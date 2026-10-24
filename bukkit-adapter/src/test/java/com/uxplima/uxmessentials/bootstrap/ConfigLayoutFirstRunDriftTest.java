@@ -37,7 +37,7 @@ class ConfigLayoutFirstRunDriftTest {
         ConfigurateConfigStore store = ConfigurateConfigStore.loadLayout(dir, NOOP);
         assertThat(store.getInt("modules.teleport.rtp.min-radius", -1)).isEqualTo(100);
         assertThat(store.getInt("modules.homes.default-limit", -1)).isEqualTo(3);
-        assertThat(store.getString("storage.backend", "x")).isEqualTo("sqlite");
+        assertThat(store.getString("storage.type", "x")).isEqualTo("sqlite");
     }
 
     @Test

@@ -40,7 +40,8 @@ class DefaultResourcesTest {
         DefaultResources.writeInto(dataFolder, JUL, "test");
         ConfigStore config = ConfigurateConfigStore.loadLayout(dataFolder, new NoopLogger());
 
-        assertThat(config.getString("storage.backend", "?")).isEqualTo("sqlite");
+        assertThat(config.getString("storage.type", "?")).isEqualTo("sqlite");
+        assertThat(config.getInt("storage.pool-size", -1)).isEqualTo(8);
         assertThat(config.getString("storage.file", "?")).isEqualTo("uxmessentials.db");
         assertThat(config.getString("language.default", "?")).isEqualTo("en");
         assertThat(config.getBoolean("language.follow-client", false)).isTrue();
@@ -111,6 +112,28 @@ class DefaultResourcesTest {
         String afterFirstRun = Files.readString(dataFolder.resolve("config.conf"));
         DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
         assertThat(Files.readString(dataFolder.resolve("config.conf"))).isEqualTo(afterFirstRun);
+    }
+
+    /**
+     * An install from before the storage keys were renamed keeps its database through the update. The appended
+     * block must not carry {@code type}: it would win over their {@code backend} and move the server to SQLite.
+     */
+    @Test
+    void anUpdateDoesNotMoveAFileThatStillSaysBackendToSqlite(@TempDir Path dataFolder) throws Exception {
+        String oldDefault = "storage {\n  backend = \"sqlite\"\n  read-pool-size = 8\n}\n";
+        String operatorEdit = "storage {\n  backend = \"mysql\"\n  read-pool-size = 4\n}\n";
+        Files.createDirectories(dataFolder);
+        Files.writeString(dataFolder.resolve("config.conf"), operatorEdit);
+        Path baseline = dataFolder.resolve(DefaultResources.BASELINE_DIR).resolve("config.conf");
+        Files.createDirectories(Objects.requireNonNull(baseline.getParent()));
+        Files.writeString(baseline, oldDefault);
+
+        DefaultResources.writeInto(dataFolder, JUL, "9.9.9");
+
+        ConfigStore config = ConfigurateConfigStore.loadLayout(dataFolder, new NoopLogger());
+        assertThat(config.getString("storage.type", "absent")).isEqualTo("absent");
+        assertThat(config.getString("storage.pool-size", "absent")).isEqualTo("absent");
+        assertThat(config.getString("storage.backend", "?")).isEqualTo("mysql");
     }
 
     /**

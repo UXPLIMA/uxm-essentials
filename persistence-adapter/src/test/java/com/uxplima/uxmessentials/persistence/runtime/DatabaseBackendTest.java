@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** The word an operator writes under {@code storage.backend}, read into a backend or refused. */
+/** The word an operator writes under {@code storage.type}, read into a backend or refused. */
 final class DatabaseBackendTest {
 
     @Test

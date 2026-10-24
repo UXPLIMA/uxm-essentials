@@ -11,10 +11,15 @@ import org.jspecify.annotations.NullMarked;
  * rather than dotted paths so the config keys live in one place; every getter carries a default so a
  * minimal config yields the embedded-SQLite backend with no operator action.
  *
- * <p>The keys, relative to {@code storage}: {@code backend} (sqlite|mysql|mariadb|postgresql, any other word refused), the network
- * coordinates {@code host}/{@code port}/{@code database}/{@code username}/{@code password}, and the
- * pool sizes {@code read-pool-size} (network backends) and {@code connection-timeout-ms}. SQLite needs
- * none of the network coordinates: its file lives under the plugin data folder.
+ * <p>The keys, relative to {@code storage}, are the ones every plugin of the family reads: {@code type}
+ * (sqlite|mysql|mariadb|postgresql, any other word refused), the network coordinates
+ * {@code host}/{@code port}/{@code database}/{@code username}/{@code password}, {@code pool-size} for a network
+ * backend, and {@code connection-timeout-ms}. SQLite needs none of the network coordinates: its file lives under the
+ * plugin data folder.
+ *
+ * <p>A file written before the family agreed on those names says {@code backend} and {@code read-pool-size}, and
+ * nothing rewrites an operator's file, so the old name is read when the new one is not written. Without that a
+ * network that kept its file would start on a SQLite file of its own and nobody would see its players' data.
  */
 @NullMarked
 public final class DatabaseSettings {
@@ -31,7 +36,8 @@ public final class DatabaseSettings {
 
     /** The selected backend; defaults to {@link DatabaseBackend#SQLITE}. */
     public DatabaseBackend backend() {
-        return DatabaseBackend.fromToken(config.getString("storage.backend", "sqlite"));
+        return DatabaseBackend.fromToken(
+                config.getString("storage.type", config.getString("storage.backend", "sqlite")));
     }
 
     /** The SQLite database file under the plugin data folder. */
@@ -45,10 +51,11 @@ public final class DatabaseSettings {
         return config.getString("storage.host", "localhost");
     }
 
-    /** The network port; defaults to the backend's standard port when unset. */
+    /** The network port; the backend's standard port when unset or zero, the way the family writes it. */
     public int port() {
-        int fallback = backend() == DatabaseBackend.POSTGRES ? 5432 : 3306;
-        return config.getInt("storage.port", fallback);
+        int standard = backend() == DatabaseBackend.POSTGRES ? 5432 : 3306;
+        int written = config.getInt("storage.port", 0);
+        return written > 0 ? written : standard;
     }
 
     /** The schema/database name on a network backend; default {@code uxmessentials}. */
@@ -71,7 +78,7 @@ public final class DatabaseSettings {
      * default 8. Ignored for SQLite, whose write pool is fixed at one connection.
      */
     public int readPoolSize() {
-        return Math.max(1, config.getInt("storage.read-pool-size", 8));
+        return Math.max(1, config.getInt("storage.pool-size", config.getInt("storage.read-pool-size", 8)));
     }
 
     /** The connection-acquisition timeout in milliseconds; default 5000. */
