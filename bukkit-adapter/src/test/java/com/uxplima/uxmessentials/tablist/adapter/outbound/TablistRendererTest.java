@@ -271,6 +271,52 @@ class TablistRendererTest {
         assertThat(plain(player.footer())).isEqualTo("Foot: OFF");
     }
 
+    /**
+     * A frame written as a catalogue line reads in each viewer's language, so a footer that turns through a few links
+     * keeps its words in the language files rather than in the animation.
+     */
+    @Test
+    void aFrameNamingACatalogueLineReadsInTheViewersLanguage() {
+        CapturingPlayerMock turkish = new CapturingPlayerMock(server, "ayse");
+        CapturingPlayerMock english = new CapturingPlayerMock(server, "bob");
+        server.addPlayer(turkish);
+        server.addPlayer(english);
+        com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText.useCatalogLines(
+                new com.uxplima.uxmessentials.shared.application.message.CatalogLines(
+                        (viewer, key, arguments) -> viewer.uuid().equals(turkish.getUniqueId())
+                                ? Map.of("custom.tab.store", "Mağaza", "custom.tab.help", "Yardım")
+                                        .getOrDefault(key.key(), key.key())
+                                : Map.of("custom.tab.store", "Store", "custom.tab.help", "Help")
+                                        .getOrDefault(key.key(), key.key()),
+                        Set.of("custom.tab.store", "custom.tab.help")::contains));
+        try {
+            AnimationRegistry registry = new AnimationRegistry(List.of(AnimationDef.frames(new AnimationSpec(
+                    "links",
+                    AnimationSpec.AnimationType.FRAMES,
+                    List.of("@custom.tab.store", "@custom.tab.help"),
+                    1))));
+            TablistContent content =
+                    new TablistContent(List.of(), List.of("%anim_links%"), Duration.ofSeconds(1L), Set.of());
+            TablistFormatConfig config = new TablistFormatConfig(List.of(new TablistFormat(
+                    "default", DisplayCondition.always(), 0, content, Optional.empty(), OptionalInt.empty())));
+            TablistRenderer renderer = rendererOf(new AtomicReference<>(config)::get, registry, new RecordingPackets());
+
+            renderer.renderFor(turkish);
+            renderer.renderFor(english);
+            assertThat(plain(turkish.footer())).isEqualTo("Mağaza");
+            assertThat(plain(english.footer())).isEqualTo("Store");
+
+            registry.advance();
+            renderer.renderFor(turkish);
+            renderer.renderFor(english);
+            assertThat(plain(turkish.footer())).isEqualTo("Yardım");
+            assertThat(plain(english.footer())).isEqualTo("Help");
+        } finally {
+            com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText.useCatalogLines(
+                    com.uxplima.uxmessentials.shared.application.message.CatalogLines.none());
+        }
+    }
+
     @Test
     void aBuiltInTokenInTheHeaderAndFooterRendersTheLiveValue() {
         // The built-in {online}/{world} tokens resolve off the live player/server with no PlaceholderAPI present, so
