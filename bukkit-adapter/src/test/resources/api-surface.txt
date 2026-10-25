@@ -257,6 +257,11 @@ abstract class com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent extends
   Player getPlayer()
   String getPlayerName()
   UUID getPlayerId()
+class com.uxplima.uxmessentials.api.bukkit.event.bossbar.UxmBossBarVisibilityEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmPlayerEvent
+  <init>(UUID, String, boolean)
+  HandlerList getHandlerList()
+  HandlerList getHandlers()
+  boolean isHidden()
 class com.uxplima.uxmessentials.api.bukkit.event.communication.UxmAnnouncerReloadEvent extends com.uxplima.uxmessentials.api.bukkit.event.UxmEvent
   <init>(int, Instant)
   HandlerList getHandlerList()

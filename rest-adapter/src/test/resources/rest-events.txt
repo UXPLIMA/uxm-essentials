@@ -1,3 +1,4 @@
+bossbar.visibility: hidden, player-id, player-name
 communication.announcer-reload: at, line-count
 communication.broadcast-opt-out: at, opted-out, player-id, player-name
 economy.bank-deposit: amount, bank-balance, bank-id, player-id, player-name

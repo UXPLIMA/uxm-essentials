@@ -73,8 +73,8 @@ class BossBarApiTest {
                 announcements,
                 (v, left) -> left.toMinutes() + "m",
                 () -> NOW);
-        ToggleBossBars toggle =
-                new ToggleBossBars(store, new Notifier((viewer, key, values) -> key.key(), (viewer, text) -> {}));
+        ToggleBossBars toggle = new ToggleBossBars(
+                store, new Notifier((viewer, key, values) -> key.key(), (viewer, text) -> {}), event -> {});
         PlayerLookup lookup = new PlayerLookup() {
             @Override
             public Optional<PlayerRef> findOnlineByName(String name) {

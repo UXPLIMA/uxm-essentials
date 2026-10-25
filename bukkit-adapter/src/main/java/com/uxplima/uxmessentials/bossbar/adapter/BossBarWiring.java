@@ -59,7 +59,8 @@ public final class BossBarWiring {
                 new BossBarRenderer(settings::bars, visibility, animations, announcements, remaining, Instant::now);
         BossBarRenderTask renderTask = new BossBarRenderTask(
                 kernel.scheduler(), renderer, animations, kernel.log(), settings::refreshInterval, running::get);
-        ToggleBossBars toggle = new ToggleBossBars(visibility, new Notifier(kernel.messages(), kernel.messageSink()));
+        ToggleBossBars toggle =
+                new ToggleBossBars(visibility, new Notifier(kernel.messages(), kernel.messageSink()), kernel.events());
 
         List<CommandRegistration> commands = List.of(new BossBarCommand(
                 toggle,

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.rest.bridge;
 import java.util.List;
 
 import com.uxplima.uxmessentials.api.bukkit.event.UxmEvent;
+import com.uxplima.uxmessentials.api.bukkit.event.bossbar.UxmBossBarVisibilityEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.communication.UxmAnnouncerReloadEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.communication.UxmBroadcastOptOutEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.economy.UxmBankDepositEvent;
@@ -188,6 +189,9 @@ public final class PublishedEvents {
 
             // scoreboard
             UxmScoreboardVisibilityEvent.class,
+
+            // bossbar
+            UxmBossBarVisibilityEvent.class,
 
             // staff
             UxmStaffChatEvent.class,

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.api;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.bossbar.adapter.outbound.api.BossBarEventBridges;
 import com.uxplima.uxmessentials.communication.adapter.outbound.api.CommunicationEventBridges;
 import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyEventBridges;
 import com.uxplima.uxmessentials.holograms.adapter.outbound.api.HologramEventBridges;
@@ -62,6 +63,7 @@ public final class EventBridges {
         CommunicationEventBridges.register(registry);
         StaffEventBridges.register(registry);
         ScoreboardEventBridges.register(registry);
+        BossBarEventBridges.register(registry);
         PoseEventBridges.register(registry);
         VoteEventBridges.register(registry);
         ItemWorldEventBridges.register(registry);
