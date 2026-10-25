@@ -1,13 +1,17 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The storage block is spelled the way every plugin of the family spells it: {@code type} and {@code pool-size}. A
@@ -75,6 +79,29 @@ final class DatabaseSettingsTest {
         assertThat(settings(Map.of("storage.type", "postgresql", "storage.local-only", "false"))
                         .backend())
                 .isEqualTo(DatabaseBackend.POSTGRES);
+    }
+
+    @Test
+    @DisplayName(
+            "a word that names no database stops a new install, which would otherwise start apart from its network")
+    void anUnknownWordStopsANewInstall(@TempDir Path folder) {
+        DatabaseSettings settings = new DatabaseSettings(new Written(Map.of("storage.backend", "sqlite3")), folder);
+
+        assertThatThrownBy(settings::backend).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("a server that ran on its SQLite file under a word that names no database keeps running on it")
+    void anUnknownWordKeepsAServerThatRanOnTheFile(@TempDir Path folder) throws IOException {
+        // Before 0.10.1 such a word fell back to SQLite, so a server written so has its rows in the file. Stopping
+        // it on the upgrade would take a working server down for a word it always had.
+        Files.createFile(folder.resolve("uxmessentials.db"));
+        DatabaseSettings settings = new DatabaseSettings(new Written(Map.of("storage.backend", "sqlite3")), folder);
+
+        assertThat(settings.backend()).isEqualTo(DatabaseBackend.SQLITE);
+        assertThat(settings.unknownType()).contains("sqlite3");
+        assertThat(new DatabaseSettings(new Written(Map.of("storage.type", "mysql")), folder).unknownType())
+                .isEmpty();
     }
 
     private static DatabaseSettings settings(Map<String, String> values) {

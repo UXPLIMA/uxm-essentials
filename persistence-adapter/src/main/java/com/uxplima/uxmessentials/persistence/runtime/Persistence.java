@@ -60,6 +60,11 @@ public final class Persistence implements AutoCloseable {
         Objects.requireNonNull(log, "log");
         DatabaseSettings settings = new DatabaseSettings(config, dataFolder);
         DatabaseBackend backend = settings.backend();
+        settings.unknownType()
+                .ifPresent(word -> log.warn(
+                        "storage.type '{}' names no database. This server has run on its SQLite file under that word,"
+                                + " so it keeps doing so: write sqlite to say it, or mysql, mariadb or postgresql.",
+                        word));
         String tablePrefix = settings.tablePrefix();
         HikariDataSource dataSource = DataSourceFactory.create(settings);
         try {

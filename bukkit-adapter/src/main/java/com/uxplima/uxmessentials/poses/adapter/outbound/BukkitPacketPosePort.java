@@ -213,6 +213,26 @@ public final class BukkitPacketPosePort implements PosePort {
         copies.clear();
     }
 
+    @Override
+    public boolean reveal(PlayerRef who) {
+        Objects.requireNonNull(who, "who");
+        Player player = server.getPlayer(who.uuid());
+        if (player == null || copies.containsKey(who.uuid())) {
+            return false;
+        }
+        // Unseen while the server holds no reason of its own is the persistent flag: a pose that ended without
+        // giving it back, as an older build did. The operator asked, so it goes whoever set it.
+        boolean leftUnseen = player.isInvisible()
+                && player.getGameMode() != GameMode.SPECTATOR
+                && !player.hasPotionEffect(PotionEffectType.INVISIBILITY);
+        boolean marked = player.getPersistentDataContainer().has(leftover);
+        if (!leftUnseen && !marked) {
+            return false;
+        }
+        giveInvisibilityBack(player);
+        return true;
+    }
+
     /** Undo the invisibility a pose the server lost left on {@code player}, who has just joined. */
     public void releaseLeftover(Player player) {
         Objects.requireNonNull(player, "player");

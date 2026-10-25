@@ -6,6 +6,7 @@ import static org.mockito.Mockito.mock;
 import java.util.Map;
 
 import com.uxplima.uxmessentials.poses.adapter.inbound.gui.PosesSettingsView;
+import com.uxplima.uxmessentials.poses.application.RevealPoser;
 import com.uxplima.uxmessentials.poses.application.TogglePlayerSit;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -34,7 +35,12 @@ class PosesCommandTest {
     @BeforeEach
     void setUp() {
         server = MockBukkit.mock();
-        command = new PosesCommand(mock(TogglePlayerSit.class), mock(PosesSettingsView.class), new KeyMessages());
+        command = new PosesCommand(
+                mock(TogglePlayerSit.class),
+                mock(PosesSettingsView.class),
+                mock(RevealPoser.class),
+                mock(com.uxplima.uxmessentials.shared.application.port.Scheduler.class),
+                new KeyMessages());
     }
 
     @AfterEach
@@ -59,6 +65,22 @@ class PosesCommandTest {
         toggleOnly.addAttachment(MockBukkit.createMockPlugin(), TOGGLE, true);
 
         assertThat(command.build().getRequirement().test(CommandSourceStackMock.from(toggleOnly)))
+                .isTrue();
+    }
+
+    @Test
+    void revealIsHiddenFromAPlayerWithoutItsNode() {
+        PlayerMock plain = server.addPlayer("Plain");
+        plain.addAttachment(MockBukkit.createMockPlugin(), GUI, true);
+        PlayerMock staff = server.addPlayer("Staff");
+        staff.addAttachment(MockBukkit.createMockPlugin(), "uxmessentials.poses.reveal", true);
+
+        com.mojang.brigadier.tree.CommandNode<io.papermc.paper.command.brigadier.CommandSourceStack> reveal =
+                command.build().getChild("reveal");
+
+        assertThat(reveal.getRequirement().test(CommandSourceStackMock.from(plain)))
+                .isFalse();
+        assertThat(reveal.getRequirement().test(CommandSourceStackMock.from(staff)))
                 .isTrue();
     }
 

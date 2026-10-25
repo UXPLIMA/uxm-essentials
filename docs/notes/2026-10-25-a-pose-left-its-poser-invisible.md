@@ -31,10 +31,11 @@ pose takes the flag, it saves a `pose_invisible` mark on the player. It gives th
 pose ends, when the module stops, and on the next join of a player who still carries the mark after
 a crash. `PosesAdapterTest` holds one test for each path.
 
-## What it does not undo
+## A player an older build left unseen
 
-A player made invisible by an older build carries the flag and no mark, so the fix cannot tell them
-from a player another plugin made invisible on purpose. Until something clears it, such a player
-stays unseen. With the player offline, removing `Bukkit.invisible` from
-`<world>/playerdata/<uuid>.dat` with an NBT editor frees them without touching anything else they
-own.
+A player made invisible by an older build carries the flag and no mark, so the plugin cannot tell them
+from a player another plugin made invisible on purpose, and it does not guess. An operator can:
+`/poses reveal <player>` (`uxmessentials.poses.reveal`, operators by default, the console too) ends a
+pose the player is still in and clears the flag. It leaves spectator mode and a potion alone, because
+the server keeps those by itself. Without the command, removing `Bukkit.invisible` from
+`<world>/playerdata/<uuid>.dat` with an NBT editor, with the player offline, does the same.

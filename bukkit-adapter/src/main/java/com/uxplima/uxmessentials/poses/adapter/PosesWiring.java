@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesConfig;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
+import com.uxplima.uxmessentials.poses.application.RevealPoser;
 import com.uxplima.uxmessentials.poses.application.StartCrawl;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPose;
@@ -254,7 +255,12 @@ public final class PosesWiring {
                         kernel.messages(),
                         cooldownNotice),
                 new CrawlCommand(startCrawl, stopPose, sessions, kernel.messages(), cooldownNotice),
-                new PosesCommand(togglePlayerSit, settingsView, kernel.messages()));
+                new PosesCommand(
+                        togglePlayerSit,
+                        settingsView,
+                        new RevealPoser(sessions, stopPose, posePort),
+                        kernel.scheduler(),
+                        kernel.messages()));
         List<Listener> listeners = List.of(
                 new SeatInteractListener(
                         startSit,

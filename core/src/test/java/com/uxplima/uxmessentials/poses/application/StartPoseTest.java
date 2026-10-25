@@ -200,6 +200,11 @@ class StartPoseTest {
         public void clearPose(PlayerRef who) {
             cleared.add(who);
         }
+
+        @Override
+        public boolean reveal(PlayerRef who) {
+            return false;
+        }
     }
 
     /** Records who was asked to start and stop snoring. */

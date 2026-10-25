@@ -35,4 +35,13 @@ public interface PosePort {
      * every exit without branching on the pose type.
      */
     void clearPose(PlayerRef who);
+
+    /**
+     * Make {@code who} seen again when something left them unseen that nothing holds any more: a pose that ended
+     * without giving their body back. A player who is unseen for a reason the server keeps by itself, spectator mode
+     * or a potion, is left as they are. Called by an operator, who knows the player was left so.
+     *
+     * @return whether there was anything to undo
+     */
+    boolean reveal(PlayerRef who);
 }

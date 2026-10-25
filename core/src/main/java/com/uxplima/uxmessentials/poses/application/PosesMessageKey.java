@@ -46,6 +46,10 @@ public enum PosesMessageKey implements MessageKey {
     // The bare /poses root's usage line: shown to a non-player sender who cannot open the GUI.
     POSES_USAGE("poses.usage"),
 
+    // /poses reveal <player>: the player is seen again, or nothing a reveal may undo was holding them unseen.
+    POSES_REVEALED("poses.reveal.done"),
+    POSES_REVEAL_NOTHING("poses.reveal.nothing"),
+
     // The /poses settings & status panel: the title, the shared value line, the on/off values, and the two button
     // labels: the current-pose status display and the player-sit opt-out.
     POSES_GUI_TITLE("poses.gui.title"),

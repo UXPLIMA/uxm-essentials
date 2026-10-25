@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
@@ -50,8 +52,32 @@ public final class DatabaseSettings {
         if (config.getBoolean("storage.local-only", false)) {
             return DatabaseBackend.SQLITE;
         }
-        return DatabaseBackend.fromToken(
-                config.getString("storage.type", config.getString("storage.backend", "sqlite")));
+        String written = typeWritten();
+        try {
+            return DatabaseBackend.fromToken(written);
+        } catch (IllegalArgumentException namesNone) {
+            // Before 0.10.1 a word that names no database fell back to SQLite, so a server written so has run on
+            // its file all along. It keeps doing so; only an install with no file yet is stopped.
+            if (Files.isRegularFile(sqliteFile())) {
+                return DatabaseBackend.SQLITE;
+            }
+            throw namesNone;
+        }
+    }
+
+    private String typeWritten() {
+        return config.getString("storage.type", config.getString("storage.backend", "sqlite"));
+    }
+
+    /** The word the block names when it names no database, for the warning that says so. */
+    public Optional<String> unknownType() {
+        String written = typeWritten();
+        try {
+            DatabaseBackend.fromToken(written);
+            return Optional.empty();
+        } catch (IllegalArgumentException namesNone) {
+            return Optional.of(written);
+        }
     }
 
     /**

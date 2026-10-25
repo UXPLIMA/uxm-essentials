@@ -66,6 +66,7 @@ import com.uxplima.uxmessentials.poses.application.AllowAllRegionGate;
 import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.poses.application.PoseSessions;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
+import com.uxplima.uxmessentials.poses.application.RevealPoser;
 import com.uxplima.uxmessentials.poses.application.StartCrawl;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPose;
@@ -130,6 +131,7 @@ class PosesAdapterTest {
     private PdcPlayerSitPreferences playerSitPreferences;
     private TogglePlayerSit togglePlayerSit;
     private StorePosesPlaceholders placeholders;
+    private RevealPoser revealPoser;
 
     @BeforeEach
     void setUp() {
@@ -206,6 +208,7 @@ class PosesAdapterTest {
                 new SeatInteractListener(startSit, seats, sittableBlocks, new KeyMessages(), cooldownNotice, true, 5.0);
         playerSitInteractListener = new PlayerSitInteractListener(startPlayerSit, new KeyMessages(), cooldownNotice);
         cancelListener = new PoseCancelListener(stopPose, sessions);
+        revealPoser = new RevealPoser(sessions, stopPose, posePort);
         crawlMoveListener = new CrawlMoveListener(sessions, crawlView, stopPose);
         placeholders = new StorePosesPlaceholders(sessions, playerSitPreferences);
     }
@@ -498,6 +501,51 @@ class PosesAdapterTest {
 
         assertThat(poser.isInvisible()).isFalse();
         assertThat(stranger.isInvisible()).isTrue();
+    }
+
+    @Test
+    void revealEndsAPoseAndGivesThePoserTheirBody() {
+        InvisibilityWrites player = writingPlayerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+        startPose.start(who, PoseType.SPIN, feet, feet.yaw());
+
+        assertThat(revealPoser.reveal(who)).isEqualTo(RevealPoser.Outcome.REVEALED);
+
+        assertThat(sessions.isPosing(who)).isFalse();
+        assertThat(player.isInvisible()).isFalse();
+    }
+
+    @Test
+    void revealFreesAPlayerAnOlderBuildLeftUnseen() {
+        // An older build wrote the persistent flag and no mark, so nothing but an operator can tell it is a leftover.
+        InvisibilityWrites player = writingPlayerAt(0.5, 64, 0.5);
+        player.serverSays(true);
+
+        assertThat(revealPoser.reveal(BukkitRefs.toRef(player))).isEqualTo(RevealPoser.Outcome.REVEALED);
+
+        assertThat(player.writes).containsExactly(false);
+        assertThat(player.isInvisible()).isFalse();
+    }
+
+    @Test
+    void revealLeavesWhatTheServerKeepsAlone() {
+        InvisibilityWrites spectator = writingPlayerAt(0.5, 64, 0.5);
+        spectator.setGameMode(org.bukkit.GameMode.SPECTATOR);
+        spectator.serverSays(true);
+        InvisibilityWrites drinker = writingPlayerAt(4.5, 64, 0.5);
+        drinker.addPotionEffect(
+                new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY, 200, 0));
+        drinker.serverSays(true);
+        InvisibilityWrites seen = writingPlayerAt(8.5, 64, 0.5);
+
+        assertThat(revealPoser.reveal(BukkitRefs.toRef(spectator))).isEqualTo(RevealPoser.Outcome.NOTHING_TO_REVEAL);
+        assertThat(revealPoser.reveal(BukkitRefs.toRef(drinker))).isEqualTo(RevealPoser.Outcome.NOTHING_TO_REVEAL);
+        assertThat(revealPoser.reveal(BukkitRefs.toRef(seen))).isEqualTo(RevealPoser.Outcome.NOTHING_TO_REVEAL);
+
+        assertThat(spectator.writes).isEmpty();
+        assertThat(drinker.writes).isEmpty();
+        assertThat(seen.writes).isEmpty();
     }
 
     @Test

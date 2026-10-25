@@ -302,6 +302,11 @@ final class SocialPermissions {
                         PermissionDefault.TRUE,
                         POSES),
                 PermissionSpec.of(
+                        "uxmessentials.poses.reveal",
+                        "/poses reveal <player>: give back a body a pose left unseen.",
+                        PermissionDefault.OP,
+                        POSES),
+                PermissionSpec.of(
                         "uxmessentials.sit.use",
                         "/sit and right-click-to-sit: sit down where you stand or on a sittable block.",
                         PermissionDefault.TRUE,
