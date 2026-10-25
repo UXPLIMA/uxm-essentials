@@ -15,6 +15,9 @@ import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
@@ -23,6 +26,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatMetaSource;
 import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderExpander;
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -103,6 +107,30 @@ class ChatFormatListenerTest {
         String plain = PLAIN.serialize(line);
         assertThat(plain).isEqualTo("Alice: hi there");
         assertThat(plain).doesNotContain("<red>");
+    }
+
+    @Test
+    void aMessageAnotherPluginPaintedKeepsItsColour() {
+        ChatFormatPolicy policy = new ChatFormatPolicy(true, "<display_name>: <message>", Map.of(), true, "", "");
+        ChatRenderer renderer = render(policy, ChatMeta.empty());
+
+        Component painted = Component.text("hello", NamedTextColor.LIGHT_PURPLE);
+        Component line = renderer.render(speaker, Component.text("Alice"), painted, speaker);
+
+        assertThat(PLAIN.serialize(line)).isEqualTo("Alice: hello");
+        assertThat(colourOf(line, "hello")).isEqualTo(NamedTextColor.LIGHT_PURPLE);
+    }
+
+    @Test
+    void aPermittedPlayerWhoWritesNoTagKeepsThePaintToo() {
+        speaker.addAttachment(MockBukkit.createMockPlugin(), FORMAT_PERMISSION, true);
+        ChatFormatPolicy policy = new ChatFormatPolicy(true, "<display_name>: <message>", Map.of(), true, "", "");
+        ChatRenderer renderer = render(policy, ChatMeta.empty());
+
+        Component painted = Component.text("hello", NamedTextColor.LIGHT_PURPLE);
+        Component line = renderer.render(speaker, Component.text("Alice"), painted, speaker);
+
+        assertThat(colourOf(line, "hello")).isEqualTo(NamedTextColor.LIGHT_PURPLE);
     }
 
     @Test
@@ -259,6 +287,25 @@ class ChatFormatListenerTest {
         ArgumentCaptor<ChatRenderer> captor = ArgumentCaptor.forClass(ChatRenderer.class);
         verify(event).renderer(captor.capture());
         return captor.getValue();
+    }
+
+    /** The colour the first run of {@code text} in {@code line} is drawn in, inherited colours included. */
+    private static @Nullable TextColor colourOf(Component line, String text) {
+        return colourOf(line, text, null);
+    }
+
+    private static @Nullable TextColor colourOf(Component part, String text, @Nullable TextColor inherited) {
+        TextColor colour = part.color() != null ? part.color() : inherited;
+        if (part instanceof TextComponent run && run.content().equals(text)) {
+            return colour;
+        }
+        for (Component child : part.children()) {
+            TextColor found = colourOf(child, text, colour);
+            if (found != null) {
+                return found;
+            }
+        }
+        return null;
     }
 
     /** Every affix as written, as on a server whose catalogue names none of them. */

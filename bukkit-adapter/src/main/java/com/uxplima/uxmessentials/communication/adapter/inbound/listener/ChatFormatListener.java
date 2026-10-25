@@ -136,8 +136,7 @@ public final class ChatFormatListener implements Listener {
             UUID speaker) {
 
         Component render(Component displayName, Component message, UUID reader) {
-            String raw = Text.plain(message);
-            TagResolver messageTag = parseMessage ? Text.parsed("message", raw) : Text.placeholder("message", raw);
+            TagResolver messageTag = messageTag(message);
             // The console has no language of its own; it reads a relational value as the speaker would.
             UUID relationalReader = PlayerRef.SYSTEM_UUID.equals(reader) ? speaker : reader;
             return StyledText.render(
@@ -148,6 +147,19 @@ public final class ChatFormatListener implements Listener {
                     Text.placeholder("name", name),
                     Text.placeholder("world", world),
                     messageTag);
+        }
+
+        /**
+         * The {@code <message>} resolver. The message goes in as the component it arrived as, so a colour another
+         * plugin painted on it (a chat colour, a mention) survives and a tag the player typed stays text. Only a
+         * player allowed to format, who did type a tag, has the words parsed: their own tags then replace the paint.
+         */
+        private TagResolver messageTag(Component message) {
+            String raw = Text.plain(message);
+            if (parseMessage && !Text.stripTags(raw).equals(raw)) {
+                return Text.parsed("message", raw);
+            }
+            return Text.component("message", message);
         }
 
         /**
