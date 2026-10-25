@@ -123,6 +123,9 @@ class FoliaThreadingDriftTest {
                 "GLOBAL: baltop online-ref snapshot resolved via onGlobal");
         allow.put(pkg + "economy.adapter.outbound.SalaryTask", "GLOBAL: salary fan-out inside scheduler.onGlobal");
         allow.put(
+                pkg + "shared.adapter.outbound.serverlinks.ServerLinksApplier",
+                "GLOBAL: reload reads the roster in scheduler.onGlobal, then hops each send to the player's entity");
+        allow.put(
                 pkg + "itemworld.adapter.inbound.command.GiveAllCommand",
                 "GLOBAL: /giveall distribution wrapped in scheduler.onGlobal");
         allow.put(

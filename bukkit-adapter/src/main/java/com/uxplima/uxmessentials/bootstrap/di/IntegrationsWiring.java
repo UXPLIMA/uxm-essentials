@@ -1,15 +1,17 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Objects;
+import java.util.UUID;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.mapmarker.MapMarkersWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksApplier;
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksConfig;
@@ -17,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSetti
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import com.uxplima.uxmlib.scheduler.Scheduler;
 import com.uxplima.uxmlib.scheduler.TaskHandle;
@@ -75,9 +78,7 @@ final class IntegrationsWiring {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(kernel, "kernel");
         Objects.requireNonNull(persistence, "persistence");
-        Path dataFolder = plugin.getDataFolder().toPath();
 
-        applyServerLinks(plugin, dataFolder, kernel);
         MapMarkersWiring.Stopped markers = wireMapMarkers(plugin, config, kernel, persistence);
         return wireUpdateChecker(plugin, config, kernel).withMapMarkers(markers.stop());
     }
@@ -90,9 +91,38 @@ final class IntegrationsWiring {
         return MapMarkersWiring.wire(plugin.getServer(), config, persistence, kernel.scheduler(), events, kernel.log());
     }
 
-    private static void applyServerLinks(JavaPlugin plugin, Path dataFolder, KernelPorts kernel) {
-        ServerLinksApplier applier = new ServerLinksApplier(plugin.getServer(), kernel.scheduler(), kernel.log());
-        applier.apply(new ServerLinksConfig(dataFolder, kernel.log()).read());
+    /**
+     * Apply the pause-menu links from {@code config.conf} and return what a join, a client language change and a
+     * reload call to send them again. A label reads like a sidebar line: a catalogue entry in each player's language,
+     * MiniMessage in the theme's colours, and PlaceholderAPI filled for the player.
+     */
+    static PauseLinks serverLinks(JavaPlugin plugin, KernelPorts kernel) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(kernel, "kernel");
+        ServerLinksConfig config = new ServerLinksConfig(plugin.getDataFolder().toPath(), kernel.log());
+        ServerLinksApplier applier =
+                new ServerLinksApplier(plugin.getServer(), kernel.scheduler(), kernel.log(), IntegrationsWiring::label);
+        applier.apply(config.read());
+        return new PauseLinks(applier, () -> applier.reload(config.read()));
+    }
+
+    private static Component label(UUID reader, String source) {
+        return PlayerRef.SYSTEM_UUID.equals(reader)
+                ? HudText.parse(HudText.lineForEverybody(source))
+                : HudText.render(reader, source);
+    }
+
+    /**
+     * The pause-menu links once applied.
+     *
+     * @param applier sends a player their own copy
+     * @param reload reads {@code config.conf} again and sends every player online the new links
+     */
+    record PauseLinks(ServerLinksApplier applier, Runnable reload) {
+        PauseLinks {
+            Objects.requireNonNull(applier, "applier");
+            Objects.requireNonNull(reload, "reload");
+        }
     }
 
     // Map the operator's update-check block onto the uxmLib update toolkit. The library's UpdateChecker /
