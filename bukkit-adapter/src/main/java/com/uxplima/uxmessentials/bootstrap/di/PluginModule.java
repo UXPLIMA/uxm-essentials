@@ -1387,6 +1387,8 @@ public final class PluginModule {
             wireScoreboard(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources, links);
+        } else if (module.id().equals(ModuleId.of("bossbar"))) {
+            wireBossBar(plugin, ctx, resources);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
@@ -2962,6 +2964,20 @@ public final class PluginModule {
                         wired.renderer(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
+    }
+
+    private static void wireBossBar(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+        // bossbar persists nothing in the database: a player's choice to hide their bars is kept on the player and
+        // an announcement lives in memory. The bars are config-authored under modules/bossbar/config.conf; the refresh
+        // loop is stopped and every bar taken off every screen on disable.
+        com.uxplima.uxmessentials.bossbar.adapter.BossBarWiring.Wired wired =
+                com.uxplima.uxmessentials.bossbar.adapter.BossBarWiring.wire(plugin, ctx);
+        wired.commands().forEach(resources::addCommand);
+        wired.listeners().forEach(resources::addListener);
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(), wired.reload(), "bars and animations re-read; online boss bars redrawn"));
+        wired.startBackgroundWork();
+        resources.onClose(wired::stop);
     }
 
     private static void wireTablist(

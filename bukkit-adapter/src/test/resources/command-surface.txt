@@ -33,6 +33,7 @@ bellyflop bellyflop -
 bigtree bigtree largetree
 biome biome -
 book book -
+bossbars bossbars -
 bottom bottom -
 break break -
 bring bring -

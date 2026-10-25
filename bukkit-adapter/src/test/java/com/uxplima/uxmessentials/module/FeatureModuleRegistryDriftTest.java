@@ -121,6 +121,7 @@ class FeatureModuleRegistryDriftTest {
                         "invrollback",
                         "regions",
                         "servertweaks",
+                        "bossbar",
                         "skin");
         assertThatThrownBy(() -> registry.all().add(new FakeModule("x")))
                 .isInstanceOf(UnsupportedOperationException.class);

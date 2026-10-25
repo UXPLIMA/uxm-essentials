@@ -48,6 +48,7 @@ class ManagementHubCoverageDriftTest {
             // No GUI at all: these configure entirely through their .conf files.
             "tablist",
             "nametags",
+            "bossbar",
             "commandcontrol",
             "servertweaks",
             "customcommands", // a definition is a .conf file the operator writes; the module ships no GUI

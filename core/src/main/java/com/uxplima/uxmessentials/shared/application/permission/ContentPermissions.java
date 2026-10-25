@@ -24,6 +24,7 @@ final class ContentPermissions {
     private static final ModuleId NAMETAGS = ModuleId.of("nametags");
     private static final ModuleId SERVERTWEAKS = ModuleId.of("servertweaks");
     private static final ModuleId SKIN = ModuleId.of("skin");
+    private static final ModuleId BOSSBAR = ModuleId.of("bossbar");
 
     private ContentPermissions() {}
 
@@ -41,7 +42,8 @@ final class ContentPermissions {
                         tablist(),
                         nametags(),
                         servertweaks(),
-                        skin())
+                        skin(),
+                        bossbar())
                 .flatMap(List::stream)
                 .toList();
     }
@@ -464,6 +466,30 @@ final class ContentPermissions {
                         "/scoreboard (alias /sb) to toggle whether you see the scoreboard display.",
                         PermissionDefault.TRUE,
                         SCOREBOARD));
+    }
+
+    private static List<PermissionSpec> bossbar() {
+        return List.of(
+                PermissionSpec.of(
+                        "uxmessentials.module.bossbar",
+                        "Hot-reload / inspect the bossbar module (bars that stay up, timed bars and announced bars).",
+                        PermissionDefault.OP,
+                        BOSSBAR),
+                PermissionSpec.of(
+                        "uxmessentials.bossbar.use",
+                        "/bossbars, /bossbars toggle|on|off to hide or show your own boss bars.",
+                        PermissionDefault.TRUE,
+                        BOSSBAR),
+                PermissionSpec.of(
+                        "uxmessentials.bossbar.others",
+                        "/bossbars toggle|on|off <player> to hide or show another player's boss bars.",
+                        PermissionDefault.OP,
+                        BOSSBAR),
+                PermissionSpec.of(
+                        "uxmessentials.bossbar.announce",
+                        "/bossbars announce <bar> <time> for everybody and /bossbars send <player> <bar> <time> for one player.",
+                        PermissionDefault.OP,
+                        BOSSBAR));
     }
 
     private static List<PermissionSpec> tablist() {

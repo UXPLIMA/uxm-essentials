@@ -64,6 +64,7 @@ final class DefaultResources {
             "modules/playerwarps/config.conf",
             "modules/scoreboard/config.conf",
             "modules/tablist/config.conf",
+            "modules/bossbar/config.conf",
             "modules/nametags/config.conf",
             "modules/staff/config.conf",
             "modules/npc/config.conf",

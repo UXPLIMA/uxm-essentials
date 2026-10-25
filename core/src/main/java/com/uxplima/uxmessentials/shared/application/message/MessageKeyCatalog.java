@@ -4,6 +4,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.bossbar.application.BossBarMessageKey;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
@@ -73,6 +74,7 @@ public final class MessageKeyCatalog {
             HologramsMessageKey.values(),
             PlayerwarpsMessageKey.values(),
             ScoreboardMessageKey.values(),
+            BossBarMessageKey.values(),
             VoteMessageKey.values(),
             StaffMessageKey.values(),
             NpcMessageKey.values(),

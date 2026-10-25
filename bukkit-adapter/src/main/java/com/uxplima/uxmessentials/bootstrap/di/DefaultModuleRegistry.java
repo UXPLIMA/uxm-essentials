@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bootstrap.di;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.bossbar.application.BossBarModule;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlModule;
 import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsModule;
@@ -228,11 +229,15 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // single tweak can be turned on in isolation, but every individual tweak defaults OFF, so a fresh install
         // wires nothing until an operator opts one in. It lands last after regions.
         delegate.register(new ServerTweaksModule());
+        // bossbar is the boss bar surface of the HUD family: bars that stay up, bars that come and go with an
+        // event's window, and bars a command announces. Like scoreboard and tablist it carries no hard dependency
+        // edge and ships DISABLED. It lands after servertweaks.
+        delegate.register(new BossBarModule());
         // skin is a new bounded context: SkinsRestorer-parity skins, so a cracked server looks right and a
         // Bedrock player arrives wearing their own face. It carries no hard dependency edge (its collaborators are
         // the shared persistence DSL, the skin-texture lookup, the Scheduler, messages and event ports; Floodgate
         // is an external soft-dep, not a module) and ships DISABLED, since an online-mode server gains nothing
-        // from it, so it lands last after servertweaks.
+        // from it, so it lands last after bossbar.
         delegate.register(new SkinModule());
 
         // The shared kernel is not a module and never appears here.

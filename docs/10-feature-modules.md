@@ -9,13 +9,13 @@ one.
 
 A feature of uxmEssentials is a bounded context: its own package, its own config file, its own
 commands, listeners and migrations, and its own switch. Homes is one, economy is another,
-thirty three in all today:
+thirty six in all today:
 
-`commandcontrol`, `communication`, `customcommands`, `custommenus`, `economy`,
-`holograms`, `homes`, `invrollback`, `itemworld`, `kits`, `messaging`, `moderation`, `npc`,
-`playerstate`, `playerwarps`, `poses`, `presence`, `ranks`, `regions`, `scoreboard`,
-`security`, `servertweaks`, `skin`, `staff`, `survival`, `teleport`, `trade`, `vanish`,
-`vaults`, `villagers`, `vote`, `warps`, `worlds`.
+`bossbar`, `commandcontrol`, `communication`, `customcommands`, `custommenus`, `economy`,
+`holograms`, `homes`, `invrollback`, `itemworld`, `kits`, `messaging`, `moderation`,
+`nametags`, `npc`, `playerstate`, `playerwarps`, `poses`, `presence`, `ranks`, `regions`,
+`scoreboard`, `security`, `servertweaks`, `skin`, `staff`, `survival`, `tablist`,
+`teleport`, `trade`, `vanish`, `vaults`, `villagers`, `vote`, `warps`, `worlds`.
 
 `shared` is not a module. It is what the modules stand on.
 
