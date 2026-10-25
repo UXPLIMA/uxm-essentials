@@ -34,6 +34,7 @@ import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityDismountEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -54,6 +55,7 @@ import com.uxplima.uxmessentials.poses.adapter.inbound.command.SitCommand;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.CrawlMoveListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PlayerSitInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCancelListener;
+import com.uxplima.uxmessentials.poses.adapter.inbound.listener.PoseCleanupListener;
 import com.uxplima.uxmessentials.poses.adapter.inbound.listener.SeatInteractListener;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitPacketPosePort;
 import com.uxplima.uxmessentials.poses.adapter.outbound.BukkitPoseReturn;
@@ -150,7 +152,8 @@ class PosesAdapterTest {
         packets = mock(NpcPackets.class);
         // Hand back a distinct built packet so the pose-broadcast tests can verify which viewers it was sent to.
         when(packets.pose(anyInt(), any())).thenReturn(new Object());
-        posePort = new BukkitPacketPosePort(server, scheduler, packets, new NoopLogger(), 1);
+        posePort = new BukkitPacketPosePort(
+                server, scheduler, packets, new NoopLogger(), 1, new NamespacedKey(plugin, "pose_invisible"));
         snores = new BukkitSnores(server, scheduler, new NoopLogger(), "minecraft:entity.fox.sleep", 0.5f, 1.0f, 20);
 
         PoseCooldownNotice cooldownNotice = new PoseCooldownNotice(PoseCooldown.unlimited(), new KeyMessages());
@@ -423,6 +426,78 @@ class PosesAdapterTest {
         assertThat(player.isInvisible()).isFalse();
         assertThat(taggedSeats()).isEmpty(); // no ghost seat left behind
         posePort.tick(); // a further pass is a harmless no-op: the copy is gone
+    }
+
+    @Test
+    void aSpectatorsSpinNeverWritesTheInvisibilityTheServerKeepsForThem() {
+        // A spectator is invisible because the server says so, not because anybody set it. The pose used to save
+        // that as "was invisible" and hand it back through setInvisible(true), which Paper keeps as a persistent
+        // flag and saves with the player: once they left spectator mode they stayed invisible for good.
+        InvisibilityWrites player = writingPlayerAt(0.5, 64, 0.5);
+        player.setGameMode(org.bukkit.GameMode.SPECTATOR);
+        player.serverSays(true);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.SPIN, feet, feet.yaw());
+        posePort.tick();
+        stopPose.stop(who);
+
+        assertThat(player.writes).isEmpty();
+    }
+
+    @Test
+    void aPotionsInvisibilityIsLeftToThePotion() {
+        InvisibilityWrites player = writingPlayerAt(0.5, 64, 0.5);
+        player.addPotionEffect(
+                new org.bukkit.potion.PotionEffect(org.bukkit.potion.PotionEffectType.INVISIBILITY, 200, 0));
+        player.serverSays(true);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.LAY, feet, feet.yaw());
+        stopPose.stop(who);
+
+        assertThat(player.writes).isEmpty();
+    }
+
+    @Test
+    void aReloadInTheMiddleOfAPoseGivesThePlayerTheirBodyBack() {
+        // A restart disables the plugins before it saves the players, so a pose still running then used to leave
+        // the poser saved as invisible.
+        InvisibilityWrites player = writingPlayerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(player);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+
+        startPose.start(who, PoseType.SPIN, feet, feet.yaw());
+        posePort.shutdown();
+
+        assertThat(player.writes).containsExactly(true, false);
+        assertThat(player.isInvisible()).isFalse();
+    }
+
+    @Test
+    void aPoserTheServerLostMidPoseIsMadeVisibleOnTheirNextJoin() {
+        InvisibilityWrites poser = writingPlayerAt(0.5, 64, 0.5);
+        PlayerRef who = BukkitRefs.toRef(poser);
+        Position feet = BukkitRefs.toPosition(Objects.requireNonNull(poser.getLocation(), "location"));
+        startPose.start(who, PoseType.SPIN, feet, feet.yaw());
+        // A crash: no stop, no shutdown. The next start builds a fresh port that knows nothing of the pose.
+        BukkitPacketPosePort restarted = new BukkitPacketPosePort(
+                server,
+                new InlineScheduler(),
+                packets,
+                new NoopLogger(),
+                1,
+                new NamespacedKey(plugin, "pose_invisible"));
+        InvisibilityWrites stranger = writingPlayerAt(4.5, 64, 0.5);
+        stranger.setInvisible(true); // another plugin's doing, not a pose's
+
+        new PoseCleanupListener(seats, restarted).onJoin(new PlayerJoinEvent(poser, Component.empty()));
+        new PoseCleanupListener(seats, restarted).onJoin(new PlayerJoinEvent(stranger, Component.empty()));
+
+        assertThat(poser.isInvisible()).isFalse();
+        assertThat(stranger.isInvisible()).isTrue();
     }
 
     @Test
@@ -734,6 +809,34 @@ class PosesAdapterTest {
 
     private static Position feetOf(PlayerMock player) {
         return BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
+    }
+
+    private InvisibilityWrites writingPlayerAt(double x, double y, double z) {
+        InvisibilityWrites player = new InvisibilityWrites(server, "Spinner");
+        server.addPlayer(player);
+        player.teleport(new Location(world, x, y, z));
+        return player;
+    }
+
+    /** A player that records every write of its invisibility, which is the one thing the pose may get wrong. */
+    private static final class InvisibilityWrites extends com.uxplima.uxmessentials.testing.CompletePlayerMock {
+
+        private final List<Boolean> writes = new ArrayList<>();
+
+        InvisibilityWrites(ServerMock server, String name) {
+            super(server, name);
+        }
+
+        /** What the server itself holds the flag at, for a spectator or a potion, which is not a write. */
+        void serverSays(boolean invisible) {
+            super.setInvisible(invisible);
+        }
+
+        @Override
+        public void setInvisible(boolean invisible) {
+            writes.add(invisible);
+            super.setInvisible(invisible);
+        }
     }
 
     private PlayerMock playerAt(double x, double y, double z) {

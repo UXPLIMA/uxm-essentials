@@ -11,8 +11,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.block.Block;
@@ -20,6 +22,9 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.block.data.type.Bed;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.persistence.PersistentDataType;
+import org.bukkit.potion.PotionEffect;
+import org.bukkit.potion.PotionEffectType;
 
 import com.destroystokyo.paper.profile.ProfileProperty;
 import com.uxplima.uxmessentials.poses.application.port.PosePort;
@@ -106,13 +111,24 @@ public final class BukkitPacketPosePort implements PosePort {
     // The copies in flight, keyed by their owner. Written from the poser's own thread, read on the global thread.
     private final ConcurrentHashMap<UUID, Copy> copies = new ConcurrentHashMap<>();
     private final AutoCloseable tickTask;
+    private final NamespacedKey leftover;
 
+    /**
+     * @param leftover the mark a player carries while a pose holds their invisibility, which is saved with them, so
+     *     a pose the server lost in a crash can still be undone when they next join
+     */
     public BukkitPacketPosePort(
-            Server server, Scheduler scheduler, NpcPackets packets, Logger log, int refreshIntervalTicks) {
+            Server server,
+            Scheduler scheduler,
+            NpcPackets packets,
+            Logger log,
+            int refreshIntervalTicks,
+            NamespacedKey leftover) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.packets = Objects.requireNonNull(packets, "packets");
         this.log = Objects.requireNonNull(log, "log");
+        this.leftover = Objects.requireNonNull(leftover, "leftover");
         Duration period = Duration.ofMillis(Math.max(1L, refreshIntervalTicks) * 50L);
         this.tickTask = scheduler.repeatGlobal(this::tick, period, period);
     }
@@ -139,12 +155,14 @@ public final class BukkitPacketPosePort implements PosePort {
                 at.getY() + height(pose),
                 at.getZ(),
                 at.getYaw(),
-                at.getWorld().getMinHeight(),
-                player.isInvisible());
+                at.getWorld().getMinHeight());
         copies.put(who.uuid(), copy);
         // The owner stays where they are and keeps their seat; they simply stop being drawn, so the copy is the
-        // only body anyone sees.
-        player.setInvisible(true);
+        // only body anyone sees. A player already unseen keeps whatever makes them so, and the pose never writes
+        // over it: see takeInvisibility.
+        if (!alreadyInvisible(player)) {
+            takeInvisibility(player, copy);
+        }
         scheduler.onGlobal(() -> refresh(who.uuid(), copy));
     }
 
@@ -157,10 +175,8 @@ public final class BukkitPacketPosePort implements PosePort {
             return;
         }
         Player player = server.getPlayer(who.uuid());
-        if (player != null) {
-            // Restore whatever they were before the pose: someone already invisible (a potion, a vanish) must not
-            // be revealed just because they lay down.
-            player.setInvisible(copy.wasInvisible);
+        if (player != null && copy.ownsInvisibility) {
+            giveInvisibilityBack(player);
         }
         scheduler.onGlobal(() -> {
             for (UUID viewerId : copy.viewers) {
@@ -175,6 +191,18 @@ public final class BukkitPacketPosePort implements PosePort {
 
     /** Cancel the refresh pass and forget every copy, so a disable or reload leaves nothing rendering. */
     public void shutdown() {
+        // A restart disables the plugins before it saves the players, so a pose still running here would otherwise
+        // be saved with its poser, who would join next time unseen.
+        copies.forEach((ownerId, copy) -> {
+            Player owner = server.getPlayer(ownerId);
+            if (owner != null && copy.ownsInvisibility) {
+                try {
+                    giveInvisibilityBack(owner);
+                } catch (RuntimeException failed) {
+                    log.error("failed to make a poser visible again on stop", failed);
+                }
+            }
+        });
         try {
             tickTask.close();
         } catch (Exception e) {
@@ -183,6 +211,54 @@ public final class BukkitPacketPosePort implements PosePort {
             log.error("failed to cancel the poses refresh task", e);
         }
         copies.clear();
+    }
+
+    /** Undo the invisibility a pose the server lost left on {@code player}, who has just joined. */
+    public void releaseLeftover(Player player) {
+        Objects.requireNonNull(player, "player");
+        if (!copies.containsKey(player.getUniqueId())
+                && player.getPersistentDataContainer().has(leftover)) {
+            giveInvisibilityBack(player);
+        }
+    }
+
+    /**
+     * Whether {@code player} is unseen already, for a reason the pose does not own: spectator mode or a potion, which
+     * the server keeps by itself, or another plugin that made them invisible.
+     */
+    private static boolean alreadyInvisible(Player player) {
+        return player.isInvisible()
+                || player.getGameMode() == GameMode.SPECTATOR
+                || player.hasPotionEffect(PotionEffectType.INVISIBILITY);
+    }
+
+    /**
+     * Make {@code owner} invisible for the pose, and remember that the pose did it.
+     *
+     * <p>{@code setInvisible} is not the flag the server keeps for spectator mode or a potion. It is a persistent
+     * flag, saved with the player, and while it is set the server keeps them unseen whatever else changes. So the
+     * pose writes it only for a player who was visible, and the mark it saves with them is how a pose the server
+     * lost in a crash is undone on their next join.
+     */
+    private void takeInvisibility(Player owner, Copy copy) {
+        owner.getPersistentDataContainer().set(leftover, PersistentDataType.BYTE, (byte) 1);
+        owner.setInvisible(true);
+        copy.ownsInvisibility = true;
+    }
+
+    /**
+     * Clear the persistent flag the pose set, and let the server work the player's invisibility out again. Clearing
+     * the flag also clears what an invisibility potion holds, so a potion the player drank during the pose is put
+     * back on, which makes the server read it again.
+     */
+    private void giveInvisibilityBack(Player owner) {
+        owner.setInvisible(false);
+        owner.getPersistentDataContainer().remove(leftover);
+        PotionEffect potion = owner.getPotionEffect(PotionEffectType.INVISIBILITY);
+        if (potion != null) {
+            owner.removePotionEffect(PotionEffectType.INVISIBILITY);
+            owner.addPotionEffect(potion);
+        }
     }
 
     /** Whether {@code id} currently has a copy standing in for them, for the tests that pin the render. */
@@ -204,7 +280,9 @@ public final class BukkitPacketPosePort implements PosePort {
             return;
         }
         if (!owner.isInvisible()) {
-            owner.setInvisible(true);
+            // Whatever kept them unseen when the pose began has ended, a potion run out or spectator mode left, so
+            // the pose takes it over until it ends.
+            takeInvisibility(owner, copy);
         }
         Set<UUID> current = new HashSet<>();
         for (Player viewer : server.getOnlinePlayers()) {
@@ -384,8 +462,9 @@ public final class BukkitPacketPosePort implements PosePort {
         private final double z;
         private final float yaw;
         private final int bedY;
-        private final boolean wasInvisible;
         private final Set<UUID> viewers = new HashSet<>();
+        // Whether the pose set the owner's invisibility, and so has to clear it. Read on the global refresh pass.
+        private volatile boolean ownsInvisibility;
 
         private Copy(
                 int entityId,
@@ -397,8 +476,7 @@ public final class BukkitPacketPosePort implements PosePort {
                 double y,
                 double z,
                 float yaw,
-                int bedY,
-                boolean wasInvisible) {
+                int bedY) {
             this.entityId = entityId;
             this.profileId = profileId;
             this.name = name;
@@ -409,7 +487,6 @@ public final class BukkitPacketPosePort implements PosePort {
             this.z = z;
             this.yaw = yaw;
             this.bedY = bedY;
-            this.wasInvisible = wasInvisible;
         }
     }
 }

@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.bukkit.Material;
+import org.bukkit.NamespacedKey;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
@@ -129,7 +130,12 @@ public final class PosesWiring {
         NpcPackets packets = new NmsNpcPackets(new PacketSender(new ChannelResolver()));
         BukkitCrawlView crawlView = new BukkitCrawlView(plugin.getServer(), packets);
         BukkitPacketPosePort posePort = new BukkitPacketPosePort(
-                plugin.getServer(), kernel.scheduler(), packets, kernel.log(), POSE_REFRESH_INTERVAL_TICKS);
+                plugin.getServer(),
+                kernel.scheduler(),
+                packets,
+                kernel.log(),
+                POSE_REFRESH_INTERVAL_TICKS,
+                new NamespacedKey(plugin, "pose_invisible"));
         BukkitSnores snores = new BukkitSnores(
                 plugin.getServer(),
                 kernel.scheduler(),
@@ -261,7 +267,7 @@ public final class PosesWiring {
                 new PlayerSitInteractListener(startPlayerSit, kernel.messages(), cooldownNotice),
                 new PoseCancelListener(stopPose, sessions),
                 new CrawlMoveListener(sessions, crawlView, stopPose),
-                new PoseCleanupListener(seats));
+                new PoseCleanupListener(seats, posePort));
         return new Wired(commands, listeners, seats, posePort, snores, sessions, playerSitPreferences);
     }
 
