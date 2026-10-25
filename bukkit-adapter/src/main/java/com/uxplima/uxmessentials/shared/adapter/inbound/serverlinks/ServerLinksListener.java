@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.serverlinks;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
@@ -9,6 +10,7 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerLocaleChangeEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
 
 import org.jspecify.annotations.NullMarked;
 
@@ -21,9 +23,11 @@ import org.jspecify.annotations.NullMarked;
 public final class ServerLinksListener implements Listener {
 
     private final Consumer<Player> send;
+    private final Consumer<UUID> forget;
 
-    public ServerLinksListener(Consumer<Player> send) {
+    public ServerLinksListener(Consumer<Player> send, Consumer<UUID> forget) {
         this.send = Objects.requireNonNull(send, "send");
+        this.forget = Objects.requireNonNull(forget, "forget");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -34,5 +38,10 @@ public final class ServerLinksListener implements Listener {
     @EventHandler(priority = EventPriority.MONITOR)
     public void onLocaleChange(PlayerLocaleChangeEvent event) {
         send.accept(event.getPlayer());
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onQuit(PlayerQuitEvent event) {
+        forget.accept(event.getPlayer().getUniqueId());
     }
 }

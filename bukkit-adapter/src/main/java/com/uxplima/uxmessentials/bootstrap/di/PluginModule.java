@@ -847,7 +847,8 @@ public final class PluginModule {
         // Registered after the messages step, so a reload sends each player the links in the words it has just read.
         IntegrationsWiring.PauseLinks pauseLinks = IntegrationsWiring.serverLinks(plugin, kernel);
         resources.addListener(new com.uxplima.uxmessentials.shared.adapter.inbound.serverlinks.ServerLinksListener(
-                pauseLinks.applier()::sendTo));
+                pauseLinks.applier()::sendTo, pauseLinks.applier()::forget));
+        resources.onClose(pauseLinks.stop());
         resources.addReloadTask(ReloadTask.kernel(
                 "server links", pauseLinks.reload(), "pause-menu links re-read and sent to every player"));
         MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence, auditChannel);

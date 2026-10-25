@@ -5,13 +5,17 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 import org.bukkit.Server;
@@ -91,6 +95,36 @@ class ServerLinksApplierTest {
         verify(player).sendLinks(own);
     }
 
+    /** A language chosen with a command reaches no client event, so the applier looks for it and sends again. */
+    @Test
+    void aPlayerWhoChoosesAnotherLanguageIsSentTheLinksAgain() {
+        ServerLinks own = labelledLinks();
+        Player player = player();
+        doReturn(List.of(player)).when(server).getOnlinePlayers();
+        ServerLinksApplier applier = applier(server);
+        applier.apply(List.of(new ServerLinksConfig.RawLink(null, "@custom.links.store", "https://store.example.com")));
+        applier.sendTo(player);
+
+        languages.put(player.getUniqueId(), Locale.forLanguageTag("tr"));
+        applier.resendWhereTheLanguageChanged();
+
+        verify(player, times(2)).sendLinks(own);
+    }
+
+    @Test
+    void aPlayerWhoKeepsTheirLanguageIsNotSentTheLinksAgain() {
+        ServerLinks own = labelledLinks();
+        Player player = player();
+        doReturn(List.of(player)).when(server).getOnlinePlayers();
+        ServerLinksApplier applier = applier(server);
+        applier.apply(List.of(new ServerLinksConfig.RawLink(null, "@custom.links.store", "https://store.example.com")));
+        applier.sendTo(player);
+
+        applier.resendWhereTheLanguageChanged();
+
+        verify(player, times(1)).sendLinks(own);
+    }
+
     @Test
     void typedLinksAloneSendNothingMoreToAPlayer() {
         ServerLinks global = mock(ServerLinks.class);
@@ -159,9 +193,26 @@ class ServerLinksApplierTest {
         return server;
     }
 
-    private static ServerLinksApplier applier(Server server) {
+    private final Map<UUID, Locale> languages = new HashMap<>();
+    private Server server = mock(Server.class);
+
+    /** A server whose links copy for a player, for the tests that send labels. */
+    private ServerLinks labelledLinks() {
+        ServerLinks global = mock(ServerLinks.class);
+        ServerLinks own = mock(ServerLinks.class);
+        when(global.copy()).thenReturn(own);
+        when(own.getLinks()).thenReturn(List.of());
+        server = serverWith(global);
+        return own;
+    }
+
+    private ServerLinksApplier applier(Server server) {
         return new ServerLinksApplier(
-                server, new InlineScheduler(), noopLog(), (reader, label) -> Component.text(label + " for " + reader));
+                server,
+                new InlineScheduler(),
+                noopLog(),
+                (reader, label) -> Component.text(label + " for " + reader),
+                reader -> languages.getOrDefault(reader, Locale.ENGLISH));
     }
 
     private static Player player() {

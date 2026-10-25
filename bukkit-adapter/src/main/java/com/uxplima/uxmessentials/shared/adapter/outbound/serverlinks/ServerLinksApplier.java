@@ -2,10 +2,14 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
+import java.util.function.Function;
 
 import org.bukkit.Server;
 import org.bukkit.ServerLinks;
@@ -29,7 +33,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>A built-in type is named by the client in its own language. A label is the operator's words, so it is read for
  * each player: a catalogue line ({@code @key}) in their language, MiniMessage in the theme's colours. The global copy
  * reads in the server's language and reaches a client while it connects; each player is sent their own copy when
- * they join, when their client changes language, and on a reload.
+ * they join, when their client changes language, and on a reload. A language chosen with a command fires no event,
+ * so {@link #resendWhereTheLanguageChanged} compares what each player reads with what they were sent.
  *
  * <p>The {@code ServerLinks} object is global game state, so the mutation runs on the global region thread through
  * the injected {@link Scheduler} ({@code onGlobal}), the one place CLAUDE.md sanctions for genuinely global state.
@@ -43,17 +48,29 @@ public final class ServerLinksApplier {
     private final Scheduler scheduler;
     private final Logger log;
     private final BiFunction<UUID, String, Component> labels;
+    private final Function<UUID, Locale> languages;
 
     /** What this plugin put in the pause menu last, so a player who joins later gets the same list. */
     private volatile List<ServerLinkSpec> applied = List.of();
 
-    /** @param labels a label as one reader reads it; {@link PlayerRef#SYSTEM_UUID} is the server's own copy */
+    /** The language each player online was last sent their copy in. */
+    private final Map<UUID, Locale> sentIn = new ConcurrentHashMap<>();
+
+    /**
+     * @param labels a label as one reader reads it; {@link PlayerRef#SYSTEM_UUID} is the server's own copy
+     * @param languages the language a player reads now
+     */
     public ServerLinksApplier(
-            Server server, Scheduler scheduler, Logger log, BiFunction<UUID, String, Component> labels) {
+            Server server,
+            Scheduler scheduler,
+            Logger log,
+            BiFunction<UUID, String, Component> labels,
+            Function<UUID, Locale> languages) {
         this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.labels = Objects.requireNonNull(labels, "labels");
+        this.languages = Objects.requireNonNull(languages, "languages");
     }
 
     /** Parse {@code raw}, then clear-and-set the global links on the global thread; an empty list is left alone. */
@@ -86,10 +103,30 @@ public final class ServerLinksApplier {
             return;
         }
         scheduler.onEntity(BukkitRefs.toRef(player), () -> {
+            UUID reader = player.getUniqueId();
+            sentIn.put(reader, languages.apply(reader));
             ServerLinks own = server.getServerLinks().copy();
-            fill(own, specs, player.getUniqueId());
+            fill(own, specs, reader);
             player.sendLinks(own);
         });
+    }
+
+    /** Send a player online their links again when they read another language than they were sent. Global thread. */
+    public void resendWhereTheLanguageChanged() {
+        if (applied.stream().allMatch(spec -> spec.label() == null)) {
+            return;
+        }
+        for (Player online : server.getOnlinePlayers()) {
+            UUID reader = online.getUniqueId();
+            if (!languages.apply(reader).equals(sentIn.get(reader))) {
+                sendTo(online);
+            }
+        }
+    }
+
+    /** Drop what was kept about a player who left. */
+    public void forget(UUID player) {
+        sentIn.remove(Objects.requireNonNull(player, "player"));
     }
 
     private List<ServerLinkSpec> parseAll(List<ServerLinksConfig.RawLink> raw) {

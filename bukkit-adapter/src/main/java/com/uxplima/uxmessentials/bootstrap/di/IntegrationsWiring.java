@@ -100,10 +100,20 @@ final class IntegrationsWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(kernel, "kernel");
         ServerLinksConfig config = new ServerLinksConfig(plugin.getDataFolder().toPath(), kernel.log());
-        ServerLinksApplier applier =
-                new ServerLinksApplier(plugin.getServer(), kernel.scheduler(), kernel.log(), IntegrationsWiring::label);
+        ServerLinksApplier applier = new ServerLinksApplier(
+                plugin.getServer(), kernel.scheduler(), kernel.log(), IntegrationsWiring::label, HudText::languageOf);
         applier.apply(config.read());
-        return new PauseLinks(applier, () -> applier.reload(config.read()));
+        // A language chosen with a command fires no event, so the players' languages are compared every two seconds.
+        AutoCloseable languageWatch =
+                kernel.scheduler().repeatGlobal(applier::resendWhereTheLanguageChanged, LANGUAGE_WATCH, LANGUAGE_WATCH);
+        Runnable stop = () -> {
+            try {
+                languageWatch.close();
+            } catch (Exception failure) {
+                kernel.log().error("could not stop the pause-menu language watch", failure);
+            }
+        };
+        return new PauseLinks(applier, () -> applier.reload(config.read()), stop);
     }
 
     private static Component label(UUID reader, String source) {
@@ -117,11 +127,13 @@ final class IntegrationsWiring {
      *
      * @param applier sends a player their own copy
      * @param reload reads {@code config.conf} again and sends every player online the new links
+     * @param stop ends the language watch on disable
      */
-    record PauseLinks(ServerLinksApplier applier, Runnable reload) {
+    record PauseLinks(ServerLinksApplier applier, Runnable reload, Runnable stop) {
         PauseLinks {
             Objects.requireNonNull(applier, "applier");
             Objects.requireNonNull(reload, "reload");
+            Objects.requireNonNull(stop, "stop");
         }
     }
 
@@ -188,6 +200,9 @@ final class IntegrationsWiring {
 
     /** The poll cadence used when notify-on-join is on but the operator set a zero (check-once) interval. */
     private static final Duration DEFAULT_POLL_PERIOD = Duration.ofHours(12);
+
+    /** How often the players' languages are compared with the language of the pause-menu links they were sent. */
+    private static final Duration LANGUAGE_WATCH = Duration.ofSeconds(2);
 
     /**
      * What the integrations wiring contributes: a stop hook that runs every disable action (the update checker's
