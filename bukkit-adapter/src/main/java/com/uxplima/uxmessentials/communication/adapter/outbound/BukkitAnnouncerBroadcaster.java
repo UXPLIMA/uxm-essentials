@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.communication.adapter.outbound;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -17,10 +18,12 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ChatCentre;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.text.CenteredTextPadder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -41,9 +44,10 @@ import org.jspecify.annotations.Nullable;
  * delivered to every opted-in viewer (optionally restricted to one world), with the sink performing the per-viewer
  * region hop and parse.
  *
- * <p><b>Centering</b> (the {@link Announcement#centered()} flag) is not yet applied: chat centering needs glyph-width
- * measurement that Adventure does not expose, so the flag is parsed and carried but the lines render left-aligned
- * for now. The flag is honoured by the model so a later width-aware centering pass needs no config change.
+ * <p><b>Centring</b>: with {@link Announcement#centered()} set, every line is drawn in the middle of the chat, and a
+ * single line asks for it on its own by opening with {@code <center>} (see {@link ChatCentre}). A line is rendered and
+ * then measured, so the padding follows the width it draws. The client already centres a title and an action bar,
+ * so an announcement shown only there leaves the flag off.
  */
 @NullMarked
 public final class BukkitAnnouncerBroadcaster {
@@ -108,8 +112,15 @@ public final class BukkitAnnouncerBroadcaster {
         return Component.join(
                 JoinConfiguration.newlines(),
                 announcement.lines().stream()
-                        .map(line -> HudText.render(viewer, line))
+                        .map(line -> renderLine(announcement.centered(), line, viewer))
                         .toList());
+    }
+
+    /** One line, in the middle of the chat when the announcement or the line itself asks for it. */
+    private static Component renderLine(boolean centred, String line, UUID viewer) {
+        Optional<String> marked = ChatCentre.afterMarker(line);
+        Component drawn = HudText.render(viewer, marked.orElse(line));
+        return centred || marked.isPresent() ? CenteredTextPadder.centred(drawn) : drawn;
     }
 
     /** Send {@code line} to every online, opted-in player. */

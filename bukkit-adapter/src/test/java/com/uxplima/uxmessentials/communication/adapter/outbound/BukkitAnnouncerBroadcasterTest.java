@@ -101,6 +101,33 @@ class BukkitAnnouncerBroadcasterTest {
     }
 
     @Test
+    void aCentredAnnouncementPutsEveryLineInTheMiddleOfTheChat() {
+        BukkitAnnouncerBroadcaster broadcaster = broadcaster(player -> alwaysContext(player));
+        Announcement centred = new Announcement(
+                "ann",
+                List.of("Hi", "Hi"),
+                new DisplayCondition.Permission("uxmessentials.vip"),
+                Optional.empty(),
+                Set.of(BroadcastChannel.CHAT),
+                Optional.empty(),
+                true);
+
+        broadcaster.preview(centred, alice);
+
+        String pad = " ".repeat(39);
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo(pad + "Hi\n" + pad + "Hi");
+    }
+
+    @Test
+    void oneLineOfAnAnnouncementCanAskForTheMiddleOnItsOwn() {
+        BukkitAnnouncerBroadcaster broadcaster = broadcaster(player -> alwaysContext(player));
+
+        broadcaster.preview(chat(new DisplayCondition.Permission("uxmessentials.vip"), "<center>Hi"), alice);
+
+        assertThat(PLAIN.serialize(alice.nextComponentMessage())).isEqualTo(" ".repeat(39) + "Hi");
+    }
+
+    @Test
     void theStringBroadcastFansOutOnTheGlobalRegionThread() {
         RecordingScheduler recording = new RecordingScheduler();
         ChannelBroadcaster channels = new ChannelBroadcaster(new SyncScheduler(), display());

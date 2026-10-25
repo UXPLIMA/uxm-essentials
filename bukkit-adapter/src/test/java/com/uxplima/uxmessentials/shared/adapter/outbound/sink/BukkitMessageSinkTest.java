@@ -36,6 +36,26 @@ class BukkitMessageSinkTest {
     }
 
     @Test
+    void aLineThatOpensWithCenterIsDrawnInTheMiddleOfTheChat() {
+        BukkitMessageSink sink = new BukkitMessageSink(scheduler, "");
+
+        sink.deliver(PlayerRef.system("CONSOLE"), "<center><green>Hi</green>");
+
+        assertThat(PLAIN.serialize(server.getConsoleSender().nextComponentMessage()))
+                .isEqualTo(" ".repeat(39) + "Hi");
+    }
+
+    @Test
+    void theBritishSpellingCentresToo() {
+        BukkitMessageSink sink = new BukkitMessageSink(scheduler, "");
+
+        sink.deliver(PlayerRef.system("CONSOLE"), "  <centre>Hi");
+
+        assertThat(PLAIN.serialize(server.getConsoleSender().nextComponentMessage()))
+                .isEqualTo(" ".repeat(39) + "Hi");
+    }
+
+    @Test
     void systemActorFeedbackIsDeliveredToConsoleOnGlobalThread() {
         BukkitMessageSink sink = new BukkitMessageSink(scheduler, "<gray>[uxm]</gray>");
 

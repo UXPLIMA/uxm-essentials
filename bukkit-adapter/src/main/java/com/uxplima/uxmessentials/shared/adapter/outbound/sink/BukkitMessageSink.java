@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.sink;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.UnaryOperator;
@@ -13,10 +14,12 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.ChatCentre;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.text.CenteredTextPadder;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -37,6 +40,8 @@ import org.jspecify.annotations.NullMarked;
  * content (announcer lines, join messages) may embed third-party placeholders. The transform runs on the
  * caller's thread before the entity hop, and degrades to the identity when PlaceholderAPI is absent, so it
  * never touches the domain and is a no-op without the soft-depend.
+ *
+ * <p>A line that opens with {@code <center>} is drawn in the middle of the chat. See {@link ChatCentre}.
  */
 @NullMarked
 public final class BukkitMessageSink implements MessageSink {
@@ -65,7 +70,10 @@ public final class BukkitMessageSink implements MessageSink {
         Objects.requireNonNull(renderedText, "renderedText");
         String expanded = preParse.apply(viewer.uuid()).apply(renderedText);
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        Component component = StyledText.render(expanded, prefix);
+        Optional<String> centred = ChatCentre.afterMarker(expanded);
+        Component component = centred.isPresent()
+                ? CenteredTextPadder.centred(StyledText.render(centred.get(), prefix))
+                : StyledText.render(expanded, prefix);
         if (viewer.isSystem()) {
             scheduler.onGlobal(() -> Bukkit.getConsoleSender().sendMessage(component));
             return;
