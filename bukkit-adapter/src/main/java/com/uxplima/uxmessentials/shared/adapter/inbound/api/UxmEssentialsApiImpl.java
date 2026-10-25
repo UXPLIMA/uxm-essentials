@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmBossBarQuery;
 import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
@@ -256,5 +257,10 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public Optional<UxmScoreboardQuery> scoreboard() {
         return queries.find(UxmScoreboardQuery.class);
+    }
+
+    @Override
+    public Optional<UxmBossBarQuery> bossBar() {
+        return queries.find(UxmBossBarQuery.class);
     }
 }

@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -19,6 +20,8 @@ import com.uxplima.uxmessentials.bossbar.adapter.outbound.BossBarRenderer;
 import com.uxplima.uxmessentials.bossbar.adapter.outbound.PdcBossBarVisibilityStore;
 import com.uxplima.uxmessentials.bossbar.adapter.outbound.RemainingTime;
 import com.uxplima.uxmessentials.bossbar.application.ToggleBossBars;
+import com.uxplima.uxmessentials.bossbar.application.port.BossBarVisibilityStore;
+import com.uxplima.uxmessentials.bossbar.domain.BossBarConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
@@ -74,7 +77,18 @@ public final class BossBarWiring {
             animations.replace(settings.animations());
             renderTask.refreshNow();
         };
-        return new Wired(commands, listeners, renderer, renderTask, running, kernel.scheduler(), reload);
+        return new Wired(
+                commands,
+                listeners,
+                renderer,
+                renderTask,
+                running,
+                kernel.scheduler(),
+                reload,
+                visibility,
+                toggle,
+                announcements,
+                settings::bars);
     }
 
     /**
@@ -87,6 +101,10 @@ public final class BossBarWiring {
      * @param running cleared on stop so the loop ends
      * @param scheduler the kernel scheduler, to reach every player on stop
      * @param reload reads the file again and draws every player's bars
+     * @param visibility the kept choice to hide the bars, read by the placeholders and the published query
+     * @param toggle the use case the command and the published actions both hide and show through
+     * @param announcements the bars a command or a consumer has put up for a while
+     * @param bars the bars the file writes, as read last
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -95,7 +113,11 @@ public final class BossBarWiring {
             BossBarRenderTask renderTask,
             AtomicBoolean running,
             Scheduler scheduler,
-            Runnable reload) {
+            Runnable reload,
+            BossBarVisibilityStore visibility,
+            ToggleBossBars toggle,
+            BossBarAnnouncements announcements,
+            Supplier<BossBarConfig> bars) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -105,6 +127,10 @@ public final class BossBarWiring {
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(scheduler, "scheduler");
             Objects.requireNonNull(reload, "reload");
+            Objects.requireNonNull(visibility, "visibility");
+            Objects.requireNonNull(toggle, "toggle");
+            Objects.requireNonNull(announcements, "announcements");
+            Objects.requireNonNull(bars, "bars");
         }
 
         /** Start the refresh loop and draw everybody already online, as after a reload of the plugin. */

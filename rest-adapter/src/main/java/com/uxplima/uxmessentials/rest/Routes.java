@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.rest.http.Json;
 import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.http.Router;
 import com.uxplima.uxmessentials.rest.route.ActionsFor;
+import com.uxplima.uxmessentials.rest.route.BossBarRoutes;
 import com.uxplima.uxmessentials.rest.route.CommandControlRoutes;
 import com.uxplima.uxmessentials.rest.route.DisplayRoutes;
 import com.uxplima.uxmessentials.rest.route.EconomyRoutes;
@@ -96,6 +97,7 @@ public final class Routes {
                 .addAll(RanksRoutes.of(api, actions))
                 .addAll(RegionsRoutes.of(api))
                 .addAll(ScoreboardRoutes.of(api, actions))
+                .addAll(BossBarRoutes.of(api, actions))
                 .addAll(SecurityRoutes.of(api, actions))
                 .addAll(SkinRoutes.of(api))
                 .addAll(StaffRoutes.of(api))

@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -21,7 +22,12 @@ import com.uxplima.uxmessentials.bossbar.application.port.BossBarVisibilityStore
 import com.uxplima.uxmessentials.bossbar.domain.BossBarConfig;
 import com.uxplima.uxmessentials.bossbar.domain.BossBarDefinition;
 import com.uxplima.uxmessentials.bossbar.domain.BossBarWindow;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationDef;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec;
+import com.uxplima.uxmessentials.shared.display.AnimationSpec.AnimationType;
 import com.uxplima.uxmessentials.shared.display.DisplayCondition;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.AfterEach;
@@ -60,7 +66,36 @@ class BossBarRendererTest {
 
     @AfterEach
     void tearDown() {
+        HudText.useCatalogLines(CatalogLines.none());
         MockBukkit.unmock();
+    }
+
+    /**
+     * A bar that turns through several texts is an animation whose frames are catalogue lines: each frame is read in
+     * the reader's language once the animation has picked it, and the colour can turn with it.
+     */
+    @Test
+    void aRotatingBarTurnsThroughCatalogueLinesAndColours() {
+        HudText.useCatalogLines(new CatalogLines(
+                (viewer, key, arguments) -> key.key().equals("custom.website") ? "<green>Website" : "<gold>Store",
+                Set.of("custom.website", "custom.store")::contains));
+        AnimationRegistry animations = new AnimationRegistry(List.of(
+                AnimationDef.frames(new AnimationSpec(
+                        "links", AnimationType.FRAMES, List.of("@custom.website", "@custom.store"), 1)),
+                AnimationDef.frames(new AnimationSpec("tint", AnimationType.FRAMES, List.of("GREEN", "YELLOW"), 1))));
+        BossBarRenderer rotating = new BossBarRenderer(
+                config::get, new MapStore(), animations, announcements, (viewer, left) -> "", now::get);
+        config.set(new BossBarConfig(List.of(bar("links", "%anim_links%", "%anim_tint%", "NOTCHED_20", "100"))));
+
+        rotating.renderFor(player);
+        BossBar shown = only(player);
+        assertThat(plain(shown)).isEqualTo("Website");
+        assertThat(shown.color()).isEqualTo(BossBar.Color.GREEN);
+
+        animations.advance();
+        rotating.renderFor(player);
+        assertThat(plain(only(player))).isEqualTo("Store");
+        assertThat(only(player).color()).isEqualTo(BossBar.Color.YELLOW);
     }
 
     @Test
@@ -192,6 +227,27 @@ class BossBarRendererTest {
 
         assertThat(player.activeBossBars()).hasSize(1);
         assertThat(other.activeBossBars()).isEmpty();
+    }
+
+    @Test
+    void theTimeLeftOnABarIsItsAnnouncementOrItsOwnEnd() {
+        BossBarWindow week = new BossBarWindow(Optional.of(NOW), NOW.plus(Duration.ofDays(7)));
+        config.set(new BossBarConfig(List.of(
+                new BossBarDefinition(
+                        "event", "x", "GREEN", "PROGRESS", "time", DisplayCondition.always(), Optional.of(week), false),
+                new BossBarDefinition(
+                        "drop", "x", "GREEN", "PROGRESS", "time", DisplayCondition.always(), Optional.empty(), true),
+                bar("plain", "x", "GREEN", "PROGRESS", "100"))));
+        announcements.send(player.getUniqueId(), "drop", Duration.ofMinutes(10), NOW);
+
+        assertThat(renderer.remaining(player.getUniqueId(), "event")).contains(Duration.ofDays(7));
+        assertThat(renderer.remaining(player.getUniqueId(), "drop")).contains(Duration.ofMinutes(10));
+        assertThat(renderer.remaining(UUID.randomUUID(), "drop")).isEmpty();
+        assertThat(renderer.remaining(player.getUniqueId(), "plain")).isEmpty();
+        assertThat(renderer.remaining(player.getUniqueId(), "missing")).isEmpty();
+
+        now.set(NOW.plus(Duration.ofDays(8)));
+        assertThat(renderer.remaining(player.getUniqueId(), "event")).isEmpty();
     }
 
     @Test

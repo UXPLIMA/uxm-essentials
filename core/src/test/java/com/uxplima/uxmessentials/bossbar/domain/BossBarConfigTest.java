@@ -112,6 +112,15 @@ class BossBarConfigTest {
         assertThatIllegalArgumentException().isThrownBy(() -> new BossBarWindow(Optional.of(NOW), NOW.minusSeconds(1)));
     }
 
+    /** A placeholder key arrives lower-cased and a command is typed by hand, so a bar is found whatever its case. */
+    @Test
+    void aBarIsFoundWhateverTheCaseOfItsId() {
+        BossBarConfig config = new BossBarConfig(List.of(bar("DoubleXp", DisplayCondition.always(), null, false)));
+
+        assertThat(config.byId("doublexp")).map(BossBarDefinition::id).contains("DoubleXp");
+        assertThat(config.byId("other")).isEmpty();
+    }
+
     @Test
     void anIdWithASpaceIsRefused() {
         assertThatIllegalArgumentException().isThrownBy(() -> bar("two words", DisplayCondition.always(), null, false));

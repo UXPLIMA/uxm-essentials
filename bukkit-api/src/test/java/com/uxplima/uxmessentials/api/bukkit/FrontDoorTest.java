@@ -251,6 +251,11 @@ class FrontDoorTest {
         }
 
         @Override
+        public Optional<com.uxplima.uxmessentials.api.query.UxmBossBarQuery> bossBar() {
+            return Optional.empty();
+        }
+
+        @Override
         public Optional<UxmTradeQuery> trade() {
             return Optional.empty();
         }

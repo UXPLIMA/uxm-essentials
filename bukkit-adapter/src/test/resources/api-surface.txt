@@ -1,4 +1,5 @@
 interface com.uxplima.uxmessentials.api.action.UxmActions
+  Optional bossBar()
   Optional economy()
   Optional holograms()
   Optional homes()
@@ -21,6 +22,12 @@ interface com.uxplima.uxmessentials.api.action.UxmActions
   Optional vote()
   Optional warps()
   Optional worlds()
+interface com.uxplima.uxmessentials.api.action.UxmBossBarActions
+  CompletableFuture announce(String, Duration)
+  CompletableFuture hide(UUID)
+  CompletableFuture refresh(UUID)
+  CompletableFuture send(UUID, String, Duration)
+  CompletableFuture show(UUID)
 interface com.uxplima.uxmessentials.api.action.UxmEconomyActions
   CompletableFuture deposit(UUID, BigDecimal)
   CompletableFuture deposit(UUID, BigDecimal, String)
@@ -198,6 +205,7 @@ class com.uxplima.uxmessentials.api.bukkit.UxmApiHolder
   void install(com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi)
   void uninstall()
 interface com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi
+  Optional bossBar()
   Optional commandControl()
   Optional economy()
   Optional holograms()
@@ -890,6 +898,11 @@ interface com.uxplima.uxmessentials.api.bukkit.menu.MenuView
   UUID viewerId()
   int page()
   int pageCount()
+interface com.uxplima.uxmessentials.api.query.UxmBossBarQuery
+  CompletableFuture hidden(UUID)
+  CompletableFuture remaining(UUID, String)
+  CompletableFuture shown(UUID)
+  List bars()
 interface com.uxplima.uxmessentials.api.query.UxmCommandControlQuery
   CompletableFuture check(UUID, String)
   CompletableFuture isBlocked(UUID, String)

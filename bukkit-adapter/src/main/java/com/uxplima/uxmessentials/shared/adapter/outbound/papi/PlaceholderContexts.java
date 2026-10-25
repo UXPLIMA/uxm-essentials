@@ -41,6 +41,7 @@ public final class PlaceholderContexts {
     private final @Nullable PosesPlaceholders poses;
     private final @Nullable SurvivalPlaceholders survival;
     private final @Nullable TablistPlaceholders tablist;
+    private final @Nullable BossBarPlaceholders bossBar;
     private final @Nullable NametagsPlaceholders nametags;
     private final @Nullable VillagersPlaceholders villagers;
     private final @Nullable ServerTweaksPlaceholders serverTweaks;
@@ -82,6 +83,7 @@ public final class PlaceholderContexts {
         this.poses = builder.poses;
         this.survival = builder.survival;
         this.tablist = builder.tablist;
+        this.bossBar = builder.bossBar;
         this.nametags = builder.nametags;
         this.villagers = builder.villagers;
         this.serverTweaks = builder.serverTweaks;
@@ -219,6 +221,10 @@ public final class PlaceholderContexts {
         return Optional.ofNullable(tablist);
     }
 
+    public Optional<BossBarPlaceholders> bossBar() {
+        return Optional.ofNullable(bossBar);
+    }
+
     public Optional<NametagsPlaceholders> nametags() {
         return Optional.ofNullable(nametags);
     }
@@ -316,6 +322,7 @@ public final class PlaceholderContexts {
         private @Nullable PosesPlaceholders poses;
         private @Nullable SurvivalPlaceholders survival;
         private @Nullable TablistPlaceholders tablist;
+        private @Nullable BossBarPlaceholders bossBar;
         private @Nullable NametagsPlaceholders nametags;
         private @Nullable VillagersPlaceholders villagers;
         private @Nullable ServerTweaksPlaceholders serverTweaks;
@@ -468,6 +475,11 @@ public final class PlaceholderContexts {
 
         public Builder tablist(TablistPlaceholders seam) {
             this.tablist = java.util.Objects.requireNonNull(seam, "seam");
+            return this;
+        }
+
+        public Builder bossBar(BossBarPlaceholders seam) {
+            this.bossBar = java.util.Objects.requireNonNull(seam, "seam");
             return this;
         }
 

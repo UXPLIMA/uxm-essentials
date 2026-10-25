@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiFunction;
@@ -32,8 +33,9 @@ import org.jspecify.annotations.NullMarked;
  * changes the ones already on their screen in place and adds or takes away the rest. The client stacks bars in the
  * order they were shown, so when the list itself changes, the bars are taken down and shown again top first.
  *
- * <p>Each source is read for its reader: a catalogue line in their language, animations, the built-in tokens,
- * {@code {remaining}} for a timed or announced bar, then PlaceholderAPI. Must run on the player's own thread.
+ * <p>Each source is read for its reader: a catalogue line in their language, animations (whose frame may be a
+ * catalogue line too), the built-in tokens, {@code {remaining}} for a timed or announced bar, then PlaceholderAPI.
+ * Must run on the player's own thread.
  */
 @NullMarked
 public final class BossBarRenderer {
@@ -117,6 +119,28 @@ public final class BossBarRenderer {
         drawn.remove(Objects.requireNonNull(player, "player"));
     }
 
+    /**
+     * The time left on bar {@code id} for {@code player}: an announcement made to them or to everybody, else the bar's
+     * own window, while either runs. Empty for a bar with no clock running, or one the file does not write.
+     */
+    public Optional<Duration> remaining(UUID player, String id) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(id, "id");
+        Instant now = clock.get();
+        return bars.get()
+                .byId(id)
+                .flatMap(bar -> announcements
+                        .windowFor(player, bar.id())
+                        .filter(window -> window.activeAt(now))
+                        .or(() -> bar.window().filter(window -> window.activeAt(now))))
+                .map(window -> window.remaining(now));
+    }
+
+    /** {@link #remaining} in the player's own words, for a placeholder. */
+    public Optional<String> remainingWords(UUID player, String id) {
+        return remaining(player, id).map(left -> remaining.apply(player, left));
+    }
+
     /** The ids of the bars on a player's screen, top first. */
     public List<String> shownIds(UUID player) {
         return ids(drawn.getOrDefault(Objects.requireNonNull(player, "player"), List.of()));
@@ -140,9 +164,12 @@ public final class BossBarRenderer {
     }
 
     private String expand(Player player, String source, long tick, String left) {
-        String animated = animations.resolve(HudText.lineFor(player.getUniqueId(), source), tick);
+        // A frame an animation picks may itself be a catalogue line, which is how one bar turns through texts in
+        // each reader's language, so the line is read again once the animation has chosen.
+        UUID reader = player.getUniqueId();
+        String animated = HudText.lineFor(reader, animations.resolve(HudText.lineFor(reader, source), tick));
         String builtins = BuiltinTokens.apply(player, animated).replace(REMAINING, left);
-        return PlaceholderApiSupport.messageBridge(player.getUniqueId()).apply(builtins);
+        return PlaceholderApiSupport.messageBridge(reader).apply(builtins);
     }
 
     private static BossBar.Color color(String name) {

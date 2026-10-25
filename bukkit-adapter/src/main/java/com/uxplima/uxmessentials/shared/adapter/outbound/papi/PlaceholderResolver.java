@@ -88,6 +88,8 @@ public final class PlaceholderResolver {
     private static final String COMMUNICATION_PREFIX = "communication_";
     private static final String SCOREBOARD_PREFIX = "scoreboard_";
     private static final String TABLIST_PREFIX = "tablist_";
+    private static final String BOSSBAR_PREFIX = "bossbar_";
+    private static final String REMAINING_PREFIX = "remaining_";
     private static final String NAMETAGS_PREFIX = "nametags_";
     private static final String VILLAGERS_PREFIX = "villagers_";
     private static final String SERVERTWEAKS_PREFIX = "servertweaks_";
@@ -248,6 +250,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(TABLIST_PREFIX)) {
             return Optional.of(tablist(who, online, normalized.substring(TABLIST_PREFIX.length())));
+        }
+        if (normalized.startsWith(BOSSBAR_PREFIX)) {
+            return Optional.of(bossBar(who, online, normalized.substring(BOSSBAR_PREFIX.length())));
         }
         if (normalized.startsWith(NAMETAGS_PREFIX)) {
             return Optional.of(nametags(who, online, normalized.substring(NAMETAGS_PREFIX.length())));
@@ -1490,6 +1495,33 @@ public final class PlaceholderResolver {
         return switch (key) {
             case "visible" -> bool(seam.get().visible(who));
             case "board" -> seam.get().board(who).orElse(EMPTY);
+            default -> EMPTY;
+        };
+    }
+
+    /**
+     * Resolve a {@code bossbar_}-stripped key against the bars on the player's screen. {@code remaining_<bar>} reads the
+     * time left on one bar in the player's words, and the bar is found whatever the case of its id, since the key
+     * arrives lower-cased. A player who sees no bar, or a bar with no clock running, reads the dash, and so does an
+     * offline requester, who has no screen.
+     */
+    private String bossBar(PlayerRef who, boolean online, String key) {
+        Optional<BossBarPlaceholders> seam = contexts.bossBar();
+        if (seam.isEmpty() || !online) {
+            return EMPTY;
+        }
+        if (key.startsWith(REMAINING_PREFIX)) {
+            return seam.get()
+                    .remaining(who, key.substring(REMAINING_PREFIX.length()))
+                    .orElse(EMPTY);
+        }
+        return switch (key) {
+            case "visible" -> bool(seam.get().visible(who));
+            case "shown" -> {
+                List<String> shown = seam.get().shown(who);
+                yield shown.isEmpty() ? EMPTY : String.join(", ", shown);
+            }
+            case "count" -> Integer.toString(seam.get().shown(who).size());
             default -> EMPTY;
         };
     }

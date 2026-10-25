@@ -1065,6 +1065,39 @@ class PlaceholderResolverTest {
     }
 
     @Test
+    void theBossBarsReadWhatIsOnThePlayersScreen() {
+        PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
+                .bossBar(new BossBarPlaceholders() {
+                    @Override
+                    public boolean visible(PlayerRef who) {
+                        return who.equals(ALICE);
+                    }
+
+                    @Override
+                    public List<String> shown(PlayerRef who) {
+                        return who.equals(ALICE) ? List.of("website", "store") : List.of();
+                    }
+
+                    @Override
+                    public Optional<String> remaining(PlayerRef who, String bar) {
+                        return who.equals(ALICE) && bar.equals("doublexp") ? Optional.of("5d 8h") : Optional.empty();
+                    }
+                })
+                .build());
+
+        assertThat(resolver.resolve(ALICE, true, "bossbar_visible")).contains("yes");
+        assertThat(resolver.resolve(ALICE, true, "bossbar_shown")).contains("website, store");
+        assertThat(resolver.resolve(ALICE, true, "bossbar_count")).contains("2");
+        assertThat(resolver.resolve(ALICE, true, "bossbar_remaining_DoubleXp")).contains("5d 8h");
+        assertThat(resolver.resolve(ALICE, true, "bossbar_remaining_store")).contains("-");
+        assertThat(resolver.resolve(BOB, true, "bossbar_visible")).contains("no");
+        assertThat(resolver.resolve(BOB, true, "bossbar_shown")).contains("-");
+        assertThat(resolver.resolve(BOB, true, "bossbar_count")).contains("0");
+        // The bars are drawn on a live screen, so an offline requester has none.
+        assertThat(resolver.resolve(ALICE, false, "bossbar_count")).contains("-");
+    }
+
+    @Test
     void theVillagerFollowCountReadsPerPlayer() {
         PlaceholderResolver resolver = resolverWith(PlaceholderContexts.builder()
                 .villagers(who -> who.equals(ALICE) ? 2 : 0)

@@ -1388,7 +1388,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("tablist"))) {
             wireTablist(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("bossbar"))) {
-            wireBossBar(plugin, ctx, resources);
+            wireBossBar(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("vote"))) {
             wireVote(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("nametags"))) {
@@ -2966,7 +2966,8 @@ public final class PluginModule {
                         ctx.kernel().scheduler()));
     }
 
-    private static void wireBossBar(JavaPlugin plugin, ModuleContext ctx, CloseableResources resources) {
+    private static void wireBossBar(
+            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
         // bossbar persists nothing in the database: a player's choice to hide their bars is kept on the player and
         // an announcement lives in memory. The bars are config-authored under modules/bossbar/config.conf; the refresh
         // loop is stopped and every bar taken off every screen on disable.
@@ -2978,6 +2979,30 @@ public final class PluginModule {
                 ctx.moduleId(), wired.reload(), "bars and animations re-read; online boss bars redrawn"));
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
+        // The placeholders, the published query and the published actions read and write the same choice, screen
+        // and announcements /bossbars does, so a consumer and a staff member never disagree about a player's bars.
+        links.placeholders.bossBar(new com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoreBossBarPlaceholders(
+                wired.visibility(), wired.renderer()));
+        links.queries.register(
+                com.uxplima.uxmessentials.api.query.UxmBossBarQuery.class,
+                new com.uxplima.uxmessentials.bossbar.adapter.outbound.api.BossBarQueries(
+                        wired.bars(),
+                        wired.visibility(),
+                        wired.renderer(),
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
+        links.actions.register(
+                com.uxplima.uxmessentials.api.action.UxmBossBarActions.class,
+                source -> new com.uxplima.uxmessentials.bossbar.adapter.outbound.api.BossBarActions(
+                        wired.toggle(),
+                        wired.visibility(),
+                        wired.renderer(),
+                        wired.announcements(),
+                        wired.bars(),
+                        wired.renderTask()::refreshNow,
+                        java.time.Instant::now,
+                        ctx.kernel().playerLookup(),
+                        ctx.kernel().scheduler()));
     }
 
     private static void wireTablist(

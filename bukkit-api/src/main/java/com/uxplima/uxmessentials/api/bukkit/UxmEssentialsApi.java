@@ -7,6 +7,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
+import com.uxplima.uxmessentials.api.query.UxmBossBarQuery;
 import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
 import com.uxplima.uxmessentials.api.query.UxmEconomyQuery;
 import com.uxplima.uxmessentials.api.query.UxmHologramsQuery;
@@ -205,6 +206,9 @@ public interface UxmEssentialsApi {
 
     /** Reading whether a player put their sidebar away, or empty when the scoreboard module is switched off. */
     Optional<UxmScoreboardQuery> scoreboard();
+
+    /** Reading the boss bars and the ones on a player's screen, or empty when the bossbar module is switched off. */
+    Optional<UxmBossBarQuery> bossBar();
 
     /** The API, or {@code null} when uxmEssentials is absent, still loading, or shutting down. */
     static @Nullable UxmEssentialsApi get() {

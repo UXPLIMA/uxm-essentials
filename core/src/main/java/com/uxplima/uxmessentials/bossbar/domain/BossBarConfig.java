@@ -25,10 +25,10 @@ public record BossBarConfig(List<BossBarDefinition> bars) {
         return new BossBarConfig(List.of());
     }
 
-    /** The bar named {@code id}, if one is written. */
+    /** The bar named {@code id}, whatever its case, if one is written. */
     public Optional<BossBarDefinition> byId(String id) {
         Objects.requireNonNull(id, "id");
-        return bars.stream().filter(bar -> bar.id().equals(id)).findFirst();
+        return bars.stream().filter(bar -> bar.id().equalsIgnoreCase(id)).findFirst();
     }
 
     /**

@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
+import com.uxplima.uxmessentials.api.action.UxmBossBarActions;
 import com.uxplima.uxmessentials.api.action.UxmEconomyActions;
 import com.uxplima.uxmessentials.api.action.UxmHologramsActions;
 import com.uxplima.uxmessentials.api.action.UxmHomeActions;
@@ -144,6 +145,11 @@ public final class UxmActionsImpl implements UxmActions {
     @Override
     public Optional<UxmScoreboardActions> scoreboard() {
         return contexts.find(UxmScoreboardActions.class, source);
+    }
+
+    @Override
+    public Optional<UxmBossBarActions> bossBar() {
+        return contexts.find(UxmBossBarActions.class, source);
     }
 
     @Override

@@ -11,6 +11,7 @@ final class StatePlaceholderKeys {
     private static final ModuleId PLAYERSTATE = ModuleId.of("playerstate");
     private static final ModuleId POSES = ModuleId.of("poses");
     private static final ModuleId SCOREBOARD = ModuleId.of("scoreboard");
+    private static final ModuleId BOSSBAR = ModuleId.of("bossbar");
     private static final ModuleId TABLIST = ModuleId.of("tablist");
     private static final ModuleId NAMETAGS = ModuleId.of("nametags");
     private static final ModuleId HOLOGRAMS = ModuleId.of("holograms");
@@ -123,6 +124,26 @@ final class StatePlaceholderKeys {
                         "The board the player's sidebar is drawn from, or a dash when they are shown none.",
                         PlaceholderScope.SESSION,
                         SCOREBOARD),
+                PlaceholderSpec.of(
+                        "bossbar_visible",
+                        "Whether the player has their boss bars showing (yes/no).",
+                        PlaceholderScope.SESSION,
+                        BOSSBAR),
+                PlaceholderSpec.of(
+                        "bossbar_shown",
+                        "The ids of the boss bars on the player's screen, top first, or a dash when they see none.",
+                        PlaceholderScope.SESSION,
+                        BOSSBAR),
+                PlaceholderSpec.of(
+                        "bossbar_count",
+                        "How many boss bars are on the player's screen.",
+                        PlaceholderScope.SESSION,
+                        BOSSBAR),
+                PlaceholderSpec.family(
+                        "bossbar_remaining_<bar>",
+                        "The time left on a timed or announced bar for the player, in their words (5d 8h 52m), or a dash when it has no clock running.",
+                        PlaceholderScope.SESSION,
+                        BOSSBAR),
                 PlaceholderSpec.of(
                         "tablist_format",
                         "The tablist format the player's tab is drawn from, or a dash when they are drawn none.",

@@ -79,6 +79,9 @@ public interface UxmActions {
     /** Redrawing and hiding the sidebar, or empty when the scoreboard module is switched off. */
     Optional<UxmScoreboardActions> scoreboard();
 
+    /** Hiding, showing and announcing boss bars, or empty when the bossbar module is switched off. */
+    Optional<UxmBossBarActions> bossBar();
+
     /** Redrawing the tab list, or empty when the tablist module is switched off. */
     Optional<UxmTablistActions> tablist();
 
