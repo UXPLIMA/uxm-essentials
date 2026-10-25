@@ -22,7 +22,9 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,7 +55,6 @@ public final class NpcInteractionListener implements Listener {
 
     private static final String CONSOLE_PREFIX = "[console]";
     private static final String PLAYER_PREFIX = "[player]";
-    private static final String PLAYER_TOKEN = "{player}";
 
     /** Cap on tracked stamps so a churn of players/NPCs cannot grow the cache even between expiries. */
     private static final long MAX_TRACKED_CLICKS = 4_096L;
@@ -63,6 +64,7 @@ public final class NpcInteractionListener implements Listener {
     private final ClickCommandRunner runner;
     private final ClickActionRunner actionRunner;
     private final Scheduler scheduler;
+    private final Logger log;
     private final long cooldownMillis;
     private final LongSupplier clock;
     private final Cache<String, Long> lastClick;
@@ -73,8 +75,9 @@ public final class NpcInteractionListener implements Listener {
             ClickCommandRunner runner,
             ClickActionRunner actionRunner,
             Scheduler scheduler,
+            Logger log,
             Duration clickCooldown) {
-        this(renderer, repository, runner, actionRunner, scheduler, clickCooldown, System::currentTimeMillis);
+        this(renderer, repository, runner, actionRunner, scheduler, log, clickCooldown, System::currentTimeMillis);
     }
 
     NpcInteractionListener(
@@ -83,6 +86,7 @@ public final class NpcInteractionListener implements Listener {
             ClickCommandRunner runner,
             ClickActionRunner actionRunner,
             Scheduler scheduler,
+            Logger log,
             Duration clickCooldown,
             LongSupplier clock) {
         this.renderer = Objects.requireNonNull(renderer, "renderer");
@@ -90,6 +94,7 @@ public final class NpcInteractionListener implements Listener {
         this.runner = Objects.requireNonNull(runner, "runner");
         this.actionRunner = Objects.requireNonNull(actionRunner, "actionRunner");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
         this.cooldownMillis =
                 Objects.requireNonNull(clickCooldown, "clickCooldown").toMillis();
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -168,7 +173,12 @@ public final class NpcInteractionListener implements Listener {
     }
 
     private void run(Player player, String rawCommand) {
-        String substituted = rawCommand.replace(PLAYER_TOKEN, player.getName());
+        Optional<String> filled = NameFill.into(rawCommand, player.getName());
+        if (filled.isEmpty()) {
+            log.warn("event=npc_command_skipped player={} reason=not_an_account_name", player.getUniqueId());
+            return;
+        }
+        String substituted = filled.get();
         String lower = substituted.toLowerCase(Locale.ROOT);
         // Already on the clicking player's region thread, where performCommand/dispatchCommand are safe.
         if (lower.startsWith(CONSOLE_PREFIX)) {

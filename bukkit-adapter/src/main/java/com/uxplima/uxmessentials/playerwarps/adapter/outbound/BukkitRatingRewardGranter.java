@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -30,8 +31,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class BukkitRatingRewardGranter implements RatingRewardGranter {
-
-    private static final String PLAYER_TOKEN = "%player%";
 
     private final Optional<PlayerWarpEconomy> economy;
     private final Scheduler scheduler;
@@ -66,9 +65,16 @@ public final class BukkitRatingRewardGranter implements RatingRewardGranter {
         }
     }
 
-    /** Substitute {@code %player%} and dispatch the command from the console on the global region thread. */
+    /**
+     * Fill the subject's name in and dispatch the command from the console on the global region thread, or skip it
+     * when the name is not one an account could have.
+     */
     private void dispatchCommand(PlayerRef subject, String template) {
-        String resolved = template.replace(PLAYER_TOKEN, subject.name());
-        scheduler.onGlobal(() -> commands.runAsConsole(resolved));
+        NameFill.into(template, subject.name())
+                .ifPresentOrElse(
+                        resolved -> scheduler.onGlobal(() -> commands.runAsConsole(resolved)),
+                        () -> log.warn(
+                                "event=pwarp_rate_reward_command_skipped player={} reason=not_an_account_name",
+                                subject.uuid()));
     }
 }

@@ -69,6 +69,16 @@ class BukkitRatingRewardGranterTest {
     }
 
     @Test
+    void aNameNoAccountCouldHaveNeverReachesTheCommand() {
+        granter(Optional.of(economy))
+                .grant(
+                        new PlayerRef(UUID.randomUUID(), "a b"),
+                        RewardSpec.of(BigDecimal.ZERO, "default", "give %player% diamond 1"));
+
+        assertThat(commands.lastConsoleCommand).isNull();
+    }
+
+    @Test
     void anEmptyRewardGrantsNothing() {
         granter(Optional.of(economy)).grant(STEVE, RewardSpec.none());
 

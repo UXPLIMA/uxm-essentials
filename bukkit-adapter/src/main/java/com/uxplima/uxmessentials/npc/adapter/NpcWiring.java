@@ -210,7 +210,13 @@ public final class NpcWiring {
                 EquipmentPayloads::resolve,
                 kernel.log());
         NpcInteractionListener interaction = new NpcInteractionListener(
-                renderer, repository, commandRunner, actionRunner, kernel.scheduler(), settings.clickCooldown());
+                renderer,
+                repository,
+                commandRunner,
+                actionRunner,
+                kernel.scheduler(),
+                kernel.log(),
+                settings.clickCooldown());
         List<Listener> listeners = List.of(new NpcLifecycleListener(renderer), interaction);
         AutoCloseable refreshTask = kernel.scheduler().repeatGlobal(renderer::refresh, REFRESH_PERIOD, REFRESH_PERIOD);
         Duration lookPeriod = settings.lookPeriod();

@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickActionType;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -62,7 +63,6 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
 
     private static final String CONSOLE_PREFIX = "[console]";
     private static final String PLAYER_PREFIX = "[player]";
-    private static final String PLAYER_TOKEN = "{player}";
     private static final long MILLIS_PER_TICK = 50L;
 
     private final ClickCommandRunner commandRunner;
@@ -258,11 +258,19 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
     }
 
     private void dispatch(Player viewer, ClickAction action) {
-        String value = action.value();
+        Optional<String> filled = NameFill.into(action.value(), viewer.getName());
+        if (filled.isEmpty()) {
+            log.warn(
+                    "event=click_action_skipped type={} player={} reason=not_an_account_name",
+                    action.type().name(),
+                    viewer.getUniqueId());
+            return;
+        }
+        String value = filled.get();
         switch (action.type()) {
-            case RUN_CONSOLE -> runConsole(viewer, value);
-            case RUN_PLAYER -> commandRunner.runAsPlayer(viewer, withPlayer(viewer, stripPrefix(value)));
-            case RUN_PLAYER_AS_OP -> commandRunner.runAsPlayerOp(viewer, withPlayer(viewer, stripPrefix(value)));
+            case RUN_CONSOLE -> runConsole(value);
+            case RUN_PLAYER -> commandRunner.runAsPlayer(viewer, stripPrefix(value));
+            case RUN_PLAYER_AS_OP -> commandRunner.runAsPlayerOp(viewer, stripPrefix(value));
             case MESSAGE -> viewer.sendMessage(component(viewer, value));
             case ACTIONBAR -> viewer.sendActionBar(component(viewer, value));
             case TITLE -> showTitle(viewer, value);
@@ -300,8 +308,8 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
         return Math.floorMod(picked, bound);
     }
 
-    private void runConsole(Player viewer, String value) {
-        commandRunner.runAsConsole(withPlayer(viewer, stripPrefix(value)));
+    private void runConsole(String value) {
+        commandRunner.runAsConsole(stripPrefix(value));
     }
 
     private void showTitle(Player viewer, String value) {
@@ -333,10 +341,6 @@ public final class BukkitClickActionRunner implements ClickActionRunner {
     private static Component component(Player viewer, String source) {
         String withTokens = BuiltinTokens.apply(viewer, HudText.lineFor(viewer.getUniqueId(), source));
         return HudText.render(viewer.getUniqueId(), withTokens);
-    }
-
-    private static String withPlayer(Player viewer, String command) {
-        return command.replace(PLAYER_TOKEN, viewer.getName());
     }
 
     /** Drop a leading {@code [console]}/{@code [player]} routing prefix; the type already chose the dispatcher. */

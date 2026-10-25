@@ -80,7 +80,14 @@ class NpcInteractionListenerTest {
 
     private NpcInteractionListener listener(Duration cooldown) {
         return new NpcInteractionListener(
-                renderer, repository, runner, actionRunner, new InlineScheduler(), cooldown, now::get);
+                renderer,
+                repository,
+                runner,
+                actionRunner,
+                new InlineScheduler(),
+                new NoopLogger(),
+                cooldown,
+                now::get);
     }
 
     @Test
@@ -113,6 +120,18 @@ class NpcInteractionListenerTest {
         listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
 
         assertThat(runner.playerCommands).containsExactly("msg " + player.getName() + " hi");
+    }
+
+    @Test
+    void aNameNoAccountCouldHaveNeverReachesTheCommand() {
+        PlayerMock player = renderNpcAndAddPlayer("guide", "[console] give {player} diamond 1");
+        player.setName("a b");
+        NpcInteractionListener listener = listener(Duration.ofMillis(500));
+
+        listener.onUseUnknownEntity(interact(player, EquipmentSlot.HAND));
+
+        assertThat(runner.consoleCommands).isEmpty();
+        assertThat(runner.playerCommands).isEmpty();
     }
 
     @Test

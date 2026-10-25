@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.kits.adapter.outbound;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -13,6 +14,7 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -69,8 +71,15 @@ public final class BukkitKitActionRunner implements KitActionRunner {
             waitThenContinue(who, kit, actions, index, action.value());
             return;
         }
+        Optional<String> value = filled(action.value(), who, kit);
+        if (value.isEmpty()) {
+            log.warn("kit " + kit.id().value() + ": skipped " + action.type().token()
+                    + " action: the name is not one an account could have");
+            step(who, kit, actions, index + 1);
+            return;
+        }
         Runnable run = () -> {
-            perform(who, kit, action);
+            perform(who, kit, action.type(), value.get());
             step(who, kit, actions, index + 1);
         };
         if (isGlobal(action.type())) {
@@ -93,26 +102,24 @@ public final class BukkitKitActionRunner implements KitActionRunner {
     }
 
     /** Perform a single non-wait action on the current (already-correct) thread; never throws. */
-    private void perform(PlayerRef who, KitDefinition kit, KitAction action) {
+    private void perform(PlayerRef who, KitDefinition kit, KitActionType type, String value) {
         try {
-            switch (action.type()) {
-                case CONSOLE_COMMAND -> dispatchConsole(who, kit, action.value());
-                case BROADCAST -> effects.broadcast(substitute(action.value(), who, kit));
-                default -> performForPlayer(who, kit, action);
+            switch (type) {
+                case CONSOLE_COMMAND -> Bukkit.dispatchCommand(Bukkit.getConsoleSender(), value);
+                case BROADCAST -> effects.broadcast(value);
+                default -> performForPlayer(who, kit, type, value);
             }
         } catch (RuntimeException failure) {
-            log.warn("kit " + kit.id().value() + ": skipped " + action.type().token() + " action: "
-                    + failure.getMessage());
+            log.warn("kit " + kit.id().value() + ": skipped " + type.token() + " action: " + failure.getMessage());
         }
     }
 
-    private void performForPlayer(PlayerRef who, KitDefinition kit, KitAction action) {
+    private void performForPlayer(PlayerRef who, KitDefinition kit, KitActionType type, String value) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null || !player.isOnline()) {
             return;
         }
-        String value = substitute(action.value(), who, kit);
-        switch (action.type()) {
+        switch (type) {
             case MESSAGE -> effects.message(player, value);
             case ACTIONBAR -> effects.actionBar(player, value);
             case TITLE -> effects.title(player, value, kit.id().value());
@@ -127,22 +134,19 @@ public final class BukkitKitActionRunner implements KitActionRunner {
         }
     }
 
-    private void dispatchConsole(PlayerRef who, KitDefinition kit, String value) {
-        Bukkit.dispatchCommand(Bukkit.getConsoleSender(), substitute(value, who, kit));
-    }
-
     private static boolean isGlobal(KitActionType type) {
         return type == KitActionType.BROADCAST || type == KitActionType.CONSOLE_COMMAND;
     }
 
-    /** Substitute the standard claim tokens ({@code %player%}, {@code {player}}, and the kit id) in {@code raw}. */
-    private static String substitute(String raw, PlayerRef who, KitDefinition kit) {
-        String name = who.name();
-        return raw.replace("%player%", name)
-                .replace("{player}", name)
-                .replace("%player_name%", name)
-                .replace("%kit%", kit.id().value())
-                .replace("{kit}", kit.id().value());
+    /**
+     * {@code raw} with the claim tokens filled in: the player's name for {@code %player%}, {@code {player}},
+     * {@code <player>} and {@code %player_name%}, and the kit id for {@code %kit%} and {@code {kit}}. Empty when the
+     * line names the player and the name is not one an account could have, which is a line that must not run.
+     */
+    private static Optional<String> filled(String raw, PlayerRef who, KitDefinition kit) {
+        return NameFill.into(raw.replace("%player_name%", "%player%"), who.name())
+                .map(line -> line.replace("%kit%", kit.id().value())
+                        .replace("{kit}", kit.id().value()));
     }
 
     private long parseTicks(String raw) {

@@ -156,6 +156,24 @@ class BukkitClickActionRunnerTest {
     }
 
     @Test
+    void aNameNoAccountCouldHaveIsNeverFilledInAndItsLinesAreSkipped() {
+        player.setName("a b");
+
+        runner().run(
+                        player,
+                        List.of(
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_CONSOLE, "give {player} diamond"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_PLAYER, "msg %player% hi"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.MESSAGE, "hi {player}"),
+                                new ClickAction(ClickTrigger.ANY, ClickActionType.RUN_CONSOLE, "say hello")),
+                        false);
+
+        assertThat(commandRunner.consoleCommands).containsExactly("say hello");
+        assertThat(commandRunner.playerCommands).isEmpty();
+        assertThat(player.nextComponentMessage()).isNull();
+    }
+
+    @Test
     void sendsAConnectRequestForAConnectAction() {
         runner().run(player, List.of(new ClickAction(ClickTrigger.ANY, ClickActionType.CONNECT, "lobby")), false);
 

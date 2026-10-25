@@ -68,6 +68,15 @@ class BuiltinTokensTest {
     }
 
     @Test
+    void aNameOrADisplayNameIsTextNeverMarkup() {
+        PlayerMock player = server.addPlayer();
+        player.setName("x<red>");
+        player.displayName(net.kyori.adventure.text.Component.text("<bold>Bob"));
+
+        assertThat(BuiltinTokens.apply(player, "{player} {displayname}")).isEqualTo("x\\<red> \\<bold>Bob");
+    }
+
+    @Test
     void substitutesTheJvmMetricTokens() {
         PlayerMock player = server.addPlayer();
 

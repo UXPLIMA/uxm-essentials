@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -21,6 +22,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.QueuedReward;
 import com.uxplima.uxmessentials.vote.domain.reward.ItemReward;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -52,8 +54,6 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public final class BukkitRewardApplier implements RewardApplier {
-
-    private static final String PLAYER_TOKEN = "{player}";
 
     private final VoteRepository repository;
     private final BukkitRewardDispatcher dispatcher;
@@ -126,7 +126,7 @@ public final class BukkitRewardApplier implements RewardApplier {
             return;
         }
         for (String line : grant.messages()) {
-            player.sendMessage(render(line, voter.name()));
+            render(line, voter.name()).ifPresent(player::sendMessage);
         }
         for (ItemReward item : grant.items()) {
             giveOrDrop(player, item);
@@ -138,7 +138,11 @@ public final class BukkitRewardApplier implements RewardApplier {
             return;
         }
         for (String line : grant.broadcasts()) {
-            Component component = render(line, voterName);
+            Optional<Component> rendered = render(line, voterName);
+            if (rendered.isEmpty()) {
+                continue;
+            }
+            Component component = rendered.get();
             scheduler.onGlobal(() -> {
                 for (Player online : Bukkit.getOnlinePlayers()) {
                     online.sendMessage(component);
@@ -174,7 +178,12 @@ public final class BukkitRewardApplier implements RewardApplier {
         return stack;
     }
 
-    private Component render(String line, String voterName) {
-        return miniMessage.deserialize(line.replace(PLAYER_TOKEN, voterName));
+    /** The line with the voter's name filled in, or empty when the name is not one an account could have. */
+    private Optional<Component> render(String line, String voterName) {
+        Optional<String> filled = NameFill.into(line, voterName);
+        if (filled.isEmpty()) {
+            log.warn("event=vote_reward_line_skipped player={} reason=not_an_account_name", voterName);
+        }
+        return filled.map(miniMessage::deserialize);
     }
 }

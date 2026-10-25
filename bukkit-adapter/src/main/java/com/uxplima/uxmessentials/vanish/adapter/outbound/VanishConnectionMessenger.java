@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevels;
+import com.uxplima.uxmlib.condition.action.NameFill;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,8 +34,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class VanishConnectionMessenger {
-
-    private static final String PLAYER_TOKEN = "{player}";
 
     private final Scheduler scheduler;
     private final MessageSink sink;
@@ -66,8 +65,9 @@ public final class VanishConnectionMessenger {
             return;
         }
         VanishLevel useLevel = levels.useLevel(who);
-        String toOthers = publicTemplate.replace(PLAYER_TOKEN, who.name());
-        String toStaff = staffTemplate.replace(PLAYER_TOKEN, who.name());
+        // A name an account could not have is never filled in; that template then sends nothing, like a blank one.
+        String toOthers = NameFill.into(publicTemplate, who.name()).orElse("");
+        String toStaff = NameFill.into(staffTemplate, who.name()).orElse("");
         scheduler.onGlobal(() -> {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 PlayerRef viewer = BukkitRefs.toRef(online);

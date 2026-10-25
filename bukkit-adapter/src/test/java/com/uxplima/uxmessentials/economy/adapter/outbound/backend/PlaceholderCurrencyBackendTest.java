@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.adapter.outbound.backend;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -60,9 +61,9 @@ class PlaceholderCurrencyBackendTest {
     @Test
     void acceptsBothAmountAndPriceTokens() {
         assertThat(PlaceholderCurrencyBackend.renderCommand("eco give %player% %amount%", "Alice", "50"))
-                .isEqualTo("eco give Alice 50");
+                .contains("eco give Alice 50");
         assertThat(PlaceholderCurrencyBackend.renderCommand("eco give %player% %price%", "Alice", "50"))
-                .isEqualTo("eco give Alice 50");
+                .contains("eco give Alice 50");
     }
 
     @Test
@@ -127,6 +128,21 @@ class PlaceholderCurrencyBackendTest {
         backend.credit(ALICE, Money.of(CROWNS, new BigDecimal("25")));
 
         assertThat(dispatched(server)).isEqualTo("myeco give Alice 25");
+    }
+
+    @Test
+    void aNameNoAccountCouldHaveIsRefusedRatherThanFilledIntoTheCommand() {
+        Server server = mock(Server.class);
+        PlaceholderCurrencyBackend backend =
+                backend((player, placeholder) -> "100", Precision.INTEGRAL, server, new RecordingScheduler());
+        PlayerRef odd = new PlayerRef(UUID.randomUUID(), "a b");
+
+        var debit = backend.debit(odd, Money.of(CROWNS, new BigDecimal("50")));
+        var credit = backend.credit(odd, Money.of(CROWNS, new BigDecimal("25")));
+
+        assertThat(debit.isErr()).isTrue();
+        assertThat(credit.isErr()).isTrue();
+        verify(server, never()).dispatchCommand(any(), anyString());
     }
 
     @Test

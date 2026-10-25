@@ -72,6 +72,23 @@ class BukkitKitActionRunnerTest {
     }
 
     @Test
+    void aNameNoAccountCouldHaveIsNeverFilledInAndItsLinesAreSkipped() {
+        player.setName("a b");
+
+        runner.run(
+                ref(),
+                kit(),
+                List.of(
+                        KitAction.of(KitActionType.CONSOLE_COMMAND, "give {player} diamond"),
+                        KitAction.of(KitActionType.MESSAGE, "<green>hi %player_name%"),
+                        KitAction.of(KitActionType.MESSAGE, "still here")));
+
+        assertThat(scheduler.dispatchedOn).containsExactly("entity");
+        assertThat(nextLine()).isEqualTo("still here");
+        assertThat(player.nextComponentMessage()).isNull();
+    }
+
+    @Test
     void aBroadcastRunsOnTheGlobalThreadAndPlayerEffectsOnTheEntityThread() {
         runner.run(
                 ref(),

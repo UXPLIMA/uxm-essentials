@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmlib.condition.action.NameFill;
 
 /**
  * The escape-hatch currency backend: an operator wires an economy nobody wrote a bridge for by pointing this at a
@@ -130,11 +132,13 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
                 (uuid, placeholder) -> PlaceholderApiSupport.messageBridge(uuid).apply(placeholder));
     }
 
-    /** Substitute the player name and the amount; both {@code %amount%} and {@code %price%} are honoured. */
-    static String renderCommand(String template, String playerName, String amount) {
-        return template.replace("%player%", playerName)
-                .replace("%amount%", amount)
-                .replace("%price%", amount);
+    /**
+     * Fill in the player name and the amount; both {@code %amount%} and {@code %price%} are honoured. Empty when the
+     * template names the player and the name is not one an account could have.
+     */
+    static Optional<String> renderCommand(String template, String playerName, String amount) {
+        return NameFill.into(template, playerName)
+                .map(command -> command.replace("%amount%", amount).replace("%price%", amount));
     }
 
     /** Reject at load a command that can never carry the amount, rather than no-oping at runtime. */
@@ -220,8 +224,7 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
     public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(amount, "amount");
-        dispatch(giveCommand, owner, amount);
-        return Result.ok();
+        return dispatch(giveCommand, owner, amount);
     }
 
     @Override
@@ -231,8 +234,7 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
         if (balance(owner, amount.currency()).isLessThan(amount)) {
             return Result.err(TransferError.INSUFFICIENT_FUNDS);
         }
-        dispatch(takeCommand, owner, amount);
-        return Result.ok();
+        return dispatch(takeCommand, owner, amount);
     }
 
     @Override
@@ -241,10 +243,19 @@ public final class PlaceholderCurrencyBackend implements CurrencyBackend {
         return List.of();
     }
 
-    private void dispatch(String template, PlayerRef owner, Money amount) {
+    /**
+     * Run the command for {@code owner}, or refuse the transfer when their name is not one an account could have: a
+     * command that cannot carry the name must not run, and a debit that ran nothing must not read as paid.
+     */
+    private Result<Unit, TransferError> dispatch(String template, PlayerRef owner, Money amount) {
         String value =
                 ReflectiveCurrencyBackend.toBackendScale(amount, precision).toPlainString();
-        String rendered = renderCommand(template, owner.name(), value);
-        scheduler.onGlobal(() -> server.dispatchCommand(server.getConsoleSender(), rendered));
+        Optional<String> rendered = renderCommand(template, owner.name(), value);
+        if (rendered.isEmpty()) {
+            log.warn("event=currency_backend_refused id={} player={} reason=not_an_account_name", id, owner.uuid());
+            return Result.err(TransferError.CURRENCY_UNSUPPORTED);
+        }
+        scheduler.onGlobal(() -> server.dispatchCommand(server.getConsoleSender(), rendered.get()));
+        return Result.ok();
     }
 }

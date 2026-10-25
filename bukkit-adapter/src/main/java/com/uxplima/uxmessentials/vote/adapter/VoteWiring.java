@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
@@ -149,7 +150,8 @@ public final class VoteWiring {
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
         VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
-        BukkitRewardDispatcher dispatcher = new BukkitRewardDispatcher(kernel.scheduler());
+        BukkitRewardDispatcher dispatcher =
+                new BukkitRewardDispatcher(kernel.scheduler(), new BukkitClickCommandRunner(), kernel.log());
         VoteAudience audience = new BukkitVoteAudience(kernel.scheduler());
         int offlineLimit = Math.max(0, ctx.config().getInt("offline-vote-limit", 0));
         RewardApplier applier =
@@ -427,8 +429,9 @@ public final class VoteWiring {
                 party,
                 streakGraceDays,
                 ZoneId.systemDefault());
-        ApplyQueuedRewards applyQueuedRewards =
-                new ApplyQueuedRewards(repository, new BukkitRewardDispatcher(kernel.scheduler()));
+        ApplyQueuedRewards applyQueuedRewards = new ApplyQueuedRewards(
+                repository,
+                new BukkitRewardDispatcher(kernel.scheduler(), new BukkitClickCommandRunner(), kernel.log()));
         VoteLinks links = new VoteLinks(voteLinks, notifier);
         VotePartyStatus status = new VotePartyStatus(repository, notifier, party.baseThreshold());
         ShowVoteTotals showVoteTotals = new ShowVoteTotals(repository, notifier);

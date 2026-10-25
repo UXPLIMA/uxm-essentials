@@ -103,6 +103,9 @@ dependencies {
     implementation(libs.uxmlib.hud) {
         exclude(group = "org.spongepowered")
     }
+    // uxmLib conditions: only NameFill, which fills a player's name into an operator's line where the name cannot
+    // change what the line does. uxmlib-common arrives with uxmlib-gui.
+    implementation(libs.uxmlib.condition) { isTransitive = false }
     // uxmLib integration toolkit (dogfood): native-Display holograms for the holograms context.
     implementation(libs.uxmlib.integration) {
         exclude(group = "org.spongepowered")

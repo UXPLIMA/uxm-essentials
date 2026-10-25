@@ -9,9 +9,11 @@ import java.util.List;
 import java.util.Optional;
 
 import org.bukkit.Material;
+import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,6 +44,7 @@ class BukkitRewardApplierTest {
     private PlayerMock voter;
     private RecordingScheduler scheduler;
     private RecordingRepository repository;
+    private RecordingCommands commands;
     private BukkitRewardApplier applier;
 
     @BeforeEach
@@ -51,8 +54,10 @@ class BukkitRewardApplierTest {
         voter = server.addPlayer("Alice");
         scheduler = new RecordingScheduler();
         repository = new RecordingRepository();
+        commands = new RecordingCommands();
         // offlineLimit 0 = unlimited; the limit-specific tests build their own applier with a cap.
-        applier = new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 0, new NoLog());
+        applier = new BukkitRewardApplier(
+                repository, new BukkitRewardDispatcher(scheduler, commands, new NoLog()), scheduler, 0, new NoLog());
     }
 
     @AfterEach
@@ -68,6 +73,28 @@ class BukkitRewardApplierTest {
         assertThat(scheduler.dispatchedOn).contains("global");
         // No items were requested, so the inventory stays empty and nothing is queued for an online voter.
         assertThat(repository.enqueued).isEmpty();
+    }
+
+    @Test
+    void onlineGrantFillsTheVotersNameIntoItsCommands() {
+        applier.apply(ref(), true, new RewardGrant(List.of("eco give {player} 100"), List.of(), List.of(), List.of()));
+
+        assertThat(commands.console).containsExactly("eco give Alice 100");
+    }
+
+    @Test
+    void aNameNoAccountCouldHaveIsNeverFilledInAndItsLinesAreSkipped() {
+        voter.setName("a b");
+        RewardGrant grant = new RewardGrant(
+                List.of("eco give {player} 100", "say thanks"),
+                List.of("<green>hi {player}"),
+                List.of("<gold>{player} voted"),
+                List.of());
+
+        applier.apply(ref(), true, grant);
+
+        assertThat(commands.console).containsExactly("say thanks");
+        assertThat(voter.nextComponentMessage()).isNull();
     }
 
     @Test
@@ -130,8 +157,8 @@ class BukkitRewardApplierTest {
 
     @Test
     void offlineGrantIsSkippedWhenTheQueueIsAtTheLimit() {
-        BukkitRewardApplier capped =
-                new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 3, new NoLog());
+        BukkitRewardApplier capped = new BukkitRewardApplier(
+                repository, new BukkitRewardDispatcher(scheduler, commands, new NoLog()), scheduler, 3, new NoLog());
         repository.queuedCount = 3; // already at the cap
         PlayerRef offline = new PlayerRef(java.util.UUID.randomUUID(), "Ghost");
 
@@ -142,8 +169,8 @@ class BukkitRewardApplierTest {
 
     @Test
     void offlineGrantIsEnqueuedWhenTheQueueIsBelowTheLimit() {
-        BukkitRewardApplier capped =
-                new BukkitRewardApplier(repository, new BukkitRewardDispatcher(scheduler), scheduler, 3, new NoLog());
+        BukkitRewardApplier capped = new BukkitRewardApplier(
+                repository, new BukkitRewardDispatcher(scheduler, commands, new NoLog()), scheduler, 3, new NoLog());
         repository.queuedCount = 2; // under the cap
         PlayerRef offline = new PlayerRef(java.util.UUID.randomUUID(), "Ghost");
 
@@ -316,5 +343,24 @@ class BukkitRewardApplierTest {
 
         @Override
         public void debug(String message, Object... args) {}
+    }
+
+    private static final class RecordingCommands implements ClickCommandRunner {
+        private final List<String> console = new ArrayList<>();
+
+        @Override
+        public void runAsConsole(String command) {
+            console.add(command);
+        }
+
+        @Override
+        public void runAsPlayer(Player player, String command) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void runAsPlayerOp(Player player, String command) {
+            throw new UnsupportedOperationException();
+        }
     }
 }

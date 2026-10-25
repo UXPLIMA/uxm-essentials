@@ -79,6 +79,18 @@ class VanishConnectionMessengerTest {
     }
 
     @Test
+    void aNameNoAccountCouldHaveIsNeverFilledInSoNothingIsSent() {
+        PlayerMock vanisher = server.addPlayer("Vanisher");
+        vanisher.setName("x<red>");
+        PlayerMock observer = server.addPlayer("Observer");
+        VanishConnectionMessenger messenger = messenger(config(true, "{player} left the game", "{player} vanished"));
+
+        messenger.announceVanish(BukkitRefs.toRef(vanisher));
+
+        assertThat(sink.received(observer.getUniqueId())).isEmpty();
+    }
+
+    @Test
     void aReappearFakesAJoinToOthers() {
         PlayerMock vanisher = server.addPlayer("Vanisher");
         PlayerMock observer = server.addPlayer("Observer");
