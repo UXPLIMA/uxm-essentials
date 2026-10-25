@@ -144,7 +144,7 @@ public final class BukkitKitActionRunner implements KitActionRunner {
      * line names the player and the name is not one an account could have, which is a line that must not run.
      */
     private static Optional<String> filled(String raw, PlayerRef who, KitDefinition kit) {
-        return NameFill.into(raw.replace("%player_name%", "%player%"), who.name())
+        return NameFill.into(raw, who.name())
                 .map(line -> line.replace("%kit%", kit.id().value())
                         .replace("{kit}", kit.id().value()));
     }
