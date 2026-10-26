@@ -31,6 +31,8 @@ import org.jspecify.annotations.NullMarked;
  * @param bedrockRetries retries for a failed Bedrock lookup ({@code bedrock.retries}, default 2)
  * @param cooldown the wait between one change and the next ({@code limits.cooldown-seconds}, default 30)
  * @param blockedSkins names nobody may wear ({@code limits.blocked-skins}, default empty)
+ * @param restrictedSkins names only the holder of the skin's node may wear ({@code limits.restricted-skins}, default
+ *     empty)
  * @param allowedUrlHosts the hosts /skin url accepts ({@code limits.allowed-url-hosts}; empty allows any)
  * @param mineskinApiKey the optional MineSkin key ({@code mineskin.api-key}, default empty)
  * @param skinFolder the folder /skin file reads from ({@code mineskin.folder}, default {@code skins})
@@ -49,6 +51,7 @@ public record SkinConfig(
         int bedrockRetries,
         Duration cooldown,
         List<String> blockedSkins,
+        List<String> restrictedSkins,
         List<String> allowedUrlHosts,
         String mineskinApiKey,
         String skinFolder) {
@@ -62,6 +65,7 @@ public record SkinConfig(
     public SkinConfig {
         defaultPool = List.copyOf(Objects.requireNonNull(defaultPool, "defaultPool"));
         blockedSkins = List.copyOf(Objects.requireNonNull(blockedSkins, "blockedSkins"));
+        restrictedSkins = List.copyOf(Objects.requireNonNull(restrictedSkins, "restrictedSkins"));
         allowedUrlHosts = List.copyOf(Objects.requireNonNull(allowedUrlHosts, "allowedUrlHosts"));
         Objects.requireNonNull(loginTimeout, "loginTimeout");
         Objects.requireNonNull(cooldown, "cooldown");
@@ -85,6 +89,7 @@ public record SkinConfig(
                 Math.max(0, config.getInt("bedrock.retries", DEFAULT_BEDROCK_RETRIES)),
                 seconds(config.getInt("limits.cooldown-seconds", DEFAULT_COOLDOWN_SECONDS)),
                 config.getStringList("limits.blocked-skins", List.of()),
+                config.getStringList("limits.restricted-skins", List.of()),
                 config.getStringList("limits.allowed-url-hosts", DEFAULT_URL_HOSTS),
                 config.getString("mineskin.api-key", ""),
                 config.getString("mineskin.folder", DEFAULT_FOLDER));
@@ -112,7 +117,7 @@ public record SkinConfig(
 
     /** The pure rules these limits describe. */
     public SkinPolicy policy() {
-        return new SkinPolicy(blockedSkins, allowedUrlHosts, defaultPool);
+        return new SkinPolicy(blockedSkins, restrictedSkins, allowedUrlHosts, defaultPool);
     }
 
     /** This config with a different blocked-skin list. */
@@ -130,6 +135,28 @@ public record SkinConfig(
                 bedrockRetries,
                 cooldown,
                 blocked,
+                restrictedSkins,
+                allowedUrlHosts,
+                mineskinApiKey,
+                skinFolder);
+    }
+
+    /** This config with a different restricted-skin list. */
+    public SkinConfig withRestrictedSkins(List<String> restricted) {
+        return new SkinConfig(
+                enabled,
+                nameSource,
+                urlSource,
+                fileSource,
+                bedrockSource,
+                premiumSkin,
+                defaultPool,
+                loginTimeout,
+                bedrockRefreshOnJoin,
+                bedrockRetries,
+                cooldown,
+                blockedSkins,
+                restricted,
                 allowedUrlHosts,
                 mineskinApiKey,
                 skinFolder);
@@ -150,6 +177,7 @@ public record SkinConfig(
                 bedrockRetries,
                 cooldown,
                 blockedSkins,
+                restrictedSkins,
                 hosts,
                 mineskinApiKey,
                 skinFolder);
@@ -170,6 +198,7 @@ public record SkinConfig(
                 bedrockRetries,
                 cooldown,
                 blockedSkins,
+                restrictedSkins,
                 allowedUrlHosts,
                 mineskinApiKey,
                 skinFolder);

@@ -108,6 +108,8 @@ public final class SetSkin {
             return Outcome.URL_NOT_ALLOWED;
         }
         if (source instanceof SkinSource.ByName name
+                && policy.restricted(name.username())
+                && !actor.isSystem()
                 && !permissions.has(actor, policy.permissionFor(name.username()))) {
             return Outcome.NO_PERMISSION;
         }

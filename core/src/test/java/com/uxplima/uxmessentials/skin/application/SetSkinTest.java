@@ -98,7 +98,43 @@ class SetSkinTest {
     }
 
     @Test
-    void aSkinTheActorMayNotWearIsRefused() {
+    void aRestrictedSkinTheActorMayNotWearIsRefused() {
+        SetSkin setSkin = new SetSkin(
+                repository,
+                new SkinFakes.Textures(Map.of("Notch", TEXTURE)),
+                new SkinFakes.Uploads(TEXTURE),
+                view,
+                new SkinFakes.Perms(),
+                SkinFakes.Gate.open(),
+                events,
+                SkinConfig.defaults().withRestrictedSkins(List.of("notch")),
+                CLOCK);
+
+        assertThat(setSkin.set(WHO, WHO, new SkinSource.ByName("Notch"), SkinModel.CLASSIC))
+                .isEqualTo(SetSkin.Outcome.NO_PERMISSION);
+        assertThat(repository.isEmpty()).isTrue();
+    }
+
+    @Test
+    void theConsoleMayDressAnybodyEvenInARestrictedSkin() {
+        SetSkin setSkin = new SetSkin(
+                repository,
+                new SkinFakes.Textures(Map.of("Notch", TEXTURE)),
+                new SkinFakes.Uploads(TEXTURE),
+                view,
+                new SkinFakes.Perms(),
+                SkinFakes.Gate.open(),
+                events,
+                SkinConfig.defaults().withRestrictedSkins(List.of("notch")),
+                CLOCK);
+
+        assertThat(setSkin.set(PlayerRef.system("CONSOLE"), WHO, new SkinSource.ByName("Notch"), SkinModel.CLASSIC))
+                .describedAs("the console holds every node, and no server lookup can say so for it")
+                .isEqualTo(SetSkin.Outcome.APPLIED);
+    }
+
+    @Test
+    void aSkinNobodyRestrictedNeedsNoNode() {
         SetSkin setSkin = new SetSkin(
                 repository,
                 new SkinFakes.Textures(Map.of("Notch", TEXTURE)),
@@ -111,8 +147,8 @@ class SetSkinTest {
                 CLOCK);
 
         assertThat(setSkin.set(WHO, WHO, new SkinSource.ByName("Notch"), SkinModel.CLASSIC))
-                .isEqualTo(SetSkin.Outcome.NO_PERMISSION);
-        assertThat(repository.isEmpty()).isTrue();
+                .describedAs("the node is checked only for a skin the operator restricted; every other skin is open")
+                .isEqualTo(SetSkin.Outcome.APPLIED);
     }
 
     @Test

@@ -79,6 +79,16 @@ class SkinConfigTest {
         assertThat(config.policy().blocked("herobrine")).isTrue();
     }
 
+    @Test
+    void theRestrictedSkinsAreReadIntoThePolicy() {
+        SkinConfig config = SkinConfig.from(new FixedConfig(Map.of("limits.restricted-skins", List.of("Dream"))));
+
+        assertThat(config.policy().restricted("dream")).isTrue();
+        assertThat(SkinConfig.defaults().policy().restricted("dream"))
+                .describedAs("nothing is restricted until the operator lists it")
+                .isFalse();
+    }
+
     /** A store answering the paths it was given and the caller's fallback for everything else. */
     private record FixedConfig(Map<String, Object> values) implements ConfigStore {
         @Override

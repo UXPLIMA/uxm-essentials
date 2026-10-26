@@ -16,17 +16,23 @@ import org.jspecify.annotations.Nullable;
  * without a network call or a server.
  *
  * @param blockedSkins names nobody may wear, matched without regard to case
+ * @param restrictedSkins names only a player holding the skin's own node may wear; every other name is open
  * @param allowedUrlHosts the hosts a url may point at; empty allows any host
  * @param defaultPool the names an undressed player may be dressed from; empty leaves them as they are
  */
 @NullMarked
-public record SkinPolicy(List<String> blockedSkins, List<String> allowedUrlHosts, List<String> defaultPool) {
+public record SkinPolicy(
+        List<String> blockedSkins,
+        List<String> restrictedSkins,
+        List<String> allowedUrlHosts,
+        List<String> defaultPool) {
 
     /** The prefix every per-skin permission node is built on. */
     private static final String NAME_NODE = "uxmessentials.skin.name.";
 
     public SkinPolicy {
         blockedSkins = lowerCased(blockedSkins, "blockedSkins");
+        restrictedSkins = lowerCased(restrictedSkins, "restrictedSkins");
         allowedUrlHosts = lowerCased(allowedUrlHosts, "allowedUrlHosts");
         defaultPool = List.copyOf(Objects.requireNonNull(defaultPool, "defaultPool"));
     }
@@ -35,6 +41,12 @@ public record SkinPolicy(List<String> blockedSkins, List<String> allowedUrlHosts
     public boolean blocked(String skinName) {
         Objects.requireNonNull(skinName, "skinName");
         return blockedSkins.contains(skinName.toLowerCase(Locale.ROOT));
+    }
+
+    /** Whether {@code skinName} is one the operator reserved behind its node, matched without regard to case. */
+    public boolean restricted(String skinName) {
+        Objects.requireNonNull(skinName, "skinName");
+        return restrictedSkins.contains(skinName.toLowerCase(Locale.ROOT));
     }
 
     /** Whether {@code url} points at a host the operator allows. A url that will not parse is never allowed. */
@@ -48,8 +60,8 @@ public record SkinPolicy(List<String> blockedSkins, List<String> allowedUrlHosts
     }
 
     /**
-     * The permission node {@code skinName} sits behind, so an operator can reserve a skin for a rank. Every skin
-     * has one; a server that reserves nothing simply grants the whole family.
+     * The permission node {@code skinName} sits behind once the operator {@linkplain #restricted restricted} it, so a
+     * skin can be reserved for a rank. A skin nobody restricted is open to everyone, node or not.
      */
     public String permissionFor(String skinName) {
         Objects.requireNonNull(skinName, "skinName");

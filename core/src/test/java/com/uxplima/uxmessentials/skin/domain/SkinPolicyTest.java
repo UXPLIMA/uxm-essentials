@@ -18,7 +18,7 @@ import org.junit.jupiter.api.Test;
 class SkinPolicyTest {
 
     private final SkinPolicy policy =
-            new SkinPolicy(List.of("Herobrine"), List.of("i.imgur.com"), List.of("Alex", "Steve"));
+            new SkinPolicy(List.of("Herobrine"), List.of("Dream"), List.of("i.imgur.com"), List.of("Alex", "Steve"));
 
     @Test
     void aBlockedSkinIsRefusedWhateverCaseItIsTypedIn() {
@@ -41,9 +41,18 @@ class SkinPolicyTest {
 
     @Test
     void anEmptyAllowlistAllowsEveryHost() {
-        SkinPolicy open = new SkinPolicy(List.of(), List.of(), List.of());
+        SkinPolicy open = new SkinPolicy(List.of(), List.of(), List.of(), List.of());
 
         assertThat(open.urlAllowed("https://anything.invalid/a.png")).isTrue();
+    }
+
+    @Test
+    void onlyARestrictedSkinIsBehindItsNode() {
+        // The node defaults to everyone and was asked of every name, and a node the server has never heard of is
+        // held by operators only: a player who was not an operator could wear no skin by name at all.
+        assertThat(policy.restricted("dream")).isTrue();
+        assertThat(policy.restricted("DREAM")).isTrue();
+        assertThat(policy.restricted("Notch")).isFalse();
     }
 
     @Test
@@ -61,7 +70,7 @@ class SkinPolicyTest {
 
     @Test
     void anEmptyPoolMeansNoFallback() {
-        SkinPolicy bare = new SkinPolicy(List.of(), List.of(), List.of());
+        SkinPolicy bare = new SkinPolicy(List.of(), List.of(), List.of(), List.of());
 
         assertThat(bare.fallbackFor(UUID.randomUUID())).isEmpty();
     }

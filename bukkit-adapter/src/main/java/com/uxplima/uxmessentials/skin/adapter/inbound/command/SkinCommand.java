@@ -181,7 +181,7 @@ public final class SkinCommand implements CommandRegistration {
     /** {@code /skin <name>}, {@code /skin set <name>} and the staff {@code /skin set <name> <player>}. */
     private int byName(CommandContext<CommandSourceStack> ctx, @Nullable String targetName) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        PlayerRef actor = actorOf(sender);
+        PlayerRef actor = targetName == null ? actorOf(sender) : CommandFeedback.refOf(sender);
         if (actor == null) {
             return 0;
         }
@@ -218,7 +218,7 @@ public final class SkinCommand implements CommandRegistration {
     /** {@code /skin clear} and the staff {@code /skin clear <player>}. */
     private int clear(CommandContext<CommandSourceStack> ctx, @Nullable String targetName) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        PlayerRef actor = actorOf(sender);
+        PlayerRef actor = targetName == null ? actorOf(sender) : CommandFeedback.refOf(sender);
         if (actor == null) {
             return 0;
         }

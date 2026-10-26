@@ -58,6 +58,7 @@ import org.junit.jupiter.api.Test;
 import org.mockbukkit.mockbukkit.MockBukkit;
 import org.mockbukkit.mockbukkit.ServerMock;
 import org.mockbukkit.mockbukkit.command.CommandSourceStackMock;
+import org.mockbukkit.mockbukkit.command.ConsoleCommandSenderMock;
 import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
@@ -192,6 +193,24 @@ class SkinCommandTest {
 
         assertThat(lines(staff)).contains("skin.set-for-other");
         assertThat(view.dressed).containsExactly("Target");
+    }
+
+    @Test
+    void theConsoleDressesAndUndressesAnotherPlayer() throws CommandSyntaxException {
+        // The console was told the command is for players only, so neither an operator at the console nor a
+        // command line another plugin runs could dress anybody.
+        textures.known.put("Notch", TEXTURE);
+        PlayerMock target = server.addPlayer("Target");
+        names.known.put("Target", new PlayerRef(target.getUniqueId(), "Target"));
+        ConsoleCommandSenderMock console = server.getConsoleSender();
+
+        dispatcher().execute("skin set Notch Target", CommandSourceStackMock.from(console));
+        assertThat(view.dressed).containsExactly("Target");
+        assertThat(lines(console)).contains("skin.set-for-other");
+
+        dispatcher().execute("skin clear Target", CommandSourceStackMock.from(console));
+        assertThat(repository.find(target.getUniqueId())).isEmpty();
+        assertThat(lines(console)).contains("skin.cleared-for-other");
     }
 
     @Test
@@ -353,6 +372,17 @@ class SkinCommandTest {
         while (message != null) {
             read.add(message);
             message = player.nextMessage();
+        }
+        return read;
+    }
+
+    /** Every line the console was sent. */
+    private static List<String> lines(ConsoleCommandSenderMock console) {
+        List<String> read = new ArrayList<>();
+        String message = console.nextMessage();
+        while (message != null) {
+            read.add(message);
+            message = console.nextMessage();
         }
         return read;
     }

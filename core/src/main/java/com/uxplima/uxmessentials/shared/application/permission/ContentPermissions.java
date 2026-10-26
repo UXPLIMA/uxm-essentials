@@ -565,7 +565,7 @@ final class ContentPermissions {
                         SKIN),
                 PermissionSpec.family(
                         "uxmessentials.skin.name.<skin>",
-                        "Wear the skin of one named account; only checked for the skins the operator restricted.",
+                        "Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone.",
                         PermissionDefault.TRUE,
                         PermissionShape.LABEL,
                         SKIN));
