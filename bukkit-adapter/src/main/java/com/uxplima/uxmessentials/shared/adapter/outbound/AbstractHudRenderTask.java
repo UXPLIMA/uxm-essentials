@@ -131,7 +131,9 @@ public abstract class AbstractHudRenderTask {
     private void enqueue(Player player) {
         PlayerRef ref = BukkitRefs.toRef(player);
         if (pendingPlayers.add(ref.uuid())) {
-            scheduler.onEntity(ref, () -> renderPending(ref));
+            // A render the server drops on a retired entity must still clear the mark, or the player is never
+            // queued again and their HUD stops on the frame it showed.
+            scheduler.onEntity(ref, () -> renderPending(ref), () -> pendingPlayers.remove(ref.uuid()));
         }
     }
 

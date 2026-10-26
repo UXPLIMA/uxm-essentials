@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.scheduler;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
@@ -9,7 +11,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.bukkit.plugin.Plugin;
 
+import io.papermc.paper.threadedregions.scheduler.EntityScheduler;
+
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.junit.jupiter.api.Test;
+import org.mockbukkit.mockbukkit.MockBukkit;
+import org.mockbukkit.mockbukkit.ServerMock;
+import org.mockbukkit.mockbukkit.entity.PlayerMock;
 
 /**
  * Guards the teardown behaviour of the region-dispatch methods. Paper's region schedulers throw
@@ -48,6 +56,36 @@ class FoliaSchedulerTest {
 
         assertThat(ran).isFalse();
         assertThat(retired).isFalse();
+    }
+
+    /**
+     * Paper refuses a task on an entity it already retired, answers {@code false} and runs neither the task nor the
+     * retired callback. The answer was ignored, so a caller waiting on one of the two waited forever: the HUD loop
+     * kept such a player marked as waiting and never drew them again.
+     */
+    @Test
+    void anEntityAlreadyRetiredRunsTheRetiredCallback() {
+        ServerMock server = MockBukkit.mock();
+        try {
+            Plugin plugin = MockBukkit.createMockPlugin();
+            EntityScheduler retiredScheduler = mock(EntityScheduler.class);
+            when(retiredScheduler.execute(any(), any(), any(), anyLong())).thenReturn(false);
+            PlayerMock gone = new PlayerMock(server, "Gone") {
+                @Override
+                public EntityScheduler getScheduler() {
+                    return retiredScheduler;
+                }
+            };
+            server.addPlayer(gone);
+            AtomicBoolean retired = new AtomicBoolean(false);
+
+            new FoliaScheduler(plugin)
+                    .onEntity(new PlayerRef(gone.getUniqueId(), "Gone"), () -> {}, () -> retired.set(true));
+
+            assertThat(retired).isTrue();
+        } finally {
+            MockBukkit.unmock();
+        }
     }
 
     /**

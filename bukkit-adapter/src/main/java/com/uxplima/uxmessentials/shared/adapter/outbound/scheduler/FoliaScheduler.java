@@ -103,8 +103,11 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
             return;
         }
         // The entity scheduler runs the retired callback if the entity is removed before the task fires,
-        // so a caller waiting on a result is released with its fallback rather than left to time out.
-        bukkit.getScheduler().execute(plugin, task, retired, 1L);
+        // so a caller waiting on a result is released with its fallback rather than left to time out. An entity
+        // retired already is refused with false and neither runs, so that answer is the retired branch too.
+        if (!bukkit.getScheduler().execute(plugin, task, retired, 1L)) {
+            retired.run();
+        }
     }
 
     @Override
