@@ -35,7 +35,9 @@ that half loaded, so the opening page turn is part of the look rather than a per
 decision, and `MenuOpenSoundDriftTest` fails a spec that forgets it.
 
 Click feedback is not declared per item. The engine plays it for every gesture it accepts, so
-it cannot drift out of a spec.
+it cannot drift out of a spec. The click, the page turn and the refusal are the three under
+`menu.sounds` in `config.conf`, handed to the listener through `MenuSoundsFile` and read again on
+a reload. uxmLib has none of its own: a listener handed no sounds plays nothing.
 
 ## 14.4 The lore of an item is a layout, not a paragraph
 

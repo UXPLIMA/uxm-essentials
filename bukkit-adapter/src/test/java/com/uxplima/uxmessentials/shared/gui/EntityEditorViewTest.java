@@ -74,7 +74,7 @@ class EntityEditorViewTest {
     }
 
     private static final int CONFIRM_SLOT =
-            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
+            11; // the engine confirm window's yes button slot (ConfirmLook.STANDARD.yesSlot())
 
     private ServerMock server;
     private Plugin plugin;

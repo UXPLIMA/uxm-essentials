@@ -76,7 +76,7 @@ class MenuGridViewTest {
     private static final int BACK_SLOT = 12; // control row (9) + BACK_COLUMN 3
     private static final int PREVIEW_SLOT = 13; // control row (9) + PREVIEW_COLUMN 4
     private static final int SAVE_SLOT = 14; // control row (9) + SAVE_COLUMN 5
-    private static final int CONFIRM_YES_SLOT = 11; // ConfirmRenderer.YES_SLOT
+    private static final int CONFIRM_YES_SLOT = 11; // ConfirmLook.STANDARD
 
     private ServerMock server;
     private Plugin plugin;

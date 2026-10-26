@@ -83,7 +83,7 @@ class PlayerWarpGuiTest {
     private static final int WARMUP_SLOT = EDITOR_SLOTS.get(8);
     private static final int DELETE_SLOT = 53;
     private static final int CONFIRM_SLOT =
-            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
+            11; // the engine confirm window's yes button slot (ConfirmLook.STANDARD.yesSlot())
 
     private ServerMock server;
     private Plugin plugin;

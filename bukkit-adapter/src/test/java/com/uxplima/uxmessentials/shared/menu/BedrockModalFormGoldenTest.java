@@ -31,7 +31,7 @@ import com.uxplima.uxmlib.bedrock.BedrockScreen;
 import com.uxplima.uxmlib.bedrock.BedrockWidget;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.render.ConfirmRenderer;
+import com.uxplima.uxmlib.menu.render.ConfirmLook;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
 import com.uxplima.uxmlib.menu.runtime.MenuHolder;
@@ -146,12 +146,12 @@ class BedrockModalFormGoldenTest {
                 .as("a Java viewer opens the confirm chest exactly as before")
                 .isTrue();
         Inventory top = player.getOpenInventory().getTopInventory();
-        assertThat(top.getItem(ConfirmRenderer.YES_SLOT))
+        assertThat(top.getItem(ConfirmLook.STANDARD.yesSlot()))
                 .as("the lime yes button sits at its slot")
                 .isNotNull()
                 .extracting(item -> item.getType())
                 .isEqualTo(Material.LIME_WOOL);
-        assertThat(top.getItem(ConfirmRenderer.NO_SLOT))
+        assertThat(top.getItem(ConfirmLook.STANDARD.noSlot()))
                 .as("the red no button sits at its slot")
                 .isNotNull()
                 .extracting(item -> item.getType())

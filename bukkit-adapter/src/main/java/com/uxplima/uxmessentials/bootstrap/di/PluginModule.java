@@ -321,6 +321,7 @@ import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.gui.Guis;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.gui.input.TextInputInstaller;
+import com.uxplima.uxmlib.gui.style.MenuSoundsFile;
 import com.uxplima.uxmlib.hook.Integrations;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -645,6 +646,11 @@ public final class PluginModule {
             }
             seam.promptResolved(player, key, prompt, initialText, onSubmit, onCancel);
         };
+        // The click, page and refusal sounds every window plays are the operator's, in config.conf under menu.sounds.
+        // The engine has none of its own, and a reload reads the file again.
+        MenuSoundsFile menuSounds =
+                MenuSoundsFile.read(plugin.getDataFolder().toPath().resolve("config.conf"), "menu.sounds");
+        resources.addReloadTask(ReloadTask.kernel("menu sounds", menuSounds::reload, "menu sounds re-read from disk"));
         MenuListener menuListener = MenuListener.builder(
                         menuRenderer,
                         menuBindings.actions(),
@@ -658,6 +664,7 @@ public final class PluginModule {
                 .pagedLists(menuBindings.pagedLists())
                 .textPrompt(menuTextPrompt)
                 .contents(menuBindings.contents())
+                .feedback(menuSounds)
                 .build();
         menuListener.install();
         // The console action in an operator menu is privileged, so it stays off unless the operator opts in via

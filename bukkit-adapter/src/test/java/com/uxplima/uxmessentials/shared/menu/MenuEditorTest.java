@@ -208,7 +208,7 @@ class MenuEditorTest {
 
     private static ItemStack filler() {
         return com.uxplima.uxmlib.item.ItemBuilder.of(Material.BLACK_STAINED_GLASS_PANE)
-                .name(Component.empty())
+                .hideTooltip(true)
                 .build();
     }
 

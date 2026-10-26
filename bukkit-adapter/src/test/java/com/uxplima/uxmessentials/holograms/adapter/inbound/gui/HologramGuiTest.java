@@ -128,8 +128,7 @@ class HologramGuiTest {
     private static final int BACKGROUND_SLOT = EDITOR_SLOTS.get(23);
     private static final int GLOW_SLOT = EDITOR_SLOTS.get(24);
     private static final int DELETE_SLOT = 53;
-    private static final int CONFIRM_SLOT =
-            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
+    private static final int CONFIRM_SLOT = 11; // the engine confirm window's yes button slot (ConfirmLook.STANDARD)
 
     private ServerMock server;
     private Plugin plugin;

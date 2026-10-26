@@ -57,7 +57,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.render.ConfirmRenderer;
+import com.uxplima.uxmlib.menu.render.ConfirmLook;
 import com.uxplima.uxmlib.menu.render.EditorRenderer;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
@@ -243,7 +243,8 @@ class PwarpManageMenuTest {
         fireClick(DELETE_SLOT, ClickType.LEFT); // opens the engine confirm; nothing archived yet
         verify(archivePlayerWarp, never()).archive(any(), any());
 
-        fireClick(ConfirmRenderer.YES_SLOT, ClickType.LEFT); // confirm runs ArchivePlayerWarp (recoverable archive)
+        fireClick(
+                ConfirmLook.STANDARD.yesSlot(), ClickType.LEFT); // confirm runs ArchivePlayerWarp (recoverable archive)
 
         verify(archivePlayerWarp).archive(viewer, warp.name());
     }

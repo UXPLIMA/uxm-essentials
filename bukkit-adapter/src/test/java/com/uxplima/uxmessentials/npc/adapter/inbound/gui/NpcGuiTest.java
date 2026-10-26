@@ -129,8 +129,7 @@ class NpcGuiTest {
     private static final int GLOW_COLOR_SLOT = EDITOR_SLOTS.get(8);
     private static final int TELEPORT_SLOT = EDITOR_SLOTS.get(18); // "Teleport here", the last property
     private static final int DELETE_SLOT = 53;
-    private static final int CONFIRM_SLOT =
-            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
+    private static final int CONFIRM_SLOT = 11; // the engine confirm window's yes button slot (ConfirmLook.STANDARD)
     private static final int EQUIP_HEAD_SLOT = 11; // first armour slot in the equipment sub-menu (code default)
 
     private ServerMock server;

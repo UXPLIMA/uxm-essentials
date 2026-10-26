@@ -67,7 +67,7 @@ class MenuEditorViewTest {
 
     private static final int SAVE_SLOT = 10;
     private static final int DELETE_SLOT = 26;
-    private static final int CONFIRM_YES_SLOT = 11; // the engine confirm window's yes button (ConfirmRenderer.YES_SLOT)
+    private static final int CONFIRM_YES_SLOT = 11; // the engine confirm window's yes button (ConfirmLook.STANDARD)
 
     private ServerMock server;
     private Plugin plugin;

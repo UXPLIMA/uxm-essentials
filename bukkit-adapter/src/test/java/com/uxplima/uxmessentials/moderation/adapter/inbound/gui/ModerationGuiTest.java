@@ -76,8 +76,7 @@ class ModerationGuiTest {
     private static final List<Integer> DETAIL_SLOTS = List.of(10, 11, 12, 13, 14, 16);
     private static final int HISTORY_SLOT = DETAIL_SLOTS.get(5);
     private static final int REVOKE_SLOT = 26;
-    private static final int CONFIRM_SLOT =
-            11; // the engine confirm window's yes button slot (ConfirmRenderer.YES_SLOT)
+    private static final int CONFIRM_SLOT = 11; // the engine confirm window's yes button slot (ConfirmLook.STANDARD)
 
     private ServerMock server;
     private Plugin plugin;

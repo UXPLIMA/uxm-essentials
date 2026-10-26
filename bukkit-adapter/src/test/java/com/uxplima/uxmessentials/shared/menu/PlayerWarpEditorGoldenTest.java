@@ -52,7 +52,7 @@ import com.uxplima.uxmlib.gui.input.TextInputTestKit;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
-import com.uxplima.uxmlib.menu.render.ConfirmRenderer;
+import com.uxplima.uxmlib.menu.render.ConfirmLook;
 import com.uxplima.uxmlib.menu.render.EditorRenderer;
 import com.uxplima.uxmlib.menu.render.ItemRenderer;
 import com.uxplima.uxmlib.menu.render.MenuRenderer;
@@ -208,7 +208,8 @@ class PlayerWarpEditorGoldenTest {
                         .status())
                 .isEqualTo(WarpStatus.ACTIVE); // still active until confirmed
 
-        fireClick(ConfirmRenderer.YES_SLOT, ClickType.LEFT); // confirm runs ArchivePlayerWarp (recoverable archive)
+        fireClick(
+                ConfirmLook.STANDARD.yesSlot(), ClickType.LEFT); // confirm runs ArchivePlayerWarp (recoverable archive)
 
         // Delete archives by default: the row is retired to ARCHIVED, not dropped, so it can be restored.
         assertThat(repository
