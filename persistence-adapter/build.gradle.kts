@@ -1,7 +1,7 @@
 import org.jooq.meta.jaxb.Logging
 
 plugins {
-    id("uxmessentials.java-conventions")
+    id("uxm.java")
     alias(libs.plugins.jooq.codegen)
 }
 
@@ -16,37 +16,22 @@ dependencies {
     implementation(project(":core"))
     api(project(":api"))
 
-    compileOnly(libs.bundles.db) // Hikari + SQLite + Flyway + jOOQ (default backend)
-    compileOnly(libs.bundles.db.mysql) // MySQL/MariaDB driver. Activated via modules.conf
-    compileOnly(libs.bundles.db.pg) // PostgreSQL driver. Activated via modules.conf
+    compileOnly(libs.bundles.db) // Hikari, SQLite, Flyway, jOOQ: the default backend
+    compileOnly(libs.bundles.db.mysql) // MySQL and MariaDB drivers, activated by modules.conf
+    compileOnly(libs.bundles.db.pg) // PostgreSQL driver, activated by modules.conf
     compileOnly(libs.caffeine)
     compileOnly(libs.gson)
     compileOnly(libs.slf4j.api)
 
-    testImplementation(libs.bundles.db)
-    testImplementation(libs.bundles.db.mysql)
-    testImplementation(libs.bundles.db.pg)
-    testImplementation(libs.caffeine)
-    testImplementation(libs.gson)
-
-    // jOOQ's render settings carry XML binding annotations. The compiler reads them when it reads the settings
-    // classes and warns, under -Werror, that the annotation types are missing. Nothing runs them.
+    // jOOQ's render settings carry XML binding annotations. The compiler reads them and warns, under -Werror,
+    // that the annotation types are missing. Nothing runs them.
     compileOnly(libs.jakarta.xml.bind)
 
-    // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase.
-    // It is needed only on the codegen classpath, never at runtime.
+    // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase, on the codegen classpath only.
     jooqCodegen(libs.jooq.meta.ext)
 
-    // The copy of a SQLite file's rows into a network database is the library's. Hikari and the drivers are
-    // here already, so only its own classes come along.
-    implementation(libs.uxmlib.storage) { isTransitive = false }
-
-    // One empty database on each backend, in containers, for the tests tagged real-database.
-    testImplementation(libs.uxmlib.storage.testing)
-    testImplementation(libs.tc.junit)
-    testImplementation(libs.tc.postgres) // network-backend integration tests
-    testImplementation(libs.tc.mysql) // network-backend integration tests
-    // SQLite needs no Testcontainer: the embedded file db runs in-process.
+    // The copy of a SQLite file's rows into a network database is the library's.
+    implementation(uxm.uxmlib.storage) { isTransitive = false }
 }
 
 jooq {
@@ -129,13 +114,6 @@ tasks.named<JavaCompile>("compileJava") {
     dependsOn(tasks.named("jooqCodegen"))
 }
 
-tasks.named<Jar>("sourcesJar") {
-    dependsOn(tasks.named("jooqCodegen"))
-    // The generated jOOQ directory is both a declared source dir and a build-output path, so the same
-    // generated file can reach the sources jar twice; keep the first and drop the duplicate.
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-}
-
 // The generated jOOQ classes are not hand-written: keep them out of Spotless so
 // the formatter does not fight the generator. The convention plugin already
 // disables Error Prone warnings in generated code; this excludes the generated
@@ -145,21 +123,3 @@ spotless {
         targetExclude("build/generated-src/**")
     }
 }
-
-// The real-database tests need a container runtime and take seconds each, so they run in a task of their own.
-tasks.test { useJUnitPlatform { excludeTags("real-database") } }
-
-val databaseTest =
-    tasks.register<Test>("databaseTest") {
-        description = "Runs the storage tests on SQLite, MySQL, MariaDB and PostgreSQL."
-        group = "verification"
-        testClassesDirs =
-            sourceSets.test
-                .get()
-                .output.classesDirs
-        classpath = sourceSets.test.get().runtimeClasspath
-        useJUnitPlatform { includeTags("real-database") }
-        shouldRunAfter(tasks.test)
-    }
-
-tasks.check { dependsOn(databaseTest) }

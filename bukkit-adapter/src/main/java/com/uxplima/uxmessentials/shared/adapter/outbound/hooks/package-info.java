@@ -4,8 +4,8 @@
  * safe no-op default, and uxmLib's {@link com.uxplima.uxmlib.hook.Integrations} resolves all of them once at
  * enable and hands a caller the capability by class.
  *
- * <p>The model was written here and moved into uxmLib on 2026-09-22, because it is a mechanism every plugin
- * with an optional dependency can use. What stays here is what this plugin integrates with.
+ * <p>The model itself lives in uxmLib, because it is a mechanism every plugin with an optional dependency can
+ * use. What stays here is what this plugin integrates with.
  *
  * <p>Every integration keeps the other plugin's types behind {@code whenPresent}, and the no-op default names
  * none of them, so a server without the plugin never constructs the real side and never loads its classes.

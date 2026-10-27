@@ -21,7 +21,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link Player} and a {@code reopen} runnable, so it can open a sub-view (or re-render) safely. It carries no
  * domain logic; the value lore is a catalog hint, since the button has no editable current value, and the
  * hint resolver takes the viewer so the hint renders in their locale the way {@link LabelProperty}'s value
- * does. It took a plain {@link String} until 2026-09-22 and the one caller passed the empty one, which left
+ * does. A plain {@link String} would let a caller pass an empty hint and leave
  * {@code moderation.gui.detail.history-hint} shipped in twelve languages and drawn nowhere.
  */
 @NullMarked

@@ -114,9 +114,9 @@ public final class IntegrationCatalog {
                     IntegrationFamily.ITEMS,
                     "com.uxplima.uxmlib.menu.providers.ExecutableItemsIconProvider",
                     "ExecutableItems items as menu icons"),
-            // Every claims seam names a class in uxmLib. The nineteen adapters lived here until 2026-09-08 and
-            // are one copy in the library now, because the plugins written in September could not depend on
-            // this one and must not each carry the same reflection. The name is written un-relocated on
+            // Every claims seam names a class in uxmLib: the nineteen adapters are one copy in the library,
+            // because other plugins cannot depend on this one and must not each carry the same reflection. The name is
+            // written un-relocated on
             // purpose: this catalogue is read by the health check and by a drift guard, both of which run
             // against the plain classpath, and never by a Class.forName inside the shaded jar.
             new Integration(

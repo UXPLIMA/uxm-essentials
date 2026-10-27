@@ -1,38 +1,31 @@
-# Build output. Gradle writes it and Gradle reproduces it, so it belongs to the machine and
-# never to the history. This repository is public: a jar committed here is the product
-# published for download.
-build/
-*/build/
-buildSrc/build/
-
-# Gradle's own state: caches, file hashes, execution history and lock files. Machine local.
+# Gradle
 .gradle/
-*/.gradle/
-
-# The one jar that stays: the wrapper, which is how a clone builds without a Gradle install.
-!gradle/wrapper/gradle-wrapper.jar
-
-# The Kotlin compiler's session state, written beside buildSrc on each build. Machine local.
+build/
 .kotlin/
-*/.kotlin/
+!gradle-wrapper.jar
 
-# Binaries and secrets never enter version control.
-*.zip
-*.tar.gz
-.env
-.env.*
-*.pem
-*.key
-*.keystore
-
-# Editor and assistant tooling.
-.claude/
-.cursor/
-CLAUDE.local.md
+# Editors
+.idea/
+*.iml
+.vscode/
 
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# jqwik writes a failure database beside the module it ran in. A test run leaves it, not a person.
-.jqwik-database
+# Local servers and logs
+run/
+*.log
+hs_err_pid*
+replay_pid*
+
+# Secrets
+.env
+.env.*
+*.keystore
+*.pem
+*.key
+
+# Session settings written by tools/setup.sh of the workspace
+.claude/settings.local.json

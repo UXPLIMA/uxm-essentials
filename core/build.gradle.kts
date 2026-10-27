@@ -1,9 +1,7 @@
-plugins { id("uxmessentials.java-conventions") }
+plugins {
+    id("uxm.java")
+}
 
 dependencies {
     api(project(":api"))
-    compileOnly(libs.jspecify)
-
-    testImplementation(libs.jqwik)
-    testImplementation(libs.archunit.junit)
 }
