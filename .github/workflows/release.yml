@@ -1,334 +1,57 @@
-name: Release
+name: release
 
-# A tag is the release. Pushing v0.5.2 builds that commit and publishes the jars
-# under it, so what people download is exactly what the tag points at. The same
-# jars then go to their store projects, so the store never trails the tag by a
-# release the way 0.5.1 did.
 on:
   push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Existing tag to build and publish (e.g. v0.5.2)'
-        required: true
+    branches: [main]
 
-permissions:
-  contents: write
+permissions: {}
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  release:
-    # Each store step checks for the version first, so a re-run over a tag that is already out publishes nothing
-    # twice.
-    runs-on: ubuntu-24.04
-    env:
-      # The GitHub repository, named outright; every link below points at the GitHub release.
-      RELEASE_REPO: UXPLIMA/uxm-essentials
-      # Read through env rather than straight from secrets so the store steps can ask whether they are set: the
-      # secrets context is not available to a step's `if`. A repository without the tokens still cuts its GitHub
-      # release, and a fork publishes nowhere.
-      MODRINTH_TOKEN: ${{ secrets.MODRINTH_TOKEN }}
-      HANGAR_TOKEN: ${{ secrets.HANGAR_TOKEN }}
-      # The REST add-on's store projects, which are newer than the other four. Set the repository variables once
-      # the projects exist and the jar starts going out with the rest; until then it ships on the GitHub release
-      # only, and the two steps below say so rather than failing.
-      MODRINTH_REST_PROJECT: ${{ vars.MODRINTH_REST_PROJECT }}
-      HANGAR_REST_PROJECT: ${{ vars.HANGAR_REST_PROJECT }}
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      created: ${{ steps.release.outputs.release_created }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag_name }}
     steps:
-      - name: Check out uxmEssentials
-        uses: actions/checkout@v4
+      - id: release
+        uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
-          ref: ${{ inputs.tag || github.ref }}
-          fetch-depth: 0
-          path: uxmEssentials
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
 
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
+  jar:
+    needs: release-please
+    if: needs.release-please.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad # v6.1.0
         with:
           distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      # paperweight unpacks the Mojang-mapped dev bundle behind a lock that is not re-entrant inside a
-      # build. Two tasks reaching it at once from a cold cache used to kill the second one outright, which
-      # is why the bundle is unpacked once, on its own, before anything else runs. Only :bukkit-adapter
-      # asks for it now that the library arrives as a published jar, so this is cheap insurance rather
-      # than a requirement.
-      - name: Warm the Mojang-mapped dev bundle
-        working-directory: uxmEssentials
-        run: ./gradlew :bukkit-adapter:paperweightUserdevSetup --no-parallel
-
-      - name: Verify
-        working-directory: uxmEssentials
-        run: ./gradlew check
-
-      - name: Build the release jars
-        working-directory: uxmEssentials
-        run: >-
-          ./gradlew
-          :bukkit-adapter:shadowJar
-          :velocity-adapter:shadowJar
-          :discord-adapter:shadowJar
-          :redis-adapter:shadowJar
-          :rest-adapter:shadowJar
-
-      # Written once and read by both publishers, so the two stores show the same text. A tag that already has a
-      # release keeps the notes it has: asking GitHub to generate them again on an update puts the existing body in
-      # front of the freshly generated one, and re-running the workflow over a published tag says everything twice.
-      # A tag with no release yet gets generated notes.
-      - name: Make sure jq is there
-        run: |
-          command -v jq > /dev/null && exit 0
-          if command -v sudo > /dev/null; then sudo apt-get update -q && sudo apt-get install -yq jq
-          else apt-get update -q && apt-get install -yq jq; fi
-
-      - name: Prepare the release notes
-        working-directory: uxmEssentials
-        env:
+          java-version: "25"
+      - uses: gradle/actions/setup-gradle@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6.4.0
+      - env:
+          VERSION: ${{ needs.release-please.outputs.version }}
+        run: ./gradlew build -PprojectVersion="$VERSION"
+      - env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag || github.ref_name }}
+          TAG: ${{ needs.release-please.outputs.tag }}
+          VERSION: ${{ needs.release-please.outputs.version }}
         run: |
-          set -euo pipefail
-          notes="$(curl -sS "https://api.github.com/repos/${RELEASE_REPO}/releases/tags/${TAG}" | jq -r '.body // empty' || true)"
-          if [ -z "$notes" ]; then
-            notes="$(gh api "repos/${RELEASE_REPO}/releases/generate-notes" -f tag_name="$TAG" --jq .body)"
-          fi
-          if [ -z "$notes" ]; then
-            notes="https://github.com/${RELEASE_REPO}/releases/tag/${TAG}"
-          fi
-          printf '%s\n' "$notes" > "${RUNNER_TEMP}/release-notes.md"
-          cat "${RUNNER_TEMP}/release-notes.md"
-
-      # A tag that already has a release, cut by hand or by an earlier run, gets its jars replaced and keeps its
-      # notes.
-      - name: Publish the GitHub release
-        working-directory: uxmEssentials
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          jars=(
-            bukkit-adapter/build/libs/uxmEssentials-*.jar
-            velocity-adapter/build/libs/uxmEssentials-velocity-*.jar
-            discord-adapter/build/libs/uxmEssentials-discord-*.jar
-            redis-adapter/build/libs/uxmEssentials-redis-*.jar
-            rest-adapter/build/libs/uxmEssentials-rest-*.jar
-          )
-          for jar in "${jars[@]}"; do
-            [ -f "$jar" ] || { echo "missing release jar: $jar"; exit 1; }
-          done
-          if gh release view "$TAG" > /dev/null 2>&1; then
-            gh release upload "$TAG" "${jars[@]}" --clobber
-          else
-            gh release create "$TAG" "${jars[@]}" --verify-tag --title "$TAG" \
-              --notes-file "${RUNNER_TEMP}/release-notes.md"
-          fi
-
-      # The developer API artifacts go to a Maven repository that is just a branch of this repository, served over
-      # raw.githubusercontent. Nothing has to be configured for that URL to work, which is the whole point: the
-      # uxmLib coordinate was broken for two months because the build consumed the library through includeBuild and
-      # never once resolved what had been published. Files are copied over the existing tree rather than replacing
-      # it, so every earlier version stays resolvable.
-      - name: Publish the API artifacts to the maven branch
-        working-directory: uxmEssentials
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          ./gradlew publishAllPublicationsToLocalRepoRepository
-          tmp="$(mktemp -d)"
-          git init -q "$tmp"
-          git -C "$tmp" remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          if git -C "$tmp" fetch -q --depth 1 origin maven; then
-            git -C "$tmp" checkout -q -B maven FETCH_HEAD
-          else
-            git -C "$tmp" checkout -q --orphan maven
-          fi
-          cp -r build/maven-repo/. "$tmp/"
-          git -C "$tmp" add -A
-          if git -C "$tmp" diff --cached --quiet; then
-            echo "the maven branch already carries ${TAG#v}, leaving it alone"
-          else
-            git -C "$tmp" -c user.name='uxplima-ci' -c user.email='ci@uxplima.com' \
-              commit -q -m "publish the developer api ${TAG#v}"
-            git -C "$tmp" push -q origin maven
-          fi
-
-      # The same four jars onto the four Modrinth projects, straight through the v2 API. No publishing action sits
-      # in between on purpose: they resolve the game versions against a list of their own, and this plugin targets
-      # the 26.x line, which is exactly the kind of version such a list is last to learn.
-      - name: Publish the jars to Modrinth
-        if: env.MODRINTH_TOKEN != ''
-        working-directory: uxmEssentials
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          version="${TAG#v}"
-          changelog="$(cat "${RUNNER_TEMP}/release-notes.md")"
-          if [ -z "$changelog" ]; then
-            changelog="https://github.com/${RELEASE_REPO}/releases/tag/${TAG}"
-          fi
-
-          publish() {
-            project="$1"
-            label="$2"
-            jar="$3"
-            loaders="$4"
-            if [ -z "$project" ]; then
-              echo "no modrinth project id for $label yet, leaving it to the GitHub release"
-              return
-            fi
-            # Modrinth accepts the same version number twice and lists it twice rather than refusing it, so a second
-            # run over a tag that is already out has to be stopped here.
-            if curl -sS "https://api.modrinth.com/v2/project/${project}/version" \
-                 | jq -e --arg v "$version" 'any(.[]; .version_number == $v)' > /dev/null; then
-              echo "modrinth project $project already has $version, leaving it alone"
-              return
-            fi
-            payload="$(jq -n \
-              --arg project "$project" \
-              --arg name "$label $version" \
-              --arg version "$version" \
-              --arg changelog "$changelog" \
-              --argjson loaders "$loaders" \
-              '{
-                 project_id: $project,
-                 name: $name,
-                 version_number: $version,
-                 changelog: $changelog,
-                 version_type: "alpha",
-                 loaders: $loaders,
-                 game_versions: ["26.2"],
-                 dependencies: [],
-                 featured: true,
-                 file_parts: ["file"],
-                 primary_file: "file"
-               }')"
-            # The payload goes through a file rather than inline: curl reads `;` inside an -F value as the start of
-            # a parameter, and release notes are full of them.
-            printf '%s' "$payload" > "${RUNNER_TEMP}/modrinth-data.json"
-            echo "publishing $(basename "$jar") to modrinth project $project"
-            curl -sS --fail-with-body -X POST https://api.modrinth.com/v2/version \
-              -H "Authorization: ${MODRINTH_TOKEN}" \
-              -F "data=@${RUNNER_TEMP}/modrinth-data.json;type=application/json" \
-              -F "file=@${jar}" \
-              -o /dev/null
-          }
-
-          # The label is what the version is called on its own project page, where "uxmEssentials 0.5.2" on all four
-          # would read as the same download listed four times.
-          publish QVeOROXV "uxmEssentials" \
-            "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" '["paper","folia","purpur"]'
-          publish giFPy916 "uxmEssentials Velocity" \
-            "velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" '["velocity"]'
-          publish IpIrzRV9 "uxmEssentials Discord" \
-            "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" '["paper","folia","purpur"]'
-          publish DCyMsr3U "uxmEssentials Redis" \
-            "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" '["paper","folia","purpur"]'
-          publish "${MODRINTH_REST_PROJECT:-}" "uxmEssentials REST" \
-            "rest-adapter/build/libs/uxmEssentials-rest-${version}.jar" '["paper","folia","purpur"]'
-
-      # Every jar has its own Hangar project, the way it does on Modrinth: Hangar carries one file per platform per
-      # version, so the four could never have shared one. The add-ons declare the main plugin as a hard dependency,
-      # which is what they are, and the main project keeps LuckPerms and PlaceholderAPI optional the way
-      # paper-plugin.yml has always described them.
-      - name: Publish the jars to Hangar
-        if: env.HANGAR_TOKEN != ''
-        working-directory: uxmEssentials
-        env:
-          TAG: ${{ inputs.tag || github.ref_name }}
-        run: |
-          set -euo pipefail
-          version="${TAG#v}"
-
-          # The key buys a JWT that lasts well under an hour, so it is fetched once here rather than carried around.
-          jwt="$(curl -sS --fail-with-body -X POST \
-            "https://hangar.papermc.io/api/v1/authenticate?apiKey=${HANGAR_TOKEN}" | jq -r .token)"
-
-          MAIN_DEPS='[{"name":"LuckPerms","required":false,"externalUrl":"https://luckperms.net/"},
-                      {"name":"PlaceholderAPI","required":false,"projectId":1289}]'
-          ADDON_DEPS='[{"name":"uxmEssentials","required":true,"projectId":6381}]'
-
-          publish() {
-            slug="$1"
-            platform="$2"
-            platform_versions="$3"
-            jar="$4"
-            deps="$5"
-
-            if [ -z "$slug" ]; then
-              echo "no hangar project for $(basename "$jar") yet, leaving it to the GitHub release"
-              return
-            fi
-            existing="$(curl -sS -o /dev/null -w '%{http_code}' \
-              "https://hangar.papermc.io/api/v1/projects/${slug}/versions/${version}")"
-            if [ "$existing" = "200" ]; then
-              echo "hangar project $slug already has $version, leaving it alone"
-              return
-            fi
-
-            # Hangar refuses an upload of 10000000 bytes or more with a 413, and the main jar passed that line at
-            # 0.6.0. A version may name an external download instead of carrying the file, which is what the
-            # release asset already is, so the ones that are too big are listed rather than hosted. Nothing about
-            # this is version-specific: whichever jars fit are uploaded, and the rest link out.
-            size="$(stat -c %s "$jar")"
-            if [ "$size" -ge 10000000 ]; then
-              url="https://github.com/${RELEASE_REPO}/releases/download/${TAG}/$(basename "$jar")"
-              files="$(jq -n --arg platform "$platform" --arg url "$url" \
-                '[{platforms: [$platform], externalUrl: $url}]')"
-              echo "$(basename "$jar") is ${size} bytes, over hangar's limit; linking to the release asset instead"
-            else
-              files="$(jq -n --arg platform "$platform" '[{platforms: [$platform]}]')"
-            fi
-
-            jq -n \
-              --arg version "$version" \
-              --arg platform "$platform" \
-              --argjson platformVersions "$platform_versions" \
-              --argjson deps "$deps" \
-              --argjson files "$files" \
-              --rawfile description "${RUNNER_TEMP}/release-notes.md" \
-              '{
-                 version: $version,
-                 channel: "Alpha",
-                 description: $description,
-                 files: $files,
-                 platformDependencies: {($platform): $platformVersions},
-                 pluginDependencies: {($platform): $deps}
-               }' > "${RUNNER_TEMP}/hangar-data.json"
-
-            echo "publishing $(basename "$jar") to hangar project $slug"
-            if [ "$size" -ge 10000000 ]; then
-              curl -sS --fail-with-body -X POST \
-                "https://hangar.papermc.io/api/v1/projects/${slug}/upload" \
-                -H "Authorization: Bearer ${jwt}" \
-                -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
-                -o /dev/null
-            else
-              curl -sS --fail-with-body -X POST \
-                "https://hangar.papermc.io/api/v1/projects/${slug}/upload" \
-                -H "Authorization: Bearer ${jwt}" \
-                -F "versionUpload=@${RUNNER_TEMP}/hangar-data.json;type=application/json" \
-                -F "files=@${jar}" \
-                -o /dev/null
-            fi
-          }
-
-          PAPER_VERSIONS='["26.2"]'
-
-          publish uxmEssentials PAPER "$PAPER_VERSIONS" \
-            "bukkit-adapter/build/libs/uxmEssentials-${version}.jar" "$MAIN_DEPS"
-          publish uxmEssentials-Velocity VELOCITY '["3.4"]' \
-            "velocity-adapter/build/libs/uxmEssentials-velocity-${version}-all.jar" "$ADDON_DEPS"
-          publish uxmEssentials-Discord PAPER "$PAPER_VERSIONS" \
-            "discord-adapter/build/libs/uxmEssentials-discord-${version}.jar" "$ADDON_DEPS"
-          publish uxmEssentials-Redis PAPER "$PAPER_VERSIONS" \
-            "redis-adapter/build/libs/uxmEssentials-redis-${version}.jar" "$ADDON_DEPS"
-          publish "${HANGAR_REST_PROJECT:-}" PAPER "$PAPER_VERSIONS" \
-            "rest-adapter/build/libs/uxmEssentials-rest-${version}.jar" "$ADDON_DEPS"
+          mkdir -p dist
+          for jar in */build/libs/uxmEssentials*-"$VERSION".jar; do cp "$jar" dist/; done
+          cd dist
+          sha256sum ./*.jar | sed 's| \./| |' >SHA256SUMS
+          gh release upload "$TAG" ./*.jar SHA256SUMS --repo "$GITHUB_REPOSITORY" --clobber

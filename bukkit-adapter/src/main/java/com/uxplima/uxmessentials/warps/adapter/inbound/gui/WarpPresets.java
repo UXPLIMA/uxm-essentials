@@ -15,8 +15,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The particles and sounds the warp editor's two pickers offer, read from {@code selector-presets} in the warps
- * file. Until 2026-09-23 both lists were written in the two views with English names, so an operator could not
- * change a picker and a Turkish player read "Dragon Breath".
+ * file, so an operator can change a picker and every player reads the names in their own language.
  *
  * <p>A preset's name is written once per language code, and a reader whose language has none reads the English
  * name, then the effect's own key. A file with no {@code selector-presets} section, which is every file written

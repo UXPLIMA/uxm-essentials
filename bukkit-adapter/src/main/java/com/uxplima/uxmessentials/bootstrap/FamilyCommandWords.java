@@ -15,8 +15,8 @@ import org.jspecify.annotations.NullMarked;
  * a server has. Where a dedicated plugin ships the same word, the dedicated plugin owns it: a server that
  * installed uxmShop next to this one wants {@code /sell} and {@code /worth} to be the shop's, and a server
  * without it wants them to be ours. Left to the server, two plugins registering one word are resolved by
- * load order; on the oneblock setup on 2026-09-22 {@code /sell} was the shop's and {@code /worth} was ours,
- * each reading its own price table.
+ * load order, which can split them: {@code /sell} from the shop and {@code /worth} from here, each reading its
+ * own price table.
  *
  * <p>This reads whether the other plugin is installed and nothing else: no call into it, no dependency and
  * no load order. The list is held to the other plugins' shipped {@code commands.conf} by

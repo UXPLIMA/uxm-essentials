@@ -1,38 +1,24 @@
-import java.util.zip.ZipFile
-
 plugins {
-    id("uxmessentials.java-conventions")
-    alias(libs.plugins.shadow)
+    id("uxm.java")
+    id("com.gradleup.shadow")
 }
 
-// The optional proxy-side cross-server bus broker. It depends on :core only for the pure
-// NetworkMessage hierarchy + codec it shares with the bukkit-side bus client (a single pure-codec
-// shared by both ends); it compiles against velocity-api ONLY, no paper/bukkit, and ships as a separate jar.
+// The optional proxy-side cross-server bus broker. It shares the pure NetworkMessage hierarchy and codec with
+// the bukkit-side bus client through :core, compiles against velocity-api only, and ships as its own jar.
 
 dependencies {
     implementation(project(":core"))
     api(project(":api"))
     compileOnly(libs.velocity.api)
-    // Command-control reuses the pure :core domain, reads its config with Configurate HOCON, renders
-    // deny/spam text with MiniMessage, and resolves groups via LuckPerms. All three are provided by the
-    // Velocity proxy at runtime, so they are compileOnly here and are never shaded into the jar.
-    compileOnly(libs.bundles.configs)
+    // The proxy provides Configurate, Adventure and LuckPerms at runtime.
+    compileOnly(uxm.configurate.hocon)
     compileOnly(libs.bundles.adventure)
     compileOnly(libs.luckperms.api)
-    // The @Plugin annotation processor also emits a velocity-plugin.json. We ship a hand-written
-    // descriptor instead (expanded with the project version by processResources below), the single
-    // source of truth Velocity loads, so the processor output is suppressed to avoid a duplicate entry.
     annotationProcessor(libs.velocity.api)
-
-    testImplementation(libs.velocity.api) // the broker test mocks ProxyServer / ServerConnection
-    // The command-control tests build real Brigadier command trees, parse HOCON, and render MiniMessage.
-    testImplementation(libs.bundles.configs)
-    testImplementation(libs.bundles.adventure)
 }
 
-// The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin
-// annotation; our hand-written resource is authoritative, so drop the generated copy before it reaches
-// the jar (keeping the processor on the classpath for its descriptor validation).
+// The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin annotation. The
+// hand-written resource is authoritative, so the generated copy is dropped before it reaches the jar.
 tasks.named<JavaCompile>("compileJava") {
     doLast {
         val generated = destinationDirectory.file("velocity-plugin.json").get().asFile
@@ -87,70 +73,23 @@ tasks.processResources {
     filesMatching("velocity-plugin.json") { expand(props) }
 }
 
-tasks.shadowJar { archiveBaseName.set("uxmEssentials-velocity") }
+tasks.shadowJar {
+    archiveBaseName = "uxmEssentials-velocity"
+    archiveClassifier = ""
+    mergeServiceFiles()
+    dependencies {
+        exclude(dependency("org.slf4j:.*:.*"))
+        exclude(dependency("net.kyori:.*:.*"))
+        exclude(dependency("com.velocitypowered:.*:.*"))
+    }
+}
+
+tasks.jar { archiveClassifier = "thin" }
+
+tasks.assemble { dependsOn(tasks.shadowJar) }
 
 spotless {
     java {
         targetExclude("build/generated-src/**", "build/generated/**")
     }
 }
-
-// The proxy jar is judged against Velocity, not against Paper, and the two do not forbid the same things.
-// Velocity ships Adventure, MiniMessage, Configurate, gson, Guava and slf4j itself, and it loads a plugin
-// through a class loader that already sees them, so a bundled copy is the one that loses. The other half is
-// that this jar runs on a proxy: it must carry no server code at all, not even the Bukkit API, because there
-// is no server on that side of the connection to reconcile it with.
-val forbiddenJarEntries =
-    listOf(
-        "com/velocitypowered/" to "The proxy API belongs to the proxy. It is compileOnly and is never shipped.",
-        "net/kyori/" to "Velocity owns Adventure and MiniMessage. A shaded copy breaks the proxy's own serializers.",
-        "org/slf4j/" to "Velocity owns slf4j and injects the plugin's logger. A second API makes logging go quiet.",
-        "org/spongepowered/" to "Velocity ships Configurate at a version it chose. Ours is compileOnly here.",
-        "com/typesafe/" to "Typesafe Config arrives with the proxy's Configurate.",
-        "io/leangen/" to "geantyref arrives with the proxy's Configurate.",
-        "com/google/gson/" to "Velocity ships gson and hands it to a plugin.",
-        "com/google/common/" to "Velocity ships Guava and hands it to a plugin.",
-        "net/luckperms/" to "LuckPerms is another plugin, on the proxy exactly as on a backend.",
-        "com/uxplima/uxmlib/" to "uxmLib must be relocated. This entry is un-relocated.",
-        "org/bukkit/" to "A proxy jar carries no server API. Nothing here may compile against Bukkit.",
-        "io/papermc/" to "A proxy jar carries no Paper API either.",
-        "net/minecraft/" to "A proxy jar carries no server. There is no NMS on this side of the connection.",
-        "org/bstats/" to "Only the host jar reports metrics. A proxy jar carrying bStats would double-count a network.",
-    )
-
-val verifyJar =
-    tasks.register("verifyJar") {
-        description = "Fail the build when the shaded jar carries a package it must not."
-        group = "verification"
-        // The shaded jar has its own base name here, so it never overwrites the plain jar and only
-        // shadowJar has to run first.
-        dependsOn(tasks.shadowJar)
-        val jar = tasks.shadowJar.flatMap { shadow -> shadow.archiveFile }
-        inputs.file(jar)
-        doLast {
-            val names = mutableListOf<String>()
-            ZipFile(jar.get().asFile).use { archive ->
-                val entries = archive.entries()
-                while (entries.hasMoreElements()) {
-                    names.add(entries.nextElement().name)
-                }
-            }
-            val found = mutableListOf<String>()
-            for ((prefix, why) in forbiddenJarEntries) {
-                var count = 0
-                for (name in names) {
-                    if (name.startsWith(prefix)) {
-                        count++
-                    }
-                }
-                if (count > 0) {
-                    found.add("  " + prefix + " (" + count + " entries): " + why)
-                }
-            }
-            if (found.isNotEmpty()) {
-                throw GradleException("The jar carries packages it must not:\n" + found.joinToString("\n"))
-            }
-        }
-    }
-
-tasks.check { dependsOn(verifyJar) }

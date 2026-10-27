@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.api.view.UxmPlayerWarp;
  *
  * <p>These are the warps players create for themselves, not the server warps an operator sets; those are
  * {@link UxmWarpsQuery}. A warp that is suspended or archived is still returned by {@link #get(String)} and by
- * {@link #ownedBy(UUID)}, because its owner can still see it; {@link #listPublic()} leaves it out, because nobody
+ * {@link #ownedBy(UUID)}, because its owner can still see it; {@link #listPublic(int, int)} leaves it out, because nobody
  * else can.
  */
 public interface UxmPlayerWarpsQuery {

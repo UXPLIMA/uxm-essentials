@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * surface, all reached through the {@code EconomyProvider} port. The module is ON by default; at
  * {@code start} the bukkit-side adapter registers the native provider through the {@code ServicesManager}
  * <em>unless</em> a foreign economy already holds the registration, in which case it defers and logs
- * (register-or-defer, ADR-0004). When the module is disabled in {@code modules.conf}, nothing registers as
+ * (register-or-defer). When the module is disabled in {@code modules.conf}, nothing registers as
  * the provider and dependent features degrade gracefully: a {@code WarpCost} resolves to "free".
  *
  * <p>The economy tables ({@code economy_owners}, {@code wallet_balances}, {@code transactions}) ship in the

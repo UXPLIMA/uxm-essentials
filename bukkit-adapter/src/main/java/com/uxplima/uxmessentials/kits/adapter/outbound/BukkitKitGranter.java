@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
  * The {@link KitGranter} implementation: decodes each {@link KitItem} through the {@link KitItemCodec} and
  * adds it to the recipient's inventory, dropping any overflow at their feet under the default {@code on-full:
  * drop} policy. A kit set to {@code on-full: deny} is pre-checked for room and granted nothing: a refused
- * {@link Grant#denied()}: when the inventory has too little free space, so the player keeps the claim. The
+ * {@code Grant.denied()}: when the inventory has too little free space, so the player keeps the claim. The
  * grant runs on the claim command thread, which is the player's own region thread (a command source resolves
  * to the player's region), so the inventory mutation is region-correct without an extra hop.
  *

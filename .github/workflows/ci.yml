@@ -1,86 +1,24 @@
-name: CI
+name: ci
 
-# Runs the same gate the contributing rules ask for locally, on a machine nobody
-# has configured: static analysis, the full test suite, and the shaded jar. The
-# jar is built here on purpose, because shading and relocation problems only
-# appear in the assembled artifact and no unit test can see them.
 on:
-  push:
-    branches:
-      - main
+  # edited: a corrected title is checked again.
   pull_request:
-  workflow_dispatch:
+    types: [opened, edited, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions: {}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  check:
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Check out uxmEssentials
-        uses: actions/checkout@v4
-        with:
-          path: uxmEssentials
-
-      - name: Set up JDK 25
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '25'
-
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
-
-      - name: Writing style
-        working-directory: uxmEssentials
-        run: scripts/check-style.sh
-
-      # paperweight unpacks the Mojang-mapped dev bundle behind a lock that is not re-entrant inside a
-      # build. Two tasks reaching it at once from a cold cache used to kill the second one outright, which
-      # is why the bundle is unpacked once, on its own, before anything else runs. Only :bukkit-adapter
-      # asks for it now that the library arrives as a published jar, so this is cheap insurance rather
-      # than a requirement.
-      - name: Warm the Mojang-mapped dev bundle
-        working-directory: uxmEssentials
-        run: ./gradlew :bukkit-adapter:paperweightUserdevSetup --no-parallel
-
-      - name: Check
-        working-directory: uxmEssentials
-        run: ./gradlew check
-
-      - name: Assemble the shaded jars
-        working-directory: uxmEssentials
-        run: >-
-          ./gradlew
-          :bukkit-adapter:shadowJar
-          :velocity-adapter:shadowJar
-          :discord-adapter:shadowJar
-          :redis-adapter:shadowJar
-          :rest-adapter:shadowJar
-
-      # The developer API is only real if somebody outside this build can resolve and compile against it. Nothing
-      # else in CI would notice a broken coordinate, a POM that forgot its dependency, or a type that moved out of
-      # the published packages, because every module here consumes the API as a project dependency. So the sample
-      # consumer is built as its own Gradle build, against the artifacts this very commit publishes. uxmLib was
-      # broken at its published coordinate for two months for exactly this reason.
-      - name: Publish the API to a local repository
-        working-directory: uxmEssentials
-        run: ./gradlew publishAllPublicationsToLocalRepoRepository
-
-      - name: Compile the sample consumer against the published artifacts
-        working-directory: uxmEssentials
-        env:
-          REPO: file://${{ github.workspace }}/uxmEssentials/build/maven-repo
-        run: |
-          version=$(./gradlew -q printVersion)
-          ./gradlew -p sample-consumer build showResolvedApi -PuxmRepo="$REPO" -PuxmVersion="$version"
-
-      - name: Upload the test reports
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: test-reports
-          path: uxmEssentials/*/build/reports/tests/
-          retention-days: 7
+  ci:
+    uses: UXPLIMA/.github/.github/workflows/uxm-ci.yml@db6eaec17eb8ba4e5aff3c4f794edaacdfc5cf17 # main
+    permissions:
+      contents: read
+    with:
+      runner: '["ubuntu-latest"]'
+      scopes: "api core command config menu storage message proxy integration build ci docs release"
+      tools-ref: db6eaec17eb8ba4e5aff3c4f794edaacdfc5cf17

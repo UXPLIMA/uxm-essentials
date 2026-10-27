@@ -31,7 +31,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  * HOCON map would lose it. A bar that cannot be read is skipped and named in the console, and the rest still show.
  *
  * <p>A start or an end is a date and a time in the file's {@code time-zone} (the server's own when it names none),
- * written {@code 2026-11-01 18:00}, or an instant with its own offset such as {@code 2026-11-01T18:00:00+03:00}.
+ * written {@code YYYY-MM-DD HH:MM}, or an instant with its own offset such as {@code YYYY-MM-DDTHH:MM:SS+03:00}.
  */
 @NullMarked
 public final class BossBarContentCodec {
