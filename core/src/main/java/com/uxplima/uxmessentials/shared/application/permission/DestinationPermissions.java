@@ -29,7 +29,7 @@ final class DestinationPermissions {
         return List.of(
                 PermissionSpec.of(
                         "uxmessentials.home.admin",
-                        "/homeadmin to manage another player's homes.",
+                        "/home admin <player> to list, teleport to, set, delete, clear and inspect another player's homes.",
                         PermissionDefault.OP,
                         HOMES),
                 PermissionSpec.of(
@@ -49,7 +49,7 @@ final class DestinationPermissions {
                         HOMES),
                 PermissionSpec.of(
                         "uxmessentials.home.invite",
-                        "/invite and /uninvite to grant or revoke another player's access to one of your homes.",
+                        "/home invite and /home uninvite to grant or revoke another player's access to one of your homes.",
                         PermissionDefault.TRUE,
                         HOMES),
                 PermissionSpec.family(
@@ -65,7 +65,7 @@ final class DestinationPermissions {
                         HOMES),
                 PermissionSpec.of(
                         "uxmessentials.home.visit",
-                        "/visit to teleport to another player's public home or one you were invited to.",
+                        "/home visit <player> [slot] to teleport to another player's public home or one you were invited to.",
                         PermissionDefault.TRUE,
                         HOMES),
                 PermissionSpec.of(

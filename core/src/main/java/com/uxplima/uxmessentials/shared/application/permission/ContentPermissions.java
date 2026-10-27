@@ -397,15 +397,15 @@ final class ContentPermissions {
         return List.of(
                 PermissionSpec.family(
                         "uxmessentials.kit.<kit>",
-                        "Claim one kit.",
+                        "Claim a kit whose file sets permission = true.",
                         PermissionDefault.TRUE,
                         PermissionShape.LABEL,
                         KITS),
                 PermissionSpec.family(
-                        "uxmessentials.kit.cooldown.<kit>.<seconds>",
-                        "The wait between claims of one kit, in seconds; the shortest tier held wins.",
-                        PermissionDefault.TRUE,
-                        PermissionShape.TIER,
+                        "uxmessentials.kit.cooldown.<group>",
+                        "Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins.",
+                        PermissionDefault.FALSE,
+                        PermissionShape.LABEL,
                         KITS),
                 PermissionSpec.of(
                         "uxmessentials.kit.cooldown.bypass",
