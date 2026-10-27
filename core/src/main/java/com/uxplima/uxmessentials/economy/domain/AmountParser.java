@@ -17,7 +17,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * <p>Separator handling is locale-agnostic and deterministic. With both {@code ,} and {@code .} present the
  * rightmost is the decimal point and the other is grouping ({@code 1.000,50} and {@code 1,000.50} both parse to
  * {@code 1000.50}). A single separator reads as grouping only when it cleanly delimits thousands groups, a
- * 1-3 digit lead followed by groups of exactly three ({@code 1,000} -> {@code 1000}, {@code 1.234.567} ->
+ * 1-3 digit lead that does not start with 0 followed by groups of exactly three ({@code 1,000} -> {@code 1000}, {@code 1.234.567} ->
  * {@code 1234567}); otherwise it is a decimal point ({@code 1.5} -> {@code 1.5}, {@code 1,5} -> {@code 1.5},
  * {@code 1.2345} -> {@code 1.2345}). A malformed grouping like {@code 1.2.3} is rejected rather than silently
  * concatenated. The parsed figure is normalised to the currency precision and clamped into {@code [min, max]}
@@ -97,12 +97,13 @@ public final class AmountParser {
     }
 
     private static @org.jspecify.annotations.Nullable String resolveSingleSeparator(String digits, char separator) {
-        int last = digits.lastIndexOf(separator);
-        boolean repeated = digits.indexOf(separator) != last;
-        boolean trailingTriple = digits.length() - last - 1 == 3;
-        if (repeated || trailingTriple) {
-            return isGrouped(digits, separator) ? digits.replace(String.valueOf(separator), "") : null;
+        if (isGrouped(digits, separator)) {
+            return digits.replace(String.valueOf(separator), "");
         }
+        if (digits.indexOf(separator) != digits.lastIndexOf(separator)) {
+            return null;
+        }
+        // One separator that cannot be grouping, such as 0.500, is the decimal point.
         return digits.replace(separator, '.');
     }
 
@@ -117,12 +118,13 @@ public final class AmountParser {
 
     /**
      * True when {@code separator} delimits the digit string into thousands groups: a 1-3 digit lead followed
-     * by one or more groups of exactly three digits ({@code 1.234.567}). A malformed grouping ({@code 1.2.3})
+     * by one or more groups of exactly three digits ({@code 1.234.567}), the lead not starting with 0. A malformed grouping ({@code 1.2.3})
      * is not, so it is rejected rather than silently concatenated.
      */
     private static boolean isGrouped(String digits, char separator) {
         String[] groups = digits.split(java.util.regex.Pattern.quote(String.valueOf(separator)), -1);
-        if (groups.length < 2 || groups[0].isEmpty() || groups[0].length() > 3) {
+        // A lead group of 0 is never written in front of thousands, so 0.500 is half, not five hundred.
+        if (groups.length < 2 || groups[0].isEmpty() || groups[0].length() > 3 || groups[0].charAt(0) == '0') {
             return false;
         }
         for (int i = 1; i < groups.length; i++) {
