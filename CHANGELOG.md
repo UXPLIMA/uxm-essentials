@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.2...v0.10.3) (2026-10-27)
+
+
+### Bug Fixes
+
+* **core:** read a leading zero amount as a decimal ([#11](https://github.com/UXPLIMA/uxm-essentials/issues/11)) ([67ab718](https://github.com/UXPLIMA/uxm-essentials/commit/67ab7187a3f1ecac6b180fcb010f5b99474a5dd4)), closes [#10](https://github.com/UXPLIMA/uxm-essentials/issues/10)
+
 ## [0.10.2](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.1...v0.10.2) (2026-10-27)
 
 ### Added
