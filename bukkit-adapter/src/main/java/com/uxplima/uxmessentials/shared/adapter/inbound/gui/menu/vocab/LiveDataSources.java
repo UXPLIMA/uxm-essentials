@@ -29,8 +29,8 @@ import com.uxplima.uxmlib.menu.runtime.MenuContext;
  * the viewer's own storage as live tiles: {@code self-inventory} (the non-empty stacks in their inventory) and
  * {@code self-enderchest} (their ender chest), each entry being the actual {@link ItemStack} so a template's
  * {@code material = "entry"} draws the real item. Each source is a list handler plus the per-entry {@code %token%}
- * placeholders a template reads to draw one row, all registered once at startup into the shared {@link MenuBindings}
- *. A spec's {@code list { source = self-inventory, template { … } }} then resolves the same way a code-registered
+ * placeholders a template reads to draw one row, all registered once at startup into the shared {@link MenuBindings}.
+ * A spec's {@code list { source = self-inventory, template { … } }} then resolves the same way a code-registered
  * feature source does.
  *
  * <p>The two storage sources are strictly read-only: they snapshot clones and never touch a target other than the

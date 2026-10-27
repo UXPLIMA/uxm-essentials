@@ -55,8 +55,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <h2>Folia</h2>
  * The connected logs are broken inline on the event thread (see {@link SurvivalBlocks}); only the replant is
- * deferred, and it hops to the base block's own region through the injected {@link Scheduler} so it runs a tick later
- *, after the vanilla break has cleared the origin, and never mutates a foreign region from the wrong thread.
+ * deferred, and it hops to the base block's own region through the injected {@link Scheduler} so it runs a tick later,
+ * after the vanilla break has cleared the origin, and never mutates a foreign region from the wrong thread.
  */
 @NullMarked
 public final class TreeFellerListener implements Listener {

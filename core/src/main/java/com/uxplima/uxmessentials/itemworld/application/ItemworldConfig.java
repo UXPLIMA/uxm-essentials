@@ -6,7 +6,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
- * The typed, immutable view of {@code itemworld.conf} (docs/09-deployment.md §itemworld.conf): the per
+ * The typed, immutable view of {@code itemworld.conf}: the per
  * sub-feature-group enable flags, the per-command disable flags, the {@code /give}//{@code /more} caps, the
  * enchant-level clamp, the spawn/purge caps, and the abusable-command audit toggles. It is resolved once from
  * the {@link ConfigStore} when the module starts and swapped atomically on reload, so a command dispatched
@@ -17,7 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * ({@code modules.itemworld.groups.<group>.enabled}, default {@code true}) and the command itself is not
  * disabled ({@code modules.itemworld.commands.<literal>.disabled}, default {@code false}). This mirrors the
  * "each group independently disableable via its own flag AND per-command disable, on top of the module-level
- * switch" rule (docs/10-feature-modules.md §15.10).
+ * switch" rule.
  */
 public final class ItemworldConfig {
 

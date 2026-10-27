@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Maps one {@code litebans_mutes} row into an {@link ImportRecord.ModerationRecord} carrying a mute-only
- * {@link ImportedModeration} (docs/12-migration §5.4). Mutes ride the existing {@code ImportedModeration}
+ * {@link ImportedModeration}. Mutes ride the existing {@code ImportedModeration}
  * path the EssentialsX source already uses, so they funnel through the same mute write the {@code /mute}
  * command does: an imported mute can never reach a state a live mute could not.
  *

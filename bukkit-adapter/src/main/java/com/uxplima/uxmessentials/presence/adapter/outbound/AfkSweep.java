@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The auto-AFK sweep: a self-rescheduling async loop that reads the presence map and flips any player idle past
- * the configured threshold to AFK (docs/02-concurrency.md §6.9). It runs off the tick thread: the scan reads
+ * the configured threshold to AFK. It runs off the tick thread: the scan reads
  * immutable aggregates from the {@code ConcurrentHashMap} via {@link PresenceStore#snapshotAll}, never touching
  * a live {@code Player}, and observes the module's {@code running} flag so it stops cleanly on disable, the
  * §6.10 self-rescheduling-loop pattern matching the messaging mail-expiry sweep and the teleport request-expiry

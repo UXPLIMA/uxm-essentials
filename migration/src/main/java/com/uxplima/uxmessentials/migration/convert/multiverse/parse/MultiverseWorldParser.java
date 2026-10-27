@@ -13,9 +13,9 @@ import org.jspecify.annotations.NullMarked;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
- * Parses Multiverse-Core's {@code plugins/Multiverse-Core/worlds.yml} into one {@link MultiverseWorld} per entry
- * (docs/12-migration §5). The Configurate codec is confined to the shared {@link YamlSource} seam, so the foreign
- * YAML never escapes {@code parse/} (docs/12-migration §2).
+ * Parses Multiverse-Core's {@code plugins/Multiverse-Core/worlds.yml} into one {@link MultiverseWorld} per entry.
+ * The Configurate codec is confined to the shared {@link YamlSource} seam, so the foreign
+ * YAML never escapes {@code parse/}.
  *
  * <p><b>Two layouts, one parser.</b> Multiverse 4 nests every world under a {@code worlds:} map and names its keys
  * in camelCase ({@code autoLoad}, {@code playerLimit}, {@code spawnLocation}); Multiverse 5 lifts the worlds to the
@@ -26,7 +26,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  *
  * <p>An entry that carries no recognisable world field at all is not a world section (the top-level {@code version}
  * scalar is the usual case) and is skipped; a structurally broken entry is skipped rather than aborting the file,
- * exactly as the other on-disk sources do (docs/12-migration §4).
+ * exactly as the other on-disk sources do.
  */
 @NullMarked
 public final class MultiverseWorldParser {

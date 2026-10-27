@@ -16,8 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The rotating announcer: self-rescheduling tasks on the {@link Scheduler} port (docs/02-concurrency.md §6.10
- * self-rescheduling-loop pattern, matching the presence AFK sweep and the messaging mail-expiry sweep).
+ * The rotating announcer: self-rescheduling tasks on the {@link Scheduler} port (matching the presence AFK sweep and the messaging mail-expiry sweep).
  *
  * <p>There are two cadences. Announcements <em>without</em> an interval override rotate together on the config-wide
  * default interval: each default tick asks {@link NextAnnouncement#pick(int)} (the cursor + ordering + no-repeat

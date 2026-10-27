@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The completion callback may resume on any region/IO thread, so the success message and the
  * {@code /back} capture hop back to the player's region thread, the one place the teleport flow
- * deliberately hops more than once (docs/02-concurrency.md §6.5).
+ * deliberately hops more than once.
  */
 @NullMarked
 public final class AsyncTeleportExecutor implements TeleportExecutor {

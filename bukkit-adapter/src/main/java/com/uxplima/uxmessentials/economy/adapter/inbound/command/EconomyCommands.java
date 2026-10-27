@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Builds the economy context's Brigadier command surface (docs/10-feature-modules.md §15.4) as
+ * Builds the economy context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link EconomyServices}. Collected in one greppable table
  * so the literal/permission pairing matches {@code permissions.md} §Economy and the kernel's
  * {@code EconomyCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. Every

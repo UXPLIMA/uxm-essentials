@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * The request-scoped carrier for the requesting player's resolved locale (docs/13-i18n §5).
+ * The request-scoped carrier for the requesting player's resolved locale.
  *
  * <p>Most messages are sent synchronously on the command thread, where the viewer's locale is trivially
  * available. The hard case is the deferred message. A {@code /baltop} page rendered after an off-tick

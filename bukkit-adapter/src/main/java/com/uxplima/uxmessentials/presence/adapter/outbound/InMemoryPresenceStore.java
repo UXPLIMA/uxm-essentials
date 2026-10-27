@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code ConcurrentHashMap<UUID, PlayerPresence>} mutated only through {@code compute} / {@code computeIfAbsent}.
  * The map holds immutable aggregates, so a sync activity listener, the async AFK sweep, and a cross-context
  * vanish lookup all observe a coherent value, and a concurrent transition never loses an update
- * {@code compute} re-applies the pure mutator under contention (docs/02-concurrency.md §6.9).
+ * {@code compute} re-applies the pure mutator under contention.
  *
  * <p>Nothing here is persisted. A presence is seeded on first read (or on join), re-stamped by the activity
  * listeners, flipped by the AFK use cases and the sweep, and dropped on quit. The {@code PlayerRef} key

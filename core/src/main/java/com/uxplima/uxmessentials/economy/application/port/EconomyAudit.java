@@ -8,10 +8,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * Outbound port for the economy audit trail. The {@code com.uxplima.uxmessentials.audit} channel,
  * <em>separate</em> from the ledger (do not conflate the two; the GLOSSARY warns against it). Every mutation
  * through the port carries an {@link EconomyReason} so a ledger review can {@code GROUP BY reason}, and bulk
- * verbs emit exactly one line with an affected-count rather than per-target spam
- * ({@code docs/11-economy-integration.md} §8, §9.4 to §9.5).
+ * verbs emit exactly one line with an affected-count rather than per-target spam.
  *
- * <p>Each method maps to one {@code event=...} line documented in {@code docs/09-deployment.md}. The
+ *
+ * <p>Each method maps to one {@code event=...} audit line. The
  * implementation lands with the bukkit-adapter; the use cases depend only on this contract.
  */
 public interface EconomyAudit {

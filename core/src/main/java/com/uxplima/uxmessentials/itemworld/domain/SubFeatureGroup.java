@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.itemworld.domain;
 import java.util.Objects;
 
 /**
- * The named sub-feature groups the itemworld surface splits into (docs/10-feature-modules.md §15.10).
+ * The named sub-feature groups the itemworld surface splits into.
  * The module is large enough that, on top of the module-level enable switch, each group is
  * independently disableable via its own {@code itemworld.conf} flag, and every command additionally
  * carries a per-command disable on top of its group.

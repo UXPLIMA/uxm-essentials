@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.warps.adapter.WarpServices;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the warps context's Brigadier command surface (docs/10-feature-modules.md §15.2) as a single
+ * Builds the warps context's Brigadier command surface as a single
  * {@link CommandRegistration} over the constructed {@link WarpServices}. Everything a player does with server
  * warps hangs off one {@code /warp} command: {@code <name>} teleports, while {@code list}, {@code set},
  * {@code del}, {@code info}, {@code move} and the per-warp {@code lock}/{@code password}/{@code rate}/

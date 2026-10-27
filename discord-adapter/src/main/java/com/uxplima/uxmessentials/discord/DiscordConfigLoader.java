@@ -16,7 +16,7 @@ import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 /**
  * Loads {@code discord.conf} into a typed {@link DiscordConfig}. On first run it extracts the bundled default
  * (with {@code enabled = false}) to {@code config/discord.conf} under the plugin data folder, so an operator
- * has a documented template to edit (docs/09-deployment.md Path C, step 2). Subsequent loads parse the
+ * has a documented template to edit. Subsequent loads parse the
  * on-disk file; a parse failure yields the dormant default rather than throwing, so a malformed file never
  * crashes plugin enable: the bridge simply stays off and the failure is logged.
  *

@@ -1,5 +1,5 @@
 /**
- * The DecentHolograms import source (docs/12-migration §1.2): reads one YAML file per hologram from
+ * The DecentHolograms import source: reads one YAML file per hologram from
  * {@code plugins/DecentHolograms/holograms/}, maps each file's first page into the {@code holograms}
  * context's {@code Hologram} aggregate, and streams them as {@code HologramRecord}s for the shared write
  * path. {@code parse/} confines the foreign YAML codec; {@code map/} performs the ACL translation to the

@@ -12,7 +12,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Resolves an EssentialsX world name to a {@link WorldRef} against the live server world list. A name the
  * server does not load (a deleted or renamed world) resolves to {@link Optional#empty()}, and the mapper
- * drops that location rather than failing the record (docs/12-migration §4). This is the one Bukkit-facing
+ * drops that location rather than failing the record. This is the one Bukkit-facing
  * seam the EssentialsX mappers need; everything else in {@code convert/} stays platform-neutral.
  */
 @NullMarked

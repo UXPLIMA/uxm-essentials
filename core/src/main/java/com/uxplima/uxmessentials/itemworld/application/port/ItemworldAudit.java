@@ -7,8 +7,8 @@ import com.uxplima.uxmessentials.itemworld.domain.PurgeSelection;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Outbound port for the itemworld audit trail. The {@code com.uxplima.uxmessentials.audit} channel
- * (docs/09-deployment.md §Audit logging, docs/permissions.md §Audit trail). Only the <em>abusable</em>
+ * Outbound port for the itemworld audit trail. The {@code com.uxplima.uxmessentials.audit} channel.
+ * Only the <em>abusable</em>
  * itemworld verbs emit a line: a bulk {@code /give}, a {@code /spawnmob}, a {@code /spawner} retype, the
  * {@code /kill}//{@code /butcher}//{@code /killall}//{@code /remove} entity-purge family, and the {@code
  * /lightning}//{@code /fireball}//{@code /kittycannon}//{@code /break}//{@code /tree}//{@code /nuke} admin-fun

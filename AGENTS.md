@@ -1,6 +1,6 @@
 # uxmEssentials
 
-The all-in-one essentials suite for Paper 26.2: 35 modules, from homes, warps and economy to moderation, NPCs and holograms Modules: `api`, `bukkit-api`, `core`, `persistence-adapter`, `migration`, `bukkit-adapter`, `velocity-adapter`, `discord-adapter`, `redis-adapter`, `rest-adapter`. The Paper plugin is under `com.uxplima.uxmessentials`, built on uxmLib and shaded into one jar.
+The all-in-one essentials suite for Paper 26.2: 35 modules, from homes, warps and economy to moderation, NPCs and holograms. Modules: `api`, `bukkit-api`, `core`, `persistence-adapter`, `migration`, `bukkit-adapter`, `velocity-adapter`, `discord-adapter`, `redis-adapter`, `rest-adapter`. The Paper plugin is under `com.uxplima.uxmessentials`, built on uxmLib and shaded into one jar.
 
 ## Commands
 

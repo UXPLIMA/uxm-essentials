@@ -18,7 +18,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameReso
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The EssentialsX {@link Convert}, the v1 source (docs/12-migration §1.2). It reads a
+ * The EssentialsX {@link Convert}, the v1 source. It reads a
  * {@code plugins/Essentials}-shaped tree ({@code userdata/}, {@code warps/}, {@code kits.yml}) and maps
  * it into the {@code homes}/{@code economy}/{@code messaging}/{@code warps}/{@code kits}/{@code moderation}
  * aggregates through its own ACL mappers. The world resolver is the only runtime seam it needs, the

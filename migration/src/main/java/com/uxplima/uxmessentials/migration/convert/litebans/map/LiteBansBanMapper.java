@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Maps one {@code litebans_bans} row into the moderation domain, a UUID {@link ImportRecord.BanRecord} or,
- * when the row is an IP ban, an {@link ImportRecord.IpBanRecord} (docs/12-migration §5.4). Pure ACL: no
+ * when the row is an IP ban, an {@link ImportRecord.IpBanRecord}. Pure ACL: no
  * JDBC, no Bukkit.
  *
  * <p>LiteBans marks a permanent punishment with {@code until <= 0}. A permanent UUID ban becomes a

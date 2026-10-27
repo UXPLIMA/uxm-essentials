@@ -22,8 +22,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * target's mute, jail and tempban in one shot, while the writes are keyed per kind so an {@code /unmute}
  * touches only the mute row.
  *
- * <p>An offline target's row is lazily materialized before any FK-bearing write ({@code ensureUserExists},
- * docs/09-deployment) so an offline {@code /jail} or {@code /banip} never breaks referential integrity. The
+ * <p>An offline target's row is lazily materialized before any FK-bearing write ({@code ensureUserExists}) so an offline {@code /jail} or {@code /banip} never breaks referential integrity. The
  * sweep methods remove sanctions whose wall-clock expiry has passed; the online-only jail countdown is not
  * swept here: it is decremented by the join/quit tick and released by {@code /unjail}.
  */

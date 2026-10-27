@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
  * Routes {@code top(currency, limit)} through the per-currency {@link BaltopSnapshots} (cached, exempt-
  * filtered, refreshed off-tick) while passing every other {@link EconomyProvider} call straight to the
  * resolved provider. This is the seam that gives the {@code BalTop} use case the budgeted, lock-free
- * {@code /baltop} read-model of {@code docs/11-economy-integration.md} §11 without the use case knowing
+ * {@code /baltop} read-model without the use case knowing
  * whether the snapshot or the provider produced the rows.
  *
  * <p>It is a read decorator only: balances, credits, debits, and transfers are the live provider's, so the

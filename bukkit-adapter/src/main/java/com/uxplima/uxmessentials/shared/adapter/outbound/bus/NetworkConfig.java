@@ -10,7 +10,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The backend's {@code network} view: whether this backend opts into cross-server sync, its unique
  * {@code server-id} (the origin tag stamped into every outbound frame and the loop sentinel on inbound), the
- * bus channel name, the bounded outbound queue size ({@code docs/09-deployment.md} Path B), and, added in
+ * bus channel name, the bounded outbound queue size, and, added in
  * Phase B, which {@link Transport} carries the bus and the canonical {@link Redis} connection block the Redis
  * transport uses. These are restart-only. The channel, the captured server-id and the chosen transport are
  * bound once at enable, so a single immutable snapshot is read at wiring time.
@@ -128,8 +128,8 @@ public record NetworkConfig(
 
     /**
      * Read the network settings from the {@code network} subtree of {@code config}. The channel defaults to the
-     * canonical {@link BusChannel#FULL}; an operator overriding it must match the proxy, or the bridge silences
-     * ({@code docs/09-deployment.md}). The bus is disabled by default so a single-server install runs with no
+     * canonical {@link BusChannel#FULL}; an operator overriding it must match the proxy, or the bridge silences.
+     * The bus is disabled by default so a single-server install runs with no
      * proxy and no behavioural change, and {@code transport} defaults to {@code velocity} so even an enabled
      * backend opens no Redis connection unless asked.
      */

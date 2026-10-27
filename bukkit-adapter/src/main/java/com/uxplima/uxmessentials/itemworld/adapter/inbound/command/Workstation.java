@@ -9,7 +9,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The nine virtual workstations the itemworld surface opens (docs/10-feature-modules.md §15.10) as a single
+ * The nine virtual workstations the itemworld surface opens as a single
  * enum, each carrying its command literal, an optional alias, its permission node, and the display name
  * rendered into {@link com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey#WORKSTATION_OPENED}.
  * Modelling them as one enum keeps the nine commands one parameterised {@link WorkstationCommand} class rather

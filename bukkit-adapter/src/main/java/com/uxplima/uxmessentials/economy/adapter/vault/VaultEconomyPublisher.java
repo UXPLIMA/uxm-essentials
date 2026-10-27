@@ -23,8 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * reward would be paid out of a ledger nobody is reading.
  *
  * <p>Whether Vault is installed at all is not asked here. {@code ForeignEconomyProviders} owns that probe,
- * for the consuming direction and this one alike, so the plugin is named in one file
- * ({@code SoftDependSeamDriftTest}). Reaching either method means the check has already passed.
+ * for the consuming direction and this one alike, so the plugin is named in one file. Reaching either method means the check has already passed.
  */
 @NullMarked
 public final class VaultEconomyPublisher {

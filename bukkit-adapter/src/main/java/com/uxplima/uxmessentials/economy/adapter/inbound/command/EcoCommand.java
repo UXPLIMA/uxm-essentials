@@ -32,8 +32,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /eco give|take|set|reset <player> <amount> [currency]} and the bulk
- * {@code /eco giveall|giverandom|resetall [amount] [currency]} (alias {@code /economy},
- * docs/10-feature-modules.md §15.4). {@code /eco note give <player> <amount> [currency]} mints an admin-issued
+ * {@code /eco giveall|giverandom|resetall [amount] [currency]} (alias {@code /economy}). {@code /eco note give <player> <amount> [currency]} mints an admin-issued
  * banknote for a player without debiting anyone.
  */
 @NullMarked

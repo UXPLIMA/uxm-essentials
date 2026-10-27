@@ -14,8 +14,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Shared bridge from a feature context's narrow per-context economy seam (the ranks {@code RankEconomy}, the warps
  * {@code WarpEconomy}, the homes {@code HomeEconomy}, ...) to the resolved {@link EconomyProvider}. Each seam is
- * charged in a resolved {@link Currency} without the feature context ever importing an economy type
- * ({@code docs/11-economy-integration.md} §4.2). A subclass {@code implements} its own port and inherits the two
+ * charged in a resolved {@link Currency} without the feature context ever importing an economy type.
+ * A subclass {@code implements} its own port and inherits the two
  * bridge operations from here.
  *
  * <p>A per-context cost is a bare {@link BigDecimal} in the feature's own terms; this bridge denominates it in the

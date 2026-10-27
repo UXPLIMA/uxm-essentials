@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The single seam where {@code java.sql} touches a foreign database for a JDBC-backed import source, the
- * DB-source analogue of the EssentialsX source's {@code YamlSource} (docs/12-migration §2). It opens a
+ * DB-source analogue of the EssentialsX source's {@code YamlSource}. It opens a
  * <em>read-only</em> {@link Connection} from a {@link JdbcConnection} and reads one table's rows through a
  * caller-supplied SQL string and {@link RowMapper}. Connection, statement and result set are all closed by
  * try-with-resources before the call returns, so a source can never leak a handle.

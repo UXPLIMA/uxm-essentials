@@ -6,7 +6,7 @@ import java.util.Optional;
 
 /**
  * The opaque, serialized payload of a vault's items at the domain boundary. The architecture persistence
- * invariant (docs/01-architecture.md §"No opaque JSON-blob columns") splits the vault's queryable facts
+ * invariant (no opaque JSON-blob columns) splits the vault's queryable facts
  * owner, index, size, last-touched, all first-class columns. From the {@code ItemStack[]} contents, which are
  * intrinsically opaque payload and the one part allowed to serialize. The domain therefore never sees a Bukkit
  * {@code ItemStack}: the adapter encodes the live inventory into these bytes on save and decodes them back into

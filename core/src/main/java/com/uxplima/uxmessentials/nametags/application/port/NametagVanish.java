@@ -6,7 +6,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * Soft-coupled gate to the presence context: whether a {@code viewer} may see the nametag of a {@code wearer}.
  * A vanished wearer's nametag is hidden from anyone who cannot see them. Staff holding the vanish-see node keep
  * seeing it, so the nametag tracks the same visibility graph the {@code /tpa} listing and {@code /msg} resolution
- * already honour (docs/02-concurrency.md §6.9: vanish visibility integrates with the player-facing surfaces).
+ * already honour.
  *
  * <p>The coupling is soft: when the presence module is disabled (or has not yet landed) the wiring binds
  * {@link #ALWAYS_VISIBLE}, so the nametag renderer degrades to "everyone can see everyone" rather than failing

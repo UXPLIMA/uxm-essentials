@@ -98,7 +98,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         delegate.register(new ModerationModule());
         // itemworld is stateless and ACL-thin (no DB, no persistence) and carries no hard dependency edge, its
         // verbs mutate the live item/entity/world directly, so it lands after the contexts wired above, ahead
-        // of vaults, matching the dependency-first ordering documented in docs/10-feature-modules.md §3.
+        // of vaults, in dependency-first order.
         delegate.register(new ItemworldModule());
         // vaults is DB-persisted player item storage (the 12th and final feature context). It carries no hard
         // dependency edge (no cross-context bridge; its only collaborators are the shared persistence DSL and the

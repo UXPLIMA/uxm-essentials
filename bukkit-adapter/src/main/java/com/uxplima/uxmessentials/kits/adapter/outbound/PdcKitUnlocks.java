@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
  * The {@link KitUnlockStore} implementation: a per-player buy-to-unlock flag stamped in PDC. Each kit a player
  * has bought the one-time unlock for is recorded as a {@code (byte) 1} under a per-kit key, so a later claim of
  * an {@code unlock-once} kit reads the mark and is granted free. An unlock is transient per-holder state that
- * may safely die with a world rollback (docs/03-paper-api §3.6), which is why it lives in PDC rather than the
+ * may safely die with a world rollback, which is why it lives in PDC rather than the
  * database: mirroring the one-time-claim store {@link PdcKitClaims}.
  *
  * <h2>Concurrency</h2>

@@ -4,7 +4,7 @@ package com.uxplima.uxmessentials.discord;
  * The host plugin's notification feed, as the bridge reads it. {@link HostAuditSource} is the one implementation: it
  * reads the host's {@code AuditFeed}, which the host registers in {@code ServicesManager}, and fans every audit and
  * economy line out as an {@link AuditNotice}. The bridge subscribes once the gateway is ready and unsubscribes on
- * disable (docs/09-deployment.md Path C). This port is the bridge's own and never crosses to the host: a type both
+ * disable. This port is the bridge's own and never crosses to the host: a type both
  * jars name lives in {@code :api}.
  *
  * <p>Keeping the subscription behind this thin port is what lets the forwarding pipeline be unit-tested with a

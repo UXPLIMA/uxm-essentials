@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The running tally of one import, accumulated across the bounded executor's writers and rendered into
- * the {@code migration_import_finish} audit line (docs/12-migration §9). Counters are {@link LongAdder}s
+ * the {@code migration_import_finish} audit line. Counters are {@link LongAdder}s
  * because many writer threads increment them concurrently and only one thread reads the totals at the
  * end (§7). The same summary is produced by a dry run, so an operator can diff a dry run against the real
  * run that follows.
@@ -64,7 +64,7 @@ public final class ImportSummary {
 
     private void countModeration(ImportRecord.ModerationRecord rec) {
         // One moderation record can carry both a mute and a jail; each is tallied on its own counter so the
-        // finish line's jails= and mutes= fields read independently (docs/12-migration §9).
+        // finish line's jails= and mutes= fields read independently.
         if (rec.moderation().hasJail()) {
             jails.increment();
         }

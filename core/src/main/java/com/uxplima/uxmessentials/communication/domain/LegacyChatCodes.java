@@ -10,8 +10,8 @@ import java.util.Objects;
  * double-parsing. It holds no Adventure type and never renders anything, keeping the decision unit-testable
  * without Bukkit.
  *
- * <p>A string counts as legacy when it contains a colour/format marker, {@code &} (ampersand) or the section sign
- *. Immediately followed by a recognised code character ({@code 0-9}, {@code a-f}, {@code k-o}, {@code r}, or the
+ * <p>A string counts as legacy when it contains a colour/format marker, {@code &} (ampersand) or the section sign.
+ * Immediately followed by a recognised code character ({@code 0-9}, {@code a-f}, {@code k-o}, {@code r}, or the
  * {@code x} hex marker, case-insensitively). A lone {@code &} that introduces no code (as in {@code "Tom & Jerry"})
  * is not a legacy string, so a plain ampersand in a prefix does not force the legacy parser.
  */

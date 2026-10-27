@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The LiteBans source's {@link ImportPlan}. It composes three sub-streams (bans, mutes, warnings) into one
  * {@link ImportRecord} stream, each table read and mapped on demand as the importer's bounded executor drains
- * it (docs/12-migration §7). Each table is queried through {@link JdbcSource}, which opens and closes its own
+ * it. Each table is queried through {@link JdbcSource}, which opens and closes its own
  * read-only connection per query, so no handle is held across records.
  *
  * <p>Resilience mirrors the EssentialsX source's "one bad record is skipped, never fatal" rule (§4): a table
@@ -77,7 +77,7 @@ final class LiteBansPlan implements ImportPlan {
         try {
             return map.apply(row).stream();
         } catch (RuntimeException badRow) {
-            // One malformed sanction is dropped, never fatal (docs/12-migration §4).
+            // One malformed sanction is dropped, never fatal.
             log.warn("skipping a malformed LiteBans row: {}", String.valueOf(badRow.getMessage()));
             return Stream.empty();
         }

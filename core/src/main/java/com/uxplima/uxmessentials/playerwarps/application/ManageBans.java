@@ -24,8 +24,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@code /pwarp ban|unban}: bar a player from a warp or lift that bar. Allowed to the owner, a co-owner, and a
  * manager by the capability matrix ({@link WarpCapability#MANAGE_BANS}). Each verb resolves the warp
  * ({@link PlayerWarpError#NOT_FOUND}), gates the actor ({@link PlayerWarpError#NO_PERMISSION}), then upserts or
- * lifts the ban row and notifies with a key distinct from the access gate's {@link PlayerWarpError#BANNED} refusal
- *: this is the manager's confirmation, not the visitor's rejection.
+ * lifts the ban row and notifies with a key distinct from the access gate's {@link PlayerWarpError#BANNED} refusal:
+ * this is the manager's confirmation, not the visitor's rejection.
  *
  * <p>Banning the warp's own owner is refused ({@link PlayerWarpError#CANNOT_TARGET_OWNER}) so no delegate can lock
  * the owner out of their own warp. An empty {@code duration} is a permanent ban (an empty {@code until}); a present

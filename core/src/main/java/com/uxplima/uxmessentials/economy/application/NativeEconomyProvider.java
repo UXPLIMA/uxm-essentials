@@ -23,8 +23,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * on. It holds <strong>no money state of its own</strong>:
  * every read is a {@link WalletRepository} read and every write is a guarded transaction the repository owns,
  * so invariant (d) (balances are DB-backed, never PDC) is honoured at the source and the double-spend
- * guard is the repository's guarded {@code UPDATE}, not a JVM lock ({@code docs/11-economy-integration.md}
- * §2.1, §3). This class is pure application code: it never imports a Vault or Treasury type (the ArchUnit
+ * guard is the repository's guarded {@code UPDATE}, not a JVM lock. This class is pure application code: it never imports a Vault or Treasury type (the ArchUnit
  * fence) and translates only between the port vocabulary and the repository.
  *
  * <p>The plugin no longer registers this directly: {@link RoutingEconomyProvider} is the provider callers

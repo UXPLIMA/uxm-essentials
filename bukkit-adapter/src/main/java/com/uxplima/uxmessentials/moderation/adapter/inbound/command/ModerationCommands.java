@@ -17,7 +17,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Builds the moderation context's Brigadier command surface (docs/10-feature-modules.md §15.9) as
+ * Builds the moderation context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link ModerationServices}. Collected in one greppable
  * table so the literal/permission pairing matches the permissions reference and the kernel's
  * {@code ModerationCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. The

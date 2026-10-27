@@ -3,8 +3,7 @@ package com.uxplima.uxmessentials.migration;
 import java.util.Locale;
 
 /**
- * The per-record result the writer reports back for audit and summary counting (docs/12-migration §6,
- * §9). The {@code conflict} branch a record took is the audit {@code conflict} field; whether it landed
+ * The per-record result the writer reports back for audit and summary counting. The {@code conflict} branch a record took is the audit {@code conflict} field; whether it landed
  * is the {@code ok} field.
  */
 public enum RecordOutcome {

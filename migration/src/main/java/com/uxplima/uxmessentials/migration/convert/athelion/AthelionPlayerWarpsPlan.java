@@ -16,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The Athelion source's lazy {@link ImportPlan}. Athelion keeps every warp in one {@code data.yml}, so the file is parsed
- * once into its entries and each is mapped on demand as the importer's bounded executor drains the stream
- * (docs/12-migration §7). A warp whose world the live server does not know is dropped from the stream and counted as
+ * once into its entries and each is mapped on demand as the importer's bounded executor drains the stream.
+ * A warp whose world the live server does not know is dropped from the stream and counted as
  * skipped downstream (§4); an unreadable {@code data.yml} yields no records rather than aborting the run, and a single
  * malformed entry is skipped rather than failing the batch.
  */
@@ -45,7 +45,7 @@ final class AthelionPlayerWarpsPlan implements ImportPlan {
         try {
             return parser.parse(dataFile);
         } catch (IOException | RuntimeException badFile) {
-            // An unreadable data.yml is skipped, never fatal (docs/12-migration §4).
+            // An unreadable data.yml is skipped, never fatal.
             log.warn("Athelion data.yml could not be read, importing nothing: {}", String.valueOf(dataFile));
             return List.of();
         }

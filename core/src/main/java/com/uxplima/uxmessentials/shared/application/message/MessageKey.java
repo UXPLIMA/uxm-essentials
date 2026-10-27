@@ -2,8 +2,7 @@ package com.uxplima.uxmessentials.shared.application.message;
 
 /**
  * Compile-time handle for one user-visible string. Every player-facing message resolves through a
- * {@code MessageKey}; there are no inline literals anywhere in the codebase
- * ({@code NoInlineUserMessageDriftTest}).
+ * {@code MessageKey}; there are no inline literals anywhere in the codebase.
  *
  * <p>The contract is intentionally minimal. A key carries only its {@link #key() catalog lookup
  * string} and nothing else. The text lives in per-locale {@code messages_<lang>.conf} catalogs loaded

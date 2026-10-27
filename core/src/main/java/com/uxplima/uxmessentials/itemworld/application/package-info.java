@@ -5,7 +5,7 @@
  * com.uxplima.uxmessentials.itemworld.application.ItemworldCommandSurface command surface}, the thin
  * per-verb-group policies where domain logic exists, and the itemworld audit port.
  *
- * <p>itemworld is overwhelmingly stateless, ACL-thin mutations (docs/10-feature-modules.md §15.10), so the
+ * <p>itemworld is overwhelmingly stateless, ACL-thin mutations, so the
  * application layer is thin by design: it carries the policies that hold a real rule, the {@code
  * /give}//{@code /more} cap ({@link com.uxplima.uxmessentials.itemworld.application.GiveCapPolicy}), the
  * enchant-level clamp ({@link com.uxplima.uxmessentials.itemworld.application.EnchantPolicy}), the powertool

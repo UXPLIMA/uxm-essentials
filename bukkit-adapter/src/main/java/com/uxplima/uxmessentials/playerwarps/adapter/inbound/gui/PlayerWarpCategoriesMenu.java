@@ -33,8 +33,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Registers and opens the player-warps landing ({@code pwarp-categories}) that a bare {@code /pwarp} opens. It is a
- * hub, not a warp list: four quick-entry buttons each open the paged {@link PlayerWarpBrowseMenu} with a preset filter
- *. The public browse, the viewer's own warps ({@code owner=<uuid>}), their favourites ({@code favouritesOf=<uuid>}),
+ * hub, not a warp list: four quick-entry buttons each open the paged {@link PlayerWarpBrowseMenu} with a preset filter.
+ * The public browse, the viewer's own warps ({@code owner=<uuid>}), their favourites ({@code favouritesOf=<uuid>}),
  * and the top-rated view, and a button per defined category drills into the browse filtered to that category
  * ({@code category=<id>}). The landing never materialises the warp table; every entry hands off to the browse, whose
  * one bounded page query does the work.

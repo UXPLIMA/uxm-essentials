@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * Outbound port over the transient per-player state map. The adapter backs it with a
  * {@code ConcurrentHashMap<UUID, PlayerStateSnapshot>} and applies every mutation through {@code compute} /
  * {@code computeIfAbsent}, so a reader on another region thread always sees a coherent immutable snapshot and
- * concurrent toggles never lose an update (docs/02-concurrency §the playerstate snapshot pattern).
+ * concurrent toggles never lose an update.
  *
  * <p>The state is in-memory only: playerstate persists nothing (no migration, no DB). A player's snapshot is
  * seeded on join, mutated by the toggle/set use cases, re-read by the reconciler, and dropped on quit.

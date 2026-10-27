@@ -30,8 +30,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The dry-run {@link RecordWriter}: runs the identical conflict-resolution logic against the live
- * repositories (reads only) and reports the outcome each record <em>would</em> get, but writes nothing
- * (docs/12-migration §1, §7). Because the parse, map, and conflict-resolve stages are shared with the
+ * repositories (reads only) and reports the outcome each record <em>would</em> get, but writes nothing.
+ * Because the parse, map, and conflict-resolve stages are shared with the
  * live writer, a dry run's per-record and summary audit are the lines a live run would emit, so an
  * operator can review conflicts and counts before committing.
  */

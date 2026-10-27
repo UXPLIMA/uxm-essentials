@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * claim debits the price and records the unlock here, and every later claim reads that unlock and is granted
  * free on its normal cooldown. This port records and reads that one-time-purchase fact. The adapter keeps the
  * mark in PDC under a per-kit {@link org.bukkit.NamespacedKey NamespacedKey} (created once), since an unlock is
- * transient per-holder state that may safely die with a world rollback (docs/03-paper-api §3.6), never the
+ * transient per-holder state that may safely die with a world rollback, never the
  * database, which is reserved for state that must survive a rollback.
  *
  * <p>This mirrors the narrow {@code KitClaimStore} one-time-claim store but answers a different question: a

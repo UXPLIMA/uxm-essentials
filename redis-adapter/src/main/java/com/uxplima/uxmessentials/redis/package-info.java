@@ -1,6 +1,6 @@
 /**
  * The cross-server bus's Redis transport, shipped as the standalone {@code uxmEssentials-redis} companion Paper
- * plugin (docs/09-deployment.md). {@link com.uxplima.uxmessentials.redis.RedisBusTransportAdapter} implements
+ * plugin. {@link com.uxplima.uxmessentials.redis.RedisBusTransportAdapter} implements
  * the host's {@code BusTransport} SPI on top of uxmlib's Lettuce-backed {@code RedisBus}, carrying the full
  * {@code NetworkMessageCodec} frame bytes between backends over a single Redis pub/sub channel with no Velocity
  * proxy in the path; the {@link com.uxplima.uxmessentials.redis.RedisBusTransports} factory builds it from

@@ -7,11 +7,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The importer's audit seam: every run emits a {@code migration_import_start}, one
- * {@code migration_import_*} line per record, and a {@code migration_import_finish} summary
- * (docs/12-migration §9). The {@code start → per-record → finish} family makes any run, including a dry
+ * {@code migration_import_*} line per record, and a {@code migration_import_finish} summary.
+ * The {@code start → per-record → finish} family makes any run, including a dry
  * run, which emits the identical lines with {@code dry_run=true}, fully replayable from the audit log.
- * The bukkit-side impl routes these to the {@code com.uxplima.uxmessentials.audit} channel;
- * {@code AuditEventsDocsDriftTest} pins every emit-site to a documented event row.
+ * The bukkit-side impl routes these to the {@code com.uxplima.uxmessentials.audit} channel.
  */
 @NullMarked
 public interface MigrationAudit {

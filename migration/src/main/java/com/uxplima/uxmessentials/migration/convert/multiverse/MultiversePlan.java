@@ -18,8 +18,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The Multiverse source's lazy {@link ImportPlan}. The whole registry lives in one {@code worlds.yml}, so the file is
- * parsed once into its entries and each is mapped on demand as the importer's bounded executor drains the stream
- * (docs/12-migration §7). An unreadable file yields no records rather than aborting the run, and a single broken
+ * parsed once into its entries and each is mapped on demand as the importer's bounded executor drains the stream.
+ * An unreadable file yields no records rather than aborting the run, and a single broken
  * entry is skipped rather than failing the batch (§4).
  *
  * <p>An entry our world registry cannot name is dropped from the stream and said so in the log, so an operator can
@@ -49,7 +49,7 @@ final class MultiversePlan implements ImportPlan {
         try {
             return parser.parse(worldsFile);
         } catch (IOException | RuntimeException badFile) {
-            // An unreadable worlds.yml is skipped, never fatal (docs/12-migration §4).
+            // An unreadable worlds.yml is skipped, never fatal.
             log.warn("Multiverse worlds.yml could not be read, importing nothing: {}", String.valueOf(worldsFile));
             return List.of();
         }

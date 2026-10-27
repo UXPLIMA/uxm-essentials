@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The parsed moderation block of one EssentialsX {@code userdata/<uuid>.yml}: the optional mute and the
  * optional per-player jail sentence. Both are absent on a clean player, so a userdata file with no
- * sanctions parses to {@link #none()} and contributes no moderation record (docs/12-migration §5.1).
+ * sanctions parses to {@link #none()} and contributes no moderation record.
  * Source-shaped foreign detail; the mapper turns it into a {@code ModerationProfile}.
  *
  * @param mute the mute, empty when the player is not muted

@@ -47,7 +47,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The live {@link RecordWriter}: applies each mapped record to the target contexts' durable repositories,
- * honouring the conflict and balance policies (docs/12-migration §6). Every write is an idempotent upsert
+ * honouring the conflict and balance policies. Every write is an idempotent upsert
  * keyed by stable identity, a home by {@code (owner, slot)}, a warp by {@code name}, a wallet balance by
  * {@code (uuid, currency)}, so a re-run never duplicates a record, and the wallet balance is always
  * <em>set</em>, never added, so a re-run can never double-credit. It writes through the same repository
@@ -156,7 +156,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         }
         wallets.ensureOwner(owner);
         // Money.of normalises to the currency's precision; the upsert sets (never adds) the balance, so a
-        // re-run can never double-credit (docs/12-migration §6).
+        // re-run can never double-credit.
         wallets.upsertBalance(owner, Money.of(defaultCurrency, raw));
     }
 
@@ -212,7 +212,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         }
         // Lazily materialise the seen row so an offline target's FK-bearing sanction write never breaks
         // integrity (ModerationRepository#ensureUserExists). Each sanction is a keyed upsert (set, never
-        // append), so a re-run replaces rather than duplicates the imported mute/jail (docs/12-migration §6).
+        // append), so a re-run replaces rather than duplicates the imported mute/jail.
         moderation.ensureUserExists(target, Instant.EPOCH);
         applySanctions(profile);
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
@@ -239,7 +239,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         }
         // Materialise the seen row so an offline target's FK-bearing ban write never breaks integrity; the
         // tempban is a keyed upsert (set, never append), so a re-run replaces the row rather than duplicating
-        // it: a permanent ban rides in as a far-future Active, exactly the row /ban writes (docs/12-migration §6).
+        // it: a permanent ban rides in as a far-future Active, exactly the row /ban writes.
         moderation.ensureUserExists(target, clock.instant());
         moderation.saveTempban(target, rec.ban());
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
@@ -259,7 +259,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         PlayerRef target = rec.target();
         // The warning history is append-only, a single row cannot be "overwritten", so idempotence is by
         // content under every policy: a re-run that already holds an equivalent warning (same issuer, reason
-        // and issue instant) skips rather than appending a duplicate (docs/12-migration §6).
+        // and issue instant) skips rather than appending a duplicate.
         if (hasEquivalentWarn(target, rec.warn())) {
             return RecordOutcome.SKIPPED;
         }

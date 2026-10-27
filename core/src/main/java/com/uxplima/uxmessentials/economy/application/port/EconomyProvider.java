@@ -16,14 +16,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * native ledger implements it natively; the Treasury and Vault outbound adapters bridge a foreign economy
  * into it. Every {@code /balance} / {@code /pay} / {@code /baltop} / eco-admin command and every
  * cross-context charge ({@code warps} {@code WarpCost}, a kit purchase) routes through these methods and
- * nothing else. There is no escape hatch into {@code economy.domain.*} (the economy GLOSSARY,
- * {@code docs/11-economy-integration.md} §1).
+ * nothing else. There is no escape hatch into {@code economy.domain.*}.
  *
  * <p>The contract is small on purpose and always carries a {@link Currency}, so a single-currency provider
  * (legacy Vault) is the degenerate case of a multi-currency one, not a different shape. The four behavioural
  * properties every implementation must satisfy. Atomic pay, insufficient-funds rejection, descending
- * baltop ordering, and concurrent-debit double-spend safety. Are pinned once by the abstract
- * {@code EconomyProviderContractTest} (§7); a provider that fails any of them is unfit to register through
+ * baltop ordering, and concurrent-debit double-spend safety. A provider that fails any of them is unfit to register through
  * the {@code ServicesManager}.
  *
  * <p>The economy {@code domain}/{@code application} layers (this port included) are ArchUnit-fenced from
@@ -38,7 +36,7 @@ public interface EconomyProvider {
 
     /**
      * Materialise {@code owner}'s account so a subsequent write cannot fail on a missing row, the
-     * offline-target {@code ensureUserExists} upsert ({@code docs/11-economy-integration.md} §10.2),
+     * offline-target {@code ensureUserExists} upsert,
      * idempotent and cheap. Credits the currency's starting balance only on first creation.
      */
     void ensureAccount(PlayerRef owner, Currency currency);

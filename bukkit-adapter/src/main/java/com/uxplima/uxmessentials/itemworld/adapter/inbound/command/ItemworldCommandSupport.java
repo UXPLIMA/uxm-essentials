@@ -48,7 +48,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Two gates run before any mutation. First {@link #enabled} consults the live {@code itemworld.conf} view:
  * a command is available only when its {@link SubFeatureGroup sub-feature group} is enabled and the command
- * itself is not per-command disabled (docs/10-feature-modules.md §15.10). A disabled command answers with
+ * itself is not per-command disabled. A disabled command answers with
  * {@link ItemworldMessageKey#COMMAND_DISABLED} and does nothing else. Then the held-item verbs resolve the
  * player's main hand through {@link #heldItem}, replying {@link ItemworldMessageKey#NO_ITEM_IN_HAND} on an
  * empty hand. Every reply is a {@link MessageKey} rendered in the viewer's locale. There are no inline

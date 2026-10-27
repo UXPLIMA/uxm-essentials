@@ -16,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The presence bounded context as a first-class {@link FeatureModule}: it owns the transient
  * {@code PlayerPresence} aggregate per player (AFK, plus the vanished flag it mirrors from the vanish context's
- * authority), the {@code /afk /list /nick /whois /realname /gc /staff} command surface
- * (docs/10-feature-modules.md §15.8), the dual sync-move /
+ * authority), the {@code /afk /list /nick /whois /realname /gc /staff} command surface,
+ * the dual sync-move /
  * async-chat activity listeners, and the self-rescheduling AFK idle sweep on the {@code Scheduler} port. Vanish
  * itself moved out to its own context: presence reads that state, it does not own it, and a presence reader
  * (the {@code %..._vanished%} placeholder, the sleep exclusion) sees whatever the vanish authority holds, or

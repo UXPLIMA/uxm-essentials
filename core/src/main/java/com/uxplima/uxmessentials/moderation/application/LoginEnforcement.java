@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * The ban-on-login enforcement the {@code PlayerLoginEvent} (priority HIGHEST) listener consults before
- * player data loads (docs/09-deployment.md). For the connecting UUID/IP it checks, in order: a server-wide
+ * player data loads. For the connecting UUID/IP it checks, in order: a server-wide
  * lockdown (the broadest gate. Only bypass-perm holders pass), then an active per-UUID tempban, then an
  * active IP ban on the connecting address. Any match is a kick-before-data-load.
  * Independently it runs alt-detection, the other UUIDs that have connected from this IP, and emits

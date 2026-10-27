@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
  * entity).
  *
  * <p>A single {@link MiniMessage} instance handles parsing; production does not split trusted /
- * untrusted at this layer (docs/03-paper-api §4.1). All templates are operator-owned catalog
+ * untrusted at this layer. All templates are operator-owned catalog
  * content.
  *
  * <p>Before MiniMessage parses, the source runs through a per-viewer pre-parse transform, the {@code

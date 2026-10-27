@@ -7,8 +7,8 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Outbound port for the moderation audit trail. The {@code com.uxplima.uxmessentials.audit} channel
- * (docs/09-deployment.md §Audit logging). Every state-mutating sanction emits exactly one structured
+ * Outbound port for the moderation audit trail. The {@code com.uxplima.uxmessentials.audit} channel.
+ * Every state-mutating sanction emits exactly one structured
  * {@code event=<name> actor=<sender> key=value} line so an operator can route the channel to a retained file
  * and reconstruct moderation activity. The implementation lands with the bukkit-adapter; the use cases
  * depend only on this contract.

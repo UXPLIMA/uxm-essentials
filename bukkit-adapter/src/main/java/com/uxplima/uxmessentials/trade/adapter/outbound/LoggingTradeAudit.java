@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link TradeAudit} implementation that writes the trade audit trail to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel as one structured {@code event=trade_completed key=value} line per
- * completed swap (docs/09-deployment.md §Audit logging), mirroring the moderation, economy, and vaults audits. Both
+ * completed swap, mirroring the moderation, economy, and vaults audits. Both
  * participants are logged by UUID for stable identity, with names carried for the human-readable render, alongside each
  * side's total item quantity, staked money, and staked experience.
  *

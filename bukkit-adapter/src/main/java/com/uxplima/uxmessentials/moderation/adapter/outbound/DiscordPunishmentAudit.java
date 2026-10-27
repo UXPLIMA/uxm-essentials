@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * additive.
  *
  * <p>The seam is reused, not hard-wired to Discord: the notice is one more line on the same SLF4J channel the
- * bridge already subscribes to (docs/09-deployment §Audit logging). With no bridge installed the line simply
+ * bridge already subscribes to. With no bridge installed the line simply
  * lands in the audit log like any other, so this never depends on the Discord jar and never fails when the
  * bridge is absent. Only the punitive verbs (ban/tempban, mute, jail, warn, kick) notify; lifts, freezes and
  * infrastructure events do not.

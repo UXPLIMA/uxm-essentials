@@ -8,8 +8,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * compile-time handle, the catalog holds the text. There are no inline player-facing literals anywhere in the
  * context: every message resolves through one of these.
  *
- * <p>The keys cover the full ~40-verb surface grouped by sub-feature group (docs/10-feature-modules.md
- * §15.10): item utils, virtual workstations, cleanup, powertool, mob/entity, time/weather (and its aliases),
+ * <p>The keys cover the full ~40-verb surface grouped by sub-feature group: item utils, virtual workstations, cleanup, powertool, mob/entity, time/weather (and its aliases),
  * and admin-fun, plus the shared validation failures the adapter boundary surfaces before a domain call
  * (unknown item, amount over cap, bad enchant level, bad time/weather, unknown mob). Per the i18n contract, a
  * disabled module still ships its keys so the catalog stays whole and the locale-parity guard sees the full

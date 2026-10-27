@@ -18,8 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * {@code /pay <player> <amount> [currency]} and {@code /payconfirm}: move value between two players atomically.
  * The gates run in order before any leg. Self-pay, the currency's {@code min-pay}, the target's
- * {@code /paytoggle} flag, then the per-currency confirm-threshold ({@code docs/11-economy-integration.md}
- * §6.2, §9.1 to §9.2). Below the threshold the transfer is immediate; above it the pay is staged (no debit) and
+ * {@code /paytoggle} flag, then the per-currency confirm-threshold. Below the threshold the transfer is immediate; above it the pay is staged (no debit) and
  * a {@code /payconfirm} re-validates from scratch and only then transfers. Confirmation re-checks, it never
  * trusts the staged amount blindly.
  *

@@ -10,11 +10,10 @@ package com.uxplima.uxmessentials.shared.network;
  * <p>Every message carries an {@link #originServer() origin server id}: the {@code server-id} of the backend
  * that produced it. The broker fans a frame out to every backend except its origin, and a backend's bus
  * client drops any frame whose origin equals its own id. Together these two checks are the replication-loop
- * sentinel ({@code docs/02-concurrency.md}). A mutation made on {@code survival-1} reaches the other
+ * sentinel. A mutation made on {@code survival-1} reaches the other
  * backends once and never echoes back to bounce around the cluster.
  *
- * <p>A frame is a <strong>notification, not the source of truth</strong> ({@code docs/09-deployment.md} Path
- * B). The shared database holds the authoritative state; a frame tells a peer "owner X's homes/balance/etc.
+ * <p>A frame is a <strong>notification, not the source of truth</strong>. The shared database holds the authoritative state; a frame tells a peer "owner X's homes/balance/etc.
  * changed on me, drop your cached copy" so the peer re-reads the fresh row on its next access. It never
  * carries a full aggregate to be written blindly: that would race the DB and risk a lost update.
  */

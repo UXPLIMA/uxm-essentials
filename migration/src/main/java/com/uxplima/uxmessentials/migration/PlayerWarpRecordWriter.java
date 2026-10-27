@@ -31,7 +31,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The shared write path for every player-warp importer (docs/12-migration). Given an {@link ImportedPlayerWarp} it
+ * The shared write path for every player-warp importer. Given an {@link ImportedPlayerWarp} it
  * lands the warp on the new surrogate-id {@code player_warps} schema through the player-warps ports, mirroring the P3
  * {@code PlayerWarpDataMigration} that copied the shipped legacy data:
  *

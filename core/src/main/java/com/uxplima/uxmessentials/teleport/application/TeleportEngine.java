@@ -163,7 +163,7 @@ public final class TeleportEngine {
         Objects.requireNonNull(kind, "kind");
         if (jail.isJailed(mover)) {
             // A jailed player cannot self-teleport, /home, /warp, /spawn, /back, /rtp all funnel through here
-            // (docs/permissions.md). The moderation context owns the gate; without moderation it is NEVER.
+            // . The moderation context owns the gate; without moderation it is NEVER.
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
         }

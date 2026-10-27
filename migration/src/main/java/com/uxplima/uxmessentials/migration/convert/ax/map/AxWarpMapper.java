@@ -17,8 +17,8 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates an AxPlayerWarps warp row into the competitor-neutral {@link ImportedPlayerWarp} the shared writer lands
- * (docs/12-migration §5). The scalar work lives here: the {@code Access} ordinal becomes a {@link WarpAccess} (the
+ * Translates an AxPlayerWarps warp row into the competitor-neutral {@link ImportedPlayerWarp} the shared writer lands.
+ * The scalar work lives here: the {@code Access} ordinal becomes a {@link WarpAccess} (the
  * source has no password gate, so a warp is only ever public / whitelist / private), the per-warp currency collapses
  * to the server default (AxPlayerWarps stores an economy-provider hook name, not one of our currency ids), and the
  * source name is kept as the display label so its original casing survives the lowercase-id sanitising the writer does.

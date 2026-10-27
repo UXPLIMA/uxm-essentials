@@ -11,7 +11,7 @@ import com.uxplima.uxmlib.text.language.LanguageSettings;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Resolves a viewer's locale through the deterministic fallback chain (docs/13-i18n §4). The first hit
+ * Resolves a viewer's locale through the deterministic fallback chain. The first hit
  * wins:
  *
  * <ol>

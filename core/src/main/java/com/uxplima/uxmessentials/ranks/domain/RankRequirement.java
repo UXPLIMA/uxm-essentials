@@ -11,8 +11,8 @@ import java.util.Optional;
  * still-opaque action strings. Resolving the value against a live player is the {@code RankRequirementEvaluator}
  * port's job, so the ranks context keeps zero dependency on any economy, playtime or placeholder engine.
  *
- * <p>A requirement is a value object: two are equal when their type and value match. The value must be non-blank
- *. A requirement keyword with nothing after it is malformed and is rejected at construction so it never reaches
+ * <p>A requirement is a value object: two are equal when their type and value match. The value must be non-blank.
+ * A requirement keyword with nothing after it is malformed and is rejected at construction so it never reaches
  * the evaluator.
  *
  * @param type what kind of condition this is

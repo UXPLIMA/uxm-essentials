@@ -14,14 +14,14 @@ import org.spongepowered.configurate.ConfigurationNode;
 
 /**
  * Parses Athelion's single {@code plugins/PlayerWarps/data.yml} into one {@link AthelionWarp} per entry under its
- * {@code warps:} map (docs/12-migration §5). Each entry is keyed by the warp uuid and stores the Bukkit-serialised warp
+ * {@code warps:} map. Each entry is keyed by the warp uuid and stores the Bukkit-serialised warp
  * fields, {@code owner-id}, {@code name}, {@code loc}, {@code lore}, {@code password}, {@code status}, {@code ratings},
  * {@code reviewers}, {@code blocked-players}, and the rest. The Configurate codec is confined to the shared
- * {@link YamlSource} seam, so the foreign YAML never escapes {@code parse/} (docs/12-migration §2).
+ * {@link YamlSource} seam, so the foreign YAML never escapes {@code parse/}.
  *
  * <p>An entry that is structurally unusable (no owner uuid, no name, or no world in its {@code loc} block) is dropped
- * from the returned list rather than aborting the file, exactly as the EssentialsX warp parser skips a world-less file
- * (docs/12-migration §4). A warp whose world the live server does not know still parses here and is dropped later by the
+ * from the returned list rather than aborting the file, exactly as the EssentialsX warp parser skips a world-less file.
+ * A warp whose world the live server does not know still parses here and is dropped later by the
  * mapper; this parser drops only what cannot be shaped at all.
  */
 @NullMarked

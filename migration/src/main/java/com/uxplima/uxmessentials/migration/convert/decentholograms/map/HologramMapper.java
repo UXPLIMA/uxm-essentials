@@ -17,13 +17,13 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates a parsed DecentHolograms hologram into a domain {@link Hologram} (docs/12-migration §5).
+ * Translates a parsed DecentHolograms hologram into a domain {@link Hologram}.
  * DecentHolograms stores far more per hologram than uxmEssentials models on a single hologram, pages,
  * per-line flags/offsets, click actions, display/update ranges, a facing angle. The importer keeps the
  * portable core: the name, the location, and the first page's text lines, with uxmEssentials' default
  * appearance, everyone-visibility, and static refresh: the same shape {@code /hologram create} produces.
  * A hologram whose world the server does not know, whose name is invalid, or that has no non-blank line
- * maps to {@link Optional#empty()} and the caller counts it a skipped record (docs/12-migration §4).
+ * maps to {@link Optional#empty()} and the caller counts it a skipped record.
  */
 @NullMarked
 public final class HologramMapper {

@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
- * Reads EssentialsX's mute and jail state. Two surfaces feed it (docs/12-migration §4): the per-player
+ * Reads EssentialsX's mute and jail state. Two surfaces feed it: the per-player
  * {@code muted}/{@code jailed} fields inside each {@code userdata/<uuid>.yml} (the importable sanction
  * state), and the server-wide {@code jail.yml} jail <em>definitions</em> (named locations). The userdata
  * read is the one the importer maps to a {@code ModerationProfile}; the definitions read only pins the
@@ -49,7 +49,7 @@ public final class JailMuteParser {
     private Optional<EssXJail> jail(ConfigurationNode root) {
         String name = root.node("jail").getString();
         if (name == null || name.isBlank()) {
-            // Jailed with no named jail is an unusable record, skipped, never fatal (docs/12-migration §4).
+            // Jailed with no named jail is an unusable record, skipped, never fatal.
             return Optional.empty();
         }
         ConfigurationNode timestamps = root.node("timestamps");

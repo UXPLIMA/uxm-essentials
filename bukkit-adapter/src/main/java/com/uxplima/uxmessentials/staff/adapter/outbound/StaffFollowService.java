@@ -32,8 +32,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link StaffMessageKey#STAFF_FOLLOW_ENDED} on their own entity thread and the session is dropped.
  *
  * <p>Following is continuous, so it must not route through the cooldown-gated teleport engine; instead each tick
- * does its own two region hops, mirroring {@code AsyncTeleportExecutor}'s region discipline (docs/02-concurrency
- * §6.5). The repeating task itself runs on the global region thread and does nothing but iterate the session map
+ * does its own two region hops, mirroring {@code AsyncTeleportExecutor}'s region discipline. The repeating task itself runs on the global region thread and does nothing but iterate the session map
  * and dispatch the hops. It never reads or moves an entity, since on Folia each player is owned by its own
  * region thread. For each session it first hops to the <em>target</em>'s entity thread to snapshot the target's
  * location, then hops to the <em>staff</em> member's entity thread to {@code teleportAsync} them onto that

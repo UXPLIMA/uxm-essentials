@@ -8,8 +8,8 @@ import org.jspecify.annotations.NullMarked;
  * {@link RecordOutcome}. A live run binds the real writer (which calls {@code SetHome}/{@code SetWarp}/
  * economy services through the same ports a live command uses, so an import can never create a state a
  * normal command could not); a dry-run binds the no-op accumulator, which runs the identical
- * conflict-resolution logic and reports the same outcomes without touching the database
- * (docs/12-migration §1, §7).
+ * conflict-resolution logic and reports the same outcomes without touching the database.
+ *
  *
  * <p>This port is the <em>only</em> difference between a live run and a dry run, the parse, map, and
  * conflict-resolve stages are shared, so a dry run's per-record and summary audit are byte-for-byte the

@@ -15,8 +15,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>This builds nothing. Each family keeps the registry that constructs its providers ({@code ClaimProviders},
  * {@code CurrencyBackends}, {@code MapMarkerPublishers}, {@code IconProviders}, {@code Hooks}); what lives here
  * is the answer to "which plugins do we integrate with, and where does each one enter the code". Three surfaces
- * read it instead of keeping their own copy: {@code paper-plugin.yml} (kept in exact bijection with this list by
- * {@code IntegrationCatalogDriftTest}), the {@code /uxmess doctor} soft-dependency check, and the integrations
+ * read it instead of keeping their own copy: {@code paper-plugin.yml} (kept in exact bijection with this list), the {@code /uxmess doctor} soft-dependency check, and the integrations
  * page in the published documentation.
  *
  * <p>Adding an integration is therefore one edit here plus the manifest entry the guard demands, and the

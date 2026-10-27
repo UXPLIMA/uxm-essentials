@@ -5,8 +5,8 @@ import java.util.Optional;
 /**
  * A validated item amount for {@code /give}, {@code /item} and {@code /more}, clamped to a configured cap.
  *
- * <p>The cap is the {@code /give}//{@code /more} cap an operator sets in {@code itemworld.conf}
- * (docs/09-deployment.md §itemworld.conf). The rule is intentionally a domain concern so the cap is enforced
+ * <p>The cap is the {@code /give}//{@code /more} cap an operator sets in {@code itemworld.conf}.
+ * The rule is intentionally a domain concern so the cap is enforced
  * once, before the adapter ever materialises a stack: a non-positive amount is invalid; an amount above the
  * cap is rejected (never silently truncated), so the actor learns the limit rather than receiving a smaller
  * stack than asked for.

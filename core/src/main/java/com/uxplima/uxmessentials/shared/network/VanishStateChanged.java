@@ -12,7 +12,7 @@ import java.util.UUID;
  * network-vanish view so a player vanished on {@code survival-1} is already hidden the instant they switch to
  * {@code survival-2}.
  *
- * <p>The origin-loop sentinel ({@code docs/02-concurrency.md}) still applies: the broker skips the origin backend
+ * <p>The origin-loop sentinel still applies: the broker skips the origin backend
  * and a backend drops any frame whose {@link #originServer()} equals its own id, so a state change made here reaches
  * every peer once and never echoes back.
  *

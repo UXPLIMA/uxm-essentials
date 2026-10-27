@@ -20,8 +20,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import org.jspecify.annotations.NullMarked;
 
 /**
- * One quick time-alias verb, {@code /day} ({@code TimeSpec.day()}) or {@code /night} ({@code TimeSpec.night()})
- *, parameterised by the {@link TimeSpec} it sets and its own literal/permission so the two share one class
+ * One quick time-alias verb, {@code /day} ({@code TimeSpec.day()}) or {@code /night} ({@code TimeSpec.night()}),
+ * parameterised by the {@link TimeSpec} it sets and its own literal/permission so the two share one class
  * rather than two near-identical files. Each is its own command literal in the time/weather sub-feature group,
  * gated by its own per-command disable. World time is global state, so the set runs on the global region thread
  * through the kernel {@code Scheduler#onGlobal} and is reported through {@link ItemworldMessageKey#TIME_SET}.

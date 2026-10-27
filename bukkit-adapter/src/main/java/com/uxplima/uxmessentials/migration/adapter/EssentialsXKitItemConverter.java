@@ -22,8 +22,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Turns one EssentialsX kit item descriptor line ({@code "diamond_sword 1 damage_all:5 durability:3"},
- * {@code "wool 1"}) into a Bukkit {@link ItemStack}, the bukkit-side conversion the kit import defers here
- * (docs/12-migration §5.1). The descriptor grammar handled is the realistic subset for a modern server: the
+ * {@code "wool 1"}) into a Bukkit {@link ItemStack}, the bukkit-side conversion the kit import defers here.
+ * The descriptor grammar handled is the realistic subset for a modern server: the
  * material (a name, optionally a {@code name:data} pair), the amount, an optional durability/damage value, and
  * enchantment {@code name:level} tokens. Including the legacy Bukkit enchant names EssentialsX historically
  * wrote ({@code damage_all}, {@code durability}, {@code dig_speed}, …). Item display name, lore, and

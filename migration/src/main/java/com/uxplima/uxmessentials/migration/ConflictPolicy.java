@@ -4,8 +4,8 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * What the importer does when an imported record collides with an existing uxmEssentials record
- * (docs/12-migration §6). The chosen branch is recorded per record in the audit {@code conflict} field.
+ * What the importer does when an imported record collides with an existing uxmEssentials record.
+ * The chosen branch is recorded per record in the audit {@code conflict} field.
  *
  * <ul>
  *   <li>{@link #SKIP} (default): keep the existing record; the safe, re-runnable choice.

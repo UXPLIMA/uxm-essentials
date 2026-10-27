@@ -27,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /butcher [radius]}: purge hostile mobs within a radius around the actor. An entity-purge verb, the
  * most abusable in the surface, so the radius is clamped to {@code purge-max-radius} in the domain
- * {@link PurgePolicy} and the sweep is audit-logged (docs/10-feature-modules.md §15.10). Tamed pets and players
+ * {@link PurgePolicy} and the sweep is audit-logged. Tamed pets and players
  * are never swept (the purger's invariant).
  *
  * <p>The sweep is region-bound, so it runs on the actor's region thread through the kernel {@code Scheduler};

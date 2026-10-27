@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The teleport context's full command surface (docs/10-feature-modules.md §15.3) as platform-neutral
+ * The teleport context's full command surface as platform-neutral
  * {@link CommandSpec}s. Each spec pairs a literal with its permission node and a factory that produces
  * the kernel-side {@link BrigadierCommand} description; the teleport inbound adapter realises the
  * Brigadier node from the started module's context on the next {@code COMMANDS} fire.

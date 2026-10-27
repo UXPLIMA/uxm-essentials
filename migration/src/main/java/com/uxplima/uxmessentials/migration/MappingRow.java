@@ -5,10 +5,10 @@ import java.util.Objects;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * One row in a source's {@code SupportedMappings} table (docs/12-migration §5): a source field, the
+ * One row in a source's {@code SupportedMappings} table: a source field, the
  * uxmEssentials target aggregate, the owning context, the mapper that performs the translation, and the
  * identity the conflict policy keys on. The table is the single source of truth for what a source
- * claims to migrate; the drift guard ties each row to a doc row and a fixture (docs/12-migration §8.1).
+ * claims to migrate; the drift guard ties each row to a doc row and a fixture.
  *
  * @param sourceField the foreign field as the source names it ({@code "homes.<name>"})
  * @param target the uxmEssentials aggregate it maps to ({@code "Home"})

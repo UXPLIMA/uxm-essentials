@@ -14,13 +14,13 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link ItemworldAudit} implementation that writes the abusable-verb audit trail to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel as structured {@code event=<name> actor=<uuid> key=value}
- * lines (docs/09-deployment.md §Audit logging), mirroring {@code LoggingModerationAudit}. Only the abusable
+ * lines, mirroring {@code LoggingModerationAudit}. Only the abusable
  * itemworld verbs reach this adapter, a bulk {@code /give}, a {@code /spawnmob}, a {@code /spawner} retype,
  * the entity-purge family, and the admin-fun verbs; the cosmetic and workstation verbs are not audited.
  *
  * <p>Each line is additionally gated by the per-action {@code audit.<event>} toggle an operator sets in
- * {@code itemworld.conf}, so a high-volume verb can be quieted while the channel stays open for the rest
- * (docs/09-deployment.md §itemworld.conf). The actor/target are logged by UUID for stable identity; the item
+ * {@code itemworld.conf}, so a high-volume verb can be quieted while the channel stays open for the rest.
+ * The actor/target are logged by UUID for stable identity; the item
  * key and mob type are already normalised by the domain value objects. A disabled audit toggle is a no-op,
  * never a thrown error.
  */

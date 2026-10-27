@@ -15,8 +15,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The nametags reconcile-and-animate timer: a self-rescheduling task on the {@link Scheduler} port
- * (docs/02-concurrency.md §6.10 self-rescheduling-loop pattern, matching the tablist and scoreboard render timers).
+ * The nametags reconcile-and-animate timer: a self-rescheduling task on the {@link Scheduler} port.
+ *
  * With the packet renderer owning each wearer's per-viewer text/viewer/line-of-sight refresh (one {@code entityTimer}
  * per wearer inside uxmLib), this task no longer renders. It does the two things the lib loop cannot:
  *

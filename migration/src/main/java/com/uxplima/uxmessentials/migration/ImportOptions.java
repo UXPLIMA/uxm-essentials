@@ -7,7 +7,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The settled inputs for one import run: where to read the source from, whether it is a real or a
- * dry-run write, and the two conflict knobs (docs/12-migration §6). An {@link ImportOptions} is built
+ * dry-run write, and the two conflict knobs. An {@link ImportOptions} is built
  * once from {@code migration.conf} plus the command's {@code --dry-run} flag and threaded read-only
  * through the whole pipeline, so the plan, the mappers, and the writer all see the same decisions.
  *

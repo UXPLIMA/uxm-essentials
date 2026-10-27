@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * Outbound port holding the one outstanding {@code /pay} confirmation per payer, a per-payer
- * {@code AtomicReference<PendingPay>} ({@code docs/11-economy-integration.md} §9.2). A second large
+ * {@code AtomicReference<PendingPay>}. A second large
  * {@code /pay} replaces the first and re-prompts; an expiry timer discards a stale one. Staging never
  * debits, so a dropped pending pay loses no money.
  *

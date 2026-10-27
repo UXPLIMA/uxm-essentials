@@ -25,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Bridges a legacy Vault economy into this plugin's {@link EconomyProvider} port, the compatibility bridge
- * for the large installed base of Vault-only economies ({@code docs/11-economy-integration.md} §2, §6). One
+ * for the large installed base of Vault-only economies. One
  * of only two classes (with {@code TreasuryEconomyAdapter}) allowed to import a provider SDK; the ArchUnit
  * fence {@code economyDomainHasNoProviderSdk} forbids {@code net.milkbowl.vault..} anywhere above this
  * adapter.

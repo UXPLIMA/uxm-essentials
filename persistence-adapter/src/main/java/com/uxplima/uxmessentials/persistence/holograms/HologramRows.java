@@ -36,8 +36,8 @@ import org.jspecify.annotations.Nullable;
  * {@link Appearance} default (or a static interval), and as {@link Visibility#everyone()}, so a pre-V35 row
  * keeps its current look and a pre-V36 row stays visible to everyone. The V37 type columns are likewise
  * nullable: a NULL type reads back as {@link HologramType#TEXT}, so a pre-V37 row keeps rendering its lines.
- * The click-action chain lives in the child {@code hologram_action} table (V60) and is passed in already ordered
- *: each row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload.
+ * The click-action chain lives in the child {@code hologram_action} table (V60) and is passed in already ordered:
+ * each row's {@code click_trigger}/{@code type} are the enum names and {@code value} the raw operator payload.
  * This class is the single place that translation lives.
  */
 final class HologramRows {

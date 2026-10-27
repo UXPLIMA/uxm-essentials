@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * DB-backed and survive a world rollback (never PDC, never an in-memory authority). Every statement is typed
  * jOOQ DSL; no SQL is ever string-concatenated.
  *
- * <p>The load-bearing rule is the guarded debit ({@code docs/02-concurrency.md} §6.7): a debit is a single
+ * <p>The load-bearing rule is the guarded debit: a debit is a single
  * {@code UPDATE … WHERE owner = ? AND currency = ? AND amount >= ?}, so the database serialises two
  * concurrent debits and an over-draw updates zero rows ({@link TransferError#INSUFFICIENT_FUNDS}). A transfer
  * is that guarded debit plus the credit in one transaction: both legs commit together or neither does. No

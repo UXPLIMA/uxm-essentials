@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates a parsed EssentialsX warp into a domain {@link Warp} (docs/12-migration §5.1). EssentialsX
+ * Translates a parsed EssentialsX warp into a domain {@link Warp}. EssentialsX
  * warps carry no owner, no cost, and no permission gate, so the mapped warp is free, ungated, and
  * attributed to a synthetic importer owner. A warp whose world the server does not know maps to
  * {@link Optional#empty()} and the caller counts it as a skipped record.

@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link ModerationAudit} implementation that writes the moderation audit trail to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel as structured {@code event=<name> actor=<sender> key=value}
- * lines (docs/09-deployment.md §Audit logging). Free-form values (reasons) are double-quoted with backslash
+ * lines. Free-form values (reasons) are double-quoted with backslash
  * escapes so a reason containing whitespace stays one greppable field. Every state-mutating sanction emits
  * exactly one line; {@code /kickall} emits one line with the affected count, never one per kicked player.
  *

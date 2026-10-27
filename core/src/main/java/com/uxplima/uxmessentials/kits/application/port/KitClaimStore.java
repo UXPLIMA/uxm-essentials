@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * Per-player one-time-claim state for kits. A one-time kit is consumed forever after the first claim; this
  * port records and reads that fact. The adapter keeps the stamp in PDC under a per-kit
  * {@link org.bukkit.NamespacedKey NamespacedKey} (created once), since a claim flag is transient per-holder
- * state that may safely die with a world rollback (docs/03-paper-api §3.6). Never the database, which is
+ * state that may safely die with a world rollback. Never the database, which is
  * reserved for state that must survive a rollback.
  *
  * <p>This is intentionally narrow and separate from the shared {@code Cooldowns} port: cooldowns rate-limit

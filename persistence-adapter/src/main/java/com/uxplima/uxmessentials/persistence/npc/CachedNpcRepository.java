@@ -76,8 +76,8 @@ public final class CachedNpcRepository implements NpcRepository {
     }
 
     /**
-     * Re-read one NPC from the durable delegate and update the in-memory set to match, returning its fresh state
-     *: present when it now exists (created or edited on a peer), empty when it was deleted there. Unlike
+     * Re-read one NPC from the durable delegate and update the in-memory set to match, returning its fresh state:
+     * present when it now exists (created or edited on a peer), empty when it was deleted there. Unlike
      * {@link #save}/{@link #delete}, the change did not pass through this cache (a peer wrote the shared row), so
      * the in-memory authoritative set is stale for that name; this hops it back in step against the database. The
      * cross-server listener calls this off the tick thread (the delegate read is a synchronous SQLite query) and

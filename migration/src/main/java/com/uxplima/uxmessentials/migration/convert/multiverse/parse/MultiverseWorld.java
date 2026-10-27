@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * One world entry as it stands in Multiverse's {@code worlds.yml}, in the competitor's own vocabulary: every field
  * optional because Multiverse omits anything left at its default, and every field a plain Java type because no
- * domain type may appear in {@code parse/} (docs/12-migration §2). The mapper is what turns this into a
+ * domain type may appear in {@code parse/}. The mapper is what turns this into a
  * {@code ManagedWorld}.
  *
  * <p>Only what Multiverse actually stores and we have a home for is carried. Its per-world weather, hunger,

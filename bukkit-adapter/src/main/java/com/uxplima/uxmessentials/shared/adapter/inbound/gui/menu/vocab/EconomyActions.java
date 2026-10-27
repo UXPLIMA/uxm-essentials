@@ -50,8 +50,8 @@ public final class EconomyActions {
      * the money actions resolve a back-end through; {@code permissions} is the Vault permission seam the permission
      * actions grant/revoke through (its {@link PermissionQuery#ABSENT} default makes those graceful no-ops when
      * Vault is absent); {@code log} is the operator console logger a fail-soft or malformed action warns through.
-     * Left separate from {@link MenuVocabulary#registerActions} so that method's existing call-sites stay untouched
-     *: the composition root calls both.
+     * Left separate from {@link MenuVocabulary#registerActions} so that method's existing call-sites stay untouched:
+     * the composition root calls both.
      */
     public static void register(MenuBindings bindings, Currencies currencies, PermissionQuery permissions, Logger log) {
         Objects.requireNonNull(bindings, "bindings");

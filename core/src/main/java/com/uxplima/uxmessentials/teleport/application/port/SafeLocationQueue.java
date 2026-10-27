@@ -6,7 +6,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 
 /**
- * Outbound port over the per-world pre-warmed random-teleport queue (ADR 0010). A {@code /rtp} is served
+ * Outbound port over the per-world pre-warmed random-teleport queue. A {@code /rtp} is served
  * O(1) by {@link #poll(WorldRef)}; the queue refills asynchronously below a threshold and is DB-backed
  * so it survives a restart. Two serving paths share the queue: the background path ({@code /rtp}) and
  * the urgent path (respawn / first-join), which serves from the queue and, when it is momentarily drained,

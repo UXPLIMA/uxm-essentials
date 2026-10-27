@@ -13,8 +13,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The itemworld context's full command surface (docs/10-feature-modules.md §15.10, docs/permissions.md
- * §Itemworld) as platform-neutral {@link CommandSpec}s, the authoritative {@code literal → permission node →
+ * The itemworld context's full command surface as platform-neutral {@link CommandSpec}s, the authoritative {@code literal → permission node →
  * sub-feature group} table the inbound adapter realises into Brigadier nodes on the next {@code COMMANDS}
  * fire. Collected here so the command/permission/group pairing is one greppable table that matches {@code
  * paper-plugin.yml} and the permissions reference, and so the module can resolve a command's owning group for

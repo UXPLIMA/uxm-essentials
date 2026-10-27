@@ -13,8 +13,7 @@ import org.jspecify.annotations.NullMarked;
  * repository while the writer and telemetry loops are armed on start and drained on stop.
  *
  * <p>The repository is the seam the {@code NativeEconomyProvider} reads and writes through; the writer and
- * telemetry are the persistence-side optimisations below the port that no consumer sees ({@code
- * docs/11-economy-integration.md} §10).
+ * telemetry are the persistence-side optimisations below the port that no consumer sees.
  *
  * @param repository the cached jOOQ wallet repository the native provider binds to
  * @param writer the debounced/coalesced settle queue (idempotent last-value-wins path only)

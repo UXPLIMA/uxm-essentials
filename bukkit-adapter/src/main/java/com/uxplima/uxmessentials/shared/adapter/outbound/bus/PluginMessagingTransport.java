@@ -31,9 +31,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <h2>Degradation</h2>
  * Plugin messages ride a player connection, so a frame can only leave once a player is online to carry it.
- * With no proxy, no peers, or no online players the buffered frames simply never drain and the bus is a no-op
- *, the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
- * nothing about the single-server happy path depends on the transport ({@code docs/02-concurrency.md}).
+ * With no proxy, no peers, or no online players the buffered frames simply never drain and the bus is a no-op,
+ * the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
+ * nothing about the single-server happy path depends on the transport.
  */
 @NullMarked
 public final class PluginMessagingTransport implements PluginMessageListener, BusTransport {

@@ -33,7 +33,7 @@ import org.jspecify.annotations.Nullable;
  * and reap any seat regardless of which run spawned it.
  *
  * <p>All entity work hops through the {@link Scheduler} so the seat and its rider stay on one region thread under
- * Folia (docs/02-concurrency): a seat is spawned and mounted on the region that owns its position (the caller
+ * Folia: a seat is spawned and mounted on the region that owns its position (the caller
  * seats a player at a block within reach, so the rider is in that region too), and removed there. The live index
  * keyed by handle id carries each seat's position, filled in synchronously at spawn time so a mount scheduled
  * immediately after resolves the right region even before the spawn task has run.

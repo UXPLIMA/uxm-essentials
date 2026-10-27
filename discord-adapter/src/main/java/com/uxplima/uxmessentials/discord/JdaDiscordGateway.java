@@ -15,7 +15,7 @@ import net.dv8tion.jda.api.utils.cache.CacheFlag;
 /**
  * The JDA-backed {@link DiscordGateway}. Builds a light JDA client (no member chunking, no voice) with only
  * the {@code GUILD_MESSAGES} intent needed to post text, and disables every cache flag a send-only bridge
- * does not use. opus-java is excluded at the build level (docs/04-build.md §7.5), so the voice codec is never
+ * does not use. opus-java is excluded at the build level, so the voice codec is never
  * on the classpath.
  *
  * <h2>Threading</h2>

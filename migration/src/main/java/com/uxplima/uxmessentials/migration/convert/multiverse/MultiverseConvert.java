@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Multiverse-Core {@link Convert}, the world-registry importer (docs/12-migration). Multiverse keeps its whole
+ * The Multiverse-Core {@link Convert}, the world-registry importer. Multiverse keeps its whole
  * registry in one {@code plugins/Multiverse-Core/worlds.yml}, so, like the file-backed hologram and Athelion sources,
  * it carries its own fixed data-file location instead of the shared {@code import.source-path}.
  *

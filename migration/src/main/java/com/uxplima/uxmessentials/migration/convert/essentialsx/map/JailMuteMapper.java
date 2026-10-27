@@ -17,8 +17,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates a parsed EssentialsX moderation block into a domain {@link ModerationProfile}
- * (docs/12-migration §2, §5.1). Pure ACL: no Bukkit, no YAML, no I/O. A {@code muted} flag maps to a
+ * Translates a parsed EssentialsX moderation block into a domain {@link ModerationProfile}.
+ * Pure ACL: no Bukkit, no YAML, no I/O. A {@code muted} flag maps to a
  * {@link MuteState} (permanent when no expiry, timed otherwise); a {@code jailed} flag with a named jail
  * maps to a {@link JailState} (permanent, wall-clock timed, or online-only timed, mirroring how
  * EssentialsX ran the sentence).

@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The DecentHolograms source's lazy {@link ImportPlan}. It streams every {@code <name>.yml} under the
  * plugin's {@code holograms/} directory, parsing and mapping each on demand as the importer's bounded
- * executor drains it (docs/12-migration §7). A malformed or world-less file is dropped from the stream
+ * executor drains it. A malformed or world-less file is dropped from the stream
  * (counted as skipped downstream), so one bad hologram file never aborts the run (§4).
  */
 @NullMarked
@@ -45,7 +45,7 @@ final class DecentHologramsPlan implements ImportPlan {
             }
             return mapper.map(parsed).<ImportRecord>map(ImportRecord.HologramRecord::new).stream();
         } catch (IOException | RuntimeException badFile) {
-            // One unreadable hologram file is skipped, never fatal (docs/12-migration §4).
+            // One unreadable hologram file is skipped, never fatal.
             return Stream.empty();
         }
     }
@@ -55,7 +55,7 @@ final class DecentHologramsPlan implements ImportPlan {
             return Stream.empty();
         }
         // Collect the listing eagerly inside try-with-resources so the directory handle is released at once;
-        // the expensive per-file parse still happens lazily as the stream is drained (docs/12-migration §7).
+        // the expensive per-file parse still happens lazily as the stream is drained.
         try (Stream<Path> listing = Files.list(dir)) {
             return listing.filter(p -> p.getFileName().toString().endsWith(".yml")).toList().stream();
         } catch (IOException unreadableDir) {
