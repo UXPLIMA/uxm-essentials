@@ -583,7 +583,7 @@ public final class AnnouncementEditorView {
                 Material.PAPER,
                 Material.LIME_DYE,
                 Material.ARROW,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     private static String channels(StoredAnnouncement announcement) {

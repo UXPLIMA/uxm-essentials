@@ -118,7 +118,7 @@ class EntityCountGoldenTest {
         baseline.put(0, new Snapshot(Material.ZOMBIE_SPAWN_EGG, entryName));
         baseline.put(1, new Snapshot(Material.COW_SPAWN_EGG, entryName));
         for (int slot = 45; slot < 54; slot++) {
-            baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
+            baseline.put(slot, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, ""));
         }
         baseline.put(48, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.prev"));
         baseline.put(50, new Snapshot(Material.ARROW, "itemworld.entitycount.gui.next"));

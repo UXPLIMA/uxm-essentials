@@ -66,7 +66,7 @@ import org.jspecify.annotations.NullMarked;
 public final class RegionFlagEditorView {
 
     /** The filler and glass materials the choice picker paints its background with. */
-    private static final Material PICKER_FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material PICKER_FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     /** The stable input-point key the operator flips between anvil and chat for the string/number flag prompt. */
     private static final String INPUT_KEY = "regions.flag-value";

@@ -86,7 +86,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
 class PwarpManageMenuTest {
 
     private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-07-10T12:00:00Z"), ZoneOffset.UTC);
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     // The manage panel's fixed button slots, matching pwarp-manage.conf.
     private static final int INFO_SLOT = 4;

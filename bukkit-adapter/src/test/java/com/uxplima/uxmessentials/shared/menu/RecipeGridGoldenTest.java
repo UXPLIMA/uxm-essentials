@@ -101,19 +101,19 @@ class RecipeGridGoldenTest {
     private static Map<Integer, Snapshot> gridBaseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         for (int slot = 0; slot < 27; slot++) {
-            baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
+            baseline.put(slot, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, ""));
         }
         String emptyName = "itemworld.recipe.gui.empty-name";
         // The 3x3 grid cells at slots {0,1,2,9,10,11,18,19,20}: planks at 0 and 2, the rest empty-slot panes.
         baseline.put(0, new Snapshot(Material.OAK_PLANKS, ""));
         baseline.put(2, new Snapshot(Material.OAK_PLANKS, ""));
-        baseline.put(1, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(9, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(10, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(11, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(18, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(19, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
-        baseline.put(20, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, emptyName));
+        baseline.put(1, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(9, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(10, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(11, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(18, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(19, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
+        baseline.put(20, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, emptyName));
         baseline.put(15, new Snapshot(Material.OAK_BOAT, "itemworld.recipe.gui.result-name"));
         return baseline;
     }
@@ -139,7 +139,7 @@ class RecipeGridGoldenTest {
                 renderer, bindings.actions(), bindings.conditions(), EngineScheduler.of(scheduler), plugin);
         server.getPluginManager().registerEvents(listener, plugin);
         Menus menus = new Menus(renderer, EngineScheduler.of(scheduler), bindings.lists());
-        RecipeGridMenu menu = new RecipeGridMenu(menus, messages, Material.BLACK_STAINED_GLASS_PANE);
+        RecipeGridMenu menu = new RecipeGridMenu(menus, messages, Material.GRAY_STAINED_GLASS_PANE);
         menu.register(bindings, specDir(), new NoopLogger());
         return menu;
     }

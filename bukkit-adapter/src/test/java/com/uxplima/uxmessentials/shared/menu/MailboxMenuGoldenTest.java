@@ -70,7 +70,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class MailboxMenuGoldenTest {
 
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private static final int DETAIL_ICON_SLOT = 13;
     private static final int DETAIL_BACK_SLOT = 22;

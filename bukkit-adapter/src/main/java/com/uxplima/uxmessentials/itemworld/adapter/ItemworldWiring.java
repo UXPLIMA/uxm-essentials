@@ -98,7 +98,7 @@ public final class ItemworldWiring {
         hubView.register(menuBindings, dataFolder, kernel.log());
         EntityCountMenu entityCountView = new EntityCountMenu(menus);
         entityCountView.register(menuBindings, dataFolder, kernel.log());
-        RecipeGridMenu recipeView = new RecipeGridMenu(menus, kernel.messages(), Material.BLACK_STAINED_GLASS_PANE);
+        RecipeGridMenu recipeView = new RecipeGridMenu(menus, kernel.messages(), Material.GRAY_STAINED_GLASS_PANE);
         recipeView.register(menuBindings, dataFolder, kernel.log());
         // The click-driven /itemedit editor: a bare /itemedit opens it on the held item, editing through the same
         // shared item-edit path the /itemedit subcommands use. Registers its preview placeholders and per-button

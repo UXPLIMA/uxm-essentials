@@ -135,6 +135,6 @@ public final class ModerationGuiViews {
                 java.util.OptionalInt.of(26),
                 Material.ARROW,
                 Material.LAVA_BUCKET,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 }

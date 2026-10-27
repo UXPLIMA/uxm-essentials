@@ -126,7 +126,7 @@ class RegionRosterViewTest {
         Inventory reopened = staff.getOpenInventory().getTopInventory();
         assertThat(reopened.getItem(0).getType()).isEqualTo(Material.GOLDEN_HELMET);
         assertThat(reopened.getItem(1).getType()).isEqualTo(Material.OAK_SIGN);
-        assertThat(reopened.getItem(2).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(reopened.getItem(2).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test

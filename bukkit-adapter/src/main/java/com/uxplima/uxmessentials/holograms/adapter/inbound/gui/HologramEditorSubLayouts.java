@@ -64,9 +64,9 @@ public record HologramEditorSubLayouts(
                 Material.PAPER,
                 Material.LIME_DYE,
                 Material.ARROW,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
         return new HologramEditorSubLayouts(
-                list, 3, List.of(10, 11, 12, 13, 14, 15, 16), Material.PAPER, Material.BLACK_STAINED_GLASS_PANE);
+                list, 3, List.of(10, 11, 12, 13, 14, 15, 16), Material.PAPER, Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /**

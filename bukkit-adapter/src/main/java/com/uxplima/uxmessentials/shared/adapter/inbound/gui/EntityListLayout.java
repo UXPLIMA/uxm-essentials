@@ -82,7 +82,7 @@ public record EntityListLayout(
     public static EntityListLayout paginatedDefault(Material fallbackIcon) {
         return new EntityListLayout(
                 GuiLayout.paginatedDefault(fallbackIcon),
-                Material.BLACK_STAINED_GLASS_PANE,
+                Material.GRAY_STAINED_GLASS_PANE,
                 OptionalInt.empty(),
                 Material.LIME_DYE);
     }
@@ -91,7 +91,7 @@ public record EntityListLayout(
     public static EntityListLayout withCreate(Material fallbackIcon, int createSlot, Material createIcon) {
         return new EntityListLayout(
                 GuiLayout.paginatedDefault(fallbackIcon),
-                Material.BLACK_STAINED_GLASS_PANE,
+                Material.GRAY_STAINED_GLASS_PANE,
                 OptionalInt.of(createSlot),
                 createIcon);
     }

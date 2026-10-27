@@ -237,10 +237,10 @@ class PwarpBrowseMenuTest {
         browse.seed(List.of());
         Inventory inv = open();
 
-        // The centred placeholder is the only content tile; the rest of the grid shows the dark backdrop under it.
+        // The centred placeholder is the only content tile; the rest of the grid shows the grey backdrop under it.
         assertThat(inv.getItem(22).getType()).isEqualTo(Material.BARRIER);
         assertThat(filledContentSlots(inv)).isEqualTo(1);
-        assertThat(inv.getItem(0).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(0).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -374,12 +374,12 @@ class PwarpBrowseMenuTest {
         server.getPluginManager().callEvent(event);
     }
 
-    /** The grid cells that hold a tile, rather than the dark backdrop a cell with no warp shows. */
+    /** The grid cells that hold a tile, rather than the grey backdrop a cell with no warp shows. */
     private static int filledContentSlots(Inventory inv) {
         int filled = 0;
         for (int slot = 0; slot < PAGE_SIZE; slot++) {
             ItemStack item = inv.getItem(slot);
-            if (item != null && !item.getType().isAir() && item.getType() != Material.BLACK_STAINED_GLASS_PANE) {
+            if (item != null && !item.getType().isAir() && item.getType() != Material.GRAY_STAINED_GLASS_PANE) {
                 filled++;
             }
         }

@@ -68,7 +68,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class MessagingSettingsGoldenTest {
 
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
     private static final List<Integer> SLOTS = List.of(11, 15);
     private static final int ACCEPT_SLOT = SLOTS.get(0);
     private static final int SOCIALSPY_SLOT = SLOTS.get(1);

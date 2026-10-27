@@ -146,8 +146,8 @@ class ItemworldHubGoldenTest {
         openEngine(new DenyAllPermissions());
 
         Inventory inv = player.getOpenInventory().getTopInventory();
-        assertThat(inv.getItem(TIME_NIGHT_SLOT).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
-        assertThat(inv.getItem(ENDERCHEST_SLOT).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(TIME_NIGHT_SLOT).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(ENDERCHEST_SLOT).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
         // The back button is never gated, so it is still drawn.
         assertThat(inv.getItem(22).getType()).isEqualTo(Material.ARROW);
     }
@@ -163,7 +163,7 @@ class ItemworldHubGoldenTest {
     private static Map<Integer, Snapshot> baseline() {
         Map<Integer, Snapshot> baseline = new LinkedHashMap<>();
         for (int slot = 0; slot < 27; slot++) {
-            baseline.put(slot, new Snapshot(Material.BLACK_STAINED_GLASS_PANE, ""));
+            baseline.put(slot, new Snapshot(Material.GRAY_STAINED_GLASS_PANE, ""));
         }
         String station = "itemworld.gui.hub.workstation";
         baseline.put(0, new Snapshot(Material.CRAFTING_TABLE, station));

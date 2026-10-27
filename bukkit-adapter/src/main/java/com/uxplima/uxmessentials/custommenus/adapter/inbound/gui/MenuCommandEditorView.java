@@ -311,7 +311,7 @@ public final class MenuCommandEditorView {
                 OptionalInt.empty(),
                 Material.ARROW,
                 Material.BARRIER,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     private static ListPropertyLayout defaultAliasLayout() {
@@ -323,7 +323,7 @@ public final class MenuCommandEditorView {
                 Material.PAPER,
                 Material.LIME_DYE,
                 Material.ARROW,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /** The subject a command-editor open carries: the menu's working copy and the id of the menu being edited. */

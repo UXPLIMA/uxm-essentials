@@ -71,7 +71,7 @@ import org.mockbukkit.mockbukkit.entity.PlayerMock;
  */
 class IgnoreMenuGoldenTest {
 
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     @TempDir
     Path dataFolder;

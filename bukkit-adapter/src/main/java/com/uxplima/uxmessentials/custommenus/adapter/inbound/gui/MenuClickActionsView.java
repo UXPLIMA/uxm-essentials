@@ -41,7 +41,7 @@ public final class MenuClickActionsView {
 
     private static final Material GESTURE_ICON = Material.LEVER;
     private static final Material BACK_ICON = Material.ARROW;
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;
     private final MenuRefListEditor refList;

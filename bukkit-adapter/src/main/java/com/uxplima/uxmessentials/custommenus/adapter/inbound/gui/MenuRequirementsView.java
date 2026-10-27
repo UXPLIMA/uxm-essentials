@@ -189,7 +189,7 @@ public final class MenuRequirementsView {
                 OptionalInt.empty(),
                 Material.ARROW,
                 Material.BARRIER,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /** The subject a requirement-editor open carries: the working copy and the id of the item being gated. */

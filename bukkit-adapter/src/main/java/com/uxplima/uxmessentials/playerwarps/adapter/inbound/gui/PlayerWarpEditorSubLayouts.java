@@ -49,7 +49,7 @@ public record PlayerWarpEditorSubLayouts(
     /** The built-in geometry used when no conf is present or a key is missing. */
     public static PlayerWarpEditorSubLayouts codeDefault() {
         return new PlayerWarpEditorSubLayouts(
-                3, List.of(11, 12, 13, 14, 15), Material.PAPER, Material.BLACK_STAINED_GLASS_PANE);
+                3, List.of(11, 12, 13, 14, 15), Material.PAPER, Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /**

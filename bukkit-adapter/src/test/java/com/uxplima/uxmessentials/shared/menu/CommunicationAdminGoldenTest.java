@@ -78,7 +78,7 @@ class CommunicationAdminGoldenTest {
     private static final int CLEARCHAT_SLOT = BUTTON_SLOTS.get(1);
     private static final int ANNOUNCER_SLOT = BUTTON_SLOTS.get(3);
     private static final int CONFIRM_SLOT = 11; // uxmLib ConfirmMenu confirm button
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     @TempDir
     Path dir;

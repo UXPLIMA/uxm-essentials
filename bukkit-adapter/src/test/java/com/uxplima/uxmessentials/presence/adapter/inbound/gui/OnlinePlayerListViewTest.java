@@ -76,7 +76,7 @@ class OnlinePlayerListViewTest {
         assertThat(inv.getItem(0).getType()).isEqualTo(Material.PLAYER_HEAD);
         assertThat(inv.getItem(1).getType()).isEqualTo(Material.PLAYER_HEAD);
         // The third content slot has no entry, so the filler shows through rather than a head.
-        assertThat(inv.getItem(2).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(2).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test

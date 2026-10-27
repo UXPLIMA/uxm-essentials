@@ -217,7 +217,7 @@ class PwarpViewMenuTest {
         Inventory inv = openView(warp(viewer, WarpAccess.PUBLIC)); // the viewer owns this warp
 
         // Owner-can't-rate: the rate cell is not drawn, so the backdrop shows through its slot instead.
-        assertThat(inv.getItem(15).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(15).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test
@@ -232,7 +232,7 @@ class PwarpViewMenuTest {
         // The viewer neither owns nor holds a role on this warp (members.roleOf is stubbed empty in setUp).
         Inventory inv = openView(warp(otherOwner, WarpAccess.PUBLIC));
 
-        assertThat(inv.getItem(16).getType()).isEqualTo(Material.BLACK_STAINED_GLASS_PANE);
+        assertThat(inv.getItem(16).getType()).isEqualTo(Material.GRAY_STAINED_GLASS_PANE);
     }
 
     @Test

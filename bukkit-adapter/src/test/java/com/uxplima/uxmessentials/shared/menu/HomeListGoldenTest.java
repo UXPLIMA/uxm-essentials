@@ -224,7 +224,7 @@ class HomeListGoldenTest {
         Map<Integer, Snapshot> out = new LinkedHashMap<>();
         for (int slot = 0; slot < inv.getSize(); slot++) {
             ItemStack item = inv.getItem(slot);
-            if (item == null || item.getType() == Material.BLACK_STAINED_GLASS_PANE) {
+            if (item == null || item.getType() == Material.GRAY_STAINED_GLASS_PANE) {
                 continue;
             }
             out.put(slot, new Snapshot(item.getType(), plainName(item)));

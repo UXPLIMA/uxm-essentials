@@ -90,7 +90,7 @@ public final class MenuPropertiesView {
     private static final int SELECTOR_ROWS = 3;
     private static final List<Integer> SELECTOR_SLOTS = List.of(11, 12, 13, 14, 15);
     private static final Material SELECTOR_OPTION_ICON = Material.PAPER;
-    private static final Material SELECTOR_FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material SELECTOR_FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;
     private final Scheduler scheduler;
@@ -553,7 +553,7 @@ public final class MenuPropertiesView {
                 OptionalInt.of(DELETE_SLOT),
                 Material.ARROW,
                 Material.BARRIER,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /**

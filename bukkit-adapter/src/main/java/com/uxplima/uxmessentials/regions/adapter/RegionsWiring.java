@@ -210,7 +210,7 @@ public final class RegionsWiring {
     private static EntityListLayout listLayout(int pageSize) {
         List<Integer> content = IntStream.range(0, pageSize).boxed().toList();
         GuiLayout base = new GuiLayout(LIST_ROWS, REGION_ICON, Material.ARROW, PREV_SLOT, NEXT_SLOT, content);
-        return new EntityListLayout(base, Material.BLACK_STAINED_GLASS_PANE, OptionalInt.empty(), REGION_ICON);
+        return new EntityListLayout(base, Material.GRAY_STAINED_GLASS_PANE, OptionalInt.empty(), REGION_ICON);
     }
 
     /**

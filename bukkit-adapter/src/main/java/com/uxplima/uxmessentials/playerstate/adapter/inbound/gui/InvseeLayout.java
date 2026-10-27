@@ -8,8 +8,6 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
-import net.kyori.adventure.text.Component;
-
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -51,10 +49,10 @@ final class InvseeLayout {
         return slot >= 0 && slot <= OFFHAND_SLOT;
     }
 
-    /** The gray-glass filler with no name, used to pad the slots that map to nothing on the target. */
+    /** The house filler, used to pad the slots that map to nothing on the target. */
     static ItemStack filler() {
         return ItemBuilder.of(Material.GRAY_STAINED_GLASS_PANE)
-                .name(Component.empty())
+                .hideTooltip(true)
                 .build();
     }
 

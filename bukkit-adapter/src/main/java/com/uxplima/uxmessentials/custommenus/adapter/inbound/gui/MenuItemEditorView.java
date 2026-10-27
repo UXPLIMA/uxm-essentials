@@ -530,7 +530,7 @@ public final class MenuItemEditorView {
     private static final int SELECTOR_ROWS = 3;
     private static final List<Integer> SELECTOR_SLOTS = List.of(10, 11, 12, 13, 14, 15, 16);
     private static final Material SELECTOR_OPTION_ICON = Material.PAPER;
-    private static final Material SELECTOR_FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material SELECTOR_FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private static EntityEditorLayout codeDefault() {
         return new EntityEditorLayout(
@@ -540,7 +540,7 @@ public final class MenuItemEditorView {
                 OptionalInt.empty(),
                 Material.ARROW,
                 Material.BARRIER,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     private static ListPropertyLayout defaultLoreLayout() {
@@ -552,7 +552,7 @@ public final class MenuItemEditorView {
                 Material.PAPER,
                 Material.LIME_DYE,
                 Material.ARROW,
-                Material.BLACK_STAINED_GLASS_PANE);
+                Material.GRAY_STAINED_GLASS_PANE);
     }
 
     /** The subject an editor open carries: the grid's working copy and the id of the item being edited within it. */

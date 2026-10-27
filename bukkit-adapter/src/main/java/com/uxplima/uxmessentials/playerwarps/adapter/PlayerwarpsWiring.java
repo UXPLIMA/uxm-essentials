@@ -743,7 +743,7 @@ public final class PlayerwarpsWiring {
                 java.util.OptionalInt.of(53),
                 org.bukkit.Material.ARROW,
                 org.bukkit.Material.BARRIER,
-                org.bukkit.Material.BLACK_STAINED_GLASS_PANE);
+                org.bukkit.Material.GRAY_STAINED_GLASS_PANE);
     }
 
     private static PlayerWarpServices assemble(

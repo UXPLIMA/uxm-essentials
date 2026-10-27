@@ -48,7 +48,7 @@ public final class MenuRefListEditor {
     private static final Material ENTRY_ICON = Material.PAPER;
     private static final Material ADD_ICON = Material.LIME_DYE;
     private static final Material BACK_ICON = Material.ARROW;
-    private static final Material FILLER = Material.BLACK_STAINED_GLASS_PANE;
+    private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;
     private final Scheduler scheduler;
