@@ -35,7 +35,7 @@ import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /lang}, a player's own language (docs/13-i18n §7). Cross-cutting rather than owned by a feature
+ * {@code /lang}, a player's own language. Cross-cutting rather than owned by a feature
  * context, so it lives in the bootstrap command surface alongside {@code /uxmess}. Permission node
  * {@code uxmessentials.lang.use} (default true), and {@code uxmessentials.lang.others} (op) for the two
  * branches that act on someone else.

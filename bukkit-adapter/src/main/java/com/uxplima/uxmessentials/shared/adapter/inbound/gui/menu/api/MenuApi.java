@@ -61,8 +61,8 @@ public interface MenuApi {
     /**
      * Register a custom action under {@code id}. A menu spec fires it by naming the id in a click gesture's action
      * list ({@code left { click = ["my-award"] } }) or in a menu's open/close actions; an {@code id:value} form
-     * arrives on the handler as {@link MenuActionContext#arg()}. This is also how a custom clickable button is added
-     *: a button is just a menu item whose click runs a registered action.
+     * arrives on the handler as {@link MenuActionContext#arg()}. This is also how a custom clickable button is added:
+     * a button is just a menu item whose click runs a registered action.
      *
      * @throws IllegalStateException if an action is already registered under {@code id}
      */

@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 
 /**
  * The aggregate root over one player's balances, a {@link Money} <strong>per {@link Currency}</strong>,
- * never one scalar (the economy GLOSSARY, {@code docs/11-economy-integration.md} §6.1). It owns the
+ * never one scalar. It owns the
  * invariants nothing else in the plugin enforces: a balance never drops below the currency's minimum (a
  * debit short of funds is rejected, not clamped), never rises above its maximum (a credit that would breach
  * it is rejected, not clamped), and currency arithmetic never crosses currencies. Every mutation is a pure

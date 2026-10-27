@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates a parsed EssentialsX userdata record into domain aggregates (docs/12-migration §2). Pure
+ * Translates a parsed EssentialsX userdata record into domain aggregates. Pure
  * ACL: no Bukkit, no YAML, no I/O: those stay in {@code parse/}. It maps homes whose world the server
  * knows into {@link Home} value objects (a home in an unknown world is dropped, not fatal), and carries
  * the raw balance and mail forward for the writer to seed a wallet and mailbox with.

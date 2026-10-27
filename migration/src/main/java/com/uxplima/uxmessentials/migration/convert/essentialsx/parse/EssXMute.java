@@ -10,7 +10,7 @@ import org.jspecify.annotations.NullMarked;
  * optional expiry epoch-millis ({@code timestamps.mute}, or the legacy top-level {@code muteTimeout}).
  * EssentialsX stores a permanent mute as {@code muted: true} with no expiry (or an expiry of {@code 0});
  * a timed mute carries a future epoch-millis. This is foreign detail. The mapper turns it into a
- * {@code MuteState} (docs/12-migration §5.1). An expiry already in the past is still carried as-is; the
+ * {@code MuteState}. An expiry already in the past is still carried as-is; the
  * mapper decides what to do with a lapsed mute.
  *
  * @param reason the free-text mute reason, empty when EssentialsX stored none

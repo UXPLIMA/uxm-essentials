@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Bounded, batched, backpressured import pool (docs/12-migration §7, docs/02-concurrency §6.10). It owns
+ * Bounded, batched, backpressured import pool. It owns
  * a fixed-size <em>platform</em>-thread pool. The deliberate exception to the project's prefer-virtual-
  * threads default, because the goal is to cap DB write pressure, not maximise parallelism. The bounded
  * queue plus {@link ThreadPoolExecutor.CallerRunsPolicy} makes the producer stall when the writers lag,
@@ -17,8 +17,7 @@ import org.jspecify.annotations.NullMarked;
  * import start and closed on finish and on module stop.
  *
  * <p>This pool never touches a region or tick thread, and it is the only place the importer spawns work:
- * no {@code new Thread(...)}, no {@code CompletableFuture.supplyAsync(...)}, no {@code BukkitRunnable}
- * ({@code ForbiddenConcurrencyApiDriftTest}).
+ * no {@code new Thread(...)}, no {@code CompletableFuture.supplyAsync(...)}, no {@code BukkitRunnable}.
  */
 @NullMarked
 public final class ImportExecutor implements AutoCloseable {

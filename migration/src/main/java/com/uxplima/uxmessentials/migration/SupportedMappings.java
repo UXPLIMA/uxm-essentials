@@ -17,7 +17,7 @@ import com.uxplima.uxmessentials.migration.convert.olzie.OlziePlayerWarpsMapping
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Aggregates every <em>built</em> source's per-source mapping table (docs/12-migration §5). It is the
+ * Aggregates every <em>built</em> source's per-source mapping table. It is the
  * single greppable answer to "what does the importer claim to migrate?", scoped by source. The built
  * sources are EssentialsX (a full on-disk source), the live economy sources Vault and PlayerPoints
  * (balance only), LiteBans (a JDBC source for bans/ip-bans/mutes/warns), the two hologram sources

@@ -10,7 +10,7 @@ import java.util.Optional;
  *
  * <p>The domain does not know Bukkit {@code Enchantment}. It normalises the id to the canonical lowercase
  * {@code namespace:path} shape and the adapter resolves it. The level is clamped at the boundary: an operator
- * sets a {@code max-enchant-level} in {@code itemworld.conf} (docs/09-deployment.md §itemworld.conf) so an
+ * sets a {@code max-enchant-level} in {@code itemworld.conf} so an
  * over-vanilla level like {@code sharpness 32767} is bounded rather than handed to the registry verbatim.
  * Whether the clamp engaged is reported, so the actor can be told the level was reduced
  * ({@link ItemworldMessageKey#ENCHANT_LEVEL_CLAMPED}).

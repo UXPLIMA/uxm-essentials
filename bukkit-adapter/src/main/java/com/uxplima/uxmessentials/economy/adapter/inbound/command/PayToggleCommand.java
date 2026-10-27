@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /paytoggle}: flip the player's persisted accept-pay flag and report its new state. When off, any
  * inbound {@code /pay} resolves {@code TransferError.TARGET_DISABLED} before the debit leg runs, so the payer
- * is never charged for a transfer the target refuses ({@code docs/11-economy-integration.md} §9.1). The flag
+ * is never charged for a transfer the target refuses. The flag
  * write is a queryable key-value row behind the {@code PayPreferences} port; the toggle runs off the tick
  * thread.
  */

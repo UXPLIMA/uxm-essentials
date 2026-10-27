@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The per-player tablist render loop (docs/02-concurrency.md §6.10, matching the scoreboard render timer). The
+ * The per-player tablist render loop. The
  * shared {@link AbstractHudRenderTask} owns the self-rescheduling loop, the global animation-clock advance and the
  * per-player entity-thread fan-out; this class supplies only the tablist render call through the
  * {@link TablistRenderer}.

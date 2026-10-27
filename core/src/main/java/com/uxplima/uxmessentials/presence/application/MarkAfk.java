@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * The AFK transition use case, covering both entry points (docs/10-feature-modules.md §15.8): the manual
+ * The AFK transition use case, covering both entry points: the manual
  * {@code /afk [reason]} toggle a player runs, and the automatic flip the idle sweep performs when a player has
  * been idle past the threshold. Both route through the {@link PresenceStore}'s atomic {@code compute} so the
  * sync activity listeners and the async sweep never lose an update, publish the matching {@link WentAfk} /

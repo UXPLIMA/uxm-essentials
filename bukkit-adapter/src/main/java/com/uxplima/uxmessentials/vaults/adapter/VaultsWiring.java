@@ -49,14 +49,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * Constructs the vaults context's adapters and use cases over the injected kernel ports and the persistence
  * DSL, and produces everything the plugin must register: the Brigadier {@code /vault} command, with the vault
- * windows themselves handled by uxmLib's {@code StorageGui}. This is the one place the vaults context is wired
- *: nothing else news up its classes.
+ * windows themselves handled by uxmLib's {@code StorageGui}. This is the one place the vaults context is wired:
+ * nothing else news up its classes.
  *
  * <p>The repository is the cached jOOQ adapter over {@code persistence.dsl()} (write-through at the database,
  * invalidate in the Caffeine cache); the two numbered-quota families resolve through the shared
  * {@code Permissions} reducer with the {@code vaults.conf} defaults; the audit trail goes to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel (not the plugin log), so an operator routes it to a retained
- * file per docs/09-deployment. The GUI rides uxmLib's menu framework: the plugin bootstrap installs the one
+ * file The GUI rides uxmLib's menu framework: the plugin bootstrap installs the one
  * shared menu listener and {@link VaultView} opens a {@code StorageGui} sized to the resolved quota that
  * writes the vault through on close.
  *

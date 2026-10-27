@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.teleport.domain.BiomeName;
 import com.uxplima.uxmessentials.teleport.domain.RtpColumn;
 
 /**
- * Outbound port over the durable random-teleport pool (ADR 0010, the {@code rtp_pool} table). It is the
+ * Outbound port over the durable random-teleport pool (the {@code rtp_pool} table). It is the
  * restart-surviving mirror of the in-memory {@code SafeLocationQueue}: the refill persists each validated
  * column here, and on enable the module loads a bounded set per world and re-probes them to warm the queue
  * before the first {@code /rtp}. Serving itself never touches this store. The queue is polled O(1); the

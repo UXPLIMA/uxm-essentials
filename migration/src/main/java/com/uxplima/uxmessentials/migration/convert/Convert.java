@@ -7,8 +7,7 @@ import com.uxplima.uxmessentials.migration.ImportPlan;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * A single legacy data source the importer can read from, the multi-source port (docs/12-migration
- * §1.1). One implementation per legacy plugin: EssentialsX ships first; CMI, HuskHomes, PlayerVaultX,
+ * A single legacy data source the importer can read from, the multi-source port. One implementation per legacy plugin: EssentialsX ships first; CMI, HuskHomes, PlayerVaultX,
  * CoinsEngine, SunLight, and AxVault are planned, each a future {@code Convert} impl behind this same
  * interface.
  *

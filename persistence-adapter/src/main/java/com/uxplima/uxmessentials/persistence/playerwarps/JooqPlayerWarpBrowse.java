@@ -39,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
  * instead issues one bounded query pair per page: a projection of only the card columns filtered, sorted, and
  * {@code LIMIT}/{@code OFFSET}-windowed, plus a {@code COUNT} over the same predicate for the total. It never loads
  * an aggregate and never reads the whole table, so a page over a hundred thousand warps costs the same as one over
- * eight: the guard {@code PlayerWarpBrowseIsPagedDriftTest} freezes that in.
+ * eight.
  *
  * <p>Correctness notes. Every sort appends a stable {@code id ASC} tiebreaker so paging is deterministic across
  * reads. {@code viewerFavourited} comes from a {@code LEFT JOIN} on {@code player_warp_favourites} scoped to the

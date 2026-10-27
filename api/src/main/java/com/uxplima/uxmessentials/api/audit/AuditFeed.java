@@ -7,7 +7,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Every line the host writes on its {@code com.uxplima.uxmessentials.audit} channel, handed to whoever subscribes.
  * The host registers one through Bukkit's {@code ServicesManager}. The optional Discord bridge looks it up and mirrors
- * what it hears (docs/09-deployment.md Path C and the audit logging section).
+ * what it hears.
  *
  * <p>This contract lives in {@code :api} because a service two jars share must be one class to both of them. The
  * bridge declared its own source once, and no host could register a class it had never seen.

@@ -6,9 +6,9 @@ import java.util.Optional;
 /**
  * The immutable per-player state the playerstate context owns and reconciles with the live Bukkit player:
  * the god (damage-immunity) and fly toggles, an optional pinned game mode, and the walk/fly speeds. Held in a
- * {@code ConcurrentHashMap<UUID, PlayerStateSnapshot>} and only ever replaced wholesale through {@code compute}
- *. Every mutator here returns a new snapshot rather than changing this one, so a reader on another thread
- * always sees a coherent value (docs/02-concurrency §the playerstate snapshot pattern).
+ * {@code ConcurrentHashMap<UUID, PlayerStateSnapshot>} and only ever replaced wholesale through {@code compute}.
+ * Every mutator here returns a new snapshot rather than changing this one, so a reader on another thread
+ * always sees a coherent value.
  *
  * <p>Heal and feed are apply-once effects and leave no flag here. They act on the live player and are not
  * part of the persisted toggle state. The game mode is modelled as an {@link Optional} because most players

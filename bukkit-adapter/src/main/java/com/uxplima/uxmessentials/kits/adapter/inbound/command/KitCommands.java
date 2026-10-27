@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the kits context's Brigadier command surface (docs/10-feature-modules.md §15.5) as a single
+ * Builds the kits context's Brigadier command surface as a single
  * {@link CommandRegistration} over the constructed {@link KitServices}. Everything a player or operator does
  * with kits hangs off one {@code /kit} command: {@code <name>} claims a kit, while {@code list}, {@code show},
  * {@code create}, {@code del}, {@code editor} and {@code reset} are Brigadier literals each gated by its own

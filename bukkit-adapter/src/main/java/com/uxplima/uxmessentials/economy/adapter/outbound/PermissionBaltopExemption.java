@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The permission-driven {@link BaltopExemption} ({@code docs/11-economy-integration.md} §9.3): an owner is
+ * The permission-driven {@link BaltopExemption}: an owner is
  * excluded from every leaderboard when they hold the configured {@code economy.baltop.exempt-permission}
  * admin float accounts, NPC/shop banks, the server account. Because exemption is permission-based it survives
  * a UUID change and needs no per-account flag. The check runs where the per-currency snapshot is built, not

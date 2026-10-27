@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The anti-corruption layer between a live vault inventory's {@code ItemStack[]} and the domain's opaque
- * {@link VaultContents} payload. The architecture persistence invariant (docs/01-architecture.md) makes the
+ * {@link VaultContents} payload. The architecture persistence invariant makes the
  * {@code ItemStack[]} contents the one part of a vault that serializes; this codec is the only place the
  * vaults context touches an {@code ItemStack}, and the {@code :core} layer never sees one.
  *

@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * {@link VaultSize} in rows, an optional player-chosen display name and icon material name, and the
  * {@code lastTouched} instant: plus the opaque {@link VaultContents} the adapter (de)serialises. The aggregate
  * never sees a Bukkit {@code ItemStack}; it holds the already-serialized payload, which is the only part the
- * architecture invariant lets serialize (docs/01-architecture.md). The icon is a plain material <em>name</em>
+ * architecture invariant lets serialize. The icon is a plain material <em>name</em>
  * (e.g. {@code "ENDER_CHEST"}); the adapter resolves it to a real {@code Material} at the boundary, so the
  * domain stays Bukkit-free.
  *

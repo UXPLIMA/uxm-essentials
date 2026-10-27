@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The per-player {@code /unlimited} switch: who has unlimited block placement on. Default is off. When on, the
  * block-place refill listener tops the placed stack back up so the player never runs out, the standard
- * {@code /unlimited} behaviour (docs/10-feature-modules.md §15.10, mob/entity group).
+ * {@code /unlimited} behaviour.
  *
  * <p>State is transient in-memory runtime state: a concurrent set of the UUIDs that have toggled <em>on</em>,
  * keyed by player so the place listener's read is a hot-path-safe membership check. The module's {@code stop()}

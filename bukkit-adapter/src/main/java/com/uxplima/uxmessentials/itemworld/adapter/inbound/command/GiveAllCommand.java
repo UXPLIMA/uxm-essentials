@@ -31,8 +31,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /giveall <item> [amount]}: hand an item to every online player at once. The bulk sibling of
  * {@code /give}, gated on its own {@code uxmessentials.giveall.use} node so a network can grant the
- * server-wide handout independently of the per-target give (docs/permissions.md §Itemworld,
- * docs/10-feature-modules.md §15.10).
+ * server-wide handout independently of the per-target give.
  *
  * <p>Inputs are validated at the boundary exactly as {@code /give}: the item id parses to an {@link ItemQuery}
  * and resolves to an obtainable {@link Material} (else {@link ItemworldMessageKey#UNKNOWN_ITEM}); the amount

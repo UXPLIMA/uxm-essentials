@@ -31,8 +31,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The per-player panel opened by {@code /survival}: one row per survival mechanic that carries a personal toggle,
- * showing its current on/off state and flipping it on click. It lists only the mechanics the viewer can actually use
- *. A globally-disabled mechanic ({@code enabled = false} in the config) is hidden, and so is one the viewer lacks the
+ * showing its current on/off state and flipping it on click. It lists only the mechanics the viewer can actually use.
+ * A globally-disabled mechanic ({@code enabled = false} in the config) is hidden, and so is one the viewer lacks the
  * {@code .toggle} permission for, so the panel reflects exactly what that player is allowed to switch.
  *
  * <p>Each mechanic's toggle is a PDC stamp owned by the viewer's own region thread, so it is flipped from an

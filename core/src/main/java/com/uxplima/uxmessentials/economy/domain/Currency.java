@@ -172,7 +172,7 @@ public final class Currency {
     /**
      * The {@code CurrencyBackend} id that holds this currency's balances. {@code native}, the default, is the
      * plugin's own DB-backed ledger, the only backend with a guarded compare-and-take debit. Anything else names
-     * a foreign economy; see {@code docs/11-economy-integration.md}.
+     * a foreign economy;
      */
     public String backendId() {
         return backendId;

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code ConcurrentHashMap<UUID, PlayerStateSnapshot>} mutated only through {@code compute} /
  * {@code computeIfAbsent}. The map holds immutable snapshots, so a reader on any region thread observes a
  * coherent value, and a concurrent toggle never loses an update. {@code compute} re-applies the pure mutator
- * under contention (docs/02-concurrency §the playerstate snapshot pattern).
+ * under contention.
  *
  * <p>Nothing here is persisted. A snapshot is seeded on first read (or on join), replaced by the toggle/set
  * use cases, and dropped on quit; a player who has never interacted has no entry and reads the neutral initial

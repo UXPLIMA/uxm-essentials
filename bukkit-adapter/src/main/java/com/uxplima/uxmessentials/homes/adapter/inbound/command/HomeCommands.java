@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the homes context's Brigadier command surface (docs/10-feature-modules.md §15.1) as a single
+ * Builds the homes context's Brigadier command surface as a single
  * {@link CommandRegistration} over the constructed {@link HomeServices}. Everything a player does with homes
  * hangs off one {@code /home} command: the no-arg invocation opens the slot grid (the player's own homes;
  * {@code /sethome}, {@code /delhome}, {@code /renamehome}, {@code /movehome}, {@code /setmainhome} and

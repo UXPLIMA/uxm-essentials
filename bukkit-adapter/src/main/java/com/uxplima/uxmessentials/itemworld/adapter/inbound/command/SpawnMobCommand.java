@@ -41,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * {@code /spawnmob <type> [amount]}: spawn mobs at the actor's location. An abusable verb: the count is
  * validated against the configured {@code spawnmob-cap} in the domain {@link MobSpec} before any entity
- * materialises, and the spawn is audit-logged (docs/10-feature-modules.md §15.10). The mob type is validated at
+ * materialises, and the spawn is audit-logged. The mob type is validated at
  * the boundary: an unknown id replies {@link ItemworldMessageKey#SPAWNMOB_UNKNOWN}; an out-of-range count
  * replies {@link ItemworldMessageKey#AMOUNT_OUT_OF_RANGE}.
  *

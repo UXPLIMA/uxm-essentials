@@ -20,8 +20,8 @@ website: 'https://github.com/UXPLIMA/uxm-essentials'
 folia-supported: true
 
 # Optional integrations, the plugin runs fully without any of them. LuckPerms
-# backs the Permissions port (else the Bukkit-permission default impl, ADR 0005);
-# Vault/Treasury are consumed/registered by the EconomyProvider adapters (ADR 0004).
+# backs the Permissions port (else the Bukkit-permission default impl);
+# Vault/Treasury are consumed/registered by the EconomyProvider adapters.
 dependencies:
   server:
     LuckPerms:

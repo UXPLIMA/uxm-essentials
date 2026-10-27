@@ -116,7 +116,7 @@ import org.jspecify.annotations.NullMarked;
  * its classes.
  *
  * <p>The audit trail goes to the dedicated {@code com.uxplima.uxmessentials.audit} SLF4J channel (not the
- * plugin log), so an operator routes it to a retained file per docs/09-deployment. The two cross-context
+ * plugin log), so an operator routes it to a retained file The two cross-context
  * gates moderation <em>provides</em> are bound here onto the rebindable holders the messaging
  * ({@code MutableMutePolicy}) and teleport ({@code MutableJailGate}) contexts already hold: a muted player
  * stops being able to {@code /msg} and a jailed player stops being able to {@code /home}/{@code /tpa} the

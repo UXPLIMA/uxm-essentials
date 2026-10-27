@@ -19,7 +19,7 @@ import java.util.Optional;
  *
  * <p>The {@code originServer = "discord"} sentinel is honoured upstream by the host plugin's bus: anything the
  * bridge posts originates here and is never re-published onto the cluster bus, so a Discord-mirrored event
- * cannot loop back and be mirrored twice (docs/09-deployment.md Path C). The forwarder only reads host
+ * cannot loop back and be mirrored twice. The forwarder only reads host
  * events; it never writes back to the bus, which is what keeps that sentinel invariant intact on this side.
  */
 public final class NotificationForwarder {

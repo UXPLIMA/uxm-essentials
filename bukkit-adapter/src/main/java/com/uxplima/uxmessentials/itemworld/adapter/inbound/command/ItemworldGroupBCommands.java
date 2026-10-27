@@ -17,7 +17,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Builds the inbound Brigadier surface for itemworld group B, powertool, mob/entity, time/weather (with the
- * {@code /sun /rain /thunder /day /night} aliases), and admin-fun (docs/10-feature-modules.md §15.10), as
+ * {@code /sun /rain /thunder /day /night} aliases), and admin-fun, as
  * {@link CommandRegistration}s over the constructed {@link ItemworldServices} and the group's policies/stores.
  * Collected in one greppable table that mirrors {@link ItemworldGroupACommands}, so the literal/permission
  * pairing matches the permissions reference and the kernel's {@code ItemworldCommandSurface}; the plugin's

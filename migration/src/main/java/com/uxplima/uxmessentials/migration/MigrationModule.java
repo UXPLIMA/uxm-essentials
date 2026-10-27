@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The migration adapter as a first-class, command-gated {@link FeatureModule} (docs/12-migration §10).
+ * The migration adapter as a first-class, command-gated {@link FeatureModule}.
  * Unlike the twelve feature contexts it is <em>not</em> a steady-state feature: it ships <strong>
  * disabled</strong> in {@code modules.conf} and is enabled only for a cutover (§9). It runs nothing at
  * plugin enable (the importer fires only on the {@code /uxmess import} command) so this module wires no
@@ -67,7 +67,7 @@ public final class MigrationModule implements FeatureModule {
     @Override
     public void start(ModuleContext ctx) {
         // Nothing runs at enable: the importer is dispatched only by /uxmess import. No adapters, no
-        // listeners, no background work are acquired here (docs/12-migration §10).
+        // listeners, no background work are acquired here.
     }
 
     @Override

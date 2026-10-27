@@ -21,8 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The jail/seen lifecycle listener: the online-only jail countdown's connection edges (docs/02-concurrency,
- * docs/09-deployment):
+ * The jail/seen lifecycle listener: the online-only jail countdown's connection edges:
  *
  * <ul>
  *   <li><b>Join</b>: record last-seen/last-IP, then re-apply a still-active jail (offline jail re-applied so

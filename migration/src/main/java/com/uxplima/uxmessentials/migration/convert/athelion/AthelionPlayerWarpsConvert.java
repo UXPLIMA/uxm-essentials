@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Athelion PlayerWarps {@link Convert}: the second of the three player-warp importers (docs/12-migration). Athelion
+ * The Athelion PlayerWarps {@link Convert}: the second of the three player-warp importers. Athelion
  * (the {@code dev.revivalo} PlayerWarps plugin) serialises every player-owned warp as a {@code ConfigurationSerializable}
  * into a single {@code plugins/PlayerWarps/data.yml}, so. Like the file-backed hologram sources rather than the JDBC
  * AxPlayerWarps source: it carries its own fixed data-file location instead of the shared {@code import.source-path}. It

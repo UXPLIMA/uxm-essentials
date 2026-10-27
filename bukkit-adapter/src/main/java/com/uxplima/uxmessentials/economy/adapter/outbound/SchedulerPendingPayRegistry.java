@@ -16,8 +16,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The one-outstanding-confirmation-per-payer registry behind the {@code /payconfirm} flow
- * ({@code docs/11-economy-integration.md} §9.2): a per-payer slot holding the staged {@link PendingPay}, with
+ * The one-outstanding-confirmation-per-payer registry behind the {@code /payconfirm} flow:
+ * a per-payer slot holding the staged {@link PendingPay}, with
  * a self-cancelling {@link Scheduler#asyncAfter} expiry that discards a stale prompt and logs
  * {@code event=economy_pay_confirm_expired} and calls {@code onExpired} so the payer hears about it.
  * Telling them is the point of the seam: the expiry used to write one console line and leave the player

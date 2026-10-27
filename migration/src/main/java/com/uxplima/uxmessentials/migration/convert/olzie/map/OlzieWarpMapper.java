@@ -18,7 +18,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Translates an Olzie PlayerWarps warp row into the competitor-neutral {@link ImportedPlayerWarp} the shared writer
- * lands (docs/12-migration §5). Olzie is the richest of the three player-warp sources, so this mapper carries the most
+ * lands. Olzie is the richest of the three player-warp sources, so this mapper carries the most
  * side data:
  *
  * <ul>

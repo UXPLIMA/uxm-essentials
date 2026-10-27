@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Translates a parsed EssentialsX kit into a domain {@link KitDefinition} (docs/12-migration §5.1). The
+ * Translates a parsed EssentialsX kit into a domain {@link KitDefinition}. The
  * EssentialsX {@code delay} (seconds) becomes the kit cooldown; each raw item descriptor line becomes an
  * opaque {@link KitItem} whose {@code data} is the descriptor and whose amount is the trailing quantity
  * token (defaulting to 1). The descriptor stays opaque. The bukkit-side writer round-trips it through

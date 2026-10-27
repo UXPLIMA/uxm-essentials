@@ -40,7 +40,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /vault}, {@code /vault <n>}, {@code /vault <player> [n]}, {@code /vault delete <n>}, and
- * {@code /vault delete <player> <n>} (docs/10-feature-modules.md §15.11). The no-argument form opens the
+ * {@code /vault delete <player> <n>}. The no-argument form opens the
  * player's default vault when they own one (or allocates the first within quota) and lists their vault numbers
  * when several exist; {@code <n>} opens the Nth; {@code <player> [n]} is the audit-logged staff inspect
  * override, gated by {@code uxmessentials.vault.others} on that branch so a non-staff player never sees it.

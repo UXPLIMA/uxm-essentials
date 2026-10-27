@@ -13,7 +13,7 @@ import org.spongepowered.configurate.yaml.YamlConfigurationLoader;
  * The single seam where SnakeYAML/Configurate touches the disk for the EssentialsX source. Every
  * parser loads its file through here, so the foreign YAML codec is confined to one class and the rest
  * of {@code parse/} works against {@link ConfigurationNode} value reads. This is the parsing-stays-in-
- * the-adapter boundary (docs/12-migration §2): no domain type appears in this file, and Configurate is
+ * the-adapter boundary: no domain type appears in this file, and Configurate is
  * a {@code :migration}-only dependency that never reaches {@code :core}.
  */
 @NullMarked

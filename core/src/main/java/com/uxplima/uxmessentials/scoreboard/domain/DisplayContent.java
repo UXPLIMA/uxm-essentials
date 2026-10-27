@@ -19,7 +19,6 @@ import java.util.Set;
  * <p>{@code hideScoreNumbers} hides the red per-line score numbers vanilla draws down the right edge of the sidebar
  * (the adapter applies a blank number format to each line unless that line overrides it). It defaults on, the clean, modern look operators
  * expect, and is purely a render concern, not a structural one, so it never affects {@link #isBlank()}.
- *
  */
 public final class DisplayContent {
 

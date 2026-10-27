@@ -18,8 +18,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  * {@code LocationUtils.asString(loc, false)} writes; a comma decimal separator is normalised to a dot
  * before the colon split, exactly as DecentHolograms itself parses it. Lines come from the first page's
  * {@code lines[].content}, falling back to the legacy top-level {@code lines} section older files carry. A
- * file with no resolvable location yields {@code null} and the caller counts it as a skipped record
- * (docs/12-migration §4).
+ * file with no resolvable location yields {@code null} and the caller counts it as a skipped record.
  */
 @NullMarked
 public final class DhHologramParser {

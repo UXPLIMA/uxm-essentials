@@ -17,7 +17,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * each performs the wallet leg (a guarded credit/debit on the same native ledger) and the loan-row change in one
  * transaction, committing together or not at all. A wallet leg that cannot apply (insufficient funds, balance
  * cap) leaves the loan row untouched and returns the modelled {@link TransferError}, so money is never created
- * or lost by a half-applied loan move (docs/02-concurrency §6.7).
+ * or lost by a half-applied loan move.
  */
 public interface LoanRepository {
 

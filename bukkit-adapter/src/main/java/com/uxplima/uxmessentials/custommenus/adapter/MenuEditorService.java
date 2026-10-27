@@ -23,8 +23,8 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The file-level CRUD the menu editor drives over {@code menus/*.conf}: create a blank menu, duplicate one, rename one,
- * delete one. It composes the editor's existing spec service, the {@link MenuSpecPersistence} save (validate → write)
- *. With the loader's single-file reload and a small "forget" hook that drops a menu from the running engine, so a GUI
+ * delete one. It composes the editor's existing spec service, the {@link MenuSpecPersistence} save (validate → write).
+ * With the loader's single-file reload and a small "forget" hook that drops a menu from the running engine, so a GUI
  * edit lands on disk and in the engine in one call.
  *
  * <p>Bukkit-free by construction: it works with the pure spec model, the persistence service, and {@code java.nio}, and

@@ -14,8 +14,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Coalesces rapid balance settles into the fewest {@code UPSERT}s ({@code docs/11-economy-integration.md}
- * §10.1, a pending-update pattern scoped to the settle path). Each
+ * Coalesces rapid balance settles into the fewest {@code UPSERT}s (a pending-update pattern scoped to the
+ * settle path). Each
  * {@code (owner, currency)} keeps an {@link AtomicReference} of the latest intended balance; a burst of
  * settles overwrites that reference (last write wins) and the row is flushed once per debounce window by a
  * self-rescheduling {@link Scheduler#asyncAfter} task gated on {@link #running}.
@@ -90,7 +90,7 @@ public final class DebouncedWalletWriter {
             repo.upsertBalance(owner, latest);
         } catch (RuntimeException cause) {
             // A transient DB outage must not lose the settle: re-arm it so the next window retries. A
-            // durable write-ahead outbox covers a crash mid-window (docs/02-concurrency.md); here the
+            // durable write-ahead outbox covers a crash mid-window; here the
             // in-memory re-arm is enough for a recoverable blip.
             pending.computeIfAbsent(key, k -> new Settle(owner)).value.compareAndSet(null, latest);
             log.warn("deferred wallet settle for {} failed; will retry next window", owner.uuid());

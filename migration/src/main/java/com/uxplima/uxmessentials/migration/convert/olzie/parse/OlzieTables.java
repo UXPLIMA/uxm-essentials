@@ -4,8 +4,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The read-only {@code SELECT} statements the Olzie PlayerWarps source runs, held as constants so no table name is
- * ever concatenated from input. Olzie uses a fixed {@code playerwarps_} table set (it has no configurable prefix), so
- *, unlike the LiteBans source, there is nothing to sanitise: these are compile-time literal statements that bind
+ * ever concatenated from input. Olzie uses a fixed {@code playerwarps_} table set (it has no configurable prefix), so,
+ * unlike the LiteBans source, there is nothing to sanitise: these are compile-time literal statements that bind
  * nothing.
  *
  * <p>The warps table carries no explicit id column, so its SQLite {@code rowid} is surfaced as {@code id} and is the

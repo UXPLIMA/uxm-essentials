@@ -6,7 +6,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * An owner tried to create a home past their resolved limit. Published on the in-process bus so an
- * upsell or analytics listener can react (docs/10-feature-modules.md §15.1); the {@code /sethome} itself
+ * upsell or analytics listener can react; the {@code /sethome} itself
  * is refused with {@code HomeError.LIMIT_REACHED}.
  *
  * @param owner the player who hit the cap

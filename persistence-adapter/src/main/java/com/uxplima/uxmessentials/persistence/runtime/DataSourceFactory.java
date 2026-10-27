@@ -16,8 +16,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The embedded-SQLite default is single-writer: the pool is sized to exactly one connection, WAL
  * mode is enabled so readers proceed while a writer is active, {@code synchronous=NORMAL} is safe under
- * WAL, and {@code busy_timeout} makes a contended writer wait rather than fail ({@code
- * docs/02-concurrency.md} §7.1). The network backends (MySQL/MariaDB, PostgreSQL) have real row-level
+ * WAL, and {@code busy_timeout} makes a contended writer wait rather than fail. The network backends (MySQL/MariaDB, PostgreSQL) have real row-level
  * locking, so they use a conventional multi-connection pool sized from config (§7.2). The factory
  * builds the data source only; migration and the {@code DSLContext} are layered on top by their own
  * components.

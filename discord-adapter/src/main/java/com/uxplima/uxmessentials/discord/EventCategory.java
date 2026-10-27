@@ -5,7 +5,7 @@ import java.util.Optional;
 /**
  * The notification categories the bridge can forward, each mapped to a Discord channel id in
  * {@code discord.conf}. A category with no configured channel is simply not forwarded, the operator opts in
- * per category (docs/09-deployment.md Path C: the audit channel and an optional separate economy channel).
+ * per category.
  *
  * <p>The {@code configKey} is the HOCON node under {@code channels} that carries the target channel id; it
  * matches the dashed glossary noun convention used across the host configs.

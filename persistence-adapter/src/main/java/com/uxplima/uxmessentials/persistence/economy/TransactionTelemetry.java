@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * The append-only ledger-history writer for the {@code transactions} table. Unlike the debounced settle queue
  * ({@link DebouncedWalletWriter}), telemetry rows must <strong>all</strong> survive, none may collapse, so
  * they buffer in memory and flush as one batch {@code INSERT} on a fixed interval
- * ({@code docs/11-economy-integration.md} §10.1: debounce collapses, batch preserves). Each row records one
+ * (debounce collapses, batch preserves). Each row records one
  * applied money move with its currency, type, and {@link EconomyReason} stored as their stable enum names so
  * an audit review can {@code GROUP BY} them.
  *

@@ -13,8 +13,7 @@ import java.util.Optional;
  *   <li><b>Permanent</b>. {@code /jail} with no duration: no {@code remaining}, no {@code until}; released
  *       only by {@code /unjail}.
  *   <li><b>Online-only timed</b>, the default {@code /jail <player> <duration>}: the {@code remaining}
- *       online time to serve is decremented only while the player is connected in the jail world (docs/02
- *       concurrency, docs/09-deployment). {@link Active#tickOnline(Duration)} burns elapsed online time off
+ *       online time to serve is decremented only while the player is connected in the jail world. {@link Active#tickOnline(Duration)} burns elapsed online time off
  *       the remainder; the sentence is over when the remainder hits zero. Wall-clock time off the server
  *       never advances it.
  *   <li><b>Wall-clock timed</b>, when an operator opts a jail into wall-clock countdown via {@code

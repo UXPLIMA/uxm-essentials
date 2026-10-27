@@ -19,8 +19,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The shared scaffolding for the per-player HUD render loops (the scoreboard and tablist timers): a
- * self-rescheduling task on the {@link Scheduler} port (docs/02-concurrency.md §6.10 self-rescheduling-loop
- * pattern). Each tick scans the live online set off the tick thread and, for each player, hops to that player's
+ * self-rescheduling task on the {@link Scheduler} port. Each tick scans the live online set off the tick thread and, for each player, hops to that player's
  * region/entity thread before touching the live {@code Player}; no Bukkit entity is touched on the async loop
  * itself. A subclass supplies only the per-player render call and the log message for a failed tick.
  *

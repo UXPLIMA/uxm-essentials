@@ -93,9 +93,8 @@ import org.jspecify.annotations.NullMarked;
  * Constructs the economy context, the plugin's canonical worked DDD example, over the injected kernel ports,
  * the persistence DSL, and the Bukkit {@code ServicesManager}. This is the one place the economy context is
  * wired: it builds the native ledger (the cached jOOQ repository plus the debounced settle writer and the
- * batched transaction telemetry), wraps it in the native {@code EconomyProvider}, then runs register-or-defer
- *. Registering the native provider unless a foreign economy is already present, in which case it consumes the
- * incumbent (Treasury before Vault, {@code docs/11-economy-integration.md} §2, §4).
+ * batched transaction telemetry), wraps it in the native {@code EconomyProvider}, then runs register-or-defer. Registering the native provider unless a foreign economy is already present, in which case it consumes the
+ * incumbent (Treasury before Vault).
  *
  * <p>Every command reads the resolved provider through the per-currency baltop snapshot decorator, so the same
  * code serves the native ledger, a Treasury economy, or a legacy Vault economy without knowing which. The

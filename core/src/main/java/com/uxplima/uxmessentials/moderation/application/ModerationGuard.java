@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * The target-side immunity check every sanction consults: a target holding the exempt node
  * ({@code uxmessentials.moderation.exempt}) cannot be muted, jailed, tempbanned, kicked, warned, IP-banned or
- * frozen by lower staff (docs/permissions.md). Centralised here so every use case applies the exact same
+ * frozen by lower staff. Centralised here so every use case applies the exact same
  * gate and the node name lives in one place.
  *
  * <p>The check is intentionally a plain node lookup through the kernel {@link Permissions} port: there is no

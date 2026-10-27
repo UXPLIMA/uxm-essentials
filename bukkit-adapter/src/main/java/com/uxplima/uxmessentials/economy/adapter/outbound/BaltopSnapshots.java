@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The provider-independent {@code /baltop} read-model machinery ({@code docs/11-economy-integration.md} §11):
+ * The provider-independent {@code /baltop} read-model machinery:
  * a per-currency {@link AtomicReference} snapshot, refreshed on a bounded interval off-tick rather than
  * recomputed per command, with exempt owners ({@link BaltopExemption}) filtered out where the snapshot is
  * built so the hot path never re-checks the node. A {@code /baltop [currency]} invocation reads its currency's

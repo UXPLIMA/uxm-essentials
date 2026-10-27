@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
  *
  * <p>This is the error half of the {@code EconomyProvider.transfer} contract: a transfer either applies both
  * legs atomically or returns one of these and mutates nothing. Rejected, not partially applied (the
- * double-spend invariant, {@code docs/02-concurrency.md} §6.7).
+ * double-spend invariant).
  */
 public enum TransferError {
 

@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * The online-only jail countdown (docs/02-concurrency.md, docs/09-deployment.md): a timed jail accrues online
+ * The online-only jail countdown: a timed jail accrues online
  * time only, so the remainder is decremented only while the player is connected in the jail and frozen on
  * quit.
  *

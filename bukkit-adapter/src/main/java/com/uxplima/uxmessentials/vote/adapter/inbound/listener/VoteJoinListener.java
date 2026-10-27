@@ -26,8 +26,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * On join:
  * <ol>
- *   <li>Pays out the rewards a player accrued while offline (drains the queue via {@link ApplyQueuedRewards})
- *: only when auto-claim is enabled. With auto-claim off the queue is left for the player to drain
+ *   <li>Pays out the rewards a player accrued while offline (drains the queue via {@link ApplyQueuedRewards}):
+ * only when auto-claim is enabled. With auto-claim off the queue is left for the player to drain
  *       with {@code /vote claim}.
  *   <li>Warms the repository cache with the player's vote totals so the first PAPI placeholder call is
  *       cheap (no cold DB hit).

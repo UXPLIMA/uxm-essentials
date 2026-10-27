@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The vaults context's command surface (docs/10-feature-modules.md §15.11) as a platform-neutral
+ * The vaults context's command surface as a platform-neutral
  * {@link CommandSpec}: the single {@code /vault} literal, gated by {@code uxmessentials.vault.use}, that
  * serves all three forms, {@code /vault} (open the default vault or list when several exist), {@code /vault
  * <n>} (open the Nth), and {@code /vault <player> [n]} (the audit-logged staff override, gated inside the

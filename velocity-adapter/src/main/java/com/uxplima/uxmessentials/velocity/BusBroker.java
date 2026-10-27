@@ -18,7 +18,7 @@ import org.slf4j.Logger;
  * plain Java. It takes a {@link PluginMessageEvent} that already matched the bus channel, decodes the frame
  * to read its origin server id, then sends the same bytes to every backend <em>except</em> the origin.
  *
- * <p>Two things make the relay safe against replication loops ({@code docs/02-concurrency.md}):
+ * <p>Two things make the relay safe against replication loops:
  *
  * <ol>
  *   <li>It only relays frames whose source is a {@link ServerConnection}, a backend → proxy message. A

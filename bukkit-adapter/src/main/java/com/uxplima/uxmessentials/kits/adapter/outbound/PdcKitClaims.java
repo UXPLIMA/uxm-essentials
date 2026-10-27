@@ -25,8 +25,8 @@ import org.jspecify.annotations.NullMarked;
  * The {@link KitClaimStore} implementation: a per-player one-time-claim flag stamped in PDC. Each one-time
  * kit a player has consumed is recorded as a {@code (byte) 1} under a per-kit key, and the set of claimed kit
  * ids is mirrored into a single index key so {@link #resetAll} can clear every stamp without scanning all
- * possible kit ids. A one-time claim is transient per-holder state that may safely die with a world rollback
- * (docs/03-paper-api §3.6), which is why it lives in PDC rather than the database.
+ * possible kit ids. A one-time claim is transient per-holder state that may safely die with a world rollback,
+ * which is why it lives in PDC rather than the database.
  *
  * <h2>Concurrency</h2>
  * The per-kit {@link NamespacedKey}s are cached in a {@link ConcurrentHashMap} populated via

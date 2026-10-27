@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Binds the requesting player's resolved locale into {@link LocaleScope#CURRENT} at the inbound command
- * boundary (docs/13-i18n §5).
+ * boundary.
  *
  * <p>A command runs on the player's region thread, where {@code Player.locale()} is a legal call. This
  * decorator captures that client locale once at dispatch, folds in any persisted {@code /lang} override,

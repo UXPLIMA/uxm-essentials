@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * per-currency balance is a first-class {@code (uuid, currency, balance)} row, never an opaque JSON blob
  * (the persistence anti-pattern list), so a {@link Wallet} loads from queryable rows and {@code /baltop}
  * pushes its {@code ORDER BY balance DESC LIMIT ?} to the database. The jOOQ adapter behind this port mirrors
- * {@code JooqHomeRepository}; the load-bearing transfer/debit guard ({@code docs/02-concurrency.md} §6.7)
+ * {@code JooqHomeRepository}; the load-bearing transfer/debit guard
  * lives below it, expressed as the guarded {@code UPDATE} the contract suite proves.
  *
  * <p>This is where invariant (d) is honoured at the source: balances are DB-backed, never PDC, so they

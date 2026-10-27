@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  * pays that bank out to the owner on withdraw. It lives in the persistence adapter, not the {@code :core}
  * player-warps context. Precisely because it is the one place allowed to see both the economy types and the
  * warp bank column; the narrow port keeps the domain free of any economy import (the {@code WarpEconomy}
- * precedent, {@code docs/11-economy-integration.md} §4.2).
+ * precedent).
  *
  * <h2>The cut is deflationary, never a {@code TaxSink}</h2>
  * The payer is debited the full {@code price}; the bank accrues only {@code price − cut}. So the server's cut is

@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The FancyHolograms source's lazy {@link ImportPlan}. FancyHolograms keeps every hologram in one
  * {@code holograms.yml}, so the file is parsed once into its entries and each is mapped on demand as the
- * importer's bounded executor drains the stream (docs/12-migration §7). A hologram whose world the server
+ * importer's bounded executor drains the stream. A hologram whose world the server
  * does not know, or that carries no text line (item and block holograms), is dropped from the stream and
  * counted as skipped downstream (§4); an unreadable file yields no records rather than aborting the run.
  */
@@ -42,7 +42,7 @@ final class FancyHologramsPlan implements ImportPlan {
         try {
             return parser.parse(hologramsFile);
         } catch (IOException | RuntimeException badFile) {
-            // An unreadable holograms.yml is skipped, never fatal (docs/12-migration §4).
+            // An unreadable holograms.yml is skipped, never fatal.
             return List.of();
         }
     }

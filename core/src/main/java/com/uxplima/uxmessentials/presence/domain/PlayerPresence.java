@@ -10,7 +10,7 @@ import java.util.Optional;
  * instant of the player's last activity, and the vanish flag. Held in a
  * {@code ConcurrentHashMap<UUID, PlayerPresence>} and only ever replaced wholesale through {@code compute}
  * every transition here returns a new aggregate rather than mutating this one, so a reader on another region
- * thread (or the async AFK sweep) always sees a coherent value (docs/02-concurrency.md §6.9).
+ * thread (or the async AFK sweep) always sees a coherent value.
  *
  * <p>The aggregate owns two transition rules. The AFK auto-transition: {@link #isIdlePast} compares {@code now}
  * against {@link #lastActivity} plus the configured idle threshold, and the async sweep flips an idle,

@@ -6,12 +6,11 @@ import com.uxplima.uxmessentials.migration.MappingRow;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Olzie source's {@code SupportedMappings} rows: its claim of what it migrates (docs/12-migration §5). Olzie is
+ * The Olzie source's {@code SupportedMappings} rows: its claim of what it migrates. Olzie is
  * the richest player-warp source: alongside the warp it seeds ratings, whitelist, bans (with a reason Ax and Athelion
  * never kept), managers (as warp members) and favourites, so it carries a row per side table. The single
  * {@code OlzieWarpMapper} produces the whole {@code ImportedPlayerWarp}; every side facet rides along on it into its
- * store, so they name that same mapper. {@code MigrationSourceRegistryDriftTest} holds this table in lock-step with the
- * registered source.
+ * store, so they name that same mapper.
  */
 @NullMarked
 public final class OlziePlayerWarpsMappings {

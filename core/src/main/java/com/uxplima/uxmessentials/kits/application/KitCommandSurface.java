@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The kits context's command surface (docs/10-feature-modules.md §15.5) as platform-neutral
+ * The kits context's command surface as platform-neutral
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The kits inbound adapter realises the Brigadier node from
  * the started module's context on the next {@code COMMANDS} fire. Collected here so {@code KitsModule} stays

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Snapshots the plugin's config/data tree under a timestamped sibling directory. The migration importer
- * takes one before a live run writes anything (docs/12-migration §9, step 1), recording its name on the
+ * takes one before a live run writes anything, recording its name on the
  * {@code migration_import_start} audit line so a bad import is always recoverable to the pre-import config;
  * the {@code /backup} command takes one on demand. It is a config snapshot, not the off-host DB backup the
  * runbook also demands, that remains the operator's responsibility, but it captures the bundled

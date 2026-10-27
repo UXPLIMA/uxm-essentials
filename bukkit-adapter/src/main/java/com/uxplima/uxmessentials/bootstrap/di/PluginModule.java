@@ -1044,8 +1044,7 @@ public final class PluginModule {
             return names == null ? List.of() : names.get();
         }));
         // Presence is asked of the class that owns the soft depend and never of the plugin manager here.
-        // SoftDependSeamDriftTest caught the second spelling the moment it was written, and its reason is
-        // the right one: a getPlugin check of our own calls a plugin that failed its own startup live.
+        // A getPlugin check of our own would call a plugin that failed its own startup live.
         checks.add(new PlaceholderExpansionHealthCheck(placeholdersPublished, PlaceholderApiSupport::isPresent));
         return List.copyOf(checks);
     }

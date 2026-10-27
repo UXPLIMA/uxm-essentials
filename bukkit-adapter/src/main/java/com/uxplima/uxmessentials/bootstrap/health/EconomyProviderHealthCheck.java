@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Checks which economy is authoritative for {@code /uxmess doctor}. The economy context runs register-or-defer
- * through the {@code ServicesManager} (docs/11 §4.1): it registers our native {@link EconomyProvider} unless a
+ * through the {@code ServicesManager}: it registers our native {@link EconomyProvider} unless a
  * foreign economy already holds the slot, in which case it consumes the incumbent. Either way every consumer in
  * this plugin reads whoever owns the service registration here.
  *

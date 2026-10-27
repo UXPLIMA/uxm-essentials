@@ -11,7 +11,7 @@ import org.spongepowered.configurate.ConfigurationNode;
 
 /**
  * Upgrades one of our own {@code .conf} files from its on-disk {@code config-version} to the current
- * target by applying numbered {@link ConfigStep}s in order (docs/12-migration §12). This is a separate,
+ * target by applying numbered {@link ConfigStep}s in order. This is a separate,
  * always-on concern from the foreign-source importer: the importer moves a foreign plugin's data in once;
  * this ladder evolves our own config forward on every upgrade. The two share one principle, numbered,
  * idempotent, tracked, never destructive.

@@ -19,8 +19,8 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Translates an Athelion warp into the competitor-neutral {@link ImportedPlayerWarp} the shared writer lands
- * (docs/12-migration §5). The scalar work lives here:
+ * Translates an Athelion warp into the competitor-neutral {@link ImportedPlayerWarp} the shared writer lands.
+ * The scalar work lives here:
  *
  * <ul>
  *   <li><b>Access.</b> Athelion's gate is a plaintext {@code password} plus a {@code WarpStatus}. A warp with a password

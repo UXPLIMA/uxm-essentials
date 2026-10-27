@@ -17,8 +17,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The itemworld bounded context as a first-class {@link FeatureModule}: the largest module, covering the full
- * item/world command surface (~40 verbs) split into independently disableable sub-feature groups
- * (docs/10-feature-modules.md §15.10). It owns the {@code /give /i /item /itemname /itemlore /itemflag /skull
+ * item/world command surface (~40 verbs) split into independently disableable sub-feature groups.
+ * It owns the {@code /give /i /item /itemname /itemlore /itemflag /skull
  * /more /repair /repairall /enchant /hat /itemdb} item utils, the virtual workstations, the {@code
  * /disposal /condense} cleanup, the {@code /powertool /powertooltoggle} powertool, the {@code /spawnmob
  * /spawner /kill /butcher /killall /remove /unlimited} mob/entity verbs, the {@code /time /weather} verbs with

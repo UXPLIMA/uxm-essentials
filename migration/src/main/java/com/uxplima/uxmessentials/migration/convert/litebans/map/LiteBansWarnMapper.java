@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Maps one {@code litebans_warnings} row into an {@link ImportRecord.WarnRecord} (docs/12-migration §5.4).
+ * Maps one {@code litebans_warnings} row into an {@link ImportRecord.WarnRecord}.
  * Pure ACL. A warning with {@code until <= 0} stands until cleared; one with a real expiry lapses on its own,
  * matching the domain's standing-vs-timed {@link Warn} split. A row whose target UUID is a LiteBans sentinel
  * is dropped. The issue instant is the row's {@code time}.

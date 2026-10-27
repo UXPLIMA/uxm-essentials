@@ -43,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
  * Constructs the itemworld context's adapters over the injected kernel ports and produces everything the plugin
  * must register: the full Brigadier command list (groups A and B, the ~40-verb surface) and the powertool +
  * unlimited-placement listeners. This is the one place the itemworld context is wired. Nothing else news up
- * its classes (the wiring invariant, docs/10-feature-modules.md §5).
+ * its classes.
  *
  * <p>itemworld is stateless and ACL-thin: it needs no database, only the {@link KernelPorts} the commands
  * schedule and render through, the {@link ItemworldConfig} view of {@code itemworld.conf} (the sub-feature-group

@@ -9,12 +9,12 @@ import org.jspecify.annotations.NullMarked;
  * The relational backend the plugin runs against. SQLite is the default: single-node servers ship
  * with it and never touch a network database. MySQL/MariaDB and PostgreSQL are the network options an
  * operator selects in {@code modules.conf}; the same migrations and the same generated jOOQ DSL run
- * against every backend (the backend-parity invariant, {@code docs/01-architecture.md} §8).
+ * against every backend (the backend-parity invariant).
  *
  * <p>Each constant carries its jOOQ {@link SQLDialect} so the {@code DSLContext} is rendered in the
  * dialect of the live connection, and the JDBC sub-protocol the {@code DataSourceFactory} builds the
  * URL from. SQLite additionally marks itself single-writer so the factory sizes the pool to one
- * connection and enables WAL ({@code docs/02-concurrency.md} §7.1).
+ * connection and enables WAL.
  */
 @NullMarked
 public enum DatabaseBackend {

@@ -19,8 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * A Caffeine read-cache decorator over the jOOQ {@link WalletRepository}, the offline-balance accelerator of
- * {@code docs/11-economy-integration.md} §9.6. {@code /balance <offline>} and {@code /baltop} are served from
+ * A Caffeine read-cache decorator over the jOOQ {@link WalletRepository}, the offline-balance accelerator. {@code /balance <offline>} and {@code /baltop} are served from
  * a bounded, TTL'd cache so a tick-thread read of an offline player's balance does not hit the database; a
  * miss loads the whole wallet through once and a write invalidates the affected owner so a stale balance is
  * never shown after a mutation, write-through at the delegate, invalidate here, never a write-back cache.

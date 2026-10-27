@@ -24,10 +24,10 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class UxmRestLoader implements PluginLoader {
 
-    /** Kept in step with the host's pin by {@code LoaderPinDriftTest}. */
+    /** Kept in step with the host's pin. */
     public static final String GSON = "com.google.code.gson:gson:2.11.0";
 
-    /** Kept in step with the host's pin by {@code LoaderPinDriftTest}. */
+    /** Kept in step with the host's pin. */
     public static final String CONFIGURATE_HOCON = "org.spongepowered:configurate-hocon:4.1.2";
 
     @Override

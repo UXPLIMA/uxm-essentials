@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The ban-on-login enforcement at {@code PlayerLoginEvent} priority HIGHEST (docs/09-deployment.md): for the
+ * The ban-on-login enforcement at {@code PlayerLoginEvent} priority HIGHEST: for the
  * connecting player it asks {@link LoginEnforcement} whether a server lockdown, an active tempban or an IP ban
  * bars the login, and disallows the connection <em>before</em> player data loads (kick-before-data-load) when
  * it does. The connecting IP is read from the event's real address, so the IP ban and the alt-detection check
@@ -24,8 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>HIGHEST runs after lower-priority listeners but before MONITOR, so a plugin observing the final decision
  * still sees our disallow; we never override an already-denied login (a kick set by another plugin stays).
  */
-// PlayerLoginEvent is the canon-mandated enforcement point (docs/09-deployment.md: ban-on-login at
-// PlayerLoginEvent priority HIGHEST, kick-before-data-load); it is the one event that refuses a connection
+// PlayerLoginEvent is the enforcement point (ban-on-login at PlayerLoginEvent priority HIGHEST,
+// kick-before-data-load); it is the one event that refuses a connection
 // before player data loads, so the API's deprecation hint toward the newer pipeline is deliberately not taken.
 @SuppressWarnings("deprecation")
 @NullMarked

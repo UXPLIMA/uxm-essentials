@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * key-value row on the player's economy state, not a JSON blob, so it survives relog and can be read
  * without materialising a wallet. When a player has turned incoming pay off, a {@code /pay} to them resolves
  * {@code TransferError.TARGET_DISABLED} before the debit leg runs, so the payer is never charged for a
- * transfer the target refuses ({@code docs/11-economy-integration.md} §9.1).
+ * transfer the target refuses.
  */
 public interface PayPreferences {
 

@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The {@link VaultAudit} implementation that writes the vaults audit trail to the dedicated
  * {@code com.uxplima.uxmessentials.audit} channel as structured {@code event=<name> actor=<staff> key=value}
- * lines (docs/09-deployment.md §Audit logging), mirroring the moderation and itemworld audit. Only the staff
+ * lines, mirroring the moderation and itemworld audit. Only the staff
  * overrides are audited (a player opening or deleting their own vault is not) so one
  * {@code event=vault_admin_open} line is emitted per inspect override ({@code /vault <player> [n]}) and one
  * {@code event=vault_admin_delete} line per delete override ({@code /vault delete <player> <n>}), with the

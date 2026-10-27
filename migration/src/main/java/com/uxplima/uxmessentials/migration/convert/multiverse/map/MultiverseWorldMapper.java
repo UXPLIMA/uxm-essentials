@@ -23,8 +23,8 @@ import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The Anti-Corruption Layer between a Multiverse world entry and our {@link ManagedWorld} aggregate
- * (docs/12-migration §5). Multiverse's creation facts (environment, seed, generator) become the immutable
+ * The Anti-Corruption Layer between a Multiverse world entry and our {@link ManagedWorld} aggregate.
+ * Multiverse's creation facts (environment, seed, generator) become the immutable
  * {@link WorldSpec}; its alias and auto-load become the management facets; the rest becomes typed
  * {@link WorldSettings} rows through the same {@link WorldProperties} catalog {@code /world set} writes.
  *

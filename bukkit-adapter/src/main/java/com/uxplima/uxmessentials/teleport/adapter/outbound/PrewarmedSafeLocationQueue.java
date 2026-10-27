@@ -21,7 +21,7 @@ import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The pre-warmed per-world random-teleport queue (ADR 0010). A {@code /rtp} is served O(1) by
+ * The pre-warmed per-world random-teleport queue. A {@code /rtp} is served O(1) by
  * {@link #poll(WorldRef)} off a per-world {@link ConcurrentLinkedQueue}; the queue refills asynchronously
  * through the injected {@link Scheduler} when it drops below its low-water mark, deduped per world by a
  * {@code compareAndSet}-guarded flag so concurrent {@code /rtp}s never launch N refills. A polled location
@@ -33,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
  * onto it with {@code thenAccept} rather than parking a worker on a {@code .get()} the way the pre-P1 loop did.
  *
  * <p>Durable restart-survival is wired through the {@link RtpPoolSink}: every location a refill validates is recorded,
- * and the world's batch is flushed to the {@code rtp_pool} table off-tick once the refill cycle ends (ADR 0010 §7).
+ * and the world's batch is flushed to the {@code rtp_pool} table off-tick once the refill cycle ends.
  * On enable, {@link #prewarm} re-loads a world's persisted columns and re-probes each, a fresh Y and full safety
  * revalidation, offering the still-valid ones straight into the queue, so the first {@code /rtp} after a restart
  * serves from a warm queue instead of paying for a cold search storm. When the persisted pool is switched off, the

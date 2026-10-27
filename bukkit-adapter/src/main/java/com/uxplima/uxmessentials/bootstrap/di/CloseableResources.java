@@ -36,7 +36,7 @@ import org.jspecify.annotations.Nullable;
  * the plugin's {@code LifecycleEvents.COMMANDS} handler publishes. A disabled module contributes
  * nothing, so its command literal never reaches the dispatcher. Every published command is wrapped by
  * the shared {@link LocaleBinding} so the requesting player's locale is bound at the inbound boundary
- * (docs/13-i18n §5) before any handler resolves a message. The chokepoint runs the binding steps in
+ * before any handler resolves a message. The chokepoint runs the binding steps in
  * order: the resolved {@link CatalogBinding} renames, realiases or drops each registration so an operator's
  * {@code commands.conf} edits change what gets published; then the {@link GuiRootBinding} installs a
  * bare-input GUI opener on any command whose {@code gui} flag is on; then the {@link UsageBinding} injects a

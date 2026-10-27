@@ -1,6 +1,5 @@
 /**
- * The optional Discord bridge, the {@code uxmessentials-discord} Paper plugin jar (docs/09-deployment.md
- * Path C). It mirrors host-plugin audit events and economy notifications to Discord channels and is a
+ * The optional Discord bridge, the {@code uxmessentials-discord} Paper plugin jar. It mirrors host-plugin audit events and economy notifications to Discord channels and is a
  * <em>separate</em> plugin: it consumes the host plugin's ports through Bukkit's {@code ServicesManager} and
  * has no compile-time link to {@code :bukkit-adapter}.
  *

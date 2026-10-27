@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Applies the resolved command catalog to a list of code-side registrations at the inbound boundary: it
  * renames the root literal, swaps the alias list, and drops disabled commands before they ever reach
- * {@code LifecycleEvents.COMMANDS} (docs/01-architecture, command catalog).
+ * {@code LifecycleEvents.COMMANDS}.
  *
  * <p>A registration is keyed by its stable {@link CommandRegistration#commandId()}; an id with no catalog
  * entry passes through untouched (an untouched install is all code defaults), so the only commands this

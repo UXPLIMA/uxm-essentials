@@ -62,7 +62,7 @@ public final class TeleportModule implements FeatureModule {
     @Override
     public List<MigrationSet> migrations() {
         // The pre-warmed RTP queue's durable mirror (rtp_queue table) lands with the persistence
-        // adapter (ADR 0010); until then the queue is in-memory and the module owns no migrations.
+        // adapter; until then the queue is in-memory and the module owns no migrations.
         return List.of();
     }
 

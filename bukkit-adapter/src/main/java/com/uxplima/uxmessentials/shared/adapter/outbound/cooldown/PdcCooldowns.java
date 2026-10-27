@@ -27,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
  * in the same space.
  *
  * <p>Stamps are transient per-holder state that may safely die with a world rollback, which is why
- * they live in PDC rather than the database (docs/03-paper-api §3.6). An offline player has no PDC to
+ * they live in PDC rather than the database. An offline player has no PDC to
  * read, so a check passes and a stamp is a no-op.
  */
 @NullMarked

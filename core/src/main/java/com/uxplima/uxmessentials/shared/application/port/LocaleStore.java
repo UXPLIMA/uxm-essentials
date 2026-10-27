@@ -6,7 +6,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Outbound port for a player's persisted {@code /lang} locale override (docs/13-i18n §7).
+ * Outbound port for a player's persisted {@code /lang} locale override.
  *
  * <p>The override is the first link in the resolution chain: an operator's explicit {@code /lang tr}
  * beats the client locale. It persists per player so the choice survives a relog; the default backing

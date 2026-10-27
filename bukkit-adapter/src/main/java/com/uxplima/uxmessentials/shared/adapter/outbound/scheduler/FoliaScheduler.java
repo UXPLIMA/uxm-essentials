@@ -80,7 +80,7 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         }
         Player bukkit = Bukkit.getPlayer(player.uuid());
         if (bukkit == null || !bukkit.isOnline()) {
-            return; // the entity scheduler refuses a despawned entity, silent no-op (docs/02 §2.4)
+            return; // the entity scheduler refuses a despawned entity, silent no-op
         }
         bukkit.getScheduler().execute(plugin, task, null, 1L);
     }

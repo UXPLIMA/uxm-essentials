@@ -24,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
  * that drops the affected owner from the same cache on a remote change.
  *
  * <p>The frame is a notification, not the figure: the cross-server transfer's debit/credit is one atomic
- * transaction against the shared row ({@code docs/02-concurrency.md} §6.7), and the bus only invalidates the
+ * transaction against the shared row, and the bus only invalidates the
  * peer's read cache so it never serves a stale balance. The {@code upsertBalance} coalesced-settle path also
  * announces, so a flushed credit reaches peers. The guarded debit/credit/transfer themselves are unchanged
  * the decorator forwards to the same repository; it only appends the announcement.

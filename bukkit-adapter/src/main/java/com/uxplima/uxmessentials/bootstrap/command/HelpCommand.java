@@ -25,7 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /help [page|query]}: the cross-cutting command listing (docs/13-i18n §7). It is owned by no
+ * {@code /help [page|query]}: the cross-cutting command listing. It is owned by no
  * feature context, so it lives in the bootstrap command surface alongside {@code /uxmess} and {@code /lang}.
  * Open to everyone (permission {@code uxmessentials.help}, default true); per-line filtering uses each
  * command's own permission, so the page shows only the commands the sender can actually run.

@@ -17,8 +17,7 @@ import org.jspecify.annotations.Nullable;
  * The anti-corruption mapping between a {@code vaults} row and the domain {@link Vault}. The queryable facts
  * owner uuid (canonical 36-char text), the one-based index, the size in rows, and the last-touched epoch
  * millis. Are first-class columns; only the {@code ItemStack[]} contents are opaque payload, stored as the
- * base64 text of the adapter's already-serialized item bytes (the architecture persistence invariant,
- * docs/01-architecture.md). This class is the single place that translation lives, so the row shape stays
+ * base64 text of the adapter's already-serialized item bytes (the architecture persistence invariant). This class is the single place that translation lives, so the row shape stays
  * identical on every backend.
  *
  * <p>A null {@code contents} cell is a freshly allocated, empty vault; it round-trips to

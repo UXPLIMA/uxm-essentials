@@ -17,7 +17,7 @@ import org.jspecify.annotations.NullMarked;
  * roster is read once on the tick thread by the command (the Bukkit roster is not safe to read off-tick) and
  * handed to the off-tick worker as an immutable list, so the DB writes never run on the tick thread.
  *
- * <p>Scope note ({@code docs/11-economy-integration.md} §9.5): the canonical {@code giveall}/{@code resetall}
+ * <p>Scope note: the canonical {@code giveall}/{@code resetall}
  * operate over <em>every known wallet</em>, online and offline, materialising offline rows via
  * {@code ensureUserExists} first. Enumerating the full offline owner set needs a repository
  * {@code allOwners()} read-model not yet on the {@code WalletRepository} port; until that lands, the bulk

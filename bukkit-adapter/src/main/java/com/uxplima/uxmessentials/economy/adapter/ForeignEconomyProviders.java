@@ -20,8 +20,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Discovers a foreign economy already on the server and wraps it in this plugin's {@code EconomyProvider}
- * port, Treasury first (modern, multi-currency), then Vault (legacy, single-currency)
- * ({@code docs/11-economy-integration.md} §2). This is the only place that reaches the foreign SDK
+ * port, Treasury first (modern, multi-currency), then Vault (legacy, single-currency).
+ * This is the only place that reaches the foreign SDK
  * registrations through the {@code ServicesManager}; the actual SDK imports are confined to the adapter
  * classes in the {@code treasury}/{@code vault} packages, fenced by {@code economyDomainHasNoProviderSdk}.
  *
@@ -52,7 +52,7 @@ final class ForeignEconomyProviders {
      *
      * <p>The other direction of the same integration. It lives beside {@link #discover} rather than in the
      * adapter it delegates to, because one optional plugin gets one presence seam: the Vault probe is spelled
-     * in this file and nowhere else ({@code SoftDependSeamDriftTest}).
+     * in this file and nowhere else.
      */
     static void publishNative(
             Plugin plugin,

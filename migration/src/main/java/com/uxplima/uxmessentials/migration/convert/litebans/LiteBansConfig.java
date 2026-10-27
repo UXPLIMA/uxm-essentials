@@ -11,8 +11,8 @@ import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcConnection;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The settled connection inputs for the LiteBans source, read once from the {@code litebans} config subtree
- * (docs/12-migration §10.1): the JDBC URL, the optional credential pair, the table prefix, and the plugins
+ * The settled connection inputs for the LiteBans source, read once from the {@code litebans} config subtree:
+ * the JDBC URL, the optional credential pair, the table prefix, and the plugins
  * directory the H2-file fallback searches. It produces a {@link JdbcConnection} two ways:
  *
  * <ul>

@@ -1,5 +1,5 @@
 /**
- * The FancyHolograms import source (docs/12-migration §1.2): reads the single
+ * The FancyHolograms import source: reads the single
  * {@code plugins/FancyHolograms/holograms.yml}, maps each entry's text lines into the {@code holograms}
  * context's {@code Hologram} aggregate, and streams them as {@code HologramRecord}s for the shared write
  * path. {@code parse/} confines the foreign YAML codec; the ACL translation reuses the DecentHolograms

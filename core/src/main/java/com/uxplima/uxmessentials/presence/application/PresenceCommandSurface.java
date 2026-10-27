@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The presence context's command surface (docs/10-feature-modules.md §15.8) as platform-neutral
+ * The presence context's command surface as platform-neutral
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The presence inbound adapter realises the Brigadier node
  * from the started module's context on the next {@code COMMANDS} fire. Collected here so {@code PresenceModule}

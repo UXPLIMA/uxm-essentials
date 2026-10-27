@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * <h2>Loop sentinel</h2>
  * Every frame carries its origin {@code server-id}. On receipt {@link #onFrame} drops any frame whose origin
  * equals {@link #serverId()}, this backend's own mutation echoed back, so a write is applied on every peer
- * once and never bounces around the cluster ({@code docs/02-concurrency.md}).
+ * once and never bounces around the cluster.
  */
 @NullMarked
 final class BusCore implements BusPublisher {

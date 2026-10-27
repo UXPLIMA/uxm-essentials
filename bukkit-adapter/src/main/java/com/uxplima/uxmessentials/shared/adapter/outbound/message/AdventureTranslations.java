@@ -16,8 +16,8 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Wires the catalog into Adventure's {@link GlobalTranslator} for the {@code translatable}-key path
- * (docs/13-i18n §8.2).
+ * Wires the catalog into Adventure's {@link GlobalTranslator} for the {@code translatable}-key path.
+ *
  *
  * <p>The {@link MessageKey} catalog is the server-side default and covers everything a player sees
  * through {@code messages.resolve(...)}. This source serves the narrow case where a call site emits a

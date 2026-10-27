@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The source-agnostic import use case (docs/12-migration §1, §7). It is the single write path every
+ * The source-agnostic import use case. It is the single write path every
  * {@link Convert} source funnels through, so idempotency, conflict policy, backup-first, and per-record
  * audit are identical no matter which source ran:
  *
@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Every write is an upsert keyed by stable identity, so a re-run is idempotent and resumable; this use
  * case never performs an additive balance mutation (§6). It runs entirely off the tick thread, the
- * command handler dispatches it and returns immediately ({@code MainThreadBlockingDriftTest}).
+ * command handler dispatches it and returns immediately.
  */
 @NullMarked
 public final class ImportData {
@@ -100,7 +100,7 @@ public final class ImportData {
         try {
             return run.writer().write(rec, run.options());
         } catch (RuntimeException badRecord) {
-            // One record's failure is counted and the run continues (docs/12-migration §4).
+            // One record's failure is counted and the run continues.
             log.warn("migration record failed kind={} cause={}", rec.kind(), badRecord.toString());
             return RecordOutcome.FAILED;
         }

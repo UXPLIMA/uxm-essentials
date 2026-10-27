@@ -12,8 +12,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Maps between this plugin's {@link Currency} and Treasury's currency identifiers at the adapter boundary, so
- * nothing above {@link TreasuryEconomyAdapter} sees a Treasury type ({@code docs/11-economy-integration.md}
- * §5, §6). A configured {@link Currency} is matched to a Treasury currency by id; only currencies the
+ * nothing above {@link TreasuryEconomyAdapter} sees a Treasury type. A configured {@link Currency} is matched to a Treasury currency by id; only currencies the
  * foreign provider can actually serve are reported by {@link #served()}, so a {@code transfer} in a currency
  * Treasury does not hold resolves to {@code CURRENCY_UNSUPPORTED} rather than silently converting: there is
  * no implicit cross-currency conversion anywhere in this plugin.

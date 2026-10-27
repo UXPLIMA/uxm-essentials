@@ -153,8 +153,7 @@ public final class EntityListView<T> {
     /**
      * The empty state tile: the wired name, the wired lore under it, and nothing to click. The material is the
      * layout's fallback icon rather than a literal, because a material named inside a generic shell is a
-     * material no operator can change: {@code GuiShellsAreLayoutDrivenDriftTest} fails the build over one, and
-     * it failed over this line before it read the layout.
+     * material no operator can change.
      */
     private ItemStack emptyTile(PlayerRef viewer) {
         ItemBuilder item = ItemBuilder.of(layout.base().fallbackIcon())

@@ -20,8 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * sampler's off-tick writes.
  *
  * <h2>Concurrency</h2>
- * Ownership: stateless; the single read is global-region-confined by its caller. Listed in
- * {@code FoliaThreadingDriftTest} under GLOBAL for that reason.
+ * Ownership: stateless; the single read is global-region-confined by its caller.
  */
 @NullMarked
 public final class BukkitOnlineRoster implements Supplier<List<PlayerRef>> {

@@ -27,8 +27,8 @@ import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the {@code /uxmess import <source> [--dry-run]} subcommand node attached under the operator root
- * (docs/12-migration §3). {@code <source>} suggests only built source ids from the registry; an unknown
+ * Builds the {@code /uxmess import <source> [--dry-run]} subcommand node attached under the operator root.
+ * {@code <source>} suggests only built source ids from the registry; an unknown
  * value is rejected with the built-source list, never a silent no-op. {@code --dry-run} and the bare
  * {@code dry-run} literal are equivalent. The handler returns control to the tick thread immediately and
  * hands the import to the bounded executor off-tick: it never blocks the caller.

@@ -61,7 +61,7 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The one place the migration adapter is wired (docs/12-migration §10). It assembles the EssentialsX
+ * The one place the migration adapter is wired. It assembles the EssentialsX
  * {@link Convert} source, the source registry, the audit/backup ports, the live and dry-run writers over
  * the persistence repositories, the {@link ImportData} use case, and the inbound
  * {@link MigrationImportService} the {@code /uxmess import} node calls. Nothing it builds runs at plugin

@@ -8,7 +8,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  * Reads the EssentialsX location shape shared by {@code userdata} homes and {@code warps} files: a
  * {@code world}/{@code world-name} key plus {@code x}/{@code y}/{@code z}/{@code yaw}/{@code pitch}.
  * EssentialsX has used both {@code world} and {@code world-name} across versions, so both are tried;
- * a node with no world resolves to {@code null} and the caller skips it (docs/12-migration §4).
+ * a node with no world resolves to {@code null} and the caller skips it.
  */
 @NullMarked
 final class LocationNodes {

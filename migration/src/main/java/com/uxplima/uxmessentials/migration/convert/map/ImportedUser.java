@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The balance is carried as a raw {@link BigDecimal} rather than a {@code Money} because the target
  * {@code Currency} is resolved at write time from the live economy config, keeping this mapper output
  * free of any runtime-configured currency instance. The writer pairs the figure with the default
- * currency and applies the {@code balance-policy} (docs/12-migration §5.1, §6).
+ * currency and applies the {@code balance-policy}.
  *
  * @param owner the player this record belongs to
  * @param homes the homes mapped from the source, already clamped to valid names

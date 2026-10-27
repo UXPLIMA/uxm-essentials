@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Builds the presence context's Brigadier command surface (docs/10-feature-modules.md §15.8) as
+ * Builds the presence context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link PresenceServices}: {@code /afk [reason]},
  * {@code /list}, {@code /realname <player>}, {@code /whois <player>}, {@code /gc}, and
  * {@code /staff}. Collected in one

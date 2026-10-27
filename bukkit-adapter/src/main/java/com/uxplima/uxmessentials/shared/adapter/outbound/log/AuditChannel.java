@@ -19,8 +19,7 @@ import org.slf4j.helpers.MessageFormatter;
  * The audit channel, and the feed of what is written on it.
  *
  * <p>Every module that writes an audit line takes its logger from here, so every line reaches both the channel an
- * operator routes to a retained file and the feed the Discord bridge subscribes to (docs/09-deployment.md, the audit
- * logging section). Five modules used to open the channel straight off SLF4J, the bridge had nothing to subscribe to,
+ * operator routes to a retained file and the feed the Discord bridge subscribes to. Five modules used to open the channel straight off SLF4J, the bridge had nothing to subscribe to,
  * and nothing it was built to mirror ever reached Discord.
  *
  * <p>A line is published only while somebody listens, so a server without the bridge pays one empty check per line.

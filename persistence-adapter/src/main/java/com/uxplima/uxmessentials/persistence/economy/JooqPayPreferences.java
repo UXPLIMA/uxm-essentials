@@ -13,7 +13,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The jOOQ-backed {@link PayPreferences} over the {@code economy_pay_preferences} table. The accept-pay flag
  * is a first-class {@code (owner, accepts_pay)} row, not a JSON blob, so it is queryable, survives relog,
- * and is read without materialising a wallet ({@code docs/11-economy-integration.md} §9.1). A player with no
+ * and is read without materialising a wallet. A player with no
  * row has never run {@code /paytoggle} and takes the configured {@code economy.pay.toggle-default}, supplied
  * to the constructor.
  *

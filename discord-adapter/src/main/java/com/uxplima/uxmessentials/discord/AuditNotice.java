@@ -8,8 +8,8 @@ import java.util.Optional;
 
 /**
  * The bridge-side representation of one host notification, an audit event or an economy notification the host
- * plugin raised on the {@code com.uxplima.uxmessentials.audit} channel / in-process {@code DomainEventPublisher}
- * (docs/09-deployment.md §Audit logging). The host's notification source produces these and feeds them to the
+ * plugin raised on the {@code com.uxplima.uxmessentials.audit} channel / in-process {@code DomainEventPublisher}.
+ * The host's notification source produces these and feeds them to the
  * {@link AuditNoticeSubscriber}; the {@link NotificationFormatter} turns one into the formatted
  * {@link Notification} that is forwarded to Discord.
  *
@@ -22,8 +22,7 @@ import java.util.Optional;
  * {@link #originServer()} carries the id of the backend that produced the event. A notification whose origin is
  * {@link #DISCORD_ORIGIN} was synthesized by the bridge itself (or re-broadcast on the cluster bus on its
  * behalf); forwarding it would mirror the same action twice, so {@link #fromBridge()} flags it and the
- * formatter drops it. This is the {@code originServer = "discord"} sentinel that prevents replication loops
- * (docs/09-deployment.md Path C, CLAUDE.md).
+ * formatter drops it. This is the {@code originServer = "discord"} sentinel that prevents replication loops.
  *
  * @param category which Discord channel category this notice routes to
  * @param event the audit/event name (the {@code event=} value), without the {@code event=} prefix

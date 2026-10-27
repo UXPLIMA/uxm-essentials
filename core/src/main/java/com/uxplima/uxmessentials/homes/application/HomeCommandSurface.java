@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The homes context's command surface (docs/10-feature-modules.md §15.1) as platform-neutral
+ * The homes context's command surface as platform-neutral
  * {@link CommandSpec}s. There is a single command literal, {@code /home}, gated by
  * {@code uxmessentials.home.use}. Everything a player does with homes hangs off it: the no-arg invocation
  * opens the slot grid, while {@code visit}, {@code invite}, {@code uninvite} and the {@code admin} subtree

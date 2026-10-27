@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.shared.application.message;
 /**
  * The shared kernel's common message keys: the cross-cutting block no single feature context owns.
  *
- * <p>Several families live here (docs/13-i18n §6, the {@code shared} row): the {@code command.*} failures
+ * <p>Several families live here: the {@code command.*} failures
  * every command-bearing context raises before it reaches a use case (no permission, player-only,
  * unknown player), the {@code cooldown.*} / {@code warmup.*} feedback the shared {@code Cooldowns} /
  * {@code Warmups} ports render, the {@code lang.*} feedback the {@code /lang} override command emits, and

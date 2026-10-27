@@ -21,7 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The activity listener feeding the AFK clock (docs/02-concurrency.md §6.9): a player who moves, chats, or
+ * The activity listener feeding the AFK clock: a player who moves, chats, or
  * reels a fishing rod is active, so their idle clock resets and an AFK player returns on the first sign of
  * life, unless the operator's anti-machine {@link ActivityPolicy} ignores that kind, in which case an AFK-farm
  * machine producing only ignored activity still drifts idle and goes AFK.

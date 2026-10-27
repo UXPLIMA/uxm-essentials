@@ -24,8 +24,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * non-atomic currency unless the operator opts in.
  *
  * <h2>Threading</h2>
- * Every method is I/O and runs off the tick and region threads. Implementations that touch Bukkit do so on a
- * thread the {@code FoliaThreadingDriftTest} allow-list names.
+ * Every method is I/O and runs off the tick and region threads. Implementations that touch Bukkit do so on the
+ * thread that owns what they touch.
  */
 public interface CurrencyBackend {
 

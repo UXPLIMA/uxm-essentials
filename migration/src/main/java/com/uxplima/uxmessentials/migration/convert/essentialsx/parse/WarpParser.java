@@ -11,7 +11,7 @@ import org.spongepowered.configurate.ConfigurationNode;
  * Parses one EssentialsX {@code warps/<name>.yml} into an {@link EssXWarp}. The warp name is taken from
  * the file name stem (EssentialsX names each warp's file after the warp), and the location is the
  * top-level coordinate block. A file with no resolvable world yields {@code null} and the caller counts
- * it as a skipped record (docs/12-migration §4).
+ * it as a skipped record.
  */
 @NullMarked
 public final class WarpParser {

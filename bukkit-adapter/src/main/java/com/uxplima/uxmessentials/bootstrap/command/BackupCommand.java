@@ -25,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /backup}: an on-demand snapshot of the plugin's own data directory. It reuses the
- * {@link DataDirBackupSnapshot} the migration importer takes before a cutover (docs/12-migration §9), so a
+ * {@link DataDirBackupSnapshot} the migration importer takes before a cutover, so a
  * backup is a timestamped copy of the bundled {@code .conf} state under the data folder, not a world or
  * off-host database backup, which stay the operator's responsibility. The reply says as much.
  *

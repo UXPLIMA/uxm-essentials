@@ -5,8 +5,8 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Outbound port for the vaults audit trail. The {@code com.uxplima.uxmessentials.audit} channel
- * (docs/09-deployment.md §Audit logging), mirroring the moderation and itemworld audit. The admin form
+ * Outbound port for the vaults audit trail. The {@code com.uxplima.uxmessentials.audit} channel,
+ * mirroring the moderation and itemworld audit. The admin form
  * ({@code /vault <player> [n]}) lets staff open and inspect another player's vault, so every admin open emits
  * exactly one structured {@code event=vault_admin_open actor=<staff> owner=<player> idx=<n>} line an operator
  * can route to a retained file. A player opening their own vault is not audited: only the staff override is.

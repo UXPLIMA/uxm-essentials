@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * {@code ConcurrentHashMap<UUID, PlayerPresence>} and applies every mutation through {@code compute} /
  * {@code computeIfAbsent}, so a reader on any thread, a sync activity listener, the async AFK sweep, a
  * cross-context vanish lookup, always sees a coherent immutable aggregate and concurrent transitions never
- * lose an update (docs/02-concurrency.md §6.9: the sync-listener / async-reader split).
+ * lose an update (the sync-listener / async-reader split).
  *
  * <p>The state is in-memory only: presence persists nothing in v1 (no migration, no DB). A player's presence
  * is seeded on join, re-stamped by the activity listeners, flipped by the AFK/vanish use cases and the sweep,

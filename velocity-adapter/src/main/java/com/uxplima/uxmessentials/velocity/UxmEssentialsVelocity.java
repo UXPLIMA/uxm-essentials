@@ -21,7 +21,7 @@ import org.slf4j.Logger;
  * The proxy-side cross-server bus broker, the entry point of the optional {@code uxmessentials-velocity}
  * jar. It registers the {@link BusChannel bus channel} on the proxy and relays uxmEssentials sync frames
  * from one backend to the others, so a {@code /sethome} on one backend invalidates the home cache on every
- * other backend in the cluster ({@code docs/09-deployment.md} Path B).
+ * other backend in the cluster.
  *
  * <p>This class is a thin Velocity-lifecycle shell: it holds the injected {@link ProxyServer} and
  * {@link Logger}, registers the channel on proxy init, and forwards the plugin-message event to the

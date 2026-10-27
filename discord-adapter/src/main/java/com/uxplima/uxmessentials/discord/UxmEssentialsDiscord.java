@@ -15,8 +15,7 @@ import org.spongepowered.configurate.ConfigurateException;
 
 /**
  * The entry point of the optional {@code uxmessentials-discord} jar. Its own Paper plugin, declared by this
- * module's {@code paper-plugin.yml} and soft-depending on the host {@code uxmEssentials} (docs/09-deployment.md
- * Path C). It is a thin lifecycle shell: load {@code discord.conf} on enable, connect off-tick only when a
+ * module's {@code paper-plugin.yml} and soft-depending on the host {@code uxmEssentials}. It is a thin lifecycle shell: load {@code discord.conf} on enable, connect off-tick only when a
  * token is configured, and shut JDA down cleanly on disable. With no token the plugin stays dormant and the
  * host plugin runs entirely unaffected.
  *

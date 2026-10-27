@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The EssentialsX source's lazy {@link ImportPlan}. It composes three sub-streams: userdata files,
  * warp files, and the kits file. Into one {@link ImportRecord} stream, each evaluated on demand as the
- * importer's bounded executor drains it (docs/12-migration §7). A malformed individual file is dropped
+ * importer's bounded executor drains it. A malformed individual file is dropped
  * from the stream (the run continues and counts it as skipped/failed downstream), so one bad
  * {@code userdata/<uuid>.yml} never aborts the import (§4).
  */
@@ -68,7 +68,7 @@ final class EssentialsXPlan implements ImportPlan {
         try {
             return userRecords(userdata.parse(file));
         } catch (IOException | RuntimeException badFile) {
-            // One unreadable userdata file is skipped, never fatal (docs/12-migration §4).
+            // One unreadable userdata file is skipped, never fatal.
             return Stream.empty();
         }
     }
@@ -119,7 +119,7 @@ final class EssentialsXPlan implements ImportPlan {
         }
         // The directory listing is collected eagerly inside try-with-resources so the directory handle is
         // released immediately; only the cheap path list is held. The expensive work: parsing each file's
-        // content: still happens lazily as the records stream is drained downstream (docs/12-migration §7).
+        // content: still happens lazily as the records stream is drained downstream.
         try (Stream<Path> listing = Files.list(dir)) {
             return listing.filter(p -> p.getFileName().toString().endsWith(".yml")).toList().stream();
         } catch (IOException unreadableDir) {

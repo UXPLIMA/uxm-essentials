@@ -22,8 +22,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Writes the importer's audit trail to the dedicated {@code com.uxplima.uxmessentials.audit} channel as
- * structured {@code event=migration_import_* key=value} lines (docs/12-migration §9, docs/09-deployment
- * audit catalogue). The {@code start → per-record → finish} family makes any run fully replayable;
+ * structured {@code event=migration_import_* key=value} lines. The {@code start → per-record → finish} family makes any run fully replayable;
  * a dry run emits the identical lines with {@code dry_run=true} so an operator can diff it against the
  * real run that follows. Audit lines are operator-facing, so they go through a {@link Logger} bound to
  * the audit channel, never the player-facing {@code MessageKey} catalogue.
@@ -128,7 +127,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
 
     private void recordModeration(SourceId source, ImportRecord.ModerationRecord rec, RecordOutcome outcome) {
         // One moderation record can carry both sanctions; the doc catalogue keeps jail and mute as separate
-        // events (docs/12-migration §9), so each present sanction emits its own audit line.
+        // events, so each present sanction emits its own audit line.
         ImportedModeration imported = rec.moderation();
         ModerationProfile profile = imported.profile();
         PlayerRef target = profile.target();
