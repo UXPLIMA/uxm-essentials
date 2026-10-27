@@ -30,8 +30,8 @@ The all-in-one essentials suite for Paper 26.2: 35 modules, from homes, warps an
 
 ## Testing
 
-There are no tests yet. New tests follow the repository standard: behavior through the public API, fakes for
-ports, no assertion on structure. In-game behavior is checked with Craftwire on a development server.
+Tests are few so far, under `core/src/test`. New tests follow the repository standard: behavior through the
+public API, fakes for ports, no assertion on structure. In-game behavior is checked with Craftwire on a development server.
 
 ## Pull requests
 

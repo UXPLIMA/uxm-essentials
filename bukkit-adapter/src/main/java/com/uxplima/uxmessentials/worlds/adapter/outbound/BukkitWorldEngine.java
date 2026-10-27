@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import org.bukkit.NamespacedKey;
 import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.WorldCreator;
@@ -24,6 +25,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
+import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
+import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -67,7 +70,15 @@ public final class BukkitWorldEngine implements WorldEngine {
 
     private Result<Unit, WorldError> loadOrCreate(WorldName name, Optional<WorldSpec> spec) {
         try {
-            WorldCreator creator = new WorldCreator(name.value());
+            // A dimension the spec names wins; otherwise the folder decides, so a datapack's dimension loads from
+            // its own namespace rather than an empty one being made under minecraft. Paper takes a name or a key,
+            // not both, and names a key's world itself the way DimensionNames does.
+            NamespacedKey key = spec.flatMap(WorldSpec::dimension)
+                    .map(d -> new NamespacedKey(DimensionNames.namespace(d), DimensionNames.path(d)))
+                    .orElseGet(() -> folders.keyOf(name.value()));
+            WorldCreator creator = key.getNamespace().equals(NamespacedKey.MINECRAFT)
+                    ? new WorldCreator(name.value())
+                    : WorldCreator.ofKey(key);
             spec.ifPresent(s -> applySpec(creator, s));
             World created = creator.createWorld();
             if (created == null) {
@@ -151,8 +162,43 @@ public final class BukkitWorldEngine implements WorldEngine {
         if (!folders.exists(name.value())) {
             return Optional.empty();
         }
-        // Precise NBT environment/seed detection for unloaded folders needs NMS; default NORMAL/no-seed.
-        return Optional.of(new DetectedWorld(WorldEnvironment.NORMAL, Optional.empty()));
+        // The seed lives in the level's level.dat and needs NMS; the environment follows the dimension's key.
+        return Optional.of(new DetectedWorld(
+                DimensionNames.environment(folders.keyOf(name.value()).value()), Optional.empty()));
+    }
+
+    @Override
+    public Optional<DetectedWorld> scanFolder(WorldName name, Optional<DimensionKey> dimension) {
+        if (dimension.isEmpty()) {
+            return scanFolder(name);
+        }
+        if (server.getWorld(name.value()) != null || !folders.exists(name.value(), dimension)) {
+            return scanFolder(name);
+        }
+        return Optional.of(
+                new DetectedWorld(DimensionNames.environment(DimensionNames.path(dimension.get())), Optional.empty()));
+    }
+
+    @Override
+    public boolean exists(WorldName name, Optional<DimensionKey> dimension) {
+        return folders.exists(name.value(), dimension);
+    }
+
+    /**
+     * The world name the server gives {@code raw} when it is a {@code namespace:path} key or the bare path of one of
+     * the level's three dimensions ({@code the_nether} reaches {@code world_nether}), else {@code raw}.
+     */
+    public String worldNameOf(String raw) {
+        String levelName = String.valueOf(server.getLevelDirectory().getFileName());
+        Optional<DimensionKey> typed = DimensionNames.parse(raw);
+        if (typed.isPresent()) {
+            return DimensionNames.worldName(typed.get(), levelName);
+        }
+        return switch (raw) {
+            case "overworld", "the_nether", "the_end" ->
+                DimensionNames.worldName(DimensionKey.of(NamespacedKey.MINECRAFT + ":" + raw), levelName);
+            default -> raw;
+        };
     }
 
     @Override

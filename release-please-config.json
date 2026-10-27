@@ -4,7 +4,8 @@
   "pull-request-title-pattern": "chore(release): release ${version}",
   "packages": {
     ".": {
-      "package-name": "uxm-essentials"
+      "package-name": "uxm-essentials",
+      "include-component-in-tag": false
     }
   }
 }

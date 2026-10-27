@@ -397,6 +397,7 @@ public final class WorldsWiring {
                 repository,
                 kernel.scheduler(),
                 engine::onDiskWorldNames,
+                engine::worldNameOf,
                 worldTeleport,
                 backupWorld,
                 listBackups,

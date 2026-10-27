@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
+import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -53,24 +54,38 @@ public final class ImportWorld {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
+    /**
+     * Import the world {@code name}. A {@code dimension} the operator named is kept on the spec, so the world loads
+     * from that dimension again on every start. An {@code environment} left out is the one the folder scan reads.
+     */
     public Result<Unit, WorldError> importWorld(
-            PlayerRef importer, WorldName name, WorldEnvironment environment, Optional<GeneratorRef> generator) {
+            PlayerRef importer,
+            WorldName name,
+            Optional<DimensionKey> dimension,
+            Optional<WorldEnvironment> environment,
+            Optional<GeneratorRef> generator) {
         Objects.requireNonNull(importer, "importer");
         Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(dimension, "dimension");
         Objects.requireNonNull(environment, "environment");
         Objects.requireNonNull(generator, "generator");
         if (repository.exists(name)) {
             return fail(importer, name, WorldError.ALREADY_EXISTS);
         }
-        if (!engine.exists(name)) {
+        if (!engine.exists(name, dimension)) {
             return fail(importer, name, WorldError.FOLDER_MISSING);
         }
-        Optional<WorldEngine.DetectedWorld> detected = engine.scanFolder(name);
+        Optional<WorldEngine.DetectedWorld> detected = engine.scanFolder(name, dimension);
         if (detected.isEmpty()) {
             return fail(importer, name, WorldError.NOT_A_WORLD_FOLDER);
         }
         WorldSpec spec = new WorldSpec(
-                environment, WorldGenType.NORMAL, detected.get().seed(), generator, true, Optional.empty());
+                environment.orElse(detected.get().environment()),
+                WorldGenType.NORMAL,
+                detected.get().seed(),
+                generator,
+                true,
+                dimension);
         ManagedWorld world = ManagedWorld.created(name, spec, true, Optional.of(importer.uuid()), clock.instant());
         Result<Unit, WorldError> loaded = engine.load(world);
         if (loaded.isErr()) {

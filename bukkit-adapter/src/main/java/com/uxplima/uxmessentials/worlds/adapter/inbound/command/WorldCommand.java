@@ -38,6 +38,8 @@ import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.BackupId;
 import com.uxplima.uxmessentials.worlds.domain.BackupRef;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
+import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
+import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -97,6 +99,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("import")
                         .requires(p(IMPORT))
                         .then(folderArg()
+                                .executes(this::runImport)
                                 .then(envArg().executes(this::runImport)
                                         .then(Commands.argument("generator", StringArgumentType.greedyString())
                                                 .executes(this::runImport)))))
@@ -275,15 +278,20 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
 
     private int runImport(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = Sender.audience(ctx.getSource());
-        WorldName name = parseName(sender, ctx.getArgument("folder", String.class));
+        String folder = ctx.getArgument("folder", String.class);
+        WorldName name = parseName(sender, folder);
         if (name == null) {
             return 0;
         }
-        WorldEnvironment env = arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL);
+        // A key the operator typed is kept, so the world loads from that namespace on every start.
+        Optional<DimensionKey> dimension = DimensionNames.parse(folder);
+        // Left out, the environment is read from the dimension: the_nether and the_end, any other normal.
+        Optional<WorldEnvironment> env = optionalString(ctx, "environment")
+                .map(raw -> arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL));
         Optional<GeneratorRef> gen = optionalString(ctx, "generator").map(GeneratorRef::of);
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_IMPORTING, Map.of("world", name.value()));
-        onGlobal(() -> services.importWorld().importWorld(who, name, env, gen));
+        onGlobal(() -> services.importWorld().importWorld(who, name, dimension, env, gen));
         return Command.SINGLE_SUCCESS;
     }
 
