@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.WorldRecord;
+import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
@@ -29,8 +30,7 @@ final class WorldRows {
                 Optional.ofNullable(row.get(WORLD.SEED)),
                 Optional.ofNullable(row.get(WORLD.GENERATOR_REF)).map(GeneratorRef::of),
                 row.get(WORLD.GENERATE_STRUCTURES) != 0,
-                // The dimension column is present but not yet mapped to a VO use; a later sub-project parses it.
-                Optional.empty());
+                Optional.ofNullable(row.get(WORLD.DIMENSION)).flatMap(DimensionNames::parse));
         return new ManagedWorld(
                 WorldName.of(row.get(WORLD.NAME)),
                 spec,

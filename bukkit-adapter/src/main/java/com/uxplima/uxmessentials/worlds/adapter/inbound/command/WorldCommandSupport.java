@@ -61,7 +61,8 @@ abstract class WorldCommandSupport {
     /** Parse a raw argument into a {@link WorldName}, or {@code null} (after sending the invalid-name reply). */
     final @Nullable WorldName parseName(CommandSender sender, String raw) {
         try {
-            return WorldName.of(raw);
+            // minecraft:the_nether and world_nether name the same world; a key is turned into the server's name.
+            return WorldName.of(services.worldNameOf(raw));
         } catch (IllegalArgumentException invalid) {
             feedback.send(sender, WorldsMessageKey.WORLD_NAME_INVALID, Map.of("world", raw));
             return null;

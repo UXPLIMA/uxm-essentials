@@ -7,6 +7,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldError;
@@ -41,7 +42,17 @@ public interface WorldEngine {
     /** Read {@code level.dat} for an on-disk, possibly-unloaded world. */
     Optional<DetectedWorld> scanFolder(WorldName name);
 
+    /** {@link #scanFolder(WorldName)} for the world {@code name} kept in {@code dimension}, when one is named. */
+    default Optional<DetectedWorld> scanFolder(WorldName name, Optional<DimensionKey> dimension) {
+        return scanFolder(name);
+    }
+
     boolean exists(WorldName name);
+
+    /** {@link #exists(WorldName)} for the world {@code name} kept in {@code dimension}, when one is named. */
+    default boolean exists(WorldName name, Optional<DimensionKey> dimension) {
+        return exists(name);
+    }
 
     boolean isLoaded(WorldName name);
 

@@ -6,6 +6,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 import java.util.stream.Collectors;
 
 import org.bukkit.entity.Player;
@@ -65,6 +66,7 @@ public final class WorldsServices {
     private final WorldRepository repository;
     private final Scheduler scheduler;
     private final Supplier<Set<WorldName>> onDiskScanner;
+    private final UnaryOperator<String> worldNames;
     private final BiConsumer<Player, PlayerRef> openWorldList;
     private final WorldMainOpener openWorldMain;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
@@ -87,6 +89,7 @@ public final class WorldsServices {
             WorldRepository repository,
             Scheduler scheduler,
             Supplier<Set<WorldName>> onDiskScanner,
+            UnaryOperator<String> worldNames,
             WorldTeleportService worldTeleport,
             BackupWorld backupWorld,
             ListBackups listBackups,
@@ -110,6 +113,7 @@ public final class WorldsServices {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.onDiskScanner = Objects.requireNonNull(onDiskScanner, "onDiskScanner");
+        this.worldNames = Objects.requireNonNull(worldNames, "worldNames");
         this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
         this.backupWorld = Objects.requireNonNull(backupWorld, "backupWorld");
         this.listBackups = Objects.requireNonNull(listBackups, "listBackups");
@@ -219,6 +223,11 @@ public final class WorldsServices {
 
     public Scheduler scheduler() {
         return scheduler;
+    }
+
+    /** The world name an operator means: a {@code namespace:path} key turned into the server's name for it. */
+    public String worldNameOf(String raw) {
+        return worldNames.apply(raw);
     }
 
     /** The candidate import folders from the last refresh (on-disk worlds not yet registered). */
