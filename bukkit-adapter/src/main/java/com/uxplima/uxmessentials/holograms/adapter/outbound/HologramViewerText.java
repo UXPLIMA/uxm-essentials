@@ -35,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 public final class HologramViewerText {
 
     private final Function<UUID, UnaryOperator<String>> bridgeFactory;
-    private final MiniMessage miniMessage;
+    private final ParsedText parsed;
     private final Supplier<TagResolver> globalTags;
     private final HologramPageState pageState;
 
@@ -45,7 +45,7 @@ public final class HologramViewerText {
             Supplier<TagResolver> globalTags,
             HologramPageState pageState) {
         this.bridgeFactory = Objects.requireNonNull(bridgeFactory, "bridgeFactory");
-        this.miniMessage = Objects.requireNonNull(miniMessage, "miniMessage");
+        this.parsed = new ParsedText(Objects.requireNonNull(miniMessage, "miniMessage"));
         this.globalTags = Objects.requireNonNull(globalTags, "globalTags");
         this.pageState = Objects.requireNonNull(pageState, "pageState");
     }
@@ -102,7 +102,7 @@ public final class HologramViewerText {
             String written = HudText.lineFor(uuid, line.value());
             String tokens = HologramTokens.resolve(written, viewer.getName(), page + 1, pages);
             String source = HologramAnimations.expand(bridge.apply(tokens), phase);
-            resolved.add(miniMessage.deserialize(source, tags));
+            resolved.add(parsed.parse(source, tags));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
     }
@@ -119,7 +119,7 @@ public final class HologramViewerText {
         List<Component> resolved = new ArrayList<>(hologram.lines().size());
         for (HologramLine line : hologram.lines()) {
             String source = HologramAnimations.expand(globalBridge.apply(line.value()), phase);
-            resolved.add(miniMessage.deserialize(source, tags));
+            resolved.add(parsed.parse(source, tags));
         }
         return Component.join(JoinConfiguration.newlines(), resolved);
     }
