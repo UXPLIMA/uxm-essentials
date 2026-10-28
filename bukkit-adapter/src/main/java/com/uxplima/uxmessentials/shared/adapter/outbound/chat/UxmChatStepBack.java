@@ -35,6 +35,9 @@ public final class UxmChatStepBack {
     public static final String CLEAR_CHAT = "clear-chat";
     public static final String ME = "me";
     public static final String TOGGLE_CHAT = "toggle-chat";
+    public static final String IGNORE = "ignore";
+    public static final String NICKNAMES = "nicknames";
+    public static final String STAFF_LIST = "staff-list";
 
     private static final String PLUGIN = "uxmChat";
     private static final String SERVICE = "com.uxplima.chat.api.UxmChat";
@@ -47,9 +50,12 @@ public final class UxmChatStepBack {
             Map.entry("msgtoggle", PRIVATE_MESSAGES),
             Map.entry("rtoggle", PRIVATE_MESSAGES),
             Map.entry("msgsettings", PRIVATE_MESSAGES),
-            Map.entry("ignore", PRIVATE_MESSAGES),
-            Map.entry("unignore", PRIVATE_MESSAGES),
-            Map.entry("ignorelist", PRIVATE_MESSAGES),
+            Map.entry("ignore", IGNORE),
+            Map.entry("unignore", IGNORE),
+            Map.entry("ignorelist", IGNORE),
+            Map.entry("nick", NICKNAMES),
+            Map.entry("realname", NICKNAMES),
+            Map.entry("stafflist", STAFF_LIST),
             Map.entry("socialspy", SOCIAL_SPY),
             Map.entry("mail", MAIL),
             Map.entry("mailclear", MAIL),
@@ -82,10 +88,22 @@ public final class UxmChatStepBack {
         return active().map(features -> features.contains(feature)).orElse(false);
     }
 
-    /** Whether uxmChat takes over the command with this id, so this plugin does not register it. */
+    /**
+     * Whether uxmChat takes over the command with this id, so this plugin does not register it.
+     *
+     * <p>Commands are decided when the server builds its command tree, after every plugin has enabled, so
+     * here a uxmChat that is not enabled runs nothing: one that failed to start must not take this plugin's
+     * commands with it.
+     */
     public boolean coversCommand(String commandId) {
         String feature = COMMANDS.get(commandId);
-        return feature != null && covers(feature);
+        if (feature == null) {
+            return false;
+        }
+        Plugin chat = server.getPluginManager().getPlugin(PLUGIN);
+        return chat != null
+                && chat.isEnabled()
+                && active().map(features -> features.contains(feature)).orElse(false);
     }
 
     private Optional<Set<String>> active() {
@@ -94,9 +112,10 @@ public final class UxmChatStepBack {
         if (last != null && now - last.at() < FRESH.toNanos()) {
             return Optional.of(last.features());
         }
-        Optional<Set<String>> read = read();
-        read.ifPresent(features -> seen = new Seen(features, now));
-        return read;
+        // An unreadable uxmChat is remembered too, so a chat line does not scan the services again.
+        Set<String> read = read().orElse(Set.of());
+        seen = new Seen(read, now);
+        return Optional.of(read);
     }
 
     private Optional<Set<String>> read() {

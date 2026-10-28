@@ -60,17 +60,26 @@ class UxmChatStepBackTest {
                 server(true, true, 100, Set.of(UxmChatStepBack.PRIVATE_MESSAGES, UxmChatStepBack.CHAT_FORMAT)));
 
         assertThat(stepBack.coversCommand("msg")).isTrue();
-        assertThat(stepBack.coversCommand("ignore")).isTrue();
+        assertThat(stepBack.coversCommand("ignore"))
+                .as("ignore is its own feature")
+                .isFalse();
         assertThat(stepBack.coversCommand("mail")).isFalse();
         assertThat(stepBack.covers(UxmChatStepBack.CHAT_FORMAT)).isTrue();
         assertThat(stepBack.coversCommand("home")).isFalse();
     }
 
     @Test
-    void whileUxmChatHasNotStartedYetItsFeaturesCountAsItsButOnceTheServerTicksTheyDoNot() {
-        assertThat(new UxmChatStepBack(server(true, false, 0, null)).coversCommand("mail"))
+    void whileUxmChatHasNotStartedYetItsChatLinesCountAsItsButOnceTheServerTicksTheyDoNot() {
+        assertThat(new UxmChatStepBack(server(true, false, 0, null)).covers(UxmChatStepBack.JOIN_QUIT))
                 .isTrue();
-        assertThat(new UxmChatStepBack(server(true, false, 40, null)).coversCommand("mail"))
+        assertThat(new UxmChatStepBack(server(true, false, 40, null)).covers(UxmChatStepBack.JOIN_QUIT))
+                .isFalse();
+    }
+
+    @Test
+    void aUxmChatThatFailedToStartTakesNoCommandWithIt() {
+        // Commands are decided after every plugin has enabled, still at tick 0.
+        assertThat(new UxmChatStepBack(server(true, false, 0, null)).coversCommand("mail"))
                 .isFalse();
     }
 }

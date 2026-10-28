@@ -55,9 +55,15 @@ database runs on the uxmLib `Scheduler` async lane; work on a player or a block 
 ## With uxmChat
 
 When uxmChat is installed, the chat features both plugins have are left to it: chat format, private
-messages, social spy, mail, helpop, the announcer, join and quit lines, broadcast, clear chat, `me` and the
-chat toggle. `UxmChatStepBack` asks uxmChat's API service (`com.uxplima.chat.api.UxmChat`) which features
-it runs, so one uxmChat has turned off stays here. Commands are decided when the server builds its command
-tree, listeners and the announcer on every event. This plugin starts before the worlds and uxmChat after
-them, so until the server ticks an installed uxmChat counts as running everything; after that, one that
-never started runs nothing.
+messages, social spy, mail, helpop, the announcer, join, quit and death lines, broadcast, clear chat, `me`,
+the chat toggle, ignore, nicknames and the staff list. `UxmChatStepBack` asks uxmChat's API service
+(`com.uxplima.chat.api.UxmChat`) which features it runs; uxmChat reports a feature only while its module is
+on and its command is enabled, so one it has turned off stays here. The joiner's MOTD and the page sent to a
+player who died stay with this plugin either way.
+
+Listeners and the announcer ask on every event. This plugin starts before the worlds and uxmChat after
+them, so until the server ticks an installed uxmChat counts as running every chat line; after that, one that
+never started runs nothing. Commands are decided when the server builds its command tree, after every
+plugin has enabled, so a uxmChat that failed to start takes no command with it. A module switched on either
+side reaches the commands on the next command reload, not on a module reload alone. `/help` lists only the
+commands this plugin registered. `/mute` stays with this plugin's moderation.

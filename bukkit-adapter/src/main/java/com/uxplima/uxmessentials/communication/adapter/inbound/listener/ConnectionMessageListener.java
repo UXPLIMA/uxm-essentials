@@ -78,10 +78,12 @@ public final class ConnectionMessageListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
         if (leftToChat.getAsBoolean()) {
+            // uxmChat writes the join line; the joiner's own MOTD is still this plugin's.
+            sendMotd(player);
             return;
         }
-        Player player = event.getPlayer();
         PlaceholderBindings bindings = ConnectionPlaceholders.connection(player, onlineCount(player));
         boolean firstJoin = !player.hasPlayedBefore();
         @Nullable String group = metaSource.metaFor(player.getUniqueId()).primaryGroup().orElse(null);

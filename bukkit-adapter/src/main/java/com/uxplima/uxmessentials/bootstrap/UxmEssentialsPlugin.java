@@ -87,18 +87,19 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         getLogger().info("[4/5] Registering command handlers...");
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
-            // Commands uxmChat runs (private messages, mail, helpop, broadcast, clear chat, me, the chat toggle)
-            // are left to it; this runs again on every command reload, so a module switched on either side follows.
+            // Commands uxmChat runs (private messages, mail, helpop, broadcast, clear chat, me, the chat toggle,
+            // ignore, nicknames, the staff list) are left to it. This runs again on every command reload, so a
+            // module switched on either side follows after the next one, not on a module reload alone.
             UxmChatStepBack chat = new UxmChatStepBack(getServer());
             List<String> left = new ArrayList<>();
             // Guard each publish so one malformed command (a broken build() or a duplicate literal) is logged
             // and skipped instead of aborting the whole batch and leaving every later command unregistered.
             wired.commands().forEach(command -> {
-                if (chat.coversCommand(command.commandId())) {
-                    left.add(command.commandId());
-                    return;
-                }
                 try {
+                    if (chat.coversCommand(command.commandId())) {
+                        left.add(command.commandId());
+                        return;
+                    }
                     registrar.register(command.build(), command.description(), command.aliases());
                 } catch (RuntimeException failure) {
                     getLogger()

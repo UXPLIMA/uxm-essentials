@@ -71,10 +71,12 @@ public final class DeathMessageListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
+        Player player = event.getEntity();
         if (leftToChat.getAsBoolean()) {
+            // uxmChat writes the death line; the page sent to the one who died is still this plugin's.
+            sendInfoPage(player);
             return;
         }
-        Player player = event.getEntity();
         Player killer = player.getKiller();
         DeathCause cause = DeathCauses.of(event);
         PlaceholderBindings bindings = ConnectionPlaceholders.death(
