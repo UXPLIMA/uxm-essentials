@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.bootstrap;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.logging.Level;
 
 import org.bukkit.generator.ChunkGenerator;
@@ -10,6 +12,7 @@ import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
+import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
@@ -84,9 +87,17 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         getLogger().info("[4/5] Registering command handlers...");
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
+            // Commands uxmChat runs (private messages, mail, helpop, broadcast, clear chat, me, the chat toggle)
+            // are left to it; this runs again on every command reload, so a module switched on either side follows.
+            UxmChatStepBack chat = new UxmChatStepBack(getServer());
+            List<String> left = new ArrayList<>();
             // Guard each publish so one malformed command (a broken build() or a duplicate literal) is logged
             // and skipped instead of aborting the whole batch and leaving every later command unregistered.
             wired.commands().forEach(command -> {
+                if (chat.coversCommand(command.commandId())) {
+                    left.add(command.commandId());
+                    return;
+                }
                 try {
                     registrar.register(command.build(), command.description(), command.aliases());
                 } catch (RuntimeException failure) {
@@ -98,6 +109,9 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
                                     failure);
                 }
             });
+            if (!left.isEmpty()) {
+                getLogger().info("Left to uxmChat: /" + String.join(", /", left));
+            }
         });
 
         getLogger().info("[5/5] Registering listener hooks...");

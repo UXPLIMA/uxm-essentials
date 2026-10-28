@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -51,6 +52,8 @@ import org.jspecify.annotations.Nullable;
 public final class ConnectionMessageListener implements Listener {
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
+    /** True while uxmChat runs this feature, which leaves it to uxmChat. */
+    private final BooleanSupplier leftToChat;
 
     private final ResolveJoinMessage resolveJoin;
     private final ResolveQuitMessage resolveQuit;
@@ -63,16 +66,21 @@ public final class ConnectionMessageListener implements Listener {
             ResolveQuitMessage resolveQuit,
             CommunicationSettings settings,
             BukkitInfoSender infoSender,
-            ChatMetaSource metaSource) {
+            ChatMetaSource metaSource,
+            BooleanSupplier leftToChat) {
         this.resolveJoin = Objects.requireNonNull(resolveJoin, "resolveJoin");
         this.resolveQuit = Objects.requireNonNull(resolveQuit, "resolveQuit");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.infoSender = Objects.requireNonNull(infoSender, "infoSender");
         this.metaSource = Objects.requireNonNull(metaSource, "metaSource");
+        this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onJoin(PlayerJoinEvent event) {
+        if (leftToChat.getAsBoolean()) {
+            return;
+        }
         Player player = event.getPlayer();
         PlaceholderBindings bindings = ConnectionPlaceholders.connection(player, onlineCount(player));
         boolean firstJoin = !player.hasPlayedBefore();
@@ -106,6 +114,9 @@ public final class ConnectionMessageListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onQuit(PlayerQuitEvent event) {
+        if (leftToChat.getAsBoolean()) {
+            return;
+        }
         Player player = event.getPlayer();
         PlaceholderBindings bindings = ConnectionPlaceholders.connection(player, onlineCount(player) - 1);
         apply(resolveQuit.resolve(bindings), event::quitMessage);

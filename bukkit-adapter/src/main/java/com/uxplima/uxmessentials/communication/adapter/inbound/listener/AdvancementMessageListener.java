@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -79,6 +80,8 @@ public final class AdvancementMessageListener implements Listener {
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
     private static final String RECIPE_INFIX = ":recipes/";
+    /** True while uxmChat runs this feature, which leaves it to uxmChat. */
+    private final BooleanSupplier leftToChat;
 
     private final Supplier<AdvancementNoticeConfig> config;
     private final ChannelBroadcaster channels;
@@ -93,13 +96,15 @@ public final class AdvancementMessageListener implements Listener {
             BroadcastOptOutStore optOut,
             Predicate<Player> vanished,
             Scheduler scheduler,
-            Locale locale) {
+            Locale locale,
+            BooleanSupplier leftToChat) {
         this.config = Objects.requireNonNull(config, "config");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.vanished = Objects.requireNonNull(vanished, "vanished");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.locale = Objects.requireNonNull(locale, "locale");
+        this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
     /**
@@ -109,6 +114,9 @@ public final class AdvancementMessageListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGHEST)
     public void onAdvancementReplaceTheLine(PlayerAdvancementDoneEvent event) {
+        if (leftToChat.getAsBoolean()) {
+            return;
+        }
         if (announces(config.get(), event)) {
             event.message(null);
         }
@@ -117,6 +125,9 @@ public final class AdvancementMessageListener implements Listener {
     /** Send this module's own notice, once every plugin has had its say about the advancement. */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onAdvancement(PlayerAdvancementDoneEvent event) {
+        if (leftToChat.getAsBoolean()) {
+            return;
+        }
         AdvancementNoticeConfig cfg = config.get();
         if (!announces(cfg, event)) {
             return;

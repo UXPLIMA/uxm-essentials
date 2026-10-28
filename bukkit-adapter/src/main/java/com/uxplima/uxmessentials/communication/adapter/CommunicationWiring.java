@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -47,6 +48,7 @@ import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -134,8 +136,16 @@ public final class CommunicationWiring {
                 channelBroadcaster,
                 CommunicationWiring::conditionContext,
                 kernel.scheduler());
+        // uxmChat, when it runs, takes over the chat format, the announcer and the join, quit, death and advancement
+        // lines it has turned on; each is checked when it would act, so a reload on either side is followed.
+        UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
         AnnouncerTask announcer = new AnnouncerTask(
-                kernel.scheduler(), services.nextAnnouncement(), broadcaster, mergedConfig, running::get);
+                kernel.scheduler(),
+                services.nextAnnouncement(),
+                broadcaster,
+                mergedConfig,
+                running::get,
+                () -> chat.covers(UxmChatStepBack.ANNOUNCEMENTS));
         // The admin panel reuses the SP0 GUI framework over the shared catalog and the data-folder layout loader. It
         // flips the live ChatLock, runs the /clearchat fan-out behind a confirm, broadcasts a captured line through
         // the same broadcaster as /broadcast, and opens a read-only announcer list. Only the surfaces the commands
@@ -199,7 +209,8 @@ public final class CommunicationWiring {
                 optOutStore,
                 kernel.scheduler(),
                 chatMeta,
-                chatPlaceholders);
+                chatPlaceholders,
+                chat);
         // The same re-read /announce reload performs, exposed so /uxmess reload communication applies the module's
         // file edits through one path rather than a second copy that could drift from it.
         Runnable reload = () -> {
@@ -255,11 +266,13 @@ public final class CommunicationWiring {
             BroadcastOptOutStore optOutStore,
             Scheduler scheduler,
             ChatMetaSource chatMeta,
-            ChatPlaceholderExpander chatPlaceholders) {
+            ChatPlaceholderExpander chatPlaceholders,
+            UxmChatStepBack chat) {
+        BooleanSupplier lines = () -> chat.covers(UxmChatStepBack.JOIN_QUIT);
         return List.of(
                 new ConnectionMessageListener(
-                        services.resolveJoin(), services.resolveQuit(), settings, infoSender, chatMeta),
-                new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings),
+                        services.resolveJoin(), services.resolveQuit(), settings, infoSender, chatMeta, lines),
+                new DeathMessageListener(services.resolveDeath(), registry, infoSender, settings, lines),
                 // English-only project (a founding decision): vanilla advancement titles are translatable components,
                 // so the listener renders them through the GlobalTranslator in this locale before flattening to text.
                 new AdvancementMessageListener(
@@ -268,11 +281,17 @@ public final class CommunicationWiring {
                         optOutStore,
                         CommunicationWiring::probeVanished,
                         scheduler,
-                        Locale.ENGLISH),
+                        Locale.ENGLISH,
+                        lines),
                 new ChatLockListener(chatLock, notifier),
                 // Registered at NORMAL, before the ChatLock at HIGH: a locked chat is cancelled there and a
                 // cancelled event never reaches the renderer, so the format can never override the lock.
-                new ChatFormatListener(settings::chatFormatPolicy, chatMeta, chatPlaceholders, HudText::lineFor));
+                new ChatFormatListener(
+                        settings::chatFormatPolicy,
+                        chatMeta,
+                        chatPlaceholders,
+                        HudText::lineFor,
+                        () -> chat.covers(UxmChatStepBack.CHAT_FORMAT)));
     }
 
     /**

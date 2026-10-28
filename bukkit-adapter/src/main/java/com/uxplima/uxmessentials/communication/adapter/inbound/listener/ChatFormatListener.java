@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -60,6 +61,8 @@ import org.jspecify.annotations.NullMarked;
 public final class ChatFormatListener implements Listener {
 
     private static final String FORMAT_PERMISSION = "uxmessentials.communication.chat.format";
+    /** True while uxmChat runs this feature, which leaves it to uxmChat. */
+    private final BooleanSupplier leftToChat;
 
     private final Supplier<ChatFormatPolicy> policy;
     private final ChatMetaSource metaSource;
@@ -74,16 +77,21 @@ public final class ChatFormatListener implements Listener {
             Supplier<ChatFormatPolicy> policy,
             ChatMetaSource metaSource,
             ChatPlaceholderExpander expander,
-            BiFunction<UUID, String, String> affixLines) {
+            BiFunction<UUID, String, String> affixLines,
+            BooleanSupplier leftToChat) {
         this.policy = Objects.requireNonNull(policy, "policy");
         this.metaSource = Objects.requireNonNull(metaSource, "metaSource");
         this.expander = Objects.requireNonNull(expander, "expander");
         this.affixLines = Objects.requireNonNull(affixLines, "affixLines");
+        this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
     /** Install the format renderer for this line unless chat formatting is disabled. */
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
+        if (leftToChat.getAsBoolean()) {
+            return;
+        }
         ChatFormatPolicy current = policy.get();
         if (!current.enabled()) {
             return;
