@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.3](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.2...v0.10.3) (2026-10-28)
+
+### Fixed
+
+- An amount with a leading zero, such as `0.500` or `0.001`, is read as a decimal. Before this, `/pay 0.500` paid 500.
+- The permission list describes the kit cooldown and home permissions the way the plugin checks them.
+
 ## [0.10.2](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.1...v0.10.2) (2026-10-27)
 
 ### Added
