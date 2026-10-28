@@ -443,6 +443,8 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
 
         private volatile @Nullable SharedText shared;
         private volatile @Nullable PacketHologram drawn;
+        /** Every request for a redraw made before one runs is served by that one redraw. */
+        private final QueuedOnce redraw;
 
         Live(Hologram shown, Position anchor, @Nullable PacketLine model) {
             this.stored = shown;
@@ -450,6 +452,7 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
             this.anchor = anchor;
             this.model = model;
             this.perViewer = text.hasPerViewerText(shown);
+            this.redraw = new QueuedOnce(task -> scheduler.onRegion(anchor, task), this::redrawNow);
         }
 
         void attach(PacketHologram packetHologram) {
@@ -465,9 +468,13 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
 
         /** Push a change out on the hologram's own thread now, rather than at the next frame. */
         void updateSoon() {
+            redraw.request();
+        }
+
+        private void redrawNow() {
             PacketHologram packetHologram = drawn;
             if (packetHologram != null) {
-                scheduler.onRegion(anchor, packetHologram::update);
+                packetHologram.update();
             }
         }
 
@@ -587,11 +594,14 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
             }
             Hologram current = shown;
             scheduler.onEntity(BukkitRefs.toRef(viewer), () -> {
+                @Nullable ViewerText before;
+                @Nullable Component now = null;
                 try {
-                    texts.put(id, new ViewerText(key, text.textFor(viewer, current, key.frame())));
+                    now = text.textFor(viewer, current, key.frame());
+                    before = texts.put(id, new ViewerText(key, now));
                 } catch (RuntimeException failed) {
                     // Kept as a failure for this key, so a text that cannot be read is not tried on every frame.
-                    texts.put(id, new ViewerText(key, null));
+                    before = texts.put(id, new ViewerText(key, null));
                     log.warn(
                             "hologram {} could not be read for {}: {}",
                             current.name().value(),
@@ -600,7 +610,11 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
                 } finally {
                     pending.remove(id);
                 }
-                updateSoon();
+                // A refresh resolves every viewer again, and most of them read what they already hold; only a
+                // viewer whose words changed, or who had none yet, needs the hologram drawn again.
+                if (before == null || !Objects.equals(before.text(), now)) {
+                    updateSoon();
+                }
             });
         }
     }
