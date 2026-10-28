@@ -339,10 +339,10 @@ public final class PacketNametagPresenter {
         return rendered;
     }
 
-    // The eligible-viewer supplier the lib loop re-reads each refresh on the wearer's region thread: online players
-    // other than the wearer, within the format's viewer-distance cull, that the vanish gate (when respected) lets see
-    // the wearer, and (unless the format hides on sneak while the wearer sneaks) at all. Returns UUIDs because that
-    // is the lib audience type; the underlying cull mirrors what the old per-tick refresh computed.
+    // The eligible-viewer supplier the lib loop re-reads each refresh on the wearer's region thread: players whose
+    // client is tracking the wearer, within the format's viewer-distance cull, that the vanish gate (when respected)
+    // lets see the wearer, and (unless the format hides on sneak while the wearer sneaks) at all. Returns UUIDs because
+    // that is the lib audience type; the underlying cull mirrors what the old per-tick refresh computed.
     private Supplier<Set<UUID>> viewerSupplier(Player wearer, NametagFormat format) {
         return () -> {
             Set<UUID> uuids = new LinkedHashSet<>();
@@ -361,10 +361,11 @@ public final class PacketNametagPresenter {
         }
         double maxBlocks = cullRadiusBlocks(visibility.viewerDistance());
         List<Player> eligible = new ArrayList<>();
-        for (Player viewer : Bukkit.getOnlinePlayers()) {
-            if (viewer.getUniqueId().equals(wearer.getUniqueId())) {
-                continue;
-            }
+        // Only a client that tracks the wearer can seat the nametag on them. Sent to any other client, the mount
+        // names an entity it does not have, so the lines stay where they spawned, at the wearer's feet, for good. The
+        // tracked set leaves out the wearer. A viewer seen out of it on a refresh is dropped and gets the whole stack,
+        // mount included, on the first refresh that sees them tracking again.
+        for (Player viewer : wearer.getTrackedBy()) {
             if (visibility.respectVanish() && !canSee(viewer, wearer)) {
                 continue;
             }
