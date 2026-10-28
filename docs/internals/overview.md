@@ -51,3 +51,13 @@ uxmEssentials is split into the modules `api`, `bukkit-api`, `core`, `persistenc
 
 Configuration is read into immutable snapshots and swapped whole on reload. Work that touches files or a
 database runs on the uxmLib `Scheduler` async lane; work on a player or a block runs on its region thread.
+
+## With uxmChat
+
+When uxmChat is installed, the chat features both plugins have are left to it: chat format, private
+messages, social spy, mail, helpop, the announcer, join and quit lines, broadcast, clear chat, `me` and the
+chat toggle. `UxmChatStepBack` asks uxmChat's API service (`com.uxplima.chat.api.UxmChat`) which features
+it runs, so one uxmChat has turned off stays here. Commands are decided when the server builds its command
+tree, listeners and the announcer on every event. This plugin starts before the worlds and uxmChat after
+them, so until the server ticks an installed uxmChat counts as running everything; after that, one that
+never started runs nothing.
