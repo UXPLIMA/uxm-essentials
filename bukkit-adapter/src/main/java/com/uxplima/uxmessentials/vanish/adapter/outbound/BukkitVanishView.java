@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -32,9 +33,15 @@ import org.jspecify.annotations.Nullable;
  * runs on that viewer's own entity thread. An offline player on either side is a silent no-op. The viewer's see level
  * is resolved per viewer through the {@link VanishLevelResolver}, so a permitted viewer keeps seeing the hidden player
  * and a level raise or drop settles in one reconciliation pass.
+ *
+ * <p>The vanished player also carries the {@code vanished} metadata, the mark every widely used vanish plugin sets and
+ * chat, tab and scoreboard plugins read, so they treat the player as gone too.
  */
 @NullMarked
 public final class BukkitVanishView implements VanishView {
+
+    /** The metadata key other plugins read to tell a vanished player. */
+    private static final String VANISHED = "vanished";
 
     private final Plugin plugin;
     private final Scheduler scheduler;
@@ -50,6 +57,7 @@ public final class BukkitVanishView implements VanishView {
     public void hide(PlayerRef who, VanishLevel level) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(level, "level");
+        mark(who, true);
         forEachViewer((viewer, viewerRef) -> {
             if (viewerRef.equals(who)) {
                 return;
@@ -69,6 +77,7 @@ public final class BukkitVanishView implements VanishView {
     @Override
     public void reveal(PlayerRef who) {
         Objects.requireNonNull(who, "who");
+        mark(who, false);
         forEachViewer((viewer, viewerRef) -> {
             if (!viewerRef.equals(who)) {
                 @Nullable Player target = liveTarget(who);
@@ -94,6 +103,25 @@ public final class BukkitVanishView implements VanishView {
                         action.run(viewer, viewerRef);
                     }
                 });
+            }
+        });
+    }
+
+    /**
+     * Set or lift the {@code vanished} metadata on the player's own entity thread. Bukkit deprecated metadata, but
+     * it is still the one mark other plugins read for vanish.
+     */
+    @SuppressWarnings("deprecation")
+    private void mark(PlayerRef who, boolean vanished) {
+        scheduler.onEntity(who, () -> {
+            @Nullable Player target = liveTarget(who);
+            if (target == null) {
+                return;
+            }
+            if (vanished) {
+                target.setMetadata(VANISHED, new FixedMetadataValue(plugin, true));
+            } else {
+                target.removeMetadata(VANISHED, plugin);
             }
         });
     }
