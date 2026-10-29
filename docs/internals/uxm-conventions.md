@@ -11,6 +11,7 @@ Contents: [Platform](#platform) · [Architecture](#architecture) · [Threading](
 3. **Nothing hardcoded.** A value an operator could want to change is configuration. A word a player reads is in the message catalog.
 4. **Every shipped example works on a bare server.** The first boot writes content that does what it says with nothing else installed.
 5. **Bedrock is the floor.** Every menu a Java player can open, a Bedrock player gets as a native form.
+6. **A replacement is a superset.** A plugin that takes over a feature from another plugin of ours keeps everything an operator used there (language keys, placeholders and their relational forms, effects) and imports that plugin's files and data, language lines included. A gap found later is fixed in the plugin and written into this page.
 
 ## Platform
 
@@ -67,7 +68,7 @@ The plugin runs on Paper and on Folia, so there is no main thread to rely on.
 | content files (`crates.conf`, `jobs/<id>.conf`) | operator content: the things the plugin is about |
 | `plugins/uxmTheme/theme.conf` | the shared palette and roles; the only file with a hex code |
 
-A word in `config.conf` is a defect, and a slot number in `messages/` is a defect. Words an operator authors (a warp label, a crate name) stay with their content.
+A word in `config.conf` is a defect, and a slot number in `messages/` is a defect. Words an operator authors (a warp label, a crate name) stay with their content, and every such field also takes a catalog line: a value that starts with `@` (`display = "@custom.tag.vip"`) names a line of the messages files and is drawn in each reader's language through `Messages.expandLine`. A field that shows text to players and cannot take `@` is a defect.
 
 ### Format
 
@@ -82,6 +83,7 @@ A word in `config.conf` is a defect, and a slot number in `messages/` is a defec
 - One `PluginSettings` class reads every file into immutable records. Nothing else reads a path by string.
 - The snapshot is read on enable and on reload, then swapped whole. A parse error on reload keeps the previous snapshot and logs the file, line and reason.
 - On every start `PluginSettings.bringUpToDate` merges keys a release added into the operator's file, keeps every value the operator wrote, and writes `config.conf.bak` first. There is no `config-version` key.
+- A map whose keys the operator chooses (groups, ranks, currencies, worlds, materials, levels, macros) is named in `PluginSettings.OPERATOR_LISTS` and passed to `mergeDefaults`. Once the operator's file has such a map, it is theirs whole: a shipped example they removed is never put back. A map whose keys the plugin defines (moments, token kinds, claim providers) is not on the list, so a key a release adds still arrives; it is turned off with `enabled = false` or `false`, not by removing it. A shipped example that comes back after an operator removed it is a defect, and a test removes one and checks it stays gone.
 - Language files are kept current with `LanguageFileUpdates.bringUpToDate`: an untouched shipped line takes the new wording, an edited line stays the operator's.
 - `/<root> reload` reloads every file in one step and reports what changed or failed.
 
@@ -101,6 +103,7 @@ A word in `config.conf` is a defect, and a slot number in `messages/` is a defec
 - `language { default, follow-client, force }` in `config.conf`. Order: forced language, the player's choice, the client language while `follow-client` is on, the default.
 - The player's choice is shared across all UXM plugins through uxmLib `SharedLanguage` (`uxmlib:language`). Nothing else reads `player.locale()`.
 - Player-facing wording is English or Turkish written for the player, short sentences, active voice.
+- Text is drawn in the language of the player who reads it, not of the player it is about. A line many players read that holds language text (a tag, a channel name) is drawn once per reader language, not once for everybody, and a line sent to another server carries one drawing per language.
 
 ### Look
 
@@ -139,6 +142,7 @@ A word in `config.conf` is a defect, and a slot number in `messages/` is a defec
 - Format: `%uxm_<plugin>_<path>%`, lower case, `_` between words: `%uxm_crates_keys_<crate>%`, `%uxm_jobs_level_<job>%`.
 - A provider answers for an `OfflinePlayer`. A value that needs an online player returns the configured empty value for an offline one.
 - A number is returned raw; `_formatted` returns it formatted for display: `%uxm_jobs_points%`, `%uxm_jobs_points_formatted%`.
+- Every placeholder whose value is text a player reads (a tag, a title, a name with a language key) also answers as a relational placeholder, `%rel_<plugin>_<path>%`, in the reader's language. Other plugins show it in chat, the tab list and nametags, which are drawn for each reader.
 - A placeholder never returns null and never throws. An unknown path returns empty.
 - A placeholder never does I/O. It reads cached state; a cache miss returns the empty value and loads in the background.
 - Leaderboards: `%uxm_<plugin>_top_<board>_<rank>_name%` and `_value`.
@@ -150,6 +154,7 @@ A word in `config.conf` is a defect, and a slot number in `messages/` is a defec
 - Window title: centered with `MenuTitles.centre`, no color, no bold, no decoration.
 - A tile's display name is a single space; its title is the first lore line. Lore order: title, category, blank, description, blank, details, blank, click hint. Built with `Tiles` and `LoreWrap`.
 - Navigation: `← previous page` and `→ next page` on arrows, `« back` on a feather, page counter muted. No close button. Glyphs are part of the catalog line.
+- Navigation sits in the middle of the bottom row: `« back` in the centre slot, `← previous page` directly left of it, `→ next page` directly right of it (slots 48, 49 and 50 in six rows, 21, 22 and 23 in three). The arrows are drawn on every page, and one with no page to go to does nothing. A menu with nothing to go back to leaves the centre to the frame, and no other button takes these three slots.
 - Materials carry meaning (money a gold ingot, danger TNT). No decorative heads, no glow except as a selected state. Empty slots take a gray pane with a hidden tooltip and no sound.
 - A destructive action asks once, in one confirm window, on Java and Bedrock alike.
 - Sounds: open, click, page and denied come from `menu.sounds` in `config.conf` through `MenuSoundsFile`; volume 0.5 to 0.7. A button with its own sound plays only that.
@@ -173,6 +178,7 @@ A word in `config.conf` is a defect, and a slot number in `messages/` is a defec
 - Anything a plugin gives is a list: items, commands, currencies. A record never holds a single reward field.
 - Requirements and rewards are declarative and run through `uxmlib-condition`: conditions with a failure policy, actions in `[verb] payload` form, parsed once at load.
 - Every interaction (refusal, win, purchase, level up) fires a configurable list of effects: message, title, action bar, boss bar, sound, particle, command.
+- Every change to a player's own choice fires such a list too: `set`, `cleared`, and `lapsed` when the plugin takes the choice back because the player lost it (checked on join). The shipped list holds the message as `[message] @key`, so an operator can add a sound or write `[]` for silence. A fixed message in code instead of a list is a defect.
 - Payments go through the wallet (`[give-money]`, `[take-money]`), never a console command against another plugin. Shipped payments use `exp`, `levels` or the plugin's own balance; `vault` appears in the comment as the alternative.
 - Shipped commands in content are vanilla commands only.
 - Every seam an action needs (command sink, broadcast audience, boss bar timer) is wired; an unwired seam throws at load with the method to call.
