@@ -367,6 +367,21 @@ Registered when PlaceholderAPI is installed, as `%uxmessentials_<key>%`. A `play
 | `worlds_loaded_count` | worlds | How many worlds are loaded right now. | global |
 | `worlds_managed_count` | worlds | How many worlds the plugin's registry holds. | global |
 
+### Boards
+
+The economy and vote leaderboards also answer the grammar every UXM plugin shares, so a hologram written for another plugin's board works here. `<board>` is `balance` (the default currency, `alltime` only, because a balance is what a player holds now) or `votes` (`alltime`, `monthly`, `weekly`, `daily`, counted in the server's zone with weeks from Monday, as the vote module counts them).
+
+| Key | Value |
+|---|---|
+| `top_<board>_<period>_<n>_name` | The name at place n, or the word for nobody. |
+| `top_<board>_<period>_<n>_value` | The value at place n as the board shows it (a balance with its symbol, a vote count), or the word for none. |
+| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name; the game's Steve for a place nobody holds. |
+| `rank_<board>_<period>` | The reader's own place, or the word for none. |
+| `value_<board>_<period>` | The reader's own balance or vote count. |
+| `resets_<period>` | The time until a vote period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
+
+The words come from the `board.*` lines of the messages files. The older `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys keep answering as before.
+
 ## Files
 
 On first start the plugin writes `config.conf`, `messages/messages_<tag>.conf` for every shipped language, and for each module a `modules/<module>/config.conf` with its menus under `modules/<module>/gui/`. `config.conf` lists every module and switches each one on or off. `/uxmess reload` reads the files again.

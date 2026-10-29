@@ -119,7 +119,15 @@ public enum SharedMessageKey implements MessageKey {
     // What a player is told when another plugin refused an action through the developer API's veto events. One key
     // for every context rather than one per context: this line only has to say that something outside uxmEssentials
     // said no, and the plugin that said no is the one that knows why and can send its own reason.
-    COMMON_ACTION_VETOED("common.action-vetoed");
+    COMMON_ACTION_VETOED("common.action-vetoed"),
+
+    // The words a leaderboard placeholder answers with, the same in every UXM plugin: the name of a place nobody holds,
+    // the value of one and a rank the reader does not have, and the time until a period starts again.
+    BOARD_NOBODY("board.nobody"),
+    BOARD_NONE("board.none"),
+    BOARD_RESETS_DAYS("board.resets-days"),
+    BOARD_RESETS_HOURS("board.resets-hours"),
+    BOARD_RESETS_MINUTES("board.resets-minutes");
 
     private final String key;
 
