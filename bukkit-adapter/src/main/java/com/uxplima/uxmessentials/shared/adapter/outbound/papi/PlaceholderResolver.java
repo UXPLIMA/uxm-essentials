@@ -139,8 +139,15 @@ public final class PlaceholderResolver {
 
     private final PlaceholderContexts contexts;
 
+    private final BoardPlaceholders boards;
+
     public PlaceholderResolver(PlaceholderContexts contexts) {
         this.contexts = Objects.requireNonNull(contexts, "contexts");
+        // A seam that is absent, which only a test bundle is, answers the dash for every word.
+        BoardPlaceholders.Words words = contexts.boardWords().orElse((reader, key, values) -> EMPTY);
+        // The server's own zone, the one the vote module counts its days, weeks and months in.
+        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+        this.boards = new BoardPlaceholders(contexts, words, java.time.Clock.system(zone), zone);
     }
 
     /**
@@ -301,6 +308,13 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(SERVER_PREFIX)) {
             return Optional.of(serverMetric(normalized.substring(SERVER_PREFIX.length())));
+        }
+        // The boards in the grammar every UXM plugin shares. Asked before the plain keys because a key it does not
+        // know,
+        // such as the ranks module's rank_next, comes back empty and falls through to them.
+        Optional<String> board = boards.resolve(who, normalized);
+        if (board.isPresent()) {
+            return board;
         }
         return switch (normalized) {
             case "balance", "balance_formatted", "baltop_position" -> Optional.of(economy(who, normalized));

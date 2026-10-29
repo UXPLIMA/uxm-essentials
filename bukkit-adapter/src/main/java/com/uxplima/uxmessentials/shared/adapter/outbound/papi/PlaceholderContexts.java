@@ -59,6 +59,7 @@ public final class PlaceholderContexts {
     private final @Nullable Cooldowns cooldowns;
     private final @Nullable VanishVisibility visibility;
     private final @Nullable TradePlaceholders trade;
+    private final BoardPlaceholders.@Nullable Words boardWords;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -101,11 +102,17 @@ public final class PlaceholderContexts {
         this.cooldowns = builder.cooldowns;
         this.visibility = builder.visibility;
         this.trade = builder.trade;
+        this.boardWords = builder.boardWords;
     }
 
     /** A fresh, empty builder: every seam starts absent until a wired context registers it. */
     public static Builder builder() {
         return new Builder();
+    }
+
+    /** The reader's words for a leaderboard placeholder: nobody, none and the time until a reset. */
+    Optional<BoardPlaceholders.Words> boardWords() {
+        return Optional.ofNullable(boardWords);
     }
 
     /** How a name becomes an account, for the {@code p_<name>_<key>} form that reads another player. */
@@ -340,8 +347,22 @@ public final class PlaceholderContexts {
         private @Nullable Cooldowns cooldowns;
         private @Nullable VanishVisibility visibility;
         private @Nullable TradePlaceholders trade;
+        private BoardPlaceholders.@Nullable Words boardWords;
 
         private Builder() {}
+
+        /**
+         * The reader's catalogue as plain text, for the words a board placeholder answers with. Given a
+         * {@code Messages} and a way to drop its tags, so the board stays free of the message adapter.
+         */
+        public Builder boardWords(
+                com.uxplima.uxmessentials.shared.application.port.Messages messages,
+                java.util.function.UnaryOperator<String> plain) {
+            java.util.Objects.requireNonNull(messages, "messages");
+            java.util.Objects.requireNonNull(plain, "plain");
+            this.boardWords = (reader, key, values) -> plain.apply(messages.resolve(reader, key, values));
+            return this;
+        }
 
         public Builder players(PlayerLookup lookup) {
             this.players = lookup;

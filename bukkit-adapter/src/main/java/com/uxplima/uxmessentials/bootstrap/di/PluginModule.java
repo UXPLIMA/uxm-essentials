@@ -1218,6 +1218,12 @@ public final class PluginModule {
         // The name lookup belongs to no context either: it is what turns the name in %uxmessentials_p_<name>_<key>%
         // into an account, through the same kernel port every command resolves a name with.
         links.placeholders.players(kernel.playerLookup());
+        // The words of the leaderboard placeholders (nobody, none, the time to a reset) come from the reader's own
+        // catalogue, as text: a placeholder lands in holograms and scoreboards that draw their own colours.
+        links.placeholders.boardWords(
+                kernel.messages(),
+                line -> net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                        .stripTags(line));
         // The account facts (ping, first join, playtime, the item in hand) are the server's own, not any
         // module's, so they are wired here too and keep answering with every feature switched off.
         links.placeholders.playerFacts(new BukkitPlayerFacts(plugin.getServer(), languages));
