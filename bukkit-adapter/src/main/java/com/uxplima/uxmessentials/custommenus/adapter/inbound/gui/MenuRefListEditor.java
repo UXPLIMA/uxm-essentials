@@ -42,12 +42,12 @@ public final class MenuRefListEditor {
     /** The 45 entry slots (rows 0 to 4) a ref button may occupy; the sixth row carries the add and back controls. */
     private static final List<Integer> ENTRY_SLOTS = entrySlots();
 
-    private static final int ADD_SLOT = 48;
-    private static final int BACK_SLOT = 50;
+    private static final int ADD_SLOT = 45;
+    private static final int BACK_SLOT = 49;
 
     private static final Material ENTRY_ICON = Material.PAPER;
     private static final Material ADD_ICON = Material.LIME_DYE;
-    private static final Material BACK_ICON = Material.ARROW;
+    private static final Material BACK_ICON = Material.FEATHER;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;

@@ -185,7 +185,7 @@ public final class WarpSoundSelectorView {
     }
 
     private ItemStack backIcon(PlayerRef viewer) {
-        return ItemBuilder.of(Material.ARROW)
+        return ItemBuilder.of(Material.FEATHER)
                 .name(text(viewer, WarpsMessageKey.WARP_EDITOR_SELECTOR_BACK))
                 .build();
     }

@@ -133,7 +133,7 @@ public final class ModerationGuiViews {
                 java.util.List.of(10, 11, 12, 13, 14, 16),
                 22,
                 java.util.OptionalInt.of(26),
-                Material.ARROW,
+                Material.FEATHER,
                 Material.LAVA_BUCKET,
                 Material.GRAY_STAINED_GLASS_PANE);
     }

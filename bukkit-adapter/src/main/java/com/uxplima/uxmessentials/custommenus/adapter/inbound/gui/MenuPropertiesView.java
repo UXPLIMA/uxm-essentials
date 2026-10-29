@@ -551,7 +551,7 @@ public final class MenuPropertiesView {
                 PROPERTY_SLOTS,
                 BACK_SLOT,
                 OptionalInt.of(DELETE_SLOT),
-                Material.ARROW,
+                Material.FEATHER,
                 Material.BARRIER,
                 Material.GRAY_STAINED_GLASS_PANE);
     }
