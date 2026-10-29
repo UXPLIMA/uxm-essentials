@@ -187,7 +187,7 @@ public final class MenuRequirementsView {
                 PROPERTY_SLOTS,
                 BACK_SLOT,
                 OptionalInt.empty(),
-                Material.ARROW,
+                Material.FEATHER,
                 Material.BARRIER,
                 Material.GRAY_STAINED_GLASS_PANE);
     }

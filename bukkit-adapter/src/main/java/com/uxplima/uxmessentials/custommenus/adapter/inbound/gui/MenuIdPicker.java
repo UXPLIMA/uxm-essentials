@@ -35,13 +35,13 @@ final class MenuIdPicker {
     /** The 45 content slots (rows 0 to 4) an id button may occupy; the sixth row carries the nav and back controls. */
     private static final List<Integer> CONTENT_SLOTS = contentSlots();
 
-    private static final int PREV_SLOT = 45;
-    private static final int NEXT_SLOT = 53;
+    private static final int PREV_SLOT = 48;
+    private static final int NEXT_SLOT = 50;
     private static final int BACK_SLOT = 49;
 
     private static final Material ID_ICON = Material.PAPER;
     private static final Material NAV_ICON = Material.ARROW;
-    private static final Material BACK_ICON = Material.ARROW;
+    private static final Material BACK_ICON = Material.FEATHER;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
 
     private final GuiText guiText;

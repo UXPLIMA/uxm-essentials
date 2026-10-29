@@ -50,12 +50,12 @@ public final class DurationPickerView {
 
     private static final int ROWS = 3;
     private static final String INPUT_KEY = "picker.duration";
-    private static final int CUSTOM_SLOT = 22;
-    private static final int BACK_SLOT = 18;
+    private static final int CUSTOM_SLOT = 18;
+    private static final int BACK_SLOT = 22;
     private static final Material FILLER = Material.GRAY_STAINED_GLASS_PANE;
     private static final Material PRESET_ICON = Material.CLOCK;
     private static final Material CUSTOM_ICON = Material.WRITABLE_BOOK;
-    private static final Material BACK_ICON = Material.ARROW;
+    private static final Material BACK_ICON = Material.FEATHER;
 
     // The default preset ladder offered when a caller does not supply its own, a sensible spread from a short
     // cooldown to a month, all valid SanctionDuration grammar.

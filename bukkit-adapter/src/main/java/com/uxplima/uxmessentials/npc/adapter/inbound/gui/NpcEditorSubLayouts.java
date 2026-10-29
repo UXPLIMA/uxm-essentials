@@ -108,16 +108,16 @@ public record NpcEditorSubLayouts(
                 16,
                 22,
                 Material.ITEM_FRAME,
-                Material.ARROW,
+                Material.FEATHER,
                 Material.GRAY_STAINED_GLASS_PANE);
         ListPropertyLayout actions = new ListPropertyLayout(
                 6,
                 List.of(10, 11, 12, 13, 14, 15, 16, 19, 20, 21, 22, 23, 24, 25, 28, 29, 30, 31, 32, 33, 34),
-                48,
-                50,
+                45,
+                49,
                 Material.PAPER,
                 Material.LIME_DYE,
-                Material.ARROW,
+                Material.FEATHER,
                 Material.GRAY_STAINED_GLASS_PANE);
         return new NpcEditorSubLayouts(
                 equipment,

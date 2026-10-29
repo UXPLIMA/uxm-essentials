@@ -292,7 +292,7 @@ public final class NpcWiring {
                 EDITOR_PROPERTY_SLOTS,
                 49,
                 java.util.OptionalInt.of(53),
-                org.bukkit.Material.ARROW,
+                org.bukkit.Material.FEATHER,
                 org.bukkit.Material.BARRIER,
                 org.bukkit.Material.GRAY_STAINED_GLASS_PANE);
     }
