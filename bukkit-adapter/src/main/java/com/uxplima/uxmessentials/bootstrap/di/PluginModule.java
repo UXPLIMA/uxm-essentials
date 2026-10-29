@@ -211,6 +211,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
@@ -903,7 +904,13 @@ public final class PluginModule {
         // /help is cross-cutting too. It reads the same resolved, module-filtered registration set the plugin
         // publishes (supplied lazily so it reflects every catalog rename and disable) and filters it per the
         // sender's own permission. The supplier is evaluated on each invocation, well after wiring completes.
-        resources.addCommand(new HelpCommand(resources::commands, kernel.messages()));
+        // /help lists only the commands this plugin registers, not the ones left to uxmChat.
+        UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
+        resources.addCommand(new HelpCommand(
+                () -> resources.commands().stream()
+                        .filter(command -> !chat.coversCommand(command.commandId()))
+                        .toList(),
+                kernel.messages()));
         // Resolved last, once every module and the bootstrap commands have contributed, so the catalog sees
         // the full default surface before it applies the operator's rename/alias/disable choices.
         applyCatalog(plugin, kernel, wiredKernel.resolver(), resources);

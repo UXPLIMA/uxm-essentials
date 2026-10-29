@@ -48,6 +48,8 @@ public final class AnnouncerTask {
     private final BukkitAnnouncerBroadcaster broadcaster;
     private final Supplier<AnnouncerConfig> config;
     private final BooleanSupplier running;
+    /** True while uxmChat runs announcements, which leaves them to uxmChat. */
+    private final BooleanSupplier leftToChat;
 
     // The live override loops, each holding its own cancellation flag. Owned by the thread that calls start /
     // rearmOverrides / stop (the wiring thread on enable, the command's async reload thread on reload); guarded by
@@ -59,12 +61,14 @@ public final class AnnouncerTask {
             NextAnnouncement nextAnnouncement,
             BukkitAnnouncerBroadcaster broadcaster,
             Supplier<AnnouncerConfig> config,
-            BooleanSupplier running) {
+            BooleanSupplier running,
+            BooleanSupplier leftToChat) {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.nextAnnouncement = Objects.requireNonNull(nextAnnouncement, "nextAnnouncement");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
         this.config = Objects.requireNonNull(config, "config");
         this.running = Objects.requireNonNull(running, "running");
+        this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
     /**
@@ -133,8 +137,12 @@ public final class AnnouncerTask {
         // the fan-out see one consistent roster. The config is read here first: it merges the announcement store,
         // a database, and the global region is the server's tick.
         AnnouncerConfig rotating = nextAnnouncement.current();
-        broadcaster.withOnlineCount(
-                count -> nextAnnouncement.pick(rotating, count).ifPresent(broadcaster::broadcast));
+        // While uxmChat runs announcements the loop keeps time but says nothing, so it speaks again the moment
+        // uxmChat's announcements are turned off.
+        if (!leftToChat.getAsBoolean()) {
+            broadcaster.withOnlineCount(
+                    count -> nextAnnouncement.pick(rotating, count).ifPresent(broadcaster::broadcast));
+        }
         scheduleDefaultRotation();
     }
 
@@ -158,7 +166,7 @@ public final class AnnouncerTask {
         // The min-players gate reads the roster size on the global region thread; the broadcast fans out from that
         // same global hop so the gate and the fan-out agree on the live roster.
         broadcaster.withOnlineCount(count -> {
-            if (live.shouldFire(count)) {
+            if (live.shouldFire(count) && !leftToChat.getAsBoolean()) {
                 broadcaster.broadcast(announcement);
             }
         });

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -47,6 +48,8 @@ public final class DeathMessageListener implements Listener {
 
     private static final MiniMessage MINI = MiniMessage.miniMessage();
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
+    /** True while uxmChat runs this feature, which leaves it to uxmChat. */
+    private final BooleanSupplier leftToChat;
 
     private final ResolveDeathMessage resolveDeath;
     private final InfoRegistry pages;
@@ -57,16 +60,23 @@ public final class DeathMessageListener implements Listener {
             ResolveDeathMessage resolveDeath,
             InfoRegistry pages,
             BukkitInfoSender infoSender,
-            CommunicationSettings settings) {
+            CommunicationSettings settings,
+            BooleanSupplier leftToChat) {
         this.resolveDeath = Objects.requireNonNull(resolveDeath, "resolveDeath");
         this.pages = Objects.requireNonNull(pages, "pages");
         this.infoSender = Objects.requireNonNull(infoSender, "infoSender");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
+        if (leftToChat.getAsBoolean()) {
+            // uxmChat writes the death line; the page sent to the one who died is still this plugin's.
+            sendInfoPage(player);
+            return;
+        }
         Player killer = player.getKiller();
         DeathCause cause = DeathCauses.of(event);
         PlaceholderBindings bindings = ConnectionPlaceholders.death(
