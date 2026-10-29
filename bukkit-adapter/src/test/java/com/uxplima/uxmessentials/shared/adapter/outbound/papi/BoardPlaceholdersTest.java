@@ -26,7 +26,8 @@ class BoardPlaceholdersTest {
 
     private static final BoardPlaceholders.Words WORDS = (reader, key, values) -> {
         String line = key.key();
-        for (Map.Entry<String, String> value : values.entrySet()) {
+        // In key order: a Map.of iterates in an order that changes from one run to the next.
+        for (Map.Entry<String, String> value : new java.util.TreeMap<>(values).entrySet()) {
             line = line + " " + value.getKey() + "=" + value.getValue();
         }
         return line;
