@@ -32,6 +32,20 @@ final class InMemoryPlaytime implements PlaytimeRepository {
     }
 
     @Override
+    public Map<UUID, Long> activeTotals() {
+        Map<UUID, Long> totals = new HashMap<>();
+        Set<UUID> players = new HashSet<>(counted.keySet());
+        players.addAll(corrections.keySet());
+        for (UUID player : players) {
+            long active = summaryOf(player, LocalDate.EPOCH).totalActive().toSeconds();
+            if (active > 0) {
+                totals.put(player, active);
+            }
+        }
+        return totals;
+    }
+
+    @Override
     public void adjust(UUID uuid, long deltaSeconds) {
         corrections.merge(uuid, deltaSeconds, Long::sum);
     }

@@ -69,6 +69,10 @@ dependencies {
     implementation(uxm.uxmlib.packet)
     implementation(uxm.uxmlib.pipeline)
     implementation(uxm.uxmlib.update)
+    // The shared leaderboards, over the same uxmLib storage persistence-adapter brings in. Neither pulls its own
+    // drivers or pool: the server's library loader supplies those.
+    implementation(uxm.uxmlib.board) { isTransitive = false }
+    implementation(uxm.uxmlib.storage) { isTransitive = false }
 }
 
 // The dev bundle is needed only to compile the offline-inventory adapter against server internals.

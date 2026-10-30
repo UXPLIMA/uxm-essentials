@@ -60,6 +60,7 @@ public final class PlaceholderContexts {
     private final @Nullable VanishVisibility visibility;
     private final @Nullable TradePlaceholders trade;
     private final BoardPlaceholders.@Nullable Words boardWords;
+    private final com.uxplima.uxmlib.board.@Nullable BoardAnswers boardAnswers;
 
     private PlaceholderContexts(Builder builder) {
         this.homes = builder.homes;
@@ -103,6 +104,7 @@ public final class PlaceholderContexts {
         this.visibility = builder.visibility;
         this.trade = builder.trade;
         this.boardWords = builder.boardWords;
+        this.boardAnswers = builder.boardAnswers;
     }
 
     /** A fresh, empty builder: every seam starts absent until a wired context registers it. */
@@ -113,6 +115,11 @@ public final class PlaceholderContexts {
     /** The reader's words for a leaderboard placeholder: nobody, none and the time until a reset. */
     Optional<BoardPlaceholders.Words> boardWords() {
         return Optional.ofNullable(boardWords);
+    }
+
+    /** The boards kept on uxmLib's shared board module, which answer before the older balance and vote boards. */
+    Optional<com.uxplima.uxmlib.board.BoardAnswers> boardAnswers() {
+        return Optional.ofNullable(boardAnswers);
     }
 
     /** How a name becomes an account, for the {@code p_<name>_<key>} form that reads another player. */
@@ -348,6 +355,7 @@ public final class PlaceholderContexts {
         private @Nullable VanishVisibility visibility;
         private @Nullable TradePlaceholders trade;
         private BoardPlaceholders.@Nullable Words boardWords;
+        private com.uxplima.uxmlib.board.@Nullable BoardAnswers boardAnswers;
 
         private Builder() {}
 
@@ -361,6 +369,12 @@ public final class PlaceholderContexts {
             java.util.Objects.requireNonNull(messages, "messages");
             java.util.Objects.requireNonNull(plain, "plain");
             this.boardWords = (reader, key, values) -> plain.apply(messages.resolve(reader, key, values));
+            return this;
+        }
+
+        /** The answers of the boards the modules defined on the shared board module. */
+        public Builder boardAnswers(com.uxplima.uxmlib.board.BoardAnswers answers) {
+            this.boardAnswers = java.util.Objects.requireNonNull(answers, "answers");
             return this;
         }
 

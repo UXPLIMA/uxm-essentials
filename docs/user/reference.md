@@ -369,16 +369,26 @@ Registered when PlaceholderAPI is installed, as `%uxmessentials_<key>%`. A `play
 
 ### Boards
 
-The economy and vote leaderboards also answer the grammar every UXM plugin shares, so a hologram written for another plugin's board works here. `<board>` is `balance` (the default currency, `alltime` only, because a balance is what a player holds now) or `votes` (`alltime`, `monthly`, `weekly`, `daily`, counted in the server's zone with weeks from Monday, as the vote module counts them).
+The boards answer the grammar every UXM plugin shares, so a hologram written for another plugin's board works here.
+
+| `<board>` | Module | Ranks | Periods |
+|---|---|---|---|
+| `playtime` | playerstate | Active time, AFK left out. All time reads the playtime record, corrections included; the other periods count from the version that added them. | all four |
+| `trades` | trade | Trades finished; both sides count one. | all four |
+| `prestige` | ranks | The prestige level. | `alltime` only |
+| `balance` | economy | The default currency's balance, from `/baltop`. | `alltime` only |
+| `votes` | vote | Votes, as the vote module counts them. | all four |
+
+The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades` and `prestige` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` and `votes` answer from their own modules.
 
 | Key | Value |
 |---|---|
 | `top_<board>_<period>_<n>_name` | The name at place n, or the word for nobody. |
-| `top_<board>_<period>_<n>_value` | The value at place n as the board shows it (a balance with its symbol, a vote count), or the word for none. |
-| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name; the game's Steve for a place nobody holds. |
+| `top_<board>_<period>_<n>_value` | The value at place n as the board shows it (a time as `1d 2h 3m`, a balance with its symbol, a count), or the word for none. |
+| `top_<board>_<period>_<n>_head` | The player at place n for a `<head:...>` tag: their name, or their uuid when an account cannot have that name; the `leaderboard.empty-head` for a place nobody holds. |
 | `rank_<board>_<period>` | The reader's own place, or the word for none. |
-| `value_<board>_<period>` | The reader's own balance or vote count. |
-| `resets_<period>` | The time until a vote period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
+| `value_<board>_<period>` | The reader's own value. |
+| `resets_<period>` | The time until a period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
 
 The words come from the `board.*` lines of the messages files. The older `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys keep answering as before.
 

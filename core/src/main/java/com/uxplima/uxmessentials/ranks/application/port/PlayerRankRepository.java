@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.ranks.application.port;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,4 +30,10 @@ public interface PlayerRankRepository {
      * advance goes through.
      */
     void save(UUID playerId, RankId rankId, Prestige prestige);
+
+    /**
+     * Every player who has prestiged at least once, with their prestige level: what the prestige leaderboard ranks.
+     * Blocks; call it off the tick thread.
+     */
+    Map<UUID, Integer> prestiged();
 }
