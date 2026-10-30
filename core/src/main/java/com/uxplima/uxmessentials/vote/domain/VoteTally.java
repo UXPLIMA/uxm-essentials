@@ -160,6 +160,23 @@ public record VoteTally(
         };
     }
 
+    /**
+     * The votes this tally holds for the window of {@code period} that holds {@code now} in {@code zone}: a bucket
+     * whose key names an earlier window holds none of them. All time is the whole count.
+     */
+    public long countIn(VotePeriod period, Instant now, ZoneId zone) {
+        Objects.requireNonNull(period, "period");
+        Objects.requireNonNull(now, "now");
+        Objects.requireNonNull(zone, "zone");
+        LocalDate date = LocalDate.ofInstant(now, zone);
+        return switch (period) {
+            case ALLTIME -> alltime;
+            case DAILY -> dayKey == date.toEpochDay() ? daily : 0L;
+            case WEEKLY -> weekKey == isoWeekKey(date) ? weekly : 0L;
+            case MONTHLY -> monthKey == monthKey(date) ? monthly : 0L;
+        };
+    }
+
     // ISO week key: (week-based year * 100) + ISO week-of-year.
     // Using IsoFields so the year used is the week-based year (which can differ from the calendar
     // year in the first/last days of January/December).

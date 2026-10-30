@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vote.application.port;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -70,6 +71,11 @@ public abstract class ForwardingVoteRepository implements VoteRepository {
     @Override
     public void saveTotals(PlayerRef player, VoteTally tally) {
         delegate.saveTotals(player, tally);
+    }
+
+    @Override
+    public Map<UUID, VoteTally> allTotals() {
+        return delegate.allTotals();
     }
 
     @Override
