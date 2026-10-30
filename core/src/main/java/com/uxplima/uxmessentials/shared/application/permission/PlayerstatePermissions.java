@@ -177,8 +177,18 @@ final class PlayerstatePermissions {
                         PermissionDefault.TRUE,
                         PLAYERSTATE),
                 PermissionSpec.of(
+                        "uxmessentials.playtime.import",
+                        "/playtime import <player>|all to bring the server's vanilla playtime into the tracked total (naming another player also needs uxmessentials.playerstate.others).",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
                         "uxmessentials.playtime.reset",
                         "/playtime reset [player] to wipe a player's tracked playtime (resetting others also needs uxmessentials.playerstate.others).",
+                        PermissionDefault.OP,
+                        PLAYERSTATE),
+                PermissionSpec.of(
+                        "uxmessentials.playtime.set",
+                        "/playtime set|add|take <player> <time> to correct a player's all-time playtime (naming another player also needs uxmessentials.playerstate.others).",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(

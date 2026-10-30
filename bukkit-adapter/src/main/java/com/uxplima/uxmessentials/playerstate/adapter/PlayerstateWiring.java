@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.playerstate.adapter;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -16,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContaine
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlaytimeImportListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitInventoryViewer;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BukkitNearbyPlayers;
@@ -28,13 +30,16 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.MutablePlaytimeAfk
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.PdcClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.PlaytimeSampler;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.VanillaPlaytime;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsOfflinePlayerStorage;
+import com.uxplima.uxmessentials.playerstate.application.AdjustPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
 import com.uxplima.uxmessentials.playerstate.application.Extinguish;
 import com.uxplima.uxmessentials.playerstate.application.Feed;
 import com.uxplima.uxmessentials.playerstate.application.Freeze;
 import com.uxplima.uxmessentials.playerstate.application.Heal;
+import com.uxplima.uxmessentials.playerstate.application.ImportPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.ListNearby;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
@@ -147,14 +152,32 @@ public final class PlayerstateWiring {
                 kernel.messages(),
                 services.showPlaytime(),
                 menus);
+        PlaytimeAdmin playtimeAdmin = new PlaytimeAdmin(
+                kernel.scheduler(),
+                new AdjustPlaytime(playtimeRepository, notifier, clock),
+                new ImportPlaytime(playtimeRepository, notifier, clock),
+                new VanillaPlaytime(kernel.scheduler()),
+                kernel.log());
         List<CommandRegistration> commands =
-                PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView);
-        List<Listener> listeners = List.of(
+                PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView, playtimeAdmin);
+        List<Listener> listeners = new ArrayList<>(List.of(
                 new PlayerStateListener(store, reconciler, teams),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
-                new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()));
+                new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink())));
+        if (settings.playtimeImportOnJoin()) {
+            listeners.add(new PlaytimeImportListener(playtimeAdmin));
+        }
         return new Wired(
-                commands, listeners, invseeView, enderseeView, offlineView, services, store, info, sampler, afkStatus);
+                commands,
+                List.copyOf(listeners),
+                invseeView,
+                enderseeView,
+                offlineView,
+                services,
+                store,
+                info,
+                sampler,
+                afkStatus);
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {

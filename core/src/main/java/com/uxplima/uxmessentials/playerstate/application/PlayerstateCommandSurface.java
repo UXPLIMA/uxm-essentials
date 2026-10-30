@@ -61,7 +61,10 @@ final class PlayerstateCommandSurface {
                 spec("ice", "uxmessentials.ice.use", cmd("ice", "Freeze a player")),
                 spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
                 spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
-                spec("playtime", "uxmessentials.playtime.use", cmd("playtime", "Show a player's playtime breakdown")),
+                spec(
+                        "playtime",
+                        "uxmessentials.playtime.use",
+                        cmd("playtime", "Show, correct or import a player's playtime")),
                 spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")),
                 spec("depth", "uxmessentials.depth.use", cmd("depth", "Show how far you are above or below sea level")),
                 spec("biome", "uxmessentials.biome.use", cmd("biome", "Show the biome you are standing in")),

@@ -35,8 +35,9 @@ public interface PlaytimeRepository {
 
     /**
      * The windowed active/AFK totals for {@code uuid} as of {@code today}, today, the last seven days, the last
-     * thirty days, and all time. Each window is a range {@code SUM} over the per-day rows; a player with no rows
-     * yields {@link PlaytimeSummary#empty()}.
+     * thirty days, and all time. Each window is a range {@code SUM} over the per-day rows, and the all-time totals
+     * carry the player's correction ({@link #adjust}) through {@link PlaytimeSummary#withAdjustment}; a player with
+     * no rows and no correction yields {@link PlaytimeSummary#empty()}.
      *
      * @param uuid the player to summarise
      * @param today the server-local calendar day to anchor the today/week/month windows on
@@ -44,12 +45,29 @@ public interface PlaytimeRepository {
      */
     PlaytimeSummary summaryOf(UUID uuid, LocalDate today);
 
-    /** Delete every row for {@code uuid}, resetting their tracked playtime to nothing. A no-op when none exist. */
+    /**
+     * Add {@code deltaSeconds} (signed) to the operator's correction for {@code uuid}, the playtime written in by
+     * {@code /playtime set}, {@code add}, {@code take} and {@code import} rather than counted by the sampler. A single
+     * atomic upsert, like {@link #addSeconds}.
+     */
+    void adjust(UUID uuid, long deltaSeconds);
+
+    /** Whether {@code uuid}'s vanilla playtime statistic was already imported. */
+    boolean imported(UUID uuid);
+
+    /** Mark {@code uuid}'s vanilla playtime statistic as imported, so the join-time import skips them. */
+    void markImported(UUID uuid);
+
+    /**
+     * Delete every row for {@code uuid} and zero their correction, resetting their tracked playtime to nothing. The
+     * import mark stays, so a reset player does not get their vanilla time back on the next join. A no-op when
+     * none exist.
+     */
     void reset(UUID uuid);
 
     /**
-     * Delete every row for every player, clearing the whole tracked ledger. The administrative companion to
-     * {@link #reset(UUID)} behind {@code /playtime resetall}; a no-op on an already-empty store.
+     * Delete every row and zero every correction, clearing the whole tracked ledger. The administrative companion
+     * to {@link #reset(UUID)} behind {@code /playtime resetall}; a no-op on an already-empty store.
      */
     void resetAll();
 }

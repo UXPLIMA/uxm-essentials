@@ -74,7 +74,7 @@ The top level commands each module registers, with the permission that gates the
 | `/near` | playerstate | List nearby players | `uxmessentials.near.use` |
 | `/nightvision` | playerstate | Toggle night vision | `uxmessentials.nightvision.use` |
 | `/ping` | playerstate | Show a player's ping | `uxmessentials.ping.use` |
-| `/playtime` | playerstate | Show a player's playtime breakdown | `uxmessentials.playtime.use` |
+| `/playtime` | playerstate | Show, correct or import a player's playtime | `uxmessentials.playtime.use` |
 | `/ptime` | playerstate | Set your personal time | `uxmessentials.ptime.use` |
 | `/pweather` | playerstate | Set your personal weather | `uxmessentials.pweather.use` |
 | `/rest` | playerstate | Reset time-since-rest so phantoms stop | `uxmessentials.rest.use` |

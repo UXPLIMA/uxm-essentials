@@ -103,7 +103,9 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.invsee.use` | /invsee [player] to view a player's inventory. | op |
 | `uxmessentials.near.use` | /near [radius] to list nearby players. | op |
 | `uxmessentials.ping.use` | /ping to show a player's round-trip latency. | true |
+| `uxmessentials.playtime.import` | /playtime import <player>\|all to bring the server's vanilla playtime into the tracked total (naming another player also needs uxmessentials.playerstate.others). | op |
 | `uxmessentials.playtime.reset` | /playtime reset [player] to wipe a player's tracked playtime (resetting others also needs uxmessentials.playerstate.others). | op |
+| `uxmessentials.playtime.set` | /playtime set\|add\|take <player> <time> to correct a player's all-time playtime (naming another player also needs uxmessentials.playerstate.others). | op |
 | `uxmessentials.playtime.use` | /playtime [player] to show a player's playtime breakdown (active/afk, today/week/month/all-time). | op |
 | `uxmessentials.seed.use` | /seed to show the seed of the world you are standing in. | true |
 | `uxmessentials.world.command-bypass` | Run commands a world blocks through its per-world command list. | op |
