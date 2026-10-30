@@ -21,6 +21,9 @@ public enum RankRequirementType {
     /** The player's tracked playtime must be at least the value's whole-second count. */
     PLAYTIME("playtime"),
 
+    /** The player's tracked playtime, AFK time left out, must be at least the value's whole-second count. */
+    PLAYTIME_ACTIVE("playtime-active"),
+
     /** The player must hold the value's permission node. */
     PERMISSION("permission"),
 

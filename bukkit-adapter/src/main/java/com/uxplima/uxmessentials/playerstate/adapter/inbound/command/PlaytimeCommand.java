@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import java.util.Objects;
 import java.util.Optional;
 
 import org.bukkit.command.CommandSender;
@@ -9,9 +10,12 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
 import com.mojang.brigadier.Command;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.adapter.PlaytimeAdmin;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
@@ -44,22 +48,29 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code /playtime resetall} ({@code uxmessentials.playtime.reset}): wipe every player's tracked ledger in one
  * call, gated by the same reset node, with a whole-ledger confirmation.
+ *
+ * <p>{@code /playtime set|add|take <player> <time>} ({@code uxmessentials.playtime.set}): correct a player's
+ * all-time playtime by hand. {@code /playtime import <player>|all} ({@code uxmessentials.playtime.import}): bring
+ * the server's vanilla playtime statistic into the tracked total. Naming another player takes the same
+ * {@code .others} node as reset; {@code import all} needs only the import node.
  */
 @NullMarked
 public final class PlaytimeCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.playtime.use";
     private static final String RESET_PERMISSION = "uxmessentials.playtime.reset";
+    private static final String SET_PERMISSION = "uxmessentials.playtime.set";
+    private static final String IMPORT_PERMISSION = "uxmessentials.playtime.import";
+    private static final String TIME = "time";
 
     private final @Nullable PlaytimeView view;
+    private final PlaytimeAdmin admin;
 
-    public PlaytimeCommand(PlayerStateServices services, Messages messages) {
-        this(services, messages, null);
-    }
-
-    public PlaytimeCommand(PlayerStateServices services, Messages messages, @Nullable PlaytimeView view) {
+    public PlaytimeCommand(
+            PlayerStateServices services, Messages messages, @Nullable PlaytimeView view, PlaytimeAdmin admin) {
         super(services, messages);
         this.view = view;
+        this.admin = Objects.requireNonNull(admin, "admin");
     }
 
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
@@ -80,13 +91,41 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
                 .then(Commands.literal("resetall")
                         .requires(src -> src.getSender().hasPermission(RESET_PERMISSION))
                         .executes(this::resetAll))
+                .then(correction("set", admin::set))
+                .then(correction("add", admin::add))
+                .then(correction("take", admin::take))
+                .then(Commands.literal("import")
+                        .requires(src -> src.getSender().hasPermission(IMPORT_PERMISSION))
+                        .then(Commands.literal("all").executes(this::importAll))
+                        .then(CommandSuggestions.playerArgument("player").executes(this::importOne)))
                 .then(CommandSuggestions.playerArgument("player").executes(this::showNamed))
                 .build();
     }
 
     @Override
     public String description() {
-        return "Show or reset a player's playtime breakdown.";
+        return "Show, correct, import or reset a player's playtime.";
+    }
+
+    /** {@code /playtime <word> <player> <time>}, handing the resolved target and the typed time to {@code action}. */
+    private LiteralArgumentBuilder<CommandSourceStack> correction(String word, Correction action) {
+        return Commands.literal(word)
+                .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                .then(CommandSuggestions.playerArgument("player")
+                        .then(Commands.argument(TIME, StringArgumentType.word()).executes(ctx -> {
+                            Optional<PlayerRef> target = resolveStorageTarget(ctx, Sender.audience(ctx.getSource()));
+                            if (target.isEmpty()) {
+                                return 0;
+                            }
+                            action.apply(actor(ctx), target.get(), StringArgumentType.getString(ctx, TIME));
+                            return Command.SINGLE_SUCCESS;
+                        })));
+    }
+
+    /** One of set, add and take on {@link PlaytimeAdmin}. */
+    @FunctionalInterface
+    private interface Correction {
+        void apply(PlayerRef actor, PlayerRef subject, String amount);
     }
 
     /**
@@ -150,6 +189,20 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
             return 0;
         }
         services.resetPlaytime().resetFor(actor(ctx), target.get());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int importOne(CommandContext<CommandSourceStack> ctx) {
+        Optional<PlayerRef> target = resolveStorageTarget(ctx, Sender.audience(ctx.getSource()));
+        if (target.isEmpty()) {
+            return 0;
+        }
+        admin.importOne(actor(ctx), target.get());
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int importAll(CommandContext<CommandSourceStack> ctx) {
+        admin.importAll(actor(ctx));
         return Command.SINGLE_SUCCESS;
     }
 

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.persistence.playerstate;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerstatePlaytime.PLAYERSTATE_PLAYTIME;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerstatePlaytimeAdjust.PLAYERSTATE_PLAYTIME_ADJUST;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -21,6 +22,9 @@ import org.jspecify.annotations.NullMarked;
  * composite key (the day's first sample inserts, every later one adds), and {@link #summaryOf} is a single
  * conditional-{@code SUM} aggregate that computes all four windows (today / last 7 days / last 30 days / all time)
  * in one round trip. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ *
+ * <p>An operator's correction lives in {@code PLAYERSTATE_PLAYTIME_ADJUST}, one row per player (V86): its signed
+ * seconds are added to the all-time totals on read, and its {@code imported} flag records a vanilla import.
  *
  * <p>The {@code day} column is the ISO-8601 date stored as {@code yyyy-MM-dd} text (V64 explains the portability
  * choice over a SQL {@code DATE}); a {@code yyyy-MM-dd} string orders the same lexicographically as
@@ -91,32 +95,91 @@ public final class JooqPlaytimeRepository extends JooqRepository implements Play
                     .from(PLAYERSTATE_PLAYTIME)
                     .where(PLAYERSTATE_PLAYTIME.UUID.eq(uuid.toString()))
                     .fetchOne();
+            long correction = adjustmentOf(dsl, uuid);
             if (row == null) {
-                return PlaytimeSummary.empty();
+                return PlaytimeSummary.empty().withAdjustment(correction);
             }
             return PlaytimeSummary.ofSeconds(
-                    seconds(row.value1()),
-                    seconds(row.value2()),
-                    seconds(row.value3()),
-                    seconds(row.value4()),
-                    seconds(row.value5()),
-                    seconds(row.value6()),
-                    seconds(row.value7()),
-                    seconds(row.value8()));
+                            seconds(row.value1()),
+                            seconds(row.value2()),
+                            seconds(row.value3()),
+                            seconds(row.value4()),
+                            seconds(row.value5()),
+                            seconds(row.value6()),
+                            seconds(row.value7()),
+                            seconds(row.value8()))
+                    .withAdjustment(correction);
         });
+    }
+
+    @Override
+    public void adjust(UUID uuid, long deltaSeconds) {
+        Objects.requireNonNull(uuid, "uuid");
+        if (deltaSeconds == 0) {
+            return;
+        }
+        write(dsl -> dsl.insertInto(PLAYERSTATE_PLAYTIME_ADJUST)
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.UUID, uuid.toString())
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS, deltaSeconds)
+                .onConflict(PLAYERSTATE_PLAYTIME_ADJUST.UUID)
+                .doUpdate()
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS, PLAYERSTATE_PLAYTIME_ADJUST.SECONDS.plus(deltaSeconds))
+                .execute());
+    }
+
+    @Override
+    public boolean imported(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        return read(dsl -> dsl.fetchExists(
+                PLAYERSTATE_PLAYTIME_ADJUST,
+                PLAYERSTATE_PLAYTIME_ADJUST.UUID.eq(uuid.toString()).and(PLAYERSTATE_PLAYTIME_ADJUST.IMPORTED.eq((short)
+                        1))));
+    }
+
+    @Override
+    public void markImported(UUID uuid) {
+        Objects.requireNonNull(uuid, "uuid");
+        write(dsl -> dsl.insertInto(PLAYERSTATE_PLAYTIME_ADJUST)
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.UUID, uuid.toString())
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.IMPORTED, (short) 1)
+                .onConflict(PLAYERSTATE_PLAYTIME_ADJUST.UUID)
+                .doUpdate()
+                .set(PLAYERSTATE_PLAYTIME_ADJUST.IMPORTED, (short) 1)
+                .execute());
     }
 
     @Override
     public void reset(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
-        write(dsl -> dsl.deleteFrom(PLAYERSTATE_PLAYTIME)
-                .where(PLAYERSTATE_PLAYTIME.UUID.eq(uuid.toString()))
-                .execute());
+        write(dsl -> {
+            dsl.deleteFrom(PLAYERSTATE_PLAYTIME)
+                    .where(PLAYERSTATE_PLAYTIME.UUID.eq(uuid.toString()))
+                    .execute();
+            // The row stays for its import mark; only the correction goes.
+            return dsl.update(PLAYERSTATE_PLAYTIME_ADJUST)
+                    .set(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS, 0L)
+                    .where(PLAYERSTATE_PLAYTIME_ADJUST.UUID.eq(uuid.toString()))
+                    .execute();
+        });
     }
 
     @Override
     public void resetAll() {
-        write(dsl -> dsl.deleteFrom(PLAYERSTATE_PLAYTIME).execute());
+        write(dsl -> {
+            dsl.deleteFrom(PLAYERSTATE_PLAYTIME).execute();
+            return dsl.update(PLAYERSTATE_PLAYTIME_ADJUST)
+                    .set(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS, 0L)
+                    .execute();
+        });
+    }
+
+    /** The signed correction for {@code uuid}, zero when they have none. */
+    private static long adjustmentOf(DSLContext dsl, UUID uuid) {
+        Long stored = dsl.select(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS)
+                .from(PLAYERSTATE_PLAYTIME_ADJUST)
+                .where(PLAYERSTATE_PLAYTIME_ADJUST.UUID.eq(uuid.toString()))
+                .fetchOne(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS);
+        return stored == null ? 0L : stored;
     }
 
     /** SUM of {@code column} over the rows where {@code inWindow} holds, zero outside it: one window's total. */

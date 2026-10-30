@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.adapter.PlaytimeAdmin;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
@@ -31,7 +32,8 @@ public final class PlayerStateCommands {
             PlayerStateServices services,
             Messages messages,
             NoFlyWorldPolicy noFlyWorlds,
-            @Nullable PlaytimeView playtimeView) {
+            @Nullable PlaytimeView playtimeView,
+            PlaytimeAdmin playtimeAdmin) {
         return List.of(
                 new GodCommand(services, messages),
                 new FlyCommand(services, messages, noFlyWorlds),
@@ -70,7 +72,7 @@ public final class PlayerStateCommands {
                 new WorldCommand(services, messages),
                 new DimensionCommand(services, messages),
                 new PingCommand(services, messages),
-                new PlaytimeCommand(services, messages, playtimeView),
+                new PlaytimeCommand(services, messages, playtimeView, playtimeAdmin),
                 new RestCommand(services, messages));
     }
 }

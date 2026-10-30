@@ -78,6 +78,33 @@ public record PlaytimeSummary(
         return totalActive.plus(totalAfk);
     }
 
+    /**
+     * This summary with an operator's correction of {@code seconds} added to the all-time totals. The correction
+     * lands on active time; a negative one that is larger than the active total takes the rest from AFK time, and
+     * neither total goes below zero. The today, week and month windows are what the sampler counted and stay as
+     * they are.
+     */
+    public PlaytimeSummary withAdjustment(long seconds) {
+        if (seconds == 0) {
+            return this;
+        }
+        long active = totalActive.toSeconds() + seconds;
+        long afk = totalAfk.toSeconds();
+        if (active < 0) {
+            afk = Math.max(0, afk + active);
+            active = 0;
+        }
+        return new PlaytimeSummary(
+                todayActive,
+                todayAfk,
+                weekActive,
+                weekAfk,
+                monthActive,
+                monthAfk,
+                Duration.ofSeconds(active),
+                Duration.ofSeconds(afk));
+    }
+
     private static void requireNonNegative(Duration value, String field) {
         if (value == null) {
             throw new NullPointerException(field);

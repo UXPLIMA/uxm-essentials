@@ -147,6 +147,18 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /playtime resetall
     PLAYTIME_RESET_ALL("playerstate.playtime.reset-all"),
 
+    // /playtime set, add, take
+    PLAYTIME_SET("playerstate.playtime.set"),
+    PLAYTIME_ADD("playerstate.playtime.add"),
+    PLAYTIME_TAKE("playerstate.playtime.take"),
+    PLAYTIME_BAD_AMOUNT("playerstate.playtime.bad-amount"),
+
+    // /playtime import
+    PLAYTIME_IMPORTED("playerstate.playtime.imported"),
+    PLAYTIME_IMPORT_NOTHING("playerstate.playtime.import-nothing"),
+    PLAYTIME_IMPORT_ALL_STARTED("playerstate.playtime.import-all-started"),
+    PLAYTIME_IMPORT_ALL_DONE("playerstate.playtime.import-all-done"),
+
     // /playtime GUI
     PLAYTIME_GUI_TITLE("playerstate.playtime.gui.title"),
     PLAYTIME_GUI_TITLE_OTHER("playerstate.playtime.gui.title-other"),
