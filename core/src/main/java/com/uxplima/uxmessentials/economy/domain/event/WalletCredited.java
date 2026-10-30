@@ -17,9 +17,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * @param resulting the owner's balance in that currency after the credit
  * @param transaction the change the aggregate minted for this credit
  * @param occurredAt when the credit applied
+ * @param counted whether it counts as money earned or spent: false for an admin change, a transfer between
+ *     players, a banknote or a refund
  */
 public record WalletCredited(
-        PlayerRef owner, Money amount, Money resulting, Transaction transaction, Instant occurredAt)
+        PlayerRef owner, Money amount, Money resulting, Transaction transaction, Instant occurredAt, boolean counted)
         implements EconomyEvent {
 
     public WalletCredited {
@@ -28,5 +30,10 @@ public record WalletCredited(
         Objects.requireNonNull(resulting, "resulting");
         Objects.requireNonNull(transaction, "transaction");
         Objects.requireNonNull(occurredAt, "occurredAt");
+    }
+
+    /** A change counted as earned or spent, as the wallet aggregate raises it. */
+    public WalletCredited(PlayerRef owner, Money amount, Money resulting, Transaction transaction, Instant occurredAt) {
+        this(owner, amount, resulting, transaction, occurredAt, true);
     }
 }

@@ -376,10 +376,12 @@ The boards answer the grammar every UXM plugin shares, so a hologram written for
 | `playtime` | playerstate | Active time, AFK left out. All time reads the playtime record, corrections included; the other periods count from the version that added them. | all four |
 | `trades` | trade | Trades finished; both sides count one. | all four |
 | `prestige` | ranks | The prestige level. | `alltime` only |
+| `earned` | economy | Money that came into a wallet in the default currency: sales, salaries, rewards, money another plugin pays through Vault. An admin give, a `/pay` from another player, a cashed banknote and a refund are left out. Counted from the version that added it. | all four |
+| `spent` | economy | Money that left a wallet in the default currency: purchases, fees, money another plugin takes through Vault. An admin take, a `/pay` to another player and a written banknote are left out. Counted from the version that added it. | all four |
 | `balance` | economy | The default currency's balance, from `/baltop`. | `alltime` only |
 | `votes` | vote | Votes, as the vote module counts them. | all four |
 
-The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades` and `prestige` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` and `votes` answer from their own modules.
+The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`, `prestige`, `earned` and `spent` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` and `votes` answer from their own modules.
 
 | Key | Value |
 |---|---|

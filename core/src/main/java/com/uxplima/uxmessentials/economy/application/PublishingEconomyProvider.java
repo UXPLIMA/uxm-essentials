@@ -75,7 +75,12 @@ public final class PublishingEconomyProvider implements EconomyProvider {
         Money resulting = inner.balance(owner, amount.currency());
         if (result.isOk()) {
             events.publish(new WalletCredited(
-                    owner, amount, resulting, Transaction.credit(owner, amount, resulting, now), now));
+                    owner,
+                    amount,
+                    resulting,
+                    Transaction.credit(owner, amount, resulting, now),
+                    now,
+                    UncountedMoney.counted()));
         } else if (result.errorOrThrow() == TransferError.BALANCE_MAX_EXCEEDED) {
             events.publish(new WalletRejected(owner, amount, resulting, EconomyError.BALANCE_MAX_EXCEEDED, now));
         }
@@ -88,8 +93,13 @@ public final class PublishingEconomyProvider implements EconomyProvider {
         Instant now = clock.instant();
         Money resulting = inner.balance(owner, amount.currency());
         if (result.isOk()) {
-            events.publish(
-                    new WalletDebited(owner, amount, resulting, Transaction.debit(owner, amount, resulting, now), now));
+            events.publish(new WalletDebited(
+                    owner,
+                    amount,
+                    resulting,
+                    Transaction.debit(owner, amount, resulting, now),
+                    now,
+                    UncountedMoney.counted()));
         } else if (result.errorOrThrow() == TransferError.INSUFFICIENT_FUNDS) {
             events.publish(new WalletRejected(owner, amount, resulting, EconomyError.INSUFFICIENT_FUNDS, now));
         }
@@ -102,8 +112,9 @@ public final class PublishingEconomyProvider implements EconomyProvider {
         Instant now = clock.instant();
         switch (result) {
             case TransferResult.Allow(Transaction debit, Transaction credit) -> {
-                events.publish(new WalletDebited(from, debit.amount(), debit.resulting(), debit, now));
-                events.publish(new WalletCredited(to, credit.amount(), credit.resulting(), credit, now));
+                // Money moved between two players was neither earned nor spent.
+                events.publish(new WalletDebited(from, debit.amount(), debit.resulting(), debit, now, false));
+                events.publish(new WalletCredited(to, credit.amount(), credit.resulting(), credit, now, false));
             }
             case TransferResult.InsufficientFunds(Money required, Money available) ->
                 events.publish(new WalletRejected(from, required, available, EconomyError.INSUFFICIENT_FUNDS, now));

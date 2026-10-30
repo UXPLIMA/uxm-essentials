@@ -119,7 +119,10 @@ public final class BanknoteRedeemer {
                 return;
             }
             redeemed = true;
-            if (economy.credit(owner, note.money()).isOk()) {
+            // Cashing a banknote gives back money already held, so it is not earning.
+            if (com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
+                            () -> economy.credit(owner, note.money()))
+                    .isOk()) {
                 playPickup(player);
                 notifier.send(
                         owner, EconomyMessageKey.BANKNOTE_DEPOSITED, Map.of("amount", notifier.amount(note.money())));

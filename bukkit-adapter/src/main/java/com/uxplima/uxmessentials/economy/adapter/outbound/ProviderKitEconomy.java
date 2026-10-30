@@ -35,7 +35,10 @@ public final class ProviderKitEconomy extends AbstractProviderEconomy implements
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        return economy().credit(who, Money.of(target, amount)).isOk();
+        // A kit refund gives back what was spent, so it is not counted as earned.
+        return com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
+                        () -> economy().credit(who, Money.of(target, amount)))
+                .isOk();
     }
 
     @Override

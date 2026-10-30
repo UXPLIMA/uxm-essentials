@@ -699,7 +699,14 @@ public final class EconomyWiring {
                 new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
                 new SetWorth(worthOverrides, notifier, audit, defaultCurrency, currencies.all()),
-                new EcoAdmin(resolved, repository, audit, notifier, history, clock),
+                // An admin change is neither earned nor spent, so the money boards leave it off.
+                new EcoAdmin(
+                        new com.uxplima.uxmessentials.economy.application.UncountedEconomyProvider(resolved),
+                        repository,
+                        audit,
+                        notifier,
+                        history,
+                        clock),
                 exchangeService,
                 currencies,
                 snapshots,

@@ -53,7 +53,10 @@ public final class ProviderTradeEconomy extends AbstractProviderEconomy implemen
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        if (economy().credit(who, Money.of(target, amount)).isErr()) {
+        // A trade moves money between two players: neither side earned it.
+        if (com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
+                        () -> economy().credit(who, Money.of(target, amount)))
+                .isErr()) {
             logger.warn(
                     "cross-server trade deposit of {} {} to {} was refused by the economy provider",
                     amount,
