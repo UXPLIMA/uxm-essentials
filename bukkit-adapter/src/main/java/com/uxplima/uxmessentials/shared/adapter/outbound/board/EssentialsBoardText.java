@@ -1,12 +1,10 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.board;
 
-import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.UUID;
+import java.util.function.LongFunction;
 
-import com.uxplima.uxmessentials.playerstate.application.PlaytimeFormat;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmlib.board.Board;
@@ -14,8 +12,9 @@ import com.uxplima.uxmlib.board.BoardText;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The words the plugin's boards answer with, from the reader's own catalogue: the shared {@code board.*} keys. A
- * board that counts time shows it the way {@code /playtime} does; every other score is a plain number.
+ * The words the plugin's boards answer with, from the reader's own catalogue: the shared {@code board.*} keys. A score
+ * is shown the way its board was defined to show it: a time as {@code /playtime} writes it, money with its symbol, a
+ * count as a plain number.
  */
 public final class EssentialsBoardText implements BoardText {
 
@@ -26,12 +25,12 @@ public final class EssentialsBoardText implements BoardText {
     }
 
     private final Words words;
-    private final Set<String> timeBoards;
+    private final Map<String, LongFunction<String>> shows;
 
-    /** @param timeBoards the words of the boards whose score is a number of seconds */
-    public EssentialsBoardText(Words words, Set<String> timeBoards) {
+    /** @param shows how each board shows its score, by word; a board not in it shows a plain number */
+    public EssentialsBoardText(Words words, Map<String, LongFunction<String>> shows) {
         this.words = Objects.requireNonNull(words, "words");
-        this.timeBoards = Set.copyOf(Objects.requireNonNull(timeBoards, "timeBoards"));
+        this.shows = Map.copyOf(Objects.requireNonNull(shows, "shows"));
     }
 
     @Override
@@ -61,9 +60,7 @@ public final class EssentialsBoardText implements BoardText {
 
     @Override
     public String score(Board board, long score, @Nullable UUID reader) {
-        return timeBoards.contains(board.word())
-                ? PlaytimeFormat.compact(Duration.ofSeconds(score))
-                : Long.toString(score);
+        return shows.getOrDefault(board.word(), Long::toString).apply(score);
     }
 
     private String line(@Nullable UUID reader, MessageKey key, String first, long a, String second, long b) {

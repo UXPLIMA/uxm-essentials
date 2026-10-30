@@ -1275,7 +1275,7 @@ public final class PluginModule {
                                         : new com.uxplima.uxmessentials.shared.domain.PlayerRef(reader, "reader"),
                                 key,
                                 values)),
-                Set.of("playtime"));
+                links.boards.shows());
         var built = links.boards.build(
                 persistence.database(),
                 persistence.table("board"),
@@ -1303,6 +1303,40 @@ public final class PluginModule {
         resources.onClose(links.boards::close);
         links.placeholders.boardAnswers(boards.answers());
         kernel.log().info("event=boards_ready boards={}", String.join(",", links.boards.words()));
+    }
+
+    /**
+     * The earned and spent boards: money that came into or left a wallet in the default currency, counted in hundredths.
+     * An admin change, a transfer between players, a banknote and a refund are marked as not counted where they are
+     * made, so these rank what players earned by playing and spent on the server.
+     */
+    private static void wireMoneyBoards(
+            ModuleContext ctx,
+            CloseableResources resources,
+            ContextLinks links,
+            com.uxplima.uxmessentials.economy.domain.Currency currency) {
+        java.util.function.LongFunction<String> show =
+                cents -> com.uxplima.uxmessentials.economy.application.MoneyFormat.withSymbol(
+                        com.uxplima.uxmessentials.economy.domain.Money.of(
+                                currency, java.math.BigDecimal.valueOf(cents, 2)));
+        links.boards.define(com.uxplima.uxmlib.board.Board.counter("earned"), show);
+        links.boards.define(com.uxplima.uxmlib.board.Board.counter("spent"), show);
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.economy.domain.event.WalletCredited credited
+                    && credited.counted()
+                    && credited.amount().currency().equals(currency)) {
+                links.boards.add(credited.owner().uuid(), "earned", cents(credited.amount()));
+            } else if (event instanceof com.uxplima.uxmessentials.economy.domain.event.WalletDebited debited
+                    && debited.counted()
+                    && debited.amount().currency().equals(currency)) {
+                links.boards.add(debited.owner().uuid(), "spent", cents(debited.amount()));
+            }
+        });
+    }
+
+    /** An amount in hundredths, the unit the money boards count in; a part of a hundredth is dropped. */
+    private static long cents(com.uxplima.uxmessentials.economy.domain.Money money) {
+        return money.amount().movePointRight(2).longValue();
     }
 
     /** Hear every domain event the plugin publishes until the plugin stops. */
@@ -1854,7 +1888,8 @@ public final class PluginModule {
                     prestigeLevels.prestiged().forEach((player, level) -> levels.put(player, level.longValue()));
                     return levels;
                 },
-                false);
+                false,
+                Long::toString);
         subscribeUntilClose(ctx, resources, event -> {
             if (event instanceof com.uxplima.uxmessentials.ranks.domain.event.PlayerPrestiged prestiged) {
                 links.boards.moved(prestiged.who().uuid(), "prestige", prestiged.level());
@@ -2237,6 +2272,7 @@ public final class PluginModule {
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
+        wireMoneyBoards(ctx, resources, links, wired.defaultCurrency());
         links.economyCurrencies = wired.currencies();
         links.economyBackends = wired.backends();
         links.economyAllowsNonAtomicRecurring = wired.allowNonAtomicRecurring();
@@ -2419,7 +2455,12 @@ public final class PluginModule {
                 new com.uxplima.uxmessentials.playerstate.adapter.outbound.BoardCountingPlaytime(
                         PlaytimeRepositories.jooq(persistence),
                         (player, seconds) -> links.boards.add(player, "playtime", seconds));
-        links.boards.held("playtime", playtimeRepository::activeTotals, true);
+        links.boards.held(
+                "playtime",
+                playtimeRepository::activeTotals,
+                true,
+                seconds -> com.uxplima.uxmessentials.playerstate.application.PlaytimeFormat.compact(
+                        java.time.Duration.ofSeconds(seconds)));
         MirrorWindow mirrorWindow = new MirrorWindow(
                 ctx.kernel().messages(),
                 menus,

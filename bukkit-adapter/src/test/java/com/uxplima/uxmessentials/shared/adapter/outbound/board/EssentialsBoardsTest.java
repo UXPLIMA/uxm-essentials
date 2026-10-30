@@ -8,10 +8,10 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.BoardCountingPlaytime;
+import com.uxplima.uxmessentials.playerstate.application.PlaytimeFormat;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
 import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -53,7 +53,8 @@ class EssentialsBoardsTest {
     @Test
     void playtimeIsShownAsTimeAndEverythingElseAsANumber() {
         EssentialsBoardText text = new EssentialsBoardText(
-                (reader, key, values) -> key.key() + new java.util.TreeMap<>(values), Set.of("playtime"));
+                (reader, key, values) -> key.key() + new java.util.TreeMap<>(values),
+                Map.of("playtime", seconds -> PlaytimeFormat.compact(java.time.Duration.ofSeconds(seconds))));
 
         assertThat(text.score(Board.counter("playtime"), 90_061, null)).isEqualTo("1d 1h 1m");
         assertThat(text.score(Board.counter("trades"), 7, null)).isEqualTo("7");

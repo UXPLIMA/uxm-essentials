@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
+import java.util.function.LongFunction;
 import java.util.function.Supplier;
 import java.util.logging.Logger;
 
@@ -39,15 +40,23 @@ public final class EssentialsBoards {
     public record Built(Leaderboard leaderboard, BoardAnswers answers, BoardPresence presence, Standings standings) {}
 
     private final Map<String, Board> boards = new LinkedHashMap<>();
+    private final Map<String, LongFunction<String>> shows = new LinkedHashMap<>();
     private final Map<String, HeldSnapshot> held = new LinkedHashMap<>();
     private final AtomicReference<BoardRecorder> recorder = new AtomicReference<>();
 
-    /** Add a counter or a record, or a snapshot board that reads its own source. */
+    /** Add a counter or a record, or a snapshot board that reads its own source, its score shown as a number. */
     public void define(Board board) {
+        define(board, Long::toString);
+    }
+
+    /** Add a board whose score is shown through {@code show}: a time, a sum of money. */
+    public void define(Board board, LongFunction<String> show) {
         Objects.requireNonNull(board, "board");
+        Objects.requireNonNull(show, "show");
         if (boards.putIfAbsent(board.word(), board) != null) {
             throw new IllegalArgumentException("two modules define the board " + board.word());
         }
+        shows.put(board.word(), show);
     }
 
     /**
@@ -56,10 +65,10 @@ public final class EssentialsBoards {
      *
      * @param source every player's score above zero; called on the async lane, may block
      */
-    public void held(String word, Supplier<Map<UUID, Long>> source, boolean countedToo) {
+    public void held(String word, Supplier<Map<UUID, Long>> source, boolean countedToo, LongFunction<String> show) {
         HeldSnapshot snapshot = new HeldSnapshot(source);
         held.put(word, snapshot);
-        define(countedToo ? Board.counter(word).withAllTime(snapshot) : Board.snapshot(word, snapshot));
+        define(countedToo ? Board.counter(word).withAllTime(snapshot) : Board.snapshot(word, snapshot), show);
     }
 
     /** Count {@code amount} on the board named {@code word} for {@code player}. */
@@ -77,6 +86,11 @@ public final class EssentialsBoards {
         if (snapshot != null) {
             snapshot.set(player, score);
         }
+    }
+
+    /** How each board shows its score, by word. */
+    public Map<String, LongFunction<String>> shows() {
+        return Map.copyOf(shows);
     }
 
     /** The words of the boards defined so far. */

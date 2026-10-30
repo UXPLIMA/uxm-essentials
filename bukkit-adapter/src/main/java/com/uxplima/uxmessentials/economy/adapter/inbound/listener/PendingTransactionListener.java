@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
+import com.uxplima.uxmessentials.economy.application.UncountedMoney;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository.PendingTransaction;
@@ -89,7 +90,8 @@ public final class PendingTransactionListener implements Listener {
         }
         Currency currency = matchedCurrency.get();
         Money money = Money.of(currency, amount);
-        if (economy.credit(ref, money).isErr()) {
+        // The queued credit's cause (trade, admin give, banknote) is lost on the queue, so the replay is not counted.
+        if (UncountedMoney.call(() -> economy.credit(ref, money)).isErr()) {
             // The credit could not land (e.g. inventory full). Re-queue so the money is never lost.
             pendingRepo.queueCredit(ref.uuid(), currencyId, amount);
             return;

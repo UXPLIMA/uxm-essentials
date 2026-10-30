@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.application.UncountedMoney;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
@@ -40,6 +41,12 @@ public final class ProviderTradeEconomy extends AbstractProviderEconomy implemen
     }
 
     @Override
+    public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+        // The escrow debit is one leg of a trade between two players: neither side spent it.
+        return UncountedMoney.call(() -> super.withdraw(who, amount, currencyId));
+    }
+
+    @Override
     public boolean transfer(PlayerRef from, PlayerRef to, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(from, "from");
         Objects.requireNonNull(to, "to");
@@ -53,7 +60,9 @@ public final class ProviderTradeEconomy extends AbstractProviderEconomy implemen
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
-        if (economy().credit(who, Money.of(target, amount)).isErr()) {
+        // A trade moves money between two players: neither side earned it.
+        if (UncountedMoney.call(() -> economy().credit(who, Money.of(target, amount)))
+                .isErr()) {
             logger.warn(
                     "cross-server trade deposit of {} {} to {} was refused by the economy provider",
                     amount,

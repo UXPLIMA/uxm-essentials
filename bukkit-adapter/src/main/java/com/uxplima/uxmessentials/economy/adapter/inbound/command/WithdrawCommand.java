@@ -88,7 +88,9 @@ public final class WithdrawCommand extends EconomyCommandSupport implements Comm
             return;
         }
 
-        Result<Unit, ?> result = services.provider().debit(owner, amount);
+        // A banknote keeps the money in another form; writing one is not spending.
+        Result<Unit, ?> result = com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
+                () -> services.provider().debit(owner, amount));
         if (result.isErr()) {
             services.notifier()
                     .send(

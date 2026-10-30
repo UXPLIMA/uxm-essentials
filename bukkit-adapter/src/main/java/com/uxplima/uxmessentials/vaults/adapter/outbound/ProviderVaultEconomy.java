@@ -66,6 +66,9 @@ public final class ProviderVaultEconomy implements VaultEconomy {
     public boolean deposit(PlayerRef who, BigDecimal amount) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        return economy.credit(who, Money.of(currency, amount)).isOk();
+        // A vault refund gives back what was spent, so it is not counted as earned.
+        return com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
+                        () -> economy.credit(who, Money.of(currency, amount)))
+                .isOk();
     }
 }
