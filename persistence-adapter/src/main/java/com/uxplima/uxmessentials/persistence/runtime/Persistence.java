@@ -138,6 +138,19 @@ public final class Persistence implements AutoCloseable {
         return dsl;
     }
 
+    /**
+     * The same pool as uxmLib storage sees it, for a library that keeps its own tables in this database: the shared
+     * leaderboard store is one. Name its tables through {@link #table(String)} so they carry the prefix.
+     */
+    public Database database() {
+        return Database.adopt(dataSource, Dialect.fromJdbcUrl("jdbc:" + backend.jdbcSubprotocol() + ":"));
+    }
+
+    /** {@code name} with the configured table prefix in front, as every migration writes it. */
+    public String table(String name) {
+        return tablePrefix + Objects.requireNonNull(name, "name");
+    }
+
     /** The active backend, for diagnostics and backend-specific repository decisions. */
     public DatabaseBackend backend() {
         return backend;

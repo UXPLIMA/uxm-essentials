@@ -28,9 +28,11 @@ import com.uxplima.uxmessentials.vote.domain.VotePeriod;
  * {@code top_<board>_<period>_<n>_name|value|head}, {@code rank_<board>_<period>}, {@code value_<board>_<period>} and
  * {@code resets_<period>}. A hologram line written for another plugin's board works for these.
  *
- * <p>There are two boards. {@code balance} ranks the default currency, for {@code alltime} only: a balance is what a
- * player holds now, not what they earned in a window. {@code votes} ranks votes over the four periods the vote module
- * keeps. Both read the snapshots {@code /baltop} and the vote board already hold, so nothing here touches storage.
+ * <p>The boards the modules define on uxmLib's shared board module (playtime, trades, prestige) answer first, through
+ * {@link com.uxplima.uxmlib.board.BoardAnswers}. Two older boards answer after them: {@code balance} ranks the
+ * default currency, for {@code alltime} only, since a balance is what a player holds now rather than what they earned
+ * in a window; {@code votes} ranks votes over the four periods the vote module keeps. Both read the snapshots
+ * {@code /baltop} and the vote board already hold.
  * The older {@code economy_baltop_*} and {@code votes_top_*} families keep answering beside these.
  *
  * <p>A place nobody holds still answers, in the reader's words: the name is the word for nobody, the value and a
@@ -71,6 +73,12 @@ final class BoardPlaceholders {
      * not a board placeholder: {@code rank_next} and the other rank keys of the ranks module fall through to them.
      */
     Optional<String> resolve(PlayerRef reader, String key) {
+        Optional<String> shared = contexts.boardAnswers()
+                .filter(answers -> answers.handles(key) && !key.equals("head"))
+                .map(answers -> answers.answer(reader.uuid(), reader.name(), key));
+        if (shared.isPresent()) {
+            return shared;
+        }
         List<String> parts = List.of(key.split("_", -1));
         if (parts.isEmpty()) {
             return Optional.empty();

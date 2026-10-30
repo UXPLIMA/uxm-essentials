@@ -5,6 +5,8 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerstatePlayt
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -109,6 +111,40 @@ public final class JooqPlaytimeRepository extends JooqRepository implements Play
                             seconds(row.value7()),
                             seconds(row.value8()))
                     .withAdjustment(correction);
+        });
+    }
+
+    @Override
+    public Map<UUID, Long> activeTotals() {
+        return read(dsl -> {
+            Map<UUID, long[]> counted = new HashMap<>();
+            dsl.select(
+                            PLAYERSTATE_PLAYTIME.UUID,
+                            total(PLAYERSTATE_PLAYTIME.ACTIVE_SECONDS),
+                            total(PLAYERSTATE_PLAYTIME.AFK_SECONDS))
+                    .from(PLAYERSTATE_PLAYTIME)
+                    .groupBy(PLAYERSTATE_PLAYTIME.UUID)
+                    .forEach(row -> counted.put(
+                            UUID.fromString(row.value1()), new long[] {seconds(row.value2()), seconds(row.value3())}));
+            Map<UUID, Long> corrections = new HashMap<>();
+            dsl.select(PLAYERSTATE_PLAYTIME_ADJUST.UUID, PLAYERSTATE_PLAYTIME_ADJUST.SECONDS)
+                    .from(PLAYERSTATE_PLAYTIME_ADJUST)
+                    .where(PLAYERSTATE_PLAYTIME_ADJUST.SECONDS.ne(0L))
+                    .forEach(row -> corrections.put(UUID.fromString(row.value1()), row.value2()));
+            Map<UUID, Long> totals = new HashMap<>();
+            java.util.Set<UUID> players = new java.util.HashSet<>(counted.keySet());
+            players.addAll(corrections.keySet());
+            for (UUID player : players) {
+                long[] row = counted.getOrDefault(player, new long[2]);
+                long active = PlaytimeSummary.ofSeconds(0, 0, 0, 0, 0, 0, row[0], row[1])
+                        .withAdjustment(corrections.getOrDefault(player, 0L))
+                        .totalActive()
+                        .toSeconds();
+                if (active > 0) {
+                    totals.put(player, active);
+                }
+            }
+            return Map.copyOf(totals);
         });
     }
 

@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.persistence.ranks;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerRanks.PLAYER_RANKS;
 
 import java.time.Clock;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -48,6 +50,18 @@ public final class JooqPlayerRankRepository extends JooqRepository implements Pl
         write(dsl -> {
             upsert(dsl, playerId, rankId, prestige);
             return null;
+        });
+    }
+
+    @Override
+    public Map<UUID, Integer> prestiged() {
+        return read(dsl -> {
+            Map<UUID, Integer> levels = new HashMap<>();
+            dsl.select(PLAYER_RANKS.UUID, PLAYER_RANKS.PRESTIGE)
+                    .from(PLAYER_RANKS)
+                    .where(PLAYER_RANKS.PRESTIGE.gt(0))
+                    .forEach(row -> levels.put(UUID.fromString(row.value1()), row.value2()));
+            return Map.copyOf(levels);
         });
     }
 

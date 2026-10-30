@@ -1211,6 +1211,7 @@ public final class PluginModule {
                     claimProviders,
                     ipCapture);
         });
+        wireBoards(plugin, config, kernel, persistence, resources, links);
         // The server-metrics seam belongs to no feature context, it reads Bukkit/JVM globals, so it is wired
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
         // from this enable (a reload restarts it) rather than the whole JVM's age.
@@ -1249,6 +1250,70 @@ public final class PluginModule {
         // dash at every player. Wired last, from what the loop above recorded.
         links.placeholders.modules(new RegistryModulesPlaceholders(wiredModules));
         return links.placeholders.build();
+    }
+
+    /**
+     * Stand up the leaderboards the modules defined: the store over the plugin's own database, the presence listener
+     * that loads a player's scores as they log in, and the timer that reads the boards. Nothing when no module that
+     * ranks anything is on.
+     */
+    private static void wireBoards(
+            JavaPlugin plugin,
+            ConfigStore config,
+            KernelPorts kernel,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links) {
+        com.uxplima.uxmlib.board.BoardSettings settings =
+                com.uxplima.uxmessentials.shared.adapter.outbound.board.BoardConfig.read(config);
+        var messages = kernel.messages();
+        var text = new com.uxplima.uxmessentials.shared.adapter.outbound.board.EssentialsBoardText(
+                (reader, key, values) -> net.kyori.adventure.text.minimessage.MiniMessage.miniMessage()
+                        .stripTags(messages.resolve(
+                                reader == null
+                                        ? com.uxplima.uxmessentials.shared.domain.PlayerRef.system("server")
+                                        : new com.uxplima.uxmessentials.shared.domain.PlayerRef(reader, "reader"),
+                                key,
+                                values)),
+                Set.of("playtime"));
+        var built = links.boards.build(
+                persistence.database(),
+                persistence.table("board"),
+                persistence.table("board_name"),
+                () -> settings,
+                text,
+                kernel.scheduler()::async,
+                player -> {
+                    String name = plugin.getServer().getOfflinePlayer(player).getName();
+                    return name == null ? player.toString() : name;
+                },
+                plugin.getLogger());
+        if (built.isEmpty()) {
+            return;
+        }
+        var boards = built.get();
+        resources.addListener(boards.presence());
+        boards.presence().loadOnline(plugin.getServer().getOnlinePlayers(), kernel.scheduler()::async);
+        com.uxplima.uxmlib.scheduler.TaskHandle refresh = new PaperScheduler(plugin)
+                .asyncTimer(
+                        java.time.Duration.ZERO,
+                        settings.refresh(),
+                        task -> boards.leaderboard().refresh());
+        resources.onClose(refresh::cancel);
+        resources.onClose(links.boards::close);
+        links.placeholders.boardAnswers(boards.answers());
+        kernel.log().info("event=boards_ready boards={}", String.join(",", links.boards.words()));
+    }
+
+    /** Hear every domain event the plugin publishes until the plugin stops. */
+    private static void subscribeUntilClose(
+            ModuleContext ctx,
+            CloseableResources resources,
+            java.util.function.Consumer<com.uxplima.uxmessentials.shared.domain.DomainEvent> listener) {
+        InProcessDomainEventPublisher events =
+                (InProcessDomainEventPublisher) ctx.kernel().events();
+        events.subscribe(listener);
+        resources.onClose(() -> events.unsubscribe(listener));
     }
 
     private static void wireAdapters(
@@ -1747,6 +1812,14 @@ public final class PluginModule {
         links.queries.register(UxmTradeQuery.class, new TradeQueries(wired.sessions()));
         // Captured for the relational trade placeholders, which are wired unconditionally after the modules.
         links.tradeSessions = wired.sessions();
+        // Both sides of a finished trade count one on the trades board.
+        links.boards.define(com.uxplima.uxmlib.board.Board.counter("trades"));
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.trade.domain.event.TradeCompleted done) {
+                links.boards.add(done.initiator().uuid(), "trades", 1);
+                links.boards.add(done.partner().uuid(), "trades", 1);
+            }
+        });
     }
 
     private static void wireRanks(
@@ -1771,6 +1844,22 @@ public final class PluginModule {
                 : Optional.empty();
         RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
+        // The prestige board ranks the stored prestige levels, read whole at each refresh; a prestige moves the
+        // player's own score at once rather than at the next read.
+        var prestigeLevels = com.uxplima.uxmessentials.persistence.ranks.PlayerRankRepositories.jooq(persistence);
+        links.boards.held(
+                "prestige",
+                () -> {
+                    Map<java.util.UUID, Long> levels = new java.util.HashMap<>();
+                    prestigeLevels.prestiged().forEach((player, level) -> levels.put(player, level.longValue()));
+                    return levels;
+                },
+                false);
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.ranks.domain.event.PlayerPrestiged prestiged) {
+                links.boards.moved(prestiged.who().uuid(), "prestige", prestiged.level());
+            }
+        });
         // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
         resources.onClose(wired.stop());
         // The rank / next-rank / prestige placeholders read the DB-backed pointer through the CurrentRank use case and
@@ -2324,7 +2413,13 @@ public final class PluginModule {
         // persistence.dsl(); the per-player snapshot map stays transient in-memory and all live-player
         // reconciliation routes through the kernel Scheduler port onto the owning region thread. The AFK-aware
         // playtime sampler is armed below and stopped on module disable, leaving no orphaned tick.
-        PlaytimeRepository playtimeRepository = PlaytimeRepositories.jooq(persistence);
+        // Every active second the sampler credits is also counted on the playtime board; its all-time board reads the
+        // ledger itself, corrections included, so it ranks the whole history and not only what was counted since.
+        PlaytimeRepository playtimeRepository =
+                new com.uxplima.uxmessentials.playerstate.adapter.outbound.BoardCountingPlaytime(
+                        PlaytimeRepositories.jooq(persistence),
+                        (player, seconds) -> links.boards.add(player, "playtime", seconds));
+        links.boards.held("playtime", playtimeRepository::activeTotals, true);
         MirrorWindow mirrorWindow = new MirrorWindow(
                 ctx.kernel().messages(),
                 menus,
@@ -3319,6 +3414,9 @@ public final class PluginModule {
                 securityLockoutBan;
         // The PlaceholderAPI read seams, filled by each enabled context that contributes placeholders.
         private final PlaceholderContexts.Builder placeholders = PlaceholderContexts.builder();
+        // The leaderboards every module that ranks something defines as it wires, built once they all have.
+        private final com.uxplima.uxmessentials.shared.adapter.outbound.board.EssentialsBoards boards =
+                new com.uxplima.uxmessentials.shared.adapter.outbound.board.EssentialsBoards();
         // The published read surfaces, filled the same way and for the same reason: a context that never wires
         // registers nothing, so the developer API answers "that module is off" rather than "no data". Handed in
         // rather than created here, because the API front door is published to other plugins before any context

@@ -57,3 +57,9 @@ actions = [
   "console playtime reset {player}"
 ]
 ```
+
+## The playtime board
+
+`%uxmessentials_top_playtime_<period>_<n>_name%` and its siblings rank active time, AFK left out. The all-time board
+reads this record, corrections included, so it covers every day since the install; the monthly, weekly and daily
+boards count from the version that added them. The reference lists every board key.

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.playerstate.application.port;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
@@ -51,6 +52,13 @@ public interface PlaytimeRepository {
      * atomic upsert, like {@link #addSeconds}.
      */
     void adjust(UUID uuid, long deltaSeconds);
+
+    /**
+     * Every player's all-time active seconds, with their correction applied the way {@link #summaryOf} applies it:
+     * what the playtime leaderboard ranks. A player whose total is zero is left out. Blocks; call it off the tick
+     * thread.
+     */
+    Map<UUID, Long> activeTotals();
 
     /** Whether {@code uuid}'s vanilla playtime statistic was already imported. */
     boolean imported(UUID uuid);

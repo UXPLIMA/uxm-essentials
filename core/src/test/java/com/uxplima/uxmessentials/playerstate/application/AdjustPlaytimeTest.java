@@ -83,4 +83,18 @@ class AdjustPlaytimeTest {
 
         assertThat(total()).isZero();
     }
+
+    @Test
+    void theActiveTotalsCarryTheCorrection() {
+        ledger.addSeconds(SAM.uuid(), TODAY, 600, 300);
+        ledger.addSeconds(ALEX.uuid(), TODAY, 60, 0);
+
+        adjust.take(ALEX, SAM, "12m");
+        adjust.take(SAM, ALEX, "1m");
+
+        assertThat(ledger.activeTotals()).isEqualTo(java.util.Map.of());
+        // The take spent the 10 active minutes and 2 of the AFK ones; the hour added lands on active time.
+        adjust.add(ALEX, SAM, "1h");
+        assertThat(ledger.activeTotals()).isEqualTo(java.util.Map.of(SAM.uuid(), 3_480L));
+    }
 }
