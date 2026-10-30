@@ -6,7 +6,9 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.function.ObjLongConsumer;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -41,6 +43,7 @@ import com.uxplima.uxmessentials.vote.adapter.inbound.command.VotePartyCommand;
 import com.uxplima.uxmessentials.vote.adapter.inbound.gui.VoteSitesMenu;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VoteJoinListener;
 import com.uxplima.uxmessentials.vote.adapter.inbound.listener.VotifierListener;
+import com.uxplima.uxmessentials.vote.adapter.outbound.BoardCountingVotes;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardApplier;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitRewardDispatcher;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BukkitVoteAudience;
@@ -127,7 +130,8 @@ public final class VoteWiring {
      * unregistered on stop. The repository is the concrete counter-cached jOOQ adapter wrapped by
      * {@link VoteSync#repository} so each counter mutation announces a {@code VoteCounterChanged} to peers; the
      * same cache is handed to {@link VoteSync#listener} so a remote advance or party fire invalidates it. With
-     * the bus disabled both seams are no-ops, so the single-server path is unchanged.
+     * the bus disabled both seams are no-ops, so the single-server path is unchanged. Every vote a saved tally
+     * adds is also counted on the votes board through {@code board}.
      */
     public static Wired wire(
             Plugin plugin,
@@ -137,7 +141,8 @@ public final class VoteWiring {
             Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            ObjLongConsumer<UUID> board) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -148,7 +153,8 @@ public final class VoteWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         CachedVoteRepository cachedRepository = VoteRepositories.cachedConcrete(persistence);
-        VoteRepository repository = VoteSync.repository(cachedRepository, bus.publisher());
+        VoteRepository repository =
+                new BoardCountingVotes(VoteSync.repository(cachedRepository, bus.publisher()), board);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         BukkitRewardDispatcher dispatcher =
                 new BukkitRewardDispatcher(kernel.scheduler(), new BukkitClickCommandRunner(), kernel.log());

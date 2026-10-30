@@ -145,9 +145,7 @@ public final class PlaceholderResolver {
         this.contexts = Objects.requireNonNull(contexts, "contexts");
         // A seam that is absent, which only a test bundle is, answers the dash for every word.
         BoardPlaceholders.Words words = contexts.boardWords().orElse((reader, key, values) -> EMPTY);
-        // The server's own zone, the one the vote module counts its days, weeks and months in.
-        java.time.ZoneId zone = java.time.ZoneId.systemDefault();
-        this.boards = new BoardPlaceholders(contexts, words, java.time.Clock.system(zone), zone);
+        this.boards = new BoardPlaceholders(contexts, words);
     }
 
     /**

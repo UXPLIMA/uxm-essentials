@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vote.application.port;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -60,6 +61,9 @@ public interface VoteRepository {
 
     /** Persist an updated {@link VoteTally} for {@code player}. */
     void saveTotals(PlayerRef player, VoteTally tally);
+
+    /** Every stored tally by player, read once to seed the vote board. */
+    Map<UUID, VoteTally> allTotals();
 
     /**
      * Return the top {@code limit} voters for {@code period}, ordered from highest to lowest vote

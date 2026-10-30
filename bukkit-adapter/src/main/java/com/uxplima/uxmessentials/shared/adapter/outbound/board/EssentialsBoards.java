@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicReference;
@@ -17,9 +18,11 @@ import java.util.logging.Logger;
 
 import com.uxplima.uxmlib.board.Board;
 import com.uxplima.uxmlib.board.BoardAnswers;
+import com.uxplima.uxmlib.board.BoardPeriod;
 import com.uxplima.uxmlib.board.BoardPresence;
 import com.uxplima.uxmlib.board.BoardRecorder;
 import com.uxplima.uxmlib.board.BoardSettings;
+import com.uxplima.uxmlib.board.BoardStore;
 import com.uxplima.uxmlib.board.BoardText;
 import com.uxplima.uxmlib.board.Leaderboard;
 import com.uxplima.uxmlib.board.SqlBoardStore;
@@ -39,9 +42,18 @@ public final class EssentialsBoards {
     /** What {@link #build} stands up, for the bootstrap to register and stop. */
     public record Built(Leaderboard leaderboard, BoardAnswers answers, BoardPresence presence, Standings standings) {}
 
+    /** The scores a counted board starts from, so the windows open when it first runs are not empty. */
+    @FunctionalInterface
+    public interface Seed {
+
+        /** Every player's score in each of {@code periods}, for the windows that hold the present moment. */
+        Map<UUID, Map<BoardPeriod, Long>> scores(Set<BoardPeriod> periods);
+    }
+
     private final Map<String, Board> boards = new LinkedHashMap<>();
     private final Map<String, LongFunction<String>> shows = new LinkedHashMap<>();
     private final Map<String, HeldSnapshot> held = new LinkedHashMap<>();
+    private final Map<String, Seed> seeds = new LinkedHashMap<>();
     private final AtomicReference<BoardRecorder> recorder = new AtomicReference<>();
 
     /** Add a counter or a record, or a snapshot board that reads its own source, its score shown as a number. */
@@ -69,6 +81,16 @@ public final class EssentialsBoards {
         HeldSnapshot snapshot = new HeldSnapshot(source);
         held.put(word, snapshot);
         define(countedToo ? Board.counter(word).withAllTime(snapshot) : Board.snapshot(word, snapshot), show);
+    }
+
+    /**
+     * Start the counted board named {@code word} from {@code seed} when it is built and none of its open windows holds
+     * a row yet: the first start after the board was added, before any event was counted on it.
+     */
+    public void seed(String word, Seed seed) {
+        Objects.requireNonNull(word, "word");
+        Objects.requireNonNull(seed, "seed");
+        seeds.put(word, seed);
     }
 
     /** Count {@code amount} on the board named {@code word} for {@code player}. */
@@ -120,11 +142,49 @@ public final class EssentialsBoards {
         Clock clock = Clock.systemUTC();
         SqlBoardStore store = new SqlBoardStore(database, boardTable, namesTable, logger);
         Leaderboard leaderboard = new Leaderboard(store, List.copyOf(boards.values()), names, settings, clock);
+        seeds.forEach((word, seed) -> {
+            Board board = boards.get(word);
+            if (board != null) {
+                int seeded = seed(store, leaderboard, board, seed, clock.millis());
+                if (seeded > 0) {
+                    logger.info("event=board_seeded board=" + word + " players=" + seeded);
+                }
+            }
+        });
         Standings standings = new Standings(store, leaderboard);
         recorder.set(new BoardRecorder(store, leaderboard, standings, async, clock));
         BoardAnswers answers = new BoardAnswers(
                 leaderboard, standings, text, () -> settings.get().emptyHead());
         return Optional.of(new Built(leaderboard, answers, new BoardPresence(standings, store), standings));
+    }
+
+    /**
+     * Add what {@code seed} gives to the open windows {@code board} counts in, unless one of them already holds a row.
+     *
+     * @return how many players were given a score
+     */
+    static int seed(BoardStore store, Leaderboard leaderboard, Board board, Seed seed, long at) {
+        Map<BoardPeriod, Long> windows = leaderboard.countedWindows(board);
+        boolean started = windows.entrySet().stream()
+                .anyMatch(open ->
+                        !store.top(board, open.getKey(), open.getValue(), 1).isEmpty());
+        if (windows.isEmpty() || started) {
+            return 0;
+        }
+        int seeded = 0;
+        for (Map.Entry<UUID, Map<BoardPeriod, Long>> player :
+                seed.scores(windows.keySet()).entrySet()) {
+            boolean scored = false;
+            for (Map.Entry<BoardPeriod, Long> score : player.getValue().entrySet()) {
+                Long window = windows.get(score.getKey());
+                if (window != null && score.getValue() > 0) {
+                    store.add(player.getKey(), board, Map.of(score.getKey(), window), score.getValue(), at);
+                    scored = true;
+                }
+            }
+            seeded += scored ? 1 : 0;
+        }
+        return seeded;
     }
 
     /** Stop counting: an event after this lands nowhere. */

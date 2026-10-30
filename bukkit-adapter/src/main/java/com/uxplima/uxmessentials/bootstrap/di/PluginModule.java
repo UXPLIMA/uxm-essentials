@@ -3353,8 +3353,47 @@ public final class PluginModule {
         // threshold are surfaced for the PAPI vote placeholder seam registered after all contexts have wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        VoteWiring.Wired wired =
-                VoteWiring.wire(plugin, ctx, persistence, events, bus, guiRegistry, menus, menuBindings);
+        VoteWiring.Wired wired = VoteWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                events,
+                bus,
+                guiRegistry,
+                menus,
+                menuBindings,
+                (player, votes) -> links.boards.add(player, "votes", votes));
+        // Every vote is counted on the votes board; its all-time board reads the stored tallies, so a reset shows.
+        // The windows open when the board first runs start from the tallies, counted in the server's own zone like
+        // the vote module counts them.
+        links.boards.held(
+                "votes",
+                () -> {
+                    Map<java.util.UUID, Long> totals = new java.util.HashMap<>();
+                    wired.repository().allTotals().forEach((player, tally) -> {
+                        if (tally.alltime() > 0) {
+                            totals.put(player, tally.alltime());
+                        }
+                    });
+                    return totals;
+                },
+                true,
+                Long::toString);
+        links.boards.seed("votes", periods -> {
+            java.time.Instant now = java.time.Instant.now();
+            java.time.ZoneId zone = java.time.ZoneId.systemDefault();
+            Map<java.util.UUID, Map<com.uxplima.uxmlib.board.BoardPeriod, Long>> scores = new java.util.HashMap<>();
+            wired.repository().allTotals().forEach((player, tally) -> {
+                Map<com.uxplima.uxmlib.board.BoardPeriod, Long> held =
+                        new java.util.EnumMap<>(com.uxplima.uxmlib.board.BoardPeriod.class);
+                periods.forEach(period -> held.put(
+                        period,
+                        tally.countIn(
+                                com.uxplima.uxmessentials.vote.domain.VotePeriod.valueOf(period.name()), now, zone)));
+                scores.put(player, held);
+            });
+            return scores;
+        });
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

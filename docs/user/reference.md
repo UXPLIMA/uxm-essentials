@@ -379,9 +379,9 @@ The boards answer the grammar every UXM plugin shares, so a hologram written for
 | `earned` | economy | Money that came into a wallet in the default currency: sales, salaries, rewards, money another plugin pays through Vault. An admin give, a `/pay` from another player, a cashed banknote and a refund are left out. Counted from the version that added it. | all four |
 | `spent` | economy | Money that left a wallet in the default currency: purchases, fees, money another plugin takes through Vault. An admin take, a `/pay` to another player and a written banknote are left out. Counted from the version that added it. | all four |
 | `balance` | economy | The default currency's balance, from `/baltop`. | `alltime` only |
-| `votes` | vote | Votes, as the vote module counts them. | all four |
+| `votes` | vote | Votes, online or offline. All time reads the vote totals, so a `/vote` reset shows; the other periods count each vote, and on the first start of the version that added them begin from the totals of the windows open then. | all four |
 
-The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`, `prestige`, `earned` and `spent` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` and `votes` answer from their own modules.
+The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`, `prestige`, `earned`, `spent` and `votes` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` answers from `/baltop`.
 
 | Key | Value |
 |---|---|

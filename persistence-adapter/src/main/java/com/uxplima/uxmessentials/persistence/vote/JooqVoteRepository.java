@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -186,6 +187,12 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 .set(VOTE_TOTALS.BEST_STREAK, tally.bestStreak())
                 .set(VOTE_TOTALS.STREAK_DAY_KEY, tally.streakDayKey())
                 .execute());
+    }
+
+    @Override
+    public Map<UUID, VoteTally> allTotals() {
+        return read(dsl -> dsl.selectFrom(VOTE_TOTALS)
+                .fetchMap(row -> UUID.fromString(row.getPlayer()), JooqVoteRepository::toTally));
     }
 
     @Override
