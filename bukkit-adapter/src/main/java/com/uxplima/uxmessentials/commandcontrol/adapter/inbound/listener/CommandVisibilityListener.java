@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Function;
 
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -19,6 +21,7 @@ import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFac
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
+import com.uxplima.uxmessentials.commandcontrol.application.LanguageWords;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
@@ -39,6 +42,7 @@ import org.jspecify.annotations.Nullable;
  *       the world's {@link RuleSet} denies (respecting the vanilla permission the command already carries) and every
  *       plugin-listing command the world's {@link HidePolicy} hides, so a disallowed command neither autocompletes nor
  *       appears in the client command graph. The list is client-agnostic - Bedrock / Geyser players receive it too.
+ *       It also drops the words {@link LanguageWords} gives to languages the player does not read.
  *   <li>{@link AsyncTabCompleteEvent}. Drops the argument suggestions of a command whose root is filtered, so the
  *       arguments of a command a player cannot run never leak through completion.
  *   <li>{@link PlayerCommandPreprocessEvent}. The scrub-help block: when {@code deny-list-commands} is on, a
@@ -65,6 +69,8 @@ public final class CommandVisibilityListener implements Listener {
     private final String bypassPermission;
     private final Messages messages;
     private final MessageSink sink;
+    private final LanguageWords languageWords;
+    private final Function<UUID, Locale> languages;
 
     public CommandVisibilityListener(
             WorldRuleSets worldRules,
@@ -75,7 +81,9 @@ public final class CommandVisibilityListener implements Listener {
             boolean scrubHelp,
             String bypassPermission,
             Messages messages,
-            MessageSink sink) {
+            MessageSink sink,
+            LanguageWords languageWords,
+            Function<UUID, Locale> languages) {
         this.worldRules = Objects.requireNonNull(worldRules, "worldRules");
         this.worldHidePolicies = Objects.requireNonNull(worldHidePolicies, "worldHidePolicies");
         this.groups = Objects.requireNonNull(groups, "groups");
@@ -88,11 +96,18 @@ public final class CommandVisibilityListener implements Listener {
         this.bypassPermission = bypassPermission;
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.languageWords = Objects.requireNonNull(languageWords, "languageWords");
+        this.languages = Objects.requireNonNull(languages, "languages");
     }
 
     @EventHandler
     public void onCommandSend(PlayerCommandSendEvent event) {
         Player player = event.getPlayer();
+        if (!languageWords.isEmpty()) {
+            // Cosmetic and for everybody, a bypass holder included: a word for another language still runs when typed.
+            Locale reads = languages.apply(player.getUniqueId());
+            event.getCommands().removeIf(label -> languageWords.hiddenFor(label, reads));
+        }
         RuleSet rules = worldRules.forWorld(worldName(player));
         HidePolicy hidePolicy = worldHidePolicies.forWorld(worldName(player));
         if (!tabActive(rules) && !hidePolicy.isActive()) {
