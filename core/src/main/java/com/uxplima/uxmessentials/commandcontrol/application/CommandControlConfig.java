@@ -59,6 +59,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param allowedChannels the plugin-messaging channels that may still be advertised ({@code
  *     plugin-channel-hide.allowed-channels})
  * @param worldOverrides the per-world overrides of the command lists and hide behaviour, keyed by world name
+ * @param languageWords the command words for the readers of one language, a list per language tag
+ *     ({@code tab-completion.languages}); see {@link LanguageWords}
  */
 public record CommandControlConfig(
         boolean enabled,
@@ -78,7 +80,8 @@ public record CommandControlConfig(
         boolean autoLowercaseBaseCommands,
         boolean channelHideEnabled,
         List<String> allowedChannels,
-        Map<String, WorldOverride> worldOverrides) {
+        Map<String, WorldOverride> worldOverrides,
+        Map<String, List<String>> languageWords) {
 
     /** The config key under {@code commands} that holds the fallback list rather than a named group. */
     private static final String DEFAULT_LIST_KEY = "default";
@@ -104,6 +107,7 @@ public record CommandControlConfig(
         allowedChannels = List.copyOf(allowedChannels);
         groupCommands = copyGroups(groupCommands);
         worldOverrides = Map.copyOf(new LinkedHashMap<>(worldOverrides));
+        languageWords = copyGroups(Objects.requireNonNull(languageWords, "languageWords"));
     }
 
     /** A per-world override of the base command lists and hide behaviour, applied while a player is in that world. */
@@ -152,7 +156,8 @@ public record CommandControlConfig(
                 config.getBoolean("auto-lowercase-base-commands", true),
                 config.getBoolean("plugin-channel-hide.enabled", false),
                 config.getStringList("plugin-channel-hide.allowed-channels", DEFAULT_ALLOWED_CHANNELS),
-                worlds);
+                worlds,
+                readLists(config, "tab-completion.languages"));
     }
 
     /** Build the pure {@link RuleSet} the base config describes, gating {@code .bypass} on {@code bypassPermission}. */
@@ -198,6 +203,11 @@ public record CommandControlConfig(
         return ChannelHidePolicy.of(channelHideEnabled, allowedChannels);
     }
 
+    /** The command words each language's readers are sent alone. */
+    public LanguageWords toLanguageWords() {
+        return LanguageWords.of(languageWords);
+    }
+
     /** The deny line to show on a blocked command, per {@link #useUnknownCommandMessage}. */
     public CommandControlMessageKey denyMessage() {
         return useUnknownCommandMessage
@@ -214,6 +224,15 @@ public record CommandControlConfig(
             }
         }
         return groups;
+    }
+
+    /** Read every {@code <path>.<key>} list, keyed as written. */
+    private static Map<String, List<String>> readLists(ConfigStore config, String path) {
+        Map<String, List<String>> lists = new LinkedHashMap<>();
+        for (String key : config.getKeys(path)) {
+            lists.put(key, config.getStringList(path + "." + key, List.of()));
+        }
+        return lists;
     }
 
     /**

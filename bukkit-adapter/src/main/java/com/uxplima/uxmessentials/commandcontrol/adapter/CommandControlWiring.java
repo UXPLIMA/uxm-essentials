@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
 import com.uxplima.uxmessentials.commandcontrol.domain.WorldHidePolicies;
 import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
@@ -102,7 +103,9 @@ public final class CommandControlWiring {
                 config.denyListCommands(),
                 BYPASS_PERMISSION,
                 kernel.messages(),
-                kernel.messageSink()));
+                kernel.messageSink(),
+                config.toLanguageWords(),
+                HudText::languageOf));
         ChannelHidePolicy channelHide = config.toChannelHidePolicy();
         if (channelHide.isEnabled()) {
             listeners.add(channelHideConnection(channelHide, kernel));
