@@ -216,9 +216,13 @@ public final class WarpSoundSelectorView {
     public String nameOf(SoundOption option, PlayerRef viewer) {
         Objects.requireNonNull(option, "option");
         Objects.requireNonNull(viewer, "viewer");
-        return option.preset()
-                .nameIn(messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of())
-                        .strip());
+        WarpPresets.Preset preset = option.preset();
+        if (preset.namedByLine()) {
+            String line = preset.line();
+            return messages.resolve(viewer, () -> line, Map.of()).strip();
+        }
+        return preset.nameIn(
+                messages.resolve(viewer, SharedMessageKey.LANG_CODE, Map.of()).strip());
     }
 
     /** One sound of the grid: the preset it shows. */

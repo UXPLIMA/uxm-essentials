@@ -79,22 +79,55 @@ public final class WarpPresets {
                         index + 1);
                 continue;
             }
-            Map<String, String> names = new LinkedHashMap<>();
-            for (String language : config.getKeys(at + ".name")) {
-                names.put(language, config.getString(at + ".name." + language, ""));
-            }
-            presets.add(new Preset(effect, icon, names));
+            Name name = name(config, at + ".name");
+            presets.add(new Preset(effect, icon, name.byLanguage(), name.line()));
         }
         return presets;
     }
 
-    /** One entry of a picker: the effect it sets, the item it shows, and its name in each language. */
-    public record Preset(String effect, Material icon, Map<String, String> names) {
+    /**
+     * A preset's name as the file wrote it: one name per language code, a line of the messages files named with
+     * {@code @}, or one name everybody reads, which is kept as the English one.
+     *
+     * @param line the messages line the name is, or empty
+     */
+    record Name(Map<String, String> byLanguage, String line) {}
+
+    static Name name(ConfigStore config, String path) {
+        Map<String, String> names = new LinkedHashMap<>();
+        for (String language : config.getKeys(path)) {
+            names.put(language, config.getString(path + "." + language, ""));
+        }
+        String written = names.isEmpty() ? config.getString(path, "").strip() : "";
+        String line = written.startsWith("@") ? written.substring(1) : "";
+        if (line.isEmpty() && !written.isEmpty()) {
+            names.put(ENGLISH, written);
+        }
+        return new Name(Map.copyOf(names), line);
+    }
+
+    /**
+     * One entry of a picker: the effect it sets, the item it shows, and its name in each language.
+     *
+     * @param line the messages line the name is, when the file named one with {@code @}; empty otherwise
+     */
+    public record Preset(String effect, Material icon, Map<String, String> names, String line) {
 
         public Preset {
             Objects.requireNonNull(effect, "effect");
             Objects.requireNonNull(icon, "icon");
+            Objects.requireNonNull(line, "line");
             names = Map.copyOf(names);
+        }
+
+        /** A preset whose name is written per language in the file. */
+        public Preset(String effect, Material icon, Map<String, String> names) {
+            this(effect, icon, names, "");
+        }
+
+        /** Whether the name is a line of the messages files rather than written here. */
+        public boolean namedByLine() {
+            return !line.isEmpty();
         }
 
         /** The name a reader of {@code language} sees: their own, else the English one, else the effect's key. */
