@@ -205,7 +205,7 @@ public final class PlayerwarpsWiring {
         // across the proxy instead of hopped locally. The gate charges here, records the pending row, connects the
         // player, and the target backend completes the hop on join (or refunds). Off, both seams are empty and the
         // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop. localServerId is
-        // this backend's network.server-id, the same source the P3 server-id claim used.
+        // this backend's network.server-name, the same source the P3 server-id claim used.
         String localServerId = bus.publisher().serverId();
         CrossServerParts crossServer = buildCrossServer(
                 ctx, plugin, kernel, persistence, repository, teleporter, notifier, economy, localServerId);

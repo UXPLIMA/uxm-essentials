@@ -113,7 +113,7 @@ public final class StaffWiring {
         StaffGadgetItems gadgetItems = new StaffGadgetItems(plugin);
         StaffModeStoreImpl store = new StaffModeStoreImpl();
         // The loadout is per-server state, so it is keyed per (player, server_id): the repository scopes every
-        // save/load/delete to THIS backend's network.server-id, so two backends sharing one DB never clobber
+        // save/load/delete to THIS backend's network.server-name, so two backends sharing one DB never clobber
         // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
         String serverId = NetworkConfig.from(ctx.config()).serverId();
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);

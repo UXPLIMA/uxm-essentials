@@ -136,7 +136,9 @@ public record NetworkConfig(
     public static NetworkConfig from(ConfigStore config) {
         Objects.requireNonNull(config, "config");
         boolean enabled = config.getBoolean("network.enabled", false);
-        String serverId = config.getString("network.server-id", DEFAULT_SERVER_ID);
+        // server-name is what every plugin of ours calls it; a file an earlier release wrote says server-id.
+        String serverId =
+                config.getString("network.server-name", config.getString("network.server-id", DEFAULT_SERVER_ID));
         String channel = config.getString("network.bus-channel", BusChannel.FULL);
         int queue = config.getInt("network.bus.outbound-queue-size", DEFAULT_QUEUE);
         // Floor at one second so a fat-fingered zero/negative cannot trip the constructor's positivity check.
