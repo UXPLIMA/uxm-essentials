@@ -14,6 +14,9 @@
 
 ### Changed
 
+- The warp picker's effect and sound presets are named in every language's messages file.
+- The network block names this backend with `server-name`; a file that still says `server-id` keeps working.
+- The shipped `config.conf` lists `storage` right after `language`, and `menu` last.
 - The SQLite database lives under data/ and moves there by itself on the first start. The config copy is in backups/.
 
 ### Fixed
