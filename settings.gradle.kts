@@ -5,8 +5,8 @@ pluginManagement {
         maven("https://repo.uxplima.com/repository/maven-public/")
     }
     plugins {
-        id("uxm.java") version "0.0.3"
-        id("uxm.paper-plugin") version "0.0.3"
+        id("uxm.java") version "0.5.0"
+        id("uxm.paper-plugin") version "0.5.0"
     }
 }
 
@@ -19,7 +19,7 @@ dependencyResolutionManagement {
         maven("https://repo.uxplima.com/repository/maven-public/")
     }
     versionCatalogs {
-        create("uxm") { from("com.uxplima.gradle:uxm-catalog:0.2.0") }
+        create("uxm") { from("com.uxplima.gradle:uxm-catalog:0.5.0") }
     }
 }
 

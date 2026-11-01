@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmlib.config.DataFiles;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -103,10 +104,13 @@ public final class DatabaseSettings {
         return config.getBoolean("storage.copy-from-file", false);
     }
 
-    /** The SQLite database file under the plugin data folder. */
+    /**
+     * The SQLite database file, under data/ in the plugin folder. A file an earlier release kept straight in the plugin
+     * folder moves into data/ the first time, with its journal files.
+     */
     public Path sqliteFile() {
         String name = config.getString("storage.file", SQLITE_FILE_NAME);
-        return dataFolder.resolve(name);
+        return DataFiles.resolve(dataFolder, name);
     }
 
     /** The network host for MySQL/Postgres; default {@code localhost}. */

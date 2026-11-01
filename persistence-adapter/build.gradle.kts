@@ -31,6 +31,7 @@ dependencies {
     jooqCodegen(libs.jooq.meta.ext)
 
     // The copy of a SQLite file's rows into a network database is the library's.
+    implementation(uxm.uxmlib.common) { isTransitive = false }
     implementation(uxm.uxmlib.storage) { isTransitive = false }
 }
 
