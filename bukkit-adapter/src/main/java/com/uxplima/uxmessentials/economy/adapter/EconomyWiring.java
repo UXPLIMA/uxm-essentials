@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.economy.adapter;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.util.Comparator;
@@ -84,6 +87,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.ProviderVaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmlib.config.DataFiles;
 import com.uxplima.uxmlib.hook.Integrations;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -551,7 +555,7 @@ public final class EconomyWiring {
                 audit,
                 kernel.scheduler(),
                 kernel.log(),
-                plugin.getDataFolder().toPath().resolve("economy").resolve("operations.log"),
+                operationLog(plugin.getDataFolder().toPath()),
                 settings.operationLogEnabled());
 
         PayPreferences preferences = WalletRepositories.payPreferences(persistence, settings.payToggleDefault());
@@ -839,5 +843,22 @@ public final class EconomyWiring {
                 ForeignEconomyProviders.withdrawNative(plugin);
             }
         }
+    }
+
+    /**
+     * The economy's operation log, data/logs/economy.log. The file an earlier release wrote at economy/operations.log
+     * moves there the first time, so no line of the audit is left behind.
+     */
+    static Path operationLog(Path folder) {
+        Path now = DataFiles.resolve(folder, "logs/economy.log");
+        Path old = folder.resolve("economy").resolve("operations.log");
+        try {
+            if (Files.isRegularFile(old) && !Files.exists(now)) {
+                Files.move(old, now);
+            }
+        } catch (IOException unmovable) {
+            throw new UncheckedIOException("cannot move " + old + " into data/logs", unmovable);
+        }
+        return now;
     }
 }
