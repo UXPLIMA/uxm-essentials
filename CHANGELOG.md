@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.11.0](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.3...v0.11.0)
+
+### Added
+
+- Correct and import playtime.
+- Show each language's readers their own command words.
+- Answer the shared leaderboard placeholders.
+- Rank money earned and spent.
+- Rank playtime, trades and prestige.
+- Rank votes on the shared boards.
+- Step back from chat features uxmChat runs.
+
+### Changed
+
+- The SQLite database lives under data/ and moves there by itself on the first start. The config copy is in backups/.
+
+### Fixed
+
+- Point the plugin website at its uxplima.com product page.
+- Join hologram redraws and parse shared words once.
+- Send nametags only to clients that track the wearer.
+- Mark vanished players for other plugins.
+- Put navigation where the conventions say.
+- Describe the new playtime subcommands in help.
+
 ## [0.10.3](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.2...v0.10.3) (2026-10-28)
 
 ### Fixed
