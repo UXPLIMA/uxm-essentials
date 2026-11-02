@@ -17,6 +17,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerCommandSendEvent;
 
 import com.destroystokyo.paper.event.server.AsyncTabCompleteEvent;
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
@@ -25,8 +26,6 @@ import com.uxplima.uxmessentials.commandcontrol.application.LanguageWords;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
-import com.uxplima.uxmessentials.commandcontrol.domain.WorldHidePolicies;
-import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -60,64 +59,56 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class CommandVisibilityListener implements Listener {
 
-    private final WorldRuleSets worldRules;
-    private final WorldHidePolicies worldHidePolicies;
+    private final CommandControlState state;
     private final PlayerGroupSource groups;
     private final CommandPermissionView permissions;
-    private final boolean tabCompletionEnabled;
-    private final boolean scrubHelp;
     private final String bypassPermission;
     private final Messages messages;
     private final MessageSink sink;
-    private final LanguageWords languageWords;
     private final Function<UUID, Locale> languages;
 
     public CommandVisibilityListener(
-            WorldRuleSets worldRules,
-            WorldHidePolicies worldHidePolicies,
+            CommandControlState state,
             PlayerGroupSource groups,
             CommandPermissionView permissions,
-            boolean tabCompletionEnabled,
-            boolean scrubHelp,
             String bypassPermission,
             Messages messages,
             MessageSink sink,
-            LanguageWords languageWords,
             Function<UUID, Locale> languages) {
-        this.worldRules = Objects.requireNonNull(worldRules, "worldRules");
-        this.worldHidePolicies = Objects.requireNonNull(worldHidePolicies, "worldHidePolicies");
+        this.state = Objects.requireNonNull(state, "state");
         this.groups = Objects.requireNonNull(groups, "groups");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
-        this.tabCompletionEnabled = tabCompletionEnabled;
-        this.scrubHelp = scrubHelp;
         if (bypassPermission == null || bypassPermission.isBlank()) {
             throw new IllegalArgumentException("bypassPermission must be non-blank");
         }
         this.bypassPermission = bypassPermission;
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
-        this.languageWords = Objects.requireNonNull(languageWords, "languageWords");
         this.languages = Objects.requireNonNull(languages, "languages");
     }
 
     @EventHandler
     public void onCommandSend(PlayerCommandSendEvent event) {
         Player player = event.getPlayer();
+        CommandControlState.Snapshot rulesInForce = state.current();
+        LanguageWords languageWords = rulesInForce.languageWords();
         if (!languageWords.isEmpty()) {
             // Cosmetic and for everybody, a bypass holder included: a word for another language still runs when typed.
             Locale reads = languages.apply(player.getUniqueId());
             event.getCommands().removeIf(label -> languageWords.hiddenFor(label, reads));
         }
-        RuleSet rules = worldRules.forWorld(worldName(player));
-        HidePolicy hidePolicy = worldHidePolicies.forWorld(worldName(player));
-        if (!tabActive(rules) && !hidePolicy.isActive()) {
+        boolean tabCompletion = rulesInForce.config().tabCompletionEnabled();
+        RuleSet rules = rulesInForce.worldRules().forWorld(worldName(player));
+        HidePolicy hidePolicy = rulesInForce.worldHidePolicies().forWorld(worldName(player));
+        if (!tabActive(tabCompletion, rules) && !hidePolicy.isActive()) {
             return;
         }
         if (player.hasPermission(bypassPermission)) {
             return;
         }
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        event.getCommands().removeIf(label -> shouldScrubFromList(rules, hidePolicy, label, player, facts));
+        event.getCommands()
+                .removeIf(label -> shouldScrubFromList(tabCompletion, rules, hidePolicy, label, player, facts));
     }
 
     @EventHandler(ignoreCancelled = true)
@@ -125,9 +116,11 @@ public final class CommandVisibilityListener implements Listener {
         if (!(event.getSender() instanceof Player player) || !event.isCommand()) {
             return;
         }
-        RuleSet rules = worldRules.forWorld(worldName(player));
-        HidePolicy hidePolicy = worldHidePolicies.forWorld(worldName(player));
-        if (!tabActive(rules) && !hidePolicy.isActive()) {
+        CommandControlState.Snapshot rulesInForce = state.current();
+        boolean tabCompletion = rulesInForce.config().tabCompletionEnabled();
+        RuleSet rules = rulesInForce.worldRules().forWorld(worldName(player));
+        HidePolicy hidePolicy = rulesInForce.worldHidePolicies().forWorld(worldName(player));
+        if (!tabActive(tabCompletion, rules) && !hidePolicy.isActive()) {
             return;
         }
         if (player.hasPermission(bypassPermission)) {
@@ -139,18 +132,19 @@ public final class CommandVisibilityListener implements Listener {
             return;
         }
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        if (isFilteredRoot(rules, hidePolicy, commandRoot(buffer), facts)) {
+        if (isFilteredRoot(tabCompletion, rules, hidePolicy, commandRoot(buffer), facts)) {
             event.setCompletions(List.of());
         }
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onCommandPreprocess(PlayerCommandPreprocessEvent event) {
-        if (!scrubHelp) {
+        CommandControlState.Snapshot rulesInForce = state.current();
+        if (!rulesInForce.config().denyListCommands()) {
             return;
         }
         Player player = event.getPlayer();
-        HidePolicy hidePolicy = worldHidePolicies.forWorld(worldName(player));
+        HidePolicy hidePolicy = rulesInForce.worldHidePolicies().forWorld(worldName(player));
         if (!hidePolicy.isActive()) {
             return;
         }
@@ -170,32 +164,40 @@ public final class CommandVisibilityListener implements Listener {
     public void onWorldChange(PlayerChangedWorldEvent event) {
         // Only when the command visibility can actually differ by world; otherwise the sent list would not change and a
         // resend would be wasted work. The event fires on the player's region thread, so the resend is region-local.
-        if (worldRules.hasWorldOverrides() || worldHidePolicies.hasWorldOverrides()) {
+        CommandControlState.Snapshot rulesInForce = state.current();
+        if (rulesInForce.worldRules().hasWorldOverrides()
+                || rulesInForce.worldHidePolicies().hasWorldOverrides()) {
             event.getPlayer().updateCommands();
         }
     }
 
     /** A label is scrubbed from the sent list when the hide covers it or the rule set / vanilla permission denies it. */
     private boolean shouldScrubFromList(
-            RuleSet rules, HidePolicy hidePolicy, String label, Player player, PlayerFacts facts) {
+            boolean tabCompletion,
+            RuleSet rules,
+            HidePolicy hidePolicy,
+            String label,
+            Player player,
+            PlayerFacts facts) {
         if (hidePolicy.shouldHide(label, facts)) {
             return true;
         }
-        if (!tabActive(rules)) {
+        if (!tabActive(tabCompletion, rules)) {
             return false;
         }
         return rules.decide(label, facts) == RuleSet.Decision.DENY || !permissions.canSee(player, label);
     }
 
     /** The pure (thread-safe) filter test for the async completion path: hidden, or denied by an active rule set. */
-    private boolean isFilteredRoot(RuleSet rules, HidePolicy hidePolicy, String root, PlayerFacts facts) {
+    private static boolean isFilteredRoot(
+            boolean tabCompletion, RuleSet rules, HidePolicy hidePolicy, String root, PlayerFacts facts) {
         return hidePolicy.shouldHide(root, facts)
-                || (tabActive(rules) && rules.decide(root, facts) == RuleSet.Decision.DENY);
+                || (tabActive(tabCompletion, rules) && rules.decide(root, facts) == RuleSet.Decision.DENY);
     }
 
     /** True when the tab-completion filter can remove anything - switched on and the world's rule set is not inert. */
-    private boolean tabActive(RuleSet rules) {
-        return tabCompletionEnabled && !rules.isInert();
+    private static boolean tabActive(boolean tabCompletion, RuleSet rules) {
+        return tabCompletion && !rules.isInert();
     }
 
     /** The player's current world name, or {@code null} when it cannot be read (falls back to the base policy). */

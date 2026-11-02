@@ -1782,13 +1782,13 @@ public final class PluginModule {
 
     private static void wireCommandControl(
             JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links) {
-        // commandcontrol persists nothing: the whitelist/blacklist rule set and the plugin-hide policy are derived once
-        // from the module's config into immutable snapshots, so a hot-reload re-runs this wiring and registers fresh
-        // listeners. The gate listener consults the rule set on PlayerCommandPreprocessEvent and, on deny, cancels the
-        // command and sends the configured deny line; the visibility listener scrubs the sent command list, tab
-        // completion, and the scrub-help output so disallowed and hidden commands stay invisible. Both read the
-        // player's group (LuckPerms when installed, empty otherwise) and permission facts. There is no runtime state to
-        // drain on stop: unregistering the listeners is enough.
+        // commandcontrol persists nothing: the whitelist/blacklist rule set, the plugin-hide policy and the language
+        // words are derived from the module's config into one immutable snapshot that a reload swaps whole. The gate
+        // listener consults it on PlayerCommandPreprocessEvent and, on deny, cancels the command and sends the
+        // configured deny line; the visibility listener scrubs the sent command list, tab completion, and the
+        // scrub-help output so disallowed and hidden commands stay invisible. Both read the player's group (LuckPerms
+        // when installed, empty otherwise) and permission facts. There is no runtime state to drain on stop:
+        // unregistering the listeners is enough.
         CommandControlWiring.Wired wired = CommandControlWiring.wire(plugin.getServer(), ctx);
         wired.listeners().forEach(resources::addListener);
         // The published check answers from the same rules and the same facts the gate uses, so a plugin hiding a
@@ -1796,15 +1796,19 @@ public final class PluginModule {
         links.queries.register(
                 com.uxplima.uxmessentials.api.query.UxmCommandControlQuery.class,
                 new com.uxplima.uxmessentials.commandcontrol.adapter.outbound.api.CommandControlQueries(
-                        wired.worldRules(),
-                        wired.blockNamespaceBypass(),
+                        wired.state(),
                         wired.groups(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler()));
         // The same check, readable from a menu requirement or a HUD line: a button hidden by the placeholder and a
         // command refused by the gate are then the same decision rather than two that drift apart.
-        links.placeholders.commandControl(new RulesCommandControlPlaceholders(
-                plugin.getServer(), wired.worldRules(), wired.blockNamespaceBypass(), wired.groups()));
+        links.placeholders.commandControl(
+                new RulesCommandControlPlaceholders(plugin.getServer(), wired.state(), wired.groups()));
+        resources.addReloadTask(
+                ReloadTask.forModule(
+                        ctx.moduleId(),
+                        wired.reload(),
+                        "command lists, plugin-hide and language words re-read; command lists resent (the channel hider waits for a restart)"));
     }
 
     private static void wireTrade(

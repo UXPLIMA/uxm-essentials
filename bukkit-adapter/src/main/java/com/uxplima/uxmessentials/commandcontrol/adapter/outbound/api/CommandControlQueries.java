@@ -13,6 +13,7 @@ import org.bukkit.entity.Player;
 import com.uxplima.uxmessentials.api.query.UxmCommandControlQuery;
 import com.uxplima.uxmessentials.api.view.UxmCommandCheck;
 import com.uxplima.uxmessentials.api.view.UxmCommandRule;
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
@@ -20,7 +21,6 @@ import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleVerdict;
-import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.AsyncQueries;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -43,20 +43,14 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class CommandControlQueries implements UxmCommandControlQuery {
 
-    private final WorldRuleSets worldRules;
-    private final boolean blockNamespaceBypass;
+    private final CommandControlState state;
     private final PlayerGroupSource groups;
     private final PlayerLookup players;
     private final Scheduler scheduler;
 
     public CommandControlQueries(
-            WorldRuleSets worldRules,
-            boolean blockNamespaceBypass,
-            PlayerGroupSource groups,
-            PlayerLookup players,
-            Scheduler scheduler) {
-        this.worldRules = Objects.requireNonNull(worldRules, "worldRules");
-        this.blockNamespaceBypass = blockNamespaceBypass;
+            CommandControlState state, PlayerGroupSource groups, PlayerLookup players, Scheduler scheduler) {
+        this.state = Objects.requireNonNull(state, "state");
         this.groups = Objects.requireNonNull(groups, "groups");
         this.players = Objects.requireNonNull(players, "players");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -83,10 +77,12 @@ public final class CommandControlQueries implements UxmCommandControlQuery {
             return Optional.empty();
         }
         String world = worldName(player);
-        RuleSet rules = worldRules.forWorld(world);
+        CommandControlState.Snapshot rulesInForce = state.current();
+        RuleSet rules = rulesInForce.worldRules().forWorld(world);
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        RuleVerdict verdict = decide(rules, root(command), facts);
-        Optional<String> deciding = worldRules.hasOverrideFor(world) ? Optional.ofNullable(world) : Optional.empty();
+        RuleVerdict verdict = decide(rules, rulesInForce.blockNamespaceBypass(), root(command), facts);
+        Optional<String> deciding =
+                rulesInForce.worldRules().hasOverrideFor(world) ? Optional.ofNullable(world) : Optional.empty();
         return Optional.of(new UxmCommandCheck(
                 verdict.commandRoot(), verdict.allowed(), rule(verdict), verdict.group(), deciding));
     }
@@ -96,7 +92,7 @@ public final class CommandControlQueries implements UxmCommandControlQuery {
      * is closed. The bare form only replaces the answer when it is the one that blocks, which is exactly when the
      * gate would stop the command.
      */
-    private RuleVerdict decide(RuleSet rules, String root, PlayerFacts facts) {
+    private static RuleVerdict decide(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
         RuleVerdict asked = rules.explain(root, facts);
         if (asked.allowed() && blockNamespaceBypass) {
             Optional<RuleVerdict> bare = NamespaceBypassRule.bareRoot(root).map(label -> rules.explain(label, facts));

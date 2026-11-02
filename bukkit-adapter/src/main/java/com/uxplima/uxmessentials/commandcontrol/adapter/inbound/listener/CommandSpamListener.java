@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
+import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
@@ -43,7 +44,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommandSpamListener implements Listener {
 
-    private final CommandRateLimiter limiter;
+    private final Supplier<CommandRateLimiter> limiter;
     private final String bypassPermission;
     private final Messages messages;
     private final MessageSink sink;
@@ -51,13 +52,13 @@ public final class CommandSpamListener implements Listener {
     private final Map<UUID, CommandWindow> windows = new ConcurrentHashMap<>();
 
     public CommandSpamListener(
-            CommandRateLimiter limiter, String bypassPermission, Messages messages, MessageSink sink) {
+            Supplier<CommandRateLimiter> limiter, String bypassPermission, Messages messages, MessageSink sink) {
         this(limiter, bypassPermission, messages, sink, System::currentTimeMillis);
     }
 
     /** Test seam: the same wiring with the millisecond clock supplied so the sliding window can be driven virtually. */
     CommandSpamListener(
-            CommandRateLimiter limiter,
+            Supplier<CommandRateLimiter> limiter,
             String bypassPermission,
             Messages messages,
             MessageSink sink,
@@ -74,15 +75,16 @@ public final class CommandSpamListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
-        if (!limiter.isEnabled()) {
+        CommandRateLimiter rules = limiter.get();
+        if (!rules.isEnabled()) {
             return;
         }
         Player player = event.getPlayer();
         if (player.hasPermission(bypassPermission)) {
             return;
         }
-        if (recordAndCheck(player.getUniqueId())) {
-            applyAction(event, player);
+        if (recordAndCheck(rules, player.getUniqueId())) {
+            applyAction(rules, event, player);
         }
     }
 
@@ -92,11 +94,11 @@ public final class CommandSpamListener implements Listener {
     }
 
     /** Fold this command into the player's window and report whether it tripped the limit - one atomic {@code compute}. */
-    private boolean recordAndCheck(UUID player) {
+    private boolean recordAndCheck(CommandRateLimiter rules, UUID player) {
         long now = clock.getAsLong();
         boolean[] tripped = {false};
         windows.compute(player, (uuid, previous) -> {
-            CommandRateLimiter.Evaluation evaluation = limiter.evaluate(previous, now);
+            CommandRateLimiter.Evaluation evaluation = rules.evaluate(previous, now);
             tripped[0] = evaluation.tripped();
             return evaluation.window();
         });
@@ -104,9 +106,9 @@ public final class CommandSpamListener implements Listener {
     }
 
     /** Apply the configured action to a player who has just exceeded the limit. */
-    private void applyAction(PlayerCommandPreprocessEvent event, Player player) {
+    private void applyAction(CommandRateLimiter rules, PlayerCommandPreprocessEvent event, Player player) {
         PlayerRef who = BukkitRefs.toRef(player);
-        switch (limiter.action()) {
+        switch (rules.action()) {
             case KICK -> player.kick(render(who, CommandControlMessageKey.COMMANDCONTROL_SPAM_KICK));
             case BLOCK -> {
                 event.setCancelled(true);

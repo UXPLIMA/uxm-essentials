@@ -7,18 +7,18 @@ import java.util.Optional;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleVerdict;
-import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.CommandControlPlaceholders;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@link CommandControlPlaceholders} seam over the same {@link WorldRuleSets} the gate listener consults, run in
+ * The {@link CommandControlPlaceholders} seam over the same {@link CommandControlState} the gate listener consults, run in
  * the gate's own order: the root as asked about first, then the bare form behind a {@code namespace:} prefix when
  * the module is set to close that bypass. An answer here therefore matches what happens when the player types the
  * command, which is the whole point of publishing it.
@@ -31,15 +31,12 @@ import org.jspecify.annotations.Nullable;
 public final class RulesCommandControlPlaceholders implements CommandControlPlaceholders {
 
     private final Server server;
-    private final WorldRuleSets worldRules;
-    private final boolean blockNamespaceBypass;
+    private final CommandControlState state;
     private final PlayerGroupSource groups;
 
-    public RulesCommandControlPlaceholders(
-            Server server, WorldRuleSets worldRules, boolean blockNamespaceBypass, PlayerGroupSource groups) {
+    public RulesCommandControlPlaceholders(Server server, CommandControlState state, PlayerGroupSource groups) {
         this.server = Objects.requireNonNull(server, "server");
-        this.worldRules = Objects.requireNonNull(worldRules, "worldRules");
-        this.blockNamespaceBypass = blockNamespaceBypass;
+        this.state = Objects.requireNonNull(state, "state");
         this.groups = Objects.requireNonNull(groups, "groups");
     }
 
@@ -51,12 +48,13 @@ public final class RulesCommandControlPlaceholders implements CommandControlPlac
         if (player == null) {
             return true;
         }
-        RuleSet rules = worldRules.forWorld(worldName(player));
-        return decide(rules, root(command), new BukkitPlayerFacts(player, groups))
+        CommandControlState.Snapshot rulesInForce = state.current();
+        RuleSet rules = rulesInForce.worldRules().forWorld(worldName(player));
+        return decide(rules, rulesInForce.blockNamespaceBypass(), root(command), new BukkitPlayerFacts(player, groups))
                 .allowed();
     }
 
-    private RuleVerdict decide(RuleSet rules, String root, PlayerFacts facts) {
+    private static RuleVerdict decide(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
         RuleVerdict asked = rules.explain(root, facts);
         if (asked.allowed() && blockNamespaceBypass) {
             Optional<RuleVerdict> bare = NamespaceBypassRule.bareRoot(root).map(label -> rules.explain(label, facts));

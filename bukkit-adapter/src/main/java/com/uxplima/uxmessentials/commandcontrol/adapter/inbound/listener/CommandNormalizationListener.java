@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener;
 
+import java.util.Objects;
+
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandLabels;
 import org.jspecify.annotations.NullMarked;
 
@@ -16,14 +19,23 @@ import org.jspecify.annotations.NullMarked;
  * arguments (a world name, a target player, a chat body) are preserved exactly (see {@link CommandLabels#lowerBaseLabel}).
  *
  * <p>The rewrite is skipped for a message the normalisation leaves unchanged, so an already-lowercase command is not
- * re-set on the event. Wired only when {@code auto-lowercase-base-commands} is on, so a server that relies on
- * case-sensitive command input can turn it off and this listener is never registered.
+ * re-set on the event. It does nothing while {@code auto-lowercase-base-commands} is off, so a server that relies on
+ * case-sensitive command input can turn it off.
  */
 @NullMarked
 public final class CommandNormalizationListener implements Listener {
 
+    private final CommandControlState state;
+
+    public CommandNormalizationListener(CommandControlState state) {
+        this.state = Objects.requireNonNull(state, "state");
+    }
+
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
+        if (!state.current().config().autoLowercaseBaseCommands()) {
+            return;
+        }
         String message = event.getMessage();
         String normalised = CommandLabels.lowerBaseLabel(message);
         if (!normalised.equals(message)) {
