@@ -14,9 +14,11 @@ import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.Command
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandNormalizationListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandSpamListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.CommandVisibilityListener;
+import com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener.PluginCommandsListener;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSources;
+import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PluginCommandIndex;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.ReflectiveChannelRegistrationRewriter;
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlConfig;
 import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
@@ -74,13 +76,15 @@ public final class CommandControlWiring {
         Objects.requireNonNull(ctx, "ctx");
         KernelPorts kernel = ctx.kernel();
         CommandControlConfig config = CommandControlConfig.from(ctx.config());
-        CommandControlState state = CommandControlState.of(config);
+        PluginCommandIndex pluginCommands = new PluginCommandIndex(server.getCommandMap());
+        CommandControlState state = CommandControlState.of(config, pluginCommands::commandsOf);
         PlayerGroupSource groups = PlayerGroupSources.create(server);
         CommandPermissionView permissions = CommandPermissionView.backedBy(server.getCommandMap());
 
         // Every listener is registered whatever the config says and reads the live state on each event, so a reload
         // that switches a feature on or off is honoured without registering anything new.
         List<Listener> listeners = new ArrayList<>();
+        listeners.add(new PluginCommandsListener(state));
         listeners.add(new CommandNormalizationListener(state));
         listeners.add(new CommandSpamListener(
                 () -> state.current().rateLimiter(), SPAM_BYPASS_PERMISSION, kernel.messages(), kernel.messageSink()));
@@ -99,23 +103,26 @@ public final class CommandControlWiring {
         if (channelHide.isEnabled()) {
             listeners.add(channelHideConnection(channelHide, kernel));
         }
+        // The config is read on the reload's own thread; the plugin: entries are opened against the command map, which
+        // belongs to the server's main thread, so the swap and the resend run there.
         Runnable reload = () -> {
-            state.replace(CommandControlConfig.from(ctx.config()));
-            resendCommandLists(server, kernel.scheduler());
+            CommandControlConfig reread = CommandControlConfig.from(ctx.config());
+            kernel.scheduler().onGlobal(() -> {
+                state.replace(reread);
+                resendCommandLists(server, kernel.scheduler());
+            });
         };
         return new Wired(List.copyOf(listeners), state, groups, reload);
     }
 
     /**
      * Send every online player their command list again, so a reload that changed what a player may see reaches the
-     * tab list they already have. The resend for each player runs on that player's own thread.
+     * tab list they already have. Called on the global thread; the resend for each player runs on that player's own thread.
      */
     private static void resendCommandLists(Server server, Scheduler scheduler) {
-        scheduler.onGlobal(() -> {
-            for (Player player : server.getOnlinePlayers()) {
-                scheduler.onEntity(BukkitRefs.toRef(player), player::updateCommands);
-            }
-        });
+        for (Player player : server.getOnlinePlayers()) {
+            scheduler.onEntity(BukkitRefs.toRef(player), player::updateCommands);
+        }
     }
 
     /**
