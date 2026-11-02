@@ -11,13 +11,12 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
-import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
 import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
-import com.uxplima.uxmessentials.commandcontrol.domain.WorldRuleSets;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -54,32 +53,24 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class CommandGateListener implements Listener {
 
-    private final WorldRuleSets worldRules;
-    private final boolean blockNamespaceBypass;
+    private final CommandControlState state;
     private final PlayerGroupSource groups;
     private final Messages messages;
     private final MessageSink sink;
-    private final CommandControlMessageKey denyMessage;
 
     public CommandGateListener(
-            WorldRuleSets worldRules,
-            boolean blockNamespaceBypass,
-            PlayerGroupSource groups,
-            Messages messages,
-            MessageSink sink,
-            CommandControlMessageKey denyMessage) {
-        this.worldRules = Objects.requireNonNull(worldRules, "worldRules");
-        this.blockNamespaceBypass = blockNamespaceBypass;
+            CommandControlState state, PlayerGroupSource groups, Messages messages, MessageSink sink) {
+        this.state = Objects.requireNonNull(state, "state");
         this.groups = Objects.requireNonNull(groups, "groups");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
-        this.denyMessage = Objects.requireNonNull(denyMessage, "denyMessage");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         Player player = event.getPlayer();
-        RuleSet rules = worldRules.forWorld(worldName(player));
+        CommandControlState.Snapshot rulesInForce = state.current();
+        RuleSet rules = rulesInForce.worldRules().forWorld(worldName(player));
         if (rules.isInert()) {
             return;
         }
@@ -88,16 +79,16 @@ public final class CommandGateListener implements Listener {
             return;
         }
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        if (!isDenied(rules, root, facts)) {
+        if (!isDenied(rules, rulesInForce.blockNamespaceBypass(), root, facts)) {
             return;
         }
         event.setCancelled(true);
         PlayerRef who = BukkitRefs.toRef(player);
-        sink.deliver(who, messages.resolve(who, denyMessage, Map.of()));
+        sink.deliver(who, messages.resolve(who, rulesInForce.config().denyMessage(), Map.of()));
     }
 
     /** A command root is denied when the world's rule set denies it, or when it is a namespace-prefixed denied command. */
-    private boolean isDenied(RuleSet rules, String root, PlayerFacts facts) {
+    private static boolean isDenied(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
         if (rules.decide(root, facts) == RuleSet.Decision.DENY) {
             return true;
         }
