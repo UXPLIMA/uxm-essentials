@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.commandcontrol.application;
 
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
@@ -158,6 +160,51 @@ public record CommandControlConfig(
                 config.getStringList("plugin-channel-hide.allowed-channels", DEFAULT_ALLOWED_CHANNELS),
                 worlds,
                 readLists(config, "tab-completion.languages"));
+    }
+
+    /**
+     * This config with every {@code plugin:<name>} entry of its command lists opened into the commands
+     * {@code commandsOf} gives for that plugin (see {@link PluginEntries}). The lists are read when the rules are
+     * built, so a caller opens them against the commands registered at that moment.
+     */
+    public CommandControlConfig withPluginCommands(Function<String, Collection<String>> commandsOf) {
+        Objects.requireNonNull(commandsOf, "commandsOf");
+        Map<String, WorldOverride> worlds = new LinkedHashMap<>();
+        worldOverrides.forEach((world, override) -> worlds.put(
+                world,
+                new WorldOverride(
+                        override.mode(),
+                        PluginEntries.expand(override.defaultCommands(), commandsOf),
+                        expandGroups(override.groupCommands(), commandsOf),
+                        override.pluginHideEnabled(),
+                        override.hiddenCommands())));
+        return new CommandControlConfig(
+                enabled,
+                mode,
+                useUnknownCommandMessage,
+                PluginEntries.expand(defaultCommands, commandsOf),
+                expandGroups(groupCommands, commandsOf),
+                tabCompletionEnabled,
+                pluginHideEnabled,
+                hiddenCommands,
+                denyListCommands,
+                blockNamespaceBypass,
+                spamEnabled,
+                spamMaxPerWindow,
+                spamWindowSeconds,
+                spamAction,
+                autoLowercaseBaseCommands,
+                channelHideEnabled,
+                allowedChannels,
+                worlds,
+                languageWords);
+    }
+
+    private static Map<String, List<String>> expandGroups(
+            Map<String, List<String>> groups, Function<String, Collection<String>> commandsOf) {
+        Map<String, List<String>> expanded = new LinkedHashMap<>();
+        groups.forEach((group, list) -> expanded.put(group, PluginEntries.expand(list, commandsOf)));
+        return expanded;
     }
 
     /** Build the pure {@link RuleSet} the base config describes, gating {@code .bypass} on {@code bypassPermission}. */

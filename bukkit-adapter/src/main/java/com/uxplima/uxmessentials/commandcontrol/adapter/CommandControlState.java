@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter;
 
+import java.util.Collection;
 import java.util.Objects;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.commandcontrol.application.CommandControlConfig;
 import com.uxplima.uxmessentials.commandcontrol.application.LanguageWords;
@@ -18,15 +20,22 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommandControlState {
 
+    private final Function<String, Collection<String>> pluginCommands;
     private volatile Snapshot current;
 
-    private CommandControlState(Snapshot first) {
+    private CommandControlState(Function<String, Collection<String>> pluginCommands, Snapshot first) {
+        this.pluginCommands = pluginCommands;
         this.current = first;
     }
 
-    /** The state built from {@code config}. */
-    public static CommandControlState of(CommandControlConfig config) {
-        return new CommandControlState(Snapshot.of(config));
+    /**
+     * The state built from {@code config}, its {@code plugin:<name>} entries opened through {@code pluginCommands}.
+     * Opening them reads the server's command map, so it runs on the server's main thread.
+     */
+    public static CommandControlState of(
+            CommandControlConfig config, Function<String, Collection<String>> pluginCommands) {
+        Objects.requireNonNull(pluginCommands, "pluginCommands");
+        return new CommandControlState(pluginCommands, Snapshot.of(config, pluginCommands));
     }
 
     /** The rules in force right now. */
@@ -36,13 +45,18 @@ public final class CommandControlState {
 
     /** Put the rules {@code config} describes in force, replacing the previous ones in one step. */
     public void replace(CommandControlConfig config) {
-        current = Snapshot.of(config);
+        current = Snapshot.of(config, pluginCommands);
+    }
+
+    /** Open the {@code plugin:<name>} entries again, for the commands registered since they were last opened. */
+    public void refresh() {
+        replace(current.config());
     }
 
     /**
      * One coherent set of rules, derived from a single read of the config.
      *
-     * @param config the config the rules were read from, for its switches
+     * @param config the config the rules were read from, for its switches, with its {@code plugin:} entries unopened
      * @param worldRules the world-scoped command lists
      * @param worldHidePolicies the world-scoped plugin-hide
      * @param languageWords the command words each language's readers are sent alone
@@ -63,10 +77,11 @@ public final class CommandControlState {
             Objects.requireNonNull(rateLimiter, "rateLimiter");
         }
 
-        static Snapshot of(CommandControlConfig config) {
+        static Snapshot of(CommandControlConfig config, Function<String, Collection<String>> pluginCommands) {
+            CommandControlConfig opened = config.withPluginCommands(pluginCommands);
             return new Snapshot(
                     config,
-                    config.toWorldRuleSets(CommandControlWiring.BYPASS_PERMISSION),
+                    opened.toWorldRuleSets(CommandControlWiring.BYPASS_PERMISSION),
                     config.toWorldHidePolicies(CommandControlWiring.VIEW_PERMISSION),
                     config.toLanguageWords(),
                     config.toRateLimiter());
