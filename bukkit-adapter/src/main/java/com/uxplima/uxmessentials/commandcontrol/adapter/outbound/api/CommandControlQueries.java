@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter.outbound.api;
 
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -16,7 +15,6 @@ import com.uxplima.uxmessentials.api.view.UxmCommandRule;
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleMode;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
@@ -80,27 +78,11 @@ public final class CommandControlQueries implements UxmCommandControlQuery {
         CommandControlState.Snapshot rulesInForce = state.current();
         RuleSet rules = rulesInForce.worldRules().forWorld(world);
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        RuleVerdict verdict = decide(rules, rulesInForce.blockNamespaceBypass(), root(command), facts);
+        RuleVerdict verdict = rules.explain(command, facts, rulesInForce.blockNamespaceBypass());
         Optional<String> deciding =
                 rulesInForce.worldRules().hasOverrideFor(world) ? Optional.ofNullable(world) : Optional.empty();
         return Optional.of(new UxmCommandCheck(
                 verdict.commandRoot(), verdict.allowed(), rule(verdict), verdict.group(), deciding));
-    }
-
-    /**
-     * The gate's own order: the root as asked about, then the bare form behind a namespace prefix when that bypass
-     * is closed. The bare form only replaces the answer when it is the one that blocks, which is exactly when the
-     * gate would stop the command.
-     */
-    private static RuleVerdict decide(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
-        RuleVerdict asked = rules.explain(root, facts);
-        if (asked.allowed() && blockNamespaceBypass) {
-            Optional<RuleVerdict> bare = NamespaceBypassRule.bareRoot(root).map(label -> rules.explain(label, facts));
-            if (bare.isPresent() && !bare.get().allowed()) {
-                return bare.get();
-            }
-        }
-        return asked;
     }
 
     /** The published rule, which folds the mode and whether the root was listed into one answer. */
@@ -112,14 +94,6 @@ public final class CommandControlQueries implements UxmCommandControlQuery {
             case UNLISTED ->
                 verdict.mode() == RuleMode.WHITELIST ? UxmCommandRule.NOT_WHITELISTED : UxmCommandRule.NOT_BLACKLISTED;
         };
-    }
-
-    /** The command label, read exactly as the gate reads it: slash stripped, arguments dropped, lowercased. */
-    private static String root(String command) {
-        String body = command.startsWith("/") ? command.substring(1) : command;
-        int space = body.indexOf(' ');
-        String label = space < 0 ? body : body.substring(0, space);
-        return label.trim().toLowerCase(Locale.ROOT);
     }
 
     /** The player's current world name, or {@code null} when it cannot be read, as the gate falls back too. */

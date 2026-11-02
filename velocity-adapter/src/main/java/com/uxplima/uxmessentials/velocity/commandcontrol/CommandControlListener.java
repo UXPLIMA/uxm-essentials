@@ -10,7 +10,6 @@ import java.util.function.LongSupplier;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandWindow;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.velocitypowered.api.command.CommandSource;
@@ -161,7 +160,7 @@ public final class CommandControlListener {
         }
         PlayerFacts facts = facts(player);
         boolean hidden = denyListCommands && hidePolicy.shouldHide(root, facts);
-        if (!hidden && !ruleDenied(root, facts)) {
+        if (!hidden && !ruleDenied(event.getCommand(), facts)) {
             return;
         }
         event.setResult(CommandResult.denied());
@@ -172,17 +171,9 @@ public final class CommandControlListener {
         }
     }
 
-    /** A root is rule-denied when the rule set denies it, or its namespaced form maps to a denied bare command. */
-    private boolean ruleDenied(String root, PlayerFacts facts) {
-        if (rules.decide(root, facts) == RuleSet.Decision.DENY) {
-            return true;
-        }
-        if (!blockNamespaceBypass) {
-            return false;
-        }
-        return NamespaceBypassRule.bareRoot(root)
-                .map(bare -> rules.decide(bare, facts) == RuleSet.Decision.DENY)
-                .orElse(false);
+    /** A command is rule-denied when the rule set denies it, its arguments and a namespace prefix read too. */
+    private boolean ruleDenied(String command, PlayerFacts facts) {
+        return !rules.explain(command, facts, blockNamespaceBypass).allowed();
     }
 
     /** Fold this command into the player's window and report whether it tripped the limit: one atomic {@code compute}. */

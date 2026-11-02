@@ -1,17 +1,12 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter.outbound;
 
-import java.util.Locale;
 import java.util.Objects;
-import java.util.Optional;
 
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
-import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
-import com.uxplima.uxmessentials.commandcontrol.domain.RuleVerdict;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.CommandControlPlaceholders;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -50,27 +45,8 @@ public final class RulesCommandControlPlaceholders implements CommandControlPlac
         }
         CommandControlState.Snapshot rulesInForce = state.current();
         RuleSet rules = rulesInForce.worldRules().forWorld(worldName(player));
-        return decide(rules, rulesInForce.blockNamespaceBypass(), root(command), new BukkitPlayerFacts(player, groups))
+        return rules.explain(command, new BukkitPlayerFacts(player, groups), rulesInForce.blockNamespaceBypass())
                 .allowed();
-    }
-
-    private static RuleVerdict decide(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
-        RuleVerdict asked = rules.explain(root, facts);
-        if (asked.allowed() && blockNamespaceBypass) {
-            Optional<RuleVerdict> bare = NamespaceBypassRule.bareRoot(root).map(label -> rules.explain(label, facts));
-            if (bare.isPresent() && !bare.get().allowed()) {
-                return bare.get();
-            }
-        }
-        return asked;
-    }
-
-    /** The command label as the gate reads it: slash stripped, arguments dropped, lowercased. */
-    private static String root(String command) {
-        String body = command.startsWith("/") ? command.substring(1) : command;
-        int space = body.indexOf(' ');
-        String label = space < 0 ? body : body.substring(0, space);
-        return label.trim().toLowerCase(Locale.ROOT);
     }
 
     private static @Nullable String worldName(Player player) {
