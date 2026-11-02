@@ -63,8 +63,8 @@ public final class MenuCommandEditorView {
     private static final String TEXT_INPUT_KEY = "editor.text-field";
     private static final String LIST_INPUT_KEY = "editor.list-entry";
 
-    /** A valid Brigadier command literal, mirrored from {@link OpenCommandSpec}: lowercase word, no whitespace. */
-    private static final Pattern COMMAND_WORD = Pattern.compile("[a-z0-9_-]+");
+    /** A valid command word, mirrored from {@link OpenCommandSpec}: lowercase letters of any script, no whitespace. */
+    private static final Pattern COMMAND_WORD = Pattern.compile("[\\p{L}\\p{N}_-]+");
 
     /** The seven field slots, in the order {@link #properties} builds them; a three-row chest with room to spare. */
     private static final List<Integer> PROPERTY_SLOTS = List.of(10, 11, 12, 13, 14, 15, 16);

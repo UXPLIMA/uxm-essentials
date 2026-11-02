@@ -36,8 +36,11 @@ public record OpenCommandSpec(
         List<ArgumentSpec> arguments,
         Optional<String> usage) {
 
-    /** A Brigadier command literal: lowercase letters, digits, underscores or hyphens, with no whitespace. */
-    private static final Pattern COMMAND_WORD = Pattern.compile("[a-z0-9_-]+");
+    /**
+     * A command word: lowercase letters of any script, digits, underscores or hyphens, with no whitespace, so
+     * {@code /yardım}, {@code /règles} and {@code /правила} are words as much as {@code /help} is.
+     */
+    private static final Pattern COMMAND_WORD = Pattern.compile("[\\p{L}\\p{N}_-]+");
 
     public OpenCommandSpec {
         name = requireCommandWord(name);

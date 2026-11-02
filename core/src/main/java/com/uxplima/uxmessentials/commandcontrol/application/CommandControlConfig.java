@@ -63,6 +63,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param worldOverrides the per-world overrides of the command lists and hide behaviour, keyed by world name
  * @param languageWords the command words for the readers of one language, a list per language tag
  *     ({@code tab-completion.languages}); see {@link LanguageWords}
+ * @param hiddenWords the command words kept out of every player's list while still running when typed
+ *     ({@code tab-completion.hidden})
  */
 public record CommandControlConfig(
         boolean enabled,
@@ -83,7 +85,8 @@ public record CommandControlConfig(
         boolean channelHideEnabled,
         List<String> allowedChannels,
         Map<String, WorldOverride> worldOverrides,
-        Map<String, List<String>> languageWords) {
+        Map<String, List<String>> languageWords,
+        List<String> hiddenWords) {
 
     /** The config key under {@code commands} that holds the fallback list rather than a named group. */
     private static final String DEFAULT_LIST_KEY = "default";
@@ -110,6 +113,7 @@ public record CommandControlConfig(
         groupCommands = copyGroups(groupCommands);
         worldOverrides = Map.copyOf(new LinkedHashMap<>(worldOverrides));
         languageWords = copyGroups(Objects.requireNonNull(languageWords, "languageWords"));
+        hiddenWords = List.copyOf(Objects.requireNonNull(hiddenWords, "hiddenWords"));
     }
 
     /** A per-world override of the base command lists and hide behaviour, applied while a player is in that world. */
@@ -159,7 +163,8 @@ public record CommandControlConfig(
                 config.getBoolean("plugin-channel-hide.enabled", false),
                 config.getStringList("plugin-channel-hide.allowed-channels", DEFAULT_ALLOWED_CHANNELS),
                 worlds,
-                readLists(config, "tab-completion.languages"));
+                readLists(config, "tab-completion.languages"),
+                config.getStringList("tab-completion.hidden", List.of()));
     }
 
     /**
@@ -197,7 +202,8 @@ public record CommandControlConfig(
                 channelHideEnabled,
                 allowedChannels,
                 worlds,
-                languageWords);
+                languageWords,
+                hiddenWords);
     }
 
     private static Map<String, List<String>> expandGroups(
@@ -252,7 +258,7 @@ public record CommandControlConfig(
 
     /** The command words each language's readers are sent alone. */
     public LanguageWords toLanguageWords() {
-        return LanguageWords.of(languageWords);
+        return LanguageWords.of(languageWords, hiddenWords);
     }
 
     /** The deny line to show on a blocked command, per {@link #useUnknownCommandMessage}. */
