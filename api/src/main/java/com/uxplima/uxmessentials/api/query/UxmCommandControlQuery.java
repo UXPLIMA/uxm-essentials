@@ -22,8 +22,9 @@ public interface UxmCommandControlQuery {
     /**
      * What the gate would do with {@code command} if this player typed it now, or empty when they are offline.
      *
-     * <p>The command may be given with or without its leading slash, and with or without its arguments: only the
-     * root is read, exactly as the gate reads it. A namespaced form such as {@code minecraft:gamemode} is answered
+     * <p>The command may be given with or without its leading slash, and with or without its arguments. The
+     * arguments are read exactly as the gate reads them, so a list entry such as {@code "gamemode creative"} decides
+     * {@code /gamemode creative} and not {@code /gamemode survival}. A namespaced form such as {@code minecraft:gamemode} is answered
      * about the bare command when the module is set to close that bypass, and about the namespaced root otherwise,
      * again matching the gate.
      */

@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.commandcontrol.adapter.inbound.listener;
 
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -14,7 +13,6 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlState;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -25,8 +23,9 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The command whitelist / blacklist gate: on {@link PlayerCommandPreprocessEvent} it extracts the command root
- * (strip leading {@code /}, drop the arguments, lowercase), resolves the rule set for the player's current world
+ * The command whitelist / blacklist gate: on {@link PlayerCommandPreprocessEvent} it reads the command with its
+ * arguments, so an entry such as {@code "gamemode creative"} decides that one argument, resolves the rule set for the
+ * player's current world
  * (a per-world override when one is configured, else the base rule set), consults it with the player's facts (their
  * group via the {@link PlayerGroupSource}, permission checks via Bukkit), and on {@link RuleSet.Decision#DENY}
  * cancels the dispatch and sends the configured deny line, the vanilla-style "unknown command" so a hidden command
@@ -35,8 +34,7 @@ import org.jspecify.annotations.Nullable;
  * <p>The gate also closes the namespace-bypass hole: a non-bypass player who prefixes a denied command with its
  * namespace ({@code /minecraft:gamemode}, {@code /plugin:cmd}) reaches the same handler as the bare command yet reads
  * as a different root, so the {@link RuleSet} alone would let it through. When {@code block-namespace-bypass} is on the
- * gate strips the prefix (via {@link NamespaceBypassRule#bareRoot}) and re-asks the world's rule set about the bare
- * form, so {@code /minecraft:gamemode} is blocked exactly when {@code /gamemode} is. The plugin-hide half of the escape
+ * rule set strips the prefix and asks about the bare form too, so {@code /minecraft:gamemode} is blocked exactly when {@code /gamemode} is. The plugin-hide half of the escape
  * is handled in the visibility listener, whose {@code HidePolicy} already folds the {@code namespace:} prefix.
  *
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but the
@@ -74,12 +72,12 @@ public final class CommandGateListener implements Listener {
         if (rules.isInert()) {
             return;
         }
-        String root = commandRoot(event.getMessage());
-        if (root.isEmpty()) {
+        String command = event.getMessage();
+        if (command.isBlank() || command.equals("/")) {
             return;
         }
         PlayerFacts facts = new BukkitPlayerFacts(player, groups);
-        if (!isDenied(rules, rulesInForce.blockNamespaceBypass(), root, facts)) {
+        if (rules.explain(command, facts, rulesInForce.blockNamespaceBypass()).allowed()) {
             return;
         }
         event.setCancelled(true);
@@ -87,30 +85,9 @@ public final class CommandGateListener implements Listener {
         sink.deliver(who, messages.resolve(who, rulesInForce.config().denyMessage(), Map.of()));
     }
 
-    /** A command root is denied when the world's rule set denies it, or when it is a namespace-prefixed denied command. */
-    private static boolean isDenied(RuleSet rules, boolean blockNamespaceBypass, String root, PlayerFacts facts) {
-        if (rules.decide(root, facts) == RuleSet.Decision.DENY) {
-            return true;
-        }
-        if (!blockNamespaceBypass) {
-            return false;
-        }
-        return NamespaceBypassRule.bareRoot(root)
-                .map(bare -> rules.decide(bare, facts) == RuleSet.Decision.DENY)
-                .orElse(false);
-    }
-
     /** The player's current world name, or {@code null} when it cannot be read (falls back to the base rule set). */
     private static @Nullable String worldName(Player player) {
         World world = player.getWorld();
         return world == null ? null : world.getName();
-    }
-
-    /** The command label: leading slash stripped, arguments dropped, lowercased. */
-    private static String commandRoot(String rawMessage) {
-        String body = rawMessage.startsWith("/") ? rawMessage.substring(1) : rawMessage;
-        int space = body.indexOf(' ');
-        String label = space < 0 ? body : body.substring(0, space);
-        return label.toLowerCase(Locale.ROOT);
     }
 }

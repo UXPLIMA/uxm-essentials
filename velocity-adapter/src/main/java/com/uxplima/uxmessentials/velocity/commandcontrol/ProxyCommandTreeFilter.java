@@ -7,7 +7,6 @@ import java.util.Objects;
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.RootCommandNode;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
-import com.uxplima.uxmessentials.commandcontrol.domain.NamespaceBypassRule;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
 
@@ -18,8 +17,8 @@ import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
  * {@code /glist}, plugin commands, and so on in tab-completion or the client command list.
  *
  * <p>The keep/remove decision is delegated to the pure {@code :core} domain: a node is removed when the
- * world-free {@link HidePolicy} hides it, or when the {@link RuleSet} denies it (whitelist/blacklist) and
- * the tab filter is on. When {@code block-namespace-bypass} is on, a namespaced node ({@code velocity:glist})
+ * world-free {@link HidePolicy} hides it, or when the {@link RuleSet} denies it (whitelist/blacklist), nothing
+ * typed after it may run, and the tab filter is on. When {@code block-namespace-bypass} is on, a namespaced node ({@code velocity:glist})
  * whose bare form is denied is removed too, closing the same escape the backend blocks. The filter never
  * sees a {@code .bypass} holder: the listener short-circuits one before calling in, so the bypass keeps the
  * full tree.
@@ -69,15 +68,7 @@ public final class ProxyCommandTreeFilter {
         if (!tabActive()) {
             return false;
         }
-        if (rules.decide(commandRoot, facts) == RuleSet.Decision.DENY) {
-            return true;
-        }
-        if (!blockNamespaceBypass) {
-            return false;
-        }
-        return NamespaceBypassRule.bareRoot(commandRoot)
-                .map(bare -> rules.decide(bare, facts) == RuleSet.Decision.DENY)
-                .orElse(false);
+        return !rules.visible(commandRoot, facts, blockNamespaceBypass);
     }
 
     /** True when the tab filter can remove anything: switched on and the rule set is not inert. */
