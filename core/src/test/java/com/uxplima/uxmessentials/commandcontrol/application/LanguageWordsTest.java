@@ -53,4 +53,13 @@ class LanguageWordsTest {
         assertThat(LanguageWords.of(Map.of()).isEmpty()).isTrue();
         assertThat(words.isEmpty()).isFalse();
     }
+
+    @Test
+    void aHiddenWordIsKeptOutOfEveryList() {
+        LanguageWords hidden = LanguageWords.of(Map.of("tr", List.of("yardım")), List.of("yardim"));
+
+        assertThat(hidden.hiddenFor("yardim", TURKISH)).isTrue();
+        assertThat(hidden.hiddenFor("uxmessentials:yardim", ENGLISH)).isTrue();
+        assertThat(hidden.hiddenFor("yardım", TURKISH)).isFalse();
+    }
 }
