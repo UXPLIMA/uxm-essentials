@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.security.domain.ClientIdMode;
 import com.uxplima.uxmessentials.security.domain.ClientPolicy;
 import com.uxplima.uxmessentials.security.domain.FreezeRestriction;
 import com.uxplima.uxmessentials.security.domain.LockoutPolicy;
+import com.uxplima.uxmessentials.security.domain.OperatorList;
 import com.uxplima.uxmessentials.security.domain.PinPolicy;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.security.domain.RevokedAccess;
@@ -36,6 +37,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * @param opProtection the op-command re-authentication settings ({@code op-protection.*})
  * @param ipGuard the same-IP alt-detection settings ({@code ip-guard.*})
  * @param clientId the client-brand guard settings ({@code client-id.*})
+ * @param feedback the feedback settings
+ * @param allowedOperators the players allowed to be operators ({@code allowed-operators.*})
  */
 public record SecurityConfig(
         boolean enabled,
@@ -44,7 +47,8 @@ public record SecurityConfig(
         OpProtection opProtection,
         IpGuard ipGuard,
         ClientId clientId,
-        Feedback feedback) {
+        Feedback feedback,
+        AllowedOperators allowedOperators) {
 
     public SecurityConfig {
         Objects.requireNonNull(twoFactor, "twoFactor");
@@ -53,6 +57,7 @@ public record SecurityConfig(
         Objects.requireNonNull(ipGuard, "ipGuard");
         Objects.requireNonNull(clientId, "clientId");
         Objects.requireNonNull(feedback, "feedback");
+        Objects.requireNonNull(allowedOperators, "allowedOperators");
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
@@ -65,7 +70,8 @@ public record SecurityConfig(
                 OpProtection.from(config),
                 IpGuard.from(config),
                 ClientId.from(config),
-                Feedback.from(config));
+                Feedback.from(config),
+                AllowedOperators.from(config));
     }
 
     /**
@@ -321,6 +327,33 @@ public record SecurityConfig(
         /** The pure re-auth decision this config drives: the guard feeds it each protected command and the last verify. */
         public ReauthPolicy policy() {
             return new ReauthPolicy(Set.copyOf(protectedCommands), reauthWindow);
+        }
+    }
+
+    /**
+     * The players allowed to be server operators ({@code allowed-operators.*}). Off by default, so an operator list an
+     * operator never wrote cannot lock anybody out.
+     *
+     * @param enabled whether the list is in force ({@code allowed-operators.enabled}, default false)
+     * @param players the player names and UUIDs on the list ({@code allowed-operators.players})
+     */
+    public record AllowedOperators(boolean enabled, List<String> players) {
+
+        public AllowedOperators {
+            players = List.copyOf(Objects.requireNonNull(players, "players"));
+        }
+
+        /** Resolve the allowed-operators settings from the module's scoped {@link ConfigStore}. */
+        public static AllowedOperators from(ConfigStore config) {
+            Objects.requireNonNull(config, "config");
+            return new AllowedOperators(
+                    config.getBoolean("allowed-operators.enabled", false),
+                    config.getStringList("allowed-operators.players", List.of()));
+        }
+
+        /** The pure list this config describes. */
+        public OperatorList list() {
+            return OperatorList.of(enabled, players);
         }
     }
 
