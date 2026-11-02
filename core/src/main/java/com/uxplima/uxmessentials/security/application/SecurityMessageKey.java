@@ -131,6 +131,11 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_REAUTH_FAILED("security.reauth.failed"),
     SECURITY_REAUTH_LOCKED_OUT("security.reauth.locked-out"),
 
+    // The allowed-operators list: the line an unlisted operator is sent away with, and the refusal of an /op that
+    // names somebody who is not on the list.
+    SECURITY_OPERATORS_NOT_ALLOWED("security.operators.not-allowed"),
+    SECURITY_OPERATORS_REFUSED("security.operators.refused"),
+
     // Phase 4, IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
     // joining player shares an IP with other accounts, and the kick shown when an IP is over the account cap.
     SECURITY_ALTS_HEADER("security.alts.header"),

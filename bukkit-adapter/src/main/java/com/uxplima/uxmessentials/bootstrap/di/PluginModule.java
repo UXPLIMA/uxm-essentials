@@ -151,7 +151,9 @@ import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
 import com.uxplima.uxmessentials.regions.adapter.outbound.ServiceRegionsPlaceholders;
 import com.uxplima.uxmessentials.regions.adapter.outbound.api.RegionsQueries;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
+import com.uxplima.uxmessentials.security.adapter.OperatorLock;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
+import com.uxplima.uxmessentials.security.adapter.inbound.listener.OperatorLockListener;
 import com.uxplima.uxmessentials.security.adapter.outbound.ModerationLockoutBan;
 import com.uxplima.uxmessentials.security.adapter.outbound.SessionSecurityPlaceholders;
 import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityActions;
@@ -1778,6 +1780,29 @@ public final class PluginModule {
         links.placeholders.security(new SessionSecurityPlaceholders(
                 wired.sessions(),
                 SecurityConfig.from(ctx.config()).joinVerification().enabled()));
+        // The allowed-operators list is the one security setting a reload applies: it is a plain list, swapped whole,
+        // and the sweep that holds online operators to it reads whichever list is in force.
+        OperatorLock operators = new OperatorLock(
+                plugin.getServer(),
+                ctx.kernel().scheduler(),
+                ctx.kernel().messages(),
+                ctx.kernel().messageSink(),
+                ctx.kernel().log(),
+                SecurityConfig.AllowedOperators.from(ctx.config()).list());
+        resources.addListener(new OperatorLockListener(operators));
+        AutoCloseable sweep = operators.startSweep();
+        resources.onClose(() -> {
+            try {
+                sweep.close();
+            } catch (Exception closeFailure) {
+                ctx.kernel().log().warn("event=operator_sweep_close_failed detail={}", closeFailure.toString());
+            }
+        });
+        resources.addReloadTask(ReloadTask.forModule(
+                ctx.moduleId(),
+                () -> operators.replace(
+                        SecurityConfig.AllowedOperators.from(ctx.config()).list()),
+                "allowed operators re-read; the other security settings wait for a restart"));
     }
 
     private static void wireCommandControl(
