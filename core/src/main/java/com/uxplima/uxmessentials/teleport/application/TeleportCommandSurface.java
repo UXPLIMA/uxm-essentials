@@ -83,11 +83,11 @@ final class TeleportCommandSurface {
                         DescribedCommand.of("settpr", "Set the random-teleport zone for /rtp")),
                 // spawn
                 spec("spawn", "uxmessentials.spawn.use", DescribedCommand.of("spawn", "Teleport to spawn")),
-                spec("setspawn", "uxmessentials.spawn.set", DescribedCommand.of("setspawn", "Set the server spawn")),
+                spec("setspawn", "uxmessentials.spawn.set", DescribedCommand.of("setspawn", "Set this world's spawn")),
                 spec(
                         "setmainspawn",
                         "uxmessentials.spawn.set",
-                        DescribedCommand.of("setmainspawn", "Set the global main spawn")),
+                        DescribedCommand.of("setmainspawn", "Set the main spawn for worlds without their own")),
                 spec(
                         "removespawn",
                         "uxmessentials.spawn.set",

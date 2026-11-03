@@ -108,8 +108,8 @@ The top level commands each module registers, with the permission that gates the
 | `/mirrorspawn` | teleport | Redirect this world's spawn to another world | `uxmessentials.spawn.set` |
 | `/removespawn` | teleport | Clear this world's own spawn | `uxmessentials.spawn.set` |
 | `/rtp` | teleport | wild | `uxmessentials.rtp.use` |
-| `/setmainspawn` | teleport | Set the global main spawn | `uxmessentials.spawn.set` |
-| `/setspawn` | teleport | Set the server spawn | `uxmessentials.spawn.set` |
+| `/setmainspawn` | teleport | Set the main spawn for worlds without their own | `uxmessentials.spawn.set` |
+| `/setspawn` | teleport | Set this world's spawn | `uxmessentials.spawn.set` |
 | `/settpr` | teleport | Set the random-teleport zone for /rtp | `uxmessentials.teleport.settpr` |
 | `/spawn` | teleport | Teleport to spawn | `uxmessentials.spawn.use` |
 | `/thru` | teleport | Teleport through the wall you are facing | `uxmessentials.tp.vertical` |
