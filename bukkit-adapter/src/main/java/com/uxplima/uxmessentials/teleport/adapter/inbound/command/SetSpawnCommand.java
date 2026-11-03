@@ -47,7 +47,7 @@ public final class SetSpawnCommand extends TeleportCommandSupport implements Com
 
     @Override
     public String description() {
-        return "Set the server spawn.";
+        return "Set this world's spawn.";
     }
 
     private int runDefault(CommandContext<CommandSourceStack> ctx) {

@@ -40,7 +40,7 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
 
     @Override
     public String description() {
-        return "Set the global main spawn.";
+        return "Set the main spawn for worlds without their own.";
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
