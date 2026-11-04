@@ -910,10 +910,11 @@ public final class GuardCommand implements CommandRegistration {
         }
         GuardConfig config = service.config();
         GuardScope scope;
+        String set = args[1].startsWith("set:") ? args[1].substring(4) : args[1];
         if (args[1].equalsIgnoreCase("server")) {
             scope = config.serverScope();
-        } else if (config.sharedSets().contains(args[1])) {
-            scope = GuardScope.set(args[1]);
+        } else if (config.sharedSets().contains(set)) {
+            scope = GuardScope.set(set);
         } else {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_SCOPE, Map.of("scope", args[1]));
             return;

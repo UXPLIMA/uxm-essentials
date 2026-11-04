@@ -143,12 +143,13 @@ public record GuardConfig(
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
-        String scopeName =
-                config.getString("network.new-region-scope", "server").strip();
+        String written = config.getString("network.new-region-scope", "server").strip();
+        // "set:lobby" and "lobby" both name the set, as the comment in the file and /guard scope accept either.
+        String scopeName = written.startsWith("set:") ? written.substring(4) : written;
         GuardScope newScope =
                 scopeName.equalsIgnoreCase("server") || !sets.contains(scopeName) ? server : GuardScope.set(scopeName);
         if (!scopeName.equalsIgnoreCase("server") && !sets.contains(scopeName)) {
-            problems.accept("network.new-region-scope names a set this server does not load: " + scopeName);
+            problems.accept("network.new-region-scope names a set this server does not load: " + written);
         }
         String channel =
                 config.getString("deny-message.channel", "actionbar").strip().toLowerCase(Locale.ROOT);

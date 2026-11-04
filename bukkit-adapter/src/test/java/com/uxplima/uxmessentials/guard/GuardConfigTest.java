@@ -150,7 +150,8 @@ class GuardConfigTest {
                 """);
 
         assertThat(config.loadedScopes()).containsExactly(GuardScope.server("lobby"), GuardScope.set("hub"));
+        assertThat(config.newRegionScope()).isEqualTo(GuardScope.set("hub"));
         assertThat(unknown.newRegionScope()).isEqualTo(GuardScope.server("lobby"));
-        assertThat(problems).isNotEmpty();
+        assertThat(problems).singleElement().asString().contains("arena");
     }
 }
