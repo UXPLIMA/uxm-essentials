@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.guard.application.GuardStats;
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import com.uxplima.uxmessentials.guard.domain.Explanation;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Region;
@@ -50,6 +52,37 @@ import org.jspecify.annotations.Nullable;
  * allocates nothing for an allowed check.
  */
 public final class GuardRuntime {
+
+    /** The actions a block inspection explains: the main action of each family a player meets. */
+    private static final List<ActionId> INSPECTED = List.of(
+            BuiltInActions.BREAK,
+            BuiltInActions.PLACE,
+            BuiltInActions.USE,
+            BuiltInActions.INTERACT,
+            BuiltInActions.DAMAGE,
+            BuiltInActions.ITEM_USE,
+            BuiltInActions.ITEM_DROP,
+            BuiltInActions.MOVE_ENTER);
+
+    /** A player with no role, no permission and no condition met: who a block inspection speaks for. */
+    private static final GuardSubject OUTSIDER = new GuardSubject() {
+        private final UUID id = new UUID(0L, 0L);
+
+        @Override
+        public UUID id() {
+            return id;
+        }
+
+        @Override
+        public boolean has(String node) {
+            return false;
+        }
+
+        @Override
+        public boolean meets(String expression) {
+            return false;
+        }
+    };
 
     /** Lets staff toggle bypass. */
     public static final String BYPASS_PERMISSION = "uxmessentials.guard.bypass";
@@ -309,6 +342,63 @@ public final class GuardRuntime {
     /** Players with bypass on, for the reminder task. */
     public Set<UUID> bypassing() {
         return Set.copyOf(bypassing);
+    }
+
+    /** True while {@code player} has inspect mode on. */
+    public boolean inspecting(Player player) {
+        return inspecting.contains(player.getUniqueId());
+    }
+
+    /**
+     * Explain to {@code viewer} what a player with no role and no permission may do at a block: the main action of
+     * each family, with the region and rule that decide it, or that no rule does.
+     */
+    public void inspectBlock(Player viewer, Block block) {
+        send(
+                viewer,
+                GuardMessageKey.INSPECT_BLOCK_HEADER,
+                Map.of(
+                        "x", String.valueOf(block.getX()),
+                        "y", String.valueOf(block.getY()),
+                        "z", String.valueOf(block.getZ())),
+                "chat");
+        GuardSnapshot snap = service.snapshot();
+        for (ActionId action : INSPECTED) {
+            Explanation explanation = snap.explain(
+                    block.getWorld().getName(), block.getX(), block.getY(), block.getZ(), action, OUTSIDER);
+            String result = explanation.verdict() == Verdict.DENY ? "deny" : "allow";
+            Optional<Explanation.Step> decisive = explanation.steps().stream()
+                    .filter(Explanation.Step::decisive)
+                    .findFirst();
+            if (decisive.isEmpty()) {
+                send(
+                        viewer,
+                        GuardMessageKey.INSPECT_NO_RULE,
+                        Map.of("action", action.value(), "result", result),
+                        "chat");
+                continue;
+            }
+            Explanation.Step step = decisive.get();
+            send(
+                    viewer,
+                    GuardMessageKey.INSPECT_LINE,
+                    Map.of(
+                            "player",
+                            "-",
+                            "action",
+                            action.value(),
+                            "region",
+                            step.region().id().value(),
+                            "node",
+                            step.node() == null ? "-" : step.node().value(),
+                            "rule",
+                            step.rule() == null
+                                    ? "-"
+                                    : StyledText.escape(step.rule().toString()),
+                            "result",
+                            result),
+                    "chat");
+        }
     }
 
     /** Toggle inspect mode; answers the new state. */

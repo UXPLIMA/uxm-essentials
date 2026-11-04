@@ -350,7 +350,7 @@ final class ContentPermissions {
                         GUARD),
                 PermissionSpec.of(
                         "uxmessentials.guard.inspect",
-                        "/guard inspect: click blocks to read who may do what there.",
+                        "/guard inspect: click a block to read what a player with no role may do there, and see why each of your own refusals happened.",
                         PermissionDefault.OP,
                         GUARD),
                 PermissionSpec.of(
@@ -360,7 +360,7 @@ final class ContentPermissions {
                         GUARD),
                 PermissionSpec.of(
                         "uxmessentials.guard.undo",
-                        "/guard undo: revert your last guard change.",
+                        "/guard undo <history id>: undo one change from a region's history.",
                         PermissionDefault.OP,
                         GUARD),
                 PermissionSpec.of(
@@ -384,7 +384,10 @@ final class ContentPermissions {
                         PermissionDefault.OP,
                         GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.guard.menu", "/guard menu: open the region menus.", PermissionDefault.OP, GUARD),
+                        "uxmessentials.guard.menu",
+                        "See the region list in /guard menu; without it a region owner or manager gets the roles window of the region they stand in.",
+                        PermissionDefault.OP,
+                        GUARD),
                 PermissionSpec.of(
                         "uxmessentials.guard.notify",
                         "Receive staff alerts when players repeatedly hit guard denials.",

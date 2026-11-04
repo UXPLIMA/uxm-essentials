@@ -23,6 +23,8 @@ public enum GuardMessageKey implements MessageKey {
     INSPECT_ON("guard.inspect.on"),
     INSPECT_OFF("guard.inspect.off"),
     INSPECT_LINE("guard.inspect.line"),
+    INSPECT_BLOCK_HEADER("guard.inspect.block-header"),
+    INSPECT_NO_RULE("guard.inspect.no-rule"),
 
     // command results
     CREATED("guard.created"),
