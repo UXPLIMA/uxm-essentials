@@ -239,6 +239,10 @@ public final class GuardWiring {
                 () -> {
                     ctx.config().reload();
                     var unused = service.reload(GuardConfig.from(ctx.config(), serverId, warn));
+                    GuardMenus windows = menusHolder[0];
+                    if (windows != null) {
+                        windows.loadSpecs(plugin.getDataFolder().toPath(), log);
+                    }
                 },
                 onPlayer,
                 config.rgAlias());

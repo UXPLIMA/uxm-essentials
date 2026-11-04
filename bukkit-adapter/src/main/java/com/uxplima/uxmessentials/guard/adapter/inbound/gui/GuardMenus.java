@@ -189,6 +189,11 @@ public final class GuardMenus {
         templates(bindings);
         history(bindings);
 
+        loadSpecs(dataFolder, log);
+    }
+
+    /** Read the window files again, so an edit under modules/guard/gui shows on the next open. */
+    public void loadSpecs(Path dataFolder, Logger log) {
         for (String id : SPECS) {
             menus.registerSpec(
                     id, MenuSpecs.loadOrBundled("modules/guard/gui/" + id + ".conf", dataFolder, 6, EngineLog.of(log)));
