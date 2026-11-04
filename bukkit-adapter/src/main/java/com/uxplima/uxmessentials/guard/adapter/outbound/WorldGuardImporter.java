@@ -534,8 +534,13 @@ public final class WorldGuardImporter {
         region = region.withRoles(roles);
 
         List<Rule> rules = new ArrayList<>();
-        boolean passthrough = "allow".equalsIgnoreCase(String.valueOf(wg.flags().get("passthrough")));
-        if (!global && !passthrough && !wg.flags().containsKey("build")) {
+        // WorldGuard lets only members build in a region unless passthrough is allow. The global region is the
+        // other way round: everyone builds there unless passthrough is set to deny, the usual way to protect a
+        // whole world.
+        String passthroughFlag = String.valueOf(wg.flags().get("passthrough"));
+        boolean passthrough =
+                global ? !"deny".equalsIgnoreCase(passthroughFlag) : "allow".equalsIgnoreCase(passthroughFlag);
+        if (!passthrough && !wg.flags().containsKey("build")) {
             for (String action : BUILD) {
                 rules.add(new Rule(ActionId.of(action), new Target.Everyone(), Effect.DENY));
                 rules.add(new Rule(ActionId.of(action), new Target.Role(RoleName.MEMBER), Effect.ALLOW));
@@ -545,6 +550,7 @@ public final class WorldGuardImporter {
                 }
             }
         }
+        int membership = rules.size();
         Map<BehaviourKey, String> behaviours = new EnumMap<>(BehaviourKey.class);
         for (Map.Entry<String, Object> flag : wg.flags().entrySet()) {
             String name = flag.getKey();
@@ -578,7 +584,39 @@ public final class WorldGuardImporter {
         if (behaviours.containsKey(BehaviourKey.MESSAGE_ENTER) || behaviours.containsKey(BehaviourKey.MESSAGE_EXIT)) {
             behaviours.putIfAbsent(BehaviourKey.MESSAGE_CHANNEL, "chat");
         }
-        return region.withRules(dedupe(rules)).withBehaviours(Behaviours.of(behaviours));
+        return region.withRules(dedupe(withoutOverriddenAllows(rules, membership)))
+                .withBehaviours(Behaviours.of(behaviours));
+    }
+
+    /**
+     * In WorldGuard a flag set on a region beats the membership test for its actions: {@code use: allow} lets
+     * everyone use, and {@code block-break: deny} stops members too. A flag denying an action to everyone therefore
+     * takes away the members' allow that the membership default wrote for that action. A flag allowing it needs
+     * nothing here: it replaces the default deny in the same slot when the rules are deduplicated.
+     *
+     * @param membership how many rules at the start of the list are the membership default
+     */
+    private static List<Rule> withoutOverriddenAllows(List<Rule> rules, int membership) {
+        Set<String> deniedToAll = new HashSet<>();
+        for (Rule rule : rules.subList(membership, rules.size())) {
+            if (rule.effect() == Effect.DENY && rule.target() instanceof Target.Everyone) {
+                deniedToAll.add(rule.action().value());
+            }
+        }
+        if (deniedToAll.isEmpty()) {
+            return rules;
+        }
+        List<Rule> out = new ArrayList<>();
+        for (int i = 0; i < rules.size(); i++) {
+            Rule rule = rules.get(i);
+            boolean overridden = i < membership
+                    && rule.effect() == Effect.ALLOW
+                    && deniedToAll.contains(rule.action().value());
+            if (!overridden) {
+                out.add(rule);
+            }
+        }
+        return out;
     }
 
     private static boolean behaviour(
