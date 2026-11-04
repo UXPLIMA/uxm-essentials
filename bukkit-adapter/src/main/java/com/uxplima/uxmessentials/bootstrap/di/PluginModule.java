@@ -2102,8 +2102,26 @@ public final class PluginModule {
                 ctx.kernel().scheduler(),
                 ctx.kernel().log(),
                 receipts(ctx));
+        // Guard regions are looked up when RTP asks, since guard may wire after teleport or be switched off.
+        com.uxplima.uxmessentials.teleport.application.port.ProtectedLand guardRegions = where -> links.queries
+                .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
+                .map(guard -> !guard.within(
+                                new com.uxplima.uxmessentials.api.view.UxmLocation(
+                                        where.world().name(), where.x(), where.y(), where.z()),
+                                0)
+                        .isEmpty())
+                .orElse(false);
         TeleportWiring.Wired wired = TeleportWiring.wire(
-                plugin, ctx, persistence, guiLayouts, guiRegistry, menus, menuBindings, fee, claimProviders);
+                plugin,
+                ctx,
+                persistence,
+                guiLayouts,
+                guiRegistry,
+                menus,
+                menuBindings,
+                fee,
+                claimProviders,
+                guardRegions);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
