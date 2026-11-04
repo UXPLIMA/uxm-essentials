@@ -171,8 +171,13 @@ public interface UxmEssentialsApi {
     /** Reading the trades open right now, or empty when the trade module is switched off. */
     Optional<UxmTradeQuery> trade();
 
-    /** Reading what WorldGuard protects, or empty when the regions module is switched off. */
+    /** Reading the guard module's regions, or empty when the guard module is switched off. */
     Optional<UxmRegionsQuery> regions();
+
+    /** The guard module's protection checks, or empty when the guard module is switched off. */
+    default Optional<com.uxplima.uxmessentials.api.query.UxmGuardQuery> guard() {
+        return Optional.empty();
+    }
 
     /** Reading the inventory snapshots held for a player, or empty when the invrollback module is switched off. */
     Optional<UxmInvRollbackQuery> invRollback();

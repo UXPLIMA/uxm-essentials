@@ -8,24 +8,18 @@ import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.api.view.UxmRegion;
 
 /**
- * What WorldGuard protects, read through this plugin.
+ * The guard module's regions, read through this plugin.
  *
- * <p>A convenience rather than a second source of truth. WorldGuard owns region state and has its own API; this is
- * here so a plugin that already depends on us can ask "what covers this spot" without taking a second dependency
- * and writing the reflective walk a third time.
+ * <p>Every answer is a future so callers never depend on which thread holds the regions. There is no write surface
+ * here on purpose: editing a region is an operator act with its own command, permissions and history.
  *
- * <p>Every answer is a future because the region container is read on the server thread rather than on a worker.
- * WorldGuard's region maps are live server state, and reading them from a pool thread is not something its API
- * promises to survive.
- *
- * <p>There is no write surface here on purpose. Editing a region is an operator act with its own command, its own
- * permissions and its own audit trail, and a silent edit from a plugin would leave staff looking at a protection
- * nobody in the logs ever changed.
+ * <p>A region's {@code flags} are its rules written as {@code <action> <target>} with the value {@code allow} or
+ * {@code deny}, followed by its behaviours by key.
  */
 public interface UxmRegionsQuery {
 
     /**
-     * Whether WorldGuard is installed and reachable.
+     * Whether the guard module is running.
      *
      * <p>Answered on the calling thread, because it is the question you ask before the others. When this is false
      * every read below answers empty rather than failing, so a caller that skips this check still behaves.

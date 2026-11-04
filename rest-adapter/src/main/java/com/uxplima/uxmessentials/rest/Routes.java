@@ -159,6 +159,7 @@ public final class Routes {
         present.put("ranks", api.ranks().isPresent());
         present.put("trade", api.trade().isPresent());
         present.put("regions", api.regions().isPresent());
+        present.put("guard", api.guard().isPresent());
         present.put("invrollback", api.invRollback().isPresent());
         present.put("security", api.security().isPresent());
         present.put("skin", api.skin().isPresent());

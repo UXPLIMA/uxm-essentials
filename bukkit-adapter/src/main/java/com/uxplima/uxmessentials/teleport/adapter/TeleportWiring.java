@@ -138,7 +138,8 @@ public final class TeleportWiring {
             Menus menus,
             MenuBindings menuBindings,
             TeleportFee fee,
-            ClaimProvidersConfig claimProviders) {
+            ClaimProvidersConfig claimProviders,
+            ProtectedLand guardRegions) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -148,6 +149,7 @@ public final class TeleportWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(fee, "fee");
         Objects.requireNonNull(claimProviders, "claimProviders");
+        Objects.requireNonNull(guardRegions, "guardRegions");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -167,7 +169,7 @@ public final class TeleportWiring {
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
         MutableWarpRespawnLocator warpRespawnLocator = new MutableWarpRespawnLocator();
         SpawnDirectory spawns = spawns(plugin, persistence);
-        RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running, claimProviders);
+        RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running, claimProviders, guardRegions);
         // The post-arrival grace shields an /rtp landing (Resistance + Slow-Falling + a no-fall-damage window);
         // it is both the engine's ArrivalGrace port and the fall-damage listener, so it is registered below.
         ArrivalGraceGuard graceGuard =
@@ -329,7 +331,8 @@ public final class TeleportWiring {
             TeleportSettings settings,
             Persistence persistence,
             AtomicBoolean running,
-            ClaimProvidersConfig claimProviders) {
+            ClaimProvidersConfig claimProviders,
+            ProtectedLand guardRegions) {
         // The safe-search probe loads each candidate's chunk asynchronously through BukkitChunkAccess, so no RTP
         // probe generates a far chunk on a tick thread and every probed-but-unserved chunk is released again. The
         // budgeted search wraps the finder so a single search terminates within its budget and tick-slices its
@@ -338,9 +341,13 @@ public final class TeleportWiring {
         // The claim + WorldGuard protection check rides along on the probe's region-thread snapshot callback (no
         // extra hop), setting each candidate's insideClaim flag so the pure policy keeps the shared pool out of
         // claimed land and regions. Both checks are folded behind the respect-claims / respect-worldguard toggles.
+        // Guard regions count as regions too, under the same switch: a server that moved from WorldGuard to the
+        // guard module keeps RTP out of its protected areas.
+        ProtectedLand worldGuard = new WorldGuardRegions(plugin.getServer(), kernel.log());
+        ProtectedLand regions = where -> guardRegions.isProtected(where) || worldGuard.isProtected(where);
         ProtectedLand protectedLand = new ClaimAwareProtectedLand(
                 buildClaimService(plugin, kernel, settings.respectClaims(), claimProviders),
-                new WorldGuardRegions(plugin.getServer(), kernel.log()),
+                regions,
                 settings.respectClaims(),
                 settings.respectWorldguard());
         // The passive rare-biome registry (enabled only when biome-targeting is on) biases the biome-targeted

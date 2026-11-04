@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.adapter.PlaytimeAdmin;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -33,10 +34,12 @@ public final class PlayerStateCommands {
             Messages messages,
             NoFlyWorldPolicy noFlyWorlds,
             @Nullable PlaytimeView playtimeView,
-            PlaytimeAdmin playtimeAdmin) {
+            PlaytimeAdmin playtimeAdmin,
+            PlayerStateStore store,
+            RegionBehaviourGate regions) {
         return List.of(
-                new GodCommand(services, messages),
-                new FlyCommand(services, messages, noFlyWorlds),
+                new GodCommand(services, messages, store, regions),
+                new FlyCommand(services, messages, noFlyWorlds, regions),
                 new HealCommand(services, messages),
                 new FeedCommand(services, messages),
                 new FoodLevelCommand(services, messages),

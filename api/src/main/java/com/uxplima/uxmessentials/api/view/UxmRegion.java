@@ -4,7 +4,7 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * A WorldGuard region as this plugin reads it.
+ * A guard region as this plugin reads it.
  *
  * <p>The roster entries are identifiers rather than players, because that is what a region holds: a uuid, a name
  * recorded before uuids existed, or a group written as {@code g:name}. Resolving one to an account is the caller's

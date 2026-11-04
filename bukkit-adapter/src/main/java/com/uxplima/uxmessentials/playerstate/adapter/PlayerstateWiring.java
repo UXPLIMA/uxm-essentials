@@ -10,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.RegionBehaviourGate;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
@@ -104,7 +105,8 @@ public final class PlayerstateWiring {
             GuiLayouts guiLayouts,
             Menus menus,
             MirrorWindow mirrorWindow,
-            PlayerTeamCoordinator teams) {
+            PlayerTeamCoordinator teams,
+            RegionBehaviourGate regions) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(playtimeRepository, "playtimeRepository");
@@ -112,6 +114,7 @@ public final class PlayerstateWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(mirrorWindow, "mirrorWindow");
         Objects.requireNonNull(teams, "teams");
+        Objects.requireNonNull(regions, "regions");
         KernelPorts kernel = ctx.kernel();
         ConfigStore config = ctx.config();
         Clock clock = Clock.systemUTC();
@@ -158,8 +161,8 @@ public final class PlayerstateWiring {
                 new ImportPlaytime(playtimeRepository, notifier, clock),
                 new VanillaPlaytime(kernel.scheduler()),
                 kernel.log());
-        List<CommandRegistration> commands =
-                PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView, playtimeAdmin);
+        List<CommandRegistration> commands = PlayerStateCommands.all(
+                services, kernel.messages(), noFlyWorlds, playtimeView, playtimeAdmin, store, regions);
         List<Listener> listeners = new ArrayList<>(List.of(
                 new PlayerStateListener(store, reconciler, teams),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),

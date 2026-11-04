@@ -4,10 +4,12 @@ import static com.uxplima.uxmessentials.rest.Routes.PREFIX;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
+import com.uxplima.uxmessentials.api.query.UxmGuardQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
@@ -20,7 +22,7 @@ import com.uxplima.uxmessentials.rest.http.Route;
 import com.uxplima.uxmessentials.rest.view.Views;
 
 /**
- * WorldGuard regions, read through the plugin.
+ * Guard regions, read through the plugin, and the guard's own verdict for an action at a point.
  *
  * <p>Under the world rather than at the top level, because a region id is only unique within one. Read-only, which
  * is the published surface's shape rather than a decision taken here: editing a protection is an operator act with
@@ -34,15 +36,16 @@ public final class RegionsRoutes {
         return List.of(
                 Route.of("GET", PREFIX + "/regions", Scopes.READ, request -> support(api)),
                 Route.of("GET", PREFIX + "/worlds/{name}/regions", Scopes.READ, request -> regions(api, request)),
-                Route.of("GET", PREFIX + "/worlds/{name}/regions/{id}", Scopes.READ, request -> region(api, request)));
+                Route.of("GET", PREFIX + "/worlds/{name}/regions/{id}", Scopes.READ, request -> region(api, request)),
+                Route.of("GET", PREFIX + "/worlds/{name}/guard/check", Scopes.READ, request -> check(api, request)));
     }
 
     /**
      * Whether region support is actually there.
      *
-     * <p>The question to ask before the others, and the one the reads below cannot answer: with no WorldGuard
-     * installed every one of them comes back empty, which looks exactly like a world nobody has protected. This
-     * tells the two apart.
+     * <p>The question to ask before the others, and the one the reads below cannot answer: with the guard module
+     * off every one of them comes back empty, which looks exactly like a world nobody has protected. This tells the
+     * two apart.
      */
     private static HttpResponse support(UxmEssentialsApi api) {
         JsonObject payload = Json.object();
@@ -72,6 +75,41 @@ public final class RegionsRoutes {
                 .orElse(JsonNull.INSTANCE));
     }
 
+    /**
+     * Whether an action is allowed at a point: {@code action}, {@code x}, {@code y} and {@code z} are required;
+     * with {@code player} (a UUID) the player's verdict, without it what nature may do there. An action outside
+     * the tree is a bad request rather than a quiet "allowed".
+     */
+    private static HttpResponse check(UxmEssentialsApi api, RestRequest request) {
+        String world = request.parameter("name");
+        String action = request.http()
+                .queryParam("action")
+                .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "action is required"));
+        UxmLocation where = point(request, world)
+                .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "x, y and z are required"));
+        UxmGuardQuery guard = Reads.module(api.guard(), "guard");
+        if (!guard.isAction(action)) {
+            throw new HttpException(HttpStatus.BAD_REQUEST, "unknown action: " + action);
+        }
+        Optional<String> player = request.http().queryParam("player");
+        boolean allowed;
+        if (player.isPresent()) {
+            UUID id;
+            try {
+                id = UUID.fromString(player.get());
+            } catch (IllegalArgumentException notAUuid) {
+                throw new HttpException(HttpStatus.BAD_REQUEST, "not a player uuid: " + player.get());
+            }
+            allowed = guard.allowed(id, action, where);
+        } else {
+            allowed = guard.allowedWorld(action, where);
+        }
+        JsonObject payload = Json.object();
+        payload.addProperty("action", action);
+        payload.addProperty("allowed", allowed);
+        return Json.ok(payload);
+    }
+
     /** The point to ask about, or empty when no coordinate was sent; a partial coordinate is a bad request. */
     private static Optional<UxmLocation> point(RestRequest request, String world) {
         Optional<String> x = request.http().queryParam("x");
@@ -96,6 +134,6 @@ public final class RegionsRoutes {
     }
 
     private static UxmRegionsQuery reads(UxmEssentialsApi api) {
-        return Reads.module(api.regions(), "regions");
+        return Reads.module(api.regions(), "guard");
     }
 }

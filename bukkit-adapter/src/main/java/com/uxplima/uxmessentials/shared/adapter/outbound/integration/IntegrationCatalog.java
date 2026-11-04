@@ -216,8 +216,8 @@ public final class IntegrationCatalog {
             new Integration(
                     "WorldEdit",
                     IntegrationFamily.REGIONS,
-                    "com.uxplima.uxmessentials.regions.adapter.inbound.command.WorldEditRegionSelection",
-                    "defines a region from your current WorldEdit selection"),
+                    "com.uxplima.uxmessentials.guard.adapter.Selections",
+                    "defines a guard region from your current WorldEdit selection and keeps WorldEdit out of locked regions"),
             new Integration(
                     "dynmap",
                     IntegrationFamily.MAPS,

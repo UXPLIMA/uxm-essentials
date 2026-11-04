@@ -32,7 +32,8 @@ public sealed interface NetworkMessage
                 VotePartyFired,
                 VoteCounterChanged,
                 TradeSignalFrame,
-                VanishStateChanged {
+                VanishStateChanged,
+                GuardChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -60,7 +61,8 @@ public sealed interface NetworkMessage
         NPC_CHANGED(12),
         IGNORE_CHANGED(13),
         TRADE_SIGNAL(14),
-        VANISH_STATE_CHANGED(15);
+        VANISH_STATE_CHANGED(15),
+        GUARD_CHANGED(16);
 
         private final byte wireTag;
 

@@ -2,7 +2,7 @@
 
 Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; the comment says whether the highest or the lowest granted number wins. The gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md).
 
-Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [regions](#regions) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
 ## bossbar
 
@@ -68,6 +68,10 @@ Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communica
 | `uxmessentials.menu.open.others` | /menu open <menu> <player>: open a custom menu for somebody else. | op |
 | `uxmessentials.menu.use` | /menu open <name> to open an operator custom menu, and /menu list to see the loaded menus. | true |
 | `uxmessentials.module.custommenus` | Hot-reload / inspect the custommenus module (operator custom menus behind /menu). | op |
+
+## guard
+
+The guard nodes are listed in [guard.md](guard.md#permissions).
 
 ## holograms
 
@@ -277,17 +281,6 @@ Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communica
 | `uxmessentials.ranks.gui` | /ranks to open the ladder panel (config-gated; registered only when the GUI is enabled). | true |
 | `uxmessentials.ranks.prestige` | /prestige to reset to the first rank for a prestige level once you reach the top rank. | true |
 | `uxmessentials.ranks.rankup` | /rankup to advance to the next rank when you meet its requirements. | true |
-
-## regions
-
-| Permission | What it allows | Default |
-|---|---|---|
-| `uxmessentials.module.regions` | Hot-reload / inspect the regions module (WorldGuard region management). | op |
-| `uxmessentials.regions.admin` | /regions priority <id> <value>: set a WorldGuard region priority. | op |
-| `uxmessentials.regions.create` | /regions create <id> (and /regions pos1\|pos2): define a cuboid WorldGuard region. | op |
-| `uxmessentials.regions.flags` | /regions flags <id>: open the per-region flag editor GUI. | op |
-| `uxmessentials.regions.list` | /regions [world]: open the WorldGuard region-list GUI for a world. | op |
-| `uxmessentials.regions.members` | /regions members <id> and /regions addmember\|addowner <id> <player>: manage a region roster. | op |
 
 ## scoreboard
 

@@ -215,6 +215,11 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     }
 
     @Override
+    public Optional<com.uxplima.uxmessentials.api.query.UxmGuardQuery> guard() {
+        return queries.find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class);
+    }
+
+    @Override
     public Optional<UxmTradeQuery> trade() {
         return queries.find(UxmTradeQuery.class);
     }

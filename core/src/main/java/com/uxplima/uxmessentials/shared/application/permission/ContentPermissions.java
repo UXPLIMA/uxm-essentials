@@ -15,7 +15,7 @@ final class ContentPermissions {
     private static final ModuleId HOLOGRAMS = ModuleId.of("holograms");
     private static final ModuleId CUSTOMMENUS = ModuleId.of("custommenus");
     private static final ModuleId CUSTOMCOMMANDS = ModuleId.of("customcommands");
-    private static final ModuleId REGIONS = ModuleId.of("regions");
+    private static final ModuleId GUARD = ModuleId.of("guard");
     private static final ModuleId VILLAGERS = ModuleId.of("villagers");
     private static final ModuleId SURVIVAL = ModuleId.of("survival");
     private static final ModuleId KITS = ModuleId.of("kits");
@@ -34,7 +34,7 @@ final class ContentPermissions {
                         holograms(),
                         custommenus(),
                         customcommands(),
-                        regions(),
+                        guard(),
                         villagers(),
                         survival(),
                         kits(),
@@ -226,38 +226,178 @@ final class ContentPermissions {
                         CUSTOMCOMMANDS));
     }
 
-    private static List<PermissionSpec> regions() {
+    private static List<PermissionSpec> guard() {
         return List.of(
                 PermissionSpec.of(
-                        "uxmessentials.module.regions",
-                        "Hot-reload / inspect the regions module (WorldGuard region management).",
+                        "uxmessentials.module.guard",
+                        "Hot-reload / inspect the guard module (region protection).",
                         PermissionDefault.OP,
-                        REGIONS),
+                        GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.regions.admin",
-                        "/regions priority <id> <value>: set a WorldGuard region priority.",
-                        PermissionDefault.OP,
-                        REGIONS),
+                        "uxmessentials.guard.use",
+                        "/guard and /guard help, actions: the base of every guard command.",
+                        PermissionDefault.TRUE,
+                        GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.regions.create",
-                        "/regions create <id> (and /regions pos1|pos2): define a cuboid WorldGuard region.",
-                        PermissionDefault.OP,
-                        REGIONS),
+                        "uxmessentials.guard.here",
+                        "/guard here: the regions you stand in and your role there.",
+                        PermissionDefault.TRUE,
+                        GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.regions.flags",
-                        "/regions flags <id>: open the per-region flag editor GUI.",
-                        PermissionDefault.OP,
-                        REGIONS),
+                        "uxmessentials.guard.member",
+                        "/guard member <region> <player> <member|guest|clear>: owners and managers edit their own region's roster.",
+                        PermissionDefault.TRUE,
+                        GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.regions.list",
-                        "/regions [world]: open the WorldGuard region-list GUI for a world.",
-                        PermissionDefault.OP,
-                        REGIONS),
+                        "uxmessentials.guard.why",
+                        "/guard why <action>: explain the verdict for an action where you stand.",
+                        PermissionDefault.TRUE,
+                        GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.regions.members",
-                        "/regions members <id> and /regions addmember|addowner <id> <player>: manage a region roster.",
+                        "uxmessentials.guard.define",
+                        "/guard define, redefine, wand, pos1, pos2, point, clear, expand: draw and define regions.",
                         PermissionDefault.OP,
-                        REGIONS));
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.remove",
+                        "/guard remove and restore: delete a region or bring a removed one back.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.info",
+                        "/guard info <region>: a region's shape, rules, roles and behaviours.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.list",
+                        "/guard list [world]: list the regions of a world.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.rule",
+                        "/guard rule <region> <action> <target> <allow|deny|clear>: edit a region's rules.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.role",
+                        "/guard role <region> <player> <role|clear>: give any role on any region.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.set",
+                        "/guard set <region> <behaviour> <value>: set a region behaviour.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.priority",
+                        "/guard priority <region> <value>: set a region's priority.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.parent",
+                        "/guard parent <region> <parent|clear>: inherit rules from another region.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.family",
+                        "/guard family <region> <name|clear>: group regions so their borders open to each other.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.tag",
+                        "/guard tag <region> add|remove|bulk: tag regions and edit them by tag.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.template",
+                        "/guard template <region> <template|clear>: apply a rule template.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.scope",
+                        "/guard scope <region> <server|set:name>: choose which servers a region applies on.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.lock",
+                        "/guard lock and unlock; edit and WorldEdit inside a locked region.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.bypass",
+                        "/guard bypass: toggle ignoring every guard rule.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.bypass.gamemode",
+                        "Keep your own game mode in a region whose gamemode behaviour would change it.",
+                        PermissionDefault.FALSE,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.show",
+                        "/guard show and hide: draw region borders for yourself.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.near",
+                        "/guard near [radius]: list regions around you.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.test",
+                        "/guard test <player> <action> [region]: check a verdict for another player.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.inspect",
+                        "/guard inspect: click a block to read what a player with no role may do there, and see why each of your own refusals happened.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.history",
+                        "/guard history <region>: the change history of a region.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.undo",
+                        "/guard undo <history id>: undo one change from a region's history.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.log",
+                        "/guard log [player]: recent denied actions.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.status",
+                        "/guard status: engine counters and memory use.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.import",
+                        "/guard import worldguard: import WorldGuard regions, with dry-run and undo.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.backups",
+                        "/guard backups [restore <file>]: list the region backups, or put a backup's regions back.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.reload",
+                        "/guard reload: reload the guard config and recompile every world.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.menu",
+                        "See the region list in /guard menu; without it a region owner or manager gets the roles window of the region they stand in.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
+                        "uxmessentials.guard.notify",
+                        "Receive staff alerts when players repeatedly hit guard denials.",
+                        PermissionDefault.OP,
+                        GUARD));
     }
 
     private static List<PermissionSpec> villagers() {

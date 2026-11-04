@@ -41,12 +41,19 @@ import org.jspecify.annotations.NullMarked;
 public final class FlyCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.fly.use";
+    private static final String GUARD_BYPASS = "uxmessentials.guard.bypass";
 
     private final NoFlyWorldPolicy noFlyWorlds;
+    private final RegionBehaviourGate regions;
 
-    public FlyCommand(PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds) {
+    public FlyCommand(
+            PlayerStateServices services,
+            Messages messages,
+            NoFlyWorldPolicy noFlyWorlds,
+            RegionBehaviourGate regions) {
         super(services, messages);
         this.noFlyWorlds = Objects.requireNonNull(noFlyWorlds, "noFlyWorlds");
+        this.regions = Objects.requireNonNull(regions, "regions");
     }
 
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
@@ -79,12 +86,21 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
             // The no-fly-world refusal is per target: a player standing in a forbidden world is skipped (and
             // told why) while the rest of an @a fan-out still toggle.
             Player live = Bukkit.getPlayer(target.uuid());
-            if (live != null && refusedByNoFlyWorld(sender, live)) {
+            if (live != null && (refusedByNoFlyWorld(sender, live) || refusedByRegion(sender, live))) {
                 continue;
             }
             services.toggleFly().toggleFor(actor(ctx), target);
         }
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** True when the toggle would grant flight where a guard region sets {@code fly = deny}. */
+    private boolean refusedByRegion(CommandSender sender, Player target) {
+        if (target.getAllowFlight() || target.hasPermission(GUARD_BYPASS) || !regions.denies(target, "fly")) {
+            return false;
+        }
+        feedback.send(sender, PlayerstateMessageKey.FLY_REGION_DISABLED, Map.of());
+        return true;
     }
 
     /** True when the toggle would grant plugin flight in a no-fly world for a player without the bypass. */

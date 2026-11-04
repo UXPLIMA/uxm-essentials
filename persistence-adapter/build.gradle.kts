@@ -33,6 +33,10 @@ dependencies {
     // The copy of a SQLite file's rows into a network database is the library's.
     implementation(uxm.uxmlib.common) { isTransitive = false }
     implementation(uxm.uxmlib.storage) { isTransitive = false }
+
+    // The store tests run the real migrations on a SQLite file.
+    testImplementation(libs.bundles.db)
+    testImplementation(libs.gson)
 }
 
 jooq {

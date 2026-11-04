@@ -15,7 +15,7 @@ final class WorldMechanicsPlaceholderKeys {
     private static final ModuleId SURVIVAL = ModuleId.of("survival");
     private static final ModuleId ITEMWORLD = ModuleId.of("itemworld");
     private static final ModuleId NPC = ModuleId.of("npc");
-    private static final ModuleId REGIONS = ModuleId.of("regions");
+    private static final ModuleId REGIONS = ModuleId.of("guard");
     private static final ModuleId SECURITY = ModuleId.of("security");
     private static final ModuleId VILLAGERS = ModuleId.of("villagers");
     private static final ModuleId SERVERTWEAKS = ModuleId.of("servertweaks");
@@ -116,7 +116,7 @@ final class WorldMechanicsPlaceholderKeys {
         return List.of(
                 PlaceholderSpec.of(
                         "regions_available",
-                        "Whether a region provider is reachable at all (yes/no).",
+                        "Whether the guard module is on (yes/no). Every regions_ placeholder is also readable as guard_.",
                         PlaceholderScope.GLOBAL,
                         REGIONS),
                 PlaceholderSpec.of(
@@ -142,6 +142,16 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "regions_here_members",
                         "Who may build in the region the player is standing in, comma separated.",
+                        PlaceholderScope.SESSION,
+                        REGIONS),
+                PlaceholderSpec.of(
+                        "regions_here_role",
+                        "The player's role in the region they stand in (owner, manager, member, guest), or empty.",
+                        PlaceholderScope.SESSION,
+                        REGIONS),
+                PlaceholderSpec.of(
+                        "regions_allowed_<action>",
+                        "Whether the player may do a guard action where they stand, such as regions_allowed_break.",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(

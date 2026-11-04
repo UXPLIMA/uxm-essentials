@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationModule;
 import com.uxplima.uxmessentials.customcommands.application.CustomCommandsModule;
 import com.uxplima.uxmessentials.custommenus.application.CustomMenusModule;
 import com.uxplima.uxmessentials.economy.application.EconomyModule;
+import com.uxplima.uxmessentials.guard.application.GuardModule;
 import com.uxplima.uxmessentials.holograms.application.HologramsModule;
 import com.uxplima.uxmessentials.homes.application.HomesModule;
 import com.uxplima.uxmessentials.invrollback.application.InvrollbackModule;
@@ -23,7 +24,6 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsModule;
 import com.uxplima.uxmessentials.poses.application.PoseModule;
 import com.uxplima.uxmessentials.presence.application.PresenceModule;
 import com.uxplima.uxmessentials.ranks.application.RanksModule;
-import com.uxplima.uxmessentials.regions.application.RegionsModule;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardModule;
 import com.uxplima.uxmessentials.security.application.SecurityModule;
 import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksModule;
@@ -215,19 +215,17 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but inert
         // until a capture happens, so it lands last after villagers.
         delegate.register(new InvrollbackModule());
-        // regions is a new bounded context: a GUI to manage WorldGuard regions (Phase 1 lists them). WorldGuard is a
-        // SOFT dependency: the adapter wiring probes for it and, when it is absent, binds a no-op RegionService so the
-        // module is inert (the /regions command reports "WorldGuard not installed"). It carries no hard dependency edge
-        // (its only collaborators are the shared Scheduler, messages and the menu engine; WorldGuard is an external
-        // soft-dep, not a module), persists nothing (WorldGuard owns the region store), and like the steady-state
-        // features ships ENABLED, so it lands last after invrollback.
-        delegate.register(new RegionsModule());
+        // guard is region protection on its own engine, in the slot the WorldGuard front end (regions) held. It
+        // carries no hard dependency edge (its collaborators are the shared persistence DSL, the bus, the Scheduler,
+        // messages and the click action engine) and ships ENABLED: with no regions it registers no protection
+        // listener, so an idle module costs nothing. It lands after invrollback.
+        delegate.register(new GuardModule());
         // servertweaks is the last bounded context, a grab-bag of small, independently-toggleable server/infra
         // tweaks (Phase 1: a custom F3 server brand and a console-spam log filter). It carries no hard dependency
         // edge (its collaborators are the shared Scheduler-free config + logger ports and Bukkit's Messenger/Log4j2
         // seams at the adapter edge), persists nothing (each tweak is a live side effect), and ships ENABLED so a
         // single tweak can be turned on in isolation, but every individual tweak defaults OFF, so a fresh install
-        // wires nothing until an operator opts one in. It lands last after regions.
+        // wires nothing until an operator opts one in. It lands last after guard.
         delegate.register(new ServerTweaksModule());
         // bossbar is the boss bar surface of the HUD family: bars that stay up, bars that come and go with an
         // event's window, and bars a command announces. Like scoreboard and tablist it carries no hard dependency
