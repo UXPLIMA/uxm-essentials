@@ -1,11 +1,15 @@
 package com.uxplima.uxmessentials.guard.adapter.movement;
 
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.function.Function;
 
 import org.bukkit.Location;
+import org.bukkit.command.Command;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -127,12 +131,16 @@ public final class BehaviourListener implements Listener {
             return;
         }
         String line = event.getMessage().substring(1).strip().toLowerCase(Locale.ROOT);
-        String root = line.split(" ", 2)[0];
-        if (root.equals("guard") || root.equals("bolge") || root.endsWith(":guard")) {
+        int space = line.indexOf(' ');
+        String typed = space < 0 ? line : line.substring(0, space);
+        String args = space < 0 ? "" : line.substring(space + 1).strip();
+        Function<String, Set<String>> namesOf = word -> names(player, word);
+        if (CommandWords.same(typed, "guard", namesOf)) {
             return;
         }
-        boolean denied = deny.isPresent() && matches(deny.get(), line);
-        if (!denied && allow.isPresent() && !matches(allow.get(), line)) {
+        String root = CommandWords.bare(typed);
+        boolean denied = deny.isPresent() && CommandWords.matches(deny.get(), typed, args, namesOf);
+        if (!denied && allow.isPresent() && !CommandWords.matches(allow.get(), typed, args, namesOf)) {
             denied = true;
         }
         if (denied) {
@@ -176,25 +184,19 @@ public final class BehaviourListener implements Listener {
         return false;
     }
 
-    /** True when a command line matches an entry: the command word, or the command and its leading arguments. */
-    static boolean matches(String list, String line) {
-        for (String entry : list.split(",", -1)) {
-            String wanted = entry.strip().replace('_', ' ');
-            if (wanted.isEmpty()) {
-                continue;
-            }
-            if (line.equals(wanted) || line.startsWith(wanted + " ")) {
-                return true;
-            }
-            int colon = line.indexOf(':');
-            if (colon > 0 && colon < line.indexOf(' ') + (line.indexOf(' ') < 0 ? line.length() + 1 : 0)) {
-                String bare = line.substring(colon + 1);
-                if (bare.equals(wanted) || bare.startsWith(wanted + " ")) {
-                    return true;
-                }
+    /** Every name a command word answers to: the word itself, and the name and aliases of its command entry. */
+    private static Set<String> names(Player player, String word) {
+        Set<String> names = new HashSet<>();
+        names.add(CommandWords.bare(word));
+        Command command = player.getServer().getCommandMap().getCommand(word);
+        if (command != null) {
+            names.add(CommandWords.bare(command.getName().toLowerCase(Locale.ROOT)));
+            names.add(CommandWords.bare(command.getLabel().toLowerCase(Locale.ROOT)));
+            for (String alias : command.getAliases()) {
+                names.add(CommandWords.bare(alias.toLowerCase(Locale.ROOT)));
             }
         }
-        return false;
+        return names;
     }
 
     private static boolean listed(String list, String name) {
