@@ -196,4 +196,60 @@ class WorldGuardImporterTest {
                 .isEqualTo(Verdict.DENY);
         assertThat(report).noneMatch(line -> line.contains("wg-global") || line.contains("__global__"));
     }
+
+    private static final String PROTECTED_WORLD = """
+            regions:
+              __global__:
+                type: global
+                members: {unique-ids: ['%s']}
+                flags:
+                  passthrough: deny
+                  use: allow
+                  chest-access: deny
+              vault:
+                type: cuboid
+                min: {x: 0, y: 0, z: 0}
+                max: {x: 10, y: 50, z: 10}
+                priority: 5
+                members: {unique-ids: ['%s']}
+                flags:
+                  block-break: deny
+            """.formatted(MEMBER, MEMBER);
+
+    private List<Region> importedProtectedWorld() throws InvalidConfigurationException {
+        YamlConfiguration yaml = new YamlConfiguration();
+        yaml.loadFromString(PROTECTED_WORLD);
+        List<Region> out = new ArrayList<>();
+        for (WorldGuardImporter.WgRegion wg : WorldGuardImporter.parseYaml("world", yaml)) {
+            out.add(WorldGuardImporter.convert(wg, "wg-2", SCOPE, this::lookup, report));
+        }
+        return out;
+    }
+
+    @Test
+    void aGlobalRegionWithPassthroughDenyLetsOnlyItsMembersBuild() throws InvalidConfigurationException {
+        WorldIndex index = compile(importedProtectedWorld());
+
+        assertThat(check(index, 500, 60, 500, "break", player(STRANGER))).isEqualTo(Verdict.DENY);
+        assertThat(check(index, 500, 60, 500, "place", player(STRANGER))).isEqualTo(Verdict.DENY);
+        assertThat(check(index, 500, 60, 500, "break", player(MEMBER))).isEqualTo(Verdict.ALLOW);
+    }
+
+    @Test
+    void aFlagSetOnTheRegionBeatsTheMembershipDefault() throws InvalidConfigurationException {
+        WorldIndex index = compile(importedProtectedWorld());
+
+        assertThat(check(index, 500, 60, 500, "use", player(STRANGER))).isEqualTo(Verdict.ALLOW);
+        assertThat(check(index, 500, 60, 500, "use.container", player(STRANGER)))
+                .isEqualTo(Verdict.DENY);
+        assertThat(check(index, 5, 5, 5, "break", player(MEMBER))).isEqualTo(Verdict.DENY);
+        assertThat(check(index, 5, 5, 5, "place", player(MEMBER))).isEqualTo(Verdict.ALLOW);
+    }
+
+    @Test
+    void aGlobalRegionWithoutPassthroughLeavesBuildingOpen() throws InvalidConfigurationException {
+        WorldIndex index = compile(imported());
+
+        assertThat(check(index, 500, 60, 500, "break", player(STRANGER))).isNotEqualTo(Verdict.DENY);
+    }
 }
