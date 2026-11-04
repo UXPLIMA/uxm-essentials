@@ -13,14 +13,19 @@ import org.bukkit.command.Command;
 import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.EntityType;
+import org.bukkit.entity.Firework;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.entity.CreatureSpawnEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
+import org.bukkit.event.entity.EntityDeathEvent;
 import org.bukkit.event.entity.EntityPotionEffectEvent;
 import org.bukkit.event.entity.EntityToggleGlideEvent;
+import org.bukkit.event.entity.FoodLevelChangeEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
@@ -54,8 +59,42 @@ public final class BehaviourListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDamage(EntityDamageEvent event) {
-        if (event.getEntity() instanceof Player player && on(player, BehaviourKey.INVINCIBLE)) {
+        if (event.getEntity() instanceof Player player
+                && (on(player, BehaviourKey.INVINCIBLE)
+                        || (event.getCause() == EntityDamageEvent.DamageCause.FALL
+                                && off(player, BehaviourKey.FALL_DAMAGE)))) {
             event.setCancelled(true);
+            return;
+        }
+        if (event instanceof EntityDamageByEntityEvent byEntity
+                && byEntity.getDamager() instanceof Firework
+                && offAt(event.getEntity().getLocation(), BehaviourKey.FIREWORK_DAMAGE)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onHunger(FoodLevelChangeEvent event) {
+        if (event.getEntity() instanceof Player player
+                && event.getFoodLevel() < player.getFoodLevel()
+                && off(player, BehaviourKey.HUNGER)) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onBlockExp(BlockBreakEvent event) {
+        if (event.getExpToDrop() > 0 && offAt(event.getBlock().getLocation(), BehaviourKey.EXP_DROPS)) {
+            event.setExpToDrop(0);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onMobExp(EntityDeathEvent event) {
+        if (!(event.getEntity() instanceof Player)
+                && event.getDroppedExp() > 0
+                && offAt(event.getEntity().getLocation(), BehaviourKey.EXP_DROPS)) {
+            event.setDroppedExp(0);
         }
     }
 
@@ -149,8 +188,8 @@ public final class BehaviourListener implements Listener {
             return;
         }
         String root = CommandWords.bare(typed);
-        boolean denied = deny.isPresent() && CommandWords.matches(deny.get(), typed, args, lookup);
-        if (!denied && allow.isPresent() && !CommandWords.matches(allow.get(), typed, args, lookup)) {
+        boolean denied = deny.isPresent() && CommandWords.denies(deny.get(), typed, args, lookup);
+        if (!denied && allow.isPresent() && !CommandWords.allows(allow.get(), typed, args, lookup)) {
             denied = true;
         }
         if (denied) {
@@ -165,6 +204,17 @@ public final class BehaviourListener implements Listener {
 
     private boolean on(Player player, BehaviourKey key) {
         return tracks.behaviour(player, key).map(Boolean::parseBoolean).orElse(false);
+    }
+
+    /** True when the region the player stands in turns {@code key} off; unset keeps the game's own behaviour. */
+    private boolean off(Player player, BehaviourKey key) {
+        return tracks.behaviour(player, key).filter("false"::equals).isPresent();
+    }
+
+    /** True when the region at {@code at} turns {@code key} off, for what happens to blocks and mobs. */
+    private boolean offAt(Location at, BehaviourKey key) {
+        RegionSet set = guard.at(at);
+        return set != null && set.behaviour(key).filter("false"::equals).isPresent();
     }
 
     private boolean denySpawn(Location at, EntityType type, CreatureSpawnEvent.SpawnReason reason) {

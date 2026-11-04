@@ -47,37 +47,47 @@ class CommandWordsTest {
 
     @Test
     void anEntryCatchesTheCommandTypedByAnyAlias() {
-        assertThat(CommandWords.matches("spawn, home", "h", "", CommandWordsTest::named))
+        assertThat(CommandWords.denies("spawn, home", "h", "", CommandWordsTest::named))
                 .isTrue();
-        assertThat(CommandWords.matches("spawn, home", "uxmessentials:home", "", CommandWordsTest::named))
+        assertThat(CommandWords.denies("spawn, home", "uxmessentials:home", "", CommandWordsTest::named))
                 .isTrue();
-        assertThat(CommandWords.matches("spawn, home", "wp", "", CommandWordsTest::named))
+        assertThat(CommandWords.denies("spawn, home", "wp", "", CommandWordsTest::named))
                 .isFalse();
     }
 
     @Test
     void anEntryWrittenAsAnAliasCatchesTheCommandTypedByName() {
-        assertThat(CommandWords.matches("h", "home", "base", CommandWordsTest::named))
+        assertThat(CommandWords.denies("h", "home", "base", CommandWordsTest::named))
                 .isTrue();
     }
 
     @Test
     void anEntryWithArgumentsNeedsThoseLeadingArguments() {
-        assertThat(CommandWords.matches("warp_vip", "wp", "vip", CommandWordsTest::named))
+        assertThat(CommandWords.denies("warp_vip", "wp", "vip", CommandWordsTest::named))
                 .isTrue();
-        assertThat(CommandWords.matches("warp_vip", "warp", "vip now", CommandWordsTest::named))
+        assertThat(CommandWords.denies("warp_vip", "warp", "vip now", CommandWordsTest::named))
                 .isTrue();
-        assertThat(CommandWords.matches("warp_vip", "warp", "vipshop", CommandWordsTest::named))
+        assertThat(CommandWords.denies("warp_vip", "warp", "vipshop", CommandWordsTest::named))
                 .isFalse();
-        assertThat(CommandWords.matches("warp_vip", "warp", "", CommandWordsTest::named))
+        assertThat(CommandWords.denies("warp_vip", "warp", "", CommandWordsTest::named))
                 .isFalse();
     }
 
     @Test
-    void anotherPluginsCommandSharingANameIsNotTheListedCommand() {
-        assertThat(CommandWords.matches("home", "otherplugin:home", "", CommandWordsTest::named))
+    void aDenyListBlocksEveryCommandSharingAName() {
+        assertThat(CommandWords.denies("home", "otherplugin:home", "", CommandWordsTest::named))
+                .isTrue();
+        assertThat(CommandWords.denies("spawn", "trick", "", CommandWordsTest::named))
+                .isTrue();
+    }
+
+    @Test
+    void anAllowListPassesOnlyTheListedPluginsCommand() {
+        assertThat(CommandWords.allows("home", "h", "", CommandWordsTest::named))
+                .isTrue();
+        assertThat(CommandWords.allows("home", "otherplugin:home", "", CommandWordsTest::named))
                 .isFalse();
-        assertThat(CommandWords.matches("spawn", "trick", "", CommandWordsTest::named))
+        assertThat(CommandWords.allows("spawn", "trick", "", CommandWordsTest::named))
                 .isFalse();
     }
 
@@ -91,7 +101,7 @@ class CommandWordsTest {
 
     @Test
     void emptyEntriesNeverMatch() {
-        assertThat(CommandWords.matches(" , ,", "home", "", CommandWordsTest::named))
+        assertThat(CommandWords.denies(" , ,", "home", "", CommandWordsTest::named))
                 .isFalse();
     }
 }

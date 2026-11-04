@@ -16,11 +16,12 @@ import org.jspecify.annotations.Nullable;
  * also catches {@code /h} and {@code /uxmessentials:home}: a list that only knew the typed word would let every
  * alias through.
  *
- * <p>Two words name the same command when they belong to the same owner (the plugin that registered them, or the
- * server for its own commands) and share a name. On Paper an alias is its own command entry that knows nothing of
- * the command it points at, while the command lists its aliases, so names are compared both ways. The owner is
- * what keeps a third plugin out: its {@code /other:home}, or an alias it declares called {@code guard}, shares a
- * name but not the owner, so it neither passes an allow list nor slips under the {@code /guard} exemption.
+ * <p>On Paper an alias is its own command entry that knows nothing of the command it points at, while the command
+ * lists its aliases, so names are compared both ways. How strict the comparison is depends on which way a mistake
+ * would fail. A deny list blocks any command sharing a name with an entry, whoever registered it, so
+ * {@code /other:home} is blocked by {@code home} too. An allow list and the {@code /guard} exemption also need the
+ * same owner (the plugin that registered the command, or the server for its own), so a third plugin's command
+ * that merely declares a matching alias neither passes an allow list nor slips under the exemption.
  */
 public final class CommandWords {
 
@@ -40,15 +41,24 @@ public final class CommandWords {
     }
 
     /**
-     * True when one entry of {@code list} names the typed command and, when the entry has arguments, the typed
-     * arguments begin with them.
+     * True when one entry of a deny list names the typed command: any shared name, whoever owns it.
      *
      * @param list the comma separated entries, as the behaviour stores them
      * @param typed the command word as typed, lower case, with or without a namespace
      * @param args what was typed after the command word, lower case; empty when nothing was
      * @param lookup how the server knows a command word
      */
-    public static boolean matches(String list, String typed, String args, Function<String, Named> lookup) {
+    public static boolean denies(String list, String typed, String args, Function<String, Named> lookup) {
+        return matches(list, typed, args, lookup, false);
+    }
+
+    /** True when one entry of an allow list names the typed command: a shared name and the same owner. */
+    public static boolean allows(String list, String typed, String args, Function<String, Named> lookup) {
+        return matches(list, typed, args, lookup, true);
+    }
+
+    private static boolean matches(
+            String list, String typed, String args, Function<String, Named> lookup, boolean sameOwner) {
         Named command = lookup.apply(typed);
         for (String raw : list.split(",", -1)) {
             String entry = raw.strip().replace('_', ' ').toLowerCase(Locale.ROOT);
@@ -58,7 +68,9 @@ public final class CommandWords {
             int space = entry.indexOf(' ');
             String word = space < 0 ? entry : entry.substring(0, space);
             String wantedArgs = space < 0 ? "" : entry.substring(space + 1).strip();
-            if (!same(command, lookup.apply(word))) {
+            Named listed = lookup.apply(word);
+            boolean named = sameOwner ? same(command, listed) : !Collections.disjoint(command.names(), listed.names());
+            if (!named) {
                 continue;
             }
             if (wantedArgs.isEmpty() || args.equals(wantedArgs) || args.startsWith(wantedArgs + " ")) {

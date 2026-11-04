@@ -355,7 +355,12 @@ public final class GuardRuntime {
         }
         long now = clock.millis();
         Long last = lastDenyMessage.get(player.getUniqueId());
-        if (last == null || now - last >= config().denyCooldown().toMillis()) {
+        boolean silenced = !index.locked()
+                && index.at(x, y, z)
+                        .behaviour(BehaviourKey.DENY_MESSAGES)
+                        .filter("false"::equals)
+                        .isPresent();
+        if (!silenced && (last == null || now - last >= config().denyCooldown().toMillis())) {
             lastDenyMessage.put(player.getUniqueId(), now);
             if (index.locked()) {
                 send(player, GuardMessageKey.DENY_LOCKED_WORLD, Map.of(), config().denyChannel());

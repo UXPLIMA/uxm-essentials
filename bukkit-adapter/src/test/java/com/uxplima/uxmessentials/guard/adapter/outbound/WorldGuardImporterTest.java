@@ -66,6 +66,13 @@ class WorldGuardImporterTest {
                 type: global
                 flags:
                   fire-spread: deny
+                  fall-damage: deny
+                  natural-hunger-drain: deny
+                  exp-drops: deny
+                  firework-damage: deny
+                  deny-message: ''
+                  lava-harden: deny
+                  entity-item-frame-destroy: deny
             """.formatted(OWNER, MEMBER);
 
     private final List<String> report = new ArrayList<>();
@@ -168,5 +175,25 @@ class WorldGuardImporterTest {
 
         assertThat(report).anyMatch(line -> line.contains("Ghost"));
         assertThat(report).anyMatch(line -> line.contains("some-plugin-flag"));
+    }
+
+    @Test
+    void aQuietLobbyGlobalRegionConvertsWhole() throws InvalidConfigurationException {
+        List<Region> regions = imported();
+        Region global = regions.stream()
+                .filter(r -> r.id().value().equals("wg-global"))
+                .findFirst()
+                .orElseThrow();
+        WorldIndex index = compile(regions);
+
+        assertThat(global.behaviours().get(BehaviourKey.FALL_DAMAGE)).contains("false");
+        assertThat(global.behaviours().get(BehaviourKey.HUNGER)).contains("false");
+        assertThat(global.behaviours().get(BehaviourKey.EXP_DROPS)).contains("false");
+        assertThat(global.behaviours().get(BehaviourKey.FIREWORK_DAMAGE)).contains("false");
+        assertThat(global.behaviours().get(BehaviourKey.DENY_MESSAGES)).contains("false");
+        assertThat(check(index, 500, 60, 500, "world.form", GuardSubject.WORLD)).isEqualTo(Verdict.DENY);
+        assertThat(check(index, 500, 60, 500, "world.mob.other", GuardSubject.WORLD))
+                .isEqualTo(Verdict.DENY);
+        assertThat(report).noneMatch(line -> line.contains("wg-global") || line.contains("__global__"));
     }
 }

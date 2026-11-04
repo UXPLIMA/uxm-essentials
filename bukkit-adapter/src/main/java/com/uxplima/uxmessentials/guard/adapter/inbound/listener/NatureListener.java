@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 import java.util.List;
 import java.util.Objects;
 
+import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -36,6 +37,7 @@ import org.bukkit.event.block.LeavesDecayEvent;
 import org.bukkit.event.block.MoistureChangeEvent;
 import org.bukkit.event.entity.EntityBreakDoorEvent;
 import org.bukkit.event.entity.EntityChangeBlockEvent;
+import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.weather.LightningStrikeEvent;
 import org.bukkit.event.world.PortalCreateEvent;
 import org.bukkit.event.world.StructureGrowEvent;
@@ -284,6 +286,19 @@ public final class NatureListener implements Listener {
         }
         Block block = event.getLightning().getLocation().getBlock();
         if (!at(BuiltInActions.WORLD_LIGHTNING, block)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** A mob or a mob's projectile taking down an item frame or painting; players are the damage family's. */
+    @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
+    public void onHangingBrokenByMob(HangingBreakByEntityEvent event) {
+        if (Causes.player(event.getRemover()) != null) {
+            return;
+        }
+        Location at = event.getEntity().getLocation();
+        if (!guard.allowWorld(
+                BuiltInActions.WORLD_MOB_OTHER, at.getWorld(), at.getBlockX(), at.getBlockY(), at.getBlockZ())) {
             event.setCancelled(true);
         }
     }

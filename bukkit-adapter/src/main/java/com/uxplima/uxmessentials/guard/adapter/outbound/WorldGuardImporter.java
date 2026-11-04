@@ -128,6 +128,9 @@ public final class WorldGuardImporter {
             Map.entry("lava-fire", List.of("world.fire.lava")),
             Map.entry("lightning", List.of("world.lightning", "world.fire.lightning")),
             Map.entry("snow-fall", List.of("world.form")),
+            Map.entry("lava-harden", List.of("world.form")),
+            Map.entry("entity-item-frame-destroy", List.of("world.mob.other")),
+            Map.entry("entity-painting-destroy", List.of("world.mob.other")),
             Map.entry("ice-form", List.of("world.form")),
             Map.entry("frosted-ice-form", List.of("world.form")),
             Map.entry("snow-melt", List.of("world.melt")),
@@ -606,6 +609,18 @@ public final class WorldGuardImporter {
                 out.put(BehaviourKey.FEED, text + " " + Math.max(1, number(flags.getOrDefault("feed-delay", 1))));
             case "heal-delay", "feed-delay" -> {
                 // Read together with the amount above.
+            }
+            case "fall-damage" -> out.put(BehaviourKey.FALL_DAMAGE, String.valueOf(!"deny".equalsIgnoreCase(text)));
+            case "firework-damage" ->
+                out.put(BehaviourKey.FIREWORK_DAMAGE, String.valueOf(!"deny".equalsIgnoreCase(text)));
+            case "natural-hunger-drain" -> out.put(BehaviourKey.HUNGER, String.valueOf(!"deny".equalsIgnoreCase(text)));
+            case "exp-drops" -> out.put(BehaviourKey.EXP_DROPS, String.valueOf(!"deny".equalsIgnoreCase(text)));
+            case "deny-message" -> {
+                // An empty message is how a WorldGuard region goes quiet; a worded one stays the server's own.
+                if (!text.isBlank()) {
+                    return false;
+                }
+                out.put(BehaviourKey.DENY_MESSAGES, "false");
             }
             case "mob-spawning" -> {
                 if ("deny".equalsIgnoreCase(text)) {
