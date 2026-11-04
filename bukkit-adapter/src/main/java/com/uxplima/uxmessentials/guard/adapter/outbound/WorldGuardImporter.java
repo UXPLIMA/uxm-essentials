@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
+import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportKind;
+import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportOutcome;
 import com.uxplima.uxmessentials.guard.application.EditContext;
 import com.uxplima.uxmessentials.guard.application.GuardService;
 import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
@@ -168,9 +170,9 @@ public final class WorldGuardImporter {
             Set<String> ownerNames,
             Set<String> memberNames) {}
 
-    /** Run {@code mode} from {@code source}; answers the one line summary. */
-    public CompletableFuture<String> run(String mode, String source, EditContext ctx) {
-        CompletableFuture<String> future = new CompletableFuture<>();
+    /** Run {@code mode} from {@code source}; answers what happened. */
+    public CompletableFuture<ImportOutcome> run(String mode, String source, EditContext ctx) {
+        CompletableFuture<ImportOutcome> future = new CompletableFuture<>();
         // A thread of its own: the import waits on the service, which works on the async lane.
         Thread worker = new Thread(() -> {
             try {
@@ -185,18 +187,18 @@ public final class WorldGuardImporter {
         return future;
     }
 
-    private String runNow(String mode, String source, EditContext ctx) throws Exception {
+    private ImportOutcome runNow(String mode, String source, EditContext ctx) throws Exception {
         Path folder = plugin.getDataFolder().toPath().resolve("guard");
         Files.createDirectories(folder);
         Path batchFile = folder.resolve("import-batch.txt");
         if (mode.equals("undo")) {
             if (!Files.exists(batchFile)) {
-                return "nothing to undo";
+                return new ImportOutcome(ImportKind.NOTHING_TO_UNDO, 0, 0, 0, 0, 0);
             }
             String batch = Files.readString(batchFile, StandardCharsets.UTF_8).strip();
             int removed = service.removeBatch(batch, ctx).get();
             Files.deleteIfExists(batchFile);
-            return "removed " + removed + " imported regions (batch " + batch + ")";
+            return new ImportOutcome(ImportKind.UNDONE, removed, 0, 0, 0, 0);
         }
         List<WgRegion> read = source.equals("sql") ? readSql() : readYaml();
         String batch = "wg-" + Instant.now().toEpochMilli();
@@ -220,14 +222,13 @@ public final class WorldGuardImporter {
         Path reportFile = folder.resolve("import-report.txt");
         Files.write(reportFile, header, StandardCharsets.UTF_8);
         if (!mode.equals("run")) {
-            return converted.size() + " regions would be imported (" + rules + " rules, " + behaviours
-                    + " behaviours, " + report.size() + " notes); see plugins/uxmEssentials/guard/import-report.txt";
+            return new ImportOutcome(ImportKind.DRY_RUN, converted.size(), rules, behaviours, report.size(), 0);
         }
         backups.write(service.all(), "before-import", service.config().backupsKept());
         List<RegionKey> skipped = service.importRegions(converted, ctx).get();
         Files.writeString(batchFile, batch, StandardCharsets.UTF_8);
-        return (converted.size() - skipped.size()) + " regions imported, " + skipped.size()
-                + " skipped because the id exists; undo with /guard import worldguard undo";
+        return new ImportOutcome(ImportKind.IMPORTED, converted.size() - skipped.size(), rules, behaviours,
+                report.size(), skipped.size());
     }
 
     // ---- reading ------------------------------------------------------------------------------------------------

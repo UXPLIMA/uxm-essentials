@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.guard.adapter.movement;
 
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import java.util.Map;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import java.util.Objects;
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
@@ -86,6 +88,9 @@ public final class MovementListener implements Listener {
         Location at = player.getLocation();
         if (at != null) {
             tracks.placed(player, at);
+        }
+        if (guard.service().loadFailed() && player.hasPermission(GuardRuntime.NOTIFY_PERMISSION)) {
+            guard.send(player, GuardMessageKey.LOCKED_WORLD_STAFF, Map.of(), "chat");
         }
     }
 

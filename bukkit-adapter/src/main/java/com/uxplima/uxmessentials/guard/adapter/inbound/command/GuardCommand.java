@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -118,8 +119,28 @@ public final class GuardCommand implements CommandRegistration {
 
     /** Whatever runs the WorldGuard import; kept behind an interface so the command does not know its files. */
     public interface GuardImports {
-        /** Run {@code mode} (dry-run, run, undo) from {@code source} (yaml or sql) and answer a report line. */
-        CompletableFuture<String> run(String mode, String source, EditContext ctx);
+        /** Run {@code mode} (dry-run, run, undo) from {@code source} (yaml or sql) and answer what happened. */
+        CompletableFuture<ImportOutcome> run(String mode, String source, EditContext ctx);
+    }
+
+    /**
+     * What an import did, for the player's message; the full report goes to a file.
+     *
+     * @param kind what was done
+     * @param regions regions imported, would be imported, or removed by an undo
+     * @param rules rules converted
+     * @param behaviours behaviours converted
+     * @param notes report lines (flags not converted, unknown names, skipped regions)
+     * @param skipped regions skipped because the id already exists
+     */
+    public record ImportOutcome(ImportKind kind, int regions, int rules, int behaviours, int notes, int skipped) {}
+
+    /** The four ways an import ends. */
+    public enum ImportKind {
+        NOTHING_TO_UNDO,
+        UNDONE,
+        DRY_RUN,
+        IMPORTED
     }
 
     @Override
@@ -324,18 +345,20 @@ public final class GuardCommand implements CommandRegistration {
         Region r = region.get();
         feedback.send(sender, GuardMessageKey.INFO_HEADER, Map.of("region", r.id().value(), "world", r.world()));
         Bounds b = r.shape().bounds();
-        line(sender, "shape", r.shape().kind() + (r.shape() instanceof Shape.Global ? ""
+        line(sender, GuardMessageKey.INFO_SHAPE, r.shape().kind() + (r.shape() instanceof Shape.Global ? ""
                 : " " + b.minX() + "," + b.minY() + "," + b.minZ() + " .. " + b.maxX() + "," + b.maxY() + ","
                         + b.maxZ()));
-        line(sender, "scope", r.scope().value());
-        line(sender, "priority", String.valueOf(r.priority()));
-        line(sender, "parent", r.parent() == null ? "-" : r.parent().value());
-        line(sender, "family", r.family() == null ? "-" : r.family());
-        line(sender, "template", r.template() == null ? "-" : r.template());
-        line(sender, "tags", r.tags().isEmpty() ? "-" : String.join(", ", r.tags()));
-        line(sender, "locked", String.valueOf(r.locked()));
+        line(sender, GuardMessageKey.INFO_SCOPE, r.scope().value());
+        line(sender, GuardMessageKey.INFO_PRIORITY, String.valueOf(r.priority()));
+        line(sender, GuardMessageKey.INFO_PARENT, r.parent() == null ? "-" : r.parent().value());
+        line(sender, GuardMessageKey.INFO_FAMILY, r.family() == null ? "-" : r.family());
+        line(sender, GuardMessageKey.INFO_TEMPLATE, r.template() == null ? "-" : r.template());
+        line(sender, GuardMessageKey.INFO_TAGS, r.tags().isEmpty() ? "-" : String.join(", ", r.tags()));
+        if (r.locked()) {
+            feedback.send(sender, GuardMessageKey.INFO_LOCKED);
+        }
         for (Rule rule : r.rules()) {
-            line(sender, "rule", rule.toString());
+            line(sender, GuardMessageKey.INFO_RULE, rule.toString());
         }
         r.behaviours().asMap().forEach((k, v) -> line(sender, k.key(), v));
         Map<RoleName, List<String>> byRole = new LinkedHashMap<>();
@@ -925,15 +948,20 @@ public final class GuardCommand implements CommandRegistration {
         }
         int n = 1;
         for (Explanation.Step step : explanation.steps()) {
-            feedback.send(sender, GuardMessageKey.WHY_STEP, Map.of(
+            GuardMessageKey stepKey = switch (step.origin()) {
+                case "world-defaults" -> GuardMessageKey.WHY_STEP_DEFAULTS;
+                case "inherited" -> GuardMessageKey.WHY_STEP_INHERITED;
+                case "none" -> GuardMessageKey.WHY_STEP_NONE;
+                default -> GuardMessageKey.WHY_STEP;
+            };
+            feedback.send(sender, stepKey, Map.of(
                     "n", String.valueOf(n++),
                     "region", step.region().id().value(),
                     "priority", String.valueOf(step.priority()),
                     "role", step.role() == null ? "-" : step.role().value(),
                     "node", step.node() == null ? "-" : step.node().value(),
-                    "rule", step.rule() == null ? "-" : step.rule().toString(),
+                    "rule", step.rule() == null ? "-" : StyledText.escape(step.rule().toString()),
                     "result", step.result().name().toLowerCase(Locale.ROOT),
-                    "origin", step.origin(),
                     "mark", step.decisive() ? "*" : ""));
         }
         feedback.send(sender, GuardMessageKey.WHY_RESULT,
@@ -1051,7 +1079,18 @@ public final class GuardCommand implements CommandRegistration {
             if (error != null) {
                 feedback.send(sender, GuardMessageKey.IMPORT_FAILED, Map.of("error", String.valueOf(error.getMessage())));
             } else {
-                feedback.send(sender, GuardMessageKey.IMPORT_REPORT, Map.of("report", report));
+                Map<String, String> values = Map.of(
+                        "regions", String.valueOf(report.regions()),
+                        "rules", String.valueOf(report.rules()),
+                        "behaviours", String.valueOf(report.behaviours()),
+                        "notes", String.valueOf(report.notes()),
+                        "skipped", String.valueOf(report.skipped()));
+                feedback.send(sender, switch (report.kind()) {
+                    case NOTHING_TO_UNDO -> GuardMessageKey.IMPORT_NOTHING;
+                    case UNDONE -> GuardMessageKey.IMPORT_UNDONE;
+                    case DRY_RUN -> GuardMessageKey.IMPORT_REPORT;
+                    case IMPORTED -> GuardMessageKey.IMPORT_DONE;
+                }, values);
             }
         });
     }
@@ -1063,7 +1102,7 @@ public final class GuardCommand implements CommandRegistration {
                 "list", "here", "near", "why <action>", "test <player> <action> [region]", "show", "history",
                 "undo <id>", "bypass", "inspect", "status", "actions [prefix]", "import worldguard dry-run")) {
             if (sender.hasPermission(BASE + line.split(" ", 2)[0])) {
-                feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", "/guard " + line));
+                feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", StyledText.escape("/guard " + line)));
             }
         }
     }
@@ -1220,7 +1259,12 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     private void line(CommandSender sender, String label, String value) {
-        feedback.send(sender, GuardMessageKey.INFO_LINE, Map.of("label", label, "value", value));
+        feedback.send(sender, GuardMessageKey.INFO_LINE,
+                Map.of("label", StyledText.escape(label), "value", StyledText.escape(value)));
+    }
+
+    private void line(CommandSender sender, GuardMessageKey key, String value) {
+        feedback.send(sender, key, Map.of("value", StyledText.escape(value)));
     }
 
     private List<String> regionIds(CommandSender sender) {

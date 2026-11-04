@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.guard.adapter.outbound.FileGuardBackups;
 import com.uxplima.uxmessentials.guard.adapter.outbound.RegionDisplay;
 import com.uxplima.uxmessentials.guard.adapter.outbound.WorldGuardImporter;
 import com.uxplima.uxmessentials.guard.application.GuardConfig;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.application.GuardService;
 import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
@@ -33,6 +34,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
@@ -148,6 +150,15 @@ public final class GuardWiring {
         });
 
         var loaded = service.load().whenComplete((ok, error) -> {
+            if (service.loadFailed()) {
+                kernel.scheduler().onGlobal(() -> {
+                    for (Player player : plugin.getServer().getOnlinePlayers()) {
+                        if (player.hasPermission(GuardRuntime.NOTIFY_PERMISSION)) {
+                            runtime.send(player, GuardMessageKey.LOCKED_WORLD_STAFF, Map.of(), "chat");
+                        }
+                    }
+                });
+            }
             if (error == null && !service.loadFailed()) {
                 try {
                     backups.write(service.all(), "start", config.backupsKept());
