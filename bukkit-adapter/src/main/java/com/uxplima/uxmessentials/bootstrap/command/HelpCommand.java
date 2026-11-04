@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.CommandGates;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -90,7 +91,7 @@ public final class HelpCommand implements CommandRegistration {
         List<HelpEntry> out = new ArrayList<>();
         for (CommandRegistration registration : commands.get()) {
             LiteralCommandNode<CommandSourceStack> node = registration.build();
-            if (!node.canUse(source)) {
+            if (!CommandGates.shows(node, source)) {
                 continue;
             }
             String description = CommandDescriptions.of(
