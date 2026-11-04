@@ -49,7 +49,15 @@ public final class InteractListener implements Listener {
         if (event.getAction() == Action.PHYSICAL) {
             if (block != null
                     && event.useInteractedBlock() != Event.Result.DENY
-                    && !guard.allow(player, physical(block.getType()), block)) {
+                    && !guard.allow(
+                            player,
+                            physical(block.getType()),
+                            block.getWorld(),
+                            block.getX(),
+                            block.getY(),
+                            block.getZ(),
+                            false)) {
+                // Standing on a plate or an egg fires every tick: the refusal stays quiet, like a pickup.
                 event.setUseInteractedBlock(Event.Result.DENY);
                 event.setCancelled(true);
             }

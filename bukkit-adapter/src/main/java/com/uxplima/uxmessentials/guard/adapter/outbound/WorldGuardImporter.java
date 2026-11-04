@@ -136,7 +136,7 @@ public final class WorldGuardImporter {
             Map.entry("snow-melt", List.of("world.melt")),
             Map.entry("ice-melt", List.of("world.melt")),
             Map.entry("frosted-ice-melt", List.of("world.melt")),
-            Map.entry("mushroom-growth", List.of("world.grow.other")),
+            Map.entry("mushroom-growth", List.of("world.spread")),
             Map.entry("leaf-decay", List.of("world.decay")),
             Map.entry("grass-growth", List.of("world.spread")),
             Map.entry("mycelium-spread", List.of("world.spread")),
