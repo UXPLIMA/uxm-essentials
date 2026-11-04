@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -33,6 +34,7 @@ import com.uxplima.uxmessentials.guard.adapter.movement.PlayerTracks;
 import com.uxplima.uxmessentials.guard.adapter.outbound.FileGuardBackups;
 import com.uxplima.uxmessentials.guard.adapter.outbound.RegionDisplay;
 import com.uxplima.uxmessentials.guard.adapter.outbound.WorldGuardImporter;
+import com.uxplima.uxmessentials.guard.application.EditContext;
 import com.uxplima.uxmessentials.guard.application.GuardConfig;
 import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.application.GuardService;
@@ -41,6 +43,7 @@ import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardSync;
 import com.uxplima.uxmessentials.guard.application.port.GuardWorlds;
 import com.uxplima.uxmessentials.guard.domain.GuardScope;
+import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
 import com.uxplima.uxmessentials.persistence.guard.JooqGuardStore;
@@ -228,6 +231,46 @@ public final class GuardWiring {
         };
         BiConsumer<Player, Runnable> onPlayer =
                 (player, task) -> kernel.scheduler().onEntity(BukkitRefs.toRef(player), task);
+        GuardCommand.GuardBackupFiles backupFiles = new GuardCommand.GuardBackupFiles() {
+            @Override
+            public CompletableFuture<List<String>> list() {
+                CompletableFuture<List<String>> names = new CompletableFuture<>();
+                kernel.scheduler().async(() -> {
+                    try {
+                        names.complete(backups.list());
+                    } catch (RuntimeException e) {
+                        names.completeExceptionally(e);
+                    }
+                });
+                return names;
+            }
+
+            @Override
+            public CompletableFuture<Optional<GuardCommand.Restored>> restore(String name, EditContext ctx) {
+                CompletableFuture<Optional<GuardCommand.Restored>> done = new CompletableFuture<>();
+                kernel.scheduler().async(() -> {
+                    try {
+                        if (!backups.list().contains(name)) {
+                            done.complete(Optional.empty());
+                            return;
+                        }
+                        List<Region> wanted = backups.read(name);
+                        String before = backups.write(service.all(), "before-restore", config.backupsKept());
+                        var unused = service.restoreBackup(wanted, ctx).whenComplete((outcome, error) -> {
+                            if (error != null) {
+                                done.completeExceptionally(error);
+                            } else {
+                                done.complete(Optional.of(new GuardCommand.Restored(outcome, before)));
+                            }
+                        });
+                    } catch (RuntimeException e) {
+                        warn.accept("guard backup restore failed: " + e.getMessage());
+                        done.completeExceptionally(e);
+                    }
+                });
+                return done;
+            }
+        };
         GuardCommand command = new GuardCommand(
                 runtime,
                 selections,
@@ -235,6 +278,7 @@ public final class GuardWiring {
                 tracks,
                 new CommandFeedback(kernel.messages()),
                 importer::run,
+                backupFiles,
                 openMenu,
                 () -> {
                     ctx.config().reload();

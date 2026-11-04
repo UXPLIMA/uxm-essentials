@@ -379,6 +379,11 @@ final class ContentPermissions {
                         PermissionDefault.OP,
                         GUARD),
                 PermissionSpec.of(
+                        "uxmessentials.guard.backups",
+                        "/guard backups [restore <file>]: list the region backups, or put a backup's regions back.",
+                        PermissionDefault.OP,
+                        GUARD),
+                PermissionSpec.of(
                         "uxmessentials.guard.reload",
                         "/guard reload: reload the guard config and recompile every world.",
                         PermissionDefault.OP,

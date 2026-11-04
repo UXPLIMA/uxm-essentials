@@ -41,8 +41,19 @@ public final class FileGuardBackups implements GuardBackups {
         String name = STAMP.format(clock.instant()) + "-" + safeReason + ".json";
         try {
             Files.createDirectories(folder);
+            List<Region> ordered = regions.stream()
+                    .sorted(Comparator.comparing((Region r) -> r.world()).thenComparing(r -> r.id().value()))
+                    .toList();
+            String content = RegionJson.writeAll(ordered);
+            // A copy of what the newest backup already holds would only push an older, different one out of the
+            // kept window, which is what makes frequent restarts eat the history; answer the newest instead.
+            List<String> existing = list();
+            if (!existing.isEmpty()
+                    && content.equals(Files.readString(folder.resolve(existing.get(0)), StandardCharsets.UTF_8))) {
+                return existing.get(0);
+            }
             Path temp = folder.resolve(name + ".tmp");
-            Files.writeString(temp, RegionJson.writeAll(regions), StandardCharsets.UTF_8);
+            Files.writeString(temp, content, StandardCharsets.UTF_8);
             Files.move(temp, folder.resolve(name), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
             List<String> all = list();
             for (int i = keep; i < all.size(); i++) {

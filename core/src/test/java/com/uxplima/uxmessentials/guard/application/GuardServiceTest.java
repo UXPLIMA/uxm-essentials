@@ -192,6 +192,44 @@ class GuardServiceTest {
     }
 
     @Test
+    void aBackupPutsItsRegionsBackAndKeepsRegionsMadeSince() {
+        GuardService service = server("lobby");
+        done(service.create(SPAWN, BOX, null, STAFF));
+        done(service.edit(SPAWN, "rule", r -> r.withRule(rule("break", "everyone", Effect.DENY)), STAFF));
+        List<Region> backup = service.all();
+        RegionKey later = new RegionKey(WORLD, RegionId.of("later"));
+        done(service.remove(SPAWN, STAFF));
+        done(service.create(later, new Shape.Cuboid(Bounds.of(100, 0, 100, 110, 10, 110)), null, STAFF));
+
+        GuardService.RestoreOutcome outcome = done(service.restoreBackup(backup, STAFF));
+
+        assertThat(outcome).isEqualTo(new GuardService.RestoreOutcome(1, 0, 0));
+        assertThat(breakAt(service, 5, 5, 5)).isEqualTo(Verdict.DENY);
+        assertThat(service.region(later)).isPresent();
+        assertThat(done(service.history(SPAWN, 0, 10)))
+                .extracting(HistoryEntry::change)
+                .first()
+                .isEqualTo("backup-restore");
+    }
+
+    @Test
+    void aBackupLeavesALockedRegionToThoseAllowedToEditIt() {
+        GuardService service = server("lobby");
+        done(service.create(SPAWN, BOX, null, ADMIN));
+        List<Region> backup = service.all();
+        done(service.edit(SPAWN, "rule", r -> r.withRule(rule("break", "everyone", Effect.DENY)), ADMIN));
+        done(service.edit(SPAWN, "lock", r -> r.withLocked(true), ADMIN));
+
+        GuardService.RestoreOutcome refused = done(service.restoreBackup(backup, STAFF));
+        assertThat(refused).isEqualTo(new GuardService.RestoreOutcome(0, 0, 1));
+        assertThat(breakAt(service, 5, 5, 5)).isEqualTo(Verdict.DENY);
+
+        GuardService.RestoreOutcome allowed = done(service.restoreBackup(backup, ADMIN));
+        assertThat(allowed).isEqualTo(new GuardService.RestoreOutcome(1, 0, 0));
+        assertThat(breakAt(service, 5, 5, 5)).isEqualTo(Verdict.UNSET);
+    }
+
+    @Test
     void aStoreThatCannotBeReadLocksEveryWorldInsteadOfLeavingItOpen() {
         store.failLoad = true;
         GuardService service = server("lobby");

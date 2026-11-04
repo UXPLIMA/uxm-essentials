@@ -328,6 +328,57 @@ public final class GuardService {
         });
     }
 
+    /**
+     * What a backup restore did.
+     *
+     * @param restored regions put back as the backup has them, created again or changed back
+     * @param unchanged regions already as the backup has them
+     * @param skipped locked regions left alone because the editor may not change locked regions, or regions of a
+     *     world or set this server does not load
+     */
+    public record RestoreOutcome(int restored, int unchanged, int skipped) {}
+
+    /**
+     * Put every region of a backup back as the backup has it. Regions made since the backup are kept, so nothing
+     * is lost without a trace; each change is written to the history like any edit, so one region can be undone.
+     */
+    public CompletableFuture<RestoreOutcome> restoreBackup(List<Region> backup, EditContext ctx) {
+        return run(() -> {
+            synchronized (lock) {
+                int restored = 0;
+                int unchanged = 0;
+                int skipped = 0;
+                Set<String> touched = new HashSet<>();
+                for (Region wanted : backup) {
+                    Region current = regions.get(wanted.key());
+                    if (wanted.equals(current)) {
+                        unchanged++;
+                        continue;
+                    }
+                    if (!config.loadedScopes().contains(wanted.scope())
+                            || worldLocked(wanted.world())
+                            || ((current != null && current.locked()) && !ctx.mayEditLocked())) {
+                        skipped++;
+                        continue;
+                    }
+                    try {
+                        store.write(current, wanted, ctx.actor(), "backup-restore");
+                    } catch (RuntimeException e) {
+                        warn.accept("guard: could not restore " + wanted.key() + ": " + e.getMessage());
+                        skipped++;
+                        continue;
+                    }
+                    regions.put(wanted.key(), wanted);
+                    touched.add(wanted.world());
+                    sync.changed(wanted.scope(), wanted.key());
+                    restored++;
+                }
+                touched.forEach(this::compileWorld);
+                return new RestoreOutcome(restored, unchanged, skipped);
+            }
+        });
+    }
+
     /** Remove every region an import batch created; answers how many. */
     public CompletableFuture<Integer> removeBatch(String batch, EditContext ctx) {
         return run(() -> {

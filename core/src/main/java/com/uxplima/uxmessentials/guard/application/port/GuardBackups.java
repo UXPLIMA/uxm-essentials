@@ -4,7 +4,7 @@ import java.util.List;
 
 import com.uxplima.uxmessentials.guard.domain.Region;
 
-/** Region backups as files: written on start and before an import, read back by an import undo. */
+/** Region backups as files: written on start, before an import and before a restore; read back by a restore. */
 public interface GuardBackups {
 
     /** Write a backup and return its name; keeps the newest {@code keep} files. */

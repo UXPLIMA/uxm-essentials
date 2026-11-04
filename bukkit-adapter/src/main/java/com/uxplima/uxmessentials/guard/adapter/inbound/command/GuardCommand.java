@@ -91,6 +91,7 @@ public final class GuardCommand implements CommandRegistration {
     private final PlayerTracks tracks;
     private final CommandFeedback feedback;
     private final GuardImports imports;
+    private final GuardBackupFiles backups;
     private final Consumer<Player> openMenu;
     private final Runnable reload;
     private final BiConsumer<Player, Runnable> onPlayer;
@@ -103,6 +104,7 @@ public final class GuardCommand implements CommandRegistration {
             PlayerTracks tracks,
             CommandFeedback feedback,
             GuardImports imports,
+            GuardBackupFiles backups,
             Consumer<Player> openMenu,
             Runnable reload,
             BiConsumer<Player, Runnable> onPlayer,
@@ -114,11 +116,27 @@ public final class GuardCommand implements CommandRegistration {
         this.tracks = Objects.requireNonNull(tracks, "tracks");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.imports = Objects.requireNonNull(imports, "imports");
+        this.backups = Objects.requireNonNull(backups, "backups");
         this.openMenu = Objects.requireNonNull(openMenu, "openMenu");
         this.reload = Objects.requireNonNull(reload, "reload");
         this.onPlayer = Objects.requireNonNull(onPlayer, "onPlayer");
         this.rgAlias = rgAlias;
     }
+
+    /** The region backups on disk; kept behind an interface so the command does not know the files. */
+    public interface GuardBackupFiles {
+        /** The backup names, newest first. */
+        CompletableFuture<List<String>> list();
+
+        /**
+         * Put a backup's regions back, after saving the present state as a new backup. Empty when no backup has
+         * that name.
+         */
+        CompletableFuture<Optional<Restored>> restore(String name, EditContext ctx);
+    }
+
+    /** What a backup restore did, and the backup that holds the state before it. */
+    public record Restored(GuardService.RestoreOutcome outcome, String before) {}
 
     /** Whatever runs the WorldGuard import; kept behind an interface so the command does not know its files. */
     public interface GuardImports {
@@ -270,6 +288,7 @@ public final class GuardCommand implements CommandRegistration {
                 s -> List.of("worldguard"),
                 s -> List.of("dry-run", "run", "undo"),
                 s -> List.of("yaml", "sql"));
+        add(subs, "backups", "backups", this::backups, s -> List.of("restore"));
         add(subs, "reload", "reload", (s, a) -> {
             reload.run();
             feedback.send(s, GuardMessageKey.RELOADED);
@@ -1395,6 +1414,41 @@ public final class GuardCommand implements CommandRegistration {
         });
     }
 
+    private void backups(CommandSender sender, String[] args) {
+        if (args.length >= 2 && args[0].equalsIgnoreCase("restore")) {
+            String name = args[1];
+            var ignored = backups.restore(name, ctx(sender)).whenComplete((done, error) -> {
+                if (error != null || done == null) {
+                    feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
+                } else if (done.isEmpty()) {
+                    feedback.send(sender, GuardMessageKey.BACKUPS_NOT_FOUND, Map.of("name", name));
+                } else {
+                    GuardService.RestoreOutcome outcome = done.get().outcome();
+                    feedback.send(
+                            sender,
+                            GuardMessageKey.BACKUPS_RESTORED,
+                            Map.of(
+                                    "name", name,
+                                    "restored", String.valueOf(outcome.restored()),
+                                    "unchanged", String.valueOf(outcome.unchanged()),
+                                    "skipped", String.valueOf(outcome.skipped()),
+                                    "before", done.get().before()));
+                }
+            });
+            return;
+        }
+        var ignored = backups.list().whenComplete((names, error) -> {
+            if (error != null || names == null || names.isEmpty()) {
+                feedback.send(sender, GuardMessageKey.BACKUPS_EMPTY);
+                return;
+            }
+            feedback.send(sender, GuardMessageKey.BACKUPS_HEADER);
+            for (String name : names) {
+                feedback.send(sender, GuardMessageKey.BACKUPS_ENTRY, Map.of("name", name));
+            }
+        });
+    }
+
     private void help(CommandSender sender) {
         feedback.send(sender, GuardMessageKey.HELP_HEADER);
         Map<String, String> nodes = new java.util.HashMap<>();
@@ -1422,7 +1476,8 @@ public final class GuardCommand implements CommandRegistration {
                 "inspect",
                 "status",
                 "actions [prefix]",
-                "import worldguard <dry-run|run|undo>")) {
+                "import worldguard <dry-run|run|undo>",
+                "backups [restore <file>]")) {
             String node = nodes.get(line.split(" ", 2)[0]);
             if (node != null && sender.hasPermission(node)) {
                 feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", StyledText.escape("/guard " + line)));
