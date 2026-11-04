@@ -929,7 +929,7 @@ public final class GuardCommand implements CommandRegistration {
             } else {
                 feedback.send(player, on.get() ? GuardMessageKey.BYPASS_ON : GuardMessageKey.BYPASS_OFF);
                 // Behaviours that bypass lifts (fly = deny) follow the switch at once, not on the next move.
-                tracks.refresh(player);
+                tracks.reapply(player);
             }
         });
     }

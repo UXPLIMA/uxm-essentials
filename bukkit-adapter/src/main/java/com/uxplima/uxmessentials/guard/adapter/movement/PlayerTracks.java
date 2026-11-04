@@ -197,6 +197,21 @@ public final class PlayerTracks {
         }
     }
 
+    /**
+     * Apply the behaviours where {@code player} stands again, though the regions did not change: for a switch that
+     * changes how they apply, such as bypass. Sends no enter or exit message. Run on the player's thread.
+     */
+    public void reapply(Player player) {
+        Location at = player.getLocation();
+        if (at == null) {
+            return;
+        }
+        Track track = tracks.computeIfAbsent(player.getUniqueId(), id -> new Track());
+        RegionSet here = guard.at(at);
+        track.set = here;
+        apply(player, track, here == null ? Behaviours.empty() : here.behaviours());
+    }
+
     /** The regions changed under everyone: re-apply behaviours for each tracked player. Run per player thread. */
     public void refresh(Player player) {
         Location at = player.getLocation();
