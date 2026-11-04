@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.kits.application;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -129,6 +130,13 @@ public final class KitAccess {
             return Result.err(KitError.REQUIREMENTS_NOT_MET);
         }
         return Result.ok();
+    }
+
+    /** How long {@code who} still waits before claiming {@code kit} again; zero when the kit is ready. */
+    public Duration cooldownLeft(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        return cooldowns.check(who, cooldownKind(who, kit)).asError().orElse(Duration.ZERO);
     }
 
     /** Reserve stock and charge for a kit already past {@link #admissible}; the irreversible part of {@link #admit}. */
