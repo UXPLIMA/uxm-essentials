@@ -66,6 +66,7 @@ public final class PlayerTracks {
         long lastFeed;
         long lastReminder;
         @Nullable Boolean allowFlight;
+        @Nullable Boolean invulnerable;
         @Nullable Float walkSpeed;
         @Nullable Float flySpeed;
         @Nullable GameMode gameMode;
@@ -259,6 +260,18 @@ public final class PlayerTracks {
             }
             track.allowFlight = null;
         }
+        // god = deny switches essentials god mode off inside (an arena), allow switches it on; leaving puts back
+        // what the player had.
+        Optional<String> god = after.get(BehaviourKey.GOD).filter(v -> !v.equals("keep"));
+        if (god.isPresent()) {
+            if (track.invulnerable == null) {
+                track.invulnerable = invulnerable(player);
+            }
+            player.setInvulnerable(god.get().equals("allow"));
+        } else if (track.invulnerable != null) {
+            player.setInvulnerable(track.invulnerable);
+            track.invulnerable = null;
+        }
         Optional<Float> walk = after.get(BehaviourKey.WALK_SPEED).map(Float::parseFloat);
         if (walk.isPresent()) {
             if (track.walkSpeed == null) {
@@ -343,6 +356,13 @@ public final class PlayerTracks {
             player.hideBossBar(track.bar);
             track.bar = null;
         }
+    }
+
+    // Paper deprecates the getter without a replacement for reading the flag essentials god mode sets; the
+    // setter is not deprecated, so reading it back is the only way to restore what the player had.
+    @SuppressWarnings("deprecation")
+    private static boolean invulnerable(Player player) {
+        return player.isInvulnerable();
     }
 
     private void restore(Player player, Track track) {

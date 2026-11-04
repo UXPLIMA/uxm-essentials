@@ -130,6 +130,8 @@ public final class PlaceholderResolver {
     private static final String ITEMWORLD_PREFIX = "itemworld_";
     private static final String NPC_PREFIX = "npc_";
     private static final String REGIONS_PREFIX = "regions_";
+    // The guard module's own spelling of the same placeholders: %uxmessentials_guard_here% reads like the command.
+    private static final String GUARD_PREFIX = "guard_";
     private static final String SECURITY_PREFIX = "security_";
     private static final String MODULE_PREFIX = "module_";
     private static final String ENABLED_SUFFIX = "_enabled";
@@ -297,6 +299,9 @@ public final class PlaceholderResolver {
         }
         if (normalized.startsWith(REGIONS_PREFIX)) {
             return Optional.of(regions(who, normalized.substring(REGIONS_PREFIX.length())));
+        }
+        if (normalized.startsWith(GUARD_PREFIX)) {
+            return Optional.of(regions(who, normalized.substring(GUARD_PREFIX.length())));
         }
         if (normalized.startsWith(SECURITY_PREFIX)) {
             return Optional.of(security(who, normalized.substring(SECURITY_PREFIX.length())));

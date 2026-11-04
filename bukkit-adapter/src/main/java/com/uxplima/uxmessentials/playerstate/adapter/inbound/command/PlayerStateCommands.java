@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import java.util.List;
 
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
@@ -33,10 +34,12 @@ public final class PlayerStateCommands {
             Messages messages,
             NoFlyWorldPolicy noFlyWorlds,
             @Nullable PlaytimeView playtimeView,
-            PlaytimeAdmin playtimeAdmin) {
+            PlaytimeAdmin playtimeAdmin,
+            PlayerStateStore store,
+            RegionBehaviourGate regions) {
         return List.of(
-                new GodCommand(services, messages),
-                new FlyCommand(services, messages, noFlyWorlds),
+                new GodCommand(services, messages, store, regions),
+                new FlyCommand(services, messages, noFlyWorlds, regions),
                 new HealCommand(services, messages),
                 new FeedCommand(services, messages),
                 new FoodLevelCommand(services, messages),

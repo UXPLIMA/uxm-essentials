@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.api.query;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.api.view.UxmRegion;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -24,11 +25,21 @@ public interface UxmGuardQuery {
     /** Whether nature may do a {@code world.*} action at {@code where}. */
     boolean allowedWorld(String action, UxmLocation where);
 
-    /** Regions whose bounds come within {@code radius} blocks of {@code where}, nearest first. */
+    /**
+     * Regions whose bounds come within {@code radius} blocks of {@code where} on the horizontal plane, at any
+     * height, nearest first. A square, not a circle: what a chunk claim needs to keep its distance.
+     */
     List<UxmRegion> within(UxmLocation where, int radius);
 
     /** The distance claims must keep from a guard region, from the guard config. */
     int claimDistance();
+
+    /**
+     * The value of a region behaviour (such as {@code fly}, {@code god} or {@code game-mode}) for an online player
+     * where they stand now, or empty when no region there sets it or the player is offline. Tristate behaviours
+     * answer {@code allow}, {@code deny} or {@code keep}.
+     */
+    Optional<String> behaviour(UUID player, String key);
 
     /** Add action ids (and their parents) to the tree, for a plugin's own protections. */
     void registerActions(List<String> ids);

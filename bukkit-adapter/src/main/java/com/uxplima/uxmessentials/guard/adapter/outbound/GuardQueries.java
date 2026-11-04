@@ -1,5 +1,11 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
+import java.util.Comparator;
+import com.uxplima.uxmessentials.guard.domain.Shape;
+import com.uxplima.uxmessentials.guard.domain.Bounds;
+import org.bukkit.Location;
+import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.api.query.UxmGuardQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
@@ -82,8 +88,40 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
 
     @Override
     public List<UxmRegion> within(UxmLocation where, int radius) {
-        return service.near(where.world(), block(where.x()), block(where.y()), block(where.z()), Math.max(0, radius))
-                .stream().map(GuardQueries::view).toList();
+        int r = Math.max(0, radius);
+        int x = block(where.x());
+        int z = block(where.z());
+        return service.regions(where.world()).stream()
+                .filter(region -> !(region.shape() instanceof Shape.Global))
+                .filter(region -> {
+                    Bounds b = region.shape().bounds();
+                    return b.maxX() >= x - r && b.minX() <= x + r && b.maxZ() >= z - r && b.minZ() <= z + r;
+                })
+                .sorted(Comparator.comparingLong(region -> horizontalGap(region.shape().bounds(), x, z)))
+                .map(GuardQueries::view)
+                .toList();
+    }
+
+    private static long horizontalGap(Bounds b, int x, int z) {
+        long dx = Math.max(0, Math.max(b.minX() - x, x - b.maxX()));
+        long dz = Math.max(0, Math.max(b.minZ() - z, z - b.maxZ()));
+        return dx * dx + dz * dz;
+    }
+
+    @Override
+    public Optional<String> behaviour(UUID player, String key) {
+        Player online = Bukkit.getPlayer(player);
+        Optional<BehaviourKey> parsed = BehaviourKey.parse(key);
+        if (online == null || parsed.isEmpty()) {
+            return Optional.empty();
+        }
+        Location at = online.getLocation();
+        WorldIndex index = service.snapshot().worlds().get(online.getWorld().getName());
+        if (index == null || index.locked() || at == null) {
+            return Optional.empty();
+        }
+        RegionSet set = index.at(at.getBlockX(), at.getBlockY(), at.getBlockZ());
+        return set == null ? Optional.empty() : set.behaviour(parsed.get());
     }
 
     @Override

@@ -21,6 +21,7 @@ public enum BehaviourKey {
     ACTIONS_INTERVAL_SECONDS("actions.interval-seconds", Kind.POSITIVE_INT),
     FLY("fly", Kind.TRISTATE),
     GLIDE("glide", Kind.TRISTATE),
+    GOD("god", Kind.TRISTATE),
     WALK_SPEED("walk-speed", Kind.SPEED),
     FLY_SPEED("fly-speed", Kind.SPEED),
     GAME_MODE("game-mode", Kind.GAME_MODE),

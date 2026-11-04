@@ -2512,7 +2512,12 @@ public final class PluginModule {
                 ctx.kernel().log());
         mirrorWindow.register(menuBindings);
         PlayerstateWiring.Wired wired =
-                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow, links.teams);
+                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow, links.teams,
+                        (player, behaviour) -> links.queries
+                                .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
+                                .flatMap(guard -> guard.behaviour(player.getUniqueId(), behaviour))
+                                .filter("deny"::equals)
+                                .isPresent());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
