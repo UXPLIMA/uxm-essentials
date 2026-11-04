@@ -7,8 +7,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -93,7 +95,8 @@ public final class GuardWiring {
             ClickActionRunner actions,
             Consumer<String> audit,
             Menus menus,
-            MenuBindings menuBindings) {
+            MenuBindings menuBindings,
+            Function<UUID, Optional<Boolean>> heldGod) {
         KernelPorts kernel = ctx.kernel();
         Logger log = kernel.log();
         Consumer<String> warn = message -> log.warn("event=guard_warning message=\"{}\"", message);
@@ -127,7 +130,7 @@ public final class GuardWiring {
                 plugin, kernel.scheduler(), service, store, kernel.messages(), kernel.messageSink(), clock, audit);
         Selections selections = new Selections(plugin.getServer());
         RegionDisplay display = new RegionDisplay(plugin);
-        PlayerTracks tracks = new PlayerTracks(runtime, actions);
+        PlayerTracks tracks = new PlayerTracks(runtime, actions, heldGod);
         ListenerRegistry registry = new ListenerRegistry(plugin, runtime);
 
         List<Listener> fixed = new ArrayList<>();
@@ -191,8 +194,8 @@ public final class GuardWiring {
                                 kernel.scheduler().onEntity(BukkitRefs.toRef(player), () -> tracks.tick(player, now));
                             }
                         },
-                        Duration.ofSeconds(1),
-                        Duration.ofSeconds(1)));
+                        Duration.ofMillis(50L * config.movementCheckTicks()),
+                        Duration.ofMillis(50L * config.movementCheckTicks())));
         timers.add(kernel.scheduler()
                 .repeatGlobal(
                         () -> kernel.scheduler().async(() -> {

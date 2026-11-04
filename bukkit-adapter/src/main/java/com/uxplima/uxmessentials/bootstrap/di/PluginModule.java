@@ -1650,7 +1650,18 @@ public final class PluginModule {
                         kernel.log());
         com.uxplima.uxmessentials.shared.application.port.Logger audit = links.auditChannel.logger();
         GuardWiring.Wired wired = GuardWiring.wire(
-                plugin, ctx, persistence, bus, actionRunner, line -> audit.info(line), menus, menuBindings);
+                plugin,
+                ctx,
+                persistence,
+                bus,
+                actionRunner,
+                line -> audit.info(line),
+                menus,
+                menuBindings,
+                id -> links.queries
+                        .find(com.uxplima.uxmessentials.api.query.UxmPlayerStateQuery.class)
+                        .flatMap(q -> q.of(id))
+                        .map(com.uxplima.uxmessentials.api.view.UxmPlayerState::godMode));
         resources.addCommand(wired.command());
         resources.onClose(wired.stop());
         GuardQueries queries = new GuardQueries(wired.service());

@@ -11,6 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import org.bukkit.GameMode;
 import org.bukkit.Location;
@@ -55,9 +56,17 @@ public final class PlayerTracks {
     private final Map<UUID, Track> tracks = new ConcurrentHashMap<>();
     private final Map<String, List<ClickAction>> parsedActions = new ConcurrentHashMap<>();
 
-    public PlayerTracks(GuardRuntime guard, ClickActionRunner actions) {
+    private final Function<UUID, Optional<Boolean>> heldGod;
+
+    /**
+     * @param heldGod whether essentials god mode is on for a player, when the playerstate module answers; leaving a
+     *     region that set god puts that back rather than what the player had on the way in, which a toggle inside
+     *     may have changed
+     */
+    public PlayerTracks(GuardRuntime guard, ClickActionRunner actions, Function<UUID, Optional<Boolean>> heldGod) {
         this.guard = Objects.requireNonNull(guard, "guard");
         this.actions = Objects.requireNonNull(actions, "actions");
+        this.heldGod = Objects.requireNonNull(heldGod, "heldGod");
     }
 
     /** One player's region state and the values behaviours took over. */
@@ -202,7 +211,7 @@ public final class PlayerTracks {
         }
     }
 
-    /** Called every second on the player's thread: heal, feed, interval actions, bypass reminder, watchdog. */
+    /** Called every movement.check-ticks on the player's thread: heal, feed, interval actions, bypass reminder, watchdog. */
     public void tick(Player player, long nowMillis) {
         Track track = tracks.get(player.getUniqueId());
         if (track == null) {
@@ -210,12 +219,21 @@ public final class PlayerTracks {
             return;
         }
         Location at = player.getLocation();
-        if (at != null
-                && track.safe != null
-                && (track.safe.getWorld() != at.getWorld() || track.safe.distanceSquared(at) > 64)) {
-            // Folia skips the move event for some teleports and respawns; catch up here.
-            refresh(player);
-            track.safe = at;
+        Location safe = track.safe;
+        if (at != null && safe != null) {
+            // Folia skips the move event for some teleports and respawns, and server-side movers fire none: when
+            // the player stands in other regions than we last saw, run the entry and exit rules now and put them
+            // back if those refuse.
+            if (safe.getWorld() == at.getWorld() && !sameRegions(track.set, guard.at(at))) {
+                Location result = moved(player, safe, at, false);
+                Location back = result == null ? safe : result;
+                if (back != at) {
+                    var ignored = player.teleportAsync(back);
+                }
+            } else if (safe.getWorld() != at.getWorld() || safe.distanceSquared(at) > 64) {
+                refresh(player);
+                track.safe = at;
+            }
         }
         Behaviours behaviours = track.set == null ? Behaviours.empty() : track.set.behaviours();
         behaviours.get(BehaviourKey.HEAL).ifPresent(v -> {
@@ -315,7 +333,7 @@ public final class PlayerTracks {
             }
             player.setInvulnerable(god.get().equals("allow"));
         } else if (track.invulnerable != null) {
-            player.setInvulnerable(track.invulnerable);
+            player.setInvulnerable(heldGod.apply(player.getUniqueId()).orElse(track.invulnerable));
             track.invulnerable = null;
         }
         Optional<Float> walk = after.get(BehaviourKey.WALK_SPEED).map(Float::parseFloat);
