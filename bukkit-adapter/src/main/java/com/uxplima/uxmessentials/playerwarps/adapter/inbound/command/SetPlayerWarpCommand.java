@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,7 +34,7 @@ public final class SetPlayerWarpCommand extends PlayerWarpCommandSupport impleme
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setpwarp")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> usage(ctx, "setpwarp", "<name>", description()))
                 .then(Commands.argument("name", StringArgumentType.string()).executes(this::run))
                 .build();

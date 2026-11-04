@@ -7,8 +7,10 @@ import java.util.logging.Level;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 
+import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.bootstrap.di.CloseableResources;
 import com.uxplima.uxmessentials.bootstrap.di.PluginModule;
 import com.uxplima.uxmessentials.poses.adapter.outbound.WorldGuardPoseFlagRegistrar;
@@ -18,6 +20,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyleTags;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ThemeFile;
 import com.uxplima.uxmessentials.shared.adapter.outbound.worldguard.WorldGuardSetPwarpFlagRegistrar;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmlib.command.CommandGates;
+import com.uxplima.uxmlib.command.GateVisibility;
 import com.uxplima.uxmlib.text.style.Theme;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -85,6 +89,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
         this.resources = wired;
 
         getLogger().info("[4/5] Registering command handlers...");
+        GateVisibility gates = GateVisibility.listen(this);
         getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             var registrar = event.registrar();
             // Commands uxmChat runs (private messages, mail, helpop, broadcast, clear chat, me, the chat toggle,
@@ -92,6 +97,9 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             // module switched on either side follows after the next one, not on a module reload alone.
             UxmChatStepBack chat = new UxmChatStepBack(getServer());
             List<String> left = new ArrayList<>();
+            // The command lists each player is sent lose what a gate hides from them. This handler runs again on every
+            // command reload, so the commands of the previous run are forgotten first.
+            gates.clear();
             // Guard each publish so one malformed command (a broken build() or a duplicate literal) is logged
             // and skipped instead of aborting the whole batch and leaving every later command unregistered.
             wired.commands().forEach(command -> {
@@ -100,7 +108,11 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
                         left.add(command.commandId());
                         return;
                     }
-                    registrar.register(command.build(), command.description(), command.aliases());
+                    LiteralCommandNode<CommandSourceStack> node = command.build();
+                    registrar.register(node, command.description(), command.aliases());
+                    if (CommandGates.hasGates(node)) {
+                        gates.add(node, command.aliases());
+                    }
                 } catch (RuntimeException failure) {
                     getLogger()
                             .log(

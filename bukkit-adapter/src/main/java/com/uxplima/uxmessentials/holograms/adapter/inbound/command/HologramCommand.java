@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.bukkit.World;
@@ -32,6 +31,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -127,7 +127,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("hologram")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::openGui);
         List<LiteralArgumentBuilder<CommandSourceStack>> verbs = new ArrayList<>(List.of(
                 createNode(),
@@ -160,10 +160,9 @@ public final class HologramCommand extends HologramCommandSupport implements Com
      * an operator narrows it by negating one capability: a builder who may re-style and move a hologram but never
      * delete one holds the base node with {@code uxmessentials.hologram.delete} negated.
      */
-    private static Predicate<CommandSourceStack> capability(String verb) {
+    private static Gate capability(String verb) {
         String node = CAPABILITIES.getOrDefault(verb, EDIT);
-        return src ->
-                src.getSender().hasPermission(PERMISSION) && src.getSender().hasPermission(node);
+        return Gate.permission(PERMISSION).and(Gate.permission(node));
     }
 
     @Override

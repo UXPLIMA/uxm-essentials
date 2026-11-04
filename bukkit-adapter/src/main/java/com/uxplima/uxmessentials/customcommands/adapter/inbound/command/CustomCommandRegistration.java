@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 
 /**
@@ -78,8 +79,7 @@ public final class CustomCommandRegistration implements CommandRegistration {
                 Commands.literal(command.literal().name());
         // Gate visibility on the declared node so a sender who cannot run the command does not see or complete it;
         // the use case re-checks before anything happens.
-        command.permission()
-                .ifPresent(node -> literal.requires(src -> src.getSender().hasPermission(node)));
+        command.permission().ifPresent(node -> literal.requires(Gate.permission(node)));
         if (arguments.isEmpty()) {
             return literal.executes(this::run).build();
         }

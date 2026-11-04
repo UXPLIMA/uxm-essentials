@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -69,9 +70,8 @@ public final class VerticalCommand extends TeleportCommandSupport implements Com
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        var node = Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(ctx -> run(ctx, 1));
+        var node =
+                Commands.literal(literal).requires(Gate.permission(PERMISSION)).executes(ctx -> run(ctx, 1));
         if (kind == Kind.UP) {
             node.then(Commands.argument("blocks", IntegerArgumentType.integer(1, 256))
                     .executes(ctx -> run(ctx, ctx.getArgument("blocks", Integer.class))));

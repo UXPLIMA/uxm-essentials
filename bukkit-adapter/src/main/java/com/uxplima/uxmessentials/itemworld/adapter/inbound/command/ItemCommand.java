@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.AmountSpec;
 import com.uxplima.uxmessentials.itemworld.domain.ItemQuery;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,7 +42,7 @@ public final class ItemCommand extends ItemworldCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(itemArgument()
                         .executes(ctx -> run(ctx, 1))
                         .then(Commands.argument("amount", IntegerArgumentType.integer(1))

@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -53,7 +54,7 @@ import org.jspecify.annotations.NullMarked;
  * rename, the metadata/access/price edits, the social verbs (rate, favourite), transfer, withdraw, info, and list.
  *
  * <p>Every subcommand is gated by its own {@code uxmessentials.pwarp.<verb>} node through Brigadier
- * {@code .requires(...)}, so only {@code pwarp} is a command-catalog id; the verbs are literals inside the tree.
+ * a {@code Gate}, so only {@code pwarp} is a command-catalog id; the verbs are literals inside the tree.
  * The self-service verbs let anyone run them but the use case's {@code WarpAuthorization} decides by role which
  * warps they touch; the {@code members}/{@code ban}/{@code whitelist} people-management verbs work the same way,
  * while the operator {@code admin} group ({@code restore}/{@code purge}/{@code setowner}/{@code reload}) acts on any
@@ -103,7 +104,7 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pwarp")
-                .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
+                .requires(Gate.permission(USE_PERMISSION))
                 .executes(this::openGui)
                 .then(visibilitySubtree())
                 .then(verb("edit", EDIT_PERMISSION).then(nameArg().executes(this::openPlayerWarpEditor)))
@@ -369,8 +370,8 @@ public final class PlayerWarpCommand extends PlayerWarpCommandSupport implements
      */
     private LiteralArgumentBuilder<CommandSourceStack> sponsorSubtree() {
         return Commands.literal("sponsor")
-                .requires(src ->
-                        services.sponsorConfig().enabled() && src.getSender().hasPermission(SPONSOR_PERMISSION))
+                .requires(Gate.when(sender -> services.sponsorConfig().enabled())
+                        .and(Gate.permission(SPONSOR_PERMISSION)))
                 .then(nameArg()
                         .executes(this::runSponsor)
                         .then(Commands.argument("days", IntegerArgumentType.integer(1))

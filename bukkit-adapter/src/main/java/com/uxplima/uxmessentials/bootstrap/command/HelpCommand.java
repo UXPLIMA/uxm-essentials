@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.CommandGates;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -58,7 +60,7 @@ public final class HelpCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(LITERAL)
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, ""))
                 .then(Commands.argument("page-or-query", StringArgumentType.greedyString())
                         .executes(ctx -> run(ctx, ctx.getArgument("page-or-query", String.class))))
@@ -89,7 +91,7 @@ public final class HelpCommand implements CommandRegistration {
         List<HelpEntry> out = new ArrayList<>();
         for (CommandRegistration registration : commands.get()) {
             LiteralCommandNode<CommandSourceStack> node = registration.build();
-            if (!node.canUse(source)) {
+            if (!CommandGates.shows(node, source)) {
                 continue;
             }
             String description = CommandDescriptions.of(

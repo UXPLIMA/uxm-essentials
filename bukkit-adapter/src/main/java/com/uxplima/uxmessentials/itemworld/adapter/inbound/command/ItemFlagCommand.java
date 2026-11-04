@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.outbound.BukkitItemResolver;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -40,7 +41,7 @@ public final class ItemFlagCommand extends ItemworldCommandSupport implements Co
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(itemFlagArgument()
                         .then(Commands.literal("on").executes(ctx -> run(ctx, true)))
                         .then(Commands.literal("off").executes(ctx -> run(ctx, false))))

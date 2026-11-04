@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -60,7 +61,7 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("mail")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::openGui)
                 .then(Commands.literal("read").executes(this::read))
                 .then(Commands.literal("clear").executes(this::clear))
@@ -69,7 +70,7 @@ public final class MailCommand extends MessagingCommandSupport implements Comman
                                 .then(Commands.argument("text", StringArgumentType.greedyString())
                                         .executes(this::send))))
                 .then(Commands.literal("sendall")
-                        .requires(src -> src.getSender().hasPermission(SENDALL_PERMISSION))
+                        .requires(Gate.permission(SENDALL_PERMISSION))
                         .then(Commands.argument("text", StringArgumentType.greedyString())
                                 .executes(this::sendAll)))
                 .build();

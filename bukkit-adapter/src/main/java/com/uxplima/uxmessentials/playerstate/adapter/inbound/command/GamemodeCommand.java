@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -54,7 +55,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("gamemode")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("mode", Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> MODE_SUGGESTIONS))
                         .executes(this::setMode)

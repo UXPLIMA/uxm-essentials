@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -70,9 +71,9 @@ public final class ScoreboardCommand
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("scoreboard")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("gui")
-                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .requires(Gate.permission(GUI_PERMISSION))
                         .executes(this::openGui))
                 .then(Commands.literal("toggle").executes(this::run))
                 .then(Commands.literal("on").executes(ctx -> set(ctx, false)))

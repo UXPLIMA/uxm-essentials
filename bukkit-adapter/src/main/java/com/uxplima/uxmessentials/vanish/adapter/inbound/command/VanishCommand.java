@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.vanish.application.ListVanished;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
 import com.uxplima.uxmessentials.vanish.application.port.VanishPickupPreferences;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -101,10 +102,10 @@ public final class VanishCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("vanish")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> toggle(ctx, false))
                 .then(Commands.literal(SILENT_FLAG)
-                        .requires(src -> src.getSender().hasPermission(SILENT_PERMISSION))
+                        .requires(Gate.permission(SILENT_PERMISSION))
                         .executes(ctx -> toggle(ctx, true)))
                 .then(Commands.literal("on")
                         .executes(ctx -> set(ctx, true, false))
@@ -117,10 +118,10 @@ public final class VanishCommand implements CommandRegistration {
                         .then(Commands.literal("on").executes(ctx -> setPickup(ctx, true)))
                         .then(Commands.literal("off").executes(ctx -> setPickup(ctx, false))))
                 .then(Commands.literal("list")
-                        .requires(src -> src.getSender().hasPermission(LIST_PERMISSION))
+                        .requires(Gate.permission(LIST_PERMISSION))
                         .executes(this::list))
                 .then(Commands.argument(TARGET_ARG, ArgumentTypes.player())
-                        .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
+                        .requires(Gate.permission(OTHERS_PERMISSION))
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .executes(this::vanishOther))
                 .build();
@@ -135,7 +136,7 @@ public final class VanishCommand implements CommandRegistration {
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> silentFlag(
             Command<CommandSourceStack> action) {
         return Commands.literal(SILENT_FLAG)
-                .requires(src -> src.getSender().hasPermission(SILENT_PERMISSION))
+                .requires(Gate.permission(SILENT_PERMISSION))
                 .executes(action);
     }
 

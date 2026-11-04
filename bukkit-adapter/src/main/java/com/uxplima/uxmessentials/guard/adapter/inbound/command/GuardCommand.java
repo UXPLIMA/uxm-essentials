@@ -71,6 +71,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -177,7 +178,7 @@ public final class GuardCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("guard")
-                .requires(src -> src.getSender().hasPermission(BASE + "use"))
+                .requires(Gate.permission(BASE + "use"))
                 .executes(ctx -> {
                     if (ctx.getSource().getSender() instanceof Player player
                             && (player.hasPermission(BASE + "menu") || managesHere(player))) {
@@ -189,7 +190,7 @@ public final class GuardCommand implements CommandRegistration {
                 });
         for (Sub sub : subs()) {
             root.then(Commands.literal(sub.name())
-                    .requires(src -> src.getSender().hasPermission(sub.permission()))
+                    .requires(Gate.permission(sub.permission()))
                     .executes(ctx -> run(ctx, sub, ""))
                     .then(Commands.argument("args", StringArgumentType.greedyString())
                             .suggests((ctx, builder) -> suggest(ctx, builder, sub))

@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -35,7 +36,7 @@ public final class ClearInventoryConfirmToggleCommand extends PlayerstateCommand
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("clearinventoryconfirmtoggle")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::toggle)
                 .build();
     }

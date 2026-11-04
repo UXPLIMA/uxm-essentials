@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +57,7 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(station.permission()))
+                .requires(Gate.permission(station.permission()))
                 .executes(this::run)
                 .then(Commands.argument("player", ArgumentTypes.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())

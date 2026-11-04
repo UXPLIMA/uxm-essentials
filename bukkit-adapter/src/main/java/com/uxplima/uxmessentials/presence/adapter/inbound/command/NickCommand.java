@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -58,14 +59,14 @@ public final class NickCommand extends PresenceCommandSupport implements Command
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("nick")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal(CLEAR).executes(this::runClear))
                 .then(Commands.literal(OFF).executes(this::runClear))
                 .then(Commands.argument("name", Args.token())
                         .suggests(nameSuggestions())
                         .executes(this::runSelf)
                         .then(Commands.argument("value", Args.token())
-                                .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
+                                .requires(Gate.permission(OTHERS_PERMISSION))
                                 .executes(this::runOther)))
                 .build();
     }

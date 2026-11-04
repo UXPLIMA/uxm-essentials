@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -46,7 +47,7 @@ public final class SetWorthCommand extends EconomyCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setworth")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("price", DoubleArgumentType.doubleArg(0))
                         .executes(ctx -> runHeld(ctx, DoubleArgumentType.getDouble(ctx, "price"), defaultCurrencyId()))
                         .then(currencyArgument()

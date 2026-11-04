@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -185,7 +186,7 @@ abstract class PlayerWarpCommandSupport {
 
     /** A {@code /pwarp <literal>} subcommand node gated by {@code permission}. */
     static LiteralArgumentBuilder<CommandSourceStack> verb(String literal, String permission) {
-        return Commands.literal(literal).requires(src -> src.getSender().hasPermission(permission));
+        return Commands.literal(literal).requires(Gate.permission(permission));
     }
 
     /** A {@code name} argument completing (cheaply, no I/O) against the sender's own cached warp names. */

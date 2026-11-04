@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -56,7 +57,7 @@ public final class MigrationImportNode {
     /** The {@code import} literal node, ready to be attached under the {@code /uxmess} root. */
     public LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("import")
-                .requires(src -> src.getSender().hasPermission(PERMISSION_IMPORT))
+                .requires(Gate.permission(PERMISSION_IMPORT))
                 .executes(this::runUsage)
                 .then(Commands.literal("--list").executes(this::runList))
                 .then(sourceArgument());

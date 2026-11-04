@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -43,7 +44,7 @@ public final class PersonalWeatherCommand extends PlayerstateCommandSupport impl
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pweather")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("value", Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> VALUES))
                         .executes(this::set))

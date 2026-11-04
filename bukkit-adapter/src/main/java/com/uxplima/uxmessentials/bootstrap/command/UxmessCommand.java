@@ -36,6 +36,7 @@ import com.uxplima.uxmessentials.shared.application.reload.ReloadResult;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadStatus;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -114,7 +115,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(ROOT_LITERAL)
-                .requires(src -> src.getSender().hasPermission(PERMISSION_ADMIN))
+                .requires(Gate.permission(PERMISSION_ADMIN))
                 .executes(this::runHelp)
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(doctorNode())
@@ -131,7 +132,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
         return Commands.literal("doctor")
                 .executes(this::runDoctor)
                 .then(Commands.literal("repair")
-                        .requires(src -> src.getSender().hasPermission(PERMISSION_DOCTOR_REPAIR))
+                        .requires(Gate.permission(PERMISSION_DOCTOR_REPAIR))
                         .executes(this::runRepairPreview)
                         .then(Commands.literal("confirm").executes(this::runRepairConfirmed)));
     }
@@ -158,7 +159,7 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
 
     private com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> reloadNode() {
         return Commands.literal("reload")
-                .requires(src -> src.getSender().hasPermission(PERMISSION_RELOAD))
+                .requires(Gate.permission(PERMISSION_RELOAD))
                 .executes(this::runReloadAll)
                 .then(Commands.argument("module", Args.token())
                         .suggests((context, builder) -> {

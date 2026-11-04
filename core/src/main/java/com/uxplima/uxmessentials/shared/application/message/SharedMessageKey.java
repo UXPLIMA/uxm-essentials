@@ -21,6 +21,7 @@ public enum SharedMessageKey implements MessageKey {
     // cross-cutting command failures shared by every command-bearing context
     COMMAND_NO_PERMISSION("command.no-permission"),
     COMMAND_PLAYERS_ONLY("command.players-only"),
+    COMMAND_UNAVAILABLE("command.unavailable"),
     COMMAND_UNKNOWN_PLAYER("command.unknown-player"),
     COMMAND_UNKNOWN_WORLD("command.unknown-world"),
     COMMAND_INVALID_POSITION("command.invalid-position"),

@@ -10,6 +10,7 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.tree.CommandNode;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmlib.command.CommandGates;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,7 +46,7 @@ final class BrigadierUsage {
     static String of(CommandNode<CommandSourceStack> root, CommandSourceStack sender) {
         Objects.requireNonNull(root, "root");
         Objects.requireNonNull(sender, "sender");
-        return joinChildren(root, false, child -> child.canUse(sender));
+        return joinChildren(root, false, child -> CommandGates.shows(child, sender));
     }
 
     /** Render every usable child of {@code node} and join the single- or multi-branch shape. */

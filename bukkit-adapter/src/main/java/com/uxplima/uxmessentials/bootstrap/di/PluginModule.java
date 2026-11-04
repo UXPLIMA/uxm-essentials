@@ -167,6 +167,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocalizedCommandVisibilityListener;
@@ -466,6 +467,7 @@ public final class PluginModule {
         resources.addReloadTask(
                 ReloadTask.kernel("messages", wiredKernel.catalog()::reload, "catalogs re-read from disk"));
         // Every published command is wrapped so the requesting player's locale binds at the boundary.
+        resources.gateBinding(new GateBinding(kernel.messages()));
         resources.localeBinding(new LocaleBinding(wiredKernel.resolver(), kernel.messages(), kernel.log()));
         // A bare arg-only command answers with its usage instead of Brigadier's red parse error; injected
         // between the catalog and the locale wrap so the usage line resolves in the player's language.

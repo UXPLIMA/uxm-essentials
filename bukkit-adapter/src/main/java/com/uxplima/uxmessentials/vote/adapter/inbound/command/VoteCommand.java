@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.domain.Vote;
 import com.uxplima.uxmessentials.vote.domain.VotePeriod;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -80,11 +81,11 @@ public final class VoteCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("vote")
-                .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
+                .requires(Gate.permission(USE_PERMISSION))
                 .executes(this::showLinks)
                 .then(Commands.literal("sites").executes(this::showSites))
                 .then(Commands.literal("testreward")
-                        .requires(src -> src.getSender().hasPermission(TEST_PERMISSION))
+                        .requires(Gate.permission(TEST_PERMISSION))
                         .executes(this::testReward))
                 .then(Commands.literal("claim").executes(this::claim))
                 .then(Commands.literal("total")
@@ -94,7 +95,7 @@ public final class VoteCommand implements CommandRegistration {
                         .executes(this::streakSelf)
                         .then(CommandSuggestions.playerArgument("player").executes(this::streakOther)))
                 .then(Commands.literal("top")
-                        .requires(src -> src.getSender().hasPermission(TOP_PERMISSION))
+                        .requires(Gate.permission(TOP_PERMISSION))
                         .executes(this::topMonthly)
                         .then(Commands.literal("daily").executes(ctx -> topPeriod(ctx, VotePeriod.DAILY)))
                         .then(Commands.literal("weekly").executes(ctx -> topPeriod(ctx, VotePeriod.WEEKLY)))
@@ -105,7 +106,7 @@ public final class VoteCommand implements CommandRegistration {
                 .then(Commands.literal("remind").executes(this::toggleRemind))
                 .then(Commands.literal("broadcasts").executes(this::toggleBroadcasts))
                 .then(Commands.literal("admin")
-                        .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                        .requires(Gate.permission(ADMIN_PERMISSION))
                         .then(Commands.literal("givevote")
                                 .then(CommandSuggestions.playerArgument("player")
                                         .executes(this::giveVoteDefault)

@@ -13,6 +13,7 @@ import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
@@ -41,6 +42,7 @@ import org.jspecify.annotations.Nullable;
  * {@code commands.conf} edits change what gets published; then the {@link GuiRootBinding} installs a
  * bare-input GUI opener on any command whose {@code gui} flag is on; then the {@link UsageBinding} injects a
  * coloured usage executor onto any root that still has arguments but no root executor; then the
+ * {@link GateBinding} seals the gates, so a refused sender reads the catalog line; then the
  * {@link LocaleBinding} binds the locale, picking up the installed executor so the line resolves in the
  * player's language.
  */
@@ -57,6 +59,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable CatalogBinding catalogBinding;
     private @Nullable GuiRootBinding guiRootBinding;
     private @Nullable UsageBinding usageBinding;
+    private @Nullable GateBinding gateBinding;
     private @Nullable WorldGeneratorResolver worldGeneratorResolver;
     private @Nullable WorldPhase worldPhase;
     private @Nullable Integrations hooks;
@@ -119,6 +122,11 @@ public final class CloseableResources implements AutoCloseable {
     /** The registered reload steps, in registration order (kernel steps first, then module steps). */
     public List<ReloadTask> reloadTasks() {
         return List.copyOf(reloadTasks);
+    }
+
+    /** Sets the {@link GateBinding} that seals every published command's gates, right before the locale binding. */
+    public void gateBinding(GateBinding binding) {
+        this.gateBinding = binding;
     }
 
     /** Sets the boundary {@link LocaleBinding} every published command is wrapped with. */
@@ -315,6 +323,10 @@ public final class CloseableResources implements AutoCloseable {
         UsageBinding usage = this.usageBinding;
         if (usage != null) {
             resolved = resolved.stream().map(usage::wrap).toList();
+        }
+        GateBinding gates = this.gateBinding;
+        if (gates != null) {
+            resolved = resolved.stream().map(gates::wrap).toList();
         }
         LocaleBinding binding = this.localeBinding;
         if (binding == null) {

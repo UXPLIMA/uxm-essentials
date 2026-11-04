@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -63,7 +64,7 @@ public final class PermissionsSubcommand {
     /** The {@code permissions} literal node, for attaching under {@code /uxmess}. */
     public LiteralArgumentBuilder<CommandSourceStack> build() {
         return Commands.literal("permissions")
-                .requires(source -> source.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runAreas)
                 .then(Commands.literal("export").executes(this::runExport))
                 .then(Commands.argument("area", Args.token())

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
@@ -66,8 +67,7 @@ public final class MenuOpenCommand implements CommandRegistration {
         LiteralArgumentBuilder<CommandSourceStack> literal = Commands.literal(spec.name());
         // Gate visibility on the menu's permission when it declares one, so the node is hidden from a sender who
         // cannot use it (its execution still re-checks). A permissionless menu stays open to everyone.
-        spec.permission()
-                .ifPresent(permission -> literal.requires(src -> src.getSender().hasPermission(permission)));
+        spec.permission().ifPresent(permission -> literal.requires(Gate.permission(permission)));
         if (spec.arguments().isEmpty()) {
             return literal.executes(this::open).build();
         }

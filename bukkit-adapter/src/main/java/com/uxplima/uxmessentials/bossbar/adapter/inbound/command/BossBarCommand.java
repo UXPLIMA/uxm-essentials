@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.common.Durations;
 import org.jspecify.annotations.NullMarked;
@@ -101,16 +102,16 @@ public final class BossBarCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("bossbars")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> self(ctx, Choice.TOGGLE))
                 .then(choice("toggle", Choice.TOGGLE))
                 .then(choice("on", Choice.SHOW))
                 .then(choice("off", Choice.HIDE))
                 .then(Commands.literal("announce")
-                        .requires(src -> src.getSender().hasPermission(ANNOUNCE))
+                        .requires(Gate.permission(ANNOUNCE))
                         .then(barArgument().then(timeArgument().executes(this::announce))))
                 .then(Commands.literal("send")
-                        .requires(src -> src.getSender().hasPermission(ANNOUNCE))
+                        .requires(Gate.permission(ANNOUNCE))
                         .then(playerArgument()
                                 .then(barArgument().then(timeArgument().executes(this::send)))))
                 .build();
@@ -125,9 +126,7 @@ public final class BossBarCommand implements CommandRegistration {
             String literal, Choice choice) {
         return Commands.literal(literal)
                 .executes(ctx -> self(ctx, choice))
-                .then(playerArgument()
-                        .requires(src -> src.getSender().hasPermission(OTHERS))
-                        .executes(ctx -> other(ctx, choice)));
+                .then(playerArgument().requires(Gate.permission(OTHERS)).executes(ctx -> other(ctx, choice)));
     }
 
     private int self(CommandContext<CommandSourceStack> ctx, Choice choice) {

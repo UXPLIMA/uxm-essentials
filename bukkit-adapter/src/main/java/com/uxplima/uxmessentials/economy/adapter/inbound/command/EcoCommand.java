@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -57,7 +58,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("eco")
-                .requires(src -> src.getSender().hasPermission(BASE))
+                .requires(Gate.permission(BASE))
                 .then(targetVerb("give", "give"))
                 .then(targetVerb("take", "take"))
                 .then(targetVerb("set", "set"))
@@ -70,13 +71,13 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(logsVerb())
                 .then(noteVerb())
                 .then(Commands.literal("backup")
-                        .requires(src -> src.getSender().hasPermission(BASE + ".backup"))
+                        .requires(Gate.permission(BASE + ".backup"))
                         .executes(this::runBackup))
                 .then(Commands.literal("export")
-                        .requires(src -> src.getSender().hasPermission(BASE + ".backup"))
+                        .requires(Gate.permission(BASE + ".backup"))
                         .executes(this::runExport))
                 .then(Commands.literal("restore")
-                        .requires(src -> src.getSender().hasPermission(BASE + ".restore"))
+                        .requires(Gate.permission(BASE + ".restore"))
                         .then(CommandSuggestions.playerArgument("player")
                                 .then(Commands.argument("date", Args.token())
                                         .suggests((ctx, builder) -> {
@@ -101,7 +102,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     /**
-     * Bare {@code /eco} opens the admin economy GUI when GUIs are enabled (the {@code .requires(...)} admin gate
+     * Bare {@code /eco} opens the admin economy GUI when GUIs are enabled (the admin {@code Gate}
      * is carried by the rebind, so a non-admin still cannot open it). Absent the GUI stack, when economy GUIs
      * are off. This returns empty and bare {@code /eco} falls through to its usage text; every raw
      * {@code /eco give|take|set|reset …} subcommand is unaffected either way.
@@ -122,7 +123,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String node) {
         return Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(BASE + "." + node))
+                .requires(Gate.permission(BASE + "." + node))
                 .executes(ctx -> usage(ctx, "eco " + literal, "<player> <amount> [currency]", "Economy " + literal))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx ->
@@ -134,7 +135,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> resetVerb() {
         return Commands.literal("reset")
-                .requires(src -> src.getSender().hasPermission(BASE + ".set"))
+                .requires(Gate.permission(BASE + ".set"))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> runReset(ctx))
                         .then(currencyArgument().executes(ctx -> runReset(ctx))));
@@ -142,7 +143,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String node) {
         return Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(BASE + "." + node))
+                .requires(Gate.permission(BASE + "." + node))
                 .then(Commands.argument("amount", Args.token())
                         .executes(ctx -> runBulk(ctx, literal))
                         .then(currencyArgument().executes(ctx -> runBulk(ctx, literal))));
@@ -150,7 +151,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
         return Commands.literal("resetall")
-                .requires(src -> src.getSender().hasPermission(BASE + ".bulk"))
+                .requires(Gate.permission(BASE + ".bulk"))
                 // A bare resetall is the question, not the reset. Without this branch Brigadier answered its
                 // own parse error and eco.admin.resetall-confirm, the line that names the flag, went unsent.
                 .executes(this::askForResetAllConfirm)
@@ -161,7 +162,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> giveRandomRangeVerb() {
         return Commands.literal("give-random")
-                .requires(src -> src.getSender().hasPermission(BASE + ".give"))
+                .requires(Gate.permission(BASE + ".give"))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("min", Args.token())
                                 .then(Commands.argument("max", Args.token())
@@ -171,20 +172,20 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> historyVerb() {
         return Commands.literal("history")
-                .requires(src -> src.getSender().hasPermission(BASE + ".history"))
+                .requires(Gate.permission(BASE + ".history"))
                 .executes(this::runHistorySelf)
                 .then(CommandSuggestions.playerArgument("player").executes(this::runHistoryTarget));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> logsVerb() {
         return Commands.literal("logs")
-                .requires(src -> src.getSender().hasPermission(BASE + ".logs"))
+                .requires(Gate.permission(BASE + ".logs"))
                 .executes(this::runLogs);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> noteVerb() {
         return Commands.literal("note")
-                .requires(src -> src.getSender().hasPermission(BASE + ".note"))
+                .requires(Gate.permission(BASE + ".note"))
                 .then(Commands.literal("give")
                         .then(CommandSuggestions.playerArgument("player")
                                 .then(Commands.argument("amount", Args.token())

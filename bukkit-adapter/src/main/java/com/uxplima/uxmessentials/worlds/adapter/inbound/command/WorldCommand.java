@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
-import java.util.function.Predicate;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -47,6 +46,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -85,7 +85,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("worlds")
-                .requires(src -> src.getSender().hasPermission(USE))
+                .requires(Gate.permission(USE))
                 .then(Commands.literal("list").requires(p(LIST)).executes(this::runList))
                 .then(Commands.literal("info").requires(p(INFO)).then(nameArg().executes(this::runInfo)))
                 .then(Commands.literal("create")
@@ -187,8 +187,8 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         return Optional.of(this::runGuiList);
     }
 
-    private static Predicate<CommandSourceStack> p(String node) {
-        return src -> src.getSender().hasPermission(node);
+    private static Gate p(String node) {
+        return Gate.permission(node);
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> nameArg() {

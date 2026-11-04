@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -49,7 +50,7 @@ public final class StaffRollbackCommand extends ModerationCommandSupport impleme
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("staffrollback")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("staff")
                         .executes(ctx -> run(ctx, DEFAULT_LIMIT))
                         .then(Commands.argument("limit", IntegerArgumentType.integer(1))

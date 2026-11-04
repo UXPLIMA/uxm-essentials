@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -84,19 +85,19 @@ public final class VaultCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("vault")
-                .requires(src -> src.getSender().hasPermission(USE))
+                .requires(Gate.permission(USE))
                 .executes(this::openDefaultOrList)
                 .then(Commands.literal("info").executes(this::info))
                 .then(Commands.literal("delete")
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> deleteOwn(ctx, ctx.getArgument("n", Integer.class))))
                         .then(Commands.argument("player", Args.token())
-                                .requires(src -> src.getSender().hasPermission(ADMIN_DELETE))
+                                .requires(Gate.permission(ADMIN_DELETE))
                                 .suggests(onlinePlayerSuggestions())
                                 .then(Commands.argument("idx", IntegerArgumentType.integer(1))
                                         .executes(ctx -> deleteOther(ctx, ctx.getArgument("idx", Integer.class))))))
                 .then(Commands.literal("rename")
-                        .requires(src -> src.getSender().hasPermission(RENAME))
+                        .requires(Gate.permission(RENAME))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> renameOwn(ctx, ctx.getArgument("n", Integer.class), null))
                                 .then(Commands.argument("name", StringArgumentType.greedyString())
@@ -105,7 +106,7 @@ public final class VaultCommand implements CommandRegistration {
                                                 ctx.getArgument("n", Integer.class),
                                                 StringArgumentType.getString(ctx, "name"))))))
                 .then(Commands.literal("icon")
-                        .requires(src -> src.getSender().hasPermission(ICON))
+                        .requires(Gate.permission(ICON))
                         .then(Commands.argument("n", IntegerArgumentType.integer(1))
                                 .executes(ctx -> iconHeld(ctx, ctx.getArgument("n", Integer.class)))
                                 .then(Commands.argument("material", Args.token())
@@ -117,7 +118,7 @@ public final class VaultCommand implements CommandRegistration {
                         .executes(ctx -> openOwn(ctx, ctx.getArgument("n", Integer.class))))
                 .then(Commands.argument("player", ArgumentTypes.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
-                        .requires(src -> src.getSender().hasPermission(OTHERS))
+                        .requires(Gate.permission(OTHERS))
                         .executes(ctx -> openOther(ctx, DEFAULT_INDEX))
                         .then(Commands.argument("idx", IntegerArgumentType.integer(1))
                                 .executes(ctx -> openOther(ctx, ctx.getArgument("idx", Integer.class)))))
