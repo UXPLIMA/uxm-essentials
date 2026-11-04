@@ -1605,7 +1605,11 @@ public final class GuardCommand implements CommandRegistration {
             id = raw;
         }
         if (world == null || !RegionId.valid(id)) {
-            feedback.send(sender, world == null ? GuardMessageKey.ERROR_PLAYER_ONLY : GuardMessageKey.ERROR_BAD_ID);
+            if (world == null) {
+                feedback.send(sender, GuardMessageKey.ERROR_NEED_WORLD, Map.of("region", raw));
+            } else {
+                feedback.send(sender, GuardMessageKey.ERROR_BAD_ID);
+            }
             return Optional.empty();
         }
         return Optional.of(new RegionKey(world, RegionId.of(id)));

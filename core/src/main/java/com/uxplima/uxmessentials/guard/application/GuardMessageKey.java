@@ -69,6 +69,7 @@ public enum GuardMessageKey implements MessageKey {
     ERROR_UNKNOWN_ACTION("guard.error.unknown-action"),
     ERROR_NOTHING_TO_UNDO("guard.error.nothing-to-undo"),
     ERROR_STORE_FAILED("guard.error.store-failed"),
+    ERROR_NEED_WORLD("guard.error.need-world"),
     ERROR_NO_SELECTION("guard.error.no-selection"),
     ERROR_BAD_ID("guard.error.bad-id"),
     ERROR_BAD_TARGET("guard.error.bad-target"),
