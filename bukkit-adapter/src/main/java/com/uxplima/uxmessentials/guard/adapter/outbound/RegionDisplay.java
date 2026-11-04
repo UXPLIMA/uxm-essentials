@@ -1,13 +1,12 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
-import com.uxplima.uxmessentials.guard.domain.Bounds;
-import com.uxplima.uxmessentials.guard.domain.Shape;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
 import org.bukkit.Color;
 import org.bukkit.Location;
 import org.bukkit.Material;
@@ -18,6 +17,9 @@ import org.bukkit.entity.Display;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.util.Transformation;
+
+import com.uxplima.uxmessentials.guard.domain.Bounds;
+import com.uxplima.uxmessentials.guard.domain.Shape;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
@@ -51,8 +53,9 @@ public final class RegionDisplay {
         }
         if (eye != null) {
             double maxSq = (double) range * range * 4;
-            edges.removeIf(e -> eye.distanceSquared(new Location(world, (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2,
-                    (e.z1 + e.z2) / 2)) > maxSq);
+            edges.removeIf(e ->
+                    eye.distanceSquared(new Location(world, (e.x1 + e.x2) / 2, (e.y1 + e.y2) / 2, (e.z1 + e.z2) / 2))
+                            > maxSq);
         }
         if (mode.equals("particles")) {
             particles(viewer, world, edges, color);
@@ -120,15 +123,22 @@ public final class RegionDisplay {
             int steps = (int) Math.min(256, Math.max(1, Math.ceil(length)));
             for (int i = 0; i <= steps; i++) {
                 double t = (double) i / steps;
-                viewer.spawnParticle(Particle.DUST, new Location(world, edge.x1 + (edge.x2 - edge.x1) * t,
-                        edge.y1 + (edge.y2 - edge.y1) * t, edge.z1 + (edge.z2 - edge.z1) * t), 1, dust);
+                viewer.spawnParticle(
+                        Particle.DUST,
+                        new Location(
+                                world,
+                                edge.x1 + (edge.x2 - edge.x1) * t,
+                                edge.y1 + (edge.y2 - edge.y1) * t,
+                                edge.z1 + (edge.z2 - edge.z1) * t),
+                        1,
+                        dust);
             }
         }
     }
 
     private static Transformation transformation(Edge edge, Location anchor) {
-        Vector3f direction = new Vector3f((float) (edge.x2 - edge.x1), (float) (edge.y2 - edge.y1),
-                (float) (edge.z2 - edge.z1));
+        Vector3f direction =
+                new Vector3f((float) (edge.x2 - edge.x1), (float) (edge.y2 - edge.y1), (float) (edge.z2 - edge.z1));
         float length = direction.length();
         Vector3f x = new Vector3f(1, 0, 0);
         AxisAngle4f none = new AxisAngle4f();
@@ -139,13 +149,14 @@ public final class RegionDisplay {
             Vector3f unit = new Vector3f(direction).normalize();
             Vector3f axis = new Vector3f(x).cross(unit);
             float angle = (float) Math.acos(Math.max(-1, Math.min(1, x.dot(unit))));
-            rotation = axis.lengthSquared() < 1e-6f ? new AxisAngle4f(angle, 0, 1, 0)
+            rotation = axis.lengthSquared() < 1e-6f
+                    ? new AxisAngle4f(angle, 0, 1, 0)
                     : new AxisAngle4f(angle, axis.normalize());
         }
-        Vector3f offset = new Vector3f((float) (edge.x1 - anchor.getX()), (float) (edge.y1 - anchor.getY()),
-                (float) (edge.z1 - anchor.getZ()));
-        return new Transformation(offset, rotation,
-                new Vector3f(Math.max(length, THICKNESS), THICKNESS, THICKNESS), new AxisAngle4f());
+        Vector3f offset = new Vector3f((float) (edge.x1 - anchor.getX()), (float) (edge.y1 - anchor.getY()), (float)
+                (edge.z1 - anchor.getZ()));
+        return new Transformation(
+                offset, rotation, new Vector3f(Math.max(length, THICKNESS), THICKNESS, THICKNESS), new AxisAngle4f());
     }
 
     private static List<Edge> edges(Shape shape, int eyeY) {
@@ -164,20 +175,35 @@ public final class RegionDisplay {
                     out.add(new Edge(xs[i] + 0.5, low, zs[i] + 0.5, xs[i] + 0.5, high, zs[i] + 0.5));
                 }
             }
-            case Shape.Cylinder c -> ring(out, c.centerX() + 0.5, c.centerZ() + 0.5, c.radiusX() + 0.5,
-                    c.radiusZ() + 0.5, c.minY(), c.maxY() + 1.0);
+            case Shape.Cylinder c ->
+                ring(
+                        out,
+                        c.centerX() + 0.5,
+                        c.centerZ() + 0.5,
+                        c.radiusX() + 0.5,
+                        c.radiusZ() + 0.5,
+                        c.minY(),
+                        c.maxY() + 1.0);
             case Shape.Sphere s -> {
                 double r = s.radius() + 0.5;
                 ring(out, s.centerX() + 0.5, s.centerZ() + 0.5, r, r, s.centerY() + 0.5, s.centerY() + 0.5);
                 for (int i = 0; i < ROUND_SEGMENTS; i++) {
                     double a1 = Math.PI * 2 * i / ROUND_SEGMENTS;
                     double a2 = Math.PI * 2 * (i + 1) / ROUND_SEGMENTS;
-                    out.add(new Edge(s.centerX() + 0.5 + Math.cos(a1) * r, s.centerY() + 0.5 + Math.sin(a1) * r,
-                            s.centerZ() + 0.5, s.centerX() + 0.5 + Math.cos(a2) * r,
-                            s.centerY() + 0.5 + Math.sin(a2) * r, s.centerZ() + 0.5));
-                    out.add(new Edge(s.centerX() + 0.5, s.centerY() + 0.5 + Math.sin(a1) * r,
-                            s.centerZ() + 0.5 + Math.cos(a1) * r, s.centerX() + 0.5,
-                            s.centerY() + 0.5 + Math.sin(a2) * r, s.centerZ() + 0.5 + Math.cos(a2) * r));
+                    out.add(new Edge(
+                            s.centerX() + 0.5 + Math.cos(a1) * r,
+                            s.centerY() + 0.5 + Math.sin(a1) * r,
+                            s.centerZ() + 0.5,
+                            s.centerX() + 0.5 + Math.cos(a2) * r,
+                            s.centerY() + 0.5 + Math.sin(a2) * r,
+                            s.centerZ() + 0.5));
+                    out.add(new Edge(
+                            s.centerX() + 0.5,
+                            s.centerY() + 0.5 + Math.sin(a1) * r,
+                            s.centerZ() + 0.5 + Math.cos(a1) * r,
+                            s.centerX() + 0.5,
+                            s.centerY() + 0.5 + Math.sin(a2) * r,
+                            s.centerZ() + 0.5 + Math.cos(a2) * r));
                 }
             }
             case Shape.ChunkSet c -> {

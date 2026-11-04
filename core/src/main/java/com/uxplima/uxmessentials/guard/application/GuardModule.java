@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.guard.application;
 
+import java.util.List;
+
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
@@ -7,7 +9,6 @@ import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
-import java.util.List;
 import org.jspecify.annotations.NullMarked;
 
 /**

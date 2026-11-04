@@ -1,11 +1,8 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.Causes;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import java.util.List;
 import java.util.Objects;
+
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -43,6 +40,11 @@ import org.bukkit.event.weather.LightningStrikeEvent;
 import org.bukkit.event.world.PortalCreateEvent;
 import org.bukkit.event.world.StructureGrowEvent;
 
+import com.uxplima.uxmessentials.guard.adapter.Causes;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
+
 /**
  * What nature does to blocks: liquids, fire, growth, spread, decay, forming and melting, pistons, dispensers,
  * portals, lightning and mob grief. Each is a {@code world.*} action decided against {@code everyone}; effects that
@@ -60,8 +62,11 @@ public final class NatureListener implements Listener {
     public void onFlow(BlockFromToEvent event) {
         Block from = event.getBlock();
         Block to = event.getToBlock();
-        ActionId action = from.getType() == Material.DRAGON_EGG ? BuiltInActions.WORLD_DRAGON_EGG
-                : from.getType() == Material.LAVA ? BuiltInActions.WORLD_LIQUID_LAVA : BuiltInActions.WORLD_LIQUID_WATER;
+        ActionId action = from.getType() == Material.DRAGON_EGG
+                ? BuiltInActions.WORLD_DRAGON_EGG
+                : from.getType() == Material.LAVA
+                        ? BuiltInActions.WORLD_LIQUID_LAVA
+                        : BuiltInActions.WORLD_LIQUID_WATER;
         if (!guard.allowWorld(action, from, to)) {
             event.setCancelled(true);
         }
@@ -74,15 +79,22 @@ public final class NatureListener implements Listener {
         ActionId action;
         if (Tag.FIRE.isTagged(type)) {
             action = BuiltInActions.WORLD_FIRE_SPREAD;
-        } else if (type == Material.VINE || type == Material.CAVE_VINES || type == Material.TWISTING_VINES
-                || type == Material.WEEPING_VINES || type == Material.GLOW_LICHEN) {
+        } else if (type == Material.VINE
+                || type == Material.CAVE_VINES
+                || type == Material.TWISTING_VINES
+                || type == Material.WEEPING_VINES
+                || type == Material.GLOW_LICHEN) {
             action = BuiltInActions.WORLD_GROW_VINE;
         } else if (type.name().contains("SCULK")) {
             action = BuiltInActions.WORLD_GROW_SCULK;
         } else if (type.name().contains("AMETHYST")) {
             action = BuiltInActions.WORLD_GROW_AMETHYST;
-        } else if (type.name().contains("MUSHROOM") || type == Material.BAMBOO || type == Material.CHORUS_FLOWER
-                || type == Material.CHORUS_PLANT || type == Material.KELP || type == Material.SUGAR_CANE
+        } else if (type.name().contains("MUSHROOM")
+                || type == Material.BAMBOO
+                || type == Material.CHORUS_FLOWER
+                || type == Material.CHORUS_PLANT
+                || type == Material.KELP
+                || type == Material.SUGAR_CANE
                 || type == Material.CACTUS) {
             action = BuiltInActions.WORLD_GROW_OTHER;
         } else {
@@ -96,8 +108,8 @@ public final class NatureListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onGrow(BlockGrowEvent event) {
         Block block = event.getBlock();
-        if (!guard.allowWorld(BuiltInActions.WORLD_GROW_CROP, block.getWorld(), block.getX(), block.getY(),
-                block.getZ())) {
+        if (!guard.allowWorld(
+                BuiltInActions.WORLD_GROW_CROP, block.getWorld(), block.getX(), block.getY(), block.getZ())) {
             event.setCancelled(true);
         }
     }
@@ -108,8 +120,15 @@ public final class NatureListener implements Listener {
         Player player = event.getPlayer();
         List<BlockState> blocks = event.getBlocks();
         blocks.removeIf(state -> !guard.allowWorld(BuiltInActions.WORLD_GROW_TREE, origin, state.getBlock())
-                || (player != null && !guard.allow(player, BuiltInActions.ITEM_USE_BONE_MEAL,
-                        state.getWorld(), state.getX(), state.getY(), state.getZ(), false)));
+                || (player != null
+                        && !guard.allow(
+                                player,
+                                BuiltInActions.ITEM_USE_BONE_MEAL,
+                                state.getWorld(),
+                                state.getX(),
+                                state.getY(),
+                                state.getZ(),
+                                false)));
         if (blocks.isEmpty()) {
             event.setCancelled(true);
         }
@@ -139,8 +158,11 @@ public final class NatureListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onFade(BlockFadeEvent event) {
         Material type = event.getBlock().getType();
-        ActionId action = type == Material.SNOW || type == Material.ICE || type == Material.SNOW_BLOCK
-                || type == Material.FROSTED_ICE ? BuiltInActions.WORLD_MELT
+        ActionId action = type == Material.SNOW
+                        || type == Material.ICE
+                        || type == Material.SNOW_BLOCK
+                        || type == Material.FROSTED_ICE
+                ? BuiltInActions.WORLD_MELT
                 : Tag.FIRE.isTagged(type) ? BuiltInActions.WORLD_FIRE_BURN : BuiltInActions.WORLD_FADE;
         if (!at(action, event.getBlock())) {
             event.setCancelled(true);
@@ -165,8 +187,8 @@ public final class NatureListener implements Listener {
     public void onBurn(BlockBurnEvent event) {
         Block block = event.getBlock();
         Block source = event.getIgnitingBlock();
-        boolean allowed = at(BuiltInActions.WORLD_FIRE_BURN, block)
-                && (source == null || guard.reachable(source, block));
+        boolean allowed =
+                at(BuiltInActions.WORLD_FIRE_BURN, block) && (source == null || guard.reachable(source, block));
         if (!allowed) {
             event.setCancelled(true);
         }
@@ -178,12 +200,13 @@ public final class NatureListener implements Listener {
             return;
         }
         Block block = event.getBlock();
-        ActionId action = switch (event.getCause()) {
-            case LAVA -> BuiltInActions.WORLD_FIRE_LAVA;
-            case LIGHTNING -> BuiltInActions.WORLD_FIRE_LIGHTNING;
-            case SPREAD -> BuiltInActions.WORLD_FIRE_SPREAD;
-            default -> BuiltInActions.WORLD_FIRE_BURN;
-        };
+        ActionId action =
+                switch (event.getCause()) {
+                    case LAVA -> BuiltInActions.WORLD_FIRE_LAVA;
+                    case LIGHTNING -> BuiltInActions.WORLD_FIRE_LIGHTNING;
+                    case SPREAD -> BuiltInActions.WORLD_FIRE_SPREAD;
+                    default -> BuiltInActions.WORLD_FIRE_BURN;
+                };
         Block source = event.getIgnitingBlock();
         boolean allowed = source == null ? at(action, block) : guard.allowWorld(action, source, block);
         if (!allowed) {
@@ -237,10 +260,16 @@ public final class NatureListener implements Listener {
         Player player = Causes.player(entity);
         for (BlockState state : event.getBlocks()) {
             boolean allowed = player != null
-                    ? guard.allow(player, BuiltInActions.PLACE, state.getWorld(), state.getX(), state.getY(),
-                            state.getZ(), true)
-                    : guard.allowWorld(BuiltInActions.WORLD_PORTAL, state.getWorld(), state.getX(), state.getY(),
-                            state.getZ());
+                    ? guard.allow(
+                            player,
+                            BuiltInActions.PLACE,
+                            state.getWorld(),
+                            state.getX(),
+                            state.getY(),
+                            state.getZ(),
+                            true)
+                    : guard.allowWorld(
+                            BuiltInActions.WORLD_PORTAL, state.getWorld(), state.getX(), state.getY(), state.getZ());
             if (!allowed) {
                 event.setCancelled(true);
                 return;
@@ -268,7 +297,8 @@ public final class NatureListener implements Listener {
         }
         Player player = Causes.player(entity);
         if (player != null) {
-            ActionId action = block.getType() == Material.FARMLAND ? BuiltInActions.TRAMPLE_CROP
+            ActionId action = block.getType() == Material.FARMLAND
+                    ? BuiltInActions.TRAMPLE_CROP
                     : event.getTo().isAir() ? BuiltInActions.BREAK : BuiltInActions.PLACE;
             if (!guard.allow(player, action, block.getWorld(), block.getX(), block.getY(), block.getZ(), false)) {
                 event.setCancelled(true);

@@ -1,5 +1,14 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+
+import org.bukkit.Location;
+import org.bukkit.Server;
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.guard.adapter.BukkitSubject;
 import com.uxplima.uxmessentials.guard.application.GuardService;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
@@ -10,13 +19,6 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RegionsPlaceholders;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import org.bukkit.Location;
-import org.bukkit.Server;
-import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -46,7 +48,8 @@ public final class GuardRegionsPlaceholders implements RegionsPlaceholders {
             List<String> owners = new ArrayList<>();
             List<String> members = new ArrayList<>();
             region.roles().forEach((id, role) -> {
-                String name = Optional.ofNullable(server.getOfflinePlayer(id).getName()).orElse(id.toString());
+                String name = Optional.ofNullable(server.getOfflinePlayer(id).getName())
+                        .orElse(id.toString());
                 if (role.equals(RoleName.OWNER)) {
                     owners.add(name);
                 } else {
@@ -70,7 +73,9 @@ public final class GuardRegionsPlaceholders implements RegionsPlaceholders {
 
     @Override
     public Optional<String> role(PlayerRef who) {
-        return set(who).flatMap(RegionSet::top).flatMap(top -> top.region().roleOf(who.uuid())).map(RoleName::value);
+        return set(who).flatMap(RegionSet::top)
+                .flatMap(top -> top.region().roleOf(who.uuid()))
+                .map(RoleName::value);
     }
 
     @Override
@@ -81,8 +86,15 @@ public final class GuardRegionsPlaceholders implements RegionsPlaceholders {
             return Optional.empty();
         }
         try {
-            return Optional.of(service.snapshot().check(player.getWorld().getName(), at.getBlockX(), at.getBlockY(),
-                    at.getBlockZ(), ActionId.of(action.replace('_', '.')), new BukkitSubject(player)) != Verdict.DENY);
+            return Optional.of(service.snapshot()
+                            .check(
+                                    player.getWorld().getName(),
+                                    at.getBlockX(),
+                                    at.getBlockY(),
+                                    at.getBlockZ(),
+                                    ActionId.of(action.replace('_', '.')),
+                                    new BukkitSubject(player))
+                    != Verdict.DENY);
         } catch (IllegalArgumentException invalid) {
             return Optional.empty();
         }

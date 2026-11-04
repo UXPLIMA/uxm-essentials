@@ -11,8 +11,8 @@ final class Precedence {
 
     private Precedence() {}
 
-    static final Comparator<CompiledRegion> ORDER = Comparator
-            .comparingInt((CompiledRegion r) -> -r.region().priority())
+    static final Comparator<CompiledRegion> ORDER = Comparator.comparingInt(
+                    (CompiledRegion r) -> -r.region().priority())
             .thenComparingLong(r -> r.region().shape().volume())
             .thenComparing(r -> r.region().id());
 }

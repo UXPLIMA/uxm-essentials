@@ -1,8 +1,5 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
-import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.persistence.guard.RegionJson;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -17,13 +14,18 @@ import java.util.List;
 import java.util.Objects;
 import java.util.stream.Stream;
 
+import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.persistence.guard.RegionJson;
+
 /**
  * Region backups as JSON files under {@code plugins/uxmEssentials/guard/backups}. A file is written to a temporary
  * name and moved into place, so a crash never leaves half a backup; the oldest files beyond the kept count go.
  */
 public final class FileGuardBackups implements GuardBackups {
 
-    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
+    private static final DateTimeFormatter STAMP =
+            DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneOffset.UTC);
 
     private final Path folder;
     private final Clock clock;

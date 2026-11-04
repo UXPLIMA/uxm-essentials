@@ -1,5 +1,21 @@
 package com.uxplima.uxmessentials.guard.application;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
+import java.util.function.UnaryOperator;
+
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardSync;
 import com.uxplima.uxmessentials.guard.application.port.GuardWorlds;
@@ -18,21 +34,6 @@ import com.uxplima.uxmessentials.guard.domain.engine.GuardSnapshot;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.function.Consumer;
-import java.util.function.UnaryOperator;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -61,7 +62,11 @@ public final class GuardService {
     private volatile long stamp;
 
     public GuardService(
-            GuardStore store, GuardSync sync, GuardWorlds worlds, Scheduler scheduler, GuardConfig config,
+            GuardStore store,
+            GuardSync sync,
+            GuardWorlds worlds,
+            Scheduler scheduler,
+            GuardConfig config,
             Consumer<String> warn) {
         this.store = Objects.requireNonNull(store, "store");
         this.sync = Objects.requireNonNull(sync, "sync");
@@ -171,7 +176,8 @@ public final class GuardService {
     public List<Region> near(String world, int x, int y, int z, int radius) {
         Bounds around = new Bounds(x - radius, y - radius, z - radius, x + radius, y + radius, z + radius);
         return regions(world).stream()
-                .filter(r -> !(r.shape() instanceof Shape.Global) && r.shape().bounds().intersects(around))
+                .filter(r -> !(r.shape() instanceof Shape.Global)
+                        && r.shape().bounds().intersects(around))
                 .sorted(Comparator.comparingLong(r -> distanceSq(r.shape().bounds(), x, y, z)))
                 .toList();
     }
@@ -352,7 +358,8 @@ public final class GuardService {
             synchronized (lock) {
                 Optional<Region> fresh = store.find(scope, key);
                 Region old = regions.get(key);
-                if (fresh.isPresent() && config.loadedScopes().contains(fresh.get().scope())) {
+                if (fresh.isPresent()
+                        && config.loadedScopes().contains(fresh.get().scope())) {
                     regions.put(key, fresh.get());
                 } else if (old != null && old.scope().equals(scope)) {
                     regions.remove(key);
@@ -446,8 +453,8 @@ public final class GuardService {
         try {
             store.write(before, after, ctx.actor(), change);
         } catch (RuntimeException e) {
-            warn.accept("guard: could not store a change to " + (after != null ? after.key() : before)
-                    + ": " + e.getMessage());
+            warn.accept("guard: could not store a change to " + (after != null ? after.key() : before) + ": "
+                    + e.getMessage());
             return Result.err(GuardError.STORE_FAILED);
         }
         Region subject = after != null ? after : Objects.requireNonNull(before);
@@ -478,8 +485,8 @@ public final class GuardService {
             loadFailed = false;
         } catch (RuntimeException e) {
             loadFailed = true;
-            warn.accept("guard: regions could not be loaded, every world is locked until they can be: "
-                    + e.getMessage());
+            warn.accept(
+                    "guard: regions could not be loaded, every world is locked until they can be: " + e.getMessage());
         }
         compileAll();
     }
@@ -506,8 +513,14 @@ public final class GuardService {
         WorldIndex previous = current.world(world).orElse(null);
         WorldIndex index = Compiler.compile(
                 tree,
-                new Compiler.Input(world, height.get().minY(), height.get().maxY(), regions(world),
-                        defaults.rules(), defaults.behaviours(), loadFailed),
+                new Compiler.Input(
+                        world,
+                        height.get().minY(),
+                        height.get().maxY(),
+                        regions(world),
+                        defaults.rules(),
+                        defaults.behaviours(),
+                        loadFailed),
                 config.templates(),
                 previous,
                 compiledTree);

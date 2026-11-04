@@ -1,15 +1,5 @@
 package com.uxplima.uxmessentials.guard.application;
 
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
-import com.uxplima.uxmessentials.guard.domain.Behaviours;
-import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
-import com.uxplima.uxmessentials.guard.domain.RoleName;
-import com.uxplima.uxmessentials.guard.domain.Rule;
-import com.uxplima.uxmessentials.guard.domain.Target;
-import com.uxplima.uxmessentials.guard.domain.Template;
-import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -20,6 +10,17 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
+
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.Behaviours;
+import com.uxplima.uxmessentials.guard.domain.Effect;
+import com.uxplima.uxmessentials.guard.domain.GuardScope;
+import com.uxplima.uxmessentials.guard.domain.RoleName;
+import com.uxplima.uxmessentials.guard.domain.Rule;
+import com.uxplima.uxmessentials.guard.domain.Target;
+import com.uxplima.uxmessentials.guard.domain.Template;
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 
 /**
  * The typed view of {@code modules/guard/config.conf}, read whole on start and on reload.
@@ -142,14 +143,15 @@ public record GuardConfig(
                 .filter(s -> !s.isEmpty())
                 .distinct()
                 .toList();
-        String scopeName = config.getString("network.new-region-scope", "server").strip();
-        GuardScope newScope = scopeName.equalsIgnoreCase("server") || !sets.contains(scopeName)
-                ? server
-                : GuardScope.set(scopeName);
+        String scopeName =
+                config.getString("network.new-region-scope", "server").strip();
+        GuardScope newScope =
+                scopeName.equalsIgnoreCase("server") || !sets.contains(scopeName) ? server : GuardScope.set(scopeName);
         if (!scopeName.equalsIgnoreCase("server") && !sets.contains(scopeName)) {
             problems.accept("network.new-region-scope names a set this server does not load: " + scopeName);
         }
-        String channel = config.getString("deny-message.channel", "actionbar").strip().toLowerCase(Locale.ROOT);
+        String channel =
+                config.getString("deny-message.channel", "actionbar").strip().toLowerCase(Locale.ROOT);
         if (!channel.equals("actionbar") && !channel.equals("chat")) {
             problems.accept("deny-message.channel must be actionbar or chat: " + channel);
             channel = "actionbar";
@@ -173,19 +175,28 @@ public record GuardConfig(
         Map<String, Template> templates = new LinkedHashMap<>();
         for (String name : config.getKeys("templates")) {
             String base = "templates." + name;
-            templates.put(name.toLowerCase(Locale.ROOT), new Template(name,
-                    rules(config.getStringList(base + ".rules", List.of()), base + ".rules", problems),
-                    behaviours(config.getStringList(base + ".behaviours", List.of()), base + ".behaviours",
-                            problems)));
+            templates.put(
+                    name.toLowerCase(Locale.ROOT),
+                    new Template(
+                            name,
+                            rules(config.getStringList(base + ".rules", List.of()), base + ".rules", problems),
+                            behaviours(
+                                    config.getStringList(base + ".behaviours", List.of()),
+                                    base + ".behaviours",
+                                    problems)));
         }
         Map<String, WorldDefaults> worlds = new LinkedHashMap<>();
         for (String name : config.getKeys("worlds")) {
             String base = "worlds." + name;
-            worlds.put(name, new WorldDefaults(
-                    config.getBoolean(base + ".high-frequency", true),
-                    rules(config.getStringList(base + ".rules", List.of()), base + ".rules", problems),
-                    behaviours(config.getStringList(base + ".behaviours", List.of()), base + ".behaviours",
-                            problems)));
+            worlds.put(
+                    name,
+                    new WorldDefaults(
+                            config.getBoolean(base + ".high-frequency", true),
+                            rules(config.getStringList(base + ".rules", List.of()), base + ".rules", problems),
+                            behaviours(
+                                    config.getStringList(base + ".behaviours", List.of()),
+                                    base + ".behaviours",
+                                    problems)));
         }
         return new GuardConfig(
                 config.getBoolean("enabled", true),

@@ -1,5 +1,12 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
@@ -10,12 +17,6 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -163,7 +164,10 @@ public final class CompiledRegion {
     }
 
     /** What one region said and why. */
-    record Decision(Verdict verdict, @Nullable ActionId node, @Nullable Rule rule) {
+    record Decision(
+            Verdict verdict,
+            @Nullable ActionId node,
+            @Nullable Rule rule) {
         static final Decision NONE = new Decision(Verdict.UNSET, null, null);
     }
 
@@ -214,13 +218,13 @@ public final class CompiledRegion {
             @Nullable Rule decisive = null;
             for (Rule rule : rules) {
                 Target target = rule.target();
-                boolean matches = target.dynamic() ? row != ROW_WORLD && matchesDynamic(target, subject)
+                boolean matches = target.dynamic()
+                        ? row != ROW_WORLD && matchesDynamic(target, subject)
                         : matchesStatic(target, row);
                 if (!matches) {
                     continue;
                 }
-                if (target.rank() < bestRank
-                        || (target.rank() == bestRank && rule.effect() == Effect.DENY)) {
+                if (target.rank() < bestRank || (target.rank() == bestRank && rule.effect() == Effect.DENY)) {
                     bestRank = target.rank();
                     decisive = rule;
                 }

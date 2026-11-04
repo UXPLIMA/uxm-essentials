@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -58,8 +59,8 @@ public record Region(
 
     /** A new region with nothing set. */
     public static Region create(RegionKey key, GuardScope scope, Shape shape) {
-        return new Region(key, scope, shape, 0, null, null, null, Set.of(), false, List.of(), Behaviours.empty(),
-                Map.of(), null);
+        return new Region(
+                key, scope, shape, 0, null, null, null, Set.of(), false, List.of(), Behaviours.empty(), Map.of(), null);
     }
 
     public RegionId id() {
@@ -76,58 +77,178 @@ public record Region(
     }
 
     public Region withShape(Shape newShape) {
-        return new Region(key, scope, newShape, priority, parent, family, template, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                newShape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withScope(GuardScope newScope) {
-        return new Region(key, newScope, shape, priority, parent, family, template, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                newScope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withPriority(int newPriority) {
-        return new Region(key, scope, shape, newPriority, parent, family, template, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                newPriority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withParent(@Nullable RegionId newParent) {
-        return new Region(key, scope, shape, priority, newParent, family, template, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                newParent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withFamily(@Nullable String newFamily) {
-        return new Region(key, scope, shape, priority, parent, newFamily, template, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                newFamily,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withTemplate(@Nullable String newTemplate) {
-        return new Region(key, scope, shape, priority, parent, family, newTemplate, tags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                newTemplate,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withTags(Set<String> newTags) {
-        return new Region(key, scope, shape, priority, parent, family, template, newTags, locked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                newTags,
+                locked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withLocked(boolean newLocked) {
-        return new Region(key, scope, shape, priority, parent, family, template, tags, newLocked, rules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                newLocked,
+                rules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     public Region withBehaviours(Behaviours newBehaviours) {
-        return new Region(key, scope, shape, priority, parent, family, template, tags, locked, rules, newBehaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                newBehaviours,
+                roles,
+                importBatch);
     }
 
     public Region withRoles(Map<UUID, RoleName> newRoles) {
-        return new Region(key, scope, shape, priority, parent, family, template, tags, locked, rules, behaviours,
-                newRoles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                rules,
+                behaviours,
+                newRoles,
+                importBatch);
     }
 
     public Region withImportBatch(@Nullable String batch) {
-        return new Region(key, scope, shape, priority, parent, family, template, tags, locked, rules, behaviours,
-                roles, batch);
+        return new Region(
+                key, scope, shape, priority, parent, family, template, tags, locked, rules, behaviours, roles, batch);
     }
 
     /** This region with {@code rule} added, replacing a rule for the same action and target. */
@@ -150,8 +271,20 @@ public record Region(
     }
 
     public Region withRules(List<Rule> newRules) {
-        return new Region(key, scope, shape, priority, parent, family, template, tags, locked, newRules, behaviours,
-                roles, importBatch);
+        return new Region(
+                key,
+                scope,
+                shape,
+                priority,
+                parent,
+                family,
+                template,
+                tags,
+                locked,
+                newRules,
+                behaviours,
+                roles,
+                importBatch);
     }
 
     /** This region with {@code player} holding {@code role}, or without any role when {@code role} is null. */

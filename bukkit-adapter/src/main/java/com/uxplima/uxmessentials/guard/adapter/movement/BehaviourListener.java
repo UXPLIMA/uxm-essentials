@@ -1,14 +1,10 @@
 package com.uxplima.uxmessentials.guard.adapter.movement;
 
-import com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
-import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+
 import org.bukkit.Location;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.EntityType;
@@ -24,6 +20,12 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import org.bukkit.event.player.PlayerToggleFlightEvent;
 import org.bukkit.potion.PotionEffect;
+
+import com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 
 /**
  * Behaviours enforced as things happen rather than on entering: invincibility, keeping inventory and experience,
@@ -61,8 +63,11 @@ public final class BehaviourListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onGlide(EntityToggleGlideEvent event) {
-        if (event.isGliding() && event.getEntity() instanceof Player player
-                && tracks.behaviour(player, BehaviourKey.GLIDE).filter("deny"::equals).isPresent()
+        if (event.isGliding()
+                && event.getEntity() instanceof Player player
+                && tracks.behaviour(player, BehaviourKey.GLIDE)
+                        .filter("deny"::equals)
+                        .isPresent()
                 && !guard.bypassOn(player)) {
             event.setCancelled(true);
         }
@@ -71,7 +76,10 @@ public final class BehaviourListener implements Listener {
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onFlight(PlayerToggleFlightEvent event) {
         Player player = event.getPlayer();
-        if (event.isFlying() && tracks.behaviour(player, BehaviourKey.FLY).filter("deny"::equals).isPresent()
+        if (event.isFlying()
+                && tracks.behaviour(player, BehaviourKey.FLY)
+                        .filter("deny"::equals)
+                        .isPresent()
                 && !guard.bypassOn(player)
                 && player.getGameMode() != org.bukkit.GameMode.CREATIVE
                 && player.getGameMode() != org.bukkit.GameMode.SPECTATOR) {
@@ -86,7 +94,8 @@ public final class BehaviourListener implements Listener {
             return;
         }
         Optional<String> blocked = tracks.behaviour(player, BehaviourKey.EFFECTS_BLOCK);
-        if (blocked.isPresent() && listed(blocked.get(), added.getType().getKey().getKey())) {
+        if (blocked.isPresent()
+                && listed(blocked.get(), added.getType().getKey().getKey())) {
             event.setCancelled(true);
         }
     }
@@ -128,7 +137,11 @@ public final class BehaviourListener implements Listener {
         }
         if (denied) {
             event.setCancelled(true);
-            guard.send(player, GuardMessageKey.DENY_COMMAND, Map.of("command", root), guard.config().denyChannel());
+            guard.send(
+                    player,
+                    GuardMessageKey.DENY_COMMAND,
+                    Map.of("command", root),
+                    guard.config().denyChannel());
         }
     }
 
@@ -151,8 +164,10 @@ public final class BehaviourListener implements Listener {
         for (String entry : rule.get().split(",", -1)) {
             String[] parts = entry.split(":", 2);
             String what = parts[0];
-            boolean typeMatches = what.equals("*") || what.equals(name)
-                    || (what.equals("monster") && monster) || (what.equals("animal") && !monster);
+            boolean typeMatches = what.equals("*")
+                    || what.equals(name)
+                    || (what.equals("monster") && monster)
+                    || (what.equals("animal") && !monster);
             boolean reasonMatches = parts.length < 2 || parts[1].equals("*") || parts[1].equals(why);
             if (typeMatches && reasonMatches) {
                 return true;

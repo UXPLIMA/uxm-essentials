@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.guard.domain;
 
 import java.util.List;
 import java.util.Objects;
+
 import org.jspecify.annotations.Nullable;
 
 /**

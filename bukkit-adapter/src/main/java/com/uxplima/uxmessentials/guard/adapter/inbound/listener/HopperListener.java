@@ -1,14 +1,16 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import java.util.Objects;
+
 import org.bukkit.Location;
 import org.bukkit.block.Block;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryMoveItemEvent;
+
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 
 /**
  * Hoppers, droppers and hopper minecarts moving items between containers. A move is refused when the destination
@@ -27,12 +29,16 @@ public final class HopperListener implements Listener {
     public void onMove(InventoryMoveItemEvent event) {
         Location from = event.getSource().getLocation();
         Location to = event.getDestination().getLocation();
-        if (from == null || to == null || from.getWorld() == null || !from.getWorld().equals(to.getWorld())) {
+        if (from == null
+                || to == null
+                || from.getWorld() == null
+                || !from.getWorld().equals(to.getWorld())) {
             return;
         }
         Block source = from.getBlock();
         Block target = to.getBlock();
-        if (!guard.allowWorld(BuiltInActions.WORLD_HOPPER, source, target) || !guard.reachable(/* source= */ target, /* target= */ source)) {
+        if (!guard.allowWorld(BuiltInActions.WORLD_HOPPER, source, target)
+                || !guard.reachable(/* source= */ target, /* target= */ source)) {
             event.setCancelled(true);
         }
     }

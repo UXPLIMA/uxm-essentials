@@ -1,22 +1,5 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
-import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportKind;
-import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportOutcome;
-import com.uxplima.uxmessentials.guard.application.EditContext;
-import com.uxplima.uxmessentials.guard.application.GuardService;
-import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
-import com.uxplima.uxmessentials.guard.domain.Behaviours;
-import com.uxplima.uxmessentials.guard.domain.Bounds;
-import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.guard.domain.RegionId;
-import com.uxplima.uxmessentials.guard.domain.RegionKey;
-import com.uxplima.uxmessentials.guard.domain.RoleName;
-import com.uxplima.uxmessentials.guard.domain.Rule;
-import com.uxplima.uxmessentials.guard.domain.Shape;
-import com.uxplima.uxmessentials.guard.domain.Target;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -41,11 +24,32 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
+
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
 import org.bukkit.plugin.Plugin;
+
+import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportKind;
+import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportOutcome;
+import com.uxplima.uxmessentials.guard.application.EditContext;
+import com.uxplima.uxmessentials.guard.application.GuardService;
+import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.Behaviours;
+import com.uxplima.uxmessentials.guard.domain.Bounds;
+import com.uxplima.uxmessentials.guard.domain.Effect;
+import com.uxplima.uxmessentials.guard.domain.GuardScope;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.guard.domain.RegionId;
+import com.uxplima.uxmessentials.guard.domain.RegionKey;
+import com.uxplima.uxmessentials.guard.domain.RoleName;
+import com.uxplima.uxmessentials.guard.domain.Rule;
+import com.uxplima.uxmessentials.guard.domain.Shape;
+import com.uxplima.uxmessentials.guard.domain.Target;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -63,10 +67,25 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
 public final class WorldGuardImporter {
 
     /** The build family WorldGuard's membership default covers. */
-    private static final List<String> BUILD = List.of("break", "place", "use", "interact", "damage.animal",
-            "damage.villager", "damage.armor-stand", "damage.hanging", "damage.vehicle", "vehicle.place",
-            "vehicle.destroy", "hanging.place", "hanging.break", "item.use.bucket", "item.use.lighter",
-            "item.use.bone-meal", "item.use.spawn-egg", "trample");
+    private static final List<String> BUILD = List.of(
+            "break",
+            "place",
+            "use",
+            "interact",
+            "damage.animal",
+            "damage.villager",
+            "damage.armor-stand",
+            "damage.hanging",
+            "damage.vehicle",
+            "vehicle.place",
+            "vehicle.destroy",
+            "hanging.place",
+            "hanging.break",
+            "item.use.bucket",
+            "item.use.lighter",
+            "item.use.bone-meal",
+            "item.use.spawn-egg",
+            "trample");
 
     /** WorldGuard state flags and the actions each covers. */
     private static final Map<String, List<String>> STATE = Map.ofEntries(
@@ -96,8 +115,9 @@ public final class WorldGuardImporter {
             Map.entry("creeper-explosion", List.of("world.explosion.creeper")),
             Map.entry("enderdragon-block-damage", List.of("world.mob.other")),
             Map.entry("ghast-fireball", List.of("world.explosion.ghast")),
-            Map.entry("other-explosion", List.of("world.explosion.other", "world.explosion.bed",
-                    "world.explosion.crystal")),
+            Map.entry(
+                    "other-explosion",
+                    List.of("world.explosion.other", "world.explosion.bed", "world.explosion.crystal")),
             Map.entry("breeze-charge-explosion", List.of("world.explosion.breeze")),
             Map.entry("wither-damage", List.of("world.explosion.wither", "world.mob.wither")),
             Map.entry("enderman-grief", List.of("world.mob.enderman")),
@@ -174,14 +194,16 @@ public final class WorldGuardImporter {
     public CompletableFuture<ImportOutcome> run(String mode, String source, EditContext ctx) {
         CompletableFuture<ImportOutcome> future = new CompletableFuture<>();
         // A thread of its own: the import waits on the service, which works on the async lane.
-        Thread worker = new Thread(() -> {
-            try {
-                future.complete(runNow(mode, source, ctx));
-            } catch (Exception e) {
-                warn.accept("WorldGuard import failed: " + e.getMessage());
-                future.completeExceptionally(e);
-            }
-        }, "uxmEssentials guard import");
+        Thread worker = new Thread(
+                () -> {
+                    try {
+                        future.complete(runNow(mode, source, ctx));
+                    } catch (Exception e) {
+                        warn.accept("WorldGuard import failed: " + e.getMessage());
+                        future.completeExceptionally(e);
+                    }
+                },
+                "uxmEssentials guard import");
         worker.setDaemon(true);
         worker.start();
         return future;
@@ -212,11 +234,12 @@ public final class WorldGuardImporter {
             }
         }
         int rules = converted.stream().mapToInt(r -> r.rules().size()).sum();
-        int behaviours = converted.stream().mapToInt(r -> r.behaviours().asMap().size()).sum();
+        int behaviours =
+                converted.stream().mapToInt(r -> r.behaviours().asMap().size()).sum();
         List<String> header = new ArrayList<>();
         header.add("WorldGuard import " + mode + " from " + source + " at " + Instant.now());
-        header.add(read.size() + " regions read, " + converted.size() + " converted, " + rules + " rules, "
-                + behaviours + " behaviours, " + report.size() + " notes");
+        header.add(read.size() + " regions read, " + converted.size() + " converted, " + rules + " rules, " + behaviours
+                + " behaviours, " + report.size() + " notes");
         header.add("");
         header.addAll(report);
         Path reportFile = folder.resolve("import-report.txt");
@@ -227,8 +250,13 @@ public final class WorldGuardImporter {
         backups.write(service.all(), "before-import", service.config().backupsKept());
         List<RegionKey> skipped = service.importRegions(converted, ctx).get();
         Files.writeString(batchFile, batch, StandardCharsets.UTF_8);
-        return new ImportOutcome(ImportKind.IMPORTED, converted.size() - skipped.size(), rules, behaviours,
-                report.size(), skipped.size());
+        return new ImportOutcome(
+                ImportKind.IMPORTED,
+                converted.size() - skipped.size(),
+                rules,
+                behaviours,
+                report.size(),
+                skipped.size());
     }
 
     // ---- reading ------------------------------------------------------------------------------------------------
@@ -245,16 +273,22 @@ public final class WorldGuardImporter {
             if (!file.isFile()) {
                 continue;
             }
-            YamlConfiguration yaml = YamlConfiguration.loadConfiguration(file);
-            ConfigurationSection regions = yaml.getConfigurationSection("regions");
-            if (regions == null) {
-                continue;
-            }
-            for (String id : regions.getKeys(false)) {
-                ConfigurationSection r = regions.getConfigurationSection(id);
-                if (r != null) {
-                    out.add(fromSection(world.getName(), id, r));
-                }
+            out.addAll(parseYaml(world.getName(), YamlConfiguration.loadConfiguration(file)));
+        }
+        return out;
+    }
+
+    /** The regions of one world's {@code regions.yml}. */
+    static List<WgRegion> parseYaml(String world, YamlConfiguration yaml) {
+        List<WgRegion> out = new ArrayList<>();
+        ConfigurationSection regions = yaml.getConfigurationSection("regions");
+        if (regions == null) {
+            return out;
+        }
+        for (String id : regions.getKeys(false)) {
+            ConfigurationSection r = regions.getConfigurationSection(id);
+            if (r != null) {
+                out.add(fromSection(world, id, r));
             }
         }
         return out;
@@ -273,12 +307,24 @@ public final class WorldGuardImporter {
                 flags.put(key, value instanceof ConfigurationSection section ? section.getValues(true) : value);
             }
         }
-        return new WgRegion(world, id, r.getString("type", "cuboid"), vector(r.getConfigurationSection("min")),
-                vector(r.getConfigurationSection("max")), points, r.getInt("min-y"), r.getInt("max-y"),
-                r.getInt("priority"), r.getString("parent"), flags,
-                uuids(r.getStringList("owners.unique-ids")), uuids(r.getStringList("members.unique-ids")),
-                new HashSet<>(r.getStringList("owners.groups")), new HashSet<>(r.getStringList("members.groups")),
-                new HashSet<>(r.getStringList("owners.players")), new HashSet<>(r.getStringList("members.players")));
+        return new WgRegion(
+                world,
+                id,
+                r.getString("type", "cuboid"),
+                vector(r.getConfigurationSection("min")),
+                vector(r.getConfigurationSection("max")),
+                points,
+                r.getInt("min-y"),
+                r.getInt("max-y"),
+                r.getInt("priority"),
+                r.getString("parent"),
+                flags,
+                uuids(r.getStringList("owners.unique-ids")),
+                uuids(r.getStringList("members.unique-ids")),
+                new HashSet<>(r.getStringList("owners.groups")),
+                new HashSet<>(r.getStringList("members.groups")),
+                new HashSet<>(r.getStringList("owners.players")),
+                new HashSet<>(r.getStringList("members.players")));
     }
 
     private List<WgRegion> readSql() throws IOException, SQLException {
@@ -301,22 +347,25 @@ public final class WorldGuardImporter {
                     worlds.put(rs.getInt(1), rs.getString(2));
                 }
             }
-            try (ResultSet rs = c.createStatement().executeQuery(
-                    "SELECT id, world_id, type, priority, parent FROM " + prefix + "region")) {
+            try (ResultSet rs = c.createStatement()
+                    .executeQuery("SELECT id, world_id, type, priority, parent FROM " + prefix + "region")) {
                 while (rs.next()) {
                     String world = worlds.getOrDefault(rs.getInt(2), "world");
                     WgBuilder b = new WgBuilder(world, rs.getString(1), rs.getString(3), rs.getInt(4), rs.getString(5));
                     byKey.put(rs.getInt(2) + ":" + rs.getString(1), b);
                 }
             }
-            query(c, "SELECT region_id, world_id, min_x, min_y, min_z, max_x, max_y, max_z FROM " + prefix
-                    + "region_cuboid", rs -> {
-                WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
-                if (b != null) {
-                    b.min = new Vec(rs.getInt(3), rs.getInt(4), rs.getInt(5));
-                    b.max = new Vec(rs.getInt(6), rs.getInt(7), rs.getInt(8));
-                }
-            });
+            query(
+                    c,
+                    "SELECT region_id, world_id, min_x, min_y, min_z, max_x, max_y, max_z FROM " + prefix
+                            + "region_cuboid",
+                    rs -> {
+                        WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
+                        if (b != null) {
+                            b.min = new Vec(rs.getInt(3), rs.getInt(4), rs.getInt(5));
+                            b.max = new Vec(rs.getInt(6), rs.getInt(7), rs.getInt(8));
+                        }
+                    });
             query(c, "SELECT region_id, world_id, min_y, max_y FROM " + prefix + "region_poly2d", rs -> {
                 WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
                 if (b != null) {
@@ -339,27 +388,33 @@ public final class WorldGuardImporter {
                     }
                 }
             });
-            query(c, "SELECT p.region_id, p.world_id, u.uuid, u.name, p.owner FROM " + prefix + "region_players p "
-                    + "JOIN " + prefix + "user u ON u.id = p.user_id", rs -> {
-                WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
-                if (b == null) {
-                    return;
-                }
-                String uuid = rs.getString(3);
-                boolean owner = rs.getBoolean(5);
-                if (uuid != null && !uuid.isBlank()) {
-                    (owner ? b.owners : b.members).add(UUID.fromString(uuid));
-                } else if (rs.getString(4) != null) {
-                    (owner ? b.ownerNames : b.memberNames).add(rs.getString(4));
-                }
-            });
-            query(c, "SELECT r.region_id, r.world_id, g.name, r.owner FROM " + prefix + "region_groups r "
-                    + "JOIN " + prefix + "group g ON g.id = r.group_id", rs -> {
-                WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
-                if (b != null) {
-                    (rs.getBoolean(4) ? b.ownerGroups : b.memberGroups).add(rs.getString(3));
-                }
-            });
+            query(
+                    c,
+                    "SELECT p.region_id, p.world_id, u.uuid, u.name, p.owner FROM " + prefix + "region_players p "
+                            + "JOIN " + prefix + "user u ON u.id = p.user_id",
+                    rs -> {
+                        WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
+                        if (b == null) {
+                            return;
+                        }
+                        String uuid = rs.getString(3);
+                        boolean owner = rs.getBoolean(5);
+                        if (uuid != null && !uuid.isBlank()) {
+                            (owner ? b.owners : b.members).add(UUID.fromString(uuid));
+                        } else if (rs.getString(4) != null) {
+                            (owner ? b.ownerNames : b.memberNames).add(rs.getString(4));
+                        }
+                    });
+            query(
+                    c,
+                    "SELECT r.region_id, r.world_id, g.name, r.owner FROM " + prefix + "region_groups r " + "JOIN "
+                            + prefix + "group g ON g.id = r.group_id",
+                    rs -> {
+                        WgBuilder b = byKey.get(rs.getInt(2) + ":" + rs.getString(1));
+                        if (b != null) {
+                            (rs.getBoolean(4) ? b.ownerGroups : b.memberGroups).add(rs.getString(3));
+                        }
+                    });
         }
         return byKey.values().stream().map(WgBuilder::build).toList();
     }
@@ -369,7 +424,8 @@ public final class WorldGuardImporter {
     }
 
     private static void query(Connection c, String sql, RowHandler handler) throws SQLException {
-        try (PreparedStatement statement = c.prepareStatement(sql); ResultSet rs = statement.executeQuery()) {
+        try (PreparedStatement statement = c.prepareStatement(sql);
+                ResultSet rs = statement.executeQuery()) {
             while (rs.next()) {
                 handler.row(rs);
             }
@@ -382,8 +438,11 @@ public final class WorldGuardImporter {
         final String type;
         final int priority;
         final @Nullable String parent;
+
         @Nullable Vec min;
+
         @Nullable Vec max;
+
         int minY;
         int maxY;
         final List<int[]> points = new ArrayList<>();
@@ -404,14 +463,47 @@ public final class WorldGuardImporter {
         }
 
         WgRegion build() {
-            return new WgRegion(world, id, type, min, max, points, minY, maxY, priority, parent, flags, owners,
-                    members, ownerGroups, memberGroups, ownerNames, memberNames);
+            return new WgRegion(
+                    world,
+                    id,
+                    type,
+                    min,
+                    max,
+                    points,
+                    minY,
+                    maxY,
+                    priority,
+                    parent,
+                    flags,
+                    owners,
+                    members,
+                    ownerGroups,
+                    memberGroups,
+                    ownerNames,
+                    memberNames);
         }
     }
 
     // ---- converting ---------------------------------------------------------------------------------------------
 
     Region convert(WgRegion wg, String batch, List<String> report) {
+        return convert(
+                wg,
+                batch,
+                service.config().newRegionScope(),
+                name -> {
+                    OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
+                    return player == null ? null : player.getUniqueId();
+                },
+                report);
+    }
+
+    /**
+     * Convert one WorldGuard region: shape, priority, parent, owners and members as roles, flags as rules or
+     * behaviours. {@code names} finds the UUID of a player stored by name; anything not converted goes to the report.
+     */
+    static Region convert(
+            WgRegion wg, String batch, GuardScope scope, Function<String, @Nullable UUID> names, List<String> report) {
         String where = wg.world() + ":" + wg.id();
         String id = wg.id().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "-");
         boolean global = wg.id().equals("__global__") || wg.type().equals("global");
@@ -422,8 +514,7 @@ public final class WorldGuardImporter {
             throw new IllegalArgumentException("id cannot be converted: " + wg.id());
         }
         Shape shape = shape(wg, global);
-        Region region = Region.create(new RegionKey(wg.world(), RegionId.of(id)), service.config().newRegionScope(),
-                        shape)
+        Region region = Region.create(new RegionKey(wg.world(), RegionId.of(id)), scope, shape)
                 .withPriority(global ? -100_000 : wg.priority())
                 .withImportBatch(batch);
         if (wg.parent() != null && !global) {
@@ -435,8 +526,8 @@ public final class WorldGuardImporter {
         Map<UUID, RoleName> roles = new HashMap<>();
         wg.members().forEach(u -> roles.put(u, RoleName.MEMBER));
         wg.owners().forEach(u -> roles.put(u, RoleName.OWNER));
-        resolveNames(wg.memberNames(), RoleName.MEMBER, roles, where, report);
-        resolveNames(wg.ownerNames(), RoleName.OWNER, roles, where, report);
+        resolveNames(wg.memberNames(), RoleName.MEMBER, roles, where, report, names);
+        resolveNames(wg.ownerNames(), RoleName.OWNER, roles, where, report, names);
         region = region.withRoles(roles);
 
         List<Rule> rules = new ArrayList<>();
@@ -460,14 +551,16 @@ public final class WorldGuardImporter {
             Object value = flag.getValue();
             List<String> actions = STATE.get(name);
             if (actions != null) {
-                Effect effect = "allow".equalsIgnoreCase(String.valueOf(value)) ? Effect.ALLOW
+                Effect effect = "allow".equalsIgnoreCase(String.valueOf(value))
+                        ? Effect.ALLOW
                         : "deny".equalsIgnoreCase(String.valueOf(value)) ? Effect.DENY : null;
                 if (effect == null) {
                     report.add(where + ": flag " + name + " has a value that is not allow or deny: " + value);
                     continue;
                 }
-                String group = String.valueOf(wg.flags().getOrDefault(name + "-group",
-                        DEFAULT_GROUP.getOrDefault(name, "all"))).toLowerCase(Locale.ROOT);
+                String group = String.valueOf(
+                                wg.flags().getOrDefault(name + "-group", DEFAULT_GROUP.getOrDefault(name, "all")))
+                        .toLowerCase(Locale.ROOT);
                 for (Target target : targets(group, wg)) {
                     for (String action : actions) {
                         rules.add(new Rule(ActionId.of(action), target, effect));
@@ -507,10 +600,10 @@ public final class WorldGuardImporter {
             case "weather-lock" -> out.put(BehaviourKey.WEATHER, text.equalsIgnoreCase("downfall") ? "rain" : "clear");
             case "blocked-cmds" -> out.put(BehaviourKey.COMMANDS_DENY, commands(value));
             case "allowed-cmds" -> out.put(BehaviourKey.COMMANDS_ALLOW, commands(value));
-            case "heal-amount" -> out.put(BehaviourKey.HEAL,
-                    text + " " + Math.max(1, number(flags.getOrDefault("heal-delay", 1))));
-            case "feed-amount" -> out.put(BehaviourKey.FEED,
-                    text + " " + Math.max(1, number(flags.getOrDefault("feed-delay", 1))));
+            case "heal-amount" ->
+                out.put(BehaviourKey.HEAL, text + " " + Math.max(1, number(flags.getOrDefault("heal-delay", 1))));
+            case "feed-amount" ->
+                out.put(BehaviourKey.FEED, text + " " + Math.max(1, number(flags.getOrDefault("feed-delay", 1))));
             case "heal-delay", "feed-delay" -> {
                 // Read together with the amount above.
             }
@@ -519,7 +612,8 @@ public final class WorldGuardImporter {
                     out.put(BehaviourKey.SPAWN_DENY, "*");
                 }
             }
-            case "deny-spawn" -> out.put(BehaviourKey.SPAWN_DENY, commands(value).replace("minecraft:", ""));
+            case "deny-spawn" ->
+                out.put(BehaviourKey.SPAWN_DENY, commands(value).replace("minecraft:", ""));
             default -> {
                 return false;
             }
@@ -567,13 +661,18 @@ public final class WorldGuardImporter {
     }
 
     private static void resolveNames(
-            Set<String> names, RoleName role, Map<UUID, RoleName> roles, String where, List<String> report) {
-        for (String name : names) {
-            OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
-            if (player == null) {
+            Set<String> wanted,
+            RoleName role,
+            Map<UUID, RoleName> roles,
+            String where,
+            List<String> report,
+            Function<String, @Nullable UUID> names) {
+        for (String name : wanted) {
+            UUID id = names.apply(name);
+            if (id == null) {
                 report.add(where + ": player name " + name + " has no known UUID and was left out");
             } else {
-                roles.putIfAbsent(player.getUniqueId(), role);
+                roles.putIfAbsent(id, role);
             }
         }
     }
@@ -608,11 +707,29 @@ public final class WorldGuardImporter {
 
     /** WorldGuard messages use {@code &} codes; turn the common ones into MiniMessage tags. */
     private static String legacy(String text) {
-        String[][] codes = {{"&0", "<black>"}, {"&1", "<dark_blue>"}, {"&2", "<dark_green>"}, {"&3", "<dark_aqua>"},
-            {"&4", "<dark_red>"}, {"&5", "<dark_purple>"}, {"&6", "<gold>"}, {"&7", "<gray>"}, {"&8", "<dark_gray>"},
-            {"&9", "<blue>"}, {"&a", "<green>"}, {"&b", "<aqua>"}, {"&c", "<red>"}, {"&d", "<light_purple>"},
-            {"&e", "<yellow>"}, {"&f", "<white>"}, {"&l", "<bold>"}, {"&o", "<italic>"}, {"&n", "<underlined>"},
-            {"&m", "<strikethrough>"}, {"&r", "<reset>"}};
+        String[][] codes = {
+            {"&0", "<black>"},
+            {"&1", "<dark_blue>"},
+            {"&2", "<dark_green>"},
+            {"&3", "<dark_aqua>"},
+            {"&4", "<dark_red>"},
+            {"&5", "<dark_purple>"},
+            {"&6", "<gold>"},
+            {"&7", "<gray>"},
+            {"&8", "<dark_gray>"},
+            {"&9", "<blue>"},
+            {"&a", "<green>"},
+            {"&b", "<aqua>"},
+            {"&c", "<red>"},
+            {"&d", "<light_purple>"},
+            {"&e", "<yellow>"},
+            {"&f", "<white>"},
+            {"&l", "<bold>"},
+            {"&o", "<italic>"},
+            {"&n", "<underlined>"},
+            {"&m", "<strikethrough>"},
+            {"&r", "<reset>"}
+        };
         String out = text;
         for (String[] code : codes) {
             out = out.replace(code[0], code[1]).replace(code[0].toUpperCase(Locale.ROOT), code[1]);

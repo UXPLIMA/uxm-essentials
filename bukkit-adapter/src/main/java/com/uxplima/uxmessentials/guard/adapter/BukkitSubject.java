@@ -1,11 +1,13 @@
 package com.uxplima.uxmessentials.guard.adapter;
 
+import java.util.UUID;
+import java.util.function.UnaryOperator;
+
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmlib.condition.Comparison;
-import java.util.UUID;
-import java.util.function.UnaryOperator;
-import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 /**

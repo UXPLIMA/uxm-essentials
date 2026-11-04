@@ -1,10 +1,7 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
-import com.uxplima.uxmessentials.guard.adapter.Causes;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import java.util.Objects;
+
 import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -24,6 +21,11 @@ import org.bukkit.event.player.PlayerBucketEmptyEvent;
 import org.bukkit.event.player.PlayerBucketEntityEvent;
 import org.bukkit.event.player.PlayerBucketFillEvent;
 
+import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
+import com.uxplima.uxmessentials.guard.adapter.Causes;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
+
 /**
  * Breaking and placing by players: blocks, multi-block placements, signs, buckets, hanging entities, vehicles and
  * other placed entities, fire started with a lighter, and bone meal. Registered while any rule uses
@@ -40,7 +42,8 @@ public final class BlockListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
         Block block = event.getBlock();
-        if (!guard.allowBlock(event.getPlayer(), BuiltInActions.BREAK, block, block.getType().name(), true)) {
+        if (!guard.allowBlock(
+                event.getPlayer(), BuiltInActions.BREAK, block, block.getType().name(), true)) {
             event.setCancelled(true);
         }
     }
@@ -49,8 +52,12 @@ public final class BlockListener implements Listener {
     public void onPlace(BlockPlaceEvent event) {
         if (event instanceof BlockMultiPlaceEvent multi) {
             for (BlockState state : multi.getReplacedBlockStates()) {
-                if (!guard.allowBlock(event.getPlayer(), BuiltInActions.PLACE, state.getBlock(),
-                        event.getBlockPlaced().getType().name(), false)) {
+                if (!guard.allowBlock(
+                        event.getPlayer(),
+                        BuiltInActions.PLACE,
+                        state.getBlock(),
+                        event.getBlockPlaced().getType().name(),
+                        false)) {
                     event.setCancelled(true);
                     return;
                 }
@@ -58,7 +65,8 @@ public final class BlockListener implements Listener {
             return;
         }
         Block block = event.getBlockPlaced();
-        if (!guard.allowBlock(event.getPlayer(), BuiltInActions.PLACE, block, block.getType().name(), false)) {
+        if (!guard.allowBlock(
+                event.getPlayer(), BuiltInActions.PLACE, block, block.getType().name(), false)) {
             event.setCancelled(true);
         }
     }
@@ -74,8 +82,13 @@ public final class BlockListener implements Listener {
     public void onBucketEmpty(PlayerBucketEmptyEvent event) {
         Player player = event.getPlayer();
         Block target = event.getBlock();
-        if (!guard.allowItem(player, BuiltInActions.ITEM_USE_BUCKET, target.getLocation(), event.getBucket().name())
-                || !guard.allowBlock(player, BuiltInActions.PLACE, target, event.getBucket().name(), false)) {
+        if (!guard.allowItem(
+                        player,
+                        BuiltInActions.ITEM_USE_BUCKET,
+                        target.getLocation(),
+                        event.getBucket().name())
+                || !guard.allowBlock(
+                        player, BuiltInActions.PLACE, target, event.getBucket().name(), false)) {
             event.setCancelled(true);
         }
     }
@@ -84,15 +97,23 @@ public final class BlockListener implements Listener {
     public void onBucketFill(PlayerBucketFillEvent event) {
         Player player = event.getPlayer();
         Block target = event.getBlockClicked();
-        if (!guard.allowItem(player, BuiltInActions.ITEM_USE_BUCKET, target.getLocation(), event.getBucket().name())
-                || !guard.allowBlock(player, BuiltInActions.BREAK, target, target.getType().name(), true)) {
+        if (!guard.allowItem(
+                        player,
+                        BuiltInActions.ITEM_USE_BUCKET,
+                        target.getLocation(),
+                        event.getBucket().name())
+                || !guard.allowBlock(
+                        player, BuiltInActions.BREAK, target, target.getType().name(), true)) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onBucketEntity(PlayerBucketEntityEvent event) {
-        if (!guard.allow(event.getPlayer(), BuiltInActions.INTERACT_ANIMAL, event.getEntity().getLocation())) {
+        if (!guard.allow(
+                event.getPlayer(),
+                BuiltInActions.INTERACT_ANIMAL,
+                event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -100,7 +121,9 @@ public final class BlockListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onHangingPlace(HangingPlaceEvent event) {
         Player player = event.getPlayer();
-        if (player != null && !guard.allow(player, BuiltInActions.HANGING_PLACE, event.getEntity().getLocation())) {
+        if (player != null
+                && !guard.allow(
+                        player, BuiltInActions.HANGING_PLACE, event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -112,7 +135,9 @@ public final class BlockListener implements Listener {
             return;
         }
         boolean vehicle = event.getEntity() instanceof org.bukkit.entity.Vehicle;
-        if (!guard.allow(player, vehicle ? BuiltInActions.VEHICLE_PLACE : BuiltInActions.PLACE,
+        if (!guard.allow(
+                player,
+                vehicle ? BuiltInActions.VEHICLE_PLACE : BuiltInActions.PLACE,
                 event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
@@ -124,7 +149,10 @@ public final class BlockListener implements Listener {
         if (player == null) {
             return;
         }
-        if (!guard.allowItem(player, BuiltInActions.ITEM_USE_LIGHTER, event.getBlock().getLocation(),
+        if (!guard.allowItem(
+                player,
+                BuiltInActions.ITEM_USE_LIGHTER,
+                event.getBlock().getLocation(),
                 Material.FLINT_AND_STEEL.name())) {
             event.setCancelled(true);
         }

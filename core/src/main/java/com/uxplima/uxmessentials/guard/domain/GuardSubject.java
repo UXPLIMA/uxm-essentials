@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.guard.domain;
 
 import java.util.UUID;
+
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -1,17 +1,5 @@
 package com.uxplima.uxmessentials.guard.adapter.movement;
 
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
-import com.uxplima.uxmessentials.guard.domain.Behaviours;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
-import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
-import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,9 +11,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import net.kyori.adventure.bossbar.BossBar;
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.title.Title;
+
 import org.bukkit.GameMode;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
@@ -35,6 +21,23 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.potion.PotionEffect;
 import org.bukkit.potion.PotionEffectType;
+
+import net.kyori.adventure.bossbar.BossBar;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.title.Title;
+
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.Behaviours;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
+import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -60,19 +63,28 @@ public final class PlayerTracks {
     /** One player's region state and the values behaviours took over. */
     static final class Track {
         @Nullable RegionSet set;
+
         @Nullable Location safe;
+
         long lastInterval;
         long lastHeal;
         long lastFeed;
         long lastReminder;
+
         @Nullable Boolean allowFlight;
+
         @Nullable Boolean invulnerable;
+
         @Nullable Float walkSpeed;
+
         @Nullable Float flySpeed;
+
         @Nullable GameMode gameMode;
+
         boolean timeSet;
         boolean weatherSet;
         Set<PotionEffectType> given = new HashSet<>();
+
         @Nullable BossBar bar;
     }
 
@@ -107,19 +119,46 @@ public final class PlayerTracks {
         List<Region> left = minus(previous, next);
         List<Region> entered = minus(next, previous);
         if (!left.isEmpty() || teleport) {
-            if (!guard.allow(player, teleport ? BuiltInActions.MOVE_TELEPORT_OUT : BuiltInActions.MOVE_EXIT,
-                    from.getWorld(), from.getBlockX(), from.getBlockY(), from.getBlockZ(), false)
-                    || (!left.isEmpty() && !guard.allow(player, BuiltInActions.MOVE_EXIT, from.getWorld(),
-                            from.getBlockX(), from.getBlockY(), from.getBlockZ(), false))) {
+            if (!guard.allow(
+                            player,
+                            teleport ? BuiltInActions.MOVE_TELEPORT_OUT : BuiltInActions.MOVE_EXIT,
+                            from.getWorld(),
+                            from.getBlockX(),
+                            from.getBlockY(),
+                            from.getBlockZ(),
+                            false)
+                    || (!left.isEmpty()
+                            && !guard.allow(
+                                    player,
+                                    BuiltInActions.MOVE_EXIT,
+                                    from.getWorld(),
+                                    from.getBlockX(),
+                                    from.getBlockY(),
+                                    from.getBlockZ(),
+                                    false))) {
                 refuse(player, previous, BehaviourKey.EXIT_DENY_MESSAGE, GuardMessageKey.DENY_EXIT);
                 return pushBack(track, from, previous, teleport);
             }
         }
         if (!entered.isEmpty() || teleport) {
-            boolean teleportAllowed = !teleport || guard.allow(player, BuiltInActions.MOVE_TELEPORT_IN, to.getWorld(),
-                    to.getBlockX(), to.getBlockY(), to.getBlockZ(), false);
-            boolean enterAllowed = entered.isEmpty() || guard.allow(player, BuiltInActions.MOVE_ENTER, to.getWorld(),
-                    to.getBlockX(), to.getBlockY(), to.getBlockZ(), false);
+            boolean teleportAllowed = !teleport
+                    || guard.allow(
+                            player,
+                            BuiltInActions.MOVE_TELEPORT_IN,
+                            to.getWorld(),
+                            to.getBlockX(),
+                            to.getBlockY(),
+                            to.getBlockZ(),
+                            false);
+            boolean enterAllowed = entered.isEmpty()
+                    || guard.allow(
+                            player,
+                            BuiltInActions.MOVE_ENTER,
+                            to.getWorld(),
+                            to.getBlockX(),
+                            to.getBlockY(),
+                            to.getBlockZ(),
+                            false);
             if (!teleportAllowed || !enterAllowed) {
                 refuse(player, next, BehaviourKey.ENTER_DENY_MESSAGE, GuardMessageKey.DENY_ENTER);
                 return pushBack(track, from, next, teleport);
@@ -171,8 +210,9 @@ public final class PlayerTracks {
             return;
         }
         Location at = player.getLocation();
-        if (at != null && track.safe != null && (track.safe.getWorld() != at.getWorld()
-                || track.safe.distanceSquared(at) > 64)) {
+        if (at != null
+                && track.safe != null
+                && (track.safe.getWorld() != at.getWorld() || track.safe.distanceSquared(at) > 64)) {
             // Folia skips the move event for some teleports and respawns; catch up here.
             refresh(player);
             track.safe = at;
@@ -183,7 +223,8 @@ public final class PlayerTracks {
             if (nowMillis - track.lastHeal >= Long.parseLong(parts[1]) * 1000L) {
                 track.lastHeal = nowMillis;
                 double max = Optional.ofNullable(player.getAttribute(org.bukkit.attribute.Attribute.MAX_HEALTH))
-                        .map(org.bukkit.attribute.AttributeInstance::getValue).orElse(20.0);
+                        .map(org.bukkit.attribute.AttributeInstance::getValue)
+                        .orElse(20.0);
                 if (!player.isDead()) {
                     player.setHealth(Math.min(max, player.getHealth() + Double.parseDouble(parts[0])));
                 }
@@ -199,14 +240,19 @@ public final class PlayerTracks {
         });
         Optional<String> interval = behaviours.get(BehaviourKey.ACTIONS_INTERVAL);
         if (interval.isPresent()) {
-            long every = behaviours.get(BehaviourKey.ACTIONS_INTERVAL_SECONDS).map(Long::parseLong).orElse(60L) * 1000L;
+            long every = behaviours
+                            .get(BehaviourKey.ACTIONS_INTERVAL_SECONDS)
+                            .map(Long::parseLong)
+                            .orElse(60L)
+                    * 1000L;
             if (nowMillis - track.lastInterval >= every) {
                 track.lastInterval = nowMillis;
                 actions.run(player, parse(interval.get()), false);
             }
         }
         if (guard.bypassOn(player)
-                && nowMillis - track.lastReminder >= guard.config().bypassReminder().toMillis()) {
+                && nowMillis - track.lastReminder
+                        >= guard.config().bypassReminder().toMillis()) {
             track.lastReminder = nowMillis;
             guard.send(player, GuardMessageKey.BYPASS_REMINDER, Map.of(), "actionbar");
         }
@@ -292,8 +338,8 @@ public final class PlayerTracks {
             player.setFlySpeed(track.flySpeed);
             track.flySpeed = null;
         }
-        Optional<GameMode> mode = after.get(BehaviourKey.GAME_MODE)
-                .map(v -> GameMode.valueOf(v.toUpperCase(Locale.ROOT)));
+        Optional<GameMode> mode =
+                after.get(BehaviourKey.GAME_MODE).map(v -> GameMode.valueOf(v.toUpperCase(Locale.ROOT)));
         if (mode.isPresent() && !player.hasPermission("uxmessentials.guard.bypass.gamemode")) {
             if (track.gameMode == null) {
                 track.gameMode = player.getGameMode();
@@ -331,8 +377,8 @@ public final class PlayerTracks {
                 }
                 int amplifier = parts.length > 1 ? parseInt(parts[1], 1) - 1 : 0;
                 wanted.add(type);
-                player.addPotionEffect(new PotionEffect(type, PotionEffect.INFINITE_DURATION, Math.max(0, amplifier),
-                        true, false, true));
+                player.addPotionEffect(new PotionEffect(
+                        type, PotionEffect.INFINITE_DURATION, Math.max(0, amplifier), true, false, true));
             }
         });
         for (PotionEffectType type : track.given) {
@@ -352,7 +398,10 @@ public final class PlayerTracks {
                 }
             }
         });
-        if (track.bar != null && after.get(BehaviourKey.MESSAGE_CHANNEL).filter("bossbar"::equals).isEmpty()) {
+        if (track.bar != null
+                && after.get(BehaviourKey.MESSAGE_CHANNEL)
+                        .filter("bossbar"::equals)
+                        .isEmpty()) {
             player.hideBossBar(track.bar);
             track.bar = null;
         }
@@ -379,7 +428,8 @@ public final class PlayerTracks {
         switch (channel) {
             case "title" -> {
                 String[] parts = text.get().split("\\|", 2);
-                player.showTitle(Title.title(StyledText.render(parts[0]),
+                player.showTitle(Title.title(
+                        StyledText.render(parts[0]),
                         parts.length > 1 ? StyledText.render(parts[1]) : Component.empty(),
                         Title.Times.times(Duration.ofMillis(250), Duration.ofSeconds(3), Duration.ofMillis(500))));
             }
@@ -409,8 +459,10 @@ public final class PlayerTracks {
         if (teleport) {
             return null;
         }
-        boolean push = set == null || set.behaviour(BehaviourKey.ENTER_PUSH_BACK).map(Boolean::parseBoolean)
-                .orElse(true);
+        boolean push = set == null
+                || set.behaviour(BehaviourKey.ENTER_PUSH_BACK)
+                        .map(Boolean::parseBoolean)
+                        .orElse(true);
         Location back = push && track.safe != null ? track.safe.clone() : from.clone();
         back.setYaw(from.getYaw());
         back.setPitch(from.getPitch());
@@ -433,8 +485,12 @@ public final class PlayerTracks {
         if (world == null) {
             return to;
         }
-        Location target = parts.length == 2 ? world.getSpawnLocation()
-                : new Location(world, Double.parseDouble(parts[2]), Double.parseDouble(parts[3]),
+        Location target = parts.length == 2
+                ? world.getSpawnLocation()
+                : new Location(
+                        world,
+                        Double.parseDouble(parts[2]),
+                        Double.parseDouble(parts[3]),
                         Double.parseDouble(parts[4]));
         player.setFallDistance(0);
         java.util.concurrent.CompletableFuture<Boolean> unused = player.teleportAsync(target);

@@ -1,5 +1,25 @@
 package com.uxplima.uxmessentials.guard.adapter;
 
+import java.time.Clock;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Consumer;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.block.Block;
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.guard.application.GuardConfig;
 import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.application.GuardService;
@@ -19,24 +39,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import java.time.Clock;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.Consumer;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.block.Block;
-import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -76,7 +78,11 @@ public final class GuardRuntime {
     public GuardRuntime(
             org.bukkit.plugin.Plugin plugin,
             com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler,
-            GuardService service, GuardStore store, Messages messages, MessageSink sink, Clock clock,
+            GuardService service,
+            GuardStore store,
+            Messages messages,
+            MessageSink sink,
+            Clock clock,
             Consumer<String> audit) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -146,8 +152,7 @@ public final class GuardRuntime {
     }
 
     /** May {@code player} do {@code action} at a block position. */
-    public boolean allow(
-            Player player, ActionId action, @Nullable World world, int x, int y, int z, boolean tell) {
+    public boolean allow(Player player, ActionId action, @Nullable World world, int x, int y, int z, boolean tell) {
         if (world == null) {
             return true;
         }
@@ -205,10 +210,12 @@ public final class GuardRuntime {
             return true;
         }
         GuardSnapshot snap = service.snapshot();
-        WorldIndex index = at.getWorld() == null ? null : snap.worlds().get(at.getWorld().getName());
+        WorldIndex index =
+                at.getWorld() == null ? null : snap.worlds().get(at.getWorld().getName());
         if (index != null && !index.locked()) {
             RegionSet set = index.at(at.getBlockX(), at.getBlockY(), at.getBlockZ());
-            if (!set.wilderness() && listed(set, BehaviourKey.ITEMS_USE_DENY, material.toLowerCase(Locale.ROOT))
+            if (!set.wilderness()
+                    && listed(set, BehaviourKey.ITEMS_USE_DENY, material.toLowerCase(Locale.ROOT))
                     && !bypasses(player, index, at.getBlockX(), at.getBlockY(), at.getBlockZ())) {
                 denied(player, action, index, at.getBlockX(), at.getBlockY(), at.getBlockZ(), true);
                 return false;
@@ -254,8 +261,8 @@ public final class GuardRuntime {
         if (index == null || index.size() == 0) {
             return index == null || !index.locked();
         }
-        return index.reachable(source.getX(), source.getY(), source.getZ(), target.getX(), target.getY(),
-                target.getZ());
+        return index.reachable(
+                source.getX(), source.getY(), source.getZ(), target.getX(), target.getY(), target.getZ());
     }
 
     /** True when some region exists in the world; listeners skip whole events otherwise. */
@@ -271,7 +278,8 @@ public final class GuardRuntime {
             return null;
         }
         WorldIndex index = service.snapshot().worlds().get(world.getName());
-        return index == null || index.locked() ? null
+        return index == null || index.locked()
+                ? null
                 : index.at(location.getBlockX(), location.getBlockY(), location.getBlockZ());
     }
 
@@ -346,14 +354,16 @@ public final class GuardRuntime {
                 }
             }
         }
-        String region = index.locked() ? "-" : index.at(x, y, z).top().map(r -> r.region().id().value()).orElse("-");
+        String region = index.locked()
+                ? "-"
+                : index.at(x, y, z).top().map(r -> r.region().id().value()).orElse("-");
         if (inspecting.contains(player.getUniqueId())) {
             inspect(player, player, action, index.world(), x, y, z);
         }
         alertIfRepeated(player, region, now);
         if (config().denialLog().enabled()) {
-            pendingLog.add(new GuardStore.Denial(clock.instant(), player.getName(), index.world(), x, y, z, region,
-                    action.value()));
+            pendingLog.add(new GuardStore.Denial(
+                    clock.instant(), player.getName(), index.world(), x, y, z, region, action.value()));
         }
     }
 
@@ -362,13 +372,20 @@ public final class GuardRuntime {
         Explanation explanation = service.snapshot().explain(world, x, y, z, action, new BukkitSubject(subject));
         for (Explanation.Step step : explanation.steps()) {
             if (step.decisive()) {
-                send(viewer, GuardMessageKey.INSPECT_LINE, Map.of(
-                        "player", subject.getName(),
-                        "action", action.value(),
-                        "region", step.region().id().value(),
-                        "node", step.node() == null ? "-" : step.node().value(),
-                        "rule", step.rule() == null ? "-" : StyledText.escape(step.rule().toString()),
-                        "result", step.result().name().toLowerCase(Locale.ROOT)), "chat");
+                send(
+                        viewer,
+                        GuardMessageKey.INSPECT_LINE,
+                        Map.of(
+                                "player", subject.getName(),
+                                "action", action.value(),
+                                "region", step.region().id().value(),
+                                "node", step.node() == null ? "-" : step.node().value(),
+                                "rule",
+                                        step.rule() == null
+                                                ? "-"
+                                                : StyledText.escape(step.rule().toString()),
+                                "result", step.result().name().toLowerCase(Locale.ROOT)),
+                        "chat");
             }
         }
     }
@@ -396,8 +413,14 @@ public final class GuardRuntime {
         }
         lastAlert.put(player.getUniqueId(), now);
         Map<String, String> values = Map.of(
-                "player", player.getName(), "region", region, "count", String.valueOf(count),
-                "seconds", String.valueOf(alerts.window().toSeconds()));
+                "player",
+                player.getName(),
+                "region",
+                region,
+                "count",
+                String.valueOf(count),
+                "seconds",
+                String.valueOf(alerts.window().toSeconds()));
         for (Player staff : Bukkit.getOnlinePlayers()) {
             if (staff.hasPermission(NOTIFY_PERMISSION)) {
                 send(staff, GuardMessageKey.ALERT, values, "chat");
@@ -447,9 +470,13 @@ public final class GuardRuntime {
     }
 
     private static boolean highFrequency(ActionId action) {
-        return action.value().startsWith("world.liquid") || action.value().startsWith("world.fire.spread")
-                || action.value().startsWith("world.grow") || action.value().startsWith("world.spread")
-                || action.value().startsWith("world.decay") || action.value().startsWith("world.form")
-                || action.value().startsWith("world.melt") || action.value().startsWith("world.fade");
+        return action.value().startsWith("world.liquid")
+                || action.value().startsWith("world.fire.spread")
+                || action.value().startsWith("world.grow")
+                || action.value().startsWith("world.spread")
+                || action.value().startsWith("world.decay")
+                || action.value().startsWith("world.form")
+                || action.value().startsWith("world.melt")
+                || action.value().startsWith("world.fade");
     }
 }

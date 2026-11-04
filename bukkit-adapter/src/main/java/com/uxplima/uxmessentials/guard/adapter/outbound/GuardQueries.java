@@ -1,11 +1,17 @@
 package com.uxplima.uxmessentials.guard.adapter.outbound;
 
+import java.util.ArrayList;
 import java.util.Comparator;
-import com.uxplima.uxmessentials.guard.domain.Shape;
-import com.uxplima.uxmessentials.guard.domain.Bounds;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+
+import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.api.query.UxmGuardQuery;
 import com.uxplima.uxmessentials.api.query.UxmRegionsQuery;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
@@ -14,22 +20,18 @@ import com.uxplima.uxmessentials.api.view.UxmRegionFlag;
 import com.uxplima.uxmessentials.guard.adapter.BukkitSubject;
 import com.uxplima.uxmessentials.guard.application.GuardService;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
 import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
+import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
+import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -51,7 +53,8 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
 
     @Override
     public CompletableFuture<List<UxmRegion>> in(String worldName) {
-        return CompletableFuture.completedFuture(service.regions(worldName).stream().map(GuardQueries::view).toList());
+        return CompletableFuture.completedFuture(
+                service.regions(worldName).stream().map(GuardQueries::view).toList());
     }
 
     @Override
@@ -69,9 +72,10 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
         if (index.isEmpty() || index.get().locked()) {
             return CompletableFuture.completedFuture(List.of());
         }
-        return CompletableFuture.completedFuture(index.get()
-                .at(block(where.x()), block(where.y()), block(where.z())).stored().stream()
-                .map(GuardQueries::view).toList());
+        return CompletableFuture.completedFuture(
+                index.get().at(block(where.x()), block(where.y()), block(where.z())).stored().stream()
+                        .map(GuardQueries::view)
+                        .toList());
     }
 
     @Override
@@ -97,7 +101,8 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
                     Bounds b = region.shape().bounds();
                     return b.maxX() >= x - r && b.minX() <= x + r && b.maxZ() >= z - r && b.minZ() <= z + r;
                 })
-                .sorted(Comparator.comparingLong(region -> horizontalGap(region.shape().bounds(), x, z)))
+                .sorted(Comparator.comparingLong(
+                        region -> horizontalGap(region.shape().bounds(), x, z)))
                 .map(GuardQueries::view)
                 .toList();
     }
@@ -145,8 +150,9 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
         } catch (IllegalArgumentException invalid) {
             return true;
         }
-        return service.snapshot().check(where.world(), block(where.x()), block(where.y()), block(where.z()), id,
-                subject) != Verdict.DENY;
+        return service.snapshot()
+                        .check(where.world(), block(where.x()), block(where.y()), block(where.z()), id, subject)
+                != Verdict.DENY;
     }
 
     /** A guard region as the public API shows it. */
@@ -162,7 +168,8 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
         });
         List<UxmRegionFlag> flags = new ArrayList<>();
         for (Rule rule : region.rules()) {
-            flags.add(new UxmRegionFlag(rule.action() + " " + rule.target().text(), rule.effect().word()));
+            flags.add(new UxmRegionFlag(
+                    rule.action() + " " + rule.target().text(), rule.effect().word()));
         }
         region.behaviours().asMap().forEach((key, value) -> flags.add(new UxmRegionFlag(key.key(), value)));
         return new UxmRegion(region.world(), region.id().value(), region.priority(), owners, members, flags);

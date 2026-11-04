@@ -1,9 +1,8 @@
 package com.uxplima.uxmessentials.guard.adapter.movement;
 
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
 import java.util.Map;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import java.util.Objects;
+
 import org.bukkit.Location;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
@@ -17,6 +16,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
+
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 
 /**
  * Feeds player movement into {@link PlayerTracks}. A move inside one block does nothing; a move to another block
@@ -36,8 +38,10 @@ public final class MovementListener implements Listener {
     public void onMove(PlayerMoveEvent event) {
         Location from = event.getFrom();
         Location to = event.getTo();
-        if (from.getBlockX() == to.getBlockX() && from.getBlockY() == to.getBlockY()
-                && from.getBlockZ() == to.getBlockZ() && from.getWorld() == to.getWorld()) {
+        if (from.getBlockX() == to.getBlockX()
+                && from.getBlockY() == to.getBlockY()
+                && from.getBlockZ() == to.getBlockZ()
+                && from.getWorld() == to.getWorld()) {
             return;
         }
         Location result = tracks.moved(event.getPlayer(), from, to, false);
@@ -68,7 +72,8 @@ public final class MovementListener implements Listener {
             if (passenger instanceof Player player) {
                 Location from = event.getFrom();
                 Location to = event.getTo();
-                if (from.getBlockX() == to.getBlockX() && from.getBlockZ() == to.getBlockZ()
+                if (from.getBlockX() == to.getBlockX()
+                        && from.getBlockZ() == to.getBlockZ()
                         && from.getBlockY() == to.getBlockY()) {
                     continue;
                 }

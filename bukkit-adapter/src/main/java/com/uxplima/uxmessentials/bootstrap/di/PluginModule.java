@@ -95,6 +95,9 @@ import com.uxplima.uxmessentials.economy.adapter.outbound.api.EconomyQueries;
 import com.uxplima.uxmessentials.economy.application.BalTop;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.guard.adapter.GuardWiring;
+import com.uxplima.uxmessentials.guard.adapter.outbound.GuardQueries;
+import com.uxplima.uxmessentials.guard.adapter.outbound.GuardRegionsPlaceholders;
 import com.uxplima.uxmessentials.holograms.adapter.HologramsWiring;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
@@ -147,9 +150,6 @@ import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
-import com.uxplima.uxmessentials.guard.adapter.GuardWiring;
-import com.uxplima.uxmessentials.guard.adapter.outbound.GuardQueries;
-import com.uxplima.uxmessentials.guard.adapter.outbound.GuardRegionsPlaceholders;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.OperatorLock;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
@@ -1632,28 +1632,25 @@ public final class PluginModule {
         // actions run through the same click action engine NPCs and holograms use. The stop hook unregisters every
         // listener, removes border displays and puts back what behaviours changed on online players.
         KernelPorts kernel = ctx.kernel();
-        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner commandRunner = new com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner(
-                new BukkitClickCommandRunner(), com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands.of(List.of()), kernel.log());
-        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner actionRunner = new com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner(
-                commandRunner,
-                new BukkitServerConnector(plugin, kernel.log()),
-                kernel.scheduler(),
-                kernel.permissions(),
-                Optional.empty(),
-                kernel.messages(),
-                com.uxplima.uxmessentials.guard.application.GuardMessageKey.DENY,
-                com.uxplima.uxmlib.item.SerializedItems::decode,
-                kernel.log());
+        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner commandRunner =
+                new com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner(
+                        new BukkitClickCommandRunner(),
+                        com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands.of(List.of()),
+                        kernel.log());
+        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner actionRunner =
+                new com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner(
+                        commandRunner,
+                        new BukkitServerConnector(plugin, kernel.log()),
+                        kernel.scheduler(),
+                        kernel.permissions(),
+                        Optional.empty(),
+                        kernel.messages(),
+                        com.uxplima.uxmessentials.guard.application.GuardMessageKey.DENY,
+                        com.uxplima.uxmlib.item.SerializedItems::decode,
+                        kernel.log());
         com.uxplima.uxmessentials.shared.application.port.Logger audit = links.auditChannel.logger();
         GuardWiring.Wired wired = GuardWiring.wire(
-                plugin,
-                ctx,
-                persistence,
-                bus,
-                actionRunner,
-                line -> audit.info(line),
-                menus,
-                menuBindings);
+                plugin, ctx, persistence, bus, actionRunner, line -> audit.info(line), menus, menuBindings);
         resources.addCommand(wired.command());
         resources.onClose(wired.stop());
         GuardQueries queries = new GuardQueries(wired.service());
@@ -2511,13 +2508,19 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ctx.kernel().log());
         mirrorWindow.register(menuBindings);
-        PlayerstateWiring.Wired wired =
-                PlayerstateWiring.wire(plugin, ctx, playtimeRepository, guiLayouts, menus, mirrorWindow, links.teams,
-                        (player, behaviour) -> links.queries
-                                .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
-                                .flatMap(guard -> guard.behaviour(player.getUniqueId(), behaviour))
-                                .filter("deny"::equals)
-                                .isPresent());
+        PlayerstateWiring.Wired wired = PlayerstateWiring.wire(
+                plugin,
+                ctx,
+                playtimeRepository,
+                guiLayouts,
+                menus,
+                mirrorWindow,
+                links.teams,
+                (player, behaviour) -> links.queries
+                        .find(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class)
+                        .flatMap(guard -> guard.behaviour(player.getUniqueId(), behaviour))
+                        .filter("deny"::equals)
+                        .isPresent());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();

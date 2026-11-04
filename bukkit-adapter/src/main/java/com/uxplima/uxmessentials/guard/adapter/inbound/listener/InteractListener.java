@@ -1,11 +1,7 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
-import io.papermc.paper.event.player.PlayerFlowerPotManipulateEvent;
 import java.util.Objects;
+
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -17,14 +13,21 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.entity.EntityMountEvent;
+import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.entity.PlayerLeashEntityEvent;
 import org.bukkit.event.player.PlayerShearEntityEvent;
 import org.bukkit.event.player.PlayerTakeLecternBookEvent;
 import org.bukkit.event.vehicle.VehicleEnterEvent;
 import org.bukkit.inventory.ItemStack;
+
+import io.papermc.paper.event.player.PlayerFlowerPotManipulateEvent;
+
+import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 
 /**
  * Right clicks on blocks and entities, stepping on blocks, and the special interactions Paper reports on their
@@ -44,7 +47,8 @@ public final class InteractListener implements Listener {
         Block block = event.getClickedBlock();
         Player player = event.getPlayer();
         if (event.getAction() == Action.PHYSICAL) {
-            if (block != null && event.useInteractedBlock() != Event.Result.DENY
+            if (block != null
+                    && event.useInteractedBlock() != Event.Result.DENY
                     && !guard.allow(player, physical(block.getType()), block)) {
                 event.setUseInteractedBlock(Event.Result.DENY);
                 event.setCancelled(true);
@@ -70,7 +74,9 @@ public final class InteractListener implements Listener {
             return;
         }
         boolean sneakingWithItem = player.isSneaking() && held != Material.AIR;
-        if (!sneakingWithItem && interactable(block) && event.useInteractedBlock() != Event.Result.DENY
+        if (!sneakingWithItem
+                && interactable(block)
+                && event.useInteractedBlock() != Event.Result.DENY
                 && !guard.allow(player, ActionKinds.use(block), block)) {
             event.setUseInteractedBlock(Event.Result.DENY);
             if (held == Material.AIR || !held.isBlock()) {
@@ -103,14 +109,20 @@ public final class InteractListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onArmorStand(PlayerArmorStandManipulateEvent event) {
-        if (!guard.allow(event.getPlayer(), BuiltInActions.INTERACT_ARMOR_STAND, event.getRightClicked().getLocation())) {
+        if (!guard.allow(
+                event.getPlayer(),
+                BuiltInActions.INTERACT_ARMOR_STAND,
+                event.getRightClicked().getLocation())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onLectern(PlayerTakeLecternBookEvent event) {
-        if (!guard.allow(event.getPlayer(), BuiltInActions.USE_LECTERN, event.getLectern().getBlock())) {
+        if (!guard.allow(
+                event.getPlayer(),
+                BuiltInActions.USE_LECTERN,
+                event.getLectern().getBlock())) {
             event.setCancelled(true);
         }
     }
@@ -124,14 +136,20 @@ public final class InteractListener implements Listener {
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onLeash(PlayerLeashEntityEvent event) {
-        if (!guard.allow(event.getPlayer(), BuiltInActions.INTERACT_ANIMAL, event.getEntity().getLocation())) {
+        if (!guard.allow(
+                event.getPlayer(),
+                BuiltInActions.INTERACT_ANIMAL,
+                event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onShear(PlayerShearEntityEvent event) {
-        if (!guard.allow(event.getPlayer(), BuiltInActions.INTERACT_ANIMAL, event.getEntity().getLocation())) {
+        if (!guard.allow(
+                event.getPlayer(),
+                BuiltInActions.INTERACT_ANIMAL,
+                event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -139,15 +157,22 @@ public final class InteractListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onVehicleEnter(VehicleEnterEvent event) {
         if (event.getEntered() instanceof Player player
-                && !guard.allow(player, BuiltInActions.INTERACT_VEHICLE, event.getVehicle().getLocation())) {
+                && !guard.allow(
+                        player,
+                        BuiltInActions.INTERACT_VEHICLE,
+                        event.getVehicle().getLocation())) {
             event.setCancelled(true);
         }
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onMount(EntityMountEvent event) {
-        if (event.getEntity() instanceof Player player && !(event.getMount() instanceof org.bukkit.entity.Vehicle)
-                && !guard.allow(player, ActionKinds.interact(event.getMount()), event.getMount().getLocation())) {
+        if (event.getEntity() instanceof Player player
+                && !(event.getMount() instanceof org.bukkit.entity.Vehicle)
+                && !guard.allow(
+                        player,
+                        ActionKinds.interact(event.getMount()),
+                        event.getMount().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -182,8 +207,12 @@ public final class InteractListener implements Listener {
 
     /** Tools that reshape the clicked block: stripping, pathing, tilling, waxing, scraping, brushing. */
     private static boolean shapesBlocks(Material held) {
-        return Tag.ITEMS_AXES.isTagged(held) || Tag.ITEMS_SHOVELS.isTagged(held) || Tag.ITEMS_HOES.isTagged(held)
-                || held == Material.HONEYCOMB || held == Material.BRUSH || held == Material.GLASS_BOTTLE
+        return Tag.ITEMS_AXES.isTagged(held)
+                || Tag.ITEMS_SHOVELS.isTagged(held)
+                || Tag.ITEMS_HOES.isTagged(held)
+                || held == Material.HONEYCOMB
+                || held == Material.BRUSH
+                || held == Material.GLASS_BOTTLE
                 || held == Material.SHEARS;
     }
 }

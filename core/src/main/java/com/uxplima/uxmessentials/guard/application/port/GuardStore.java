@@ -1,13 +1,14 @@
 package com.uxplima.uxmessentials.guard.application.port;
 
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
-import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.guard.domain.RegionKey;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+
+import com.uxplima.uxmessentials.guard.domain.GuardScope;
+import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.guard.domain.RegionKey;
 import org.jspecify.annotations.Nullable;
 
 /**

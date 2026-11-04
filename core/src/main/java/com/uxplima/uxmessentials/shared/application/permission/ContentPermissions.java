@@ -384,10 +384,7 @@ final class ContentPermissions {
                         PermissionDefault.OP,
                         GUARD),
                 PermissionSpec.of(
-                        "uxmessentials.guard.menu",
-                        "/guard menu: open the region menus.",
-                        PermissionDefault.OP,
-                        GUARD),
+                        "uxmessentials.guard.menu", "/guard menu: open the region menus.", PermissionDefault.OP, GUARD),
                 PermissionSpec.of(
                         "uxmessentials.guard.notify",
                         "Receive staff alerts when players repeatedly hit guard denials.",

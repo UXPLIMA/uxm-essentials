@@ -1,5 +1,28 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.gui;
 
+import java.nio.file.Path;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.function.BiConsumer;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
+
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand;
 import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.application.GuardService;
@@ -27,27 +50,6 @@ import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
 import com.uxplima.uxmlib.menu.spec.MenuSpecs;
-import java.nio.file.Path;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.function.BiConsumer;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
-import org.bukkit.Bukkit;
-import org.bukkit.Location;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.entity.Player;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -70,8 +72,8 @@ public final class GuardMenus {
     static final String TEMPLATES = "guard-templates";
     static final String HISTORY = "guard-history";
 
-    private static final List<String> SPECS = List.of(LIST, CHILDREN, HUB, RULES, ROLES, BEHAVIOURS, TEMPLATES,
-            HISTORY);
+    private static final List<String> SPECS =
+            List.of(LIST, CHILDREN, HUB, RULES, ROLES, BEHAVIOURS, TEMPLATES, HISTORY);
     private static final String BASE = "uxmessentials.guard.";
     private static final int HISTORY_ROWS = 45;
     private static final DateTimeFormatter TIME =
@@ -84,8 +86,13 @@ public final class GuardMenus {
     private final Messages messages;
     private final BiConsumer<Player, Runnable> onPlayer;
 
-    public GuardMenus(Menus menus, GuardService service, GuardCommand command, CommandFeedback feedback,
-            Messages messages, BiConsumer<Player, Runnable> onPlayer) {
+    public GuardMenus(
+            Menus menus,
+            GuardService service,
+            GuardCommand command,
+            CommandFeedback feedback,
+            Messages messages,
+            BiConsumer<Player, Runnable> onPlayer) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.service = Objects.requireNonNull(service, "service");
         this.command = Objects.requireNonNull(command, "command");
@@ -134,21 +141,38 @@ public final class GuardMenus {
     /** Register list sources, placeholders, actions and the window files; once at wiring. */
     public void register(MenuBindings bindings, Path dataFolder, Logger log) {
         bindings.list("guard:regions", this::regionRows);
-        bindings.placeholder("guard_region_id", ctx -> ctx.entry(Region.class).id().value());
-        bindings.placeholder("guard_region_world", ctx -> ctx.entry(Region.class).world());
-        bindings.placeholder("guard_region_shape", ctx -> ctx.entry(Region.class).shape().kind());
-        bindings.placeholder("guard_region_priority", ctx -> String.valueOf(ctx.entry(Region.class).priority()));
-        bindings.placeholder("guard_region_rules", ctx -> String.valueOf(ctx.entry(Region.class).rules().size()));
-        bindings.placeholder("guard_region_roles", ctx -> String.valueOf(ctx.entry(Region.class).roles().size()));
+        bindings.placeholder(
+                "guard_region_id", ctx -> ctx.entry(Region.class).id().value());
+        bindings.placeholder(
+                "guard_region_world", ctx -> ctx.entry(Region.class).world());
+        bindings.placeholder(
+                "guard_region_shape", ctx -> ctx.entry(Region.class).shape().kind());
+        bindings.placeholder(
+                "guard_region_priority",
+                ctx -> String.valueOf(ctx.entry(Region.class).priority()));
+        bindings.placeholder(
+                "guard_region_rules",
+                ctx -> String.valueOf(ctx.entry(Region.class).rules().size()));
+        bindings.placeholder(
+                "guard_region_roles",
+                ctx -> String.valueOf(ctx.entry(Region.class).roles().size()));
         bindings.placeholder("guard_region_icon", ctx -> regionIcon(ctx.entry(Region.class)));
-        bindings.placeholder("guard_list_world", ctx -> ctx.subject(RegionsView.class).world());
-        bindings.placeholder("guard_list_parent", ctx -> Optional.ofNullable(ctx.subject(RegionsView.class).parent())
-                .map(RegionId::value).orElse("-"));
-        bindings.action("guard:regions-open", ctx -> openHub(ctx.player(), ctx.entry(Region.class).key()));
+        bindings.placeholder(
+                "guard_list_world", ctx -> ctx.subject(RegionsView.class).world());
+        bindings.placeholder(
+                "guard_list_parent",
+                ctx -> Optional.ofNullable(ctx.subject(RegionsView.class).parent())
+                        .map(RegionId::value)
+                        .orElse("-"));
+        bindings.action(
+                "guard:regions-open",
+                ctx -> openHub(ctx.player(), ctx.entry(Region.class).key()));
         bindings.action("guard:regions-show", ctx -> {
             Region region = ctx.entry(Region.class);
             ctx.player().closeInventory();
-            ctx.player().performCommand("guard show " + region.world() + ":" + region.id().value());
+            ctx.player()
+                    .performCommand(
+                            "guard show " + region.world() + ":" + region.id().value());
         });
         bindings.action("guard:children-back", ctx -> {
             RegionsView view = ctx.subject(RegionsView.class);
@@ -166,29 +190,41 @@ public final class GuardMenus {
         history(bindings);
 
         for (String id : SPECS) {
-            menus.registerSpec(id, MenuSpecs.loadOrBundled("modules/guard/gui/" + id + ".conf", dataFolder, 6,
-                    EngineLog.of(log)));
+            menus.registerSpec(
+                    id, MenuSpecs.loadOrBundled("modules/guard/gui/" + id + ".conf", dataFolder, 6, EngineLog.of(log)));
         }
     }
 
     private void hub(MenuBindings bindings) {
-        bindings.placeholder("guard_hub_id", ctx -> ctx.subject(RegionView.class).key().id().value());
-        bindings.placeholder("guard_hub_world", ctx -> ctx.subject(RegionView.class).key().world());
+        bindings.placeholder(
+                "guard_hub_id", ctx -> ctx.subject(RegionView.class).key().id().value());
+        bindings.placeholder(
+                "guard_hub_world", ctx -> ctx.subject(RegionView.class).key().world());
         bindings.placeholder("guard_hub_priority", ctx -> hubValue(ctx, r -> String.valueOf(r.priority())));
-        bindings.placeholder("guard_hub_shape", ctx -> hubValue(ctx, r -> r.shape().kind()));
-        bindings.placeholder("guard_hub_scope", ctx -> hubValue(ctx, r -> r.scope().value()));
-        bindings.placeholder("guard_hub_parent", ctx -> hubValue(ctx, r -> r.parent() == null ? "-"
-                : r.parent().value()));
+        bindings.placeholder(
+                "guard_hub_shape", ctx -> hubValue(ctx, r -> r.shape().kind()));
+        bindings.placeholder(
+                "guard_hub_scope", ctx -> hubValue(ctx, r -> r.scope().value()));
+        bindings.placeholder(
+                "guard_hub_parent",
+                ctx -> hubValue(ctx, r -> r.parent() == null ? "-" : r.parent().value()));
         bindings.placeholder("guard_hub_family", ctx -> hubValue(ctx, r -> r.family() == null ? "-" : r.family()));
-        bindings.placeholder("guard_hub_template", ctx -> hubValue(ctx, r -> r.template() == null ? "-"
-                : r.template()));
-        bindings.placeholder("guard_hub_tags", ctx -> hubValue(ctx, r -> r.tags().isEmpty() ? "-"
-                : String.join(", ", r.tags())));
-        bindings.placeholder("guard_hub_rules", ctx -> hubValue(ctx, r -> String.valueOf(r.rules().size())));
-        bindings.placeholder("guard_hub_roles", ctx -> hubValue(ctx, r -> String.valueOf(r.roles().size())));
-        bindings.placeholder("guard_hub_behaviours",
+        bindings.placeholder(
+                "guard_hub_template", ctx -> hubValue(ctx, r -> r.template() == null ? "-" : r.template()));
+        bindings.placeholder(
+                "guard_hub_tags", ctx -> hubValue(ctx, r -> r.tags().isEmpty() ? "-" : String.join(", ", r.tags())));
+        bindings.placeholder(
+                "guard_hub_rules",
+                ctx -> hubValue(ctx, r -> String.valueOf(r.rules().size())));
+        bindings.placeholder(
+                "guard_hub_roles",
+                ctx -> hubValue(ctx, r -> String.valueOf(r.roles().size())));
+        bindings.placeholder(
+                "guard_hub_behaviours",
                 ctx -> hubValue(ctx, r -> String.valueOf(r.behaviours().asMap().size())));
-        bindings.placeholder("guard_hub_children", ctx -> hubValue(ctx, r -> String.valueOf(children(r).size())));
+        bindings.placeholder(
+                "guard_hub_children",
+                ctx -> hubValue(ctx, r -> String.valueOf(children(r).size())));
         bindings.placeholder("guard_hub_locked", ctx -> hubValue(ctx, r -> r.locked() ? "IRON_BARS" : "OAK_FENCE"));
 
         bindings.action("guard:hub-rules", ctx -> {
@@ -219,7 +255,8 @@ public final class GuardMenus {
         bindings.action("guard:hub-show", ctx -> {
             RegionKey key = hubKey(ctx);
             ctx.player().closeInventory();
-            ctx.player().performCommand("guard show " + key.world() + ":" + key.id().value());
+            ctx.player()
+                    .performCommand("guard show " + key.world() + ":" + key.id().value());
         });
         bindings.action("guard:hub-lock", ctx -> {
             if (!allowed(ctx, "lock")) {
@@ -227,9 +264,14 @@ public final class GuardMenus {
             }
             RegionKey key = hubKey(ctx);
             boolean locked = service.region(key).map(Region::locked).orElse(false);
-            edit(ctx.player(), key, "lock", r -> r.withLocked(!locked),
-                    locked ? GuardMessageKey.LOCK_OFF : GuardMessageKey.LOCK_ON, Map.of(), () -> openHub(ctx.player(),
-                            key));
+            edit(
+                    ctx.player(),
+                    key,
+                    "lock",
+                    r -> r.withLocked(!locked),
+                    locked ? GuardMessageKey.LOCK_OFF : GuardMessageKey.LOCK_ON,
+                    Map.of(),
+                    () -> openHub(ctx.player(), key));
         });
         bindings.action("guard:hub-remove", ctx -> {
             if (!allowed(ctx, "remove")) {
@@ -237,11 +279,18 @@ public final class GuardMenus {
             }
             Player player = ctx.player();
             RegionKey key = hubKey(ctx);
-            String title = messages.resolve(BukkitRefs.toRef(player), GuardMessageKey.GUI_REMOVE_CONFIRM,
+            String title = messages.resolve(
+                    BukkitRefs.toRef(player),
+                    GuardMessageKey.GUI_REMOVE_CONFIRM,
                     Map.of("region", key.id().value()));
-            menus.confirm(player, StyledText.render(title),
-                    () -> command.answerMenu(player, service.remove(key, command.editContext(player)),
-                            GuardMessageKey.REMOVED, Map.of("region", key.id().value()),
+            menus.confirm(
+                    player,
+                    StyledText.render(title),
+                    () -> command.answerMenu(
+                            player,
+                            service.remove(key, command.editContext(player)),
+                            GuardMessageKey.REMOVED,
+                            Map.of("region", key.id().value()),
                             () -> open(player, LIST, new RegionsView(key.world(), null))),
                     () -> openHub(player, key));
         });
@@ -257,13 +306,20 @@ public final class GuardMenus {
                 feedback.send(ctx.player(), GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", ctx.arg()));
                 return;
             }
-            edit(ctx.player(), key, "priority", r -> r.withPriority(value), GuardMessageKey.PRIORITY_SET,
-                    Map.of("priority", String.valueOf(value)), () -> openHub(ctx.player(), key));
+            edit(
+                    ctx.player(),
+                    key,
+                    "priority",
+                    r -> r.withPriority(value),
+                    GuardMessageKey.PRIORITY_SET,
+                    Map.of("priority", String.valueOf(value)),
+                    () -> openHub(ctx.player(), key));
         });
         bindings.action("guard-hub-tag-add", ctx -> tag(ctx, true));
         bindings.action("guard-hub-tag-remove", ctx -> tag(ctx, false));
-        bindings.action("guard:hub-back", ctx -> open(ctx.player(), LIST,
-                new RegionsView(hubKey(ctx).world(), null)));
+        bindings.action(
+                "guard:hub-back",
+                ctx -> open(ctx.player(), LIST, new RegionsView(hubKey(ctx).world(), null)));
     }
 
     private void tag(MenuActionContext ctx, boolean add) {
@@ -276,21 +332,28 @@ public final class GuardMenus {
             feedback.send(ctx.player(), GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", ctx.arg()));
             return;
         }
-        edit(ctx.player(), key, "tag", r -> {
-            Set<String> tags = new LinkedHashSet<>(r.tags());
-            if (add) {
-                tags.add(tag);
-            } else {
-                tags.remove(tag);
-            }
-            return r.withTags(tags);
-        }, add ? GuardMessageKey.TAG_ADDED : GuardMessageKey.TAG_REMOVED, Map.of("tag", tag),
+        edit(
+                ctx.player(),
+                key,
+                "tag",
+                r -> {
+                    Set<String> tags = new LinkedHashSet<>(r.tags());
+                    if (add) {
+                        tags.add(tag);
+                    } else {
+                        tags.remove(tag);
+                    }
+                    return r.withTags(tags);
+                },
+                add ? GuardMessageKey.TAG_ADDED : GuardMessageKey.TAG_REMOVED,
+                Map.of("tag", tag),
                 () -> openHub(ctx.player(), key));
     }
 
     private void rules(MenuBindings bindings) {
         bindings.list("guard:actions", this::actionRows);
-        bindings.placeholder("guard_action_id", ctx -> ctx.entry(ActionRow.class).id().value());
+        bindings.placeholder(
+                "guard_action_id", ctx -> ctx.entry(ActionRow.class).id().value());
         bindings.placeholder("guard_action_state", ctx -> {
             Effect effect = ctx.entry(ActionRow.class).effect();
             return effect == null ? "-" : effect.name().toLowerCase(Locale.ROOT);
@@ -299,11 +362,20 @@ public final class GuardMenus {
             Effect effect = ctx.entry(ActionRow.class).effect();
             return effect == null ? "GRAY_DYE" : effect == Effect.ALLOW ? "LIME_DYE" : "RED_DYE";
         });
-        bindings.placeholder("guard_action_children", ctx -> String.valueOf(ctx.entry(ActionRow.class).children()));
-        bindings.placeholder("guard_rules_target", ctx -> ctx.subject(RulesView.class).target().text());
-        bindings.placeholder("guard_rules_node", ctx -> Optional.ofNullable(ctx.subject(RulesView.class).node())
-                .map(ActionId::value).orElse("*"));
-        bindings.placeholder("guard_rules_region", ctx -> ctx.subject(RulesView.class).key().id().value());
+        bindings.placeholder(
+                "guard_action_children",
+                ctx -> String.valueOf(ctx.entry(ActionRow.class).children()));
+        bindings.placeholder(
+                "guard_rules_target",
+                ctx -> ctx.subject(RulesView.class).target().text());
+        bindings.placeholder(
+                "guard_rules_node",
+                ctx -> Optional.ofNullable(ctx.subject(RulesView.class).node())
+                        .map(ActionId::value)
+                        .orElse("*"));
+        bindings.placeholder(
+                "guard_rules_region",
+                ctx -> ctx.subject(RulesView.class).key().id().value());
 
         bindings.action("guard:rule-cycle", ctx -> {
             if (!allowed(ctx, "rule")) {
@@ -312,15 +384,32 @@ public final class GuardMenus {
             RulesView view = ctx.subject(RulesView.class);
             ActionRow row = ctx.entry(ActionRow.class);
             Effect current = row.effect();
-            Map<String, String> values = Map.of("action", row.id().value(), "target", view.target().text(),
-                    "effect", current == null ? "allow" : current == Effect.ALLOW ? "deny" : "clear");
+            Map<String, String> values = Map.of(
+                    "action",
+                    row.id().value(),
+                    "target",
+                    view.target().text(),
+                    "effect",
+                    current == null ? "allow" : current == Effect.ALLOW ? "deny" : "clear");
             if (current == Effect.DENY) {
-                edit(ctx.player(), view.key(), "rule", r -> r.withoutRule(row.id(), view.target()),
-                        GuardMessageKey.RULE_CLEARED, values, () -> open(ctx.player(), RULES, view, ctx.page()));
+                edit(
+                        ctx.player(),
+                        view.key(),
+                        "rule",
+                        r -> r.withoutRule(row.id(), view.target()),
+                        GuardMessageKey.RULE_CLEARED,
+                        values,
+                        () -> open(ctx.player(), RULES, view, ctx.page()));
             } else {
                 Effect next = current == null ? Effect.ALLOW : Effect.DENY;
-                edit(ctx.player(), view.key(), "rule", r -> r.withRule(new Rule(row.id(), view.target(), next)),
-                        GuardMessageKey.RULE_SET, values, () -> open(ctx.player(), RULES, view, ctx.page()));
+                edit(
+                        ctx.player(),
+                        view.key(),
+                        "rule",
+                        r -> r.withRule(new Rule(row.id(), view.target(), next)),
+                        GuardMessageKey.RULE_SET,
+                        values,
+                        () -> open(ctx.player(), RULES, view, ctx.page()));
             }
         });
         bindings.action("guard:rule-open", ctx -> {
@@ -359,10 +448,15 @@ public final class GuardMenus {
     }
 
     private void roles(MenuBindings bindings) {
-        bindings.list("guard:roles", ctx -> List.copyOf(ctx.subject(RolesView.class).rows()));
-        bindings.placeholder("guard_role_player", ctx -> ctx.entry(RoleRow.class).name());
-        bindings.placeholder("guard_role_name", ctx -> ctx.entry(RoleRow.class).role().value());
-        bindings.placeholder("guard_roles_region", ctx -> ctx.subject(RolesView.class).key().id().value());
+        bindings.list(
+                "guard:roles", ctx -> List.copyOf(ctx.subject(RolesView.class).rows()));
+        bindings.placeholder(
+                "guard_role_player", ctx -> ctx.entry(RoleRow.class).name());
+        bindings.placeholder(
+                "guard_role_name", ctx -> ctx.entry(RoleRow.class).role().value());
+        bindings.placeholder(
+                "guard_roles_region",
+                ctx -> ctx.subject(RolesView.class).key().id().value());
         bindings.action("guard:role-next", ctx -> {
             RolesView view = ctx.subject(RolesView.class);
             RoleRow row = ctx.entry(RoleRow.class);
@@ -402,8 +496,12 @@ public final class GuardMenus {
                 feedback.send(ctx.player(), GuardMessageKey.ERROR_NOT_MANAGER);
                 return;
             }
-            setRole(ctx.player(), view.key(), target.getUniqueId(),
-                    target.getName() == null ? name : target.getName(), RoleName.MEMBER);
+            setRole(
+                    ctx.player(),
+                    view.key(),
+                    target.getUniqueId(),
+                    target.getName() == null ? name : target.getName(),
+                    RoleName.MEMBER);
         });
         bindings.action("guard:roles-back", ctx -> {
             RegionKey key = ctx.subject(RolesView.class).key();
@@ -418,21 +516,26 @@ public final class GuardMenus {
     private void behaviours(MenuBindings bindings) {
         bindings.list("guard:behaviours", ctx -> {
             RegionKey key = ctx.subject(BehavioursView.class).key();
-            Map<BehaviourKey, String> set = service.region(key).map(r -> r.behaviours().asMap()).orElse(Map.of());
+            Map<BehaviourKey, String> set =
+                    service.region(key).map(r -> r.behaviours().asMap()).orElse(Map.of());
             List<Object> rows = new ArrayList<>();
             for (BehaviourKey behaviour : BehaviourKey.values()) {
                 rows.add(new BehaviourRow(behaviour, set.get(behaviour)));
             }
             return rows;
         });
-        bindings.placeholder("guard_behaviour_key", ctx -> ctx.entry(BehaviourRow.class).key().key());
+        bindings.placeholder(
+                "guard_behaviour_key",
+                ctx -> ctx.entry(BehaviourRow.class).key().key());
         bindings.placeholder("guard_behaviour_value", ctx -> {
             String value = ctx.entry(BehaviourRow.class).value();
             return value == null ? "-" : StyledText.escape(value);
         });
-        bindings.placeholder("guard_behaviour_icon",
-                ctx -> ctx.entry(BehaviourRow.class).value() == null ? "GRAY_DYE" : "NAME_TAG");
-        bindings.placeholder("guard_behaviours_region", ctx -> ctx.subject(BehavioursView.class).key().id().value());
+        bindings.placeholder(
+                "guard_behaviour_icon", ctx -> ctx.entry(BehaviourRow.class).value() == null ? "GRAY_DYE" : "NAME_TAG");
+        bindings.placeholder(
+                "guard_behaviours_region",
+                ctx -> ctx.subject(BehavioursView.class).key().id().value());
         bindings.action("guard-behaviour-set", ctx -> {
             if (!allowed(ctx, "set")) {
                 return;
@@ -446,8 +549,13 @@ public final class GuardMenus {
                 open(ctx.player(), BEHAVIOURS, new BehavioursView(key), ctx.page());
                 return;
             }
-            edit(ctx.player(), key, "set", r -> r.withBehaviours(r.behaviours().with(behaviour, value)),
-                    GuardMessageKey.BEHAVIOUR_SET, Map.of("key", behaviour.key(), "value", value),
+            edit(
+                    ctx.player(),
+                    key,
+                    "set",
+                    r -> r.withBehaviours(r.behaviours().with(behaviour, value)),
+                    GuardMessageKey.BEHAVIOUR_SET,
+                    Map.of("key", behaviour.key(), "value", value),
                     () -> open(ctx.player(), BEHAVIOURS, new BehavioursView(key), ctx.page()));
         });
         bindings.action("guard:behaviour-clear", ctx -> {
@@ -459,11 +567,17 @@ public final class GuardMenus {
             if (row.value() == null) {
                 return;
             }
-            edit(ctx.player(), key, "set", r -> r.withBehaviours(r.behaviours().without(row.key())),
-                    GuardMessageKey.BEHAVIOUR_CLEARED, Map.of("key", row.key().key(), "value", "-"),
+            edit(
+                    ctx.player(),
+                    key,
+                    "set",
+                    r -> r.withBehaviours(r.behaviours().without(row.key())),
+                    GuardMessageKey.BEHAVIOUR_CLEARED,
+                    Map.of("key", row.key().key(), "value", "-"),
                     () -> open(ctx.player(), BEHAVIOURS, new BehavioursView(key), ctx.page()));
         });
-        bindings.action("guard:behaviours-back",
+        bindings.action(
+                "guard:behaviours-back",
                 ctx -> openHub(ctx.player(), ctx.subject(BehavioursView.class).key()));
     }
 
@@ -477,53 +591,92 @@ public final class GuardMenus {
                     .forEach(t -> rows.add(new TemplateRow(t, t.name().equals(linked))));
             return rows;
         });
-        bindings.placeholder("guard_template_name", ctx -> ctx.entry(TemplateRow.class).template().name());
-        bindings.placeholder("guard_template_rules",
-                ctx -> String.valueOf(ctx.entry(TemplateRow.class).template().rules().size()));
-        bindings.placeholder("guard_template_behaviours",
-                ctx -> String.valueOf(ctx.entry(TemplateRow.class).template().behaviours().asMap().size()));
-        bindings.placeholder("guard_template_icon",
-                ctx -> ctx.entry(TemplateRow.class).linked() ? "ENCHANTED_BOOK" : "BOOK");
-        bindings.placeholder("guard_templates_region", ctx -> ctx.subject(TemplatesView.class).key().id().value());
+        bindings.placeholder(
+                "guard_template_name",
+                ctx -> ctx.entry(TemplateRow.class).template().name());
+        bindings.placeholder(
+                "guard_template_rules",
+                ctx -> String.valueOf(
+                        ctx.entry(TemplateRow.class).template().rules().size()));
+        bindings.placeholder(
+                "guard_template_behaviours",
+                ctx -> String.valueOf(ctx.entry(TemplateRow.class)
+                        .template()
+                        .behaviours()
+                        .asMap()
+                        .size()));
+        bindings.placeholder(
+                "guard_template_icon", ctx -> ctx.entry(TemplateRow.class).linked() ? "ENCHANTED_BOOK" : "BOOK");
+        bindings.placeholder(
+                "guard_templates_region",
+                ctx -> ctx.subject(TemplatesView.class).key().id().value());
         bindings.action("guard:template-apply", ctx -> {
             if (!allowed(ctx, "template")) {
                 return;
             }
             RegionKey key = ctx.subject(TemplatesView.class).key();
             String name = ctx.entry(TemplateRow.class).template().name();
-            edit(ctx.player(), key, "template", r -> r.withTemplate(name), GuardMessageKey.TEMPLATE_SET,
-                    Map.of("template", name), () -> open(ctx.player(), TEMPLATES, new TemplatesView(key)));
+            edit(
+                    ctx.player(),
+                    key,
+                    "template",
+                    r -> r.withTemplate(name),
+                    GuardMessageKey.TEMPLATE_SET,
+                    Map.of("template", name),
+                    () -> open(ctx.player(), TEMPLATES, new TemplatesView(key)));
         });
         bindings.action("guard:template-clear", ctx -> {
             if (!allowed(ctx, "template")) {
                 return;
             }
             RegionKey key = ctx.subject(TemplatesView.class).key();
-            edit(ctx.player(), key, "template", r -> r.withTemplate(null), GuardMessageKey.TEMPLATE_CLEARED,
-                    Map.of("template", "-"), () -> open(ctx.player(), TEMPLATES, new TemplatesView(key)));
+            edit(
+                    ctx.player(),
+                    key,
+                    "template",
+                    r -> r.withTemplate(null),
+                    GuardMessageKey.TEMPLATE_CLEARED,
+                    Map.of("template", "-"),
+                    () -> open(ctx.player(), TEMPLATES, new TemplatesView(key)));
         });
-        bindings.action("guard:templates-back",
+        bindings.action(
+                "guard:templates-back",
                 ctx -> openHub(ctx.player(), ctx.subject(TemplatesView.class).key()));
     }
 
     private void history(MenuBindings bindings) {
-        bindings.list("guard:history", ctx -> List.copyOf(ctx.subject(HistoryView.class).rows()));
-        bindings.placeholder("guard_history_id", ctx -> String.valueOf(ctx.entry(HistoryEntry.class).id()));
-        bindings.placeholder("guard_history_time", ctx -> TIME.format(ctx.entry(HistoryEntry.class).at()));
-        bindings.placeholder("guard_history_actor", ctx -> ctx.entry(HistoryEntry.class).actor());
-        bindings.placeholder("guard_history_change", ctx -> ctx.entry(HistoryEntry.class).change());
-        bindings.placeholder("guard_history_region", ctx -> ctx.subject(HistoryView.class).key().id().value());
+        bindings.list(
+                "guard:history",
+                ctx -> List.copyOf(ctx.subject(HistoryView.class).rows()));
+        bindings.placeholder(
+                "guard_history_id",
+                ctx -> String.valueOf(ctx.entry(HistoryEntry.class).id()));
+        bindings.placeholder(
+                "guard_history_time",
+                ctx -> TIME.format(ctx.entry(HistoryEntry.class).at()));
+        bindings.placeholder(
+                "guard_history_actor", ctx -> ctx.entry(HistoryEntry.class).actor());
+        bindings.placeholder(
+                "guard_history_change", ctx -> ctx.entry(HistoryEntry.class).change());
+        bindings.placeholder(
+                "guard_history_region",
+                ctx -> ctx.subject(HistoryView.class).key().id().value());
         bindings.action("guard:history-undo", ctx -> {
             if (!allowed(ctx, "undo")) {
                 return;
             }
             HistoryEntry entry = ctx.entry(HistoryEntry.class);
             RegionKey key = ctx.subject(HistoryView.class).key();
-            command.answerMenu(ctx.player(), service.undo(entry.id(), command.editContext(ctx.player())),
-                    GuardMessageKey.UNDONE, Map.of("id", String.valueOf(entry.id()), "region", key.id().value()),
+            command.answerMenu(
+                    ctx.player(),
+                    service.undo(entry.id(), command.editContext(ctx.player())),
+                    GuardMessageKey.UNDONE,
+                    Map.of("id", String.valueOf(entry.id()), "region", key.id().value()),
                     () -> openHistory(ctx.player(), key));
         });
-        bindings.action("guard:history-back", ctx -> openHub(ctx.player(), ctx.subject(HistoryView.class).key()));
+        bindings.action(
+                "guard:history-back",
+                ctx -> openHub(ctx.player(), ctx.subject(HistoryView.class).key()));
     }
 
     // ---- opening ------------------------------------------------------------------------------------------------
@@ -567,7 +720,10 @@ public final class GuardMenus {
 
     private void openHub(Player player, RegionKey key) {
         if (service.region(key).isEmpty()) {
-            feedback.send(player, GuardMessageKey.ERROR_NO_SUCH_REGION, Map.of("region", key.id().value()));
+            feedback.send(
+                    player,
+                    GuardMessageKey.ERROR_NO_SUCH_REGION,
+                    Map.of("region", key.id().value()));
             open(player, LIST, new RegionsView(key.world(), null));
             return;
         }
@@ -586,17 +742,18 @@ public final class GuardMenus {
         List<RoleRow> rows = new ArrayList<>();
         region.get().roles().forEach((id, role) -> {
             OfflinePlayer offline = Bukkit.getOfflinePlayer(id);
-            rows.add(new RoleRow(id, offline.getName() == null ? id.toString().substring(0, 8) : offline.getName(),
-                    role));
+            rows.add(new RoleRow(
+                    id, offline.getName() == null ? id.toString().substring(0, 8) : offline.getName(), role));
         });
-        rows.sort(Comparator.comparingInt((RoleRow r) -> RoleName.BUILT_IN.indexOf(r.role()) < 0 ? 9
-                : RoleName.BUILT_IN.indexOf(r.role())).thenComparing(RoleRow::name, String.CASE_INSENSITIVE_ORDER));
+        rows.sort(Comparator.comparingInt((RoleRow r) ->
+                        RoleName.BUILT_IN.indexOf(r.role()) < 0 ? 9 : RoleName.BUILT_IN.indexOf(r.role()))
+                .thenComparing(RoleRow::name, String.CASE_INSENSITIVE_ORDER));
         open(player, ROLES, new RolesView(key, rows));
     }
 
     private void openHistory(Player player, RegionKey key) {
-        var ignored = service.history(key, 0, HISTORY_ROWS).whenComplete((rows, error) -> onPlayer.accept(player,
-                () -> {
+        var ignored = service.history(key, 0, HISTORY_ROWS)
+                .whenComplete((rows, error) -> onPlayer.accept(player, () -> {
                     if (error != null) {
                         feedback.send(player, GuardMessageKey.ERROR_STORE_FAILED);
                         return;
@@ -622,8 +779,7 @@ public final class GuardMenus {
         if (parent != null) {
             regions.removeIf(r -> !parent.equals(r.parent()));
         }
-        regions.sort(Comparator.comparingInt(Region::priority).reversed()
-                .thenComparing(r -> r.id().value()));
+        regions.sort(Comparator.comparingInt(Region::priority).reversed().thenComparing(r -> r.id().value()));
         return List.copyOf(regions);
     }
 
@@ -680,8 +836,10 @@ public final class GuardMenus {
             all.addAll(service.config().extraRoles());
             return all;
         }
-        boolean manages = service.region(key).flatMap(r -> r.roleOf(player.getUniqueId()))
-                .map(RoleName::manages).orElse(false);
+        boolean manages = service.region(key)
+                .flatMap(r -> r.roleOf(player.getUniqueId()))
+                .map(RoleName::manages)
+                .orElse(false);
         return manages ? List.of(RoleName.MEMBER, RoleName.GUEST) : List.of();
     }
 
@@ -694,19 +852,34 @@ public final class GuardMenus {
     }
 
     private void setRole(Player player, RegionKey key, UUID target, String name, @Nullable RoleName role) {
-        Map<String, String> values = Map.of("region", key.id().value(), "player", name,
-                "role", role == null ? "-" : role.value());
-        edit(player, key, "role", r -> r.withRole(target, role),
-                role == null ? GuardMessageKey.ROLE_CLEARED : GuardMessageKey.ROLE_SET, values,
+        Map<String, String> values =
+                Map.of("region", key.id().value(), "player", name, "role", role == null ? "-" : role.value());
+        edit(
+                player,
+                key,
+                "role",
+                r -> r.withRole(target, role),
+                role == null ? GuardMessageKey.ROLE_CLEARED : GuardMessageKey.ROLE_SET,
+                values,
                 () -> openRoles(player, key));
     }
 
-    private void edit(Player player, RegionKey key, String change, UnaryOperator<Region> edit,
-            GuardMessageKey success, Map<String, String> extra, Runnable after) {
+    private void edit(
+            Player player,
+            RegionKey key,
+            String change,
+            UnaryOperator<Region> edit,
+            GuardMessageKey success,
+            Map<String, String> extra,
+            Runnable after) {
         Map<String, String> values = new HashMap<>(extra);
         values.putIfAbsent("region", key.id().value());
-        command.answerMenu(player, service.edit(key, change, edit, command.editContext(player)), success,
-                Map.copyOf(values), after);
+        command.answerMenu(
+                player,
+                service.edit(key, change, edit, command.editContext(player)),
+                success,
+                Map.copyOf(values),
+                after);
     }
 
     private boolean allowed(MenuActionContext ctx, String node) {

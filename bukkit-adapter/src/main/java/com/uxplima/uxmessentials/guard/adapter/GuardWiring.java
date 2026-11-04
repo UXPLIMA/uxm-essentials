@@ -1,5 +1,24 @@
 package com.uxplima.uxmessentials.guard.adapter;
 
+import java.time.Clock;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.event.world.WorldLoadEvent;
+import org.bukkit.event.world.WorldUnloadEvent;
+import org.bukkit.plugin.java.JavaPlugin;
+
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand;
 import com.uxplima.uxmessentials.guard.adapter.inbound.gui.GuardMenus;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.ListenerRegistry;
@@ -31,23 +50,6 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.network.GuardChanged;
-import java.time.Clock;
-import java.time.Duration;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import org.bukkit.World;
-import org.bukkit.entity.Player;
-import org.bukkit.event.EventHandler;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
-import org.bukkit.event.world.WorldLoadEvent;
-import org.bukkit.event.world.WorldUnloadEvent;
-import org.bukkit.plugin.java.JavaPlugin;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 
@@ -60,8 +62,8 @@ public final class GuardWiring {
     private GuardWiring() {}
 
     /** What the plugin module keeps: the command to register, the service for the API, and the stop hook. */
-    public record Wired(GuardCommand command, GuardService service, GuardRuntime runtime, PlayerTracks tracks,
-            Runnable stop) {}
+    public record Wired(
+            GuardCommand command, GuardService service, GuardRuntime runtime, PlayerTracks tracks, Runnable stop) {}
 
     /** Compiles a world when it loads and forgets it when it unloads. */
     public static final class WorldListener implements Listener {
@@ -99,25 +101,30 @@ public final class GuardWiring {
         GuardConfig config = GuardConfig.from(ctx.config(), serverId, warn);
         Clock clock = Clock.systemUTC();
         GuardStore store = new JooqGuardStore(persistence.dsl(), clock, warn);
-        GuardBackups backups = new FileGuardBackups(plugin.getDataFolder().toPath().resolve("guard/backups"), clock);
-        GuardSync sync = (scope, key) -> bus.publisher().publish(
-                new GuardChanged(serverId, scope.value(), key.world(), key.id().value()));
+        GuardBackups backups =
+                new FileGuardBackups(plugin.getDataFolder().toPath().resolve("guard/backups"), clock);
+        GuardSync sync = (scope, key) -> bus.publisher()
+                .publish(new GuardChanged(
+                        serverId, scope.value(), key.world(), key.id().value()));
         GuardWorlds worlds = new GuardWorlds() {
             @Override
             public List<String> loaded() {
-                return plugin.getServer().getWorlds().stream().map(World::getName).toList();
+                return plugin.getServer().getWorlds().stream()
+                        .map(World::getName)
+                        .toList();
             }
 
             @Override
             public Optional<Height> height(String name) {
                 World world = plugin.getServer().getWorld(name);
-                return world == null ? Optional.empty()
+                return world == null
+                        ? Optional.empty()
                         : Optional.of(new Height(world.getMinHeight(), world.getMaxHeight() - 1));
             }
         };
         GuardService service = new GuardService(store, sync, worlds, kernel.scheduler(), config, warn);
-        GuardRuntime runtime = new GuardRuntime(plugin, kernel.scheduler(), service, store, kernel.messages(),
-                kernel.messageSink(), clock, audit);
+        GuardRuntime runtime = new GuardRuntime(
+                plugin, kernel.scheduler(), service, store, kernel.messages(), kernel.messageSink(), clock, audit);
         Selections selections = new Selections(plugin.getServer());
         RegionDisplay display = new RegionDisplay(plugin);
         PlayerTracks tracks = new PlayerTracks(runtime, actions);
@@ -144,9 +151,11 @@ public final class GuardWiring {
         }));
 
         bus.registry().register(message -> {
-            if (message instanceof GuardChanged changed && !changed.originServer().equals(serverId)) {
+            if (message instanceof GuardChanged changed
+                    && !changed.originServer().equals(serverId)) {
                 try {
-                    service.remoteChanged(new GuardScope(changed.scope()),
+                    service.remoteChanged(
+                            new GuardScope(changed.scope()),
                             new RegionKey(changed.world(), RegionId.of(changed.region())));
                 } catch (IllegalArgumentException malformed) {
                     warn.accept("ignored a malformed guard change from " + changed.originServer());
@@ -174,22 +183,32 @@ public final class GuardWiring {
         });
 
         List<AutoCloseable> timers = new ArrayList<>();
-        timers.add(kernel.scheduler().repeatGlobal(() -> {
-            long now = clock.millis();
-            for (Player player : plugin.getServer().getOnlinePlayers()) {
-                kernel.scheduler().onEntity(BukkitRefs.toRef(player), () -> tracks.tick(player, now));
-            }
-        }, Duration.ofSeconds(1), Duration.ofSeconds(1)));
-        timers.add(kernel.scheduler().repeatGlobal(() -> kernel.scheduler().async(() -> {
-            try {
-                runtime.flushLog();
-                if (service.config().denialLog().enabled()) {
-                    store.pruneDenials(clock.instant().minus(Duration.ofDays(service.config().denialLog().keepDays())));
-                }
-            } catch (RuntimeException e) {
-                warn.accept("guard denial log write failed: " + e.getMessage());
-            }
-        }), Duration.ofSeconds(5), Duration.ofSeconds(5)));
+        timers.add(kernel.scheduler()
+                .repeatGlobal(
+                        () -> {
+                            long now = clock.millis();
+                            for (Player player : plugin.getServer().getOnlinePlayers()) {
+                                kernel.scheduler().onEntity(BukkitRefs.toRef(player), () -> tracks.tick(player, now));
+                            }
+                        },
+                        Duration.ofSeconds(1),
+                        Duration.ofSeconds(1)));
+        timers.add(kernel.scheduler()
+                .repeatGlobal(
+                        () -> kernel.scheduler().async(() -> {
+                            try {
+                                runtime.flushLog();
+                                if (service.config().denialLog().enabled()) {
+                                    store.pruneDenials(clock.instant()
+                                            .minus(Duration.ofDays(
+                                                    service.config().denialLog().keepDays())));
+                                }
+                            } catch (RuntimeException e) {
+                                warn.accept("guard denial log write failed: " + e.getMessage());
+                            }
+                        }),
+                        Duration.ofSeconds(5),
+                        Duration.ofSeconds(5)));
         timers.add(kernel.scheduler().repeatGlobal(service::poll, config.pollInterval(), config.pollInterval()));
 
         WorldGuardImporter importer = new WorldGuardImporter(plugin, service, backups, warn);
@@ -218,8 +237,8 @@ public final class GuardWiring {
                 },
                 onPlayer,
                 config.rgAlias());
-        GuardMenus guardMenus = new GuardMenus(menus, service, command, new CommandFeedback(kernel.messages()),
-                kernel.messages(), onPlayer);
+        GuardMenus guardMenus = new GuardMenus(
+                menus, service, command, new CommandFeedback(kernel.messages()), kernel.messages(), onPlayer);
         guardMenus.register(menuBindings, plugin.getDataFolder().toPath(), log);
         menusHolder[0] = guardMenus;
 

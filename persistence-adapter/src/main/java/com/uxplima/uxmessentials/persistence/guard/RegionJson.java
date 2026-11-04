@@ -1,5 +1,14 @@
 package com.uxplima.uxmessentials.persistence.guard;
 
+import java.util.ArrayList;
+import java.util.EnumMap;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
@@ -17,14 +26,6 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
-import java.util.ArrayList;
-import java.util.EnumMap;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -92,7 +93,8 @@ public final class RegionJson {
 
     /** Read a region from a JSON object. */
     public static Region fromJson(JsonObject o) {
-        RegionKey key = new RegionKey(o.get("world").getAsString(), RegionId.of(o.get("id").getAsString()));
+        RegionKey key = new RegionKey(
+                o.get("world").getAsString(), RegionId.of(o.get("id").getAsString()));
         List<Rule> rules = new ArrayList<>();
         for (JsonElement element : array(o, "rules")) {
             JsonObject r = element.getAsJsonObject();
@@ -109,7 +111,8 @@ public final class RegionJson {
         Map<BehaviourKey, String> behaviours = new EnumMap<>(BehaviourKey.class);
         JsonObject b = object(o, "behaviours");
         for (String name : b.keySet()) {
-            BehaviourKey.parse(name).ifPresent(k -> behaviours.put(k, b.get(name).getAsString()));
+            BehaviourKey.parse(name)
+                    .ifPresent(k -> behaviours.put(k, b.get(name).getAsString()));
         }
         Map<UUID, RoleName> roles = new HashMap<>();
         JsonObject r = object(o, "roles");
@@ -207,10 +210,20 @@ public final class RegionJson {
                 int[] max = ints(o.getAsJsonArray("max"));
                 yield new Shape.Cuboid(Bounds.of(min[0], min[1], min[2], max[0], max[1], max[2]));
             }
-            case "polygon" -> Shape.Polygon.of(ints(o.getAsJsonArray("xs")), ints(o.getAsJsonArray("zs")),
-                    o.get("minY").getAsInt(), o.get("maxY").getAsInt());
-            case "cylinder" -> new Shape.Cylinder(o.get("cx").getAsInt(), o.get("cz").getAsInt(),
-                    o.get("rx").getAsInt(), o.get("rz").getAsInt(), o.get("minY").getAsInt(), o.get("maxY").getAsInt());
+            case "polygon" ->
+                Shape.Polygon.of(
+                        ints(o.getAsJsonArray("xs")),
+                        ints(o.getAsJsonArray("zs")),
+                        o.get("minY").getAsInt(),
+                        o.get("maxY").getAsInt());
+            case "cylinder" ->
+                new Shape.Cylinder(
+                        o.get("cx").getAsInt(),
+                        o.get("cz").getAsInt(),
+                        o.get("rx").getAsInt(),
+                        o.get("rz").getAsInt(),
+                        o.get("minY").getAsInt(),
+                        o.get("maxY").getAsInt());
             case "sphere" -> {
                 int[] c = ints(o.getAsJsonArray("center"));
                 yield new Shape.Sphere(c[0], c[1], c[2], o.get("radius").getAsInt());
@@ -221,7 +234,8 @@ public final class RegionJson {
                     int[] xz = ints(element.getAsJsonArray());
                     keys.add(Shape.chunkKey(xz[0], xz[1]));
                 }
-                yield Shape.ChunkSet.of(keys, o.get("minY").getAsInt(), o.get("maxY").getAsInt());
+                yield Shape.ChunkSet.of(
+                        keys, o.get("minY").getAsInt(), o.get("maxY").getAsInt());
             }
             case "global" -> new Shape.Global();
             default -> throw new IllegalArgumentException("unknown shape kind: " + kind);

@@ -4,6 +4,14 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.GuardDenials.GUA
 import static com.uxplima.uxmessentials.persistence.jooq.tables.GuardHistory.GUARD_HISTORY;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.GuardRegions.GUARD_REGIONS;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardStoreException;
 import com.uxplima.uxmessentials.guard.domain.GuardScope;
@@ -12,13 +20,6 @@ import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
-import java.time.Clock;
-import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
@@ -46,10 +47,11 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
         try {
             return read(dsl -> {
                 List<Region> out = new ArrayList<>();
-                for (Record row : dsl.select(GUARD_REGIONS.SCOPE, GUARD_REGIONS.WORLD, GUARD_REGIONS.ID,
-                                GUARD_REGIONS.DATA)
+                for (Record row : dsl.select(
+                                GUARD_REGIONS.SCOPE, GUARD_REGIONS.WORLD, GUARD_REGIONS.ID, GUARD_REGIONS.DATA)
                         .from(GUARD_REGIONS)
-                        .where(GUARD_REGIONS.SCOPE.in(scopes.stream().map(GuardScope::value).toList()))
+                        .where(GUARD_REGIONS.SCOPE.in(
+                                scopes.stream().map(GuardScope::value).toList()))
                         .fetch()) {
                     try {
                         out.add(RegionJson.read(row.get(GUARD_REGIONS.DATA)));
@@ -88,11 +90,18 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
     }
 
     private HistoryEntry writeIn(
-            DSLContext dsl, @Nullable Region before, @Nullable Region after, Region subject, String actor,
-            String change, Instant now) {
+            DSLContext dsl,
+            @Nullable Region before,
+            @Nullable Region after,
+            Region subject,
+            String actor,
+            String change,
+            Instant now) {
         String who = actor.length() > 64 ? actor.substring(0, 64) : actor;
         if (before != null && (after == null || !before.scope().equals(after.scope()))) {
-            dsl.deleteFrom(GUARD_REGIONS).where(keyIs(before.scope(), before.key())).execute();
+            dsl.deleteFrom(GUARD_REGIONS)
+                    .where(keyIs(before.scope(), before.key()))
+                    .execute();
         }
         if (after != null) {
             Long version = dsl.select(GUARD_REGIONS.VERSION)
@@ -141,8 +150,12 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
     @Override
     public List<HistoryEntry> history(@Nullable RegionKey key, int offset, int limit) {
         return read(dsl -> {
-            Condition where = key == null ? DSL.noCondition()
-                    : GUARD_HISTORY.WORLD.eq(key.world()).and(GUARD_HISTORY.REGION.eq(key.id().value()));
+            Condition where = key == null
+                    ? DSL.noCondition()
+                    : GUARD_HISTORY
+                            .WORLD
+                            .eq(key.world())
+                            .and(GUARD_HISTORY.REGION.eq(key.id().value()));
             List<HistoryEntry> out = new ArrayList<>();
             for (Record row : dsl.selectFrom(GUARD_HISTORY)
                     .where(where)
@@ -169,7 +182,8 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
         return read(dsl -> {
             Record row = dsl.select(DSL.max(GUARD_REGIONS.UPDATED_AT), DSL.count())
                     .from(GUARD_REGIONS)
-                    .where(GUARD_REGIONS.SCOPE.in(scopes.stream().map(GuardScope::value).toList()))
+                    .where(GUARD_REGIONS.SCOPE.in(
+                            scopes.stream().map(GuardScope::value).toList()))
                     .fetchOne();
             if (row == null) {
                 return 0L;
@@ -238,7 +252,9 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
     }
 
     private static Condition keyIs(GuardScope scope, RegionKey key) {
-        return GUARD_REGIONS.SCOPE.eq(scope.value())
+        return GUARD_REGIONS
+                .SCOPE
+                .eq(scope.value())
                 .and(GUARD_REGIONS.WORLD.eq(key.world()))
                 .and(GUARD_REGIONS.ID.eq(key.id().value()));
     }

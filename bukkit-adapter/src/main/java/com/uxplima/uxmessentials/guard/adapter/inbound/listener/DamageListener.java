@@ -1,11 +1,7 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
-import com.uxplima.uxmessentials.guard.adapter.Causes;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import java.util.Objects;
+
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.LivingEntity;
 import org.bukkit.entity.Player;
@@ -19,6 +15,12 @@ import org.bukkit.event.entity.PotionSplashEvent;
 import org.bukkit.event.hanging.HangingBreakByEntityEvent;
 import org.bukkit.event.vehicle.VehicleDamageEvent;
 import org.bukkit.event.vehicle.VehicleDestroyEvent;
+
+import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
+import com.uxplima.uxmessentials.guard.adapter.Causes;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 
 /**
  * Harm done by players, directly or through what they shot, lit, threw or own. A victim is classified by
@@ -53,8 +55,12 @@ public final class DamageListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onCombust(EntityCombustByEntityEvent event) {
         Player attacker = Causes.player(event.getCombuster());
-        if (attacker != null && !attacker.equals(event.getEntity())
-                && !guard.allow(attacker, ActionKinds.damage(event.getEntity()), event.getEntity().getLocation())) {
+        if (attacker != null
+                && !attacker.equals(event.getEntity())
+                && !guard.allow(
+                        attacker,
+                        ActionKinds.damage(event.getEntity()),
+                        event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -79,7 +85,10 @@ public final class DamageListener implements Listener {
     public void onLingering(LingeringPotionSplashEvent event) {
         Player thrower = Causes.player(event.getEntity());
         if (thrower != null
-                && !guard.allow(thrower, BuiltInActions.ITEM_USE_POTION, event.getEntity().getLocation())) {
+                && !guard.allow(
+                        thrower,
+                        BuiltInActions.ITEM_USE_POTION,
+                        event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -87,7 +96,9 @@ public final class DamageListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onHangingBreak(HangingBreakByEntityEvent event) {
         Player remover = Causes.player(event.getRemover());
-        if (remover != null && !guard.allow(remover, BuiltInActions.HANGING_BREAK, event.getEntity().getLocation())) {
+        if (remover != null
+                && !guard.allow(
+                        remover, BuiltInActions.HANGING_BREAK, event.getEntity().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -95,7 +106,11 @@ public final class DamageListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onVehicleDamage(VehicleDamageEvent event) {
         Player attacker = Causes.player(event.getAttacker());
-        if (attacker != null && !guard.allow(attacker, BuiltInActions.DAMAGE_VEHICLE, event.getVehicle().getLocation())) {
+        if (attacker != null
+                && !guard.allow(
+                        attacker,
+                        BuiltInActions.DAMAGE_VEHICLE,
+                        event.getVehicle().getLocation())) {
             event.setCancelled(true);
         }
     }
@@ -104,7 +119,10 @@ public final class DamageListener implements Listener {
     public void onVehicleDestroy(VehicleDestroyEvent event) {
         Player attacker = Causes.player(event.getAttacker());
         if (attacker != null
-                && !guard.allow(attacker, BuiltInActions.VEHICLE_DESTROY, event.getVehicle().getLocation())) {
+                && !guard.allow(
+                        attacker,
+                        BuiltInActions.VEHICLE_DESTROY,
+                        event.getVehicle().getLocation())) {
             event.setCancelled(true);
         }
     }

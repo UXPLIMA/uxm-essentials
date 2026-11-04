@@ -1,5 +1,36 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.command;
 
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.UnaryOperator;
+
+import org.bukkit.Bukkit;
+import org.bukkit.Color;
+import org.bukkit.Location;
+import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
+import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
+
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
@@ -36,38 +67,10 @@ import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import io.papermc.paper.command.brigadier.CommandSourceStack;
-import io.papermc.paper.command.brigadier.Commands;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
-import java.util.function.Consumer;
-import java.util.function.Function;
-import java.util.function.UnaryOperator;
-import org.bukkit.Bukkit;
-import org.bukkit.Color;
-import org.bukkit.Location;
-import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Player;
-import org.bukkit.inventory.ItemStack;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -158,8 +161,7 @@ public final class GuardCommand implements CommandRegistration {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("guard")
                 .requires(src -> src.getSender().hasPermission(BASE + "use"))
                 .executes(ctx -> {
-                    if (ctx.getSource().getSender() instanceof Player player
-                            && player.hasPermission(BASE + "menu")) {
+                    if (ctx.getSource().getSender() instanceof Player player && player.hasPermission(BASE + "menu")) {
                         openMenu.accept(player);
                     } else {
                         help(ctx.getSource().getSender());
@@ -178,18 +180,22 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     /** One sub command: its word, its permission node, its handler and what each argument position suggests. */
-    private record Sub(String name, String permission, BiConsumer<CommandSender, String[]> handler,
+    private record Sub(
+            String name,
+            String permission,
+            BiConsumer<CommandSender, String[]> handler,
             List<Function<CommandSender, List<String>>> suggestions) {}
 
     private List<Sub> subs() {
         List<Sub> subs = new ArrayList<>();
         Function<CommandSender, List<String>> regions = this::regionIds;
-        Function<CommandSender, List<String>> actions = s -> service.tree().ids().stream().map(ActionId::value).toList();
-        Function<CommandSender, List<String>> targets = s -> List.of("everyone", "nonmember", "role:owner",
-                "role:manager", "role:member", "role:guest", "perm:", "cond:");
+        Function<CommandSender, List<String>> actions =
+                s -> service.tree().ids().stream().map(ActionId::value).toList();
+        Function<CommandSender, List<String>> targets = s -> List.of(
+                "everyone", "nonmember", "role:owner", "role:manager", "role:member", "role:guest", "perm:", "cond:");
         Function<CommandSender, List<String>> effects = s -> List.of("allow", "deny", "clear");
-        Function<CommandSender, List<String>> players = s -> Bukkit.getOnlinePlayers().stream()
-                .map(Player::getName).toList();
+        Function<CommandSender, List<String>> players =
+                s -> Bukkit.getOnlinePlayers().stream().map(Player::getName).toList();
         Function<CommandSender, List<String>> roles = s -> {
             List<String> all = new ArrayList<>();
             RoleName.BUILT_IN.forEach(r -> all.add(r.value()));
@@ -204,8 +210,8 @@ public final class GuardCommand implements CommandRegistration {
             }
             return all;
         };
-        Function<CommandSender, List<String>> shapes = s -> List.of("cuboid", "polygon", "global", "cylinder",
-                "sphere", "chunks");
+        Function<CommandSender, List<String>> shapes =
+                s -> List.of("cuboid", "polygon", "global", "cylinder", "sphere", "chunks");
         Function<CommandSender, List<String>> templates = s -> {
             List<String> all = new ArrayList<>(service.config().templates().keySet());
             all.add("clear");
@@ -223,7 +229,12 @@ public final class GuardCommand implements CommandRegistration {
         add(subs, "pos2", "define", (s, a) -> corner(s, false));
         add(subs, "point", "define", this::point);
         add(subs, "clear", "define", this::clearSelection);
-        add(subs, "expand", "define", this::expand, s -> List.of("1", "5", "10", "vert"),
+        add(
+                subs,
+                "expand",
+                "define",
+                this::expand,
+                s -> List.of("1", "5", "10", "vert"),
                 s -> List.of("up", "down", "north", "south", "east", "west", "all"));
         add(subs, "rule", "rule", this::rule, regions, actions, targets, effects);
         add(subs, "role", "role", this::role, regions, players, roles);
@@ -250,8 +261,14 @@ public final class GuardCommand implements CommandRegistration {
         add(subs, "log", "log", this::log, players);
         add(subs, "status", "status", (s, a) -> status(s));
         add(subs, "actions", "use", this::actions, actions);
-        add(subs, "import", "import", this::importCommand, s -> List.of("worldguard"),
-                s -> List.of("dry-run", "run", "undo"), s -> List.of("yaml", "sql"));
+        add(
+                subs,
+                "import",
+                "import",
+                this::importCommand,
+                s -> List.of("worldguard"),
+                s -> List.of("dry-run", "run", "undo"),
+                s -> List.of("yaml", "sql"));
         add(subs, "reload", "reload", (s, a) -> {
             reload.run();
             feedback.send(s, GuardMessageKey.RELOADED);
@@ -261,7 +278,11 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     @SafeVarargs
-    private void add(List<Sub> subs, String name, String node, BiConsumer<CommandSender, String[]> handler,
+    private void add(
+            List<Sub> subs,
+            String name,
+            String node,
+            BiConsumer<CommandSender, String[]> handler,
             Function<CommandSender, List<String>>... suggestions) {
         List<Function<CommandSender, List<String>>> list = new ArrayList<>(suggestions.length);
         for (Function<CommandSender, List<String>> suggestion : suggestions) {
@@ -306,7 +327,10 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         RegionKey key = new RegionKey(shape.get().world(), RegionId.of(args[0]));
-        answer(sender, service.create(key, shape.get().shape(), null, ctx(sender)), GuardMessageKey.CREATED,
+        answer(
+                sender,
+                service.create(key, shape.get().shape(), null, ctx(sender)),
+                GuardMessageKey.CREATED,
                 Map.of("region", key.id().value(), "world", key.world()));
     }
 
@@ -319,23 +343,33 @@ public final class GuardCommand implements CommandRegistration {
         if (shape.isEmpty()) {
             return;
         }
-        edit(sender, key.get(), "redefine", r -> r.withShape(shape.get().shape()), GuardMessageKey.REDEFINED,
+        edit(
+                sender,
+                key.get(),
+                "redefine",
+                r -> r.withShape(shape.get().shape()),
+                GuardMessageKey.REDEFINED,
                 Map.of("region", key.get().id().value()));
     }
 
     private void remove(CommandSender sender, String[] args) {
-        key(sender, args, 0).ifPresent(key -> answer(sender, service.remove(key, ctx(sender)),
-                GuardMessageKey.REMOVED, Map.of("region", key.id().value())));
+        key(sender, args, 0)
+                .ifPresent(key -> answer(
+                        sender,
+                        service.remove(key, ctx(sender)),
+                        GuardMessageKey.REMOVED,
+                        Map.of("region", key.id().value())));
     }
 
     private void restore(CommandSender sender, String[] args) {
         Optional<RegionKey> key = rawKey(sender, args, 0);
-        key.ifPresent(k -> answer(sender, service.restore(k, ctx(sender)), GuardMessageKey.RESTORED,
-                Map.of("region", k.id().value())));
+        key.ifPresent(k -> answer(
+                sender, service.restore(k, ctx(sender)), GuardMessageKey.RESTORED, Map.of("region", k.id().value())));
     }
 
     private void info(CommandSender sender, String[] args) {
-        Optional<Region> region = args.length == 0 ? topHere(sender) : key(sender, args, 0).flatMap(service::region);
+        Optional<Region> region =
+                args.length == 0 ? topHere(sender) : key(sender, args, 0).flatMap(service::region);
         if (region.isEmpty()) {
             if (args.length == 0) {
                 feedback.send(sender, GuardMessageKey.ERROR_NO_REGION_HERE);
@@ -345,12 +379,20 @@ public final class GuardCommand implements CommandRegistration {
         Region r = region.get();
         feedback.send(sender, GuardMessageKey.INFO_HEADER, Map.of("region", r.id().value(), "world", r.world()));
         Bounds b = r.shape().bounds();
-        line(sender, GuardMessageKey.INFO_SHAPE, r.shape().kind() + (r.shape() instanceof Shape.Global ? ""
-                : " " + b.minX() + "," + b.minY() + "," + b.minZ() + " .. " + b.maxX() + "," + b.maxY() + ","
-                        + b.maxZ()));
+        line(
+                sender,
+                GuardMessageKey.INFO_SHAPE,
+                r.shape().kind()
+                        + (r.shape() instanceof Shape.Global
+                                ? ""
+                                : " " + b.minX() + "," + b.minY() + "," + b.minZ() + " .. " + b.maxX() + "," + b.maxY()
+                                        + "," + b.maxZ()));
         line(sender, GuardMessageKey.INFO_SCOPE, r.scope().value());
         line(sender, GuardMessageKey.INFO_PRIORITY, String.valueOf(r.priority()));
-        line(sender, GuardMessageKey.INFO_PARENT, r.parent() == null ? "-" : r.parent().value());
+        line(
+                sender,
+                GuardMessageKey.INFO_PARENT,
+                r.parent() == null ? "-" : r.parent().value());
         line(sender, GuardMessageKey.INFO_FAMILY, r.family() == null ? "-" : r.family());
         line(sender, GuardMessageKey.INFO_TEMPLATE, r.template() == null ? "-" : r.template());
         line(sender, GuardMessageKey.INFO_TAGS, r.tags().isEmpty() ? "-" : String.join(", ", r.tags()));
@@ -362,14 +404,17 @@ public final class GuardCommand implements CommandRegistration {
         }
         r.behaviours().asMap().forEach((k, v) -> line(sender, k.key(), v));
         Map<RoleName, List<String>> byRole = new LinkedHashMap<>();
-        r.roles().forEach((id, role) -> byRole.computeIfAbsent(role, x -> new ArrayList<>()).add(name(id)));
+        r.roles()
+                .forEach((id, role) ->
+                        byRole.computeIfAbsent(role, x -> new ArrayList<>()).add(name(id)));
         byRole.forEach((role, names) -> line(sender, role.value(), String.join(", ", names)));
     }
 
     private void list(CommandSender sender, String[] args) {
         String world = args.length > 0 && Bukkit.getWorld(args[0]) != null ? args[0] : worldOf(sender);
         if (world == null) {
-            feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_WORLD, Map.of("world", args.length > 0 ? args[0] : "-"));
+            feedback.send(
+                    sender, GuardMessageKey.ERROR_UNKNOWN_WORLD, Map.of("world", args.length > 0 ? args[0] : "-"));
             return;
         }
         List<Region> regions = service.regions(world);
@@ -381,12 +426,33 @@ public final class GuardCommand implements CommandRegistration {
         int per = 10;
         int pages = (regions.size() + per - 1) / per;
         page = Math.max(1, Math.min(page, pages));
-        feedback.send(sender, GuardMessageKey.LIST_HEADER, Map.of("world", world, "count",
-                String.valueOf(regions.size()), "page", String.valueOf(page), "pages", String.valueOf(pages)));
+        feedback.send(
+                sender,
+                GuardMessageKey.LIST_HEADER,
+                Map.of(
+                        "world",
+                        world,
+                        "count",
+                        String.valueOf(regions.size()),
+                        "page",
+                        String.valueOf(page),
+                        "pages",
+                        String.valueOf(pages)));
         for (Region region : regions.subList((page - 1) * per, Math.min(regions.size(), page * per))) {
-            feedback.send(sender, GuardMessageKey.LIST_ENTRY, Map.of("region", region.id().value(),
-                    "priority", String.valueOf(region.priority()), "shape", region.shape().kind(),
-                    "rules", String.valueOf(region.rules().size()), "world", world));
+            feedback.send(
+                    sender,
+                    GuardMessageKey.LIST_ENTRY,
+                    Map.of(
+                            "region",
+                            region.id().value(),
+                            "priority",
+                            String.valueOf(region.priority()),
+                            "shape",
+                            region.shape().kind(),
+                            "rules",
+                            String.valueOf(region.rules().size()),
+                            "world",
+                            world));
         }
     }
 
@@ -478,7 +544,10 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         if (args.length < 4) {
-            feedback.usage(sender, "guard rule", "<region> <action> <target> <allow|deny|clear>",
+            feedback.usage(
+                    sender,
+                    "guard rule",
+                    "<region> <action> <target> <allow|deny|clear>",
                     "Set or clear a protection rule");
             return;
         }
@@ -500,10 +569,22 @@ public final class GuardCommand implements CommandRegistration {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_TARGET, Map.of("target", targetText));
             return;
         }
-        Map<String, String> values = Map.of("region", key.get().id().value(), "action", action.value(),
-                "target", target.get().text(), "effect", last.toLowerCase(Locale.ROOT));
+        Map<String, String> values = Map.of(
+                "region",
+                key.get().id().value(),
+                "action",
+                action.value(),
+                "target",
+                target.get().text(),
+                "effect",
+                last.toLowerCase(Locale.ROOT));
         if (last.equalsIgnoreCase("clear") || last.equalsIgnoreCase("temizle")) {
-            edit(sender, key.get(), "rule", r -> r.withoutRule(action, target.get()), GuardMessageKey.RULE_CLEARED,
+            edit(
+                    sender,
+                    key.get(),
+                    "rule",
+                    r -> r.withoutRule(action, target.get()),
+                    GuardMessageKey.RULE_CLEARED,
                     values);
             return;
         }
@@ -530,7 +611,10 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         if (args.length < 3) {
-            feedback.usage(sender, "guard " + (staff ? "role" : "member"), "<region> <player> <role|clear>",
+            feedback.usage(
+                    sender,
+                    "guard " + (staff ? "role" : "member"),
+                    "<region> <player> <role|clear>",
                     "Give or take a region role");
             return;
         }
@@ -549,11 +633,14 @@ public final class GuardCommand implements CommandRegistration {
         }
         if (!staff) {
             Optional<Region> region = service.region(key.get());
-            boolean manages = sender instanceof Player p && region.flatMap(r -> r.roleOf(p.getUniqueId()))
-                    .map(RoleName::manages).orElse(false);
+            boolean manages = sender instanceof Player p
+                    && region.flatMap(r -> r.roleOf(p.getUniqueId()))
+                            .map(RoleName::manages)
+                            .orElse(false);
             boolean allowedRole = role == null || role.equals(RoleName.MEMBER) || role.equals(RoleName.GUEST);
             boolean targetManaged = region.flatMap(r -> r.roleOf(target.getUniqueId()))
-                    .map(r -> !r.manages()).orElse(true);
+                    .map(r -> !r.manages())
+                    .orElse(true);
             if (!(sender.hasPermission(BASE + "role") || (manages && allowedRole && targetManaged))) {
                 feedback.send(sender, GuardMessageKey.ERROR_NOT_MANAGER);
                 return;
@@ -561,10 +648,15 @@ public final class GuardCommand implements CommandRegistration {
         }
         UUID id = target.getUniqueId();
         String name = target.getName() == null ? args[1] : target.getName();
-        Map<String, String> values = Map.of("region", key.get().id().value(), "player", name,
-                "role", role == null ? "-" : role.value());
-        edit(sender, key.get(), "role", r -> r.withRole(id, role),
-                role == null ? GuardMessageKey.ROLE_CLEARED : GuardMessageKey.ROLE_SET, values);
+        Map<String, String> values =
+                Map.of("region", key.get().id().value(), "player", name, "role", role == null ? "-" : role.value());
+        edit(
+                sender,
+                key.get(),
+                "role",
+                r -> r.withRole(id, role),
+                role == null ? GuardMessageKey.ROLE_CLEARED : GuardMessageKey.ROLE_SET,
+                values);
     }
 
     private void set(CommandSender sender, String[] args) {
@@ -582,19 +674,29 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         String value = String.join(" ", Arrays.copyOfRange(args, 2, args.length));
-        Map<String, String> values = Map.of("region", key.get().id().value(), "key", behaviour.get().key(),
-                "value", value);
+        Map<String, String> values =
+                Map.of("region", key.get().id().value(), "key", behaviour.get().key(), "value", value);
         if (value.equalsIgnoreCase("clear") || value.equalsIgnoreCase("temizle")) {
-            edit(sender, key.get(), "set", r -> r.withBehaviours(r.behaviours().without(behaviour.get())),
-                    GuardMessageKey.BEHAVIOUR_CLEARED, values);
+            edit(
+                    sender,
+                    key.get(),
+                    "set",
+                    r -> r.withBehaviours(r.behaviours().without(behaviour.get())),
+                    GuardMessageKey.BEHAVIOUR_CLEARED,
+                    values);
             return;
         }
         if (behaviour.get().normalise(value).isEmpty()) {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", value));
             return;
         }
-        edit(sender, key.get(), "set", r -> r.withBehaviours(r.behaviours().with(behaviour.get(), value)),
-                GuardMessageKey.BEHAVIOUR_SET, values);
+        edit(
+                sender,
+                key.get(),
+                "set",
+                r -> r.withBehaviours(r.behaviours().with(behaviour.get(), value)),
+                GuardMessageKey.BEHAVIOUR_SET,
+                values);
     }
 
     private void priority(CommandSender sender, String[] args) {
@@ -607,7 +709,12 @@ public final class GuardCommand implements CommandRegistration {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", args[1]));
             return;
         }
-        edit(sender, key.get(), "priority", r -> r.withPriority(priority), GuardMessageKey.PRIORITY_SET,
+        edit(
+                sender,
+                key.get(),
+                "priority",
+                r -> r.withPriority(priority),
+                GuardMessageKey.PRIORITY_SET,
                 Map.of("region", key.get().id().value(), "priority", String.valueOf(priority)));
     }
 
@@ -617,7 +724,12 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         if (args[1].equalsIgnoreCase("clear") || args[1].equalsIgnoreCase("temizle")) {
-            edit(sender, key.get(), "parent", r -> r.withParent(null), GuardMessageKey.PARENT_CLEARED,
+            edit(
+                    sender,
+                    key.get(),
+                    "parent",
+                    r -> r.withParent(null),
+                    GuardMessageKey.PARENT_CLEARED,
                     Map.of("region", key.get().id().value()));
             return;
         }
@@ -626,7 +738,12 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         RegionId parent = RegionId.of(args[1]);
-        edit(sender, key.get(), "parent", r -> r.withParent(parent), GuardMessageKey.PARENT_SET,
+        edit(
+                sender,
+                key.get(),
+                "parent",
+                r -> r.withParent(parent),
+                GuardMessageKey.PARENT_SET,
                 Map.of("region", key.get().id().value(), "parent", parent.value()));
     }
 
@@ -636,7 +753,12 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         String family = args[1].equalsIgnoreCase("clear") ? null : args[1].toLowerCase(Locale.ROOT);
-        edit(sender, key.get(), "family", r -> r.withFamily(family), GuardMessageKey.FAMILY_SET,
+        edit(
+                sender,
+                key.get(),
+                "family",
+                r -> r.withFamily(family),
+                GuardMessageKey.FAMILY_SET,
                 Map.of("region", key.get().id().value(), "family", family == null ? "-" : family));
     }
 
@@ -647,21 +769,29 @@ public final class GuardCommand implements CommandRegistration {
         }
         Optional<RegionKey> key = key(sender, args, 0);
         if (key.isEmpty() || args.length < 3) {
-            feedback.usage(sender, "guard tag", "<region> add|remove <tag>  |  bulk <tag> rule|set|template ...",
+            feedback.usage(
+                    sender,
+                    "guard tag",
+                    "<region> add|remove <tag>  |  bulk <tag> rule|set|template ...",
                     "Tag regions and edit them together");
             return;
         }
         String tag = args[2].toLowerCase(Locale.ROOT);
         boolean add = args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("ekle");
-        edit(sender, key.get(), "tag", r -> {
-            Set<String> tags = new HashSet<>(r.tags());
-            if (add) {
-                tags.add(tag);
-            } else {
-                tags.remove(tag);
-            }
-            return r.withTags(tags);
-        }, add ? GuardMessageKey.TAG_ADDED : GuardMessageKey.TAG_REMOVED,
+        edit(
+                sender,
+                key.get(),
+                "tag",
+                r -> {
+                    Set<String> tags = new HashSet<>(r.tags());
+                    if (add) {
+                        tags.add(tag);
+                    } else {
+                        tags.remove(tag);
+                    }
+                    return r.withTags(tags);
+                },
+                add ? GuardMessageKey.TAG_ADDED : GuardMessageKey.TAG_REMOVED,
                 Map.of("region", key.get().id().value(), "tag", tag));
     }
 
@@ -697,34 +827,46 @@ public final class GuardCommand implements CommandRegistration {
         } else if (what.equals("set") && args.length >= 5) {
             Optional<BehaviourKey> key = BehaviourKey.parse(args[3]);
             String value = String.join(" ", Arrays.copyOfRange(args, 4, args.length));
-            if (key.isEmpty() || (!value.equalsIgnoreCase("clear") && key.get().normalise(value).isEmpty())) {
+            if (key.isEmpty()
+                    || (!value.equalsIgnoreCase("clear")
+                            && key.get().normalise(value).isEmpty())) {
                 feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", value));
                 return;
             }
-            change = value.equalsIgnoreCase("clear") ? r -> r.withBehaviours(r.behaviours().without(key.get()))
+            change = value.equalsIgnoreCase("clear")
+                    ? r -> r.withBehaviours(r.behaviours().without(key.get()))
                     : r -> r.withBehaviours(r.behaviours().with(key.get(), value));
         } else if (what.equals("template") && args.length >= 4) {
             String name = args[3].equalsIgnoreCase("clear") ? null : args[3].toLowerCase(Locale.ROOT);
             change = r -> r.withTemplate(name);
         } else {
-            feedback.usage(sender, "guard tag bulk", "<tag> rule <action> <target> <effect> | set <key> <value> | "
-                    + "template <name>", "Edit every region with a tag");
+            feedback.usage(
+                    sender,
+                    "guard tag bulk",
+                    "<tag> rule <action> <target> <effect> | set <key> <value> | " + "template <name>",
+                    "Edit every region with a tag");
             return;
         }
         var ignored = service.editTagged(tag, "bulk", change, ctx(sender)).whenComplete((result, error) -> {
             if (error != null || result.isErr()) {
                 feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
             } else {
-                feedback.send(sender, GuardMessageKey.TAG_BULK, Map.of("tag", tag,
-                        "count", String.valueOf(result.orElseThrow())));
+                feedback.send(
+                        sender,
+                        GuardMessageKey.TAG_BULK,
+                        Map.of("tag", tag, "count", String.valueOf(result.orElseThrow())));
             }
         });
     }
 
     private void template(CommandSender sender, String[] args) {
         if (args.length >= 1 && (args[0].equalsIgnoreCase("list") || args[0].equalsIgnoreCase("liste"))) {
-            feedback.send(sender, GuardMessageKey.TEMPLATE_LIST,
-                    Map.of("templates", String.join(", ", service.config().templates().keySet())));
+            feedback.send(
+                    sender,
+                    GuardMessageKey.TEMPLATE_LIST,
+                    Map.of(
+                            "templates",
+                            String.join(", ", service.config().templates().keySet())));
             return;
         }
         Optional<RegionKey> key = key(sender, args, 0);
@@ -732,7 +874,11 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         String name = args[1].equalsIgnoreCase("clear") ? null : args[1].toLowerCase(Locale.ROOT);
-        edit(sender, key.get(), "template", r -> r.withTemplate(name),
+        edit(
+                sender,
+                key.get(),
+                "template",
+                r -> r.withTemplate(name),
                 name == null ? GuardMessageKey.TEMPLATE_CLEARED : GuardMessageKey.TEMPLATE_SET,
                 Map.of("region", key.get().id().value(), "template", name == null ? "-" : name));
     }
@@ -752,13 +898,24 @@ public final class GuardCommand implements CommandRegistration {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_SCOPE, Map.of("scope", args[1]));
             return;
         }
-        edit(sender, key.get(), "scope", r -> r.withScope(scope), GuardMessageKey.SCOPE_SET,
+        edit(
+                sender,
+                key.get(),
+                "scope",
+                r -> r.withScope(scope),
+                GuardMessageKey.SCOPE_SET,
                 Map.of("region", key.get().id().value(), "scope", scope.value()));
     }
 
     private void lock(CommandSender sender, String[] args, boolean locked) {
-        key(sender, args, 0).ifPresent(key -> edit(sender, key, "lock", r -> r.withLocked(locked),
-                locked ? GuardMessageKey.LOCK_ON : GuardMessageKey.LOCK_OFF, Map.of("region", key.id().value())));
+        key(sender, args, 0)
+                .ifPresent(key -> edit(
+                        sender,
+                        key,
+                        "lock",
+                        r -> r.withLocked(locked),
+                        locked ? GuardMessageKey.LOCK_ON : GuardMessageKey.LOCK_OFF,
+                        Map.of("region", key.id().value())));
     }
 
     // ---- staff tools --------------------------------------------------------------------------------------------
@@ -782,17 +939,34 @@ public final class GuardCommand implements CommandRegistration {
             } else {
                 Location at = player.getLocation();
                 if (at != null) {
-                    service.near(player.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ(),
-                            service.config().displayRange()).forEach(r -> shapes.add(r.shape()));
+                    service.near(
+                                    player.getWorld().getName(),
+                                    at.getBlockX(),
+                                    at.getBlockY(),
+                                    at.getBlockZ(),
+                                    service.config().displayRange())
+                            .forEach(r -> shapes.add(r.shape()));
                 }
                 selections.cuboid(player).ifPresent(sel -> shapes.add(sel.shape()));
             }
             GuardConfig config = service.config();
-            onPlayer.accept(player, () -> display.show(player, player.getWorld(), shapes, config.displayMode(),
-                    config.displayRange(), Color.fromRGB(0x55, 0xFF, 0xFF)));
-            feedback.send(player, GuardMessageKey.SHOW_STARTED,
-                    Map.of("count", String.valueOf(shapes.size()),
-                            "seconds", String.valueOf(config.displayDuration().toSeconds())));
+            onPlayer.accept(
+                    player,
+                    () -> display.show(
+                            player,
+                            player.getWorld(),
+                            shapes,
+                            config.displayMode(),
+                            config.displayRange(),
+                            Color.fromRGB(0x55, 0xFF, 0xFF)));
+            feedback.send(
+                    player,
+                    GuardMessageKey.SHOW_STARTED,
+                    Map.of(
+                            "count",
+                            String.valueOf(shapes.size()),
+                            "seconds",
+                            String.valueOf(config.displayDuration().toSeconds())));
             scheduleHide(player, shapes, config);
         });
     }
@@ -801,8 +975,17 @@ public final class GuardCommand implements CommandRegistration {
         long seconds = config.displayDuration().toSeconds();
         if (config.displayMode().equals("particles")) {
             for (long s = 1; s < seconds; s++) {
-                player.getScheduler().runDelayed(guardPlugin(), task -> display.particles(player, player.getWorld(),
-                        shapes, config.displayRange(), Color.fromRGB(0x55, 0xFF, 0xFF)), null, s * 20);
+                player.getScheduler()
+                        .runDelayed(
+                                guardPlugin(),
+                                task -> display.particles(
+                                        player,
+                                        player.getWorld(),
+                                        shapes,
+                                        config.displayRange(),
+                                        Color.fromRGB(0x55, 0xFF, 0xFF)),
+                                null,
+                                s * 20);
             }
             return;
         }
@@ -824,11 +1007,23 @@ public final class GuardCommand implements CommandRegistration {
                 feedback.send(player, GuardMessageKey.HERE_NONE);
                 return;
             }
-            feedback.send(player, GuardMessageKey.HERE_HEADER, Map.of("count", String.valueOf(set.stored().size())));
+            feedback.send(
+                    player,
+                    GuardMessageKey.HERE_HEADER,
+                    Map.of("count", String.valueOf(set.stored().size())));
             for (Region region : set.stored()) {
-                feedback.send(player, GuardMessageKey.HERE_ENTRY, Map.of("region", region.id().value(),
-                        "priority", String.valueOf(region.priority()),
-                        "role", region.roleOf(player.getUniqueId()).map(RoleName::value).orElse("-")));
+                feedback.send(
+                        player,
+                        GuardMessageKey.HERE_ENTRY,
+                        Map.of(
+                                "region",
+                                region.id().value(),
+                                "priority",
+                                String.valueOf(region.priority()),
+                                "role",
+                                region.roleOf(player.getUniqueId())
+                                        .map(RoleName::value)
+                                        .orElse("-")));
             }
         });
     }
@@ -840,25 +1035,41 @@ public final class GuardCommand implements CommandRegistration {
                 return;
             }
             int radius = args.length > 0 ? Math.max(1, Math.min(512, parseInt(args[0], 32))) : 32;
-            List<Region> near = service.near(player.getWorld().getName(), at.getBlockX(), at.getBlockY(),
-                    at.getBlockZ(), radius);
+            List<Region> near =
+                    service.near(player.getWorld().getName(), at.getBlockX(), at.getBlockY(), at.getBlockZ(), radius);
             if (near.isEmpty()) {
                 feedback.send(player, GuardMessageKey.NEAR_NONE, Map.of("radius", String.valueOf(radius)));
                 return;
             }
-            feedback.send(player, GuardMessageKey.NEAR_HEADER,
+            feedback.send(
+                    player,
+                    GuardMessageKey.NEAR_HEADER,
                     Map.of("count", String.valueOf(near.size()), "radius", String.valueOf(radius)));
             for (Region region : near) {
                 Bounds b = region.shape().bounds();
-                feedback.send(player, GuardMessageKey.NEAR_ENTRY, Map.of("region", region.id().value(),
-                        "priority", String.valueOf(region.priority()),
-                        "center", ((b.minX() + b.maxX()) / 2) + " " + ((b.minY() + b.maxY()) / 2) + " "
-                                + ((b.minZ() + b.maxZ()) / 2)));
+                feedback.send(
+                        player,
+                        GuardMessageKey.NEAR_ENTRY,
+                        Map.of(
+                                "region",
+                                region.id().value(),
+                                "priority",
+                                String.valueOf(region.priority()),
+                                "center",
+                                ((b.minX() + b.maxX()) / 2) + " " + ((b.minY() + b.maxY()) / 2) + " "
+                                        + ((b.minZ() + b.maxZ()) / 2)));
             }
             List<Shape> shapes = near.stream().map(Region::shape).toList();
             GuardConfig config = service.config();
-            onPlayer.accept(player, () -> display.show(player, player.getWorld(), shapes, config.displayMode(),
-                    config.displayRange(), Color.fromRGB(0xFF, 0xAA, 0x00)));
+            onPlayer.accept(
+                    player,
+                    () -> display.show(
+                            player,
+                            player.getWorld(),
+                            shapes,
+                            config.displayMode(),
+                            config.displayRange(),
+                            Color.fromRGB(0xFF, 0xAA, 0x00)));
             scheduleHide(player, shapes, config);
         });
     }
@@ -873,8 +1084,15 @@ public final class GuardCommand implements CommandRegistration {
             if (at == null) {
                 return;
             }
-            explain(player, new BukkitSubject(player), player.getName(), args[0], player.getWorld().getName(),
-                    at.getBlockX(), at.getBlockY(), at.getBlockZ());
+            explain(
+                    player,
+                    new BukkitSubject(player),
+                    player.getName(),
+                    args[0],
+                    player.getWorld().getName(),
+                    at.getBlockX(),
+                    at.getBlockY(),
+                    at.getBlockZ());
         });
     }
 
@@ -923,8 +1141,15 @@ public final class GuardCommand implements CommandRegistration {
         explain(sender, subject, target.getName() == null ? args[0] : target.getName(), args[1], world, x, y, z);
     }
 
-    private void explain(CommandSender sender, GuardSubject subject, String name, String rawAction, String world,
-            int x, int y, int z) {
+    private void explain(
+            CommandSender sender,
+            GuardSubject subject,
+            String name,
+            String rawAction,
+            String world,
+            int x,
+            int y,
+            int z) {
         ActionId action;
         try {
             action = ActionId.of(rawAction);
@@ -941,36 +1166,57 @@ public final class GuardCommand implements CommandRegistration {
             feedback.send(sender, GuardMessageKey.WHY_LOCKED_WORLD);
             return;
         }
-        feedback.send(sender, GuardMessageKey.WHY_HEADER, Map.of("player", name, "action", action.value(),
-                "where", world + " " + x + " " + y + " " + z));
+        feedback.send(
+                sender,
+                GuardMessageKey.WHY_HEADER,
+                Map.of("player", name, "action", action.value(), "where", world + " " + x + " " + y + " " + z));
         if (explanation.steps().isEmpty()) {
             feedback.send(sender, GuardMessageKey.WHY_NOTHING);
         }
         int n = 1;
         for (Explanation.Step step : explanation.steps()) {
-            GuardMessageKey stepKey = switch (step.origin()) {
-                case "world-defaults" -> GuardMessageKey.WHY_STEP_DEFAULTS;
-                case "inherited" -> GuardMessageKey.WHY_STEP_INHERITED;
-                case "none" -> GuardMessageKey.WHY_STEP_NONE;
-                default -> GuardMessageKey.WHY_STEP;
-            };
-            feedback.send(sender, stepKey, Map.of(
-                    "n", String.valueOf(n++),
-                    "region", step.region().id().value(),
-                    "priority", String.valueOf(step.priority()),
-                    "role", step.role() == null ? "-" : step.role().value(),
-                    "node", step.node() == null ? "-" : step.node().value(),
-                    "rule", step.rule() == null ? "-" : StyledText.escape(step.rule().toString()),
-                    "result", step.result().name().toLowerCase(Locale.ROOT),
-                    "mark", step.decisive() ? "*" : ""));
+            GuardMessageKey stepKey =
+                    switch (step.origin()) {
+                        case "world-defaults" -> GuardMessageKey.WHY_STEP_DEFAULTS;
+                        case "inherited" -> GuardMessageKey.WHY_STEP_INHERITED;
+                        case "none" -> GuardMessageKey.WHY_STEP_NONE;
+                        default -> GuardMessageKey.WHY_STEP;
+                    };
+            feedback.send(
+                    sender,
+                    stepKey,
+                    Map.of(
+                            "n",
+                            String.valueOf(n++),
+                            "region",
+                            step.region().id().value(),
+                            "priority",
+                            String.valueOf(step.priority()),
+                            "role",
+                            step.role() == null ? "-" : step.role().value(),
+                            "node",
+                            step.node() == null ? "-" : step.node().value(),
+                            "rule",
+                            step.rule() == null
+                                    ? "-"
+                                    : StyledText.escape(step.rule().toString()),
+                            "result",
+                            step.result().name().toLowerCase(Locale.ROOT),
+                            "mark",
+                            step.decisive() ? "*" : ""));
         }
-        feedback.send(sender, GuardMessageKey.WHY_RESULT,
+        feedback.send(
+                sender,
+                GuardMessageKey.WHY_RESULT,
                 Map.of("result", explanation.verdict().allowed() ? "allow" : "deny"));
     }
 
     private void inspect(CommandSender sender) {
-        withPlayer(sender, player -> feedback.send(player,
-                guard.toggleInspect(player) ? GuardMessageKey.INSPECT_ON : GuardMessageKey.INSPECT_OFF));
+        withPlayer(
+                sender,
+                player -> feedback.send(
+                        player,
+                        guard.toggleInspect(player) ? GuardMessageKey.INSPECT_ON : GuardMessageKey.INSPECT_OFF));
     }
 
     private void history(CommandSender sender, String[] args) {
@@ -989,12 +1235,31 @@ public final class GuardCommand implements CommandRegistration {
                 feedback.send(sender, GuardMessageKey.HISTORY_EMPTY);
                 return;
             }
-            feedback.send(sender, GuardMessageKey.HISTORY_HEADER, Map.of("page", String.valueOf(page),
-                    "region", key.map(k -> k.id().value()).orElse("*")));
+            feedback.send(
+                    sender,
+                    GuardMessageKey.HISTORY_HEADER,
+                    Map.of(
+                            "page",
+                            String.valueOf(page),
+                            "region",
+                            key.map(k -> k.id().value()).orElse("*")));
             for (HistoryEntry entry : entries) {
-                feedback.send(sender, GuardMessageKey.HISTORY_ENTRY, Map.of("id", String.valueOf(entry.id()),
-                        "time", TIME.format(entry.at()), "actor", entry.actor(), "change", entry.change(),
-                        "region", entry.key().id().value(), "world", entry.key().world()));
+                feedback.send(
+                        sender,
+                        GuardMessageKey.HISTORY_ENTRY,
+                        Map.of(
+                                "id",
+                                String.valueOf(entry.id()),
+                                "time",
+                                TIME.format(entry.at()),
+                                "actor",
+                                entry.actor(),
+                                "change",
+                                entry.change(),
+                                "region",
+                                entry.key().id().value(),
+                                "world",
+                                entry.key().world()));
             }
         });
     }
@@ -1016,21 +1281,31 @@ public final class GuardCommand implements CommandRegistration {
         String player = args.length > 0 && !isNumber(args[0]) && !args[0].startsWith("region:") ? args[0] : null;
         String region = args.length > 0 && args[0].startsWith("region:") ? args[0].substring(7) : null;
         int page = args.length > 0 && isNumber(args[args.length - 1]) ? parseInt(args[args.length - 1], 1) : 1;
-        var ignored = guard.denials(player, region, (page - 1) * 10, 10)
-                .whenComplete((rows, error) -> {
-                    if (error != null) {
-                        feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
-                        return;
-                    }
-                    if (rows.isEmpty()) {
-                        feedback.send(sender, GuardMessageKey.LOG_EMPTY);
-                        return;
-                    }
-                    feedback.send(sender, GuardMessageKey.LOG_HEADER, Map.of("page", String.valueOf(page)));
-                    rows.forEach(d -> feedback.send(sender, GuardMessageKey.LOG_ENTRY, Map.of(
-                            "time", TIME.format(d.at()), "player", d.player(), "action", d.action(),
-                            "region", d.region(), "where", d.world() + " " + d.x() + " " + d.y() + " " + d.z())));
-                });
+        var ignored = guard.denials(player, region, (page - 1) * 10, 10).whenComplete((rows, error) -> {
+            if (error != null) {
+                feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
+                return;
+            }
+            if (rows.isEmpty()) {
+                feedback.send(sender, GuardMessageKey.LOG_EMPTY);
+                return;
+            }
+            feedback.send(sender, GuardMessageKey.LOG_HEADER, Map.of("page", String.valueOf(page)));
+            rows.forEach(d -> feedback.send(
+                    sender,
+                    GuardMessageKey.LOG_ENTRY,
+                    Map.of(
+                            "time",
+                            TIME.format(d.at()),
+                            "player",
+                            d.player(),
+                            "action",
+                            d.action(),
+                            "region",
+                            d.region(),
+                            "where",
+                            d.world() + " " + d.x() + " " + d.y() + " " + d.z())));
+        });
     }
 
     private void status(CommandSender sender) {
@@ -1043,41 +1318,60 @@ public final class GuardCommand implements CommandRegistration {
             columns += index.columnCount();
             sets += index.setCount();
         }
-        long checks = stats.families().stream().mapToLong(GuardStats.Family::checks).sum();
+        long checks =
+                stats.families().stream().mapToLong(GuardStats.Family::checks).sum();
         feedback.send(sender, GuardMessageKey.STATUS_HEADER);
-        feedback.send(sender, GuardMessageKey.STATUS_LINE, Map.of(
-                "regions", String.valueOf(regions),
-                "worlds", String.valueOf(service.snapshot().worlds().size()),
-                "columns", String.valueOf(columns),
-                "sets", String.valueOf(sets),
-                "checks", String.valueOf(checks),
-                "rate", String.format(Locale.ROOT, "%.1f", checks / stats.uptimeSeconds()),
-                "generation", String.valueOf(service.snapshot().generation()),
-                "locked", String.valueOf(service.loadFailed())));
-        stats.families().stream().filter(f -> f.checks() > 0).limit(5).forEach(f -> feedback.send(sender,
-                GuardMessageKey.STATUS_FAMILY, Map.of("family", f.name(), "checks", String.valueOf(f.checks()),
-                        "denials", String.valueOf(f.denials()), "average", String.valueOf(f.averageNanos()))));
+        feedback.send(
+                sender,
+                GuardMessageKey.STATUS_LINE,
+                Map.of(
+                        "regions", String.valueOf(regions),
+                        "worlds", String.valueOf(service.snapshot().worlds().size()),
+                        "columns", String.valueOf(columns),
+                        "sets", String.valueOf(sets),
+                        "checks", String.valueOf(checks),
+                        "rate", String.format(Locale.ROOT, "%.1f", checks / stats.uptimeSeconds()),
+                        "generation", String.valueOf(service.snapshot().generation()),
+                        "locked", String.valueOf(service.loadFailed())));
+        stats.families().stream()
+                .filter(f -> f.checks() > 0)
+                .limit(5)
+                .forEach(f -> feedback.send(
+                        sender,
+                        GuardMessageKey.STATUS_FAMILY,
+                        Map.of(
+                                "family",
+                                f.name(),
+                                "checks",
+                                String.valueOf(f.checks()),
+                                "denials",
+                                String.valueOf(f.denials()),
+                                "average",
+                                String.valueOf(f.averageNanos()))));
     }
 
     private void actions(CommandSender sender, String[] args) {
         String prefix = args.length > 0 ? args[0].toLowerCase(Locale.ROOT) : "";
-        List<String> ids = service.tree().ids().stream().map(ActionId::value)
-                .filter(id -> prefix.isEmpty() ? !id.contains(".") : id.startsWith(prefix)).toList();
+        List<String> ids = service.tree().ids().stream()
+                .map(ActionId::value)
+                .filter(id -> prefix.isEmpty() ? !id.contains(".") : id.startsWith(prefix))
+                .toList();
         feedback.send(sender, GuardMessageKey.ACTIONS_HEADER, Map.of("count", String.valueOf(ids.size())));
         feedback.send(sender, GuardMessageKey.ACTIONS_ENTRY, Map.of("actions", String.join(", ", ids)));
     }
 
     private void importCommand(CommandSender sender, String[] args) {
         if (args.length < 2 || !args[0].equalsIgnoreCase("worldguard")) {
-            feedback.usage(sender, "guard import", "worldguard <dry-run|run|undo> [yaml|sql]",
-                    "Import WorldGuard regions");
+            feedback.usage(
+                    sender, "guard import", "worldguard <dry-run|run|undo> [yaml|sql]", "Import WorldGuard regions");
             return;
         }
         String mode = args[1].toLowerCase(Locale.ROOT);
         String source = args.length > 2 ? args[2].toLowerCase(Locale.ROOT) : "yaml";
         var ignored = imports.run(mode, source, ctx(sender)).whenComplete((report, error) -> {
             if (error != null) {
-                feedback.send(sender, GuardMessageKey.IMPORT_FAILED, Map.of("error", String.valueOf(error.getMessage())));
+                feedback.send(
+                        sender, GuardMessageKey.IMPORT_FAILED, Map.of("error", String.valueOf(error.getMessage())));
             } else {
                 Map<String, String> values = Map.of(
                         "regions", String.valueOf(report.regions()),
@@ -1085,22 +1379,40 @@ public final class GuardCommand implements CommandRegistration {
                         "behaviours", String.valueOf(report.behaviours()),
                         "notes", String.valueOf(report.notes()),
                         "skipped", String.valueOf(report.skipped()));
-                feedback.send(sender, switch (report.kind()) {
-                    case NOTHING_TO_UNDO -> GuardMessageKey.IMPORT_NOTHING;
-                    case UNDONE -> GuardMessageKey.IMPORT_UNDONE;
-                    case DRY_RUN -> GuardMessageKey.IMPORT_REPORT;
-                    case IMPORTED -> GuardMessageKey.IMPORT_DONE;
-                }, values);
+                feedback.send(
+                        sender,
+                        switch (report.kind()) {
+                            case NOTHING_TO_UNDO -> GuardMessageKey.IMPORT_NOTHING;
+                            case UNDONE -> GuardMessageKey.IMPORT_UNDONE;
+                            case DRY_RUN -> GuardMessageKey.IMPORT_REPORT;
+                            case IMPORTED -> GuardMessageKey.IMPORT_DONE;
+                        },
+                        values);
             }
         });
     }
 
     private void help(CommandSender sender) {
         feedback.send(sender, GuardMessageKey.HELP_HEADER);
-        for (String line : List.of("define <id> [shape]", "rule <region> <action> <target> <allow|deny|clear>",
-                "role <region> <player> <role|clear>", "set <region> <behaviour> <value|clear>", "info [region]",
-                "list", "here", "near", "why <action>", "test <player> <action> [region]", "show", "history",
-                "undo <id>", "bypass", "inspect", "status", "actions [prefix]", "import worldguard dry-run")) {
+        for (String line : List.of(
+                "define <id> [shape]",
+                "rule <region> <action> <target> <allow|deny|clear>",
+                "role <region> <player> <role|clear>",
+                "set <region> <behaviour> <value|clear>",
+                "info [region]",
+                "list",
+                "here",
+                "near",
+                "why <action>",
+                "test <player> <action> [region]",
+                "show",
+                "history",
+                "undo <id>",
+                "bypass",
+                "inspect",
+                "status",
+                "actions [prefix]",
+                "import worldguard dry-run")) {
             if (sender.hasPermission(BASE + line.split(" ", 2)[0])) {
                 feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", StyledText.escape("/guard " + line)));
             }
@@ -1122,45 +1434,61 @@ public final class GuardCommand implements CommandRegistration {
         if (at == null) {
             return Optional.empty();
         }
-        Optional<ShapeIn> made = switch (kind) {
-            case "cuboid", "kup" -> selections.cuboid(player).map(s -> new ShapeIn(s.world(), s.shape()));
-            case "polygon", "poligon" -> selections.polygon(player,
-                            args.length > 1 ? parseInt(args[1], world.getMinHeight()) : world.getMinHeight(),
-                            args.length > 2 ? parseInt(args[2], world.getMaxHeight() - 1) : world.getMaxHeight() - 1)
-                    .map(s -> new ShapeIn(s.world(), s.shape()));
-            case "global", "dunya" -> Optional.of(new ShapeIn(world.getName(), new Shape.Global()));
-            case "cylinder", "silindir" -> {
-                int r = args.length > 1 ? parseInt(args[1], -1) : -1;
-                if (r < 0) {
-                    yield Optional.empty();
-                }
-                int height = args.length > 2 ? parseInt(args[2], -1) : -1;
-                int low = height < 0 ? world.getMinHeight() : at.getBlockY();
-                int high = height < 0 ? world.getMaxHeight() - 1 : at.getBlockY() + height - 1;
-                yield Optional.of(new ShapeIn(world.getName(),
-                        new Shape.Cylinder(at.getBlockX(), at.getBlockZ(), r, r, low, high)));
-            }
-            case "sphere", "kure" -> {
-                int r = args.length > 1 ? parseInt(args[1], -1) : -1;
-                yield r < 0 ? Optional.empty() : Optional.of(new ShapeIn(world.getName(),
-                        new Shape.Sphere(at.getBlockX(), at.getBlockY(), at.getBlockZ(), r)));
-            }
-            case "chunks", "chunk" -> {
-                int r = args.length > 1 ? Math.max(0, Math.min(32, parseInt(args[1], 0))) : 0;
-                Set<Long> keys = new HashSet<>();
-                for (int dx = -r; dx <= r; dx++) {
-                    for (int dz = -r; dz <= r; dz++) {
-                        keys.add(Shape.chunkKey((at.getBlockX() >> 4) + dx, (at.getBlockZ() >> 4) + dz));
+        Optional<ShapeIn> made =
+                switch (kind) {
+                    case "cuboid", "kup" -> selections.cuboid(player).map(s -> new ShapeIn(s.world(), s.shape()));
+                    case "polygon", "poligon" ->
+                        selections
+                                .polygon(
+                                        player,
+                                        args.length > 1
+                                                ? parseInt(args[1], world.getMinHeight())
+                                                : world.getMinHeight(),
+                                        args.length > 2
+                                                ? parseInt(args[2], world.getMaxHeight() - 1)
+                                                : world.getMaxHeight() - 1)
+                                .map(s -> new ShapeIn(s.world(), s.shape()));
+                    case "global", "dunya" -> Optional.of(new ShapeIn(world.getName(), new Shape.Global()));
+                    case "cylinder", "silindir" -> {
+                        int r = args.length > 1 ? parseInt(args[1], -1) : -1;
+                        if (r < 0) {
+                            yield Optional.empty();
+                        }
+                        int height = args.length > 2 ? parseInt(args[2], -1) : -1;
+                        int low = height < 0 ? world.getMinHeight() : at.getBlockY();
+                        int high = height < 0 ? world.getMaxHeight() - 1 : at.getBlockY() + height - 1;
+                        yield Optional.of(new ShapeIn(
+                                world.getName(), new Shape.Cylinder(at.getBlockX(), at.getBlockZ(), r, r, low, high)));
                     }
-                }
-                yield Optional.of(new ShapeIn(world.getName(),
-                        Shape.ChunkSet.of(keys, world.getMinHeight(), world.getMaxHeight() - 1)));
-            }
-            default -> Optional.empty();
-        };
+                    case "sphere", "kure" -> {
+                        int r = args.length > 1 ? parseInt(args[1], -1) : -1;
+                        yield r < 0
+                                ? Optional.empty()
+                                : Optional.of(new ShapeIn(
+                                        world.getName(),
+                                        new Shape.Sphere(at.getBlockX(), at.getBlockY(), at.getBlockZ(), r)));
+                    }
+                    case "chunks", "chunk" -> {
+                        int r = args.length > 1 ? Math.max(0, Math.min(32, parseInt(args[1], 0))) : 0;
+                        Set<Long> keys = new HashSet<>();
+                        for (int dx = -r; dx <= r; dx++) {
+                            for (int dz = -r; dz <= r; dz++) {
+                                keys.add(Shape.chunkKey((at.getBlockX() >> 4) + dx, (at.getBlockZ() >> 4) + dz));
+                            }
+                        }
+                        yield Optional.of(new ShapeIn(
+                                world.getName(),
+                                Shape.ChunkSet.of(keys, world.getMinHeight(), world.getMaxHeight() - 1)));
+                    }
+                    default -> Optional.empty();
+                };
         if (made.isEmpty()) {
-            feedback.send(sender, kind.equals("cuboid") || kind.equals("polygon") ? GuardMessageKey.ERROR_NO_SELECTION
-                    : GuardMessageKey.ERROR_BAD_SHAPE, Map.of("shape", kind));
+            feedback.send(
+                    sender,
+                    kind.equals("cuboid") || kind.equals("polygon")
+                            ? GuardMessageKey.ERROR_NO_SELECTION
+                            : GuardMessageKey.ERROR_BAD_SHAPE,
+                    Map.of("shape", kind));
         }
         return made;
     }
@@ -1169,7 +1497,9 @@ public final class GuardCommand implements CommandRegistration {
     private Optional<RegionKey> key(CommandSender sender, String[] args, int index) {
         Optional<RegionKey> key = rawKey(sender, args, index);
         if (key.isPresent() && service.region(key.get()).isEmpty()) {
-            feedback.send(sender, GuardMessageKey.ERROR_NO_SUCH_REGION,
+            feedback.send(
+                    sender,
+                    GuardMessageKey.ERROR_NO_SUCH_REGION,
                     Map.of("region", key.get().id().value(), "world", key.get().world()));
             return Optional.empty();
         }
@@ -1207,18 +1537,30 @@ public final class GuardCommand implements CommandRegistration {
         return set == null ? Optional.empty() : set.top().map(c -> c.region());
     }
 
-    private void edit(CommandSender sender, RegionKey key, String change, UnaryOperator<Region> edit,
-            MessageKey success, Map<String, String> values) {
+    private void edit(
+            CommandSender sender,
+            RegionKey key,
+            String change,
+            UnaryOperator<Region> edit,
+            MessageKey success,
+            Map<String, String> values) {
         answer(sender, service.edit(key, change, edit, ctx(sender)), success, values);
     }
 
-    private void answer(CommandSender sender, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
+    private void answer(
+            CommandSender sender,
+            CompletableFuture<Result<Region, GuardError>> future,
+            MessageKey success,
             Map<String, String> values) {
         answer(sender, future, success, values, () -> {});
     }
 
-    private void answer(CommandSender sender, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
-            Map<String, String> values, Runnable after) {
+    private void answer(
+            CommandSender sender,
+            CompletableFuture<Result<Region, GuardError>> future,
+            MessageKey success,
+            Map<String, String> values,
+            Runnable after) {
         var ignored = future.whenComplete((result, error) -> {
             if (error != null) {
                 feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
@@ -1245,8 +1587,12 @@ public final class GuardCommand implements CommandRegistration {
      * Answer an edit made from a menu exactly as the command answers its own: the success or error line, the
      * behaviour refresh, then {@code after} (usually reopening the menu) on the player's thread.
      */
-    public void answerMenu(Player player, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
-            Map<String, String> values, Runnable after) {
+    public void answerMenu(
+            Player player,
+            CompletableFuture<Result<Region, GuardError>> future,
+            MessageKey success,
+            Map<String, String> values,
+            Runnable after) {
         answer(player, future, success, values, after);
     }
 
@@ -1271,7 +1617,8 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     private EditContext ctx(CommandSender sender) {
-        return new EditContext(sender instanceof Player p ? p.getName() : "console",
+        return new EditContext(
+                sender instanceof Player p ? p.getName() : "console",
                 !(sender instanceof Player) || sender.hasPermission(GuardRuntime.LOCK_PERMISSION));
     }
 
@@ -1284,7 +1631,9 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     private void line(CommandSender sender, String label, String value) {
-        feedback.send(sender, GuardMessageKey.INFO_LINE,
+        feedback.send(
+                sender,
+                GuardMessageKey.INFO_LINE,
                 Map.of("label", StyledText.escape(label), "value", StyledText.escape(value)));
     }
 
@@ -1316,8 +1665,13 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     private static Map<String, String> xyz(Location at) {
-        return Map.of("x", String.valueOf(at.getBlockX()), "y", String.valueOf(at.getBlockY()),
-                "z", String.valueOf(at.getBlockZ()));
+        return Map.of(
+                "x",
+                String.valueOf(at.getBlockX()),
+                "y",
+                String.valueOf(at.getBlockY()),
+                "z",
+                String.valueOf(at.getBlockZ()));
     }
 
     private static String facing(Player player) {

@@ -1,14 +1,12 @@
 package com.uxplima.uxmessentials.playerstate.adapter.inbound.command;
 
-import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
-import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
-import org.bukkit.entity.Player;
-import org.bukkit.Bukkit;
-import java.util.Objects;
-import java.util.Map;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -17,6 +15,8 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
+import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -39,8 +39,8 @@ public final class GodCommand extends PlayerstateCommandSupport implements Comma
     private final PlayerStateStore store;
     private final RegionBehaviourGate regions;
 
-    public GodCommand(PlayerStateServices services, Messages messages, PlayerStateStore store,
-            RegionBehaviourGate regions) {
+    public GodCommand(
+            PlayerStateServices services, Messages messages, PlayerStateStore store, RegionBehaviourGate regions) {
         super(services, messages);
         this.store = Objects.requireNonNull(store, "store");
         this.regions = Objects.requireNonNull(regions, "regions");
@@ -75,7 +75,9 @@ public final class GodCommand extends PlayerstateCommandSupport implements Comma
         for (PlayerRef target : targets) {
             // A guard region with god = deny (an arena) refuses turning god mode on; turning it off is always fine.
             Player live = Bukkit.getPlayer(target.uuid());
-            if (live != null && !store.current(target).god() && !live.hasPermission(GUARD_BYPASS)
+            if (live != null
+                    && !store.current(target).god()
+                    && !live.hasPermission(GUARD_BYPASS)
                     && regions.denies(live, "god")) {
                 feedback.send(sender, PlayerstateMessageKey.GOD_REGION_DISABLED, Map.of());
                 continue;

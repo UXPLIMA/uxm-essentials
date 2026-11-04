@@ -1,12 +1,8 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
-import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
-import com.uxplima.uxmessentials.guard.adapter.Causes;
-import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import java.util.List;
 import java.util.Objects;
+
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
@@ -21,6 +17,12 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.EntityExplodeEvent;
 import org.bukkit.event.hanging.HangingBreakEvent;
+
+import com.uxplima.uxmessentials.guard.adapter.ActionKinds;
+import com.uxplima.uxmessentials.guard.adapter.Causes;
+import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
+import com.uxplima.uxmessentials.guard.domain.ActionId;
+import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 
 /**
  * Explosions remove only the blocks they may: each block is checked for the explosion's action and for the border
@@ -45,14 +47,23 @@ public final class ExplosionListener implements Listener {
         BlockState exploded = event.getExplodedBlockState();
         Material type = exploded.getType();
         ActionId action = Tag.BEDS.isTagged(type) || type == Material.RESPAWN_ANCHOR
-                ? BuiltInActions.WORLD_EXPLOSION_BED : BuiltInActions.WORLD_EXPLOSION_OTHER;
+                ? BuiltInActions.WORLD_EXPLOSION_BED
+                : BuiltInActions.WORLD_EXPLOSION_OTHER;
         filter(action, event.getBlock(), event.blockList(), null);
     }
 
-    private void filter(ActionId action, Block origin, List<Block> blocks, @org.jspecify.annotations.Nullable Player player) {
+    private void filter(
+            ActionId action, Block origin, List<Block> blocks, @org.jspecify.annotations.Nullable Player player) {
         blocks.removeIf(block -> !guard.allowWorld(action, origin, block)
-                || (player != null && !guard.allow(player, BuiltInActions.BREAK, block.getWorld(), block.getX(),
-                        block.getY(), block.getZ(), false)));
+                || (player != null
+                        && !guard.allow(
+                                player,
+                                BuiltInActions.BREAK,
+                                block.getWorld(),
+                                block.getX(),
+                                block.getY(),
+                                block.getZ(),
+                                false)));
     }
 
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)

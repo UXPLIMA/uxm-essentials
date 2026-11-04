@@ -1,10 +1,11 @@
 package com.uxplima.uxmessentials.api.query;
 
-import com.uxplima.uxmessentials.api.view.UxmLocation;
-import com.uxplima.uxmessentials.api.view.UxmRegion;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+
+import com.uxplima.uxmessentials.api.view.UxmLocation;
+import com.uxplima.uxmessentials.api.view.UxmRegion;
 
 /**
  * The guard module's protection, for other plugins: may a player do an action at a place, which regions lie near a

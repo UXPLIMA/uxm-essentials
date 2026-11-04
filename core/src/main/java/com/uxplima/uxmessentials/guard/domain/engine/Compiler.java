@@ -1,5 +1,17 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
+
+import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
@@ -12,17 +24,6 @@ import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
-import com.uxplima.uxmessentials.guard.domain.ActionId;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
-import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -66,7 +67,10 @@ public final class Compiler {
 
     /** Compile a world, reusing what it can from {@code previous}. */
     public static WorldIndex compile(
-            ActionTree tree, Input input, Map<String, Template> templates, @Nullable WorldIndex previous,
+            ActionTree tree,
+            Input input,
+            Map<String, Template> templates,
+            @Nullable WorldIndex previous,
             @Nullable ActionTree previousTree) {
         Map<RegionId, Region> byId = new HashMap<>();
         for (Region region : input.regions()) {
@@ -79,8 +83,12 @@ public final class Compiler {
         for (Region region : byId.values()) {
             Region effective = flatten(region, byId, templates);
             String family = familyOf(region, byId);
-            CompiledRegion old = previous == null ? null : previous.region(region.id()).orElse(null);
-            if (sameTree && old != null && old.region().equals(region) && old.effective().equals(effective)
+            CompiledRegion old =
+                    previous == null ? null : previous.region(region.id()).orElse(null);
+            if (sameTree
+                    && old != null
+                    && old.region().equals(region)
+                    && old.effective().equals(effective)
                     && old.family().equals(family)) {
                 compiled.add(old);
             } else {
@@ -102,18 +110,29 @@ public final class Compiler {
         compiled.sort(Precedence.ORDER);
 
         Region defaultsRegion = defaultsRegion(input);
-        CompiledRegion defaults = defaultsRegion.rules().isEmpty() && defaultsRegion.behaviours().isEmpty()
+        CompiledRegion defaults = defaultsRegion.rules().isEmpty()
+                        && defaultsRegion.behaviours().isEmpty()
                 ? null
                 : new CompiledRegion(defaultsRegion, defaultsRegion, tree, RegionId.WORLD_DEFAULTS.value(), true);
 
         Map<Long, Column> reuse = Map.of();
-        if (previous != null && sameTree && !previous.locked() && !input.locked()
+        if (previous != null
+                && sameTree
+                && !previous.locked()
+                && !input.locked()
                 && sameDefaults(previous, defaultsRegion)
                 && changed.stream().noneMatch(b -> b.equals(Bounds.EVERYTHING))) {
             reuse = previous.columnsOutside(changed);
         }
-        return new WorldIndex(input.world(), input.minY(), input.maxY(), input.locked(),
-                compiled.toArray(CompiledRegion[]::new), defaults, reuse, defaultsRegion);
+        return new WorldIndex(
+                input.world(),
+                input.minY(),
+                input.maxY(),
+                input.locked(),
+                compiled.toArray(CompiledRegion[]::new),
+                defaults,
+                reuse,
+                defaultsRegion);
     }
 
     /** A region with its parent chain and templates folded in. */
@@ -137,7 +156,9 @@ public final class Compiler {
             behaviours = behaviours.overlay(level.behaviours());
             roles.putAll(level.roles());
         }
-        return region.withRules(List.copyOf(rules.values())).withBehaviours(behaviours).withRoles(roles);
+        return region.withRules(List.copyOf(rules.values()))
+                .withBehaviours(behaviours)
+                .withRoles(roles);
     }
 
     /** The region and its ancestors, nearest first; stops at a missing parent or a cycle. */
@@ -167,7 +188,9 @@ public final class Compiler {
     }
 
     private static Region defaultsRegion(Input input) {
-        return Region.create(new RegionKey(input.world(), RegionId.WORLD_DEFAULTS), GuardScope.server("defaults"),
+        return Region.create(
+                        new RegionKey(input.world(), RegionId.WORLD_DEFAULTS),
+                        GuardScope.server("defaults"),
                         new Shape.Global())
                 .withPriority(Integer.MIN_VALUE)
                 .withRules(input.defaultRules())

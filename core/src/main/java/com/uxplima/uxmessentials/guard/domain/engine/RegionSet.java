@@ -1,15 +1,16 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
-import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
-import com.uxplima.uxmessentials.guard.domain.Behaviours;
-import com.uxplima.uxmessentials.guard.domain.GuardSubject;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.guard.domain.Verdict;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 import java.util.TreeSet;
+
+import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.Behaviours;
+import com.uxplima.uxmessentials.guard.domain.GuardSubject;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.guard.domain.Verdict;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -183,11 +184,15 @@ public final class RegionSet {
         }
         for (int i = start; i < candidate; i++) {
             CompiledRegion member = ordered[i];
-            if (member.worldDefaults() || member.region().priority() != next.region().priority()) {
+            if (member.worldDefaults()
+                    || member.region().priority() != next.region().priority()) {
                 return false;
             }
             if (member.region().shape().bounds().contains(next.region().shape().bounds())
-                    || next.region().shape().bounds().contains(member.region().shape().bounds())) {
+                    || next.region()
+                            .shape()
+                            .bounds()
+                            .contains(member.region().shape().bounds())) {
                 return false;
             }
         }

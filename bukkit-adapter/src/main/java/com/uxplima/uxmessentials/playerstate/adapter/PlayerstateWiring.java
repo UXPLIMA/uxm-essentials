@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.playerstate.adapter;
 
-import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.RegionBehaviourGate;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -11,6 +10,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerStateCommands;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.RegionBehaviourGate;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
@@ -161,9 +161,8 @@ public final class PlayerstateWiring {
                 new ImportPlaytime(playtimeRepository, notifier, clock),
                 new VanillaPlaytime(kernel.scheduler()),
                 kernel.log());
-        List<CommandRegistration> commands =
-                PlayerStateCommands.all(services, kernel.messages(), noFlyWorlds, playtimeView, playtimeAdmin, store,
-                        regions);
+        List<CommandRegistration> commands = PlayerStateCommands.all(
+                services, kernel.messages(), noFlyWorlds, playtimeView, playtimeAdmin, store, regions);
         List<Listener> listeners = new ArrayList<>(List.of(
                 new PlayerStateListener(store, reconciler, teams),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),

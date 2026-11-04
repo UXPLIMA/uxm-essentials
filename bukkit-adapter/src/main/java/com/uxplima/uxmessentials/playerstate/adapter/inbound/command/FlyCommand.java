@@ -46,7 +46,10 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
     private final NoFlyWorldPolicy noFlyWorlds;
     private final RegionBehaviourGate regions;
 
-    public FlyCommand(PlayerStateServices services, Messages messages, NoFlyWorldPolicy noFlyWorlds,
+    public FlyCommand(
+            PlayerStateServices services,
+            Messages messages,
+            NoFlyWorldPolicy noFlyWorlds,
             RegionBehaviourGate regions) {
         super(services, messages);
         this.noFlyWorlds = Objects.requireNonNull(noFlyWorlds, "noFlyWorlds");

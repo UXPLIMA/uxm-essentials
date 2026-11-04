@@ -1,10 +1,11 @@
 package com.uxplima.uxmessentials.guard.application;
 
-import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.atomic.LongAdder;
+
+import com.uxplima.uxmessentials.guard.domain.ActionTree;
 
 /**
  * Counters behind {@code /guard status}: checks, denials and time spent per top level action family. Striped

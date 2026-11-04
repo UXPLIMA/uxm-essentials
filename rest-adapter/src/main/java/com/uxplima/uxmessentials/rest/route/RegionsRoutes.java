@@ -81,7 +81,8 @@ public final class RegionsRoutes {
      */
     private static HttpResponse check(UxmEssentialsApi api, RestRequest request) {
         String world = request.parameter("name");
-        String action = request.http().queryParam("action")
+        String action = request.http()
+                .queryParam("action")
                 .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "action is required"));
         UxmLocation where = point(request, world)
                 .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "x, y and z are required"));

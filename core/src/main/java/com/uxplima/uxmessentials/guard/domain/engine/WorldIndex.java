@@ -1,11 +1,5 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
-import com.uxplima.uxmessentials.guard.domain.Bounds;
-import com.uxplima.uxmessentials.guard.domain.GuardSubject;
-import com.uxplima.uxmessentials.guard.domain.Region;
-import com.uxplima.uxmessentials.guard.domain.RegionId;
-import com.uxplima.uxmessentials.guard.domain.Shape;
-import com.uxplima.uxmessentials.guard.domain.Verdict;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -14,6 +8,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.uxplima.uxmessentials.guard.domain.Bounds;
+import com.uxplima.uxmessentials.guard.domain.GuardSubject;
+import com.uxplima.uxmessentials.guard.domain.Region;
+import com.uxplima.uxmessentials.guard.domain.RegionId;
+import com.uxplima.uxmessentials.guard.domain.Shape;
+import com.uxplima.uxmessentials.guard.domain.Verdict;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -41,6 +42,7 @@ public final class WorldIndex {
     private final ConcurrentHashMap<Long, Column> columns;
     private final ConcurrentHashMap<List<CompiledRegion>, RegionSet> interned = new ConcurrentHashMap<>();
     private final RegionSet emptySet;
+    private final RegionSet wilderness;
     private final Region defaultsRegion;
 
     WorldIndex(
@@ -74,7 +76,9 @@ public final class WorldIndex {
             }
             for (int cx = b.minX() >> 4; cx <= b.maxX() >> 4; cx++) {
                 for (int cz = b.minZ() >> 4; cz <= b.maxZ() >> 4; cz++) {
-                    chunkLists.computeIfAbsent(chunkKey(cx, cz), k -> new ArrayList<>()).add(region);
+                    chunkLists
+                            .computeIfAbsent(chunkKey(cx, cz), k -> new ArrayList<>())
+                            .add(region);
                 }
             }
         }
@@ -95,6 +99,7 @@ public final class WorldIndex {
         }
         this.columns = new ConcurrentHashMap<>(reusedColumns);
         this.emptySet = intern(new CompiledRegion[0]);
+        this.wilderness = intern(withDefaults(new CompiledRegion[0]));
     }
 
     /** The world defaults as a region, compiled or not. */
@@ -205,9 +210,29 @@ public final class WorldIndex {
         long key = chunkKey(x >> 4, z >> 4);
         Column column = columns.get(key);
         if (column == null) {
+            // A chunk no region touches answers the defaults alone and keeps no column, so a player exploring the
+            // wilderness costs no memory.
+            if (wild(key, x >> 4, z >> 4)) {
+                return wilderness;
+            }
             column = columns.computeIfAbsent(key, k -> buildColumn(x >> 4, z >> 4));
         }
         return column.at(x, y, z, minSection, maxSection, this);
+    }
+
+    private boolean wild(long key, int cx, int cz) {
+        if (smallByChunk.containsKey(key)) {
+            return false;
+        }
+        int minX = cx << 4;
+        int minZ = cz << 4;
+        for (CompiledRegion region : large) {
+            Bounds b = region.region().shape().bounds();
+            if (b.maxX() >= minX && b.minX() <= minX + 15 && b.maxZ() >= minZ && b.minZ() <= minZ + 15) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private RegionSet outsideHeight(int x, int y, int z) {
@@ -226,8 +251,8 @@ public final class WorldIndex {
         columns.forEach((key, column) -> {
             int cx = (int) (key >> 32);
             int cz = (int) (long) key;
-            Bounds chunk = new Bounds(cx << 4, Integer.MIN_VALUE / 2, cz << 4, (cx << 4) + 15,
-                    Integer.MAX_VALUE / 2, (cz << 4) + 15);
+            Bounds chunk = new Bounds(
+                    cx << 4, Integer.MIN_VALUE / 2, cz << 4, (cx << 4) + 15, Integer.MAX_VALUE / 2, (cz << 4) + 15);
             for (Bounds bounds : changed) {
                 if (bounds.intersects(chunk)) {
                     return;
@@ -249,8 +274,8 @@ public final class WorldIndex {
     private Column buildColumn(int cx, int cz) {
         CompiledRegion[] small = smallByChunk.getOrDefault(chunkKey(cx, cz), new CompiledRegion[0]);
         List<CompiledRegion> candidates = new ArrayList<>(small.length + large.length);
-        Bounds chunk = new Bounds(cx << 4, minSection << 4, cz << 4, (cx << 4) + 15, (maxSection << 4) + 15,
-                (cz << 4) + 15);
+        Bounds chunk =
+                new Bounds(cx << 4, minSection << 4, cz << 4, (cx << 4) + 15, (maxSection << 4) + 15, (cz << 4) + 15);
         for (CompiledRegion region : small) {
             candidates.add(region);
         }
@@ -279,9 +304,8 @@ public final class WorldIndex {
             CompiledRegion[] array = inSection.toArray(CompiledRegion[]::new);
             String cellKey = exact + Arrays.toString(array);
             final boolean isExact = exact;
-            cells[sy - minSection] = cellIntern.computeIfAbsent(cellKey, k -> isExact
-                    ? Cell.exact(intern(withDefaults(array)))
-                    : Cell.mixed(array));
+            cells[sy - minSection] = cellIntern.computeIfAbsent(
+                    cellKey, k -> isExact ? Cell.exact(intern(withDefaults(array))) : Cell.mixed(array));
         }
         return new Column(cells);
     }

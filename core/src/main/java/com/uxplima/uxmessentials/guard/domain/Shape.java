@@ -28,10 +28,14 @@ public sealed interface Shape {
         if (!bounds().contains(box)) {
             return false;
         }
-        return contains(box.minX(), box.minY(), box.minZ()) && contains(box.maxX(), box.maxY(), box.maxZ())
-                && contains(box.minX(), box.minY(), box.maxZ()) && contains(box.maxX(), box.minY(), box.minZ())
-                && contains(box.minX(), box.maxY(), box.minZ()) && contains(box.maxX(), box.maxY(), box.maxZ())
-                && contains(box.minX(), box.maxY(), box.maxZ()) && contains(box.maxX(), box.maxY(), box.minZ())
+        return contains(box.minX(), box.minY(), box.minZ())
+                && contains(box.maxX(), box.maxY(), box.maxZ())
+                && contains(box.minX(), box.minY(), box.maxZ())
+                && contains(box.maxX(), box.minY(), box.minZ())
+                && contains(box.minX(), box.maxY(), box.minZ())
+                && contains(box.maxX(), box.maxY(), box.maxZ())
+                && contains(box.minX(), box.maxY(), box.maxZ())
+                && contains(box.maxX(), box.maxY(), box.minZ())
                 && convexFullyContains(box);
     }
 
@@ -113,7 +117,11 @@ public sealed interface Shape {
             int maxX = Arrays.stream(xs).max().orElseThrow();
             int minZ = Arrays.stream(zs).min().orElseThrow();
             int maxZ = Arrays.stream(zs).max().orElseThrow();
-            return new Polygon(xs, zs, Math.min(minY, maxY), Math.max(minY, maxY),
+            return new Polygon(
+                    xs,
+                    zs,
+                    Math.min(minY, maxY),
+                    Math.max(minY, maxY),
                     new Bounds(minX, Math.min(minY, maxY), minZ, maxX, Math.max(minY, maxY), maxZ));
         }
 
@@ -161,8 +169,10 @@ public sealed interface Shape {
         private static boolean onSegment(int x, int z, int x1, int z1, int x2, int z2) {
             long cross = (long) (x - x1) * (z2 - z1) - (long) (z - z1) * (x2 - x1);
             return cross == 0
-                    && x >= Math.min(x1, x2) && x <= Math.max(x1, x2)
-                    && z >= Math.min(z1, z2) && z <= Math.max(z1, z2);
+                    && x >= Math.min(x1, x2)
+                    && x <= Math.max(x1, x2)
+                    && z >= Math.min(z1, z2)
+                    && z <= Math.max(z1, z2);
         }
 
         @Override
@@ -207,7 +217,10 @@ public sealed interface Shape {
         @Override
         public boolean equals(Object o) {
             return o instanceof Polygon p
-                    && Arrays.equals(xs, p.xs) && Arrays.equals(zs, p.zs) && minY == p.minY && maxY == p.maxY;
+                    && Arrays.equals(xs, p.xs)
+                    && Arrays.equals(zs, p.zs)
+                    && minY == p.minY
+                    && maxY == p.maxY;
         }
 
         @Override
@@ -263,8 +276,13 @@ public sealed interface Shape {
 
         @Override
         public Bounds bounds() {
-            return new Bounds(centerX - radius, centerY - radius, centerZ - radius,
-                    centerX + radius, centerY + radius, centerZ + radius);
+            return new Bounds(
+                    centerX - radius,
+                    centerY - radius,
+                    centerZ - radius,
+                    centerX + radius,
+                    centerY + radius,
+                    centerZ + radius);
         }
 
         @Override
@@ -315,8 +333,8 @@ public sealed interface Shape {
             }
             int low = Math.min(minY, maxY);
             int high = Math.max(minY, maxY);
-            return new ChunkSet(chunks, low, high,
-                    new Bounds(minX << 4, low, minZ << 4, (maxX << 4) + 15, high, (maxZ << 4) + 15));
+            return new ChunkSet(
+                    chunks, low, high, new Bounds(minX << 4, low, minZ << 4, (maxX << 4) + 15, high, (maxZ << 4) + 15));
         }
 
         @Override

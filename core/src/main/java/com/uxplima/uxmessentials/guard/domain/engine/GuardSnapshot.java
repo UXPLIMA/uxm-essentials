@@ -1,12 +1,13 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 
 /**
  * Everything the listeners read, as one immutable value swapped atomically on every change. A world with no

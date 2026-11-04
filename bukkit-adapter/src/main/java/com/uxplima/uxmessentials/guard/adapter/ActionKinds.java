@@ -2,13 +2,14 @@ package com.uxplima.uxmessentials.guard.adapter;
 
 import static com.uxplima.uxmessentials.guard.domain.BuiltInActions.*;
 
-import com.uxplima.uxmessentials.guard.domain.ActionId;
 import org.bukkit.Material;
 import org.bukkit.Tag;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.Container;
 import org.bukkit.entity.AbstractVillager;
+import org.bukkit.entity.AbstractWindCharge;
+import org.bukkit.entity.Ambient;
 import org.bukkit.entity.Animals;
 import org.bukkit.entity.ArmorStand;
 import org.bukkit.entity.Creeper;
@@ -24,8 +25,8 @@ import org.bukkit.entity.Vehicle;
 import org.bukkit.entity.WaterMob;
 import org.bukkit.entity.Wither;
 import org.bukkit.entity.WitherSkull;
-import org.bukkit.entity.AbstractWindCharge;
-import org.bukkit.entity.Ambient;
+
+import com.uxplima.uxmessentials.guard.domain.ActionId;
 
 /**
  * Which action a block, item or entity stands for. Anything not named falls into the {@code other} leaf of its
@@ -93,8 +94,11 @@ public final class ActionKinds {
             return USE_WORKSTATION;
         }
         BlockState state = block.getState(false);
-        if (state instanceof Container || type == Material.CHISELED_BOOKSHELF || type == Material.DECORATED_POT
-                || Tag.ITEMS_BOOKSHELF_BOOKS.isTagged(type) || type == Material.ENDER_CHEST) {
+        if (state instanceof Container
+                || type == Material.CHISELED_BOOKSHELF
+                || type == Material.DECORATED_POT
+                || Tag.ITEMS_BOOKSHELF_BOOKS.isTagged(type)
+                || type == Material.ENDER_CHEST) {
             return type == Material.ENDER_CHEST ? USE_OTHER : USE_CONTAINER;
         }
         return USE_OTHER;
@@ -102,8 +106,18 @@ public final class ActionKinds {
 
     private static boolean workstation(Material type) {
         return switch (type) {
-            case CRAFTING_TABLE, CRAFTER, ANVIL, CHIPPED_ANVIL, DAMAGED_ANVIL, ENCHANTING_TABLE, SMITHING_TABLE,
-                    LOOM, GRINDSTONE, STONECUTTER, CARTOGRAPHY_TABLE, FLETCHING_TABLE -> true;
+            case CRAFTING_TABLE,
+                    CRAFTER,
+                    ANVIL,
+                    CHIPPED_ANVIL,
+                    DAMAGED_ANVIL,
+                    ENCHANTING_TABLE,
+                    SMITHING_TABLE,
+                    LOOM,
+                    GRINDSTONE,
+                    STONECUTTER,
+                    CARTOGRAPHY_TABLE,
+                    FLETCHING_TABLE -> true;
             default -> false;
         };
     }
@@ -211,9 +225,15 @@ public final class ActionKinds {
 
     /** True for items whose right click changes the world on their own (handled as item actions). */
     public static boolean worldChangingItem(Material item) {
-        return item.name().endsWith("_SPAWN_EGG") || item == Material.BONE_MEAL || item == Material.FIREWORK_ROCKET
-                || item == Material.FLINT_AND_STEEL || item == Material.FIRE_CHARGE
-                || item == Material.ARMOR_STAND || item == Material.END_CRYSTAL || item == Material.ITEM_FRAME
-                || item == Material.GLOW_ITEM_FRAME || item == Material.PAINTING;
+        return item.name().endsWith("_SPAWN_EGG")
+                || item == Material.BONE_MEAL
+                || item == Material.FIREWORK_ROCKET
+                || item == Material.FLINT_AND_STEEL
+                || item == Material.FIRE_CHARGE
+                || item == Material.ARMOR_STAND
+                || item == Material.END_CRYSTAL
+                || item == Material.ITEM_FRAME
+                || item == Material.GLOW_ITEM_FRAME
+                || item == Material.PAINTING;
     }
 }

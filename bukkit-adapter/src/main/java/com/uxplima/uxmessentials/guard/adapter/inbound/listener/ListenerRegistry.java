@@ -1,17 +1,19 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.listener;
 
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
+
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.engine.GuardSnapshot;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.function.Function;
-import org.bukkit.event.HandlerList;
-import org.bukkit.event.Listener;
-import org.bukkit.plugin.Plugin;
 
 /**
  * Registers a listener family only while some rule needs it, and takes it away when none does (B02): a server
@@ -58,13 +60,29 @@ public final class ListenerRegistry {
 
     /** Every family. */
     public static final List<Family> FAMILIES = List.of(
-            new Family("block", List.of("break", "place", "item.use", "hanging.place", "vehicle.place", "use.sign",
-                    "interact.animal"), false, BlockListener::new),
+            new Family(
+                    "block",
+                    List.of(
+                            "break",
+                            "place",
+                            "item.use",
+                            "hanging.place",
+                            "vehicle.place",
+                            "use.sign",
+                            "interact.animal"),
+                    false,
+                    BlockListener::new),
             new Family("interact", List.of("use", "interact", "trample", "break"), false, InteractListener::new),
-            new Family("damage", List.of("damage", "hanging.break", "vehicle.destroy", "item.use.potion"), false,
+            new Family(
+                    "damage",
+                    List.of("damage", "hanging.break", "vehicle.destroy", "item.use.potion"),
+                    false,
                     DamageListener::new),
             new Family("item", List.of("item"), false, ItemListener::new),
-            new Family("nature", List.of("world", "trample", "place", "break", "item.use.bone-meal"), true,
+            new Family(
+                    "nature",
+                    List.of("world", "trample", "place", "break", "item.use.bone-meal"),
+                    true,
                     NatureListener::new),
             new Family("explosion", List.of("world.explosion", "break"), true, ExplosionListener::new),
             new Family("hopper", List.of("world.hopper"), true, HopperListener::new));

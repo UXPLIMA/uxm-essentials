@@ -1,12 +1,13 @@
 package com.uxplima.uxmessentials.guard.domain.engine;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Explanation;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * Builds the step by step account of a decision. It runs the same order as the hot path but records every
@@ -34,8 +35,8 @@ public final class Explainer {
             boolean deny = false;
             for (int i = start; i < end; i++) {
                 CompiledRegion region = set.at(i);
-                CompiledRegion.Decision decision = node < 0 ? CompiledRegion.Decision.NONE
-                        : region.explain(node, subject);
+                CompiledRegion.Decision decision =
+                        node < 0 ? CompiledRegion.Decision.NONE : region.explain(node, subject);
                 deny |= decision.verdict() == Verdict.DENY;
                 allow |= decision.verdict() == Verdict.ALLOW;
             }
