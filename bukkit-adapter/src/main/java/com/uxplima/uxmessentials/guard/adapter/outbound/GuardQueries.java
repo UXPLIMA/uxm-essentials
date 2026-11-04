@@ -91,6 +91,15 @@ public final class GuardQueries implements UxmRegionsQuery, UxmGuardQuery {
     }
 
     @Override
+    public boolean isAction(String action) {
+        try {
+            return service.tree().contains(ActionId.of(action));
+        } catch (IllegalArgumentException invalid) {
+            return false;
+        }
+    }
+
+    @Override
     public List<UxmRegion> within(UxmLocation where, int radius) {
         int r = Math.max(0, radius);
         int x = block(where.x());

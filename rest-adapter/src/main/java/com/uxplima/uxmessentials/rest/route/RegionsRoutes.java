@@ -77,7 +77,8 @@ public final class RegionsRoutes {
 
     /**
      * Whether an action is allowed at a point: {@code action}, {@code x}, {@code y} and {@code z} are required;
-     * with {@code player} (a UUID) the player's verdict, without it what nature may do there.
+     * with {@code player} (a UUID) the player's verdict, without it what nature may do there. An action outside
+     * the tree is a bad request rather than a quiet "allowed".
      */
     private static HttpResponse check(UxmEssentialsApi api, RestRequest request) {
         String world = request.parameter("name");
@@ -87,6 +88,9 @@ public final class RegionsRoutes {
         UxmLocation where = point(request, world)
                 .orElseThrow(() -> new HttpException(HttpStatus.BAD_REQUEST, "x, y and z are required"));
         UxmGuardQuery guard = Reads.module(api.guard(), "guard");
+        if (!guard.isAction(action)) {
+            throw new HttpException(HttpStatus.BAD_REQUEST, "unknown action: " + action);
+        }
         Optional<String> player = request.http().queryParam("player");
         boolean allowed;
         if (player.isPresent()) {

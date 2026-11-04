@@ -27,6 +27,12 @@ public interface UxmGuardQuery {
     boolean allowedWorld(String action, UxmLocation where);
 
     /**
+     * Whether {@code action} names an action in the tree, built in or registered. A caller that takes action ids
+     * from a person checks this first, so a typo is not read as "allowed".
+     */
+    boolean isAction(String action);
+
+    /**
      * Regions whose bounds come within {@code radius} blocks of {@code where} on the horizontal plane, at any
      * height, nearest first. A square, not a circle: what a chunk claim needs to keep its distance.
      */
