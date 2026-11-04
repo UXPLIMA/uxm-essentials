@@ -301,14 +301,16 @@ Registered when PlaceholderAPI is installed, as `%uxmessentials_<key>%`. A `play
 | `rank_position` | ranks | Which rung of the ladder the player stands on, counting from one. | player |
 | `rank_progress` | ranks | How far up the ladder the player stands, as a whole percentage. | player |
 | `rank_total` | ranks | How many rungs the ladder holds. | player |
-| `regions_available` | regions | Whether a region provider is reachable at all (yes/no). | global |
-| `regions_count` | regions | How many regions cover the player at once. | session |
-| `regions_here` | regions | The region the player is standing in, highest priority first when they overlap. | session |
-| `regions_here_members` | regions | Who may build in the region the player is standing in, comma separated. | session |
-| `regions_here_owners` | regions | Who owns the region the player is standing in, comma separated. | session |
-| `regions_here_priority` | regions | That region's priority, which is what decides an overlap. | session |
-| `regions_inside` | regions | Whether the player is standing in a protected region (yes/no). | session |
-| `regions_world_count` | regions | How many regions are defined in the world the player is in. | session |
+| `regions_allowed_<action>` | guard | Whether the player may do a guard action where they stand, such as regions_allowed_break. | session |
+| `regions_available` | guard | Whether the guard module is on (yes/no). Every regions_ placeholder is also readable as guard_. | global |
+| `regions_count` | guard | How many regions cover the player at once. | session |
+| `regions_here` | guard | The region the player is standing in, highest priority first when they overlap. | session |
+| `regions_here_members` | guard | Who may build in the region the player is standing in, comma separated. | session |
+| `regions_here_owners` | guard | Who owns the region the player is standing in, comma separated. | session |
+| `regions_here_priority` | guard | That region's priority, which is what decides an overlap. | session |
+| `regions_here_role` | guard | The player's role in the region they stand in (owner, manager, member, guest), or empty. | session |
+| `regions_inside` | guard | Whether the player is standing in a protected region (yes/no). | session |
+| `regions_world_count` | guard | How many regions are defined in the world the player is in. | session |
 | `scoreboard_board` | scoreboard | The board the player's sidebar is drawn from, or a dash when they are shown none. | session |
 | `scoreboard_visible` | scoreboard | Whether the player has the sidebar showing (yes/no). | session |
 | `security_enforced` | security | Whether the server asks players to verify on join at all (yes/no). | global |

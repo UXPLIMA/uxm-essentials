@@ -2,7 +2,7 @@
 
 Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; the comment says whether the highest or the lowest granted number wins. The gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md).
 
-Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [regions](#regions) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
 ## bossbar
 
@@ -68,6 +68,45 @@ Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communica
 | `uxmessentials.menu.open.others` | /menu open <menu> <player>: open a custom menu for somebody else. | op |
 | `uxmessentials.menu.use` | /menu open <name> to open an operator custom menu, and /menu list to see the loaded menus. | true |
 | `uxmessentials.module.custommenus` | Hot-reload / inspect the custommenus module (operator custom menus behind /menu). | op |
+
+## guard
+
+| Permission | What it allows | Default |
+|---|---|---|
+| `uxmessentials.module.guard` | Hot-reload / inspect the guard module (region protection). | op |
+| `uxmessentials.guard.use` | /guard and /guard help, actions: the base of every guard command. | true |
+| `uxmessentials.guard.here` | /guard here: the regions you stand in and your role there. | true |
+| `uxmessentials.guard.member` | /guard member <region> <player> <member\|guest\|clear>: owners and managers edit their own region's roster. | true |
+| `uxmessentials.guard.why` | /guard why <action>: explain the verdict for an action where you stand. | true |
+| `uxmessentials.guard.define` | /guard define, redefine, wand, pos1, pos2, point, clear, expand: draw and define regions. | op |
+| `uxmessentials.guard.remove` | /guard remove and restore: delete a region or bring a removed one back. | op |
+| `uxmessentials.guard.info` | /guard info <region>: a region's shape, rules, roles and behaviours. | op |
+| `uxmessentials.guard.list` | /guard list [world]: list the regions of a world. | op |
+| `uxmessentials.guard.rule` | /guard rule <region> <action> <target> <allow\|deny\|clear>: edit a region's rules. | op |
+| `uxmessentials.guard.role` | /guard role <region> <player> <role\|clear>: give any role on any region. | op |
+| `uxmessentials.guard.set` | /guard set <region> <behaviour> <value>: set a region behaviour. | op |
+| `uxmessentials.guard.priority` | /guard priority <region> <value>: set a region's priority. | op |
+| `uxmessentials.guard.parent` | /guard parent <region> <parent\|clear>: inherit rules from another region. | op |
+| `uxmessentials.guard.family` | /guard family <region> <name\|clear>: group regions so their borders open to each other. | op |
+| `uxmessentials.guard.tag` | /guard tag <region> add\|remove\|bulk: tag regions and edit them by tag. | op |
+| `uxmessentials.guard.template` | /guard template <region> <template\|clear>: apply a rule template. | op |
+| `uxmessentials.guard.scope` | /guard scope <region> <server\|set:name>: choose which servers a region applies on. | op |
+| `uxmessentials.guard.lock` | /guard lock and unlock; edit and WorldEdit inside a locked region. | op |
+| `uxmessentials.guard.bypass` | /guard bypass: toggle ignoring every guard rule. | op |
+| `uxmessentials.guard.bypass.gamemode` | Keep your own game mode in a region whose gamemode behaviour would change it. | false |
+| `uxmessentials.guard.show` | /guard show and hide: draw region borders for yourself. | op |
+| `uxmessentials.guard.near` | /guard near [radius]: list regions around you. | op |
+| `uxmessentials.guard.test` | /guard test <player> <action> [region]: check a verdict for another player. | op |
+| `uxmessentials.guard.inspect` | /guard inspect: click a block to read what a player with no role may do there, and see why each of your own refusals happened. | op |
+| `uxmessentials.guard.history` | /guard history <region>: the change history of a region. | op |
+| `uxmessentials.guard.undo` | /guard undo <history id>: undo one change from a region's history. | op |
+| `uxmessentials.guard.log` | /guard log [player]: recent denied actions. | op |
+| `uxmessentials.guard.status` | /guard status: engine counters and memory use. | op |
+| `uxmessentials.guard.import` | /guard import worldguard: import WorldGuard regions, with dry-run and undo. | op |
+| `uxmessentials.guard.backups` | /guard backups [restore <file>]: list the region backups, or put a backup's regions back. | op |
+| `uxmessentials.guard.reload` | /guard reload: reload the guard config and recompile every world. | op |
+| `uxmessentials.guard.menu` | See the region list in /guard menu; without it a region owner or manager gets the roles window of the region they stand in. | op |
+| `uxmessentials.guard.notify` | Receive staff alerts when players repeatedly hit guard denials. | op |
 
 ## holograms
 
@@ -277,17 +316,6 @@ Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communica
 | `uxmessentials.ranks.gui` | /ranks to open the ladder panel (config-gated; registered only when the GUI is enabled). | true |
 | `uxmessentials.ranks.prestige` | /prestige to reset to the first rank for a prestige level once you reach the top rank. | true |
 | `uxmessentials.ranks.rankup` | /rankup to advance to the next rank when you meet its requirements. | true |
-
-## regions
-
-| Permission | What it allows | Default |
-|---|---|---|
-| `uxmessentials.module.regions` | Hot-reload / inspect the regions module (WorldGuard region management). | op |
-| `uxmessentials.regions.admin` | /regions priority <id> <value>: set a WorldGuard region priority. | op |
-| `uxmessentials.regions.create` | /regions create <id> (and /regions pos1\|pos2): define a cuboid WorldGuard region. | op |
-| `uxmessentials.regions.flags` | /regions flags <id>: open the per-region flag editor GUI. | op |
-| `uxmessentials.regions.list` | /regions [world]: open the WorldGuard region-list GUI for a world. | op |
-| `uxmessentials.regions.members` | /regions members <id> and /regions addmember\|addowner <id> <player>: manage a region roster. | op |
 
 ## scoreboard
 

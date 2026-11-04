@@ -9,6 +9,7 @@ uxmEssentials is split into the modules `api`, `bukkit-api`, `core`, `persistenc
 - `customcommands`
 - `custommenus`
 - `economy`
+- `guard`
 - `holograms`
 - `homes`
 - `invrollback`
@@ -24,7 +25,6 @@ uxmEssentials is split into the modules `api`, `bukkit-api`, `core`, `persistenc
 - `poses`
 - `presence`
 - `ranks`
-- `regions`
 - `scoreboard`
 - `security`
 - `servertweaks`
