@@ -6,10 +6,10 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Read seam the expansion queries for the {@code regions_*} placeholders: which protected region a player is
- * standing in, who holds it, and how many regions their world carries. Wired during regions wiring; with the
- * module disabled, or with no region provider present, the seam is absent or reports nothing and every key
- * degrades to the dash.
+ * Read seam the expansion queries for the {@code regions_*} placeholders: which guard region a player is standing
+ * in, who holds it, their role there, whether an action is allowed, and how many regions their world carries.
+ * Wired during guard wiring; with the guard module disabled the seam is absent and every key degrades to the
+ * dash.
  */
 public interface RegionsPlaceholders {
 
@@ -24,6 +24,16 @@ public interface RegionsPlaceholders {
 
     /** How many regions are defined in the world {@code who} stands in. */
     int worldCount(PlayerRef who);
+
+    /** The role {@code who} holds in the region they stand in. */
+    default Optional<String> role(PlayerRef who) {
+        return Optional.empty();
+    }
+
+    /** Whether {@code who} may do {@code action} (dots may be written as underscores) where they stand. */
+    default Optional<Boolean> allowed(PlayerRef who, String action) {
+        return Optional.empty();
+    }
 
     /**
      * The region a player stands in.

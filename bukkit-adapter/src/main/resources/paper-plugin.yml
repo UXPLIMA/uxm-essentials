@@ -182,9 +182,9 @@ dependencies:
     WorldGuard:
       load: BEFORE
       required: false
-    # WorldEdit backs '/region select', which reads your current WorldEdit selection (regions.adapter.inbound
-    # command WorldEditRegionSelection). Reached reflectively past a present-guard, so the regions module runs
-    # fully without it. Loaded before us so its selection API is ready when the command resolves.
+    # WorldEdit backs '/guard define' from your current WorldEdit selection and the locked-region edit block
+    # (guard.adapter Selections and LockListener). Reached reflectively past a present-guard, so the guard module
+    # runs fully without it. Loaded before us so its selection API is ready when the command resolves.
     WorldEdit:
       load: BEFORE
       required: false

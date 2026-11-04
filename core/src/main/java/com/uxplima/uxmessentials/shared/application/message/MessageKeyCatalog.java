@@ -23,7 +23,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
-import com.uxplima.uxmessentials.regions.application.RegionsMessageKey;
+import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.skin.application.SkinMessageKey;
@@ -88,7 +88,7 @@ public final class MessageKeyCatalog {
             TradeMessageKey.values(),
             VillagersMessageKey.values(),
             InvrollbackMessageKey.values(),
-            RegionsMessageKey.values(),
+            GuardMessageKey.values(),
             SkinMessageKey.values());
 
     private MessageKeyCatalog() {}

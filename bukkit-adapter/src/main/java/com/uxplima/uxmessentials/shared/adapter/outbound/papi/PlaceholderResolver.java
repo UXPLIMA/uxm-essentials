@@ -1678,7 +1678,11 @@ public final class PlaceholderResolver {
                 regions.standingIn(who)
                         .map(standing -> standing(standing, tail))
                         .orElse(EMPTY);
-            default -> EMPTY;
+            case "here_role" -> regions.role(who).orElse(EMPTY);
+            default -> tail.startsWith("allowed_")
+                    ? regions.allowed(who, tail.substring("allowed_".length())).map(PlaceholderResolver::bool)
+                            .orElse(EMPTY)
+                    : EMPTY;
         };
     }
 

@@ -147,9 +147,9 @@ import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
-import com.uxplima.uxmessentials.regions.adapter.RegionsWiring;
-import com.uxplima.uxmessentials.regions.adapter.outbound.ServiceRegionsPlaceholders;
-import com.uxplima.uxmessentials.regions.adapter.outbound.api.RegionsQueries;
+import com.uxplima.uxmessentials.guard.adapter.GuardWiring;
+import com.uxplima.uxmessentials.guard.adapter.outbound.GuardQueries;
+import com.uxplima.uxmessentials.guard.adapter.outbound.GuardRegionsPlaceholders;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.OperatorLock;
 import com.uxplima.uxmessentials.security.adapter.SecurityWiring;
@@ -1557,8 +1557,8 @@ public final class PluginModule {
             wireVillagers(plugin, ctx, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
-        } else if (module.id().equals(ModuleId.of("regions"))) {
-            wireRegions(plugin, ctx, resources, links, guiRegistry, menus, textInput, guiLayouts);
+        } else if (module.id().equals(ModuleId.of("guard"))) {
+            wireGuard(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
@@ -1616,36 +1616,47 @@ public final class PluginModule {
         resources.onClose(wired::stop);
     }
 
-    private static void wireRegions(
+    private static void wireGuard(
             JavaPlugin plugin,
             ModuleContext ctx,
+            Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            ManagementGuiRegistry guiRegistry,
-            Menus menus,
-            TextInput textInput,
-            GuiLayouts guiLayouts) {
-        // regions manages WorldGuard regions behind a SOFT dependency. The wiring probes for the WorldGuard plugin and
-        // binds either the reflective WorldGuardRegionService (WG present) or the NoWorldGuardRegionService no-op (WG
-        // absent); the /regions command consults RegionService.available() and, on the no-op, replies "WorldGuard not
-        // installed" and opens nothing, so the surface is inert without WorldGuard. The region-list panel rides the
-        // shared menu engine's paginated list (no raw inventory), reading the region set + each region's priority and
-        // roster counts off the tick thread on the global region thread. The context persists nothing and holds no
-        // runtime state, so there is no stop hook. A disabled module wires none of this.
-        RegionsWiring.Wired wired = RegionsWiring.wire(plugin, ctx, guiRegistry, menus, textInput, guiLayouts);
-        wired.commands().forEach(resources::addCommand);
-        // Read-only, and on the server thread rather than a worker: WorldGuard's region container is live state.
-        // There is no action surface because editing a region is an operator act with its own audit trail.
-        links.queries.register(
-                UxmRegionsQuery.class,
-                new RegionsQueries(
-                        wired.service(),
-                        ctx.kernel().worldLookup(),
-                        ctx.kernel().scheduler()));
-        // Which region a player stands in is the one regions fact a scoreboard asks for, so the same service the
-        // command reads is handed to the expansion. Without WorldGuard the no-op service reports nothing available
-        // and every key degrades to the dash, exactly as the command replies.
-        links.placeholders.regions(new ServiceRegionsPlaceholders(plugin.getServer(), wired.service()));
+            Bus bus) {
+        // guard is region protection on its own engine: the jOOQ store over persistence.dsl() (the guard tables ship
+        // in the V88 baseline), an immutable snapshot every protection listener reads without locking, listener
+        // families registered only while some rule needs them, the movement tracker that applies region behaviours,
+        // the /guard command, cross-server sync over the bus and the public queries. Region enter, exit and interval
+        // actions run through the same click action engine NPCs and holograms use. The stop hook unregisters every
+        // listener, removes border displays and puts back what behaviours changed on online players.
+        KernelPorts kernel = ctx.kernel();
+        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner commandRunner = new com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner(
+                new BukkitClickCommandRunner(), com.uxplima.uxmessentials.shared.adapter.outbound.action.BlockedCommands.of(List.of()), kernel.log());
+        com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner actionRunner = new com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickActionRunner(
+                commandRunner,
+                new BukkitServerConnector(plugin, kernel.log()),
+                kernel.scheduler(),
+                kernel.permissions(),
+                Optional.empty(),
+                kernel.messages(),
+                com.uxplima.uxmessentials.guard.application.GuardMessageKey.DENY,
+                com.uxplima.uxmlib.item.SerializedItems::decode,
+                kernel.log());
+        com.uxplima.uxmessentials.shared.application.port.Logger audit = links.auditChannel.logger();
+        GuardWiring.Wired wired = GuardWiring.wire(
+                plugin,
+                ctx,
+                persistence,
+                bus,
+                actionRunner,
+                line -> audit.info(line),
+                player -> player.performCommand("guard list"));
+        resources.addCommand(wired.command());
+        resources.onClose(wired.stop());
+        GuardQueries queries = new GuardQueries(wired.service());
+        links.queries.register(UxmRegionsQuery.class, queries);
+        links.queries.register(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class, queries);
+        links.placeholders.regions(new GuardRegionsPlaceholders(plugin.getServer(), wired.service()));
     }
 
     private static void wireInvrollback(

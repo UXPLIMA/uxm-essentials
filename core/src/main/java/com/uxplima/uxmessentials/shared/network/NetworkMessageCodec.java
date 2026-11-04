@@ -105,6 +105,11 @@ public final class NetworkMessageCodec {
                 out.writeBoolean(vanish.vanished());
                 out.writeInt(vanish.level());
             }
+            case GuardChanged guard -> {
+                out.writeUTF(guard.scope());
+                out.writeUTF(guard.world());
+                out.writeUTF(guard.region());
+            }
         }
     }
 
@@ -129,6 +134,7 @@ public final class NetworkMessageCodec {
                         origin, readUuid(in), in.readUTF(), readUuid(in), in.readUTF(), readUuid(in), in.readUTF());
             case VANISH_STATE_CHANGED ->
                 new VanishStateChanged(origin, readUuid(in), in.readUTF(), in.readBoolean(), in.readInt());
+            case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
         };
     }
 
