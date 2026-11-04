@@ -36,9 +36,11 @@ import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
+import me.clip.placeholderapi.PlaceholderAPI;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -442,10 +444,11 @@ public final class PlayerTracks {
             return;
         }
         String channel = behaviours.get(BehaviourKey.MESSAGE_CHANNEL).orElse("chat");
-        Component rendered = StyledText.render(text.get());
+        String line = expand(player, text.get());
+        Component rendered = StyledText.render(line);
         switch (channel) {
             case "title" -> {
-                String[] parts = text.get().split("\\|", 2);
+                String[] parts = line.split("\\|", 2);
                 player.showTitle(Title.title(
                         StyledText.render(parts[0]),
                         parts.length > 1 ? StyledText.render(parts[1]) : Component.empty(),
@@ -467,10 +470,21 @@ public final class PlayerTracks {
     private void refuse(Player player, @Nullable RegionSet set, BehaviourKey custom, GuardMessageKey fallback) {
         Optional<String> text = set == null ? Optional.empty() : set.behaviour(custom);
         if (text.isPresent()) {
-            player.sendActionBar(StyledText.render(text.get()));
-        } else {
+            player.sendActionBar(StyledText.render(expand(player, text.get())));
+        } else if (set == null
+                || set.behaviour(BehaviourKey.DENY_MESSAGES)
+                        .filter("false"::equals)
+                        .isEmpty()) {
             guard.send(player, fallback, Map.of(), guard.config().denyChannel());
         }
+    }
+
+    /** A region message with {@code {player}} filled in, and PlaceholderAPI's placeholders when it is installed. */
+    private static String expand(Player player, String text) {
+        String named = text.replace("{player}", player.getName());
+        return PlaceholderApiSupport.isPresent() && named.indexOf('%') >= 0
+                ? PlaceholderAPI.setPlaceholders(player, named)
+                : named;
     }
 
     private @Nullable Location pushBack(Track track, Location from, @Nullable RegionSet set, boolean teleport) {
