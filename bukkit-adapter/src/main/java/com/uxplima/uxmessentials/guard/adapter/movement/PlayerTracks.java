@@ -309,7 +309,10 @@ public final class PlayerTracks {
 
     private void apply(Player player, Track track, Behaviours after) {
         boolean exempt = player.getGameMode() == GameMode.CREATIVE || player.getGameMode() == GameMode.SPECTATOR;
-        Optional<String> fly = after.get(BehaviourKey.FLY).filter(v -> !v.equals("keep"));
+        // A player with bypass on is not grounded by fly = deny, the same as the rules do not stop them.
+        Optional<String> fly = after.get(BehaviourKey.FLY)
+                .filter(v -> !v.equals("keep"))
+                .filter(v -> !(v.equals("deny") && guard.bypassOn(player)));
         if (fly.isPresent() && !exempt) {
             if (track.allowFlight == null) {
                 track.allowFlight = player.getAllowFlight();
