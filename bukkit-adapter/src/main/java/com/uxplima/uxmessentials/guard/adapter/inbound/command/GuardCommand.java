@@ -161,7 +161,8 @@ public final class GuardCommand implements CommandRegistration {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("guard")
                 .requires(src -> src.getSender().hasPermission(BASE + "use"))
                 .executes(ctx -> {
-                    if (ctx.getSource().getSender() instanceof Player player && player.hasPermission(BASE + "menu")) {
+                    if (ctx.getSource().getSender() instanceof Player player
+                            && (player.hasPermission(BASE + "menu") || managesHere(player))) {
                         openMenu.accept(player);
                     } else {
                         help(ctx.getSource().getSender());
@@ -1428,6 +1429,21 @@ public final class GuardCommand implements CommandRegistration {
     }
 
     // ---- helpers ------------------------------------------------------------------------------------------------
+
+    /** True when {@code player} owns or manages a region where they stand, so a bare /guard opens their window. */
+    private boolean managesHere(Player player) {
+        Location at = player.getLocation();
+        RegionSet set = at == null ? null : guard.at(at);
+        if (set == null) {
+            return false;
+        }
+        for (Region region : set.stored()) {
+            if (region.roleOf(player.getUniqueId()).map(RoleName::manages).orElse(false)) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     private record ShapeIn(String world, Shape shape) {}
 
