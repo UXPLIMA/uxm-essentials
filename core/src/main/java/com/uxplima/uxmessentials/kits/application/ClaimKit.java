@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.kits.domain.event.KitClaiming;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
+import com.uxplima.uxmessentials.shared.domain.DurationText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -184,7 +185,10 @@ public final class ClaimKit {
 
     /** Notify the actor of the failure and run the kit's deny actions for the refused recipient. */
     private void deny(PlayerRef actor, PlayerRef recipient, KitDefinition kit, KitError error) {
-        notifier.send(actor, error.messageKey(), Map.of("kit", kit.id().value()));
+        Map<String, String> values = error == KitError.ON_COOLDOWN
+                ? Map.of("kit", kit.id().value(), "time", DurationText.humanize(access.cooldownLeft(recipient, kit)))
+                : Map.of("kit", kit.id().value());
+        notifier.send(actor, error.messageKey(), values);
         runActions(recipient, kit, kit.denyActions());
     }
 

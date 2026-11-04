@@ -81,6 +81,22 @@ class ClaimKitTest {
     }
 
     @Test
+    void aRefusalOnCooldownSaysHowLongIsLeft() {
+        define(starter().cooldown(Duration.ofHours(1)).build());
+        ClaimKit claim = claimKit();
+        claim.claim(ALEX, STARTER);
+        clock.advance(Duration.ofMinutes(15));
+
+        claim.claim(ALEX, STARTER);
+
+        assertThat(notifier.sent())
+                .last()
+                .satisfies(line -> assertThat(line.placeholders())
+                        .containsEntry("kit", "starter")
+                        .containsEntry("time", "45m"));
+    }
+
+    @Test
     void anUnknownKitIsNotFound() {
         assertThat(claimKit().claim(ALEX, KitId.of("missing")).asError()).contains(KitError.NOT_FOUND);
         assertThat(notifier.sent())
