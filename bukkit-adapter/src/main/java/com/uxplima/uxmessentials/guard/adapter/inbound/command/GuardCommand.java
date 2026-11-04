@@ -1394,26 +1394,34 @@ public final class GuardCommand implements CommandRegistration {
 
     private void help(CommandSender sender) {
         feedback.send(sender, GuardMessageKey.HELP_HEADER);
+        Map<String, String> nodes = new java.util.HashMap<>();
+        for (Sub sub : subs()) {
+            nodes.put(sub.name(), sub.permission());
+        }
         for (String line : List.of(
+                "menu",
+                "here",
+                "why <action>",
+                "member <region> <player> <member|guest|clear>",
                 "define <id> [shape]",
                 "rule <region> <action> <target> <allow|deny|clear>",
                 "role <region> <player> <role|clear>",
                 "set <region> <behaviour> <value|clear>",
+                "template <region> <template|clear>",
                 "info [region]",
-                "list",
-                "here",
-                "near",
-                "why <action>",
+                "list [world]",
+                "near [radius]",
                 "test <player> <action> [region]",
-                "show",
-                "history",
+                "show [region]",
+                "history [region]",
                 "undo <id>",
                 "bypass",
                 "inspect",
                 "status",
                 "actions [prefix]",
-                "import worldguard dry-run")) {
-            if (sender.hasPermission(BASE + line.split(" ", 2)[0])) {
+                "import worldguard <dry-run|run|undo>")) {
+            String node = nodes.get(line.split(" ", 2)[0]);
+            if (node != null && sender.hasPermission(node)) {
                 feedback.send(sender, GuardMessageKey.HELP_LINE, Map.of("usage", StyledText.escape("/guard " + line)));
             }
         }
