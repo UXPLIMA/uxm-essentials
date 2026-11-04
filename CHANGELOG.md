@@ -1,5 +1,40 @@
 # Changelog
 
+## [0.12.0](https://github.com/UXPLIMA/uxm-essentials/compare/v0.11.0...v0.12.0)
+
+Upgrading: the `regions` module is gone and the new `guard` module protects regions itself. A server that used
+`/regions` with WorldGuard imports its regions with `/guard import worldguard dry-run`, then `run`, and can remove
+WorldGuard once they match. Grants of `uxmessentials.regions.*` move to the `uxmessentials.guard.*` nodes. The
+`regions_*` placeholders keep their names.
+
+### Added
+
+- The guard module: region protection for Paper and Folia, on one server or a network. Regions of any shape with
+  rules per action and role, behaviours, templates, menus, history and undo, inspect, backups, alerts and a
+  WorldGuard importer. `/guard` (`/bolge`), `modules/guard/config.conf`.
+- `security.allowed-operators`: only the listed players may be operators.
+- One command-control entry can cover a whole plugin, and entries reach down to a command's arguments.
+
+### Changed
+
+- A player who types a command word they may not use reads "you don't have permission" in their language, and the
+  word stays out of their command list and tab completion. Before, they read Minecraft's "Incorrect argument for
+  command". A feature that is turned off answers with the new `command.unavailable` line.
+- The kit cooldown refusal says how long is left (`kit.on-cooldown` takes `{time}`).
+- Command-control edits apply on `/uxmess reload commandcontrol`.
+- `/rtp` keeps out of guard regions under `respect-worldguard`, as it keeps out of WorldGuard regions.
+- The Latin-script languages are written in small capitals.
+
+### Fixed
+
+- Command words may use the letters of every language.
+- `/setspawn` is described as the current world's spawn.
+- The example menu's title carries no colour.
+
+### Removed
+
+- The `regions` module, `/regions` and the `uxmessentials.regions.*` nodes.
+
 ## [0.11.0](https://github.com/UXPLIMA/uxm-essentials/compare/v0.10.3...v0.11.0)
 
 ### Added
