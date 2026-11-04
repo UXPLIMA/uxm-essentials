@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.guard.adapter;
 
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand;
+import com.uxplima.uxmessentials.guard.adapter.inbound.gui.GuardMenus;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.ListenerRegistry;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.LockListener;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.WandListener;
@@ -37,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
@@ -46,6 +48,8 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldLoadEvent;
 import org.bukkit.event.world.WorldUnloadEvent;
 import org.bukkit.plugin.java.JavaPlugin;
+import com.uxplima.uxmlib.menu.Menus;
+import com.uxplima.uxmlib.menu.binding.MenuBindings;
 
 /**
  * Builds the guard context: store, service, runtime, listeners, movement, command, sync and timers. The one place
@@ -86,7 +90,8 @@ public final class GuardWiring {
             Bus bus,
             ClickActionRunner actions,
             Consumer<String> audit,
-            Consumer<Player> openMenu) {
+            Menus menus,
+            MenuBindings menuBindings) {
         KernelPorts kernel = ctx.kernel();
         Logger log = kernel.log();
         Consumer<String> warn = message -> log.warn("event=guard_warning message=\"{}\"", message);
@@ -188,6 +193,17 @@ public final class GuardWiring {
         timers.add(kernel.scheduler().repeatGlobal(service::poll, config.pollInterval(), config.pollInterval()));
 
         WorldGuardImporter importer = new WorldGuardImporter(plugin, service, backups, warn);
+        // The command opens the menus and the menus answer through the command, so the menus are reached through a
+        // holder filled right after both exist.
+        GuardMenus[] menusHolder = new GuardMenus[1];
+        Consumer<Player> openMenu = player -> {
+            GuardMenus guardMenus = menusHolder[0];
+            if (guardMenus != null) {
+                guardMenus.openFor(player);
+            }
+        };
+        BiConsumer<Player, Runnable> onPlayer =
+                (player, task) -> kernel.scheduler().onEntity(BukkitRefs.toRef(player), task);
         GuardCommand command = new GuardCommand(
                 runtime,
                 selections,
@@ -200,8 +216,12 @@ public final class GuardWiring {
                     ctx.config().reload();
                     var unused = service.reload(GuardConfig.from(ctx.config(), serverId, warn));
                 },
-                (player, task) -> kernel.scheduler().onEntity(BukkitRefs.toRef(player), task),
+                onPlayer,
                 config.rgAlias());
+        GuardMenus guardMenus = new GuardMenus(menus, service, command, new CommandFeedback(kernel.messages()),
+                kernel.messages(), onPlayer);
+        guardMenus.register(menuBindings, plugin.getDataFolder().toPath(), log);
+        menusHolder[0] = guardMenus;
 
         Runnable stop = () -> {
             for (AutoCloseable timer : timers) {

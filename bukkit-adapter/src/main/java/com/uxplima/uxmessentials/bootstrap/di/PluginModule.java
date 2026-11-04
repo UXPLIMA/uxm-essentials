@@ -1558,7 +1558,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("guard"))) {
-            wireGuard(plugin, ctx, persistence, resources, links, bus);
+            wireGuard(plugin, ctx, persistence, resources, links, bus, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
@@ -1622,7 +1622,9 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
-            Bus bus) {
+            Bus bus,
+            Menus menus,
+            MenuBindings menuBindings) {
         // guard is region protection on its own engine: the jOOQ store over persistence.dsl() (the guard tables ship
         // in the V88 baseline), an immutable snapshot every protection listener reads without locking, listener
         // families registered only while some rule needs them, the movement tracker that applies region behaviours,
@@ -1650,7 +1652,8 @@ public final class PluginModule {
                 bus,
                 actionRunner,
                 line -> audit.info(line),
-                player -> player.performCommand("guard list"));
+                menus,
+                menuBindings);
         resources.addCommand(wired.command());
         resources.onClose(wired.stop());
         GuardQueries queries = new GuardQueries(wired.service());

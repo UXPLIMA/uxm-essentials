@@ -256,7 +256,7 @@ public final class GuardCommand implements CommandRegistration {
             reload.run();
             feedback.send(s, GuardMessageKey.RELOADED);
         });
-        add(subs, "menu", "menu", (s, a) -> withPlayer(s, openMenu));
+        add(subs, "menu", "use", (s, a) -> withPlayer(s, openMenu));
         return subs;
     }
 
@@ -1214,6 +1214,11 @@ public final class GuardCommand implements CommandRegistration {
 
     private void answer(CommandSender sender, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
             Map<String, String> values) {
+        answer(sender, future, success, values, () -> {});
+    }
+
+    private void answer(CommandSender sender, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
+            Map<String, String> values, Runnable after) {
         var ignored = future.whenComplete((result, error) -> {
             if (error != null) {
                 feedback.send(sender, GuardMessageKey.ERROR_STORE_FAILED);
@@ -1222,12 +1227,32 @@ public final class GuardCommand implements CommandRegistration {
             if (result.isOk()) {
                 feedback.send(sender, success, values);
                 if (sender instanceof Player player) {
-                    onPlayer.accept(player, () -> tracks.refresh(player));
+                    onPlayer.accept(player, () -> {
+                        tracks.refresh(player);
+                        after.run();
+                    });
                 }
             } else {
                 feedback.send(sender, errorKey(result.errorOrThrow()), values);
+                if (sender instanceof Player player) {
+                    onPlayer.accept(player, after);
+                }
             }
         });
+    }
+
+    /**
+     * Answer an edit made from a menu exactly as the command answers its own: the success or error line, the
+     * behaviour refresh, then {@code after} (usually reopening the menu) on the player's thread.
+     */
+    public void answerMenu(Player player, CompletableFuture<Result<Region, GuardError>> future, MessageKey success,
+            Map<String, String> values, Runnable after) {
+        answer(player, future, success, values, after);
+    }
+
+    /** Who is editing, as the service records it, for a menu edit. */
+    public EditContext editContext(Player player) {
+        return ctx(player);
     }
 
     private static GuardMessageKey errorKey(GuardError error) {
