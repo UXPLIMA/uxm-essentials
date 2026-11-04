@@ -1558,7 +1558,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
             wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("guard"))) {
-            wireGuard(plugin, ctx, persistence, resources, links, bus, menus, menuBindings);
+            wireGuard(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
             wireServerTweaks(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("skin"))) {
@@ -1623,6 +1623,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             Bus bus,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // guard is region protection on its own engine: the jOOQ store over persistence.dsl() (the guard tables ship
@@ -1664,6 +1665,13 @@ public final class PluginModule {
                         .map(com.uxplima.uxmessentials.api.view.UxmPlayerState::godMode));
         resources.addCommand(wired.command());
         resources.onClose(wired.stop());
+        // The /uxmess gui hub tile opens what /guard menu opens.
+        guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
+                "guard",
+                com.uxplima.uxmessentials.guard.application.GuardMessageKey.GUI_HUB_TILE,
+                Material.BRICKS,
+                "uxmessentials.guard.menu",
+                (player, viewer) -> wired.openMenu().accept(player)));
         GuardQueries queries = new GuardQueries(wired.service());
         links.queries.register(UxmRegionsQuery.class, queries);
         links.queries.register(com.uxplima.uxmessentials.api.query.UxmGuardQuery.class, queries);

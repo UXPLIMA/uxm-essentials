@@ -69,7 +69,12 @@ public final class GuardWiring {
 
     /** What the plugin module keeps: the command to register, the service for the API, and the stop hook. */
     public record Wired(
-            GuardCommand command, GuardService service, GuardRuntime runtime, PlayerTracks tracks, Runnable stop) {}
+            GuardCommand command,
+            GuardService service,
+            GuardRuntime runtime,
+            PlayerTracks tracks,
+            Consumer<Player> openMenu,
+            Runnable stop) {}
 
     /** Compiles a world when it loads and forgets it when it unloads. */
     public static final class WorldListener implements Listener {
@@ -314,6 +319,6 @@ public final class GuardWiring {
             }
         };
         Objects.requireNonNull(loaded, "loaded");
-        return new Wired(command, service, runtime, tracks, stop);
+        return new Wired(command, service, runtime, tracks, openMenu, stop);
     }
 }
