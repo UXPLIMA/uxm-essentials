@@ -10,6 +10,7 @@ import java.util.function.Function;
 
 import org.bukkit.Location;
 import org.bukkit.command.Command;
+import org.bukkit.command.PluginIdentifiableCommand;
 import org.bukkit.entity.Enemy;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
@@ -36,6 +37,12 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
  * gliding, blocked effects, flight toggles, mob spawning by type and reason, and blocked or allowed commands.
  */
 public final class BehaviourListener implements Listener {
+
+    /** The guard command under this plugin's namespace, which no other plugin can claim. */
+    private static final String OWN_GUARD = "uxmessentials:guard";
+
+    /** The owner given to the server's own commands, which no plugin registers. */
+    private static final String SERVER_OWNER = "(server)";
 
     private final GuardRuntime guard;
     private final PlayerTracks tracks;
@@ -134,13 +141,16 @@ public final class BehaviourListener implements Listener {
         int space = line.indexOf(' ');
         String typed = space < 0 ? line : line.substring(0, space);
         String args = space < 0 ? "" : line.substring(space + 1).strip();
-        Function<String, Set<String>> namesOf = word -> names(player, word);
-        if (CommandWords.same(typed, "guard", namesOf)) {
+        Function<String, CommandWords.Named> lookup = word -> named(player, word);
+        // The guard's own command always runs, so staff can fix a region they stand in. The namespaced label is
+        // this plugin's whatever else claims the bare words.
+        CommandWords.Named own = lookup.apply(OWN_GUARD);
+        if (own.owner() != null && CommandWords.same(lookup.apply(typed), own)) {
             return;
         }
         String root = CommandWords.bare(typed);
-        boolean denied = deny.isPresent() && CommandWords.matches(deny.get(), typed, args, namesOf);
-        if (!denied && allow.isPresent() && !CommandWords.matches(allow.get(), typed, args, namesOf)) {
+        boolean denied = deny.isPresent() && CommandWords.matches(deny.get(), typed, args, lookup);
+        if (!denied && allow.isPresent() && !CommandWords.matches(allow.get(), typed, args, lookup)) {
             denied = true;
         }
         if (denied) {
@@ -184,19 +194,23 @@ public final class BehaviourListener implements Listener {
         return false;
     }
 
-    /** Every name a command word answers to: the word itself, and the name and aliases of its command entry. */
-    private static Set<String> names(Player player, String word) {
+    /** How the server knows a command word: who registered it, and every name of its entry. */
+    private static CommandWords.Named named(Player player, String word) {
         Set<String> names = new HashSet<>();
         names.add(CommandWords.bare(word));
         Command command = player.getServer().getCommandMap().getCommand(word);
-        if (command != null) {
-            names.add(CommandWords.bare(command.getName().toLowerCase(Locale.ROOT)));
-            names.add(CommandWords.bare(command.getLabel().toLowerCase(Locale.ROOT)));
-            for (String alias : command.getAliases()) {
-                names.add(CommandWords.bare(alias.toLowerCase(Locale.ROOT)));
-            }
+        if (command == null) {
+            return new CommandWords.Named(null, names);
         }
-        return names;
+        names.add(CommandWords.bare(command.getName().toLowerCase(Locale.ROOT)));
+        names.add(CommandWords.bare(command.getLabel().toLowerCase(Locale.ROOT)));
+        for (String alias : command.getAliases()) {
+            names.add(CommandWords.bare(alias.toLowerCase(Locale.ROOT)));
+        }
+        String owner = command instanceof PluginIdentifiableCommand owned
+                ? owned.getPlugin().getName()
+                : SERVER_OWNER;
+        return new CommandWords.Named(owner, names);
     }
 
     private static boolean listed(String list, String name) {

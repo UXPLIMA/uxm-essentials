@@ -151,7 +151,11 @@ public final class GuardRuntime {
         return allow(player, action, at.getWorld(), at.getBlockX(), at.getBlockY(), at.getBlockZ(), true);
     }
 
-    /** May {@code player} do {@code action} at a block position. */
+    /**
+     * May {@code player} do {@code action} at a block position. With {@code tell} false the refusal is quiet: for
+     * what happens to a player rather than what they try (picking up an item they walk over), so it sends nothing,
+     * raises no alert and writes no log row.
+     */
     public boolean allow(Player player, ActionId action, @Nullable World world, int x, int y, int z, boolean tell) {
         if (world == null) {
             return true;
@@ -167,8 +171,9 @@ public final class GuardRuntime {
         }
         long started = System.nanoTime();
         Verdict verdict = index.check(x, y, z, node, new BukkitSubject(player));
+        long took = System.nanoTime() - started;
         boolean denied = verdict == Verdict.DENY && !bypasses(player, index, x, y, z);
-        stats().record(node, System.nanoTime() - started, denied);
+        stats().record(node, took, denied);
         if (denied) {
             denied(player, action, index, x, y, z, tell);
         }
@@ -342,16 +347,20 @@ public final class GuardRuntime {
     // ---- feedback -----------------------------------------------------------------------------------------------
 
     private void denied(Player player, ActionId action, WorldIndex index, int x, int y, int z, boolean tell) {
+        // A quiet refusal (an item walked over, a crop trampled) is not something the player chose to try: it is
+        // not told, not shown to an inspector on every tick, not counted towards a staff alert and kept out of the
+        // log. /guard why explains one on demand.
+        if (!tell) {
+            return;
+        }
         long now = clock.millis();
-        if (tell) {
-            Long last = lastDenyMessage.get(player.getUniqueId());
-            if (last == null || now - last >= config().denyCooldown().toMillis()) {
-                lastDenyMessage.put(player.getUniqueId(), now);
-                if (index.locked()) {
-                    send(player, GuardMessageKey.DENY_LOCKED_WORLD, Map.of(), config().denyChannel());
-                } else {
-                    send(player, GuardMessageKey.DENY, Map.of("action", action.value()), config().denyChannel());
-                }
+        Long last = lastDenyMessage.get(player.getUniqueId());
+        if (last == null || now - last >= config().denyCooldown().toMillis()) {
+            lastDenyMessage.put(player.getUniqueId(), now);
+            if (index.locked()) {
+                send(player, GuardMessageKey.DENY_LOCKED_WORLD, Map.of(), config().denyChannel());
+            } else {
+                send(player, GuardMessageKey.DENY, Map.of("action", action.value()), config().denyChannel());
             }
         }
         String region = index.locked()
