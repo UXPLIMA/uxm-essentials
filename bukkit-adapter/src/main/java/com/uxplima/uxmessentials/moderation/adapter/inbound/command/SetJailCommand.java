@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -45,7 +46,7 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("setjail")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("name", Args.token())
                         .executes(this::run)
                         .then(Commands.literal("at").then(positionArguments())))

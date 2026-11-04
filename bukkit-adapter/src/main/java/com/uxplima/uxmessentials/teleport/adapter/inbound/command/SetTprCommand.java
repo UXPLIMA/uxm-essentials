@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.RtpWorldSettings;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -39,7 +40,7 @@ public final class SetTprCommand extends TeleportCommandSupport implements Comma
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("settpr")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("minRange", DoubleArgumentType.doubleArg(0))
                         .then(Commands.argument("maxRange", DoubleArgumentType.doubleArg(1))
                                 .executes(this::set)))

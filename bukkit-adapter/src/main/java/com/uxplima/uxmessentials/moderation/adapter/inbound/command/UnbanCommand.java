@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,7 +34,7 @@ public final class UnbanCommand extends ModerationCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("unban")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();
     }

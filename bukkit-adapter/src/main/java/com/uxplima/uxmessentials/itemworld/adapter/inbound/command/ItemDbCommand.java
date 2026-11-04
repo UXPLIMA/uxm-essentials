@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.ItemQuery;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -42,7 +43,7 @@ public final class ItemDbCommand extends ItemworldCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
                 .then(Commands.argument("item", Args.token())
                         .executes(ctx -> run(ctx, Optional.of(StringArgumentType.getString(ctx, "item")))))

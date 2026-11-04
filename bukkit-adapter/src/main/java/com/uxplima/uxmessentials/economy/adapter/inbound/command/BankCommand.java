@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,23 +49,23 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("bank")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runOpenGui)
                 .then(Commands.literal("create")
-                        .requires(src -> src.getSender().hasPermission(CREATE))
+                        .requires(Gate.permission(CREATE))
                         .executes(ctx -> usage(ctx, "bank create", "<name> [currency]", "Create a bank account"))
                         .then(Commands.argument("name", StringArgumentType.string())
                                 .executes(this::runCreate)
                                 .then(currencyArgument().executes(this::runCreate))))
                 .then(Commands.literal("deposit")
-                        .requires(src -> src.getSender().hasPermission(DEPOSIT))
+                        .requires(Gate.permission(DEPOSIT))
                         .executes(ctx -> usage(ctx, "bank deposit", "<bank_id> <amount>", "Deposit into bank"))
                         .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
                                 .executes(ctx -> usage(ctx, "bank deposit", "<bank_id> <amount>", "Deposit into bank"))
                                 .then(Commands.argument("amount", Args.token()).executes(this::runDeposit))))
                 .then(Commands.literal("withdraw")
-                        .requires(src -> src.getSender().hasPermission(WITHDRAW))
+                        .requires(Gate.permission(WITHDRAW))
                         .executes(ctx -> usage(ctx, "bank withdraw", "<bank_id> <amount>", "Withdraw from bank"))
                         .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -72,7 +73,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                                         ctx -> usage(ctx, "bank withdraw", "<bank_id> <amount>", "Withdraw from bank"))
                                 .then(Commands.argument("amount", Args.token()).executes(this::runWithdraw))))
                 .then(Commands.literal("addmember")
-                        .requires(src -> src.getSender().hasPermission(MEMBERS))
+                        .requires(Gate.permission(MEMBERS))
                         .executes(ctx -> usage(ctx, "bank addmember", "<bank_id> <player>", "Add member to bank"))
                         .then(Commands.argument("bank_id", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(services.bankService()::getBankIdsForPlayer))
@@ -82,7 +83,7 @@ public final class BankCommand extends EconomyCommandSupport implements CommandR
                                         .suggests(CommandSuggestions.onlinePlayers())
                                         .executes(this::runAddMember))))
                 .then(Commands.literal("removemember")
-                        .requires(src -> src.getSender().hasPermission(MEMBERS))
+                        .requires(Gate.permission(MEMBERS))
                         .executes(
                                 ctx -> usage(ctx, "bank removemember", "<bank_id> <player>", "Remove member from bank"))
                         .then(Commands.argument("bank_id", Args.token())

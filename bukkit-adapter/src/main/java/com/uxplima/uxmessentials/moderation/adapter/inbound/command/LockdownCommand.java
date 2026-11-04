@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,7 +46,7 @@ public final class LockdownCommand extends ModerationCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("lockdown")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
                 .then(Commands.argument(STATE_ARG, Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> List.of(ON, OFF)))

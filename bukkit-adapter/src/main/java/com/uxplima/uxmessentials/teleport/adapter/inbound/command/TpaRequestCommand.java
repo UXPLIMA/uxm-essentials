@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -58,7 +59,7 @@ public final class TpaRequestCommand extends TeleportCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(permission))
+                .requires(Gate.permission(permission))
                 .then(Commands.argument("player", ArgumentTypes.player())
                         .suggests(CommandSuggestions.singlePlayerTarget())
                         .executes(this::run))

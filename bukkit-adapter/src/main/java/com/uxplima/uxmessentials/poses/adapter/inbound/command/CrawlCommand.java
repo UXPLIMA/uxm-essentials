@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -65,7 +66,7 @@ public final class CrawlCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("crawl")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::run)
                 .build();
     }

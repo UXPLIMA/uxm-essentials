@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -60,7 +61,7 @@ public final class StaffModeCommand extends StaffCommandSupport implements Comma
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("staffmode")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player").executes(this::toggleOther))
                 .executes(this::toggleSelf)
                 .build();

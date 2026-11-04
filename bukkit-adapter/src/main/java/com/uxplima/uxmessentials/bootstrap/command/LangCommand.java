@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -95,16 +96,16 @@ public final class LangCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(LITERAL)
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runStatus)
                 .then(Commands.literal(RESET_LITERAL)
                         .executes(this::runReset)
                         .then(Commands.argument("player", Args.token())
-                                .requires(src -> src.getSender().hasPermission(OTHERS))
+                                .requires(Gate.permission(OTHERS))
                                 .suggests(CommandSuggestions.onlinePlayers())
                                 .executes(this::runResetOther)))
                 .then(Commands.literal(SET_LITERAL)
-                        .requires(src -> src.getSender().hasPermission(OTHERS))
+                        .requires(Gate.permission(OTHERS))
                         .then(Commands.argument("player", Args.token())
                                 .suggests(CommandSuggestions.onlinePlayers())
                                 .then(Commands.argument("code", Args.token()).executes(this::runSetOther))))

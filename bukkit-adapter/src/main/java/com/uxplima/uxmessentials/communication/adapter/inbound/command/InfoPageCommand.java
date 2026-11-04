@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -66,7 +67,7 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
     public LiteralCommandNode<CommandSourceStack> build() {
         String permission = PERMISSION_PREFIX + command;
         return Commands.literal(command)
-                .requires(src -> src.getSender().hasPermission(permission))
+                .requires(Gate.permission(permission))
                 .executes(ctx -> show(ctx, 1))
                 .then(Commands.argument("page", IntegerArgumentType.integer(1))
                         .executes(ctx -> show(ctx, ctx.getArgument("page", Integer.class))))

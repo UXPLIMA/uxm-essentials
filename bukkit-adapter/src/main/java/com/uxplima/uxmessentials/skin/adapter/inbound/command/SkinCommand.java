@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.skin.application.UpdateSkin;
 import com.uxplima.uxmessentials.skin.domain.SkinModel;
 import com.uxplima.uxmessentials.skin.domain.SkinSource;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -113,48 +114,44 @@ public final class SkinCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("skin")
-                .requires(src -> src.getSender().hasPermission(USE)
-                        || src.getSender().hasPermission(OTHER)
-                        || src.getSender().hasPermission(INFO))
+                .requires(Gate.permission(USE).or(Gate.permission(OTHER)).or(Gate.permission(INFO)))
                 .then(Commands.literal("set")
-                        .requires(src -> src.getSender().hasPermission(USE))
+                        .requires(Gate.permission(USE))
                         .then(nameArgument()
                                 .executes(ctx -> byName(ctx, null))
                                 .then(CommandSuggestions.playerArgument("player")
-                                        .requires(src -> src.getSender().hasPermission(OTHER))
+                                        .requires(Gate.permission(OTHER))
                                         .executes(ctx -> byName(ctx, StringArgumentType.getString(ctx, "player"))))))
                 .then(Commands.literal("url")
-                        .requires(src -> src.getSender().hasPermission(URL))
+                        .requires(Gate.permission(URL))
                         .then(Commands.argument("link", Args.token())
                                 .executes(ctx -> fromUpload(ctx, true, false))
                                 .then(Commands.literal(SLIM).executes(ctx -> fromUpload(ctx, true, true)))))
                 .then(Commands.literal("file")
-                        .requires(src -> src.getSender().hasPermission(FILE))
+                        .requires(Gate.permission(FILE))
                         .then(Commands.argument("file", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(skinFiles))
                                 .executes(ctx -> fromUpload(ctx, false, false))
                                 .then(Commands.literal(SLIM).executes(ctx -> fromUpload(ctx, false, true)))))
                 .then(Commands.literal("clear")
-                        .requires(src -> src.getSender().hasPermission(USE))
+                        .requires(Gate.permission(USE))
                         .executes(ctx -> clear(ctx, null))
                         .then(CommandSuggestions.playerArgument("player")
-                                .requires(src -> src.getSender().hasPermission(OTHER))
+                                .requires(Gate.permission(OTHER))
                                 .executes(ctx -> clear(ctx, StringArgumentType.getString(ctx, "player")))))
                 .then(Commands.literal("update")
-                        .requires(src -> src.getSender().hasPermission(UPDATE))
+                        .requires(Gate.permission(UPDATE))
                         .executes(this::update))
                 .then(Commands.literal("drop")
-                        .requires(src -> src.getSender().hasPermission(DROP))
+                        .requires(Gate.permission(DROP))
                         .then(CommandSuggestions.playerArgument("player").executes(this::drop)))
                 .then(Commands.literal("info")
-                        .requires(src -> src.getSender().hasPermission(INFO))
+                        .requires(Gate.permission(INFO))
                         .then(CommandSuggestions.playerArgument("player").executes(this::info)))
                 .then(Commands.literal("purge")
-                        .requires(src -> src.getSender().hasPermission(PURGE))
+                        .requires(Gate.permission(PURGE))
                         .then(nameArgument().executes(this::purge)))
-                .then(nameArgument()
-                        .requires(src -> src.getSender().hasPermission(USE))
-                        .executes(ctx -> byName(ctx, null)))
+                .then(nameArgument().requires(Gate.permission(USE)).executes(ctx -> byName(ctx, null)))
                 .executes(this::usage)
                 .build();
     }

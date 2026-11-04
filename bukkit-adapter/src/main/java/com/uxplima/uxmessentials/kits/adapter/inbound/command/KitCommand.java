@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -66,7 +67,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The positional {@code <name>} could in principle collide with a subcommand literal (a kit literally
  * named {@code list}), but Brigadier matches literal children before the {@code name} argument, so the
  * literals always win, the same disambiguation {@code /warp} and {@code /pwarp} rely on, with no
- * reserved-name guard. Per-subcommand permissions are enforced by Brigadier {@code .requires(...)} on each
+ * reserved-name guard. Per-subcommand permissions are enforced by a {@code Gate} on each
  * node, so only {@code kit} is a command-catalog id; the subcommands are literals inside the tree.
  */
 @NullMarked
@@ -99,28 +100,28 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("kit")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("list").executes(this::runList))
                 .then(Commands.literal("show")
-                        .requires(src -> src.getSender().hasPermission(PREVIEW_PERMISSION))
+                        .requires(Gate.permission(PREVIEW_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit show", "<name>", "Preview a kit"))
                         .then(kitNameArgument("name").executes(this::show)))
                 .then(Commands.literal("create")
-                        .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
+                        .requires(Gate.permission(EDIT_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit create", "<name>", "Create a kit from inventory"))
                         .then(Commands.argument("name", Args.token()).executes(this::create)))
                 .then(Commands.literal("del")
-                        .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
+                        .requires(Gate.permission(EDIT_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit del", "<name>", "Delete a kit"))
                         .then(kitNameArgument("name").executes(this::delete)))
                 .then(Commands.literal("editor")
-                        .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
+                        .requires(Gate.permission(EDIT_PERMISSION))
                         .executes(this::openManager)
                         .then(kitNameArgument("name")
                                 .executes(this::openEditor)
                                 .then(Commands.literal("save").executes(this::saveEditor))))
                 .then(Commands.literal("reset")
-                        .requires(src -> src.getSender().hasPermission(RESET_PERMISSION))
+                        .requires(Gate.permission(RESET_PERMISSION))
                         .executes(ctx -> usage(ctx, "kit reset", "<player> [kit]", "Reset player kit cooldown"))
                         .then(playerSelectorArgument("player")
                                 .executes(this::resetAll)
@@ -128,7 +129,7 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
                 .then(kitNameArgument("name")
                         .executes(this::claimSelf)
                         .then(playerSelectorArgument("player")
-                                .requires(src -> src.getSender().hasPermission(OTHERS_PERMISSION))
+                                .requires(Gate.permission(OTHERS_PERMISSION))
                                 .executes(this::give)))
                 .build();
     }

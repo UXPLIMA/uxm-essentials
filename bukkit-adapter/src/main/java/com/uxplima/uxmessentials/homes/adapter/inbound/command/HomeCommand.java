@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
  *       management over another player's homes. Gated by {@code uxmessentials.home.admin}.
  * </ul>
  *
- * <p>Per-subcommand permissions are enforced by Brigadier {@code .requires(...)} on each node, so only
+ * <p>Per-subcommand permissions are enforced by a {@code Gate} on each node, so only
  * {@code home} is a command-catalog id; the subcommands are literals inside the tree. Each subcommand keeps
  * its prior behaviour: targets resolve via the offline-capable
  * {@link com.uxplima.uxmessentials.shared.application.port.PlayerLookup#findByName} (only {@code admin tp}
@@ -68,7 +69,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("home")
-                .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
+                .requires(Gate.permission(USE_PERMISSION))
                 .executes(this::open)
                 .then(targetSlotSub("visit", VISIT_PERMISSION, this::runVisit))
                 .then(targetSlotSub("invite", INVITE_PERMISSION, this::runInvite))
@@ -89,7 +90,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     private LiteralArgumentBuilder<CommandSourceStack> targetSlotSub(
             String literal, String permission, SlotAction action) {
         return Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(permission))
+                .requires(Gate.permission(permission))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> action.run(ctx, HomeSlot.of(0)))
                         .then(Commands.argument("slot", IntegerArgumentType.integer(1))
@@ -98,7 +99,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
 
     private LiteralArgumentBuilder<CommandSourceStack> adminSubtree() {
         return Commands.literal("admin")
-                .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                .requires(Gate.permission(ADMIN_PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.literal("list").executes(this::runAdminList))
                         .then(withSlot(Commands.literal("del"), this::runAdminDelete))

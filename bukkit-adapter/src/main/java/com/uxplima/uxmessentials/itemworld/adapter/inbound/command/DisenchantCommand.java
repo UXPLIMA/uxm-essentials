@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -45,7 +46,7 @@ public final class DisenchantCommand extends ItemworldCommandSupport implements 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, Optional.empty()))
                 .then(Commands.literal("all").executes(ctx -> run(ctx, Optional.empty())))
                 .then(Commands.argument("enchant", Args.token())

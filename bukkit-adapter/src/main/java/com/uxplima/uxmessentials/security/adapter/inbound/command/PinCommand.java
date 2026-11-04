@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -84,7 +85,7 @@ public final class PinCommand extends SecurityCommandSupport implements CommandR
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("pin")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("set")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_PIN_USAGE))
                         .then(Commands.argument("pin", Args.token()).executes(this::set)))

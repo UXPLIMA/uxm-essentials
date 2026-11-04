@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerFollowService;
 import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -73,24 +74,24 @@ public final class VillagerCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("villager")
-                .requires(src -> src.getSender().hasPermission(USE_PERMISSION))
+                .requires(Gate.permission(USE_PERMISSION))
                 .executes(this::help);
         if (managerView != null && managerPermission != null) {
             String permission = managerPermission;
             root.then(Commands.literal("manager")
-                    .requires(src -> src.getSender().hasPermission(permission))
+                    .requires(Gate.permission(permission))
                     .executes(this::openManager));
         }
         if (protectToggle != null && protectPermission != null) {
             String permission = protectPermission;
             root.then(Commands.literal("protect")
-                    .requires(src -> src.getSender().hasPermission(permission))
+                    .requires(Gate.permission(permission))
                     .executes(this::toggleProtect));
         }
         if (followService != null && followPermission != null) {
             String permission = followPermission;
             root.then(Commands.literal("follow")
-                    .requires(src -> src.getSender().hasPermission(permission))
+                    .requires(Gate.permission(permission))
                     .executes(this::toggleFollow));
         }
         return root.build();

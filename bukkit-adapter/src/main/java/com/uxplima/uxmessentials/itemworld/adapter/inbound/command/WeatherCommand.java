@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.WeatherSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,7 +45,7 @@ public final class WeatherCommand extends ItemworldCommandSupport implements Com
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("kind", Args.token())
                         .executes(ctx -> run(ctx, Optional.empty()))
                         .then(Commands.argument("duration", IntegerArgumentType.integer(0))

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -32,7 +33,7 @@ public final class WalletCommand extends EconomyCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("wallet")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runOwn)
                 .then(currencyArgument().executes(this::runOwn))
                 .build();

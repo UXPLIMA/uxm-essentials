@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -42,7 +43,7 @@ public final class StaffHistoryCommand extends ModerationCommandSupport implemen
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("staffhistory")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("staff").executes(this::run))
                 .build();
     }

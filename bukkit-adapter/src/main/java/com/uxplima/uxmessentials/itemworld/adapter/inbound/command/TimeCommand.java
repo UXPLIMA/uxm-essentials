@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -51,7 +52,7 @@ public final class TimeCommand extends ItemworldCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("mode", Args.token())
                         .suggests(CommandSuggestions.fromStrings(() -> MODES))
                         .then(Commands.argument("value", Args.token())

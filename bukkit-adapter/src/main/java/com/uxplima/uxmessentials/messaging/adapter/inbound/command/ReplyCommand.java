@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -34,7 +35,7 @@ public final class ReplyCommand extends MessagingCommandSupport implements Comma
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("reply")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("text", StringArgumentType.greedyString())
                         .executes(this::run))
                 .build();

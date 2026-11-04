@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -86,7 +87,7 @@ public final class TwoFactorCommand extends SecurityCommandSupport implements Co
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("2fa")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("setup").executes(this::setup))
                 .then(Commands.literal("confirm")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_2FA_CONFIRM_USAGE))

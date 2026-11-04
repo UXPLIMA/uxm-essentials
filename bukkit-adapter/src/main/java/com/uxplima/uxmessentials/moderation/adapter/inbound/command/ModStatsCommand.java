@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -49,7 +50,7 @@ public final class ModStatsCommand extends ModerationCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("modstats")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> serverWide(ctx, OptionalInt.empty()))
                 .then(Commands.argument("days", IntegerArgumentType.integer(1))
                         .executes(ctx -> serverWide(ctx, days(ctx))))

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -48,7 +49,7 @@ abstract class AbstractTreeCommand extends ItemworldCommandSupport {
 
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(treeTypeArgument().executes(this::run))
                 .build();
     }

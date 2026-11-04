@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -49,7 +50,7 @@ public final class GcCommand extends PresenceCommandSupport implements CommandRe
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("gc")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::show)
                 .build();
     }

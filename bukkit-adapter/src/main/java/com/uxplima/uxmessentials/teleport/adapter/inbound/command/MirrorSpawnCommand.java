@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,7 +34,7 @@ public final class MirrorSpawnCommand extends TeleportCommandSupport implements 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("mirrorspawn")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("world", Args.token()).executes(this::run))
                 .build();
     }

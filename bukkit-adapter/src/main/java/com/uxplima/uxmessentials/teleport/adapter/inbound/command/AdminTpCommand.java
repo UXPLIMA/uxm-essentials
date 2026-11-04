@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -82,19 +83,18 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
                     .suggests(CommandSuggestions.singlePlayerTarget())
                     .executes(this::runBetweenPlayers));
         }
-        var root = Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(permission))
-                .then(player);
+        var root =
+                Commands.literal(literal).requires(Gate.permission(permission)).then(player);
         // The coordinate form mirrors /tppos and only makes sense for the GO variants (/tp, /tpo)
         // moving the actor to a raw point, so /tphere and /tpohere keep the player-only argument.
         if (pull == Pull.GO) {
             root.then(Commands.literal("at")
-                    .requires(src -> src.getSender().hasPermission(POSITION_PERMISSION))
+                    .requires(Gate.permission(POSITION_PERMISSION))
                     .then(Commands.argument("player", ArgumentTypes.player())
                             .suggests(CommandSuggestions.singlePlayerTarget())
                             .then(positionArguments(this::runTargetPosition))));
             root.then(Commands.argument("x", DoubleArgumentType.doubleArg())
-                    .requires(src -> src.getSender().hasPermission(POSITION_PERMISSION))
+                    .requires(Gate.permission(POSITION_PERMISSION))
                     .then(Commands.argument("y", DoubleArgumentType.doubleArg())
                             .then(Commands.argument("z", DoubleArgumentType.doubleArg())
                                     .executes(ctx -> runPosition(ctx, null))

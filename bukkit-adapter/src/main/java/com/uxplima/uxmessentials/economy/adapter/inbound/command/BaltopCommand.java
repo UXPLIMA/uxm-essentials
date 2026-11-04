@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,10 +45,10 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("baltop")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runDefault)
                 .then(Commands.literal("refresh")
-                        .requires(src -> src.getSender().hasPermission("uxmessentials.economy.admin"))
+                        .requires(Gate.permission("uxmessentials.economy.admin"))
                         .executes(this::runRefresh))
                 .then(Commands.argument("page", IntegerArgumentType.integer(1)).executes(this::runDefaultPage))
                 .then(currencyArgument()

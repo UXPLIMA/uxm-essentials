@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -53,7 +54,7 @@ public final class TimeAliasCommand extends ItemworldCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(permission))
+                .requires(Gate.permission(permission))
                 .executes(this::run)
                 .build();
     }

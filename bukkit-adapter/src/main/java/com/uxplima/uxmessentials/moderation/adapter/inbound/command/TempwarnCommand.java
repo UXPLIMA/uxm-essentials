@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,7 +42,7 @@ public final class TempwarnCommand extends ModerationCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("tempwarn")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("duration", Args.token())
                                 .executes(ctx -> run(ctx, Optional.empty()))

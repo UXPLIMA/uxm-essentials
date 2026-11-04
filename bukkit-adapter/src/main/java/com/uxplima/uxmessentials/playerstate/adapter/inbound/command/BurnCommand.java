@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -44,7 +45,7 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("burn")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("seconds", IntegerArgumentType.integer(0, BurnDuration.MAX_SECONDS))
                         .executes(this::burn)
                         .then(PlayerTargets.players("player").executes(this::burn)))

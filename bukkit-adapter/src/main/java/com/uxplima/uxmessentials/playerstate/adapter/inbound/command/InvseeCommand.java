@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,7 +42,7 @@ public final class InvseeCommand extends PlayerstateCommandSupport implements Co
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("invsee")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::view)
                 .then(Commands.argument("player", Args.token())
                         .suggests(onlinePlayerSuggestions())

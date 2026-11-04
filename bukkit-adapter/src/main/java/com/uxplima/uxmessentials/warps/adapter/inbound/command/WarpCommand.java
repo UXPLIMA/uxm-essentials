@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -58,7 +59,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The positional {@code <name>} could in principle collide with a subcommand literal (a warp literally
  * named {@code set}), but Brigadier matches literal children before the {@code name} argument, so the
  * literals always win. The same disambiguation {@code /pwarp} relies on, with no reserved-name guard on
- * either side. Per-subcommand permissions are enforced by Brigadier {@code .requires(...)} on each node, so
+ * either side. Per-subcommand permissions are enforced by a {@code Gate} on each node, so
  * only {@code warp} is a command-catalog id; the subcommands are literals inside the tree.
  */
 @NullMarked
@@ -85,39 +86,39 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("warp")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("list")
-                        .requires(src -> src.getSender().hasPermission(LIST_PERMISSION))
+                        .requires(Gate.permission(LIST_PERMISSION))
                         .executes(this::runList))
                 .then(Commands.literal("create")
-                        .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                        .requires(Gate.permission(SET_PERMISSION))
                         .then(Commands.argument("name", Args.token())
                                 .executes(this::runSet)
                                 .then(Commands.literal("at").then(explicitPositionArguments(this::runSetAt)))))
                 .then(explicitPositionNode("createat", SET_PERMISSION, this::runSetAt))
                 // Hidden alias of `create` so existing `/warp set <name>` muscle-memory and docs keep working.
                 .then(Commands.literal("set")
-                        .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                        .requires(Gate.permission(SET_PERMISSION))
                         .then(Commands.argument("name", Args.token()).executes(this::runSet)))
                 .then(Commands.literal("del")
-                        .requires(src -> src.getSender().hasPermission(DELETE_PERMISSION))
+                        .requires(Gate.permission(DELETE_PERMISSION))
                         .then(warpNameArgument().executes(this::runDelete)))
                 .then(Commands.literal("info")
-                        .requires(src -> src.getSender().hasPermission(INFO_PERMISSION))
+                        .requires(Gate.permission(INFO_PERMISSION))
                         .then(warpNameArgument().executes(this::runInfo)))
                 .then(Commands.literal("move")
-                        .requires(src -> src.getSender().hasPermission(MOVE_PERMISSION))
+                        .requires(Gate.permission(MOVE_PERMISSION))
                         .then(warpNameArgument()
                                 .executes(this::runMove)
                                 .then(Commands.literal("at").then(explicitPositionArguments(this::runMoveAt)))))
                 .then(explicitPositionNode("moveat", MOVE_PERMISSION, this::runMoveAt))
                 .then(Commands.literal("lock")
-                        .requires(src -> src.getSender().hasPermission(LOCK_PERMISSION))
+                        .requires(Gate.permission(LOCK_PERMISSION))
                         .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::toggleLock)))
                 .then(Commands.literal("password")
-                        .requires(src -> src.getSender().hasPermission(PASSWORD_PERMISSION))
+                        .requires(Gate.permission(PASSWORD_PERMISSION))
                         .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::setPasswordClear)
@@ -135,7 +136,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
                                 .executes(this::getWarpRating)))
                 .then(Commands.literal("editor")
-                        .requires(src -> src.getSender().hasPermission(EDIT_PERMISSION))
+                        .requires(Gate.permission(EDIT_PERMISSION))
                         .executes(this::openWarpManager)
                         .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.forPlayer(this::usableWarpNames))
@@ -387,7 +388,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     private LiteralArgumentBuilder<CommandSourceStack> explicitPositionNode(
             String literal, String permission, Command<CommandSourceStack> action) {
         return Commands.literal(literal)
-                .requires(src -> src.getSender().hasPermission(permission))
+                .requires(Gate.permission(permission))
                 .then(Commands.argument("name", Args.token()).then(explicitPositionArguments(action)));
     }
 

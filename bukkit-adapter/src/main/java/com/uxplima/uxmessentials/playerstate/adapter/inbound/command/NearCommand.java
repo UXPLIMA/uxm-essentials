@@ -12,6 +12,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,7 +32,7 @@ public final class NearCommand extends PlayerstateCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("near")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::nearDefault)
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1))
                         .executes(this::nearRadius))

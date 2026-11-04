@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -82,20 +83,20 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("playtime")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::showSelfChat)
                 .then(Commands.literal("reset")
-                        .requires(src -> src.getSender().hasPermission(RESET_PERMISSION))
+                        .requires(Gate.permission(RESET_PERMISSION))
                         .executes(this::reset)
                         .then(CommandSuggestions.playerArgument("player").executes(this::reset)))
                 .then(Commands.literal("resetall")
-                        .requires(src -> src.getSender().hasPermission(RESET_PERMISSION))
+                        .requires(Gate.permission(RESET_PERMISSION))
                         .executes(this::resetAll))
                 .then(correction("set", admin::set))
                 .then(correction("add", admin::add))
                 .then(correction("take", admin::take))
                 .then(Commands.literal("import")
-                        .requires(src -> src.getSender().hasPermission(IMPORT_PERMISSION))
+                        .requires(Gate.permission(IMPORT_PERMISSION))
                         .then(Commands.literal("all").executes(this::importAll))
                         .then(CommandSuggestions.playerArgument("player").executes(this::importOne)))
                 .then(CommandSuggestions.playerArgument("player").executes(this::showNamed))
@@ -110,7 +111,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     /** {@code /playtime <word> <player> <time>}, handing the resolved target and the typed time to {@code action}. */
     private LiteralArgumentBuilder<CommandSourceStack> correction(String word, Correction action) {
         return Commands.literal(word)
-                .requires(src -> src.getSender().hasPermission(SET_PERMISSION))
+                .requires(Gate.permission(SET_PERMISSION))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument(TIME, StringArgumentType.word()).executes(ctx -> {
                             Optional<PlayerRef> target = resolveStorageTarget(ctx, Sender.audience(ctx.getSource()));

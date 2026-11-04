@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +51,7 @@ public final class MeCommand extends CommunicationCommandSupport implements Comm
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("me")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument(ACTION_ARG, StringArgumentType.greedyString())
                         .executes(this::run))
                 .build();

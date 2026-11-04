@@ -14,8 +14,8 @@ import org.jspecify.annotations.NullMarked;
  * {@link CommandRegistration} over the constructed {@link WarpServices}. Everything a player does with server
  * warps hangs off one {@code /warp} command: {@code <name>} teleports, while {@code list}, {@code set},
  * {@code del}, {@code info}, {@code move} and the per-warp {@code lock}/{@code password}/{@code rate}/
- * {@code rating}/{@code edit} actions are Brigadier literals each gated by its own permission node via
- * {@code .requires(...)}. Collected here so the literal/permission pairing matches the permissions reference
+ * {@code rating}/{@code edit} actions are Brigadier literals each gated by its own permission node via a
+ * {@code Gate}. Collected here so the literal/permission pairing matches the permissions reference
  * and the kernel's {@code WarpCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler
  * registers it. Mirrors the subcommand-tree idiom {@code /pwarp} and {@code /home} use.
  */

@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -44,7 +45,7 @@ public final class ToggleChatCommand extends CommunicationCommandSupport impleme
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("togglechat")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::run)
                 .build();
     }

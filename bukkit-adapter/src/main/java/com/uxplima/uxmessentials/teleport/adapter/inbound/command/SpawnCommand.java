@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,10 +37,10 @@ public final class SpawnCommand extends TeleportCommandSupport implements Comman
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("spawn")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runDefault)
                 .then(Commands.argument("name", Args.token())
-                        .requires(src -> src.getSender().hasPermission(NAMED_PERMISSION))
+                        .requires(Gate.permission(NAMED_PERMISSION))
                         .executes(this::runNamed))
                 .build();
     }

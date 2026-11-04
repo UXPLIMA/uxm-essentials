@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 import org.bukkit.World;
@@ -34,6 +33,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -119,9 +119,8 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("npc")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
-                .executes(this::openGui);
+        LiteralArgumentBuilder<CommandSourceStack> root =
+                Commands.literal("npc").requires(Gate.permission(PERMISSION)).executes(this::openGui);
         List<LiteralArgumentBuilder<CommandSourceStack>> verbs = new ArrayList<>(List.of(
                 Commands.literal("create")
                         .executes(ctx -> usage(ctx, "npc create", "<name> [type]", "Create a new NPC"))
@@ -170,10 +169,9 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
      * operator narrows it by negating one capability: builder staff who may move and re-dress an NPC but never
      * delete one hold the base node with {@code uxmessentials.npc.admin.delete} negated.
      */
-    private static Predicate<CommandSourceStack> capability(String verb) {
+    private static Gate capability(String verb) {
         String node = CAPABILITIES.getOrDefault(verb, EDIT);
-        return src ->
-                src.getSender().hasPermission(PERMISSION) && src.getSender().hasPermission(node);
+        return Gate.permission(PERMISSION).and(Gate.permission(node));
     }
 
     @Override

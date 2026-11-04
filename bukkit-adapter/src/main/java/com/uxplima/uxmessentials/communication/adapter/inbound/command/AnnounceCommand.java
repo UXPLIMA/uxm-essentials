@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -111,21 +112,19 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("announce")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("editor")
-                        .requires(src -> src.getSender().hasPermission(EDITOR))
+                        .requires(Gate.permission(EDITOR))
                         .executes(this::openEditor))
                 .then(Commands.literal("reload")
-                        .requires(src -> src.getSender().hasPermission(RELOAD))
+                        .requires(Gate.permission(RELOAD))
                         .executes(this::reload))
-                .then(Commands.literal("list")
-                        .requires(src -> src.getSender().hasPermission(LIST))
-                        .executes(this::list))
+                .then(Commands.literal("list").requires(Gate.permission(LIST)).executes(this::list))
                 .then(Commands.literal("preview")
-                        .requires(src -> src.getSender().hasPermission(PREVIEW))
+                        .requires(Gate.permission(PREVIEW))
                         .then(Commands.argument("id", Args.token()).executes(this::preview)))
                 .then(Commands.literal("toggle")
-                        .requires(src -> src.getSender().hasPermission(TOGGLE))
+                        .requires(Gate.permission(TOGGLE))
                         .executes(this::toggle))
                 .build();
     }

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.domain.event.EntitiesPurged;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -50,7 +51,7 @@ public final class ButcherCommand extends ItemworldCommandSupport implements Com
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, DEFAULT_RADIUS))
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1))
                         .executes(ctx -> run(ctx, IntegerArgumentType.getInteger(ctx, "radius"))))

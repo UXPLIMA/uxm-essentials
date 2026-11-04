@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -61,17 +62,17 @@ public final class VotePartyCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("voteparty")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::status)
                 .then(Commands.literal("force")
-                        .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                        .requires(Gate.permission(ADMIN_PERMISSION))
                         .executes(this::forceParty))
                 .then(Commands.literal("set")
-                        .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                        .requires(Gate.permission(ADMIN_PERMISSION))
                         .then(Commands.argument("count", IntegerArgumentType.integer(0))
                                 .executes(this::setCount)))
                 .then(Commands.literal("add")
-                        .requires(src -> src.getSender().hasPermission(ADMIN_PERMISSION))
+                        .requires(Gate.permission(ADMIN_PERMISSION))
                         .then(Commands.argument("amount", IntegerArgumentType.integer(1))
                                 .executes(this::addCount)))
                 .build();

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -75,7 +76,7 @@ public final class EntityCountCommand extends ItemworldCommandSupport implements
         // catalog flag is on. The <radius> child can't reach that flag, so it mirrors the bare root by view
         // presence: open the grid when a view is wired, chat when it is not.
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, DEFAULT_RADIUS))
                 .then(Commands.argument("radius", IntegerArgumentType.integer(1))
                         .executes(ctx -> dispatch(ctx, IntegerArgumentType.getInteger(ctx, "radius"))))

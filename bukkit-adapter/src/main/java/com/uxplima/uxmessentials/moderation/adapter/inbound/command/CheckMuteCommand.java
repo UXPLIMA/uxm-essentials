@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import org.jspecify.annotations.NullMarked;
@@ -74,7 +75,7 @@ public final class CheckMuteCommand extends ModerationCommandSupport implements 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("checkmute")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();
     }

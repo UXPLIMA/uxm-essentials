@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeMessageKey;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -83,7 +84,7 @@ public final class TradeCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("trade")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::usage)
                 .then(resolutionNode("accept", this::accept))
                 .then(resolutionNode("deny", this::deny))

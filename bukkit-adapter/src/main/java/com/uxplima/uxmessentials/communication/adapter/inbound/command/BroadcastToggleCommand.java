@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -37,7 +38,7 @@ public final class BroadcastToggleCommand extends CommunicationCommandSupport im
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("broadcasttoggle")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::toggle)
                 .build();
     }

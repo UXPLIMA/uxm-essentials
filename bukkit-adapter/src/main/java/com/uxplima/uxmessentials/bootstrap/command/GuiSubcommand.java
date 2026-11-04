@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -55,9 +56,7 @@ public final class GuiSubcommand {
 
     /** The {@code gui} literal node, gated on {@code uxmessentials.gui}, for attaching under {@code /uxmess}. */
     public LiteralArgumentBuilder<CommandSourceStack> build() {
-        return Commands.literal("gui")
-                .requires(src -> src.getSender().hasPermission(PERMISSION_GUI))
-                .executes(this::runGui);
+        return Commands.literal("gui").requires(Gate.permission(PERMISSION_GUI)).executes(this::runGui);
     }
 
     /**

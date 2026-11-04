@@ -35,6 +35,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -97,16 +98,16 @@ public final class SecurityCommand extends SecurityCommandSupport implements Com
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("security")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("status")
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_USAGE))
                         .then(CommandSuggestions.playerArgument("player").executes(this::status)))
                 .then(Commands.literal("force")
-                        .requires(src -> src.getSender().hasPermission(FORCE_PERMISSION))
+                        .requires(Gate.permission(FORCE_PERMISSION))
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_FORCE_USAGE))
                         .then(CommandSuggestions.playerArgument("player").executes(this::force)))
                 .then(Commands.literal("reset")
-                        .requires(src -> src.getSender().hasPermission(RESET_PERMISSION))
+                        .requires(Gate.permission(RESET_PERMISSION))
                         .executes(ctx -> usage(ctx, SecurityMessageKey.SECURITY_ADMIN_RESET_USAGE))
                         .then(CommandSuggestions.playerArgument("player")
                                 .executes(ctx -> reset(ctx, FactorScope.ALL))

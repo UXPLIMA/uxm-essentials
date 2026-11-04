@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.inbound.gui.CommunicationAdminMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,7 +37,7 @@ public final class CommunicationGuiCommand extends CommunicationCommandSupport i
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("communication")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("gui").executes(this::open))
                 .executes(this::open)
                 .build();

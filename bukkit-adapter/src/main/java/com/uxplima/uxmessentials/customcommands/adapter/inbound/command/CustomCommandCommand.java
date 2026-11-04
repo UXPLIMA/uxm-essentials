@@ -37,6 +37,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 
 /**
@@ -86,7 +87,7 @@ public final class CustomCommandCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("customcmd")
-                .requires(src -> src.getSender().hasPermission(ADMIN))
+                .requires(Gate.permission(ADMIN))
                 .executes(this::usage)
                 .then(Commands.literal("list").executes(this::list))
                 .then(Commands.literal("info").then(idArgument().executes(this::info)))

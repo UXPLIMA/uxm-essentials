@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.AltGroup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -61,7 +62,7 @@ public final class IpAltsCommand extends SecurityCommandSupport implements Comma
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("ipalts")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(CommandSuggestions.playerArgument("player").executes(this::run))
                 .build();
     }

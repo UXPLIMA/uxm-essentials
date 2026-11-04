@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -70,17 +71,17 @@ public final class PosesCommand implements CommandRegistration {
         return Commands.literal("poses")
                 // Hide the whole /poses tree from a player with no poses access; either self-service node (its bare
                 // GUI or the toggle) keeps it visible, so a player holding only one still sees the command.
-                .requires(src -> src.getSender().hasPermission(GUI_PERMISSION)
-                        || src.getSender().hasPermission(TOGGLE_PERMISSION)
-                        || src.getSender().hasPermission(REVEAL_PERMISSION))
+                .requires(Gate.permission(GUI_PERMISSION)
+                        .or(Gate.permission(TOGGLE_PERMISSION))
+                        .or(Gate.permission(REVEAL_PERMISSION)))
                 .then(Commands.literal("toggle")
-                        .requires(src -> src.getSender().hasPermission(TOGGLE_PERMISSION))
+                        .requires(Gate.permission(TOGGLE_PERMISSION))
                         .executes(this::toggle))
                 .then(Commands.literal("gui")
-                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .requires(Gate.permission(GUI_PERMISSION))
                         .executes(this::openGui))
                 .then(Commands.literal("reveal")
-                        .requires(src -> src.getSender().hasPermission(REVEAL_PERMISSION))
+                        .requires(Gate.permission(REVEAL_PERMISSION))
                         .then(Commands.argument(TARGET, ArgumentTypes.player()).executes(this::reveal)))
                 .executes(this::open)
                 .build();

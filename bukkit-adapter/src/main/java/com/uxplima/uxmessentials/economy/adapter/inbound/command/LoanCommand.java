@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -44,11 +45,11 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("loan")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runStatus)
                 .then(Commands.literal("status").executes(this::runStatus))
                 .then(Commands.literal("take")
-                        .requires(src -> src.getSender().hasPermission(TAKE))
+                        .requires(Gate.permission(TAKE))
                         .executes(ctx -> usage(ctx, "loan take", "<amount> [currency] [installments]", "Take a loan"))
                         .then(Commands.argument("amount", Args.token())
                                 .executes(ctx -> this.runTake(ctx, null, 10)) // default 10 installments

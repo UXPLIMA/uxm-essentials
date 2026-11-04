@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 
@@ -40,7 +41,7 @@ public final class ItemModelCommand extends ItemworldCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.literal("clear").executes(ctx -> run(ctx, Optional.empty())))
                 .then(Commands.argument("id", IntegerArgumentType.integer(0))
                         .executes(ctx -> run(ctx, Optional.of(IntegerArgumentType.getInteger(ctx, "id")))))

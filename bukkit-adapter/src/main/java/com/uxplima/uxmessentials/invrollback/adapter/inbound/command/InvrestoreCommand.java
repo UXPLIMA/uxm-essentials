@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -97,22 +98,22 @@ public final class InvrestoreCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("invrestore")
-                .requires(src -> src.getSender().hasPermission(RESTORE_PERMISSION)
-                        || src.getSender().hasPermission(EXPORT_PERMISSION)
-                        || src.getSender().hasPermission(TELEPORT_PERMISSION))
+                .requires(Gate.permission(RESTORE_PERMISSION)
+                        .or(Gate.permission(EXPORT_PERMISSION))
+                        .or(Gate.permission(TELEPORT_PERMISSION)))
                 .executes(ctx -> usage(ctx, "invrestore", "<player>", description()))
                 .then(Commands.literal("export")
-                        .requires(src -> src.getSender().hasPermission(EXPORT_PERMISSION))
+                        .requires(Gate.permission(EXPORT_PERMISSION))
                         .executes(ctx ->
                                 usage(ctx, "invrestore export", "<player> <index>", "Export an inventory snapshot"))
                         .then(indexed("invrestore export", "Export an inventory snapshot", this::exportSnapshot)))
                 .then(Commands.literal("tp")
-                        .requires(src -> src.getSender().hasPermission(TELEPORT_PERMISSION))
+                        .requires(Gate.permission(TELEPORT_PERMISSION))
                         .executes(
                                 ctx -> usage(ctx, "invrestore tp", "<player> <index>", "Teleport to snapshot location"))
                         .then(indexed("invrestore tp", "Teleport to snapshot location", this::teleportSnapshot)))
                 .then(Commands.argument("player", Args.token())
-                        .requires(src -> src.getSender().hasPermission(RESTORE_PERMISSION))
+                        .requires(Gate.permission(RESTORE_PERMISSION))
                         .suggests(CommandSuggestions.onlinePlayers())
                         .executes(this::open))
                 .build();

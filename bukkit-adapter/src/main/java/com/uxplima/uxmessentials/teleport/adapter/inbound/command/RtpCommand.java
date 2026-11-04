@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
@@ -69,13 +70,13 @@ public final class RtpCommand extends TeleportCommandSupport implements CommandR
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("rtp")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::runBare)
                 .then(Commands.literal("gui")
-                        .requires(src -> src.getSender().hasPermission(GUI_PERMISSION))
+                        .requires(Gate.permission(GUI_PERMISSION))
                         .executes(this::openGui))
                 .then(Commands.literal("biome")
-                        .requires(src -> src.getSender().hasPermission(BIOME_PERMISSION))
+                        .requires(Gate.permission(BIOME_PERMISSION))
                         .then(Commands.argument("biome", Args.token())
                                 .suggests(this::suggestBiomes)
                                 .executes(this::runBiome)))

@@ -15,7 +15,7 @@ import org.jspecify.annotations.NullMarked;
  * {@link CommandRegistration} over the constructed {@link KitServices}. Everything a player or operator does
  * with kits hangs off one {@code /kit} command: {@code <name>} claims a kit, while {@code list}, {@code show},
  * {@code create}, {@code del}, {@code editor} and {@code reset} are Brigadier literals each gated by its own
- * permission node via {@code .requires(...)}. Collected here so the literal/permission pairing matches the
+ * permission node via a {@code Gate}. Collected here so the literal/permission pairing matches the
  * permissions reference and the kernel's {@code KitCommandSurface}; the plugin's
  * {@code LifecycleEvents.COMMANDS} handler registers it. Mirrors the subcommand-tree idiom {@code /warp} and
  * {@code /home} use.

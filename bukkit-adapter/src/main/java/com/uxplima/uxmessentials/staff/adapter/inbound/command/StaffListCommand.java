@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -64,7 +65,7 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("stafflist")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(this::open)
                 .build();
     }

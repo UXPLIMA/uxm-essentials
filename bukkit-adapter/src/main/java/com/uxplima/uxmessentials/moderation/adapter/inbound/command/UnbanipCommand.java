@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -29,7 +30,7 @@ public final class UnbanipCommand extends ModerationCommandSupport implements Co
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("unbanip")
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .then(Commands.argument("ip", Args.token()).executes(this::run))
                 .build();
     }

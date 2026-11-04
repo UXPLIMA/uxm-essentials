@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.domain.PowertoolBinding;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -52,7 +53,7 @@ public final class PowertoolCommand extends ItemworldCommandSupport implements C
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal(literal())
-                .requires(src -> src.getSender().hasPermission(PERMISSION))
+                .requires(Gate.permission(PERMISSION))
                 .executes(ctx -> run(ctx, ""))
                 .then(Commands.argument("command", StringArgumentType.greedyString())
                         .executes(ctx -> run(ctx, StringArgumentType.getString(ctx, "command"))))
