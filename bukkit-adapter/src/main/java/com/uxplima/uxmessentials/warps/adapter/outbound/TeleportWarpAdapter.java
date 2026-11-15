@@ -34,6 +34,13 @@ public final class TeleportWarpAdapter implements WarpTeleporter {
     }
 
     @Override
+    public boolean admits(PlayerRef who, Warp warp) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(warp, "warp");
+        return engine.gateHop(who, destinationOf(warp), TeleportKind.WARP).isOk();
+    }
+
+    @Override
     public void teleportTo(PlayerRef who, Warp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");

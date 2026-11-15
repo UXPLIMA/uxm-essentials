@@ -12,17 +12,23 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolution;
 import com.uxplima.uxmessentials.shared.application.hop.HopResolver;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
 import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmessentials.warps.domain.WarpError;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 
 /**
  * The server-warp side of the shared cross-server hop. A hop's target is the warp's name. On the target the warp is
- * read again and moved to only while it still exists and still lives on this backend; the move is the teleport
- * context's immediate arrival, through {@link WarpTeleporter#arrive}. The charge goes back through the same
+ * read again and moved to only while it still exists and still lives on this backend, and only onto a destination
+ * that passes the safety check a local use passes; the move is the teleport context's immediate arrival, through
+ * {@link WarpTeleporter#arrive}, and a landing counts as a visit. The charge goes back through the same
  * {@link WarpEconomy} the use charged on. A warp's cost is the server's, so a hop to one never carries a
  * settlement: there is no one to pay on once the player lands.
  */
@@ -42,13 +48,28 @@ public final class WarpHopResolver implements HopResolver {
     private final WarpRepository repository;
     private final WarpTeleporter teleporter;
     private final Optional<WarpEconomy> economy;
+    private final WarpSafetyChecker safety;
+    private final Permissions permissions;
+    private final Notifier notifier;
+    private final Scheduler scheduler;
     private final String localServer;
 
     public WarpHopResolver(
-            WarpRepository repository, WarpTeleporter teleporter, Optional<WarpEconomy> economy, String localServer) {
+            WarpRepository repository,
+            WarpTeleporter teleporter,
+            Optional<WarpEconomy> economy,
+            WarpSafetyChecker safety,
+            Permissions permissions,
+            Notifier notifier,
+            Scheduler scheduler,
+            String localServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.economy = Objects.requireNonNull(economy, "economy");
+        this.safety = Objects.requireNonNull(safety, "safety");
+        this.permissions = Objects.requireNonNull(permissions, "permissions");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
@@ -76,7 +97,62 @@ public final class WarpHopResolver implements HopResolver {
         }
         Warp warp = found.get();
         return HopResolution.landsAt(
-                warp.name().value(), (who, onLanded, onMissed) -> teleporter.arrive(who, warp, onLanded, onMissed));
+                warp.name().value(), (who, onLanded, onMissed) -> land(who, warp, onLanded, onMissed));
+    }
+
+    /**
+     * Judge the destination on its own region thread, the only one that may read its blocks, then move the player on
+     * theirs. An unsafe destination is refused as a local use would be, unless the player may bypass the check, and
+     * the miss gives the charge back. A failure anywhere on the way is a miss too, so the claimed hop always ends in
+     * exactly one outcome.
+     */
+    private void land(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed) {
+        scheduler.onRegion(warp.location(), () -> {
+            boolean safe = isSafe(warp);
+            try {
+                scheduler.onEntity(who, () -> arriveIfAllowed(who, warp, safe, onLanded, onMissed), onMissed);
+            } catch (RuntimeException unscheduled) {
+                onMissed.run();
+            }
+        });
+    }
+
+    private void arriveIfAllowed(PlayerRef who, Warp warp, boolean safe, Runnable onLanded, Runnable onMissed) {
+        if (!safe && !permissions.has(who, UseWarp.BYPASS_SAFETY)) {
+            notifier.send(
+                    who,
+                    WarpError.UNSAFE_LOCATION.messageKey(),
+                    Map.of("warp", warp.name().value()));
+            onMissed.run();
+            return;
+        }
+        Runnable landed = () -> {
+            onLanded.run();
+            countVisit(warp.name());
+        };
+        teleporter.arrive(who, warp, landed, onMissed);
+    }
+
+    private boolean isSafe(Warp warp) {
+        try {
+            return safety.isSafe(warp.location());
+        } catch (RuntimeException unreadable) {
+            // A destination that cannot be judged is treated as unsafe: the player is refunded, not dropped into it.
+            return false;
+        }
+    }
+
+    /**
+     * Count the landing as a visit, as a local use counts one. A statistic, so a lane that refuses the write (a
+     * backend shutting down) loses only the count, and the answer says whether it was queued.
+     */
+    private boolean countVisit(WarpName name) {
+        try {
+            scheduler.async(() -> repository.find(name).ifPresent(warp -> repository.save(warp.incrementedVisitors())));
+            return true;
+        } catch (RuntimeException refused) {
+            return false;
+        }
     }
 
     @Override

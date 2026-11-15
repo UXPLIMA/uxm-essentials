@@ -4,6 +4,8 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpPendin
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -31,7 +33,10 @@ import org.jspecify.annotations.Nullable;
  * {@code warp_id}, and {@code accrue_on_arrival} 1 for the settlement to the warp itself (NULL is a row an older
  * origin wrote, which already paid the owner). Every other kind names itself in {@code kind}, keeps its target in
  * {@code target_ref} and any payee in {@code settle_to}, and writes {@code warp_id} 0, an id no player warp has, so
- * an older backend fails to read the row instead of taking it for a player warp. The charge is a
+ * an older backend fails to read the row instead of taking it for a player warp. The warp id decides on the way
+ * back too: an older backend's upsert rewrites only its own columns, so a row with a positive warp id is a player
+ * warp whatever stale kind it carries, and a kind name this release does not know reads as
+ * {@link HopKind#UNKNOWN}, which no resolver serves. The charge is a
  * {@code DECIMAL(20,4)} paired with its currency id for every kind, both NULL when nothing was charged.
  */
 @NullMarked
@@ -94,10 +99,11 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
     public int clear(PendingHop pending) {
         Objects.requireNonNull(pending, "pending");
         Condition sameTarget = pending.kind() == HopKind.PLAYER_WARP
-                ? isPlayerWarp().and(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID.eq(warpIdOf(pending.target())))
+                ? PLAYER_WARP_PENDING_TELEPORTS.WARP_ID.eq(warpIdOf(pending.target()))
                 : PLAYER_WARP_PENDING_TELEPORTS
-                        .KIND
-                        .eq(pending.kind().name())
+                        .WARP_ID
+                        .eq(NO_PLAYER_WARP)
+                        .and(kindIs(pending.kind()))
                         .and(PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF.eq(pending.target()));
         return write(dsl -> dsl.deleteFrom(PLAYER_WARP_PENDING_TELEPORTS)
                 .where(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID.eq(
@@ -109,25 +115,32 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
                 .execute());
     }
 
-    /** A player-warp row is one with no kind, as every release before kinds wrote it, or one that names it. */
-    private static Condition isPlayerWarp() {
-        return PLAYER_WARP_PENDING_TELEPORTS
-                .KIND
-                .isNull()
-                .or(PLAYER_WARP_PENDING_TELEPORTS.KIND.eq(HopKind.PLAYER_WARP.name()));
+    /** The stored kind of a row this backend reads as {@code kind}; an unknown one is any name it does not know. */
+    private static Condition kindIs(HopKind kind) {
+        if (kind != HopKind.UNKNOWN) {
+            return PLAYER_WARP_PENDING_TELEPORTS.KIND.eq(kind.name());
+        }
+        List<String> known = Arrays.stream(HopKind.values())
+                .filter(each -> each != HopKind.UNKNOWN)
+                .map(HopKind::name)
+                .toList();
+        return PLAYER_WARP_PENDING_TELEPORTS.KIND.notIn(known);
     }
 
     /** Rebuild the hop from a row; the charge is present only when both the amount and currency survived. */
     private static PendingHop toPending(PlayerWarpPendingTeleportsRecord row) {
-        @Nullable String storedKind = row.getKind();
-        HopKind kind = storedKind == null ? HopKind.PLAYER_WARP : HopKind.valueOf(storedKind);
         String target;
         Optional<HopSettlement> settlement;
-        if (kind == HopKind.PLAYER_WARP) {
+        HopKind kind;
+        // A positive warp id is a player-warp hop whatever the kind column says: an older backend's upsert rewrites
+        // warp_id and leaves kind, target_ref and settle_to as an earlier row of another kind left them.
+        if (row.getWarpId() > NO_PLAYER_WARP) {
+            kind = HopKind.PLAYER_WARP;
             target = Long.toString(row.getWarpId());
             settlement = isSet(row.getAccrueOnArrival()) ? Optional.of(new HopSettlement(target)) : Optional.empty();
         } else {
-            target = Objects.requireNonNull(row.getTargetRef(), "a " + kind + " hop row has no target_ref");
+            kind = kindOf(row.getKind());
+            target = Objects.requireNonNullElse(row.getTargetRef(), "");
             settlement = Optional.ofNullable(row.getSettleTo()).map(HopSettlement::new);
         }
         return new PendingHop(
@@ -139,6 +152,19 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
                 Instant.ofEpochMilli(row.getRequestedAt()),
                 chargeOf(row.getPaidAmount(), row.getPaidCurrency()),
                 settlement);
+    }
+
+    /** A kind this release knows, or the unknown sentinel for one a newer release added. */
+    private static HopKind kindOf(@Nullable String stored) {
+        if (stored == null) {
+            return HopKind.UNKNOWN;
+        }
+        for (HopKind kind : HopKind.values()) {
+            if (kind != HopKind.UNKNOWN && kind.name().equals(stored)) {
+                return kind;
+            }
+        }
+        return HopKind.UNKNOWN;
     }
 
     /** NULL is a row an earlier origin wrote, which already paid the owner, so only a stored 1 sets the flag. */
@@ -171,6 +197,9 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
             short accrueOnArrival) {
 
         static Row of(PendingHop pending) {
+            if (pending.kind() == HopKind.UNKNOWN) {
+                throw new IllegalArgumentException("a hop of an unknown kind is only ever read, never recorded");
+            }
             Optional<String> payee = pending.settlement().map(HopSettlement::payee);
             if (pending.kind() == HopKind.PLAYER_WARP) {
                 if (payee.filter(to -> !to.equals(pending.target())).isPresent()) {

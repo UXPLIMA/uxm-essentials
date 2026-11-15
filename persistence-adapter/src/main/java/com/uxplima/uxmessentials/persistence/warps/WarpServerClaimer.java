@@ -3,10 +3,12 @@ package com.uxplima.uxmessentials.persistence.warps;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Warps.WARPS;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,31 +36,51 @@ public final class WarpServerClaimer extends JooqRepository {
     }
 
     /** Claim over the shared {@link Persistence} handle, keeping jOOQ off the bukkit-adapter's classpath. */
-    public static int claim(Persistence persistence, String serverId, Collection<String> localWorldUids) {
+    public static List<String> claim(Persistence persistence, String serverId, Collection<String> localWorldUids) {
         Objects.requireNonNull(persistence, "persistence");
         return new WarpServerClaimer(persistence.dsl()).claim(serverId, localWorldUids);
     }
 
     /**
      * Stamp {@code serverId} onto every warp of unknown server whose {@code world} uid is in {@code localWorldUids},
-     * returning how many rows were claimed.
+     * returning the names of the warps claimed, so the operator can see which ones this backend took.
      *
      * @param serverId this backend's non-blank network name, never {@value #UNSCOPED}
      * @param localWorldUids the uid strings of the worlds loaded on this backend; empty claims nothing
      */
-    public int claim(String serverId, Collection<String> localWorldUids) {
+    public List<String> claim(String serverId, Collection<String> localWorldUids) {
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(localWorldUids, "localWorldUids");
         if (serverId.isBlank() || serverId.equals(UNSCOPED)) {
             throw new IllegalArgumentException("a warp cannot be claimed for the server '" + serverId + "'");
         }
         if (localWorldUids.isEmpty()) {
-            return 0;
+            return List.of();
         }
-        return write(dsl -> dsl.update(WARPS)
-                .set(WARPS.SERVER_ID, serverId)
-                .where(WARPS.SERVER_ID.isNull().or(WARPS.SERVER_ID.eq(UNSCOPED)))
-                .and(WARPS.WORLD.in(localWorldUids))
-                .execute());
+        Condition claimable =
+                WARPS.SERVER_ID.isNull().or(WARPS.SERVER_ID.eq(UNSCOPED)).and(WARPS.WORLD.in(localWorldUids));
+        return write(dsl -> {
+            List<String> names = dsl.select(WARPS.NAME)
+                    .from(WARPS)
+                    .where(claimable)
+                    .orderBy(WARPS.NAME)
+                    .fetch(WARPS.NAME);
+            if (names.isEmpty()) {
+                return List.<String>of();
+            }
+            // The update names its rows and repeats the condition, so a warp another backend claimed between the
+            // read and the write is not taken back; the list is trimmed to the rows that were really written.
+            dsl.update(WARPS)
+                    .set(WARPS.SERVER_ID, serverId)
+                    .where(WARPS.NAME.in(names))
+                    .and(claimable)
+                    .execute();
+            return dsl.select(WARPS.NAME)
+                    .from(WARPS)
+                    .where(WARPS.NAME.in(names))
+                    .and(WARPS.SERVER_ID.eq(serverId))
+                    .orderBy(WARPS.NAME)
+                    .fetch(WARPS.NAME);
+        });
     }
 }

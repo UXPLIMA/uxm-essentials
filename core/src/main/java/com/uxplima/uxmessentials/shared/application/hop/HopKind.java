@@ -22,5 +22,11 @@ public enum HopKind {
     JAIL,
 
     /** Another player's position. */
-    PLAYER
+    PLAYER,
+
+    /**
+     * A kind a newer release wrote that this one does not know. No resolver ever serves it, so such a row is left for
+     * its origin while it is fresh and claimed once it is abandoned, like any kind this backend cannot serve.
+     */
+    UNKNOWN
 }

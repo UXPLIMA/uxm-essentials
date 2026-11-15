@@ -59,11 +59,17 @@ public final class WarpServerAdoption implements Runnable {
 
     private void claim(List<String> localWorlds) {
         try {
-            int claimed = WarpServerClaimer.claim(persistence, server, localWorlds);
-            if (claimed == 0) {
+            List<String> claimed = WarpServerClaimer.claim(persistence, server, localWorlds);
+            if (claimed.isEmpty()) {
                 return;
             }
-            kernel.log().info("event=warp_server_claim server={} claimed={}", server, claimed);
+            kernel.log()
+                    .info(
+                            "event=warp_server_claim server={} claimed={} warps={} fix=/warp setserver <warp> <server>"
+                                    + " when one belongs to another server",
+                            server,
+                            claimed.size(),
+                            String.join(",", claimed));
             cache.invalidateAll();
             bus.publish(new WarpChanged(server, "*"));
         } catch (RuntimeException unclaimed) {

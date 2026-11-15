@@ -46,6 +46,8 @@ public final class TeleportHopGate implements HopGate {
             case WORLD -> Optional.of(TeleportKind.SPAWN);
             case PLAYER -> Optional.of(TeleportKind.REQUEST);
             case JAIL -> Optional.empty();
+            // Never sent by this release; read only from a row a newer one wrote.
+            case UNKNOWN -> Optional.empty();
         };
     }
 }

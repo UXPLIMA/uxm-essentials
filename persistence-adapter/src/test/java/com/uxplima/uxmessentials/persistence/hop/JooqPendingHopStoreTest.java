@@ -182,4 +182,56 @@ class JooqPendingHopStoreTest {
 
         assertThat(store.find(ALEX)).isEmpty();
     }
+
+    @Test
+    void aRowAnOlderBackendRewroteOverAnotherKindIsAPlayerWarpHop() {
+        store.record(new PendingHop(
+                ALEX, HopKind.WARP, "market", "survival", "lobby", ASKED, Optional.empty(), Optional.empty()));
+        // What an older backend's upsert of a player-warp hop leaves: its own columns, and the stale kind beside them.
+        dsl.update(PLAYER_WARP_PENDING_TELEPORTS)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
+                .set(
+                        PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT,
+                        ASKED.plusSeconds(1).toEpochMilli())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
+                .execute();
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.PLAYER_WARP);
+        assertThat(found.target()).isEqualTo("7");
+        assertThat(store.clear(new PendingHop(
+                        ALEX,
+                        HopKind.WARP,
+                        "market",
+                        "survival",
+                        "lobby",
+                        ASKED.plusSeconds(1),
+                        Optional.empty(),
+                        Optional.empty())))
+                .isZero();
+        assertThat(store.clear(found)).isEqualTo(1);
+    }
+
+    @Test
+    void aKindANewerReleaseAddedReadsAsUnknownAndCanStillBeClaimed() {
+        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "SHIP")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF, "galleon")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
+                .execute();
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.UNKNOWN);
+        assertThat(found.target()).isEqualTo("galleon");
+        assertThatThrownBy(() -> store.record(found)).isInstanceOf(IllegalArgumentException.class);
+        assertThat(store.clear(found)).isEqualTo(1);
+        assertThat(store.find(ALEX)).isEmpty();
+    }
 }

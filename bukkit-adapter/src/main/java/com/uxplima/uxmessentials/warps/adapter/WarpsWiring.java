@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
+import com.uxplima.uxmessentials.warps.application.SetWarpServer;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
 import com.uxplima.uxmessentials.warps.application.WarpHopResolver;
@@ -129,7 +130,15 @@ public final class WarpsWiring {
         String localServer = hops.server();
         WarpHops warpHops = WarpHops.local(localServer);
         if (ctx.config().getBoolean("cross-server.enabled", false)) {
-            hops.register(new WarpHopResolver(repository, teleporter, economy, localServer));
+            hops.register(new WarpHopResolver(
+                    repository,
+                    teleporter,
+                    economy,
+                    new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                    kernel.permissions(),
+                    notifier,
+                    kernel.scheduler(),
+                    localServer));
             warpHops = new WarpHops(Optional.of(hops.departures(new TeleportHopGate(teleportEngine))), localServer);
         }
         // UseWarp is built once here so the editor's "go to" button and the /warp command share the exact same
@@ -301,7 +310,9 @@ public final class WarpsWiring {
                 repository,
                 editorView,
                 managerView,
-                kernel.scheduler());
+                kernel.scheduler(),
+                new SetWarpServer(repository, notifier),
+                localServer);
     }
 
     /**

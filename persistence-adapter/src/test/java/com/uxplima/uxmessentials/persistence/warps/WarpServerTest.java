@@ -99,15 +99,16 @@ class WarpServerTest {
                 .containsOnly(WarpServerClaimer.UNSCOPED);
         assertThat(serverOf(MARKET)).isEmpty();
 
-        int claimed = claimer.claim("survival", List.of(SURVIVAL_WORLD.uid().toString()));
+        List<String> claimed =
+                claimer.claim("survival", List.of(SURVIVAL_WORLD.uid().toString()));
 
-        assertThat(claimed).isOne();
+        assertThat(claimed).containsExactly("market");
         assertThat(serverOf(MARKET)).contains("survival");
         assertThat(serverOf(PLOTS)).isEmpty();
         assertThat(claimer.claim("survival", List.of(SURVIVAL_WORLD.uid().toString())))
-                .isZero();
+                .isEmpty();
         assertThat(claimer.claim("creative", List.of(CREATIVE_WORLD.uid().toString())))
-                .isOne();
+                .containsExactly("plots");
         assertThat(serverOf(PLOTS)).contains("creative");
     }
 
@@ -116,7 +117,7 @@ class WarpServerTest {
         oldReleaseSets(MARKET, SURVIVAL_WORLD);
         upgrade();
 
-        assertThat(claimer.claim("survival", List.of())).isZero();
+        assertThat(claimer.claim("survival", List.of())).isEmpty();
         assertThat(serverOf(MARKET)).isEmpty();
     }
 
@@ -126,7 +127,7 @@ class WarpServerTest {
         oldReleaseSets(MARKET, SURVIVAL_WORLD);
 
         assertThat(claimer.claim("survival", List.of(SURVIVAL_WORLD.uid().toString())))
-                .isOne();
+                .containsExactly("market");
         assertThat(serverOf(MARKET)).contains("survival");
     }
 
@@ -160,6 +161,6 @@ class WarpServerTest {
                         List.of(
                                 CREATIVE_WORLD.uid().toString(),
                                 SURVIVAL_WORLD.uid().toString())))
-                .isZero();
+                .isEmpty();
     }
 }

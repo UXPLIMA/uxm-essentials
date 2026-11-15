@@ -9,9 +9,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,31 +22,25 @@ import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
-import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
-import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
-import com.uxplima.uxmessentials.teleport.domain.Destination;
-import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MemoryHopStore;
 import com.uxplima.uxmessentials.testing.MutableClock;
-import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.testing.SteppedScheduler;
-import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
-import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
-import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmessentials.warps.domain.WarpError;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -69,9 +61,12 @@ class CrossServerWarpTest {
     private final MutableClock clock = new MutableClock(NOW);
     private final SteppedScheduler scheduler = new SteppedScheduler(clock);
     private final MemoryHopStore store = new MemoryHopStore();
-    private final Warps warps = new Warps();
-    private final Purse purse = new Purse();
-    private final Moves moves = new Moves();
+    private final List<String> storeCallsOnTheCallerThread = new ArrayList<>();
+    private final Lanes lanes = new Lanes(scheduler);
+    private final PendingHopStore shared = new Guarded(store);
+    private final WarpFakes.Warps warps = new WarpFakes.Warps();
+    private final WarpFakes.Purse purse = new WarpFakes.Purse();
+    private final WarpFakes.Moves moves = new WarpFakes.Moves();
     private final RecordingLogger log = new RecordingLogger();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
@@ -79,11 +74,12 @@ class CrossServerWarpTest {
     private final List<String> connects = new ArrayList<>();
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = resolversOn(LOBBY);
-    private final HopWatchdog watchdog = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
+    private final HopWatchdog watchdog = new HopWatchdog(shared, lobbyResolvers, charges, lanes, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
     private HopGate gate = HopGate.OPEN;
     private boolean proxyAvailable = true;
     private boolean tagged;
+    private boolean unsafe;
 
     CrossServerWarpTest() {
         warps.put(marketOn(SURVIVAL));
@@ -93,12 +89,20 @@ class CrossServerWarpTest {
 
     private HopResolvers resolversOn(String server) {
         HopResolvers resolvers = new HopResolvers();
-        resolvers.register(new WarpHopResolver(warps, moves, Optional.of(purse), server));
+        resolvers.register(new WarpHopResolver(
+                warps,
+                moves,
+                Optional.of(purse),
+                position -> !unsafe,
+                permissions,
+                notifier.notifier(),
+                lanes,
+                server));
         return resolvers;
     }
 
     private HopArrival arrivalOn(String server) {
-        return new HopArrival(store, resolversOn(server), charges, scheduler, log, server, SETTLE, TTL, clock);
+        return new HopArrival(shared, resolversOn(server), charges, lanes, log, server, SETTLE, TTL, clock);
     }
 
     /** {@code /warp} on the lobby, with the warps cross-server block on or off. */
@@ -116,8 +120,8 @@ class CrossServerWarpTest {
         };
         WarpHops hops = routed
                 ? new WarpHops(
-                        Optional.of(new HopDepartures(
-                                gate, proxy, watchdog, charges, lobbyResolvers, scheduler, LOBBY, clock)),
+                        Optional.of(
+                                new HopDepartures(gate, proxy, watchdog, charges, lobbyResolvers, lanes, LOBBY, clock)),
                         LOBBY)
                 : WarpHops.local(LOBBY);
         return new UseWarp(
@@ -125,9 +129,9 @@ class CrossServerWarpTest {
                 new WarpAccess(permissions, Optional.of(purse)),
                 moves,
                 notifier.notifier(),
-                position -> true,
+                position -> !unsafe,
                 permissions,
-                scheduler,
+                lanes,
                 hops);
     }
 
@@ -142,17 +146,7 @@ class CrossServerWarpTest {
 
     /** The teleport engine both backends run, sharing one cooldown store as a player's cooldowns follow them. */
     private TeleportEngine engine() {
-        return new TeleportEngine(
-                cooldowns,
-                (who, kind, onComplete, onCancel) -> {
-                    throw new UnsupportedOperationException("a cross-server hop never warms up");
-                },
-                (who, destination, kind) -> {},
-                notifier.notifier(),
-                new RecordingEvents(),
-                new TeleportSettings(new Defaults()),
-                who -> false,
-                who -> tagged);
+        return WarpFakes.engine(cooldowns, notifier, () -> tagged);
     }
 
     private static Warp marketOn(String server) {
@@ -288,9 +282,8 @@ class CrossServerWarpTest {
         tagged = true;
         gate = new TeleportHopGate(engine());
 
-        Result<Unit, WarpError> used = useMarket();
+        useMarket();
 
-        assertThat(used.asError()).contains(WarpError.TELEPORT_REFUSED);
         assertThat(purse.wallet).isEqualByComparingTo(START);
         assertThat(purse.charges).isZero();
         assertThat(store.rows()).isEmpty();
@@ -308,9 +301,8 @@ class CrossServerWarpTest {
         join(survival);
         assertThat(moves.made).containsExactly("Alex->market");
 
-        Result<Unit, WarpError> again = useMarket();
+        useMarket();
 
-        assertThat(again.asError()).contains(WarpError.TELEPORT_REFUSED);
         assertThat(purse.wallet).isEqualByComparingTo("74.50");
         assertThat(purse.charges).isOne();
         assertThat(store.rows()).isEmpty();
@@ -352,135 +344,168 @@ class CrossServerWarpTest {
         assertThat(connects).isEmpty();
     }
 
-    /** The warps table both backends share. */
-    private static final class Warps implements WarpRepository {
+    @Test
+    void theRemoteUseTouchesTheSharedStoreOnlyFromTheAsyncLane() {
+        useMarket();
+        join(survival);
+        scheduler.advance(TTL);
 
-        private final Map<String, Warp> byName = new HashMap<>();
+        assertThat(moves.made).containsExactly("Alex->market");
+        assertThat(storeCallsOnTheCallerThread).isEmpty();
+    }
 
-        void put(Warp warp) {
-            byName.put(warp.name().value(), warp);
+    @Test
+    void aRemoteUseTheAsyncLaneRefusesChargesNothingAndSaysTheWarpIsUnreachable() {
+        scheduler.rejectAsync(true);
+
+        Result<Unit, WarpError> used = useMarket();
+
+        assertThat(used.asError()).contains(WarpError.TELEPORT_REFUSED);
+        assertThat(purse.charges).isZero();
+        assertThat(store.rows()).isEmpty();
+        assertThat(connects).isEmpty();
+        assertThat(notifier.keys()).containsExactly("warp.cross-server.unavailable");
+    }
+
+    @Test
+    void anUnsafeDestinationIsRefusedOnLandingAndRefundedOnce() {
+        useMarket();
+        unsafe = true;
+
+        join(survival);
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys())
+                .containsExactly(
+                        "warp.cross-server.sending",
+                        "warp.unsafe",
+                        "warp.cross-server.failed",
+                        "warp.cross-server.refunded");
+    }
+
+    @Test
+    void aPlayerWhoMayBypassTheSafetyCheckLandsOnAnUnsafeDestination() {
+        permissions.grant(ALEX, UseWarp.BYPASS_SAFETY);
+        unsafe = true;
+        useMarket();
+
+        join(survival);
+
+        assertThat(moves.made).containsExactly("Alex->market");
+        assertThat(purse.refunds).isZero();
+    }
+
+    @Test
+    void aLandingCountsAsAVisit() {
+        useMarket();
+
+        join(survival);
+
+        assertThat(warps.visitors(MARKET)).isOne();
+    }
+
+    @Test
+    void aStaffSendTheTeleportRulesRefuseTellsTheStaffMember() {
+        tagged = true;
+        gate = new TeleportHopGate(engine());
+
+        lobby(true).useFor(SAM, ALEX, MARKET);
+
+        assertThat(purse.charges).isZero();
+        assertThat(notifier.sent()).anySatisfy(line -> {
+            assertThat(line.viewer()).isEqualTo(SAM);
+            assertThat(line.key()).isEqualTo("warp.sent-refused");
+        });
+    }
+
+    /** Runs every task like the scheduler it wraps, and knows whether the task running now is on the async lane. */
+    private static final class Lanes implements Scheduler {
+
+        private final SteppedScheduler delegate;
+        private int asyncDepth;
+
+        Lanes(SteppedScheduler delegate) {
+            this.delegate = delegate;
+        }
+
+        boolean offTick() {
+            return asyncDepth > 0;
         }
 
         @Override
-        public Optional<Warp> find(WarpName name) {
-            return Optional.ofNullable(byName.get(name.value()));
+        public void onGlobal(Runnable task) {
+            delegate.onGlobal(task);
         }
 
         @Override
-        public List<Warp> all() {
-            return List.copyOf(byName.values());
+        public void onRegion(Position position, Runnable task) {
+            delegate.onRegion(position, task);
         }
 
         @Override
-        public boolean exists(WarpName name) {
-            return byName.containsKey(name.value());
+        public void onEntity(PlayerRef player, Runnable task) {
+            delegate.onEntity(player, task);
         }
 
         @Override
-        public void save(Warp warp) {
-            put(warp);
+        public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+            delegate.onEntity(player, task, retired);
         }
 
         @Override
-        public void delete(WarpName name) {
-            byName.remove(name.value());
+        public void async(Runnable task) {
+            delegate.async(() -> offTick(task));
         }
 
         @Override
-        public void rate(WarpName name, UUID player, double rating) {}
+        public void asyncAfter(Duration delay, Runnable task) {
+            delegate.asyncAfter(delay, () -> offTick(task));
+        }
 
-        @Override
-        public double averageRating(WarpName name) {
-            return 0;
+        private void offTick(Runnable task) {
+            asyncDepth++;
+            try {
+                task.run();
+            } finally {
+                asyncDepth--;
+            }
         }
     }
 
-    /** The player's wallet, with every debit and credit counted. */
-    private static final class Purse implements WarpEconomy {
+    /** The shared store, noting every call made from outside the async lane. */
+    private final class Guarded implements PendingHopStore {
 
-        private BigDecimal wallet = BigDecimal.ZERO;
-        private int charges;
-        private int refunds;
+        private final PendingHopStore delegate;
 
-        @Override
-        public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
-            return wallet.compareTo(amount) >= 0;
+        Guarded(PendingHopStore delegate) {
+            this.delegate = delegate;
         }
 
-        @Override
-        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
-            if (!canAfford(who, amount, currencyId)) {
-                return false;
-            }
-            wallet = wallet.subtract(amount);
-            charges++;
-            return true;
-        }
-
-        @Override
-        public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
-            wallet = wallet.add(amount);
-            refunds++;
-            return true;
-        }
-    }
-
-    /**
-     * Records every move, and lands every arrival unless told to refuse it. Given an engine, it arrives through that
-     * engine instead, as the teleport adapter does.
-     */
-    private static final class Moves implements WarpTeleporter {
-
-        private final List<String> made = new ArrayList<>();
-        private boolean refuses;
-        private @Nullable TeleportEngine engine;
-
-        @Override
-        public void teleportTo(PlayerRef who, Warp warp) {
-            made.add(who.name() + "->" + warp.name().value());
-        }
-
-        @Override
-        public void arrive(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed) {
-            if (refuses) {
-                onMissed.run();
-                return;
-            }
-            Runnable landed = () -> {
-                made.add(who.name() + "->" + warp.name().value());
-                onLanded.run();
-            };
-            TeleportEngine through = engine;
-            if (through == null) {
-                landed.run();
-                return;
-            }
-            Optional<Duration> cooldown =
-                    warp.cooldownOverrideSeconds().map(seconds -> Duration.ofMillis((long) (seconds * 1000)));
-            Destination destination = Destination.at(warp.location(), Optional.empty(), cooldown);
-            if (through.arriveImmediately(who, destination, TeleportKind.WARP, landed, onMissed)
-                    .isErr()) {
-                onMissed.run();
+        private void check(String call) {
+            if (!lanes.offTick()) {
+                storeCallsOnTheCallerThread.add(call);
             }
         }
-    }
-
-    /** Teleport settings at their defaults. */
-    private static final class Defaults implements ConfigStore {
 
         @Override
-        public boolean getBoolean(String path, boolean fallback) {
-            return fallback;
+        public void record(PendingHop pending) {
+            check("record");
+            delegate.record(pending);
         }
 
         @Override
-        public String getString(String path, String fallback) {
-            return fallback;
+        public Optional<PendingHop> find(UUID player) {
+            check("find");
+            return delegate.find(player);
         }
 
         @Override
-        public int getInt(String path, int fallback) {
-            return fallback;
+        public int clear(PendingHop pending) {
+            check("clear");
+            return delegate.clear(pending);
         }
     }
 }

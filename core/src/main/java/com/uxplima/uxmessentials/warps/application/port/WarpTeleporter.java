@@ -13,6 +13,13 @@ import com.uxplima.uxmessentials.warps.domain.Warp;
  */
 public interface WarpTeleporter {
 
+    /**
+     * Whether the teleport rules (jail, combat tag, the warp cooldown) let {@code who} start a teleport to
+     * {@code warp} now. Asked before the use is charged, so a use those rules refuse costs nothing; on false the
+     * player has already been told why.
+     */
+    boolean admits(PlayerRef who, Warp warp);
+
     /** Send {@code who} to {@code warp}, routing the hop through the teleport context's gated flow. */
     void teleportTo(PlayerRef who, Warp warp);
 
