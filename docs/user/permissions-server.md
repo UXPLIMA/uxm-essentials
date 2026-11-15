@@ -377,7 +377,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.module.vanish` | Hot-reload / inspect the vanish module. | op |
 | `uxmessentials.vanish.list` | /vanish list to see the hidden players you are permitted to see (scoped to your see level). | op |
 | `uxmessentials.vanish.others` | /vanish <player> to toggle another player's vanish. | op |
-| `uxmessentials.vanish.persist` | Rejoin already vanished every time, even after leaving visible; a vanish itself always lasts across a relog. | op |
+| `uxmessentials.vanish.persist` | Remain vanished across a relog instead of reappearing on join. | op |
 | `uxmessentials.vanish.see` | See other vanished players (staff-among-staff visibility) and target them with /tp. | op |
 | `uxmessentials.vanish.see.level<n>` | How deeply you see: a viewer sees a vanished player when their see level reaches that player's use level; the largest level held wins and plain .see is level 1. | op |
 | `uxmessentials.vanish.use.level<n>` | How deeply you vanish: only a viewer whose see level reaches this level finds you; the largest level held wins and plain .use is level 1. | op |

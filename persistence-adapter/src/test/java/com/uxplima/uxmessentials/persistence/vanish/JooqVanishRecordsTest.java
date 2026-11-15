@@ -62,6 +62,27 @@ class JooqVanishRecordsTest {
         assertThat(records.find(ALEX)).isEqualTo(Optional.of(StoredVanish.visible(LATE)));
     }
 
+    @Test
+    void aDepartureIsKeptOnAVanishedRowAndClearedByTheNextVanish() {
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), EARLY));
+        records.markDeparted(ALEX, LATE);
+
+        assertThat(openStore().find(ALEX))
+                .contains(StoredVanish.vanished(VanishLevel.of(2), EARLY).departed(LATE));
+
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), LATE));
+
+        assertThat(records.find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(2), LATE));
+    }
+
+    @Test
+    void aDepartureThatArrivesAfterTheRowWasClearedChangesNothing() {
+        records.save(ALEX, StoredVanish.visible(EARLY));
+        records.markDeparted(ALEX, LATE);
+
+        assertThat(records.find(ALEX)).contains(StoredVanish.visible(EARLY));
+    }
+
     private VanishRecords openStore() {
         SQLiteDataSource data = new SQLiteDataSource();
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));

@@ -32,8 +32,8 @@ import com.uxplima.uxmessentials.vanish.domain.event.VanishToggled;
  * (a server hop must not read as an unvanish); it is published as a departure by {@link DepartVanished}. With the bus
  * {@link VanishBus#disabled() disabled} the publish is a no-op and cross-server is inert.
  *
- * <p>Every transition is also kept through {@link RememberVanish}, so the vanish follows the player to the next backend
- * they join and through a restart, whether or not the bus delivered the frame.
+ * <p>Every transition is also written through {@link RememberVanish}, so the vanish survives a server switch whether or
+ * not the bus delivered the frame, and a player who may persist it keeps it through a restart.
  *
  * <p>Every transition also raises {@link VanishToggled} on the in-process bus, which is what the published API
  * bridges to a Bukkit event. The bus publish above talks to the other backends; this one talks to the plugins

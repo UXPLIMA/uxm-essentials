@@ -11,9 +11,10 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
  * Seeds a joining player's local vanish state before the join flow hides them, from the two places that can know they
- * are vanished: their durable {@link StoredVanish} and the {@link NetworkVanishStore}, where a peer that is hiding
- * them right now has reported them. The live network report wins on the level, since it is the fresher of the two;
- * the stored state covers a backend that has not heard of them, such as one that just started.
+ * are vanished: the kept {@link StoredVanish} that carries over to this join (the caller decides that, from the
+ * persist permission and the hop window), and the {@link NetworkVanishStore}, where a peer that is hiding them right
+ * now has reported them. The live network report wins on the level, since it is the fresher of the two; the kept
+ * state covers a backend that has not heard of them, such as one that just started.
  *
  * <p>Either source saying vanished is enough. The two only disagree for the moment a write is in flight, and hiding a
  * player for that moment costs less than showing one who meant to stay hidden.

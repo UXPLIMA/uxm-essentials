@@ -10,8 +10,9 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
  * A player left this backend. This backend stops hiding them and, when they were vanished, tells the peers so the
- * entry it reported is dropped from their network view. The durable state is left alone: the player is still vanished,
- * and the next backend they join reads it.
+ * entry it reported is dropped from their network view, and records when they left. A backend they reach within the
+ * hop window reads that as a server switch and keeps them hidden; a later return to the network finds them visible,
+ * unless they may persist their vanish.
  */
 public final class DepartVanished {
 
@@ -31,7 +32,10 @@ public final class DepartVanished {
         Optional<VanishLevel> level = store.levelOf(who.uuid());
         store.reveal(who.uuid());
         remember.forget(who.uuid());
-        level.ifPresent(hiddenAt -> bus.publishDeparture(who, hiddenAt));
+        level.ifPresent(hiddenAt -> {
+            remember.departed(who.uuid());
+            bus.publishDeparture(who, hiddenAt);
+        });
         return level.isPresent();
     }
 }

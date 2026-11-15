@@ -60,6 +60,8 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *     neither plugin is installed
  * @param foreignVanishLevel the use level a foreign-hidden player is folded in at, so the usual see-level rule decides
  *     who still sees them ({@code foreign.level}, default {@code 1})
+ * @param hopWindow how long after a vanished player left a backend their arrival on another still counts as a server
+ *     switch and keeps them hidden ({@code hop-window-seconds}, default 30, at least 1)
  * @param loadTimeout how long a login waits for the player's kept vanish state before it goes ahead and applies the
  *     state once it arrives ({@code load-timeout-seconds}, default 2, at least 1)
  */
@@ -82,10 +84,12 @@ public record VanishConfig(
         boolean crossServer,
         boolean readForeignVanish,
         int foreignVanishLevel,
+        Duration hopWindow,
         Duration loadTimeout) {
 
     private static final String DEFAULT_FAKE_QUIT = "<yellow>{player} left the game";
     private static final String DEFAULT_FAKE_JOIN = "<yellow>{player} joined the game";
+    private static final int DEFAULT_HOP_WINDOW_SECONDS = 30;
     private static final int DEFAULT_LOAD_TIMEOUT_SECONDS = 2;
 
     public VanishConfig {
@@ -93,6 +97,7 @@ public record VanishConfig(
         Objects.requireNonNull(fakeJoinMessage, "fakeJoinMessage");
         Objects.requireNonNull(fakeQuitMessageStaff, "fakeQuitMessageStaff");
         Objects.requireNonNull(fakeJoinMessageStaff, "fakeJoinMessageStaff");
+        Objects.requireNonNull(hopWindow, "hopWindow");
         Objects.requireNonNull(loadTimeout, "loadTimeout");
     }
 
@@ -118,6 +123,7 @@ public record VanishConfig(
                 config.getBoolean("cross-server", false),
                 config.getBoolean("foreign.read-supervanish", true),
                 config.getInt("foreign.level", VanishLevel.MIN_LEVEL),
+                Duration.ofSeconds(Math.max(1, config.getInt("hop-window-seconds", DEFAULT_HOP_WINDOW_SECONDS))),
                 Duration.ofSeconds(Math.max(1, config.getInt("load-timeout-seconds", DEFAULT_LOAD_TIMEOUT_SECONDS))));
     }
 }

@@ -2929,10 +2929,10 @@ public final class PluginModule {
             Bus bus) {
         // vanish is the single vanish authority: an in-memory ConcurrentHashMap of who is vanished, the /vanish
         // command, the Bukkit hide-show view (which drops both the player entity and their tab entry for ineligible
-        // viewers), and the login/join/quit listeners. Each player's vanish is kept in the player_vanish table so it
-        // follows them across backends and restarts, and the peer heartbeat roster ages out the network entries of a
-        // backend that stopped. It wires before the contexts it informs
-        // (messaging, presence, nametags, staff), so its store and toggle are captured here and threaded into their
+        // viewers), and the login/join/quit listeners. Each player's vanish is written to the player_vanish table so it
+        // survives a server switch (and a restart for a persist holder), and the peer heartbeat roster ages out the
+        // network entries of a backend that stopped. It wires before the contexts it informs (messaging, presence,
+        // nametags, staff), so its store and toggle are captured here and threaded into their
         // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
         VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, persistence, bus, links.clusterPeers);

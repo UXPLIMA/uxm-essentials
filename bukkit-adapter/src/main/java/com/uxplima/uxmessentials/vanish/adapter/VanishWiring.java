@@ -63,9 +63,9 @@ import org.jspecify.annotations.Nullable;
  * wired: nothing else news up its classes.
  *
  * <p>Who this backend is hiding is the in-memory {@link InMemoryVanishStore}, the single authority every consumer
- * (messaging, nametags, staff) reads. Each player's vanish is also kept in the database through {@link RememberVanish}
- * and read at login by the {@link VanishLoginListener}, so it follows the player to another backend and through a
- * restart. Its outbound adapters are the store, the level-aware
+ * (messaging, nametags, staff) reads. Each player's vanish is also written to the database through
+ * {@link RememberVanish} and read at login by the {@link VanishLoginListener}, so it survives a server switch, and a
+ * player who may persist it keeps it through a restart. Its outbound adapters are the store, the level-aware
  * {@link BukkitVanishView}, and the {@link BukkitVanishLevelResolver} that reads a player's see/use levels from their
  * permissions. The store, the toggle, and the resolver are exposed on {@link Wired} so bootstrap can hand them to the
  * consumers' vanish gates (which now read the layered see level) and to staff-mode vanish. On stop the store is cleared
@@ -117,8 +117,8 @@ public final class VanishWiring {
         SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs, cross.bus(), remember);
         ListVanished listVanished = new ListVanished(store, levels, network);
         JoinVanishReconciler reconciler = new JoinVanishReconciler(network, store);
-        ApplyVanishOnJoin applyOnJoin =
-                new ApplyVanishOnJoin(reconciler, toggleVanish, setVanishLevel, remember, store);
+        ApplyVanishOnJoin applyOnJoin = new ApplyVanishOnJoin(
+                reconciler, toggleVanish, setVanishLevel, remember, store, Clock.systemUTC(), config.hopWindow());
         DepartVanished departVanished = new DepartVanished(store, cross.bus(), remember);
         VanishLoginListener login =
                 new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());

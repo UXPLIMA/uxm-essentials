@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vanish.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -14,9 +15,10 @@ import com.uxplima.uxmessentials.vanish.domain.StoredVanish;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
- * Keeps each player's vanish in the durable {@link VanishRecords}, so it follows them to another backend and through a
- * restart. A write is stamped when the change happens and runs on the async lane, so a command never waits on the
- * database and two writes that finish out of order still settle on the later change.
+ * Writes each player's vanish to the shared {@link VanishRecords}, which the next backend they join reads: that is how
+ * a vanish survives a server switch, and how a player who may persist it comes back hidden after a restart. A write is
+ * stamped when the change happens and runs on the async lane, so a command never waits on the database and two writes
+ * that finish out of order still settle on the later change.
  *
  * <p>It also remembers which online players changed their vanish on this backend, so a stored state that arrives late
  * (the login read timed out) never overrides a change the player made after joining.
@@ -46,6 +48,29 @@ public final class RememberVanish {
         save(who, StoredVanish.visible(clock.instant()));
     }
 
+    /** Record that the vanished {@code who} left this backend, so a backend they reach soon after keeps them hidden. */
+    public void departed(UUID who) {
+        Objects.requireNonNull(who, "who");
+        Instant at = clock.instant();
+        scheduler.async(() -> {
+            try {
+                records.markDeparted(who, at);
+            } catch (RuntimeException failed) {
+                // Only a server switch in the next moments is affected: the player then arrives visible.
+                log.warn("event=vanish_departure_save_failed player={} reason={}", who, failed.toString());
+            }
+        });
+    }
+
+    /**
+     * Clear a kept vanish that did not carry over to this join, so it cannot come back later. Unlike a reveal this is
+     * not a change the player made here.
+     */
+    public void clearStored(UUID who) {
+        Objects.requireNonNull(who, "who");
+        write(who, StoredVanish.visible(clock.instant()));
+    }
+
     /** The kept state of {@code who}. Blocks on the database, so only an off-tick caller reads it. */
     public Optional<StoredVanish> load(UUID who) {
         Objects.requireNonNull(who, "who");
@@ -67,6 +92,10 @@ public final class RememberVanish {
     private void save(UUID who, StoredVanish state) {
         Objects.requireNonNull(who, "who");
         changedHere.add(who);
+        write(who, state);
+    }
+
+    private void write(UUID who, StoredVanish state) {
         scheduler.async(() -> {
             try {
                 records.save(who, state);

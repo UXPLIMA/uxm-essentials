@@ -32,13 +32,15 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *   <li><b>Join, state.</b> The joiner's vanish is settled through {@link ApplyVanishOnJoin} from the state the login
- *       read ({@link VanishLoginListener}), the network view, and the join-vanished rule, and every vanished
+ *       read ({@link VanishLoginListener}), which carries over only for a persist holder or a server switch within the
+ *       hop window, the network view, and the join-vanished rule, and every vanished
  *       <em>other</em> player is re-hidden from the joiner. This runs first so every later join listener already sees
  *       the joiner hidden. When the login read did not finish in time, the state is read again off the tick and applied
  *       on the joiner's own thread once it arrives.
  *   <li><b>Join, message.</b> A vanished joiner's join line is suppressed late, after the plugins that write it.
  *   <li><b>Quit.</b> A vanished player's quit line is suppressed the same way; once the quit is settled the player is
- *       dropped from this backend's store and the peers are told they left, through {@link DepartVanished}.
+ *       dropped from this backend's store, the time they left is recorded, and the peers are told they left, through
+ *       {@link DepartVanished}.
  * </ul>
  *
  * <p>The events fire on the player's region thread; every hide routes through the {@link VanishView}, which hops to
@@ -91,11 +93,12 @@ public final class VanishLifecycleListener implements Listener {
     public void onJoin(PlayerJoinEvent event) {
         Player joiner = event.getPlayer();
         PlayerRef ref = BukkitRefs.toRef(joiner);
-        boolean joinVanished = config.joinVanished() && joiner.hasPermission(PERSIST_PERMISSION);
+        boolean persist = joiner.hasPermission(PERSIST_PERMISSION);
+        boolean joinVanished = config.joinVanished() && persist;
         VanishLoginListener.@Nullable Read read = login.take(joiner.getUniqueId());
-        applyOnJoin.join(ref, read == null ? Optional.empty() : read.stored(), joinVanished);
+        applyOnJoin.join(ref, read == null ? Optional.empty() : read.stored(), persist, joinVanished);
         if (read == null) {
-            readLate(ref);
+            readLate(ref, persist);
         }
         rehideOthersFrom(joiner.getUniqueId());
     }
@@ -122,7 +125,7 @@ public final class VanishLifecycleListener implements Listener {
         departVanished.depart(BukkitRefs.toRef(event.getPlayer()));
     }
 
-    private void readLate(PlayerRef joiner) {
+    private void readLate(PlayerRef joiner, boolean persist) {
         scheduler.async(() -> {
             Optional<StoredVanish> stored;
             try {
@@ -132,7 +135,7 @@ public final class VanishLifecycleListener implements Listener {
                 return;
             }
             // The scheduler drops the task when the player has already left.
-            scheduler.onEntity(joiner, () -> applyOnJoin.lateLoad(joiner, stored));
+            scheduler.onEntity(joiner, () -> applyOnJoin.lateLoad(joiner, stored, persist));
         });
     }
 
