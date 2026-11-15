@@ -251,4 +251,40 @@ class JooqPendingHopStoreTest {
         assertThat(store.clear(found)).isEqualTo(1);
         assertThat(store.find(ALEX)).isEmpty();
     }
+
+    @Test
+    void aRowStoredUnderTheEarlierPlayerKindReadsAsARequestHopAndCanBeClaimed() {
+        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "PLAYER")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF, "anchor")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
+                .execute();
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.PLAYER_REQUEST);
+        assertThat(found.target()).isEqualTo("anchor");
+        PendingHop asStaff = new PendingHop(
+                ALEX, HopKind.PLAYER_STAFF, "anchor", "harbour", "lobby", ASKED, Optional.empty(), Optional.empty());
+        assertThat(store.clear(asStaff)).isZero();
+        assertThat(store.clear(found)).isEqualTo(1);
+        assertThat(store.find(ALEX)).isEmpty();
+    }
+
+    @Test
+    void theRequestAndStaffPlayerHopsAreClaimedOnlyAsThemselves() {
+        PendingHop staff = new PendingHop(
+                ALEX, HopKind.PLAYER_STAFF, "anchor", "harbour", "lobby", ASKED, Optional.empty(), Optional.empty());
+        store.record(staff);
+
+        PendingHop asRequest = new PendingHop(
+                ALEX, HopKind.PLAYER_REQUEST, "anchor", "harbour", "lobby", ASKED, Optional.empty(), Optional.empty());
+        assertThat(store.find(ALEX).map(PendingHop::kind)).contains(HopKind.PLAYER_STAFF);
+        assertThat(store.clear(asRequest)).isZero();
+        assertThat(store.clear(staff)).isEqualTo(1);
+    }
 }

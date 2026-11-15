@@ -35,6 +35,7 @@ public final class AcceptTeleport {
     private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final RemoteRequests remote;
 
     public AcceptTeleport(
             RequestRegistry requests,
@@ -42,6 +43,18 @@ public final class AcceptTeleport {
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock) {
+        this(requests, engine, notifier, events, clock, RemoteRequests.NONE);
+    }
+
+    /** {@code remote} carries the outcome of a request sent from another backend back to it. */
+    public AcceptTeleport(
+            RequestRegistry requests,
+            TeleportEngine engine,
+            Notifier notifier,
+            DomainEventPublisher events,
+            Clock clock,
+            RemoteRequests remote) {
+        this.remote = Objects.requireNonNull(remote, "remote");
         this.requests = Objects.requireNonNull(requests, "requests");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -64,6 +77,11 @@ public final class AcceptTeleport {
         TeleportRequest request = pending.get();
         Transition accepted = request.accept(clock.instant());
         finish(accepted);
+        if (remote.isRemote(request.id())) {
+            // The requester's backend tells them and, for /tpa, runs their warmup; the mover is not here.
+            remote.accepted(accepted.request());
+            return Result.ok();
+        }
         beginMoverWarmup(accepted.request(), anchorPosition);
         notifier.send(request.requester(), TeleportMessageKey.TPA_ACCEPTED, Map.of("player", target.name()));
         return Result.ok();
@@ -77,11 +95,15 @@ public final class AcceptTeleport {
             return noPending(target);
         }
         TeleportRequest request = pending.get();
-        finish(request.deny());
+        Transition denied = request.deny();
+        finish(denied);
         notifier.send(
                 target,
                 TeleportMessageKey.TPA_DENIED,
                 Map.of("player", request.requester().name()));
+        if (remote.isRemote(request.id())) {
+            remote.denied(denied.request());
+        }
         return Result.ok();
     }
 
@@ -90,7 +112,7 @@ public final class AcceptTeleport {
         Objects.requireNonNull(requester, "requester");
         Optional<TeleportRequest> outgoing = requests.outgoing(requester);
         if (outgoing.isEmpty()) {
-            return noPending(requester);
+            return remote.cancelOutgoing(requester) ? Result.ok() : noPending(requester);
         }
         TeleportRequest request = outgoing.get();
         finish(request.cancel());
@@ -111,6 +133,14 @@ public final class AcceptTeleport {
         }
         Transition expired = request.expire(now);
         finish(expired);
+        if (remote.isRemote(request.id())) {
+            notifier.send(
+                    request.target(),
+                    TeleportMessageKey.TPA_EXPIRED,
+                    Map.of("player", request.requester().name()));
+            remote.expired(expired.request());
+            return;
+        }
         notifier.send(
                 request.requester(),
                 TeleportMessageKey.TPA_EXPIRED,

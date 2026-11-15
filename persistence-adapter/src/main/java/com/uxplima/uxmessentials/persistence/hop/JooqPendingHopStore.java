@@ -4,8 +4,10 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpPendin
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,13 +38,20 @@ import org.jspecify.annotations.Nullable;
  * an older backend fails to read the row instead of taking it for a player warp. The warp id decides on the way
  * back too: an older backend's upsert rewrites only its own columns, so a row with a positive warp id is a player
  * warp whatever stale kind it carries, and a kind name this release does not know reads as
- * {@link HopKind#UNKNOWN}, which no resolver serves. The charge is a
+ * {@link HopKind#UNKNOWN}, which no resolver serves. A kind that was split keeps its earlier name readable as one of
+ * the kinds it became, so a row written under that name still resolves and can still be claimed. The charge is a
  * {@code DECIMAL(20,4)} paired with its currency id for every kind, both NULL when nothing was charged.
  */
 @NullMarked
 public final class JooqPendingHopStore extends JooqRepository implements PendingHopStore {
 
     private static final long NO_PLAYER_WARP = 0L;
+
+    /**
+     * Stored kind names that no longer name a kind of their own. The player kind became a request and a staff kind;
+     * a row under the old name reads as a request, the hop it was declared for.
+     */
+    private static final Map<String, HopKind> EARLIER_NAMES = Map.of("PLAYER", HopKind.PLAYER_REQUEST);
 
     public JooqPendingHopStore(DSLContext dsl) {
         super(dsl);
@@ -118,11 +127,11 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
     /** The stored kind of a row this backend reads as {@code kind}; an unknown one is any name it does not know. */
     private static Condition kindIs(HopKind kind) {
         if (kind != HopKind.UNKNOWN) {
-            return PLAYER_WARP_PENDING_TELEPORTS.KIND.eq(kind.name());
+            return PLAYER_WARP_PENDING_TELEPORTS.KIND.in(storedNamesOf(kind));
         }
         List<String> known = Arrays.stream(HopKind.values())
                 .filter(each -> each != HopKind.UNKNOWN)
-                .map(HopKind::name)
+                .flatMap(each -> storedNamesOf(each).stream())
                 .toList();
         // A NULL kind with no player warp is no row this release writes, so it reads as unknown too.
         return PLAYER_WARP_PENDING_TELEPORTS.KIND.notIn(known).or(PLAYER_WARP_PENDING_TELEPORTS.KIND.isNull());
@@ -166,10 +175,26 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
                 settlement);
     }
 
+    /** Every name a row of {@code kind} may be stored under: its own, then any earlier one that reads as it. */
+    private static List<String> storedNamesOf(HopKind kind) {
+        List<String> names = new ArrayList<>();
+        names.add(kind.name());
+        EARLIER_NAMES.forEach((name, current) -> {
+            if (current == kind) {
+                names.add(name);
+            }
+        });
+        return names;
+    }
+
     /** A kind this release knows, or the unknown sentinel for one a newer release added. */
     private static HopKind kindOf(@Nullable String stored) {
         if (stored == null) {
             return HopKind.UNKNOWN;
+        }
+        HopKind earlier = EARLIER_NAMES.get(stored);
+        if (earlier != null) {
+            return earlier;
         }
         for (HopKind kind : HopKind.values()) {
             if (kind != HopKind.UNKNOWN && kind.name().equals(stored)) {
