@@ -4,13 +4,16 @@ import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
 import org.jspecify.annotations.NullMarked;
 
@@ -40,16 +43,24 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
 
     private static final byte[] EMPTY = new byte[0];
 
+    /** How often an oversized frame is reported, so a type that keeps producing them cannot flood the log. */
+    private static final long OVERSIZE_WARN_INTERVAL_MILLIS = 60_000L;
+
     private final Plugin plugin;
     private final Scheduler scheduler;
     private final String channel;
     private final int outboundQueueSize;
     private final Deque<byte[]> outbound = new ArrayDeque<>();
+    private final Logger log;
+    private final AtomicLong oversizeDropped = new AtomicLong();
+    private final AtomicLong lastOversizeWarn = new AtomicLong(Long.MIN_VALUE);
 
     private volatile boolean running;
     private @org.jspecify.annotations.Nullable Consumer<byte[]> onFrame;
 
-    public PluginMessagingTransport(Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize) {
+    public PluginMessagingTransport(
+            Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize, Logger log) {
+        this.log = Objects.requireNonNull(log, "log");
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.channel = Objects.requireNonNull(channel, "channel");
@@ -93,6 +104,11 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         if (!running) {
             return;
         }
+        if (frame.length > BusChannel.MAX_FRAME_BYTES) {
+            // The proxy relays the frame serverbound, and a backend disconnects the carrier for a payload this large.
+            dropOversized(frame.length);
+            return;
+        }
         synchronized (outbound) {
             while (outbound.size() >= outboundQueueSize) {
                 outbound.pollFirst();
@@ -118,6 +134,19 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         // decode + dispatch does cache work, not Bukkit work.
         byte[] copy = frame.clone();
         scheduler.async(() -> sink.accept(copy));
+    }
+
+    private void dropOversized(int bytes) {
+        long dropped = oversizeDropped.incrementAndGet();
+        long now = System.currentTimeMillis();
+        long last = lastOversizeWarn.get();
+        if (now - last >= OVERSIZE_WARN_INTERVAL_MILLIS && lastOversizeWarn.compareAndSet(last, now)) {
+            log.warn(
+                    "dropped a bus frame of {} bytes, over the {} byte plugin-messaging limit ({} dropped so far)",
+                    String.valueOf(bytes),
+                    String.valueOf(BusChannel.MAX_FRAME_BYTES),
+                    String.valueOf(dropped));
+        }
     }
 
     private void flush() {

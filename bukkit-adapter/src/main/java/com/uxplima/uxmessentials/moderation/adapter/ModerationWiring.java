@@ -105,6 +105,7 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -160,7 +161,8 @@ public final class ModerationWiring {
             MenuBindings menuBindings,
             Path dataFolder,
             IpHistoryStore ipHistory,
-            IpTokens ipTokens) {
+            IpTokens ipTokens,
+            NetworkPresence presence) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -175,6 +177,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
+        Objects.requireNonNull(presence, "presence");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -202,6 +205,7 @@ public final class ModerationWiring {
                 sync,
                 ipHistory,
                 ipTokens,
+                presence,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -331,6 +335,7 @@ public final class ModerationWiring {
             SanctionSync sync,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
+            NetworkPresence presence,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -381,7 +386,7 @@ public final class ModerationWiring {
                 settings.addressStrictness(),
                 ipHistory,
                 clock);
-        Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast);
+        Kick kick = new Kick(sanctionPort, guard, notifier, audit, history, broadcast, presence);
         // /punish resolves a configured template to a preset reason + duration and dispatches to the same
         // audited ban/tempban use cases above, so no punish logic is duplicated.
         Punish punish = new Punish(new ResolveTemplate(settings.templates()), ban, tempBan, notifier);
@@ -449,9 +454,15 @@ public final class ModerationWiring {
                         history,
                         clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
-                .freeze(new Freeze(sanctionPort, guard, notifier, audit))
+                .freeze(new Freeze(sanctionPort, guard, notifier, audit, presence))
                 .seen(new Seen(
-                        repository, ipAlts, kernel.playerLookup(), notifier, settings.censorIpAddresses(), clock))
+                        repository,
+                        ipAlts,
+                        kernel.playerLookup(),
+                        notifier,
+                        settings.censorIpAddresses(),
+                        clock,
+                        presence))
                 .listAlts(new ListAlts(ipHistory, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .staffRollback(staffRollback)
@@ -460,7 +471,7 @@ public final class ModerationWiring {
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
                 .players(kernel.playerLookup())
-                .targets(new PlayerLookupTargetResolver(kernel.playerLookup()))
+                .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
                 .build();
     }
 

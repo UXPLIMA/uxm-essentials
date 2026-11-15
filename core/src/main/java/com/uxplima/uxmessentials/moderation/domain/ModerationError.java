@@ -17,6 +17,12 @@ public enum ModerationError {
     /** The target holds the exempt node and cannot be sanctioned by lower staff. */
     TARGET_EXEMPT(ModerationMessageKey.TARGET_EXEMPT),
 
+    /**
+     * The target is connected to another backend, so a live action (a kick, a freeze) cannot reach them from here.
+     * The refusal names that backend, so the use case sends it with its placeholders itself.
+     */
+    TARGET_ELSEWHERE(ModerationMessageKey.TARGET_ELSEWHERE),
+
     /** The supplied duration string did not parse to a positive span. */
     BAD_DURATION(ModerationMessageKey.BAD_DURATION),
 

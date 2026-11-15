@@ -36,7 +36,9 @@ public sealed interface NetworkMessage
                 VanishStateChanged,
                 GuardChanged,
                 IpBanChanged,
-                RankChanged {
+                RankChanged,
+                PresenceChanged,
+                PresenceSnapshot {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -67,7 +69,9 @@ public sealed interface NetworkMessage
         VANISH_STATE_CHANGED(15),
         GUARD_CHANGED(16),
         RANK_CHANGED(17),
-        IP_BAN_CHANGED(18);
+        IP_BAN_CHANGED(18),
+        PRESENCE_CHANGED(19),
+        PRESENCE_SNAPSHOT(20);
 
         private final byte wireTag;
 
@@ -83,7 +87,7 @@ public sealed interface NetworkMessage
         /**
          * The type carrying {@code wireTag}.
          *
-         * @throws IllegalArgumentException if no type uses that tag (an unknown or malformed frame)
+         * @throws UnknownMessageTypeException if no type uses that tag: a frame from a newer peer, or a malformed one
          */
         public static MessageType fromWireTag(byte wireTag) {
             for (MessageType type : values()) {
@@ -91,7 +95,7 @@ public sealed interface NetworkMessage
                     return type;
                 }
             }
-            throw new IllegalArgumentException("unknown network message wire tag: " + wireTag);
+            throw new UnknownMessageTypeException(wireTag);
         }
     }
 }

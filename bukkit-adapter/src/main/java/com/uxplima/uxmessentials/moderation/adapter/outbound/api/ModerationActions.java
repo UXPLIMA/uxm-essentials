@@ -222,6 +222,7 @@ public final class ModerationActions implements UxmModerationActions {
     private static UxmFailure failure(ModerationError error) {
         return switch (error) {
             case TARGET_EXEMPT -> UxmFailure.of(UxmFailure.REFUSED, "that player is exempt from punishment");
+            case TARGET_ELSEWHERE -> UxmFailure.of(UxmFailure.REFUSED, "that player is connected to another server");
             case ALREADY_MUTED -> UxmFailure.of(UxmFailure.ALREADY_IN_STATE, "that player is already muted");
             case ALREADY_JAILED -> UxmFailure.of(UxmFailure.ALREADY_IN_STATE, "that player is already jailed");
             case UNKNOWN_JAIL -> UxmFailure.of(UxmFailure.NOT_FOUND, "no jail by that name");
