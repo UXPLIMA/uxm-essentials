@@ -50,6 +50,15 @@ requirements are met, the inventory has room when `on-full = "deny"`, stock is l
 then is the cost taken, the items given, the cooldown started and the claim money paid. A refused claim costs
 nothing and starts no cooldown.
 
+## On a network
+
+With `network.enabled = true` in `config.conf`, one-time claims and cooldowns are kept in the shared database
+instead of each server's player data, so a player who switches servers cannot claim the same kit again. The same
+holds for every other cooldown and for the economy's daily login reward. A player's claims are read while they log
+in; in the rare case the database has not answered by the time they claim a kit, the claim is refused with a
+"still loading" line and works a moment later. The first time a player joins a server with the network on, what
+that server already knew about them is carried into the database, and the stricter value wins.
+
 ## Commands
 
 | Command | Permission | Default | What it does |

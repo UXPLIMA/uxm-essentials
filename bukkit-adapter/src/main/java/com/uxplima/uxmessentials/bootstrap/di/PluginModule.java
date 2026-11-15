@@ -132,6 +132,7 @@ import com.uxplima.uxmessentials.npc.adapter.NpcWiring;
 import com.uxplima.uxmessentials.persistence.communication.AnnouncementStores;
 import com.uxplima.uxmessentials.persistence.ip.IpHistoryStores;
 import com.uxplima.uxmessentials.persistence.ip.LegacyIpHistoryBackfill;
+import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
 import com.uxplima.uxmessentials.persistence.lookup.PlayerNameRepositories;
 import com.uxplima.uxmessentials.persistence.menu.PlayerDataRepositories;
 import com.uxplima.uxmessentials.persistence.playerstate.PlaytimeRepositories;
@@ -215,6 +216,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -441,9 +443,21 @@ public final class PluginModule {
         // catalog, because the catalog styles every line with them when it reads a language.
         Path themeFolder = plugin.getDataFolder().toPath();
         EngineTheme engineTheme = new EngineTheme(themeFolder);
-        KernelWiring.Kernel wiredKernel = KernelWiring.wire(plugin, config, kernelLog, engineTheme);
-        KernelPorts kernel = wiredKernel.ports();
         ModuleRegistry registry = new DefaultModuleRegistry();
+        // Opened before the kernel, because on a network the kernel's cooldowns live in the database. The pool is
+        // closed last (pushed first), after every module has stopped and drained its writes.
+        Persistence persistence = KernelWiring.openPersistence(plugin, config, kernelLog, registry);
+        resources.onClose(persistence::close);
+        // One-time kit claims, cooldowns and the daily reward stamp are shared through the database on a network, so
+        // a player switching backends is not granted them again by each one. A single server keeps them in PDC.
+        boolean networked = NetworkConfig.from(config).enabled();
+        KernelWiring.Kernel wiredKernel = KernelWiring.wire(
+                plugin,
+                config,
+                kernelLog,
+                engineTheme,
+                networked ? Optional.of(ClaimLedgers.claims(persistence)) : Optional.empty());
+        KernelPorts kernel = wiredKernel.ports();
         // The hand-wired hub registry every module's management GUI plugs into. Built once here and handed to
         // the hub command below; module wiring (SP1+) registers each module's opener into it. Empty until then.
         ManagementGuiRegistry guiRegistry = new ManagementGuiRegistry();
@@ -474,14 +488,21 @@ public final class PluginModule {
         // between the catalog and the locale wrap so the usage line resolves in the player's language.
         resources.usageBinding(new UsageBinding(kernel.messages()));
 
-        Persistence persistence = KernelWiring.openPersistence(plugin, config, kernelLog, registry);
-        // The pool is closed last (pushed first), after every module has stopped and drained its writes.
-        resources.onClose(persistence::close);
+        // Reads each player's shared claims during the asynchronous pre-login, carries this server's PDC copy over
+        // on their first networked join, and lets them go on quit.
+        wiredKernel.networkClaims().ifPresent(claims -> {
+            com.uxplima.uxmessentials.shared.adapter.inbound.ledger.NetworkClaimsListener listener =
+                    new com.uxplima.uxmessentials.shared.adapter.inbound.ledger.NetworkClaimsListener(
+                            claims,
+                            new com.uxplima.uxmessentials.shared.adapter.outbound.ledger.PdcLocalClaims(plugin),
+                            kernel.scheduler(),
+                            kernel.log());
+            resources.addListener(listener);
+            listener.adoptOnline(plugin.getServer().getOnlinePlayers());
+        });
 
-        // The name index is where a typed name becomes an account, for every context. Backing it with the
-        // database here (rather than in KernelWiring) is what the wiring order allows: the kernel is built before
-        // persistence opens. The warm reads the database, so it goes to the async seam; the command path only
-        // ever touches the in-memory map the warm fills.
+        // The name index is where a typed name becomes an account, for every context. The warm reads the database,
+        // so it goes to the async seam; the command path only ever touches the in-memory map the warm fills.
         CachingPlayerNameIndex nameIndex = wiredKernel.nameIndex();
         PlayerNameRepository nameStore = PlayerNameRepositories.jooq(persistence);
         int nameIndexSize = config.getInt("lookup.name-index-size", DEFAULT_NAME_INDEX_SIZE);
@@ -839,7 +860,8 @@ public final class PluginModule {
                 menuBindings,
                 menuCurrencyBackends,
                 menuTextInputRef,
-                wiredKernel.resolver()::resolve);
+                wiredKernel.resolver()::resolve,
+                wiredKernel.networkClaims());
         bus.start();
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
         // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
@@ -1131,10 +1153,13 @@ public final class PluginModule {
             MenuBindings menuBindings,
             AtomicReference<EconomyBackends> menuCurrencyBackends,
             AtomicReference<TextInput> menuTextInputRef,
-            Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages) {
+            Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages,
+            Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks(auditChannel, queries, actions);
+        links.networkClaims = networkClaims;
+        links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -2348,7 +2373,8 @@ public final class PluginModule {
                 links.playerPicker,
                 menus,
                 menuBindings,
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                links.dailyRewards);
         // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
         // a give-money click resolves against the same backend and currency registries a warp fee spends through.
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
@@ -2482,12 +2508,19 @@ public final class PluginModule {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
-        // kits need no database: definitions live in modules/kits/kits/<id>.conf and claim/cooldown state
-        // is transient PDC.
+        // Definitions live in modules/kits/kits/<id>.conf. One-time claims are transient PDC on a single server and
+        // the shared database on a network, so a kit claimed on one backend stays claimed on the others.
         // The per-kit cost charges through the economy bridge captured during economy wiring when present. The admin
         // /kit editor manager renders through the always-on menu engine, so the engine façade + bindings are handed in.
         KitsWiring.Wired wired = KitsWiring.wire(
-                plugin, ctx, Optional.ofNullable(links.kitEconomy), guiLayouts, textInput, menus, menuBindings);
+                plugin,
+                ctx,
+                Optional.ofNullable(links.kitEconomy),
+                links.networkClaims,
+                guiLayouts,
+                textInput,
+                menus,
+                menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3532,6 +3565,12 @@ public final class PluginModule {
         private boolean economyAllowsNonAtomicRecurring;
         private @org.jspecify.annotations.Nullable WarpEconomy warpEconomy;
         private @org.jspecify.annotations.Nullable KitEconomy kitEconomy;
+        // The shared kit claims and daily reward stamps on a network (network.enabled); empty on a single server,
+        // where kits and the daily reward keep them in PDC.
+        private Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims =
+                Optional.empty();
+        private Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards =
+                Optional.empty();
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;

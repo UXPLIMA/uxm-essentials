@@ -30,6 +30,12 @@ public enum KitError {
     /** A one-time kit the player has already consumed. */
     ALREADY_CLAIMED(KitsMessageKey.KIT_ALREADY_CLAIMED),
 
+    /**
+     * The player's claims and cooldowns are shared between servers and have not been read yet, or the shared store
+     * could not be reached. Nothing was granted; the player tries again in a moment.
+     */
+    LOADING(KitsMessageKey.KIT_LOADING),
+
     /** The player does not satisfy one or more of the kit's claim requirements (placeholder conditions). */
     REQUIREMENTS_NOT_MET(KitsMessageKey.KIT_REQUIREMENTS_NOT_MET),
 

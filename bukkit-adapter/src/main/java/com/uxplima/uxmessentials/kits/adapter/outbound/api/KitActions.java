@@ -15,7 +15,6 @@ import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
-import com.uxplima.uxmessentials.shared.adapter.outbound.api.AsyncActions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -55,16 +54,18 @@ public final class KitActions implements UxmKitActions {
     public CompletableFuture<UxmOutcome> give(UUID playerId, String kitId) {
         return onRecipient(playerId, kitId, (recipient, kit) -> {
             granter.grant(recipient, kit);
-            return UxmOutcome.ok();
+            return CompletableFuture.completedFuture(UxmOutcome.ok());
         });
     }
 
     @Override
     public CompletableFuture<UxmOutcome> claim(UUID playerId, String kitId) {
-        return onRecipient(playerId, kitId, (recipient, kit) -> {
-            Result<Unit, KitError> result = claim.claim(recipient, kit.id());
-            return result.isErr() ? UxmOutcome.failed(failure(result.errorOrThrow())) : UxmOutcome.ok();
-        });
+        return onRecipient(
+                playerId,
+                kitId,
+                (recipient, kit) -> claim.claim(recipient, kit.id())
+                        .thenApply((Result<Unit, KitError> result) ->
+                                result.isErr() ? UxmOutcome.failed(failure(result.errorOrThrow())) : UxmOutcome.ok()));
     }
 
     /** Resolve the player and the kit, then run {@code hand} on the thread that owns the player's inventory. */
@@ -81,11 +82,27 @@ public final class KitActions implements UxmKitActions {
                     UxmOutcome.failed(UxmFailure.NOT_FOUND, "no kit with the id " + kitId));
         }
         PlayerRef recipient = ApiValues.subject(players, playerId);
-        return AsyncActions.onPlayer(
-                scheduler,
+        // A shared one-time claim answers later, so the hand-out is itself a future, followed here once it is begun
+        // on the thread that owns the recipient. A player who leaves first gets the offline answer, never a hang.
+        CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();
+        scheduler.onEntity(
                 recipient,
-                () -> hand.apply(recipient, kit.get()),
-                UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player left before the kit could be handed over"));
+                () -> {
+                    try {
+                        var unused = hand.apply(recipient, kit.get()).whenComplete((outcome, failure) -> {
+                            if (failure != null) {
+                                answer.completeExceptionally(failure);
+                            } else {
+                                answer.complete(outcome);
+                            }
+                        });
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                () -> answer.complete(UxmOutcome.failed(
+                        UxmFailure.PLAYER_OFFLINE, "the player left before the kit could be handed over")));
+        return answer;
     }
 
     /** Which published code a kits refusal is. */
@@ -112,6 +129,6 @@ public final class KitActions implements UxmKitActions {
     @FunctionalInterface
     private interface Handout {
 
-        UxmOutcome apply(PlayerRef recipient, KitDefinition kit);
+        CompletableFuture<UxmOutcome> apply(PlayerRef recipient, KitDefinition kit);
     }
 }

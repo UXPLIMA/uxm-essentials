@@ -40,6 +40,7 @@ import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitReset;
 import com.uxplima.uxmessentials.kits.application.ListKits;
+import com.uxplima.uxmessentials.kits.application.NetworkKitClaims;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
 import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
@@ -54,6 +55,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -91,19 +93,21 @@ public final class KitsWiring {
             TextInput textInput,
             Menus menus,
             MenuBindings menuBindings) {
-        return wire(plugin, ctx, Optional.empty(), guiLayouts, textInput, menus, menuBindings);
+        return wire(plugin, ctx, Optional.empty(), Optional.empty(), guiLayouts, textInput, menus, menuBindings);
     }
 
     /**
      * Build the kits context, charging a recorded per-kit cost through {@code economy} when present. The
      * economy context lands before kits in the registry, so its {@link KitEconomy} bridge is captured during
      * economy wiring and handed in here; when it is empty (economy disabled), a priced kit's cost is recorded
-     * but not charged: the soft coupling the kits context owns.
+     * but not charged: the soft coupling the kits context owns. With {@code networkClaims} (the network is on) the
+     * one-time claims live in the shared database instead of each player's PDC.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Optional<KitEconomy> economy,
+            Optional<NetworkClaims> networkClaims,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -111,6 +115,7 @@ public final class KitsWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(networkClaims, "networkClaims");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -122,7 +127,8 @@ public final class KitsWiring {
         KitRepository repository = ConfigurateKitRepository.load(kitsDir, legacy, kernel.log());
         Path categoriesDir = dataFolder.resolve("modules").resolve("kits").resolve("categories");
         KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
-        KitClaimStore claims = new PdcKitClaims(plugin);
+        KitClaimStore claims =
+                networkClaims.<KitClaimStore>map(NetworkKitClaims::new).orElseGet(() -> new PdcKitClaims(plugin));
         KitUnlockStore unlocks = new PdcKitUnlocks(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());

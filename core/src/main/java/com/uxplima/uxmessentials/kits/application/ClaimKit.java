@@ -6,6 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 
 import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -48,6 +51,12 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * other gate. The deny actions run and the player keeps the claim, with no cooldown, one-time stamp, stock
  * decrement, charge, or reward deposit applied. The check sits ahead of the irreversible reserve-and-charge
  * step precisely so a space refusal leaves nothing to compensate.
+ *
+ * <p>A one-time kit's claim is taken from the {@code KitClaimStore} after the cheap gates and before the charge.
+ * On a single server that answers at once and the claim finishes on the calling thread. On a network it is a
+ * conditional insert in the shared database, so the rest of the claim runs once the answer is back on the
+ * recipient's thread, and a claim lost to another server is refused as already claimed. That is why a claim
+ * answers with a future: completed at once when nothing had to wait.
  */
 public final class ClaimKit {
 
@@ -108,50 +117,73 @@ public final class ClaimKit {
     }
 
     /** Claim the kit {@code id} for {@code who} themselves. */
-    public Result<Unit, KitError> claim(PlayerRef who, KitId id) {
+    public CompletableFuture<Result<Unit, KitError>> claim(PlayerRef who, KitId id) {
         return claimFor(who, who, id);
     }
 
     /** Give the kit {@code id} to {@code recipient}, triggered by {@code actor} (a staff give). */
-    public Result<Unit, KitError> claimFor(PlayerRef actor, PlayerRef recipient, KitId id) {
+    public CompletableFuture<Result<Unit, KitError>> claimFor(PlayerRef actor, PlayerRef recipient, KitId id) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(id, "id");
         Optional<KitDefinition> kit = repository.find(id);
         if (kit.isEmpty()) {
             notifier.send(actor, KitError.NOT_FOUND.messageKey(), Map.of("kit", id.value()));
-            return Result.err(KitError.NOT_FOUND);
+            return CompletableFuture.completedFuture(Result.err(KitError.NOT_FOUND));
         }
         return admitAndGrant(actor, recipient, kit.get());
     }
 
-    private Result<Unit, KitError> admitAndGrant(PlayerRef actor, PlayerRef recipient, KitDefinition kit) {
+    private CompletableFuture<Result<Unit, KitError>> admitAndGrant(
+            PlayerRef actor, PlayerRef recipient, KitDefinition kit) {
         if (!kit.isAvailableAt(LocalDateTime.now(clock))) {
-            deny(actor, recipient, kit, KitError.UNAVAILABLE);
-            return Result.err(KitError.UNAVAILABLE);
+            return refused(actor, recipient, kit, KitError.UNAVAILABLE);
         }
         Result<Unit, KitError> gated = access.admissible(recipient, kit);
         if (gated.isErr()) {
-            deny(actor, recipient, kit, gated.errorOrThrow());
-            return gated;
+            return refused(actor, recipient, kit, gated.errorOrThrow());
         }
         KitDefinition granted = access.resolveVariant(recipient, kit);
         if (deniesForFullInventory(recipient, granted)) {
-            deny(actor, recipient, kit, KitError.INVENTORY_FULL);
-            return Result.err(KitError.INVENTORY_FULL);
+            return refused(actor, recipient, kit, KitError.INVENTORY_FULL);
         }
         // Before the charge and before a single item is placed, so a refused claim costs neither money nor a
         // cooldown and leaves the recipient's inventory exactly as it was.
         if (!gate.allows(new KitClaiming(kit.id(), recipient, actor))) {
-            deny(actor, recipient, kit, KitError.VETOED);
-            return Result.err(KitError.VETOED);
+            return refused(actor, recipient, kit, KitError.VETOED);
         }
+        if (!access.claimsBeforeGrant(recipient, kit)) {
+            return CompletableFuture.completedFuture(chargeAndGrant(actor, recipient, kit, granted, false));
+        }
+        return access.acquireOneTime(recipient, kit).<Result<Unit, KitError>>handle((won, failure) -> {
+            if (failure != null) {
+                KitError error =
+                        unwrap(failure) instanceof CancellationException ? KitError.CANCELLED : KitError.LOADING;
+                deny(actor, recipient, kit, error);
+                return Result.err(error);
+            }
+            if (!Boolean.TRUE.equals(won)) {
+                deny(actor, recipient, kit, KitError.ALREADY_CLAIMED);
+                return Result.err(KitError.ALREADY_CLAIMED);
+            }
+            return chargeAndGrant(actor, recipient, kit, granted, true);
+        });
+    }
+
+    /**
+     * The irreversible part of a claim: reserve stock, charge, grant and record. A one-time claim taken before this
+     * ({@code claimed}) is given back when the claim stops here, so the player can try again.
+     */
+    private Result<Unit, KitError> chargeAndGrant(
+            PlayerRef actor, PlayerRef recipient, KitDefinition kit, KitDefinition granted, boolean claimed) {
         Result<Unit, KitError> charged = access.reserveAndCharge(recipient, kit);
         if (charged.isErr()) {
+            giveBack(recipient, kit, claimed);
             deny(actor, recipient, kit, charged.errorOrThrow());
             return charged;
         }
         if (!granter.preGrant(recipient, granted)) {
+            giveBack(recipient, kit, claimed);
             deny(actor, recipient, kit, KitError.CANCELLED);
             return Result.err(KitError.CANCELLED);
         }
@@ -159,6 +191,23 @@ public final class ClaimKit {
         granter.grant(recipient, granted);
         runActions(recipient, granted, afterItems(granted));
         return completeClaim(actor, recipient, kit);
+    }
+
+    private void giveBack(PlayerRef recipient, KitDefinition kit, boolean claimed) {
+        if (claimed) {
+            access.releaseOneTime(recipient, kit);
+        }
+    }
+
+    private CompletableFuture<Result<Unit, KitError>> refused(
+            PlayerRef actor, PlayerRef recipient, KitDefinition kit, KitError error) {
+        deny(actor, recipient, kit, error);
+        return CompletableFuture.completedFuture(Result.err(error));
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable cause = failure.getCause();
+        return failure instanceof CompletionException && cause != null ? cause : failure;
     }
 
     /** Record the cooldown/one-time stamp, deposit any claim reward, publish the event, and notify the recipient. */
