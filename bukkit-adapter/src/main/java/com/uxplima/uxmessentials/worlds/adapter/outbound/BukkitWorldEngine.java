@@ -5,8 +5,10 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -234,6 +236,31 @@ public final class BukkitWorldEngine implements WorldEngine {
             log.error("Failed to scan the world folders", e);
         }
         return names;
+    }
+
+    /**
+     * Every world with files on disk, loaded or not, with the uid its folder records, read by {@link WorldUidFiles}.
+     * Disk reads only, for the async lane: a loaded world's live uid comes from {@link #uidOf}. Unlike
+     * {@link #onDiskWorldNames}, a folder that cannot be listed is thrown, not logged and skipped, so the start-up
+     * claim does not mistake a failed scan for a disk without worlds.
+     *
+     * @throws UncheckedIOException if a world folder cannot be listed
+     */
+    public Map<WorldName, Optional<UUID>> scanWorldFolders() {
+        Map<WorldName, Optional<UUID>> worlds = new HashMap<>();
+        for (Map.Entry<String, Path> folder : folders.onDiskFolders().entrySet()) {
+            // A folder whose name is no world name is skipped, and logged by onDiskWorldNames.
+            validName(folder.getKey()).ifPresent(world -> worlds.put(world, WorldUidFiles.read(folder.getValue())));
+        }
+        return worlds;
+    }
+
+    private static Optional<WorldName> validName(String name) {
+        try {
+            return Optional.of(WorldName.of(name));
+        } catch (IllegalArgumentException unusable) {
+            return Optional.empty();
+        }
     }
 
     private void addIfValid(Set<WorldName> names, String name) {

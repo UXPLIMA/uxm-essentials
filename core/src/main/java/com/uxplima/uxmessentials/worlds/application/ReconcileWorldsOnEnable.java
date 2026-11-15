@@ -29,7 +29,9 @@ public final class ReconcileWorldsOnEnable {
     private final Clock clock;
     private final BooleanSupplier adoptLoaded;
     private final BooleanSupplier autoLoadRegistered;
+    private final BooleanSupplier createMissing;
 
+    /** A reconcile that creates an auto-load world whose folder is missing, as loading one always has. */
     public ReconcileWorldsOnEnable(
             WorldRepository repository,
             WorldEngine engine,
@@ -37,12 +39,28 @@ public final class ReconcileWorldsOnEnable {
             Clock clock,
             BooleanSupplier adoptLoaded,
             BooleanSupplier autoLoadRegistered) {
+        this(repository, engine, events, clock, adoptLoaded, autoLoadRegistered, () -> true);
+    }
+
+    /**
+     * A reconcile whose auto-load phase skips a registered world with no folder on this backend while
+     * {@code createMissing} is false, instead of generating it.
+     */
+    public ReconcileWorldsOnEnable(
+            WorldRepository repository,
+            WorldEngine engine,
+            DomainEventPublisher events,
+            Clock clock,
+            BooleanSupplier adoptLoaded,
+            BooleanSupplier autoLoadRegistered,
+            BooleanSupplier createMissing) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.adoptLoaded = Objects.requireNonNull(adoptLoaded, "adoptLoaded");
         this.autoLoadRegistered = Objects.requireNonNull(autoLoadRegistered, "autoLoadRegistered");
+        this.createMissing = Objects.requireNonNull(createMissing, "createMissing");
     }
 
     public void run() {
@@ -73,8 +91,12 @@ public final class ReconcileWorldsOnEnable {
     }
 
     private void autoLoadRegisteredWorlds() {
+        boolean create = createMissing.getAsBoolean();
         for (ManagedWorld world : repository.all()) {
             if (!world.autoLoad() || engine.isLoaded(world.name())) {
+                continue;
+            }
+            if (!create && !engine.exists(world.name(), world.spec().dimension())) {
                 continue;
             }
             if (engine.load(world).isOk()) {

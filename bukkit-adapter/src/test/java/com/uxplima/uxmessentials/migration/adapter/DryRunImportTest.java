@@ -68,6 +68,7 @@ import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.junit.jupiter.api.Test;
@@ -441,6 +442,13 @@ class DryRunImportTest {
             @Override
             public void delete(WorldName name) {
                 write("delete world " + name);
+            }
+
+            @Override
+            public List<NetworkWorld> network() {
+                return worlds.values().stream()
+                        .map(world -> new NetworkWorld(NetworkWorld.UNSCOPED, world))
+                        .toList();
             }
         }
 

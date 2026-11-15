@@ -320,6 +320,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.world.<world>` | Enter one world that is configured as restricted. | op |
 | `uxmessentials.world.access.bypass` | Enter a restricted world without holding that world's own entry node. | op |
 | `uxmessentials.world.backup` | /worlds backup <name>: snapshot a world's folder. | op |
+| `uxmessentials.world.bypass.safety` | Land on the spawn of a world on another server even when the safe-landing check refuses it. | op |
+| `uxmessentials.world.claim` | /worlds claim <name>: take a world no server has claimed onto this server. | op |
 | `uxmessentials.world.create` | /worlds create <name>: generate and register a new world. | op |
 | `uxmessentials.world.delete` | /worlds delete <name>: unregister a world and delete its folder from disk. | op |
 | `uxmessentials.world.gamemode.bypass` | Keep your own game mode in a world that forces one on entry. | op |
@@ -332,6 +334,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.world.pregen` | /worlds pregen <name> <radius>: pre-generate a world's chunks in the background. | op |
 | `uxmessentials.world.restore` | /worlds restore <name> <backup>: restore a world from one of its snapshots. | op |
 | `uxmessentials.world.set` | /worlds set <name> <property> <value>: change a world property such as difficulty or PvP. | op |
+| `uxmessentials.world.setserver` | /worlds setserver <from> <to>: move every world recorded on one server to another, settings included, without touching a world's files. | op |
 | `uxmessentials.world.setspawn` | /worlds setspawn [name]: set a world's spawn point to where you are standing. | op |
 | `uxmessentials.world.spawn` | /worlds spawn to teleport to a world's spawn (subject to per-world access rules). | true |
 | `uxmessentials.world.tp` | /worlds tp <name>: teleport yourself to a world's spawn. | op |

@@ -264,6 +264,11 @@ public final class NetworkMessageCodec {
                 out.writeUTF(staff.subjectServer());
                 out.writeInt(staff.seeLevel());
             }
+            case WorldChanged world -> {
+                writeUuid(out, world.changeId());
+                out.writeUTF(world.server());
+                out.writeUTF(world.world());
+            }
         }
     }
 
@@ -356,6 +361,7 @@ public final class NetworkMessageCodec {
                         in.readUTF(),
                         in.readUTF(),
                         in.readInt());
+            case WORLD_CHANGED -> new WorldChanged(origin, readUuid(in), in.readUTF(), in.readUTF());
         };
     }
 
