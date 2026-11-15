@@ -5,8 +5,8 @@ import java.util.UUID;
 
 /**
  * A player's vanish state changed on the origin backend. They vanished, reappeared, or had their use level
- * re-resolved. Unlike the DB-backed {@code *Changed} frames (which only tell a peer to drop a cached row), the
- * vanish state is transient in-memory state with no shared table, so this frame <strong>carries the value</strong>:
+ * re-resolved. Unlike the DB-backed {@code *Changed} frames (which only tell a peer to drop a cached row), the live
+ * vanish state is in memory on the backend the player is on, so this frame <strong>carries the value</strong>:
  * the affected player, their name (so a network-wide {@code /vanish list} can render a hidden player who is not
  * online on the reading backend), the vanished flag, and the resolved use level. A peer applies it to its own
  * network-vanish view so a player vanished on {@code survival-1} is already hidden the instant they switch to
@@ -16,14 +16,14 @@ import java.util.UUID;
  * and a backend drops any frame whose {@link #originServer()} equals its own id, so a state change made here reaches
  * every peer once and never echoes back.
  *
+ * <p>A departure says the player left the origin backend while still vanished, so a peer retires the entry that
+ * backend reported and nothing else. It still carries {@code vanished = true}: a peer that predates the flag then keeps
+ * the player hidden instead of reading the departure as a reveal.
+ *
  * @param originServer the backend that produced the change
  * @param player the player whose vanish state changed
  * @param playerName the player's name at the moment of the change, for a network-wide roster render
  * @param vanished {@code true} when the player is now vanished, {@code false} when they reappeared
- * <p>A departure says the player left the origin backend while still vanished, so a peer drops the entry that backend
- * reported and nothing else. It still carries {@code vanished = true}: a peer that predates the flag then keeps the
- * player hidden instead of reading the departure as a reveal.
- *
  * @param level the player's resolved use level (always {@code >= 1}); meaningful only when {@code vanished} is true
  * @param departed {@code true} when the player left the origin backend rather than changed their vanish
  */

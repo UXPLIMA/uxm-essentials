@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vanish.adapter.inbound.listener;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,11 +33,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *   <li><b>Join, state.</b> The joiner's vanish is settled through {@link ApplyVanishOnJoin} from the state the login
- *       read ({@link VanishLoginListener}), which carries over only for a persist holder or a server switch within the
- *       hop window, the network view, and the join-vanished rule, and every vanished
+ *       read ({@link VanishLoginListener}), the network view, and the join-vanished rule, and every vanished
  *       <em>other</em> player is re-hidden from the joiner. This runs first so every later join listener already sees
- *       the joiner hidden. When the login read did not finish in time, the state is read again off the tick and applied
- *       on the joiner's own thread once it arrives.
+ *       the outcome. When the login read did not finish in time, a joiner who may vanish is hidden until the state is
+ *       read again off the tick and decided on their own thread; a read that keeps failing is retried a few times.
  *   <li><b>Join, message.</b> A vanished joiner's join line is suppressed late, after the plugins that write it.
  *   <li><b>Quit.</b> A vanished player's quit line is suppressed the same way; once the quit is settled the player is
  *       dropped from this backend's store, the time they left is recorded, and the peers are told they left, through
@@ -50,6 +50,12 @@ import org.jspecify.annotations.Nullable;
 public final class VanishLifecycleListener implements Listener {
 
     private static final String PERSIST_PERMISSION = "uxmessentials.vanish.persist";
+    private static final String USE_PERMISSION = "uxmessentials.vanish.use";
+
+    /** Reads after the first one that failed; with the delay below a database outage of a few seconds is ridden out. */
+    private static final int READ_RETRIES = 3;
+
+    private static final Duration RETRY_DELAY = Duration.ofSeconds(2);
 
     private final VanishStore store;
     private final VanishView view;
@@ -96,9 +102,11 @@ public final class VanishLifecycleListener implements Listener {
         boolean persist = joiner.hasPermission(PERSIST_PERMISSION);
         boolean joinVanished = config.joinVanished() && persist;
         VanishLoginListener.@Nullable Read read = login.take(joiner.getUniqueId());
-        applyOnJoin.join(ref, read == null ? Optional.empty() : read.stored(), persist, joinVanished);
-        if (read == null) {
-            readLate(ref, persist);
+        if (read != null) {
+            applyOnJoin.join(ref, read.stored(), persist, joinVanished);
+        } else {
+            applyOnJoin.joinUnread(ref, joinVanished, joiner.hasPermission(USE_PERMISSION));
+            readLate(ref, persist, 0);
         }
         rehideOthersFrom(joiner.getUniqueId());
     }
@@ -125,13 +133,18 @@ public final class VanishLifecycleListener implements Listener {
         departVanished.depart(BukkitRefs.toRef(event.getPlayer()));
     }
 
-    private void readLate(PlayerRef joiner, boolean persist) {
+    private void readLate(PlayerRef joiner, boolean persist, int retry) {
         scheduler.async(() -> {
             Optional<StoredVanish> stored;
             try {
                 stored = remember.load(joiner.uuid());
             } catch (RuntimeException failed) {
+                if (retry < READ_RETRIES) {
+                    scheduler.asyncAfter(RETRY_DELAY, () -> readLate(joiner, persist, retry + 1));
+                    return;
+                }
                 log.warn("event=vanish_join_read_failed player={} reason={}", joiner.name(), failed.toString());
+                scheduler.onEntity(joiner, () -> applyOnJoin.readFailed(joiner));
                 return;
             }
             // The scheduler drops the task when the player has already left.

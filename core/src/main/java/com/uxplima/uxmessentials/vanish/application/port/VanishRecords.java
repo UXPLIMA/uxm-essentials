@@ -8,8 +8,8 @@ import com.uxplima.uxmessentials.vanish.domain.StoredVanish;
 
 /**
  * The last written vanish state of each player. A port because it is a platform boundary: the database every backend
- * on the network shares, which is what lets a vanish follow a player through a server switch, and a persisting
- * player through a restart. Every call blocks on I/O, so callers run them off the tick.
+ * on the network shares, which is what lets a vanish follow a player through a server switch, and a persisting player
+ * through a restart. Every call blocks on I/O, so callers run them off the tick.
  */
 public interface VanishRecords {
 
@@ -23,9 +23,12 @@ public interface VanishRecords {
     void save(UUID player, StoredVanish state);
 
     /**
-     * Record that {@code player} left a backend at {@code at} while vanished. Nothing happens when the kept row says
-     * they are visible: a backend they reached since has already decided, and a late departure must not bring the
-     * vanish back.
+     * Record that the vanished {@code player} left {@code server} at {@code at}. Nothing happens unless the kept row
+     * still says they are vanished on that server: a backend they reached since has already claimed it, and a late
+     * departure must neither bring a cleared vanish back nor mark the player gone from where they are now.
      */
-    void markDeparted(UUID player, Instant at);
+    void markDeparted(UUID player, String server, Instant at);
+
+    /** Record that the vanished {@code player} is now on {@code server}; nothing happens unless the row says vanished. */
+    void markArrived(UUID player, String server);
 }

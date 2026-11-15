@@ -12,10 +12,11 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * {@link VanishStore} of who this backend is hiding. It is fed only by the cross-server bus and read by the join
  * reconcile and the network-wide {@code /vanish list}.
  *
- * <p>Every entry remembers the backend that reported it. A player who leaves that backend is dropped when it says so,
- * and every entry of a backend that stops sending heartbeats or starts again is dropped too, so the view never keeps a
- * player nobody is hiding any more. A departure from a backend other than the one the entry came from is ignored: on
- * a server hop the destination may already have reported the player before the origin's departure arrives.
+ * <p>Every entry remembers the backend that reported it. When a player leaves that backend the entry turns into a
+ * departure, which still hides the player if they arrive here within the hop window (on a server switch the origin's
+ * departure can arrive before the destination's join) but no longer lists them. A departure from a backend other than
+ * the one the entry came from is ignored. The entries of a backend that stops running, or starts a new run, are
+ * dropped, so the view never keeps a player nobody is hiding any more.
  *
  * <p>The name rides along so the list can render a hidden player who is not online on the reading backend. When
  * {@code cross-server} is off the module wires {@link #empty()}, so the reconcile and list paths stay inert.
@@ -25,19 +26,26 @@ public interface NetworkVanishStore {
     /** Apply a change reported by peer {@code origin}: record the player vanished, or drop them on a reveal. */
     void apply(String origin, VanishSync change);
 
-    /** Peer {@code origin} says {@code player} left it; drop them unless another backend reported them since. */
+    /** Peer {@code origin} says {@code player} left it; their entry from that backend becomes a departure. */
     void depart(String origin, UUID player);
 
-    /** Peer {@code origin} started again, so every player it reported belongs to a run that is over. */
-    void forgetServer(String origin);
+    /**
+     * Peer {@code origin} sent a heartbeat. When it is the first of a new run ({@code newRun}), every entry that arrived
+     * before the previous heartbeat belongs to the run that ended and is dropped; what the new run already reported is
+     * kept.
+     */
+    void heartbeat(String origin, boolean newRun);
 
-    /** The network-wide use level {@code who} is vanished at, or empty when no live peer reports them vanished. */
+    /**
+     * The use level {@code who} is vanished at on a peer, or empty when no peer reports them vanished. A departure
+     * within the hop window counts, since this read decides whether an arriving player is hidden.
+     */
     Optional<VanishLevel> levelOf(UUID who);
 
     /** The last-known name of a network-vanished {@code who}, for a roster render; empty when not tracked. */
     Optional<String> nameOf(UUID who);
 
-    /** A point-in-time copy of every network-vanished player keyed by uuid, for the aggregated {@code /vanish list}. */
+    /** Every player a peer is hiding right now keyed by uuid, for {@code /vanish list}; departures are left out. */
     Map<UUID, VanishLevel> levels();
 
     /** Drop every entry; called on module stop so a disable or reload leaves zero residual network state. */
@@ -63,7 +71,7 @@ public interface NetworkVanishStore {
         }
 
         @Override
-        public void forgetServer(String origin) {
+        public void heartbeat(String origin, boolean newRun) {
             // Nothing tracked, so nothing to drop.
         }
 

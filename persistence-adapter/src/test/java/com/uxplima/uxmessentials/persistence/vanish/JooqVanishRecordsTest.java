@@ -40,15 +40,15 @@ class JooqVanishRecordsTest {
 
     @Test
     void aKeptVanishIsReadBackByAnotherConnection() {
-        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(3), EARLY));
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(3), "survival", EARLY));
 
-        assertThat(openStore().find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(3), EARLY));
+        assertThat(openStore().find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(3), "survival", EARLY));
         assertThat(openStore().find(SAM)).isEmpty();
     }
 
     @Test
     void aLaterRevealReplacesTheVanish() {
-        records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, EARLY));
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
         records.save(ALEX, StoredVanish.visible(LATE));
 
         assertThat(records.find(ALEX)).contains(StoredVanish.visible(LATE));
@@ -57,28 +57,31 @@ class JooqVanishRecordsTest {
     @Test
     void aWriteThatLandsAfterANewerOneIsDropped() {
         records.save(ALEX, StoredVanish.visible(LATE));
-        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), EARLY));
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY));
 
         assertThat(records.find(ALEX)).isEqualTo(Optional.of(StoredVanish.visible(LATE)));
     }
 
     @Test
-    void aDepartureIsKeptOnAVanishedRowAndClearedByTheNextVanish() {
-        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), EARLY));
-        records.markDeparted(ALEX, LATE);
+    void aDepartureIsKeptOnlyFromTheServerThePlayerIsOnAndClearedByTheirArrival() {
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY));
+        records.markDeparted(ALEX, "lobby", LATE);
+        assertThat(records.find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY));
 
+        records.markDeparted(ALEX, "survival", LATE);
         assertThat(openStore().find(ALEX))
-                .contains(StoredVanish.vanished(VanishLevel.of(2), EARLY).departed(LATE));
+                .contains(StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY)
+                        .departed(LATE));
 
-        records.save(ALEX, StoredVanish.vanished(VanishLevel.of(2), LATE));
-
-        assertThat(records.find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(2), LATE));
+        records.markArrived(ALEX, "lobby");
+        assertThat(records.find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(2), "lobby", EARLY));
     }
 
     @Test
-    void aDepartureThatArrivesAfterTheRowWasClearedChangesNothing() {
+    void aDepartureOrArrivalOnAClearedRowChangesNothing() {
         records.save(ALEX, StoredVanish.visible(EARLY));
-        records.markDeparted(ALEX, LATE);
+        records.markDeparted(ALEX, "survival", LATE);
+        records.markArrived(ALEX, "lobby");
 
         assertThat(records.find(ALEX)).contains(StoredVanish.visible(EARLY));
     }

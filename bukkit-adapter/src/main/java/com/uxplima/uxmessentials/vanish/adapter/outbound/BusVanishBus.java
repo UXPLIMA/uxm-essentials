@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.network.ServerPing;
 import com.uxplima.uxmessentials.shared.network.VanishStateChanged;
 import com.uxplima.uxmessentials.vanish.application.VanishSync;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus.PeerRun;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -21,10 +22,8 @@ import org.jspecify.annotations.Nullable;
  * dispatches to {@link #onFrame} is translated back and handed to the subscribed listener on the bus's off-tick
  * dispatch thread, which does its own region hop for any Bukkit touch.
  *
- * <p>The heartbeats are read too: a {@link ServerPing} whose boot nonce differs from the last one seen from that peer
- * means the peer started again, with an empty view of the network, so the listener is told to forget what it reported
- * and to send it this backend's vanished players. The first ping heard from a peer only asks for the send: the peer may
- * have just started, but what it reported so far is current.
+ * <p>The heartbeats are read too and passed on with what they say about the sender's run, from its boot nonce: the
+ * first heard, the same run, or a new run after a restart. Only the nonce is compared, never the sender's clock.
  *
  * <p>The publisher stamps this backend's {@code server-id} as the frame origin, so the shared loop sentinel drops the
  * echo on the origin backend. With the network bus disabled the injected publisher is the no-op one, so publishing is
@@ -88,11 +87,15 @@ public final class BusVanishBus implements VanishBus {
                                 frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
             case ServerPing ping -> {
                 Long previous = bootByPeer.put(ping.originServer(), ping.bootNonce());
+                PeerRun run;
                 if (previous == null) {
-                    target.peerFound(ping.originServer());
-                } else if (previous != ping.bootNonce()) {
-                    target.peerStarted(ping.originServer());
+                    run = PeerRun.FIRST_HEARD;
+                } else if (previous == ping.bootNonce()) {
+                    run = PeerRun.SAME_RUN;
+                } else {
+                    run = PeerRun.NEW_RUN;
                 }
+                target.pinged(ping.originServer(), run);
             }
             default -> {
                 // Every other frame belongs to another context.

@@ -16,9 +16,10 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
  * Writes each player's vanish to the shared {@link VanishRecords}, which the next backend they join reads: that is how
- * a vanish survives a server switch, and how a player who may persist it comes back hidden after a restart. A write is
- * stamped when the change happens and runs on the async lane, so a command never waits on the database and two writes
- * that finish out of order still settle on the later change.
+ * a vanish survives a server switch, and how a player who may persist it comes back hidden after a restart. Every
+ * write names this backend, so the next one can tell where the player was. A write is stamped when the change happens
+ * and runs on the async lane, so a command never waits on the database and two writes that finish out of order still
+ * settle on the later change.
  *
  * <p>It also remembers which online players changed their vanish on this backend, so a stored state that arrives late
  * (the login read timed out) never overrides a change the player made after joining.
@@ -26,21 +27,23 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 public final class RememberVanish {
 
     private final VanishRecords records;
+    private final String server;
     private final Scheduler scheduler;
     private final Clock clock;
     private final Logger log;
     private final Set<UUID> changedHere = ConcurrentHashMap.newKeySet();
 
-    public RememberVanish(VanishRecords records, Scheduler scheduler, Clock clock, Logger log) {
+    public RememberVanish(VanishRecords records, String server, Scheduler scheduler, Clock clock, Logger log) {
         this.records = Objects.requireNonNull(records, "records");
+        this.server = Objects.requireNonNull(server, "server");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.log = Objects.requireNonNull(log, "log");
     }
 
-    /** Keep {@code who} as vanished at {@code level}. */
+    /** Keep {@code who} as vanished at {@code level} on this backend. */
     public void vanished(UUID who, VanishLevel level) {
-        save(who, StoredVanish.vanished(level, clock.instant()));
+        save(who, StoredVanish.vanished(level, server, clock.instant()));
     }
 
     /** Keep {@code who} as visible. */
@@ -52,14 +55,13 @@ public final class RememberVanish {
     public void departed(UUID who) {
         Objects.requireNonNull(who, "who");
         Instant at = clock.instant();
-        scheduler.async(() -> {
-            try {
-                records.markDeparted(who, at);
-            } catch (RuntimeException failed) {
-                // Only a server switch in the next moments is affected: the player then arrives visible.
-                log.warn("event=vanish_departure_save_failed player={} reason={}", who, failed.toString());
-            }
-        });
+        run(who, "departure", () -> records.markDeparted(who, server, at));
+    }
+
+    /** Record that the vanished {@code who} is now on this backend, so a late departure from the last one is ignored. */
+    public void arrived(UUID who) {
+        Objects.requireNonNull(who, "who");
+        run(who, "arrival", () -> records.markArrived(who, server));
     }
 
     /**
@@ -68,7 +70,8 @@ public final class RememberVanish {
      */
     public void clearStored(UUID who) {
         Objects.requireNonNull(who, "who");
-        write(who, StoredVanish.visible(clock.instant()));
+        StoredVanish visible = StoredVanish.visible(clock.instant());
+        run(who, "clear", () -> records.save(who, visible));
     }
 
     /** The kept state of {@code who}. Blocks on the database, so only an off-tick caller reads it. */
@@ -92,16 +95,16 @@ public final class RememberVanish {
     private void save(UUID who, StoredVanish state) {
         Objects.requireNonNull(who, "who");
         changedHere.add(who);
-        write(who, state);
+        run(who, "save", () -> records.save(who, state));
     }
 
-    private void write(UUID who, StoredVanish state) {
+    private void run(UUID who, String what, Runnable write) {
         scheduler.async(() -> {
             try {
-                records.save(who, state);
+                write.run();
             } catch (RuntimeException failed) {
-                // The live state and the bus frame already moved; only the next session loses this change.
-                log.warn("event=vanish_save_failed player={} reason={}", who, failed.toString());
+                // The live state and the bus frames already moved; only the next backend's read can be off.
+                log.warn("event=vanish_write_failed kind={} player={} reason={}", what, who, failed.toString());
             }
         });
     }

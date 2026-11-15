@@ -23,7 +23,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Reads a connecting player's kept vanish while they are still logging in, so the join can hide them before anybody
  * sees them. The read runs on the async lane and the login waits for it only up to the configured timeout: a slow
- * database lets the player in, and the join then reads the state again itself and applies it when it arrives.
+ * database lets the player in, hidden for now if they may vanish, and the join then reads the state again itself and
+ * decides when it arrives.
  *
  * <p>What was read is held until the join takes it. A login another plugin refuses never joins, so an answer older
  * than {@link #HELD_FOR} is dropped the next time anything is held.
@@ -63,10 +64,12 @@ public final class VanishLoginListener implements Listener {
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onPreLogin(AsyncPlayerPreLoginEvent event) {
+        UUID player = event.getUniqueId();
+        // An answer left from an earlier attempt that never joined must not stand in for this one.
+        held.remove(player);
         if (event.getLoginResult() != AsyncPlayerPreLoginEvent.Result.ALLOWED) {
             return;
         }
-        UUID player = event.getUniqueId();
         CompletableFuture<Optional<StoredVanish>> answer = new CompletableFuture<>();
         scheduler.async(() -> {
             try {

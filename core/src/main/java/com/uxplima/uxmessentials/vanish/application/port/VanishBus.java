@@ -13,9 +13,9 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * {@code RemoteSyncRegistry}.
  *
  * <p>The bus is fire-and-forget and lossy by design (a peer may miss a frame during a restart). What a lost frame
- * costs is bounded: the durable {@link VanishRecords} decide whether a joining player is hidden, a peer that starts
- * again is sent every vanished player afresh, and the entries of a peer that stops are dropped once its heartbeats
- * stop. When the network bus is disabled the module wires {@link #disabled()}, so cross-server is inert.
+ * costs is bounded: the shared {@link VanishRecords} decide whether a joining player is hidden, a peer heard for the
+ * first time or starting again is sent every vanished player afresh, and the entries of a peer that stops are dropped
+ * once it stops counting as running. When the network bus is disabled the module wires {@link #disabled()}, so cross-server is inert.
  */
 public interface VanishBus {
 
@@ -43,11 +43,18 @@ public interface VanishBus {
         /** A vanished player left peer {@code origin}. */
         void departed(String origin, UUID player);
 
-        /** This backend heard from peer {@code origin} for the first time; it may know nothing of this one yet. */
-        void peerFound(String origin);
+        /** Peer {@code origin} sent a heartbeat; {@code run} says whether it is the first heard, or a new run. */
+        void pinged(String origin, PeerRun run);
+    }
 
-        /** Peer {@code origin} started again: what it reported belongs to its last run, and it knows nothing yet. */
-        void peerStarted(String origin);
+    /** What a heartbeat says about the run of the peer that sent it, read from its boot nonce. */
+    enum PeerRun {
+        /** The first heartbeat this backend has heard from the peer: it may know nothing of this backend yet. */
+        FIRST_HEARD,
+        /** Another heartbeat of the run already heard. */
+        SAME_RUN,
+        /** The peer started again: its last run is over, and it knows nothing of this backend yet. */
+        NEW_RUN
     }
 
     /** A no-op bus for a backend that opts out of cross-server vanish: publish drops, subscribe is never invoked. */

@@ -63,15 +63,13 @@ public final class VanishNetworkSync implements VanishBus.Listener {
     }
 
     @Override
-    public void peerFound(String origin) {
-        // Whatever it reported so far belongs to its current run, so only the announce is due.
-        scheduler.onGlobal(this::announceLocal);
-    }
-
-    @Override
-    public void peerStarted(String origin) {
-        network.forgetServer(origin);
-        scheduler.onGlobal(this::announceLocal);
+    public void pinged(String origin, VanishBus.PeerRun run) {
+        Objects.requireNonNull(origin, "origin");
+        Objects.requireNonNull(run, "run");
+        network.heartbeat(origin, run == VanishBus.PeerRun.NEW_RUN);
+        if (run != VanishBus.PeerRun.SAME_RUN) {
+            scheduler.onGlobal(this::announceLocal);
+        }
     }
 
     private void reconcileOnline(PlayerRef target, VanishSync change) {

@@ -221,6 +221,21 @@ class NetworkPresenceTest {
     }
 
     @Test
+    void aBackendWithNoPlayersLeftStaysLiveUntilItIsNoLongerHeardFrom() {
+        lobby.track.joined(STEVE);
+        lobby.track.left(STEVE);
+        lobby.out.deliverAll(survival.track);
+
+        clock.advance(LIVENESS);
+        assertThat(survival.roster.isLive("lobby-1")).isTrue();
+        assertThat(survival.roster.isLive("hub-1")).isFalse();
+        clock.advance(Duration.ofSeconds(1));
+
+        assertThat(survival.roster.isLive("lobby-1")).isFalse();
+        assertThat(survival.roster.isLive("survival-1")).isTrue();
+    }
+
+    @Test
     void heartbeatsKeepABackendsPlayersOnline() {
         lobby.track.joined(STEVE);
         lobby.out.deliverAll(survival.track);

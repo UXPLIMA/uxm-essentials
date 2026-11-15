@@ -46,4 +46,16 @@ public interface NetworkPresence {
     default boolean isOnline(UUID player) {
         return find(player).isPresent();
     }
+
+    /**
+     * Whether the backend named {@code server} is running as far as this server knows: this backend itself, or a peer
+     * heard from within the liveness window, timed by when its frames arrived here. A peer this server has not heard
+     * from yet is not live.
+     *
+     * <p>This default can only tell a peer with players on it; the roster that keeps itself current knows every peer
+     * it hears from, players or not.
+     */
+    default boolean isLive(String server) {
+        return server.equals(localServer()) || !onServer(server).isEmpty();
+    }
 }

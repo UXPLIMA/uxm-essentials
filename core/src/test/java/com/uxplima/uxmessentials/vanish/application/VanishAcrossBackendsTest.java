@@ -7,6 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -16,8 +18,10 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -26,6 +30,7 @@ import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus.PeerRun;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishRecords;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
@@ -36,12 +41,16 @@ import com.uxplima.uxmessentials.vanish.domain.VanishState;
 import org.junit.jupiter.api.Test;
 
 /**
- * A vanish survives a server switch within the hop window, ends when the player leaves the network unless they may
- * persist it, and the network list only shows players some running backend is hiding. Each backend is the real use cases over fakes; they share one database and one bus.
+ * A vanish survives a server switch, ends when the player leaves the network unless they may persist it, and the
+ * network list only shows players some running backend is hiding.
+ *
+ * <p>Each backend is the real use cases over fakes; they share one database and one bus. A server switch follows the
+ * proxy's order: the target reads the row at login, then the origin lets the player go and its departure reaches the
+ * target, then the target's join runs. Heartbeats only arrive when a test delivers them, and a backend can be made deaf
+ * to every frame, as an empty backend on the proxy transport is.
  */
 class VanishAcrossBackendsTest {
 
-    private static final Duration GRACE = Duration.ofSeconds(30);
     private static final Duration HOP_WINDOW = Duration.ofSeconds(30);
 
     private final MutableClock clock = new MutableClock(NOW);
@@ -49,118 +58,100 @@ class VanishAcrossBackendsTest {
     private final Network network = new Network();
 
     @Test
-    void aVanishedPlayerWhoMovesToAnotherBackendArrivesHidden() {
+    void aSwitchInTheProxysOrderKeepsTheVanishedPlayerHidden() {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
+        Backend creative = network.start("creative");
+        network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
 
-        survival.quit(ALEX);
-        lobby.join(ALEX);
+        network.switchServer(ALEX, survival, lobby);
 
         assertThat(lobby.isHidden(ALEX)).isTrue();
-        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+        assertThat(creative.listFor(SAM)).containsExactly(ALEX.uuid());
+        assertThat(database.find(ALEX.uuid()).flatMap(StoredVanish::server)).contains("lobby");
     }
 
     @Test
-    void aVanishedPlayerWhoMovesToABackendStartedAfterTheirVanishArrivesHidden() {
+    void aSwitchWhoseRowWasNeverWrittenIsCoveredByTheOriginsDeparture() {
         Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+        database.lose(ALEX.uuid());
+
+        network.switchServer(ALEX, survival, lobby);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+    }
+
+    @Test
+    void aPlayerWhoLeftIsNoLongerListedAnywhere() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+
+        survival.quit(ALEX);
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
+    }
+
+    @Test
+    void theOriginsDepartureArrivingAfterTheTargetsJoinKeepsThePlayerListed() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        Backend creative = network.start("creative");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        Optional<StoredVanish> read = lobby.preLogin(ALEX);
+        lobby.join(ALEX, read);
+        survival.quit(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+        assertThat(creative.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aSwitchToABackendThatHasHeardNoPeerYetKeepsThePlayerHidden() {
+        Backend survival = network.start("survival");
+        network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
         Backend fresh = network.start("fresh");
 
-        survival.quit(ALEX);
-        fresh.join(ALEX);
+        network.switchServer(ALEX, survival, fresh);
 
         assertThat(fresh.isHidden(ALEX)).isTrue();
     }
 
     @Test
-    void aPlayerWhoReappearedArrivesVisibleOnTheNextBackend() {
-        Backend survival = network.start("survival");
-        Backend lobby = network.start("lobby");
-        survival.join(ALEX);
-        survival.toggle(ALEX);
-        survival.toggle(ALEX);
-
-        survival.quit(ALEX);
-        lobby.join(ALEX);
-
-        assertThat(lobby.isHidden(ALEX)).isFalse();
-        assertThat(lobby.listFor(SAM)).isEmpty();
-    }
-
-    @Test
-    void aVanishedPlayerWhoQuitsLeavesEveryNetworkList() {
-        Backend survival = network.start("survival");
-        Backend lobby = network.start("lobby");
-        survival.join(ALEX);
-        survival.toggle(ALEX);
-        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
-
-        survival.quit(ALEX);
-
-        assertThat(lobby.listFor(SAM)).isEmpty();
-    }
-
-    @Test
-    void theOriginsDepartureArrivingAfterTheDestinationReportedThePlayerKeepsThemListed() {
+    void aSwitchToABackendTheTransportCannotReachKeepsThePlayerHidden() {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
         Backend creative = network.start("creative");
+        creative.join(SAM);
+        network.beat();
+        network.deafen("lobby");
         survival.join(ALEX);
         survival.toggle(ALEX);
 
-        // The proxy connects the player to the destination before it lets go of the origin.
-        lobby.join(ALEX);
-        survival.quit(ALEX);
+        network.switchServer(ALEX, survival, lobby);
 
-        assertThat(creative.listFor(SAM)).containsExactly(ALEX.uuid());
+        assertThat(lobby.isHidden(ALEX)).isTrue();
     }
 
     @Test
-    void theEntriesOfABackendThatStopsSendingHeartbeatsExpire() {
+    void aSwitchWithinTheHopWindowOfTheDepartureKeepsThePlayerHidden() {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
-        survival.join(ALEX);
-        survival.toggle(ALEX);
-
-        network.crash("survival");
-        clock.advance(GRACE.plusSeconds(1));
-
-        assertThat(lobby.listFor(SAM)).isEmpty();
-    }
-
-    @Test
-    void aRestartedBackendHearsOfThePlayersItsPeersAreHiding() {
-        Backend survival = network.start("survival");
-        network.start("lobby");
-        survival.join(ALEX);
-        survival.toggle(ALEX);
-
-        network.crash("lobby");
-        Backend restarted = network.start("lobby");
-
-        assertThat(restarted.listFor(SAM)).containsExactly(ALEX.uuid());
-    }
-
-    @Test
-    void aBackendThatRestartsWithinTheHeartbeatWindowTakesItsOldEntriesWithIt() {
-        Backend survival = network.start("survival");
-        Backend lobby = network.start("lobby");
-        survival.join(ALEX);
-        survival.toggle(ALEX);
-
-        network.crash("survival");
-        network.start("survival");
-
-        assertThat(lobby.listFor(SAM)).isEmpty();
-    }
-
-    @Test
-    void aVanishedPlayerWhoSwitchesServersWithinTheHopWindowStaysHidden() {
-        Backend survival = network.start("survival");
-        Backend lobby = network.start("lobby");
+        network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
 
@@ -175,11 +166,13 @@ class VanishAcrossBackendsTest {
     void aSwitchThatLandsAfterTheHopWindowShowsThePlayer() {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
+        network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
 
-        // A transfer slower than the window cannot be told apart from leaving the network and coming back, so the
-        // player lands visible, as a returning player without the persist node does.
+        // When the origin let the player go before the target's login read and the transfer outlasted the window, it
+        // cannot be told apart from leaving the network and coming back, so the player lands visible, as a returning
+        // player without the persist node does.
         survival.quit(ALEX);
         clock.advance(HOP_WINDOW.plusSeconds(1));
         lobby.join(ALEX);
@@ -189,7 +182,7 @@ class VanishAcrossBackendsTest {
     }
 
     @Test
-    void aVanishedPlayerWithoutPersistWhoReturnsAfterTheHopWindowIsVisible() {
+    void aPlayerWithoutPersistWhoRelogsAfterTheHopWindowIsVisible() {
         Backend survival = network.start("survival");
         survival.join(ALEX);
         survival.toggle(ALEX);
@@ -203,20 +196,25 @@ class VanishAcrossBackendsTest {
     }
 
     @Test
-    void aVanishedPlayerWithoutPersistWhoseBackendCrashedReturnsVisible() {
+    void aPlayerWithoutPersistWhoseBackendCrashedReturnsVisibleWhereThePeersAreSeen() {
         Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        Backend creative = network.start("creative");
+        creative.join(SAM);
+        network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
 
         network.crash("survival");
-        Backend restarted = network.start("survival");
-        restarted.join(ALEX);
+        clock.advance(HOP_WINDOW.plusSeconds(1));
+        lobby.join(ALEX);
 
-        assertThat(restarted.isHidden(ALEX)).isFalse();
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+        assertThat(database.find(ALEX.uuid()).map(StoredVanish::vanished)).contains(false);
     }
 
     @Test
-    void aPersistHolderWhoRejoinsTheirRestartedBackendIsStillHidden() {
+    void aPersistHolderComesBackHiddenAfterTheirBackendRestarts() {
         Backend survival = network.start("survival");
         survival.joinHoldingPersist(ALEX);
         survival.toggle(ALEX);
@@ -230,60 +228,194 @@ class VanishAcrossBackendsTest {
     }
 
     @Test
-    void aKeptVanishReadAfterTheJoinStillHidesASwitchingPlayer() {
+    void aPlayerWhoReappearedArrivesVisibleOnTheNextBackend() {
         Backend survival = network.start("survival");
-        database.save(ALEX.uuid(), StoredVanish.vanished(VanishLevel.DEFAULT, NOW));
-        database.markDeparted(ALEX.uuid(), NOW);
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+        survival.toggle(ALEX);
 
-        survival.joinBeforeTheReadFinished(ALEX);
-        survival.lateRead(ALEX);
+        network.switchServer(ALEX, survival, lobby);
 
-        assertThat(survival.isHidden(ALEX)).isTrue();
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+        assertThat(lobby.listFor(SAM)).isEmpty();
     }
 
     @Test
-    void aKeptVanishReadLateDoesNotUndoAChangeMadeAfterTheJoin() {
+    void theEntriesOfABackendThatStopsRunningExpire() {
         Backend survival = network.start("survival");
-        Optional<StoredVanish> readBeforeTheChange =
-                Optional.of(StoredVanish.vanished(VanishLevel.DEFAULT, NOW).departed(NOW));
-        survival.joinBeforeTheReadFinished(ALEX);
-        survival.toggle(ALEX);
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
         survival.toggle(ALEX);
 
-        survival.applyLate(ALEX, readBeforeTheChange);
+        network.crash("survival");
+        clock.advance(HOP_WINDOW.plusSeconds(1));
 
-        assertThat(survival.isHidden(ALEX)).isFalse();
+        assertThat(lobby.listFor(SAM)).isEmpty();
     }
 
-    /** The bus between the backends: delivers each frame to every other running backend, and their heartbeats. */
+    @Test
+    void aBackendThatStartsAgainTakesItsOldEntriesWithIt() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        network.start("survival");
+        clock.advance(Duration.ofSeconds(1));
+        network.beat();
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
+    }
+
+    @Test
+    void whatABackendsNewRunReportsBeforeItsFirstHeartbeatIsKept() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.joinHoldingPersist(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        clock.advance(Duration.ofSeconds(5));
+        Backend restarted = network.start("survival");
+        restarted.joinHoldingPersist(ALEX);
+        clock.advance(Duration.ofSeconds(1));
+        network.beat();
+
+        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aRestartedBackendHearsOfThePlayersItsPeersAreHiding() {
+        Backend survival = network.start("survival");
+        network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("lobby");
+        Backend restarted = network.start("lobby");
+        network.beat();
+
+        assertThat(restarted.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aJoinWhoseReadIsLateHidesAPlayerWhoMayVanishUntilTheReadKeepsThemHidden() {
+        Backend lobby = network.start("lobby");
+        database.save(ALEX.uuid(), StoredVanish.vanished(VanishLevel.DEFAULT, "survival", NOW));
+        database.markDeparted(ALEX.uuid(), "survival", NOW);
+
+        lobby.joinUnread(ALEX, true);
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+        lobby.lateRead(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+    }
+
+    @Test
+    void aLateReadThatDoesNotCarryTheVanishOverRevealsThePlayer() {
+        Backend lobby = network.start("lobby");
+
+        lobby.joinUnread(ALEX, true);
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+        lobby.lateRead(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aJoinWhoseReadIsLateLeavesAPlayerWhoCannotVanishVisible() {
+        Backend lobby = network.start("lobby");
+
+        lobby.joinUnread(ALEX, false);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aLateReadDoesNotUndoAChangeMadeAfterTheJoin() {
+        Backend lobby = network.start("lobby");
+        Optional<StoredVanish> readBeforeTheChange = Optional.of(
+                StoredVanish.vanished(VanishLevel.DEFAULT, "survival", NOW).departed(NOW));
+        lobby.joinUnread(ALEX, true);
+        lobby.toggle(ALEX);
+
+        lobby.applyLate(ALEX, readBeforeTheChange);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aReadThatKeepsFailingLeavesAPlayerWhoMayVanishHidden() {
+        Backend lobby = network.start("lobby");
+        lobby.joinUnread(ALEX, true);
+
+        lobby.readFailed(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+    }
+
+    /** The bus between the backends, and what each one has heard of the others. */
     private final class Network {
 
         private final Map<String, Backend> running = new LinkedHashMap<>();
-        private final Set<String> everStarted = new HashSet<>();
+        private final Map<String, Integer> runs = new HashMap<>();
+        private final Map<String, Map<String, Integer>> runSeen = new HashMap<>();
+        private final Map<String, Set<String>> heard = new HashMap<>();
+        private final Set<String> deaf = new HashSet<>();
 
         Backend start(String name) {
+            runs.merge(name, 1, Integer::sum);
+            heard.put(name, new HashSet<>());
+            runSeen.remove(name);
             Backend started = new Backend(name, this);
-            List<Backend> peers = List.copyOf(running.values());
             running.put(name, started);
-            boolean restart = !everStarted.add(name);
-            for (Backend peer : peers) {
-                if (restart) {
-                    peer.sync.peerStarted(name);
-                } else {
-                    peer.sync.peerFound(name);
-                }
-                started.sync.peerFound(peer.name);
-            }
             return started;
         }
 
         /** The backend stops at once: no departure, no more heartbeats. */
         void crash(String name) {
             running.remove(name);
+            heard.values().forEach(origins -> origins.remove(name));
         }
 
-        boolean isLive(String name) {
-            return running.containsKey(name);
+        /** The backend receives nothing from now on, and has forgotten what it heard. */
+        void deafen(String name) {
+            deaf.add(name);
+            heardBy(name).clear();
+        }
+
+        /** Every running backend's heartbeat reaches every peer that can hear. */
+        void beat() {
+            for (String origin : List.copyOf(running.keySet())) {
+                for (Backend receiver : others(origin)) {
+                    heardBy(receiver.name).add(origin);
+                    Integer before = runSeen.computeIfAbsent(receiver.name, key -> new HashMap<>())
+                            .put(origin, runs.get(origin));
+                    PeerRun run;
+                    if (before == null) {
+                        run = PeerRun.FIRST_HEARD;
+                    } else if (before.equals(runs.get(origin))) {
+                        run = PeerRun.SAME_RUN;
+                    } else {
+                        run = PeerRun.NEW_RUN;
+                    }
+                    receiver.sync.pinged(origin, run);
+                }
+            }
+        }
+
+        /** The proxy's order: the target's login read, then the origin's quit and departure, then the target's join. */
+        void switchServer(PlayerRef who, Backend from, Backend to) {
+            Optional<StoredVanish> read = to.preLogin(who);
+            from.quit(who);
+            to.join(who, read);
         }
 
         void changed(String origin, VanishSync change) {
@@ -294,9 +426,28 @@ class VanishAcrossBackendsTest {
             others(origin).forEach(peer -> peer.sync.departed(origin, player));
         }
 
+        boolean isLive(String viewer, String server) {
+            return server.equals(viewer)
+                    || (running.containsKey(server) && heardBy(viewer).contains(server));
+        }
+
+        List<OnlinePlayer> seenBy(String viewer) {
+            List<OnlinePlayer> seen = new ArrayList<>();
+            running.forEach((name, backend) -> {
+                if (isLive(viewer, name)) {
+                    backend.players.values().forEach(player -> seen.add(new OnlinePlayer(player, name)));
+                }
+            });
+            return seen;
+        }
+
+        private Set<String> heardBy(String receiver) {
+            return heard.computeIfAbsent(receiver, key -> new HashSet<>());
+        }
+
         private List<Backend> others(String origin) {
             return running.values().stream()
-                    .filter(peer -> !peer.name.equals(origin))
+                    .filter(peer -> !peer.name.equals(origin) && !deaf.contains(peer.name))
                     .toList();
         }
     }
@@ -305,7 +456,7 @@ class VanishAcrossBackendsTest {
     private final class Backend {
 
         private final String name;
-        private final Set<UUID> online = new HashSet<>();
+        private final Map<UUID, PlayerRef> players = new ConcurrentHashMap<>();
         private final Set<UUID> hidden = new HashSet<>();
         private final MapStore store = new MapStore();
         private final RememberVanish remember;
@@ -317,7 +468,7 @@ class VanishAcrossBackendsTest {
 
         Backend(String name, Network network) {
             this.name = name;
-            Scheduler scheduler = new OnlineScheduler(online);
+            Scheduler scheduler = new OnlineScheduler(players);
             VanishView view = new VanishView() {
                 @Override
                 public void hide(PlayerRef who, VanishLevel level) {
@@ -330,8 +481,9 @@ class VanishAcrossBackendsTest {
                 }
             };
             VanishBus bus = new BackendBus(name, network);
-            NetworkVanishRoster roster = new NetworkVanishRoster(network::isLive, clock, GRACE);
-            remember = new RememberVanish(database, scheduler, clock, new RecordingLogger());
+            NetworkPresence presence = new SeenPresence(name, network);
+            NetworkVanishRoster roster = new NetworkVanishRoster(presence, clock, HOP_WINDOW);
+            remember = new RememberVanish(database, name, scheduler, clock, new RecordingLogger());
             VanishBuffs buffs = new VanishBuffs() {
                 @Override
                 public void apply(PlayerRef who) {}
@@ -366,26 +518,38 @@ class VanishAcrossBackendsTest {
                     setVanishLevel,
                     remember,
                     store,
+                    view,
+                    levels,
+                    presence,
                     clock,
                     HOP_WINDOW);
             departVanished = new DepartVanished(store, bus, remember);
             listVanished = new ListVanished(store, levels, roster);
-            sync = new VanishNetworkSync(roster, store, view, bus, new OnlinePlayers(online), scheduler);
+            sync = new VanishNetworkSync(roster, store, view, bus, new OnlinePlayers(players), scheduler);
+        }
+
+        Optional<StoredVanish> preLogin(PlayerRef who) {
+            return remember.load(who.uuid());
         }
 
         void join(PlayerRef who) {
-            online.add(who.uuid());
-            applyOnJoin.join(who, remember.load(who.uuid()), false, false);
+            join(who, preLogin(who));
+        }
+
+        void join(PlayerRef who, Optional<StoredVanish> read) {
+            players.put(who.uuid(), who);
+            applyOnJoin.join(who, read, false, false);
         }
 
         void joinHoldingPersist(PlayerRef who) {
-            online.add(who.uuid());
-            applyOnJoin.join(who, remember.load(who.uuid()), true, false);
+            Optional<StoredVanish> read = preLogin(who);
+            players.put(who.uuid(), who);
+            applyOnJoin.join(who, read, true, false);
         }
 
-        void joinBeforeTheReadFinished(PlayerRef who) {
-            online.add(who.uuid());
-            applyOnJoin.join(who, Optional.empty(), false, false);
+        void joinUnread(PlayerRef who, boolean canVanish) {
+            players.put(who.uuid(), who);
+            applyOnJoin.joinUnread(who, false, canVanish);
         }
 
         void lateRead(PlayerRef who) {
@@ -396,22 +560,63 @@ class VanishAcrossBackendsTest {
             applyOnJoin.lateLoad(who, stored, false);
         }
 
+        void readFailed(PlayerRef who) {
+            applyOnJoin.readFailed(who);
+        }
+
         void toggle(PlayerRef who) {
             toggleVanish.toggle(who);
         }
 
         void quit(PlayerRef who) {
             departVanished.depart(who);
-            online.remove(who.uuid());
+            players.remove(who.uuid());
             hidden.remove(who.uuid());
         }
 
         boolean isHidden(PlayerRef who) {
-            return online.contains(who.uuid()) && store.isVanished(who.uuid()) && hidden.contains(who.uuid());
+            return players.containsKey(who.uuid()) && store.isVanished(who.uuid()) && hidden.contains(who.uuid());
         }
 
         List<UUID> listFor(PlayerRef caller) {
             return listVanished.visibleTo(caller);
+        }
+    }
+
+    /** What one backend's network presence knows: the players of the backends it has heard from. */
+    private record SeenPresence(String localServer, Network network) implements NetworkPresence {
+
+        @Override
+        public Optional<OnlinePlayer> find(UUID player) {
+            List<OnlinePlayer> found = online().stream()
+                    .filter(online -> online.player().uuid().equals(player))
+                    .toList();
+            return found.stream()
+                    .filter(online -> online.server().equals(localServer))
+                    .findFirst()
+                    .or(() -> found.stream().findFirst());
+        }
+
+        @Override
+        public Optional<OnlinePlayer> findByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public List<OnlinePlayer> onServer(String server) {
+            return online().stream()
+                    .filter(online -> online.server().equals(server))
+                    .toList();
+        }
+
+        @Override
+        public List<OnlinePlayer> online() {
+            return network.seenBy(localServer);
+        }
+
+        @Override
+        public boolean isLive(String server) {
+            return network.isLive(localServer, server);
         }
     }
 
@@ -439,7 +644,7 @@ class VanishAcrossBackendsTest {
         }
     }
 
-    /** The database every backend shares; like the real table, an older write never replaces a newer one. */
+    /** The database every backend shares, following the real table's rules for each write. */
     private static final class SharedRecords implements VanishRecords {
 
         private final Map<UUID, StoredVanish> rows = new ConcurrentHashMap<>();
@@ -455,13 +660,31 @@ class VanishAcrossBackendsTest {
         }
 
         @Override
-        public void markDeparted(UUID player, Instant at) {
-            rows.computeIfPresent(player, (id, kept) -> kept.vanished() ? kept.departed(at) : kept);
+        public void markDeparted(UUID player, String server, Instant at) {
+            rows.computeIfPresent(
+                    player,
+                    (id, kept) ->
+                            kept.vanished() && kept.server().equals(Optional.of(server)) ? kept.departed(at) : kept);
+        }
+
+        @Override
+        public void markArrived(UUID player, String server) {
+            rows.computeIfPresent(
+                    player,
+                    (id, kept) -> kept.vanished()
+                            ? new StoredVanish(
+                                    true, kept.level(), Optional.of(server), kept.updatedAt(), Optional.empty())
+                            : kept);
+        }
+
+        /** The row never reached the database, as when its write failed. */
+        void lose(UUID player) {
+            rows.remove(player);
         }
     }
 
     /** Runs everything at once, except entity work for a player who is not online on this backend, which it drops. */
-    private record OnlineScheduler(Set<UUID> online) implements Scheduler {
+    private record OnlineScheduler(Map<UUID, PlayerRef> online) implements Scheduler {
 
         @Override
         public void onGlobal(Runnable task) {
@@ -475,7 +698,7 @@ class VanishAcrossBackendsTest {
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
-            if (online.contains(player.uuid())) {
+            if (online.containsKey(player.uuid())) {
                 task.run();
             }
         }
@@ -492,7 +715,7 @@ class VanishAcrossBackendsTest {
     }
 
     /** The players online on one backend. */
-    private record OnlinePlayers(Set<UUID> online) implements PlayerLookup {
+    private record OnlinePlayers(Map<UUID, PlayerRef> online) implements PlayerLookup {
 
         @Override
         public Optional<PlayerRef> findOnlineByName(String name) {
@@ -501,15 +724,12 @@ class VanishAcrossBackendsTest {
 
         @Override
         public Optional<PlayerRef> findByUuid(UUID uuid) {
-            if (!online.contains(uuid)) {
-                return Optional.empty();
-            }
-            return Optional.of(uuid.equals(ALEX.uuid()) ? ALEX : SAM);
+            return Optional.ofNullable(online.get(uuid));
         }
 
         @Override
         public boolean isOnline(UUID uuid) {
-            return online.contains(uuid);
+            return online.containsKey(uuid);
         }
     }
 

@@ -16,11 +16,11 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
-import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ClusterPeers;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.command.VanishCommand;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycleListener;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLoginListener;
@@ -46,7 +46,6 @@ import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
 import com.uxplima.uxmessentials.vanish.application.VanishNetworkSync;
 import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
-import com.uxplima.uxmessentials.vanish.application.port.PeerLiveness;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
@@ -88,15 +87,16 @@ public final class VanishWiring {
 
     /**
      * Build the vanish adapters and use cases from {@code plugin}, {@code ctx}, the shared {@code persistence}, the
-     * cross-server {@code bus}, and the heartbeat roster of the peer backends ({@code peers}, empty when the bus is off).
+     * cross-server {@code bus}, and the network {@code presence} that says which backend each player is on and which
+     * backends are running.
      */
     public static Wired wire(
-            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, Optional<ClusterPeers> peers) {
+            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, NetworkPresence presence) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
-        Objects.requireNonNull(peers, "peers");
+        Objects.requireNonNull(presence, "presence");
         KernelPorts kernel = ctx.kernel();
         VanishConfig config = VanishConfig.from(ctx.config());
 
@@ -109,8 +109,12 @@ public final class VanishWiring {
         VanishPickupPreferences pickup = new PdcVanishPickup(plugin.getServer(), config.pickupItems());
 
         RememberVanish remember = new RememberVanish(
-                VanishRecordStores.jooq(persistence), kernel.scheduler(), Clock.systemUTC(), kernel.log());
-        CrossServer cross = crossServer(config, bus, peers, store, view, kernel);
+                VanishRecordStores.jooq(persistence),
+                presence.localServer(),
+                kernel.scheduler(),
+                Clock.systemUTC(),
+                kernel.log());
+        CrossServer cross = crossServer(config, bus, presence, store, view, kernel);
         NetworkVanishStore network = cross.network();
         ToggleVanish toggleVanish =
                 new ToggleVanish(store, view, levels, notifier, buffs, cross.bus(), kernel.events(), remember);
@@ -118,7 +122,16 @@ public final class VanishWiring {
         ListVanished listVanished = new ListVanished(store, levels, network);
         JoinVanishReconciler reconciler = new JoinVanishReconciler(network, store);
         ApplyVanishOnJoin applyOnJoin = new ApplyVanishOnJoin(
-                reconciler, toggleVanish, setVanishLevel, remember, store, Clock.systemUTC(), config.hopWindow());
+                reconciler,
+                toggleVanish,
+                setVanishLevel,
+                remember,
+                store,
+                view,
+                levels,
+                presence,
+                Clock.systemUTC(),
+                config.hopWindow());
         DepartVanished departVanished = new DepartVanished(store, cross.bus(), remember);
         VanishLoginListener login =
                 new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());
@@ -198,26 +211,22 @@ public final class VanishWiring {
 
     /**
      * Wire the cross-server vanish sync, or the inert shape when it is off. With {@code cross-server=true} it builds the
-     * network-wide view, which drops a peer's entries once the heartbeat roster stops hearing from it, the bus bridge
+     * network-wide view, which drops a peer's entries once the network presence stops counting it as running, the bus bridge
      * that publishes and receives vanish frames, and the sync that applies what the peers send. With it off it returns
      * the disabled bus and empty view, so every cross-server seam is a harmless no-op and same-server vanish is
-     * unchanged. With the network bus itself off nothing ever arrives, so the missing roster only means no peer is live.
+     * unchanged.
      */
     private static CrossServer crossServer(
             VanishConfig config,
             Bus bus,
-            Optional<ClusterPeers> peers,
+            NetworkPresence presence,
             VanishStore store,
             VanishView view,
             KernelPorts kernel) {
         if (!config.crossServer()) {
             return new CrossServer(VanishBus.disabled(), NetworkVanishStore.empty());
         }
-        PeerLiveness liveness = peers.<PeerLiveness>map(
-                        roster -> origin -> roster.isLive(origin, System.currentTimeMillis()))
-                .orElse(origin -> false);
-        Duration grace = peers.map(ClusterPeers::livenessWindow).orElse(Duration.ZERO);
-        NetworkVanishRoster network = new NetworkVanishRoster(liveness, Clock.systemUTC(), grace);
+        NetworkVanishRoster network = new NetworkVanishRoster(presence, Clock.systemUTC(), config.hopWindow());
         BusVanishBus vanishBus = new BusVanishBus(bus.publisher(), true);
         vanishBus.subscribe(
                 new VanishNetworkSync(network, store, view, vanishBus, kernel.playerLookup(), kernel.scheduler()));
