@@ -20,6 +20,7 @@ import java.util.function.Predicate;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
@@ -134,7 +135,8 @@ class LiveTargetsTest {
                 notifier.notifier(),
                 false,
                 CLOCK,
-                presence);
+                presence,
+                SeenVisibility.ALWAYS_VISIBLE);
 
         seen.seen(STAFF, REMOTE);
 
@@ -154,7 +156,8 @@ class LiveTargetsTest {
                 notifier.notifier(),
                 false,
                 CLOCK,
-                presence);
+                presence,
+                SeenVisibility.ALWAYS_VISIBLE);
 
         seen.seen(STAFF, LOCAL);
 
@@ -163,6 +166,41 @@ class LiveTargetsTest {
                         STAFF,
                         "moderation.seen.online-here",
                         Map.of("player", "Alex", "first", "2026-01-02T03:04:05Z", "server", "survival-1")));
+    }
+
+    @Test
+    void seenShowsAVanishedPlayerOnAnotherBackendAsLastSeenToSomeoneWhoMayNotSeeThem() {
+        Seen seen = seenHiding(REMOTE, new OnlyOnline(LOCAL));
+
+        seen.seen(STAFF, REMOTE);
+
+        assertThat(notifier.keys()).containsExactly("moderation.seen.report");
+    }
+
+    @Test
+    void seenShowsAVanishedPlayerHereAsLastSeenToSomeoneWhoMayNotSeeThem() {
+        Seen seen = seenHiding(LOCAL, new OnlyOnline(LOCAL));
+
+        seen.seen(STAFF, LOCAL);
+
+        assertThat(notifier.keys()).containsExactly("moderation.seen.report");
+    }
+
+    /** A /seen whose records hold both players, joined an hour ago, and whose vanish hides {@code hidden}. */
+    private Seen seenHiding(PlayerRef hidden, PlayerLookup players) {
+        InMemoryIpBans repository = new InMemoryIpBans();
+        Instant joined = CLOCK.instant().minus(Duration.ofHours(1));
+        repository.recordSeen(SeenRecord.firstJoin(LOCAL, Optional.empty(), joined));
+        repository.recordSeen(SeenRecord.firstJoin(REMOTE, Optional.empty(), joined));
+        return new Seen(
+                repository,
+                new IpAlts(new NoIpHistory(), address -> address),
+                players,
+                notifier.notifier(),
+                false,
+                CLOCK,
+                presence,
+                (viewer, target) -> target.equals(hidden));
     }
 
     /** The live side of this backend: who was kicked and who is frozen. */

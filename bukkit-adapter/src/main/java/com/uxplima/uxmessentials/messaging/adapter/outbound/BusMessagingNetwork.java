@@ -63,6 +63,7 @@ public final class BusMessagingNetwork implements MessagingNetwork {
                 message.targetServer(),
                 message.sender().uuid(),
                 message.sender().name(),
+                message.senderSeeLevel(),
                 message.target().uuid(),
                 message.target().name(),
                 message.body().value(),
@@ -118,6 +119,7 @@ public final class BusMessagingNetwork implements MessagingNetwork {
                 .ifPresent(body -> boundRelay.receive(new RemoteMessage(
                         frame.messageId(),
                         new PlayerRef(frame.senderUuid(), frame.senderName()),
+                        frame.senderSeeLevel(),
                         new PlayerRef(frame.targetUuid(), frame.targetName()),
                         frame.targetServer(),
                         body,

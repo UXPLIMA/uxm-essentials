@@ -130,7 +130,8 @@ public final class SendMessage {
         return deliver(sender, target, body);
     }
 
-    private Result<Unit, MessagingError> offline(PlayerRef sender, PlayerRef target, MessageBody body) {
+    /** The offline path: mail when offline-to-mail is on, else the offline line. Writes storage, so off the tick. */
+    Result<Unit, MessagingError> offline(PlayerRef sender, PlayerRef target, MessageBody body) {
         // A muted sender is gated even on the mail fallback, mirroring SendMail's mute gate.
         if (mute.isMuted(sender)) {
             return reject(sender, MessagingError.SENDER_MUTED);
@@ -249,9 +250,11 @@ public final class SendMessage {
     }
 
     /**
-     * The sender's side of a message sent to another backend: tell the sender how it went, with the same lines a
-     * message to a player here would have produced. An ignore still reads as sent, and a target who left reads as
-     * offline (or, for a reply, as no one to reply to).
+     * The sender's side of a message sent to another backend, on the sender's thread: tell the sender how it went, with
+     * the same lines a message to a player here would have produced. An ignore still reads as sent. An offline answer
+     * here only shows the offline line (or, for a reply, no one to reply to) and never writes mail: the caller sends
+     * an explicit offline answer to a message through {@link #offline} on the async lane instead, and an answer that
+     * never came may still mean the target read it live.
      */
     void conclude(RemoteMessage message, RemoteAnswer answer) {
         PlayerRef sender = message.sender();
@@ -272,13 +275,8 @@ public final class SendMessage {
             }
             case TOGGLED_OFF -> reject(sender, MessagingError.TARGET_TOGGLED_OFF);
             case REPLIES_OFF -> reject(sender, MessagingError.NO_REPLY_TARGET);
-            case OFFLINE -> {
-                if (message.reply()) {
-                    reject(sender, MessagingError.NO_REPLY_TARGET);
-                } else {
-                    offline(sender, target, body);
-                }
-            }
+            case OFFLINE ->
+                reject(sender, message.reply() ? MessagingError.NO_REPLY_TARGET : MessagingError.TARGET_OFFLINE);
         }
     }
 

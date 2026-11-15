@@ -127,6 +127,7 @@ public final class ModerationCommands {
                         messages,
                         sink,
                         (a, t) -> services.freeze().unfreeze(a, t)),
+                // Both read the database (the seen record, the vanish row), so they run on the async lane.
                 target(
                         "seen",
                         "uxmessentials.moderation.seen",
@@ -134,7 +135,7 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.seen().seen(a, t)),
+                        (a, t) -> scheduler.async(() -> services.seen().seen(a, t))),
                 target(
                         "seenip",
                         "uxmessentials.moderation.seen",
@@ -142,7 +143,7 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.seen().seenIp(a, t)),
+                        (a, t) -> scheduler.async(() -> services.seen().seenIp(a, t))),
                 new AltsCommand(services, messages, sink, scheduler),
                 new CommandSpyCommand(services, messages, sink),
                 new LockdownCommand(services, messages, sink, scheduler),

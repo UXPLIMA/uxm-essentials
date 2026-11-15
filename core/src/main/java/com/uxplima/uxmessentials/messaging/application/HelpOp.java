@@ -31,6 +31,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * <p>On a network the request also reaches the staff of every other backend, with the requester's server in the line
  * so staff know where to go. The event is published on the requester's backend only. With no staff here, the
  * requester is told the request was sent as long as another backend has players on it, since its staff may answer.
+ * Presence cannot tell staff from other players; the line names nobody, so it reveals at most that another backend
+ * is not empty.
  */
 public final class HelpOp {
 

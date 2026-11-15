@@ -1324,8 +1324,11 @@ public final class PluginModule {
         // target through, built here from the one vanish authority; with vanish disabled the seam stays absent and
         // "can see" answers yes, which is what a server without vanish means.
         if (links.vanishStore != null && links.vanishLevelResolver != null && links.vanishNetwork != null) {
-            links.placeholders.visibility(
-                    new AuthorityVanishVisibility(links.vanishStore, links.vanishNetwork, links.vanishLevelResolver));
+            links.placeholders.visibility(new AuthorityVanishVisibility(
+                    links.vanishStore,
+                    links.vanishNetwork,
+                    links.vanishLevelResolver,
+                    kernel.playerLookup()::isOnline));
         }
         if (links.tradeSessions != null) {
             links.placeholders.trade(new SessionsTradePlaceholders(links.tradeSessions));
@@ -2726,7 +2729,8 @@ public final class PluginModule {
                 : new com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility(
                         vanishStore,
                         java.util.Objects.requireNonNull(links.vanishNetwork),
-                        java.util.Objects.requireNonNull(links.vanishLevelResolver));
+                        java.util.Objects.requireNonNull(links.vanishLevelResolver),
+                        ctx.kernel().playerLookup()::isOnline);
         MessagingWiring.Wired wired = MessagingWiring.wire(
                 plugin,
                 ctx,
@@ -2782,6 +2786,24 @@ public final class PluginModule {
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }
 
+    /**
+     * What keeps {@code /seen} from showing a vanished player as online to someone who may not see them: the vanish
+     * authority here and the vanish rows every backend shares, or nothing to hide with the vanish module disabled.
+     */
+    private static com.uxplima.uxmessentials.moderation.application.port.SeenVisibility seenVisibility(
+            ContextLinks links, Persistence persistence, ModuleContext ctx) {
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver levels = links.vanishLevelResolver;
+        if (vanishStore == null || levels == null) {
+            return com.uxplima.uxmessentials.moderation.application.port.SeenVisibility.ALWAYS_VISIBLE;
+        }
+        return new com.uxplima.uxmessentials.moderation.adapter.outbound.VanishSeenVisibility(
+                vanishStore,
+                com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence),
+                levels,
+                ctx.kernel().playerLookup()::isOnline);
+    }
+
     private static void wireModeration(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -2824,7 +2846,8 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
                 ipCapture.tokens(),
-                links.presence);
+                links.presence,
+                seenVisibility(links, persistence, ctx));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

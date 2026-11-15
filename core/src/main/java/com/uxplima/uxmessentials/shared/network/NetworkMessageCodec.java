@@ -194,6 +194,7 @@ public final class NetworkMessageCodec {
                 out.writeUTF(privateMessage.targetServer());
                 writeUuid(out, privateMessage.senderUuid());
                 out.writeUTF(privateMessage.senderName());
+                out.writeInt(privateMessage.senderSeeLevel());
                 writeUuid(out, privateMessage.targetUuid());
                 out.writeUTF(privateMessage.targetName());
                 out.writeUTF(privateMessage.body());
@@ -266,6 +267,7 @@ public final class NetworkMessageCodec {
                         in.readUTF(),
                         readUuid(in),
                         in.readUTF(),
+                        in.readInt(),
                         readUuid(in),
                         in.readUTF(),
                         in.readUTF(),

@@ -108,8 +108,20 @@ class CrossServerMessagingTest {
     }
 
     @Test
-    void aVanishedTargetLooksOfflineToASenderWhoCannotSeeThem() {
-        network.vanished.add(BOB.uuid());
+    void aVanishedTargetLooksOfflineToASenderWhoseBackendKnowsTheyAreVanished() {
+        network.crossServerVanish = true;
+        lobby.vanishedHere.add(BOB.uuid());
+
+        survival.msg(ALEX, "Bob", "hi");
+
+        assertThat(survival.lines()).containsExactly("Alex: msg.target-offline");
+        assertThat(lobby.lines()).isEmpty();
+    }
+
+    @Test
+    void aTargetVanishedOnTheirOwnBackendLooksOfflineWhenTheSenderBackendCannotKnow() {
+        lobby.vanishedHere.add(BOB.uuid());
+        lobby.spy(MOD);
 
         survival.msg(ALEX, "Bob", "hi");
 
@@ -119,12 +131,33 @@ class CrossServerMessagingTest {
 
     @Test
     void aVanishedTargetStillGetsTheMessageOfASenderWhoCanSeeThem() {
-        network.vanished.add(BOB.uuid());
+        lobby.vanishedHere.add(BOB.uuid());
         network.seeVanished.add(ALEX.uuid());
 
         survival.msg(ALEX, "Bob", "hi");
 
         assertThat(lobby.lines()).containsExactly("Bob: received from Alex: hi");
+    }
+
+    @Test
+    void aReplyToAPartnerWhoVanishedSinceFindsNoOne() {
+        survival.msg(ALEX, "Bob", "hi");
+        lobby.vanishedHere.add(BOB.uuid());
+
+        survival.reply.reply(ALEX, body("still there?"));
+
+        assertThat(survival.lines()).containsExactly("Alex: sent to Bob: hi", "Alex: msg.no-reply-target");
+        assertThat(lobby.lines()).containsExactly("Bob: received from Alex: hi");
+    }
+
+    @Test
+    void aBackendWhereAnotherPluginRunsPrivateMessagesAnswersOffline() {
+        lobby.steppedBack = true;
+
+        survival.msg(ALEX, "Bob", "hi");
+
+        assertThat(survival.lines()).containsExactly("Alex: msg.target-offline");
+        assertThat(lobby.lines()).isEmpty();
     }
 
     @Test
@@ -227,6 +260,54 @@ class CrossServerMessagingTest {
     }
 
     @Test
+    void aTargetWhoLeftBecomesMailWhenOfflineToMailIsOn() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        Backend to = mailing.backend("lobby");
+        from.join(ALEX);
+        to.join(BOB);
+        to.connected.remove(BOB.uuid());
+
+        from.msg(ALEX, "Bob", "hi");
+
+        assertThat(from.lines()).containsExactly("Alex: msg.sent-to-mail{player=Bob}");
+        assertThat(mailing.mail).extracting(item -> item.body().value()).containsExactly("hi");
+    }
+
+    @Test
+    void anUnansweredMessageNeverBecomesMail() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        mailing.backend("lobby").join(BOB);
+        from.join(ALEX);
+        mailing.unreachable.add("lobby");
+
+        from.msg(ALEX, "Bob", "hi");
+        from.endWaits();
+
+        assertThat(from.lines()).containsExactly("Alex: msg.target-offline");
+        assertThat(mailing.mail).isEmpty();
+    }
+
+    @Test
+    void anAnswerThatArrivesAfterTheWaitStillTellsTheSenderAndWritesNoMail() {
+        Network mailing = new Network(true);
+        Backend from = mailing.backend("survival");
+        Backend to = mailing.backend("lobby");
+        from.join(ALEX);
+        to.join(BOB);
+        mailing.holdAnswers = true;
+
+        from.msg(ALEX, "Bob", "hi");
+        from.endWaits();
+        mailing.releaseAnswers();
+
+        assertThat(from.lines()).containsExactly("Alex: msg.target-offline", "Alex: sent to Bob: hi");
+        assertThat(to.lines()).containsExactly("Bob: received from Alex: hi");
+        assertThat(mailing.mail).isEmpty();
+    }
+
+    @Test
     void aBackendThatAnsweredIsNotAskedAgainWhenTheWaitEnds() {
         survival.msg(ALEX, "Bob", "hi");
 
@@ -288,14 +369,40 @@ class CrossServerMessagingTest {
     /** The shared bus, the shared database and the presence view every backend reads. */
     private static final class Network {
 
+        final boolean offlineToMail;
         final Map<String, Backend> backends = new LinkedHashMap<>();
         final Map<UUID, OnlinePlayer> online = new LinkedHashMap<>();
         final Map<UUID, IgnoreList> ignores = new HashMap<>();
+        final List<MailItem> mail = new ArrayList<>();
         final Set<UUID> muted = new HashSet<>();
-        final Set<UUID> vanished = new HashSet<>();
         final Set<UUID> seeVanished = new HashSet<>();
         final Set<String> unreachable = new HashSet<>();
+        final List<Runnable> heldAnswers = new ArrayList<>();
         boolean deliverTwice;
+        boolean crossServerVanish;
+        boolean holdAnswers;
+
+        Network() {
+            this(false);
+        }
+
+        Network(boolean offlineToMail) {
+            this.offlineToMail = offlineToMail;
+        }
+
+        /** Deliver the answers held back so far, as a bus that was only slow finally does. */
+        void releaseAnswers() {
+            holdAnswers = false;
+            List<Runnable> due = List.copyOf(heldAnswers);
+            heldAnswers.clear();
+            due.forEach(Runnable::run);
+        }
+
+        /** Whether any backend but {@code server} hides {@code player}. */
+        boolean vanishedElsewhere(String server, UUID player) {
+            return backends.values().stream()
+                    .anyMatch(backend -> !backend.name.equals(server) && backend.vanishedHere.contains(player));
+        }
 
         Backend backend(String name) {
             Backend backend = new Backend(this, name);
@@ -326,6 +433,8 @@ class CrossServerMessagingTest {
         final Set<UUID> connected = new HashSet<>();
         final Set<UUID> toggledOff = new HashSet<>();
         final Set<UUID> repliesOff = new HashSet<>();
+        final Set<UUID> vanishedHere = new HashSet<>();
+        boolean steppedBack;
         final Map<UUID, String> away = new HashMap<>();
         final Set<PlayerRef> spies = new HashSet<>();
         final List<PlayerRef> staff = new ArrayList<>();
@@ -348,8 +457,7 @@ class CrossServerMessagingTest {
             Delivery delivery = new Delivery();
             Scheduler scheduler = new BackendScheduler();
             NetworkPresence presence = new Presence();
-            VanishVisibility vanish = (viewer, target) ->
-                    network.vanished.contains(target.uuid()) && !network.seeVanished.contains(viewer.uuid());
+            VanishVisibility vanish = new Vanish();
             ReplyRoutingStore replyRouting = new Switch(repliesOff);
             SendMessage sendMessage = new SendMessage(
                     delivery,
@@ -359,13 +467,14 @@ class CrossServerMessagingTest {
                     new Spies(),
                     who -> network.muted.contains(who.uuid()),
                     (AfkStatus) who -> Optional.ofNullable(away.get(who.uuid())),
-                    new NoMail(),
-                    false,
+                    new Mail(),
+                    network.offlineToMail,
                     notifier,
                     events,
                     CLOCK);
             Bus bus = new Bus();
-            this.relay = new RelayPrivateMessage(sendMessage, replyRouting, vanish, presence, bus, notifier, scheduler);
+            this.relay = new RelayPrivateMessage(
+                    sendMessage, replyRouting, vanish, presence, bus, notifier, scheduler, () -> steppedBack);
             this.reply = new Reply(
                     sendMessage,
                     new Conversations(),
@@ -523,7 +632,12 @@ class CrossServerMessagingTest {
 
             @Override
             public void answer(RemoteAnswer answer) {
-                network.peersOf(name).forEach(peer -> peer.relay.receive(answer));
+                Runnable deliver = () -> network.peersOf(name).forEach(peer -> peer.relay.receive(answer));
+                if (network.holdAnswers) {
+                    network.heldAnswers.add(deliver);
+                } else {
+                    deliver.run();
+                }
             }
 
             @Override
@@ -534,6 +648,65 @@ class CrossServerMessagingTest {
             @Override
             public void publish(RemoteStaffChat chat) {
                 network.peersOf(name).forEach(peer -> peer.staffChat.receive(chat, name));
+            }
+        }
+
+        /**
+         * Vanish with flat levels: a viewer sees vanished players or does not. This backend knows whom it hides; it
+         * knows whom the others hide only while cross-server vanish is on.
+         */
+        private final class Vanish implements VanishVisibility {
+
+            @Override
+            public boolean isHiddenFrom(PlayerRef viewer, PlayerRef target) {
+                if (seeLevel(viewer) > 0) {
+                    return false;
+                }
+                if (connected.contains(target.uuid())) {
+                    return vanishedHere.contains(target.uuid());
+                }
+                return network.crossServerVanish && network.vanishedElsewhere(name, target.uuid());
+            }
+
+            @Override
+            public int seeLevel(PlayerRef viewer) {
+                return network.seeVanished.contains(viewer.uuid()) ? 1 : 0;
+            }
+
+            @Override
+            public boolean isHiddenHereFrom(PlayerRef viewer, int viewerSeeLevel, PlayerRef target) {
+                return vanishedHere.contains(target.uuid()) && viewerSeeLevel < 1;
+            }
+        }
+
+        /** The mail every backend writes to the shared database. */
+        private final class Mail implements MailRepository {
+
+            @Override
+            public MailBox load(PlayerRef recipient) {
+                return MailBox.empty(recipient);
+            }
+
+            @Override
+            public long unreadCount(PlayerRef recipient) {
+                return 0;
+            }
+
+            @Override
+            public MailItem append(MailItem item) {
+                network.mail.add(item);
+                return item;
+            }
+
+            @Override
+            public void markAllRead(PlayerRef recipient) {}
+
+            @Override
+            public void clear(PlayerRef recipient) {}
+
+            @Override
+            public int deleteSentBefore(Instant cutoff) {
+                return 0;
             }
         }
 
@@ -680,36 +853,6 @@ class CrossServerMessagingTest {
         @Override
         public boolean toggle(PlayerRef who) {
             throw new UnsupportedOperationException();
-        }
-    }
-
-    /** Mail is off in these tests: offline-to-mail is disabled, so nothing may write here. */
-    private static final class NoMail implements MailRepository {
-
-        @Override
-        public MailBox load(PlayerRef recipient) {
-            return MailBox.empty(recipient);
-        }
-
-        @Override
-        public long unreadCount(PlayerRef recipient) {
-            return 0;
-        }
-
-        @Override
-        public MailItem append(MailItem item) {
-            throw new AssertionError("mail written with offline-to-mail off");
-        }
-
-        @Override
-        public void markAllRead(PlayerRef recipient) {}
-
-        @Override
-        public void clear(PlayerRef recipient) {}
-
-        @Override
-        public int deleteSentBefore(Instant cutoff) {
-            return 0;
         }
     }
 }

@@ -11,13 +11,20 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * @param id identifies the message; the answer names it
  * @param sender who sent it
+ * @param senderSeeLevel the vanish see level the sender holds on their backend
  * @param target who it is for
  * @param targetServer the backend the target was online on when it was sent
  * @param body the message
  * @param reply whether it is a {@code /reply}, which the target's reply-routing switch also gates
  */
 public record RemoteMessage(
-        UUID id, PlayerRef sender, PlayerRef target, String targetServer, MessageBody body, boolean reply) {
+        UUID id,
+        PlayerRef sender,
+        int senderSeeLevel,
+        PlayerRef target,
+        String targetServer,
+        MessageBody body,
+        boolean reply) {
 
     public RemoteMessage {
         Objects.requireNonNull(id, "id");

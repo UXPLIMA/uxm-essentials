@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.messaging.adapter.outbound;
 
 import java.util.Objects;
+import java.util.UUID;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.messaging.application.port.VanishVisibility;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -20,7 +22,9 @@ import org.jspecify.annotations.NullMarked;
  * so the layered see/use semantics apply here exactly as they do in the world).
  *
  * <p>A target on another backend of the network is not in the local store, so the network-wide vanish view answers for
- * them: a player vanished elsewhere is hidden from {@code /msg} here exactly as they would be on their own backend.
+ * them, as far as it knows (it is empty with {@code cross-server} off; the target's backend then refuses the message
+ * itself through {@link #isHiddenHereFrom}). A target online here is judged by the local store alone: the network view
+ * never hears this backend's own reveals, so an entry left in it must not hide a player standing here.
  *
  * <p>Bound only when the vanish module is enabled; with vanish off the wiring binds {@link VanishVisibility#ALWAYS_VISIBLE}
  * instead, so messaging degrades to "no one is hidden" rather than failing.
@@ -31,11 +35,14 @@ public final class AuthorityVanishVisibility implements VanishVisibility {
     private final VanishStore store;
     private final NetworkVanishStore network;
     private final VanishLevelResolver levels;
+    private final Predicate<UUID> onlineHere;
 
-    public AuthorityVanishVisibility(VanishStore store, NetworkVanishStore network, VanishLevelResolver levels) {
+    public AuthorityVanishVisibility(
+            VanishStore store, NetworkVanishStore network, VanishLevelResolver levels, Predicate<UUID> onlineHere) {
         this.store = Objects.requireNonNull(store, "store");
         this.network = Objects.requireNonNull(network, "network");
         this.levels = Objects.requireNonNull(levels, "levels");
+        this.onlineHere = Objects.requireNonNull(onlineHere, "onlineHere");
     }
 
     @Override
@@ -46,11 +53,23 @@ public final class AuthorityVanishVisibility implements VanishVisibility {
             return false;
         }
         int seeLevel = levels.seeLevel(viewer);
-        if (!store.snapshot().canSee(viewer.uuid(), target.uuid(), seeLevel)) {
-            return true;
+        if (onlineHere.test(target.uuid())) {
+            return !store.snapshot().canSee(viewer.uuid(), target.uuid(), seeLevel);
         }
         return network.levelOf(target.uuid())
                 .filter(level -> !VanishLevels.sees(seeLevel, level))
                 .isPresent();
+    }
+
+    @Override
+    public int seeLevel(PlayerRef viewer) {
+        return levels.seeLevel(Objects.requireNonNull(viewer, "viewer"));
+    }
+
+    @Override
+    public boolean isHiddenHereFrom(PlayerRef viewer, int viewerSeeLevel, PlayerRef target) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(target, "target");
+        return !store.snapshot().canSee(viewer.uuid(), target.uuid(), viewerSeeLevel);
     }
 }

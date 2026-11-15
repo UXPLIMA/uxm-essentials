@@ -47,6 +47,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -118,8 +119,11 @@ public final class MessagingWiring {
         // Private messages to players on other backends and help requests for their staff ride the shared bus; with
         // the network off the publisher discards them and presence knows only this backend, so nothing changes.
         BusMessagingNetwork network = new BusMessagingNetwork(bus.publisher(), kernel.log());
-        MessagingServices services =
-                assemble(kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, Clock.systemUTC());
+        // Where uxmChat runs private messages, its ignore lists and toggles decide; a message from another backend is
+        // then answered as offline here rather than judged by this module's own, unused stores.
+        UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
+        MessagingServices services = assemble(
+                kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, chat, Clock.systemUTC());
         network.bind(services.relay(), services.helpOp());
         bus.registry().register(network::onFrame);
         MailExpirySweep sweep = new MailExpirySweep(
@@ -165,6 +169,7 @@ public final class MessagingWiring {
             VanishVisibility vanish,
             BusMessagingNetwork network,
             NetworkPresence presence,
+            UxmChatStepBack chat,
             Clock clock) {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
@@ -182,7 +187,14 @@ public final class MessagingWiring {
                 kernel.events(),
                 clock);
         RelayPrivateMessage relay = new RelayPrivateMessage(
-                sendMessage, stores.replyRouting(), vanish, presence, network, notifier, kernel.scheduler());
+                sendMessage,
+                stores.replyRouting(),
+                vanish,
+                presence,
+                network,
+                notifier,
+                kernel.scheduler(),
+                () -> chat.covers(UxmChatStepBack.PRIVATE_MESSAGES));
         return new MessagingServices(
                 sendMessage,
                 relay,

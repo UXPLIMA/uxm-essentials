@@ -5,8 +5,8 @@ import java.util.UUID;
 
 /**
  * A private message sent from the origin backend to a player online on {@code targetServer}. Every backend receives
- * the frame, and only the one named {@code targetServer} acts on it: it applies the recipient's own gates (message
- * toggle, reply routing, ignore list), delivers the line, and answers with a {@link PrivateMessageAnswerFrame}. The
+ * the frame, and only the one named {@code targetServer} acts on it: it applies the recipient's own gates (vanish,
+ * message toggle, reply routing, ignore list), delivers the line, and answers with a {@link PrivateMessageAnswerFrame}. The
  * recipient's gates live only on the backend they are connected to, which is why the decision is made there and not
  * by the sender's backend.
  *
@@ -15,6 +15,8 @@ import java.util.UUID;
  * @param targetServer the backend the recipient was online on when the message was sent
  * @param senderUuid the sender's account
  * @param senderName the sender's name
+ * @param senderSeeLevel the vanish see level the sender holds on their backend, so the target's backend can hide a
+ *     player it has vanished from a sender who may not see them
  * @param targetUuid the recipient's account
  * @param targetName the recipient's name
  * @param body the message as the sender's backend escaped it, ready to sit inside a catalog line
@@ -26,6 +28,7 @@ public record PrivateMessageFrame(
         String targetServer,
         UUID senderUuid,
         String senderName,
+        int senderSeeLevel,
         UUID targetUuid,
         String targetName,
         String body,

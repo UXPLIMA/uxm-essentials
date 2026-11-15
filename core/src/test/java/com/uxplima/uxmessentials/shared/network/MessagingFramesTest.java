@@ -20,7 +20,7 @@ class MessagingFramesTest {
     @Test
     void aPrivateMessageCrossesTheWireUnchanged() {
         PrivateMessageFrame sent =
-                new PrivateMessageFrame("survival-1", ID, "lobby-1", ALEX, "Alex", BOB, "Bob", "hi there", true);
+                new PrivateMessageFrame("survival-1", ID, "lobby-1", ALEX, "Alex", 2, BOB, "Bob", "hi there", true);
 
         assertThat(roundTrip(sent)).isEqualTo(sent);
     }
