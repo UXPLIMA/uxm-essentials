@@ -24,8 +24,11 @@ public final class KitMapper {
 
     public ImportedKit map(EssXKit src) {
         Objects.requireNonNull(src, "src");
+        // EssentialsX reads a negative delay as "each player may claim this kit once", not as a cooldown.
+        boolean oneTime = src.delaySeconds() < 0;
         KitDefinition definition = KitDefinition.repeatable(
-                KitId.of(src.name()), items(src.items()), Duration.ofSeconds(src.delaySeconds()));
+                        KitId.of(src.name()), items(src.items()), Duration.ofSeconds(oneTime ? 0L : src.delaySeconds()))
+                .withOneTime(oneTime);
         return new ImportedKit(definition);
     }
 

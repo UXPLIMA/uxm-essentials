@@ -241,6 +241,75 @@ class UserRecordWriterTest {
                 .isEqualTo("a".repeat(MessageBody.MAX_LENGTH - 1));
     }
 
+    @Test
+    void underSkipIfPresentAWalletThatHoldsMoneyKeepsItsBalance() {
+        wallets.upsertBalance(STEVE_REF, Money.of(COINS, 500));
+
+        RecordResult result = writer().write(onlyBalance("1250.5"), SKIP);
+
+        assertThat(wallets.balance(STEVE_REF, COINS)).contains(Money.of(COINS, 500));
+        assertThat(result.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(result.notes()).contains("balance=kept");
+    }
+
+    @Test
+    void aWalletAtZeroHoldsNoBalanceSoTheImportedOneLandsUnderSkipIfPresent() {
+        wallets.upsertBalance(STEVE_REF, Money.of(COINS, 0));
+
+        RecordResult result = writer().write(onlyBalance("1250.5"), SKIP);
+
+        assertThat(wallets.balance(STEVE_REF, COINS)).contains(Money.of(COINS, new BigDecimal("1250.5")));
+        assertThat(result.outcome()).isEqualTo(RecordOutcome.WRITTEN);
+    }
+
+    @Test
+    void underOverwriteTheBalanceIsSetToTheSourceAndARerunNeverAddsToIt() {
+        wallets.upsertBalance(STEVE_REF, Money.of(COINS, 500));
+        ImportOptions overwrite =
+                new ImportOptions(Path.of("Essentials"), ImportMode.LIVE, ConflictPolicy.SKIP, BalancePolicy.OVERWRITE);
+
+        RecordResult first = writer().write(onlyBalance("1250.5"), overwrite);
+        RecordResult second = writer().write(onlyBalance("1250.5"), overwrite);
+
+        assertThat(wallets.balance(STEVE_REF, COINS)).contains(Money.of(COINS, new BigDecimal("1250.5")));
+        assertThat(first.outcome()).isEqualTo(RecordOutcome.OVERWRITTEN);
+        assertThat(second.outcome()).isEqualTo(RecordOutcome.OVERWRITTEN);
+    }
+
+    @Test
+    void theBalanceKnobIsSeparateSoOverwritingRecordsStillKeepsAnExistingBalance() {
+        homes.save(home(STEVE_REF, 100));
+        wallets.upsertBalance(STEVE_REF, Money.of(COINS, 500));
+        ImportOptions overwriteRecords = new ImportOptions(
+                Path.of("Essentials"), ImportMode.LIVE, ConflictPolicy.OVERWRITE, BalancePolicy.SKIP_IF_PRESENT);
+        ImportedUser user = new ImportedUser(
+                STEVE_REF, List.of(home(STEVE_REF, 5)), Optional.of(new BigDecimal("1250.5")), List.of());
+
+        RecordResult result = writer().write(user, overwriteRecords);
+
+        assertThat(homes.all()).containsExactly(home(STEVE_REF, 5));
+        assertThat(wallets.balance(STEVE_REF, COINS)).contains(Money.of(COINS, 500));
+        assertThat(result.outcome()).isEqualTo(RecordOutcome.PARTIAL);
+        assertThat(result.notes()).contains("homes_written=1", "balance=kept");
+    }
+
+    @Test
+    void underOverwriteAnOccupiedHomeSlotTakesTheImportedHome() {
+        homes.save(home(STEVE_REF, 100));
+        ImportOptions overwrite = new ImportOptions(
+                Path.of("Essentials"), ImportMode.LIVE, ConflictPolicy.OVERWRITE, BalancePolicy.SKIP_IF_PRESENT);
+        ImportedUser user = new ImportedUser(STEVE_REF, List.of(home(STEVE_REF, 5)), Optional.empty(), List.of());
+
+        RecordResult result = writer().write(user, overwrite);
+
+        assertThat(homes.all()).containsExactly(home(STEVE_REF, 5));
+        assertThat(result.outcome()).isEqualTo(RecordOutcome.OVERWRITTEN);
+    }
+
+    private static ImportedUser onlyBalance(String amount) {
+        return new ImportedUser(STEVE_REF, List.of(), Optional.of(new BigDecimal(amount)), List.of());
+    }
+
     private static ImportedMail mailFrom(String sender, String text) {
         return new ImportedMail(Optional.empty(), sender, text, Optional.empty(), Optional.empty(), false);
     }
