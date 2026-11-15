@@ -4,7 +4,9 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.Vaults.VAULTS;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -17,13 +19,15 @@ import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 
 /**
  * The jOOQ-backed {@link VaultRepository} over the generated {@code VAULTS} table. A point read resolves one
  * owner's vault by the {@code (owner, idx)} primary key; the listing reads an owner's indices in ascending
  * order off the {@code idx_vaults_owner} index; the count is a {@code COUNT(*)} so the amount-quota check never
- * materialises the rows. A {@code save} upserts on the primary key and an {@code update} rewrites an existing row
- * only, so a vault deleted in the meantime stays deleted. Neither writes the payment columns: only
+ * materialises the rows. A {@code save} upserts on the primary key (an existing row takes the contents columns
+ * only) and an {@code update} rewrites the named columns of an existing row only, so a vault deleted in the meantime
+ * stays deleted. Neither writes the payment columns: only
  * {@code create} does, as a plain insert that does nothing when the row exists. A {@code delete} removes the one
  * {@code (owner, idx)} row only while it still records the expected payment, compared with
  * {@code IS NOT DISTINCT FROM} so a row with no payment matches an empty expectation, and reports whether it
@@ -83,17 +87,27 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     }
 
     @Override
-    public boolean update(Vault vault) {
+    public boolean update(Vault vault, Columns columns) {
         Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(columns, "columns");
         return write(dsl -> {
             VaultsRecord record = dsl.newRecord(VAULTS);
             VaultRows.apply(record, vault);
+            Map<Field<?>, Object> values = new LinkedHashMap<>();
+            switch (columns) {
+                case CONTENTS -> {
+                    values.put(VAULTS.SIZE, record.getSize());
+                    values.put(VAULTS.LAST_TOUCHED, record.getLastTouched());
+                    values.put(VAULTS.CONTENTS, record.getContents());
+                }
+                case PRESENTATION -> {
+                    values.put(VAULTS.DISPLAY_NAME, record.getDisplayName());
+                    values.put(VAULTS.ICON, record.getIcon());
+                }
+                case SIZE -> values.put(VAULTS.SIZE, record.getSize());
+            }
             return dsl.update(VAULTS)
-                            .set(VAULTS.SIZE, record.getSize())
-                            .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
-                            .set(VAULTS.CONTENTS, record.getContents())
-                            .set(VAULTS.DISPLAY_NAME, record.getDisplayName())
-                            .set(VAULTS.ICON, record.getIcon())
+                            .set(values)
                             .where(VAULTS.OWNER.eq(record.getOwner()))
                             .and(VAULTS.IDX.eq(record.getIdx()))
                             .execute()
@@ -150,8 +164,6 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .set(VAULTS.SIZE, record.getSize())
                 .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
                 .set(VAULTS.CONTENTS, record.getContents())
-                .set(VAULTS.DISPLAY_NAME, record.getDisplayName())
-                .set(VAULTS.ICON, record.getIcon())
                 .execute();
     }
 }

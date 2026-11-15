@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.network.VaultChanged;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
+import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
@@ -51,13 +52,35 @@ class VaultSyncTest {
 
     @Test
     void createAndUpdateReportWhetherTheyWrote() {
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
+        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(1), NOW), VaultRepository.Columns.CONTENTS))
+                .isFalse();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE)))
                 .isTrue();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(2), NOW))).isTrue();
+        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(2), NOW), VaultRepository.Columns.CONTENTS))
+                .isTrue();
 
         assertThat(frames.published).allSatisfy(frame -> assertThat(frame).isInstanceOf(VaultChanged.class));
+    }
+
+    @Test
+    void theCachedCopyTakesTheItemsAClosingWindowWrote() {
+        store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE));
+        Vault opened = store.find(FIRST).orElseThrow();
+        store.update(opened.renamedTo("loot"), VaultRepository.Columns.PRESENTATION);
+        Vault named = store.find(FIRST).orElseThrow();
+
+        store.update(
+                opened.withContents(ALEX, VaultContents.of(new byte[] {5}), NOW.plusSeconds(1))
+                        .result(),
+                VaultRepository.Columns.CONTENTS);
+        rows.held.clear();
+
+        Vault cached = store.find(FIRST).orElseThrow();
+        assertThat(named.displayName()).isEqualTo("loot");
+        assertThat(cached.contents()).isEqualTo(VaultContents.of(new byte[] {5}));
+        assertThat(cached.displayName()).isEqualTo("loot");
+        assertThat(cached.lastTouched()).isEqualTo(NOW.plusSeconds(1));
     }
 
     /** Rows keyed by vault, with the store's payment rules: only a create records one, a delete must match it. */
@@ -91,8 +114,14 @@ class VaultSyncTest {
         }
 
         @Override
-        public boolean update(Vault vault) {
-            return held.computeIfPresent(vault.id(), (id, stored) -> vault) != null;
+        public boolean update(Vault vault, Columns columns) {
+            return held.computeIfPresent(vault.id(), (id, stored) -> switch (columns) {
+                        case CONTENTS -> stored.withContentsOf(vault);
+                        case PRESENTATION ->
+                            stored.renamedTo(vault.displayName()).iconSet(vault.iconMaterial());
+                        case SIZE -> stored.openedAt(vault.size());
+                    })
+                    != null;
         }
 
         @Override

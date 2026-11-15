@@ -24,16 +24,16 @@ import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.listener.VaultReturnListener;
-import com.uxplima.uxmessentials.vaults.adapter.outbound.BukkitVaultItemHandBack;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.BukkitVaultItemReceiver;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultCleanupSweep;
-import com.uxplima.uxmessentials.vaults.application.CloseVaultWindow;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenAdminVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
 import com.uxplima.uxmessentials.vaults.application.PurgeInactiveVaults;
 import com.uxplima.uxmessentials.vaults.application.RenameVault;
+import com.uxplima.uxmessentials.vaults.application.ReturnVaultItems;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.SetVaultIcon;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultCharge;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSizeQuota;
+import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 import com.uxplima.uxmessentials.vaults.application.port.VaultItemHandBack;
@@ -130,12 +131,13 @@ public final class VaultsWiring {
         VaultAmountQuota amountQuota = new VaultAmountQuota(kernel.permissions(), settings.defaultAmount());
         VaultSizeQuota sizeQuota = new VaultSizeQuota(kernel.permissions(), settings.defaultSize());
         // Items of a vault deleted while its window was open go back to the owner, or wait for their next join.
-        BukkitVaultItemHandBack handBack = new BukkitVaultItemHandBack(
+        ReturnVaultItems returns = new ReturnVaultItems(
                 kernel.scheduler(),
                 VaultRepositories.itemReturns(persistence, clock),
-                kernel.messages(),
-                kernel.messageSink(),
-                kernel.log());
+                new BukkitVaultItemReceiver(),
+                new VaultNotifier(kernel.messages(), kernel.messageSink()),
+                kernel.log(),
+                plugin::isEnabled);
         VaultServices services = assemble(
                 plugin,
                 kernel,
@@ -146,7 +148,7 @@ public final class VaultsWiring {
                 audit,
                 amountQuota,
                 sizeQuota,
-                handBack,
+                returns,
                 menus,
                 menuBindings);
         // The cleanup sweep is opt-in: when cleanup.enabled is false it is never built, so a disabled module
@@ -155,7 +157,7 @@ public final class VaultsWiring {
         Optional<VaultCleanupSweep> sweep = cleanupSweep(kernel, settings, repository, audit, running, clock);
         return new Wired(
                 VaultCommands.all(services),
-                List.of(new VaultReturnListener(handBack, kernel.scheduler())),
+                List.of(new VaultReturnListener(returns, kernel.scheduler())),
                 services.view(),
                 services.selector(),
                 repository,
@@ -163,8 +165,7 @@ public final class VaultsWiring {
                 sizeQuota,
                 services,
                 sweep,
-                running,
-                handBack);
+                running);
     }
 
     private static Optional<VaultCleanupSweep> cleanupSweep(
@@ -208,12 +209,12 @@ public final class VaultsWiring {
         VaultView view = new VaultView(
                 kernel.messages(),
                 kernel.messageSink(),
-                saveVault,
-                new CloseVaultWindow(saveVault, handBack),
+                new VaultWindows<>(saveVault, handBack, clock),
                 kernel.scheduler(),
                 kernel.permissions(),
                 settings.itemPolicy(),
-                openSound);
+                openSound,
+                plugin::isEnabled);
         OpenVault openVault = new OpenVault(repository, amountQuota, sizeQuota, charge, clock);
         ListVaults listVaults = new ListVaults(repository);
         VaultSelectorMenu selector = new VaultSelectorMenu(
@@ -277,7 +278,6 @@ public final class VaultsWiring {
      * @param services the assembled use cases, handed on so the published vault actions run the same ones
      * @param cleanupSweep the inactive-vault cleanup sweep, armed by {@link #startBackgroundWork} (empty when off)
      * @param running the flag flipped false on stop so the sweep's self-rescheduling loop exits
-     * @param handBack gives back the items of a vault deleted while its window was open, stopped before the flush
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -289,8 +289,7 @@ public final class VaultsWiring {
             VaultSizeQuota sizeQuota,
             VaultServices services,
             Optional<VaultCleanupSweep> cleanupSweep,
-            AtomicBoolean running,
-            BukkitVaultItemHandBack handBack) {
+            AtomicBoolean running) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -303,7 +302,6 @@ public final class VaultsWiring {
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(cleanupSweep, "cleanupSweep");
             Objects.requireNonNull(running, "running");
-            Objects.requireNonNull(handBack, "handBack");
         }
 
         /** Arm the inactive-vault cleanup sweep (a no-op when cleanup is disabled). Called on module enable. */
@@ -314,8 +312,6 @@ public final class VaultsWiring {
         /** Stop the cleanup sweep and save every still-open vault window before the pool closes. On module stop. */
         public void stop() {
             running.set(false);
-            // Before the flush: items the flush hands back are kept on this thread once the scheduler has stopped.
-            handBack.stop();
             view.flushAll();
         }
     }

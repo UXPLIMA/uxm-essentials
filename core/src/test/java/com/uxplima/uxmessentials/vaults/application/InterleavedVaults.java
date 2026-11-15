@@ -80,13 +80,13 @@ final class InterleavedVaults implements VaultRepository {
     }
 
     @Override
-    public boolean update(Vault vault) {
+    public boolean update(Vault vault, Columns columns) {
         Runnable step = beforeUpdate;
         beforeUpdate = null;
         if (step != null) {
             step.run();
         }
-        return rows.update(vault);
+        return rows.update(vault, columns);
     }
 
     @Override

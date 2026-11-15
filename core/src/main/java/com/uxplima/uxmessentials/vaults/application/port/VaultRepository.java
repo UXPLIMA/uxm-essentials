@@ -36,21 +36,33 @@ public interface VaultRepository {
     int count(PlayerRef owner);
 
     /**
-     * Persist {@code vault}, upserting on the {@code (owner, index)} key: a re-save of an existing vault
-     * overwrites its size, contents, name, icon and last-touched in place, and a vault with no row is inserted.
-     * Only a staff window and a window still open when the module stops save this way, because for them losing
-     * the items would be worse than keeping the vault. Every other write to an existing vault goes through
-     * {@link #update}, so it cannot bring back a vault that was deleted. The upsert never writes a payment, and
-     * never changes one already stored, so a vault it brings back carries none and cannot be refunded.
+     * Persist {@code vault}, upserting on the {@code (owner, index)} key: a vault with no row is inserted whole, and
+     * an existing row takes the vault's {@link Columns#CONTENTS} only, so a name or icon changed meanwhile stays.
+     * Only a staff window saves this way, because the staff member is not the owner the items could go back to.
+     * Every other write to an existing vault goes through {@link #update}, so it cannot bring back a vault that was
+     * deleted. The upsert never writes a payment, and never changes one already stored, so a vault it brings back
+     * carries none and cannot be refunded.
      */
     void save(Vault vault);
 
     /**
-     * Overwrite the size, contents, name, icon and last-touched of the existing row at the vault's id, leaving
-     * its payment as it is, and report whether that row was there. A vault deleted in the meantime stays deleted:
-     * nothing is inserted and the result is {@code false}.
+     * Overwrite {@code columns} of the existing row at the vault's id with the vault's values, leaving every other
+     * column (and the payment) as it is, and report whether that row was there. A vault deleted in the meantime
+     * stays deleted: nothing is inserted and the result is {@code false}. Writing only the columns an action changed
+     * keeps a stale copy of the vault from undoing another write: a rename never rewrites the items, and a closing
+     * window never rewrites a name set while it was open.
      */
-    boolean update(Vault vault);
+    boolean update(Vault vault, Columns columns);
+
+    /** The groups of columns {@link #update} can write. */
+    enum Columns {
+        /** The items, the size they are laid out in, and the last-touched instant: what a closing window writes. */
+        CONTENTS,
+        /** The player-chosen display name and icon. */
+        PRESENTATION,
+        /** The size alone, for an open that adopts a changed size quota. */
+        SIZE
+    }
 
     /**
      * Insert a freshly allocated {@code vault} together with what its owner paid for it ({@link Vault#paid()}),

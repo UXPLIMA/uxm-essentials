@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vaults.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -36,11 +37,17 @@ public final class SaveVault {
      * Bringing it back would give the player a vault they had already been refunded for, or undo a staff delete.
      */
     public boolean save(PlayerRef owner, Vault vault, VaultContents newContents) {
+        return save(owner, vault, newContents, clock.instant());
+    }
+
+    /** {@link #save(PlayerRef, Vault, VaultContents)} stamped with {@code at} as the vault's last-touched instant. */
+    public boolean save(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
-        Vault.Change change = vault.withContents(owner, newContents, clock.instant());
-        if (!repository.update(change.result())) {
+        Objects.requireNonNull(at, "at");
+        Vault.Change change = vault.withContents(owner, newContents, at);
+        if (!repository.update(change.result(), VaultRepository.Columns.CONTENTS)) {
             return false;
         }
         events.publish(change.event());
@@ -53,10 +60,16 @@ public final class SaveVault {
      * yet. A vault this brings back records no payment, so deleting it again refunds nothing.
      */
     public void keep(PlayerRef owner, Vault vault, VaultContents newContents) {
+        keep(owner, vault, newContents, clock.instant());
+    }
+
+    /** {@link #keep(PlayerRef, Vault, VaultContents)} stamped with {@code at} as the vault's last-touched instant. */
+    public void keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
-        Vault.Change change = vault.withContents(owner, newContents, clock.instant());
+        Objects.requireNonNull(at, "at");
+        Vault.Change change = vault.withContents(owner, newContents, at);
         repository.save(change.result());
         events.publish(change.event());
     }

@@ -55,12 +55,15 @@ final class InMemoryVaults implements VaultRepository {
         return ownedIndices(owner).size();
     }
 
-    /** Like the real store, a save neither writes nor changes a payment: only {@link #create} records one. */
+    /**
+     * Like the real store: a save neither writes nor changes a payment (only {@link #create} records one), and an
+     * existing row takes the contents columns only.
+     */
     @Override
     public void save(Vault vault) {
         saves++;
         Vault stored = rows.get(vault.id());
-        rows.put(vault.id(), withPayment(vault, stored == null ? Optional.empty() : stored.paid()));
+        rows.put(vault.id(), stored == null ? withPayment(vault, Optional.empty()) : stored.withContentsOf(vault));
     }
 
     private static Vault withPayment(Vault vault, Optional<VaultPayment> paid) {
@@ -75,13 +78,19 @@ final class InMemoryVaults implements VaultRepository {
     }
 
     @Override
-    public boolean update(Vault vault) {
+    public boolean update(Vault vault, Columns columns) {
         Vault stored = rows.get(vault.id());
         if (stored == null) {
             return false;
         }
         saves++;
-        rows.put(vault.id(), withPayment(vault, stored.paid()));
+        Vault updated =
+                switch (columns) {
+                    case CONTENTS -> stored.withContentsOf(vault);
+                    case PRESENTATION -> stored.renamedTo(vault.displayName()).iconSet(vault.iconMaterial());
+                    case SIZE -> stored.openedAt(vault.size());
+                };
+        rows.put(vault.id(), updated);
         return true;
     }
 

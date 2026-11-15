@@ -93,8 +93,8 @@ public final class VaultSync {
         }
 
         @Override
-        public boolean update(Vault vault) {
-            boolean updated = delegate.update(vault);
+        public boolean update(Vault vault, Columns columns) {
+            boolean updated = delegate.update(vault, columns);
             announce(vault.id());
             return updated;
         }

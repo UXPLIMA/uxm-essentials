@@ -166,6 +166,19 @@ public final class Vault {
     }
 
     /**
+     * This vault with the size, contents and last-touched instant of {@code written}, a copy of the same vault that a
+     * closing window wrote back. The name, icon and payment stay this vault's, since that write leaves them as they
+     * are.
+     */
+    public Vault withContentsOf(Vault written) {
+        Objects.requireNonNull(written, "written");
+        if (!written.id.equals(id)) {
+            throw new IllegalArgumentException("a different vault: " + written.id + " is not " + id);
+        }
+        return new Vault(id, written.size, written.contents, displayName, iconMaterial, written.lastTouched, paid);
+    }
+
+    /**
      * Set or clear this vault's display name, preserving its size, contents, icon and last-touched. A
      * {@code null} name clears it; a non-null name must satisfy the domain sanity cap of {@value #MAX_NAME_LENGTH}
      * characters: anything longer is a programming error and throws. The configurable, friendlier clamp the

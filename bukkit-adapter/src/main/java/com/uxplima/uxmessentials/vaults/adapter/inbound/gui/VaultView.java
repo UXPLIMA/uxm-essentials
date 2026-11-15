@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
@@ -21,8 +23,6 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
-import com.uxplima.uxmessentials.vaults.application.CloseVaultWindow;
-import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
@@ -70,10 +70,16 @@ import org.jspecify.annotations.Nullable;
  * safely with the player, no loss, no dupe. When staff open another player's vault the overflow returns to the
  * staff opener, consistent with the blacklist's admin semantics.
  *
- * <p>A vault deleted while its window is open stays deleted. Closing the window goes through
- * {@link CloseVaultWindow}: the owner's own window writes back with an update only, and when the row is gone the
- * items still in the window go back to the owner through the {@code VaultItemHandBack} (their live inventory, or kept
- * for their next join), never into a recreated row. Only a staff window keeps the upsert.
+ * <p>Closing a window hands its items to {@link VaultWindows}, which keeps them as the vault's pending state until
+ * the write lands, so a reopen in the same tick is filled with them rather than with a cached copy from before the
+ * close. A vault deleted while its window is open stays deleted: the owner's own window writes back with an update
+ * only, and when the row is gone the items go back to the owner (their live inventory, or kept for their next join),
+ * never into a recreated row. Only a staff window keeps the upsert. The write writes the items, size and
+ * last-touched only, so a rename made while the window was open stays.
+ *
+ * <p>When the module stops, every open window is closed on its viewer's own thread, so nothing can be taken out of it
+ * after its items were written. When the plugin is no longer running (the server is stopping), the scheduler runs
+ * nothing more, so the writes run on the calling thread instead.
  *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
@@ -88,31 +94,30 @@ public final class VaultView {
 
     private final Messages messages;
     private final MessageSink sink;
-    private final SaveVault saveVault;
-    private final CloseVaultWindow closeWindow;
+    private final VaultWindows<StorageGui> windows;
     private final Scheduler scheduler;
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
-    private final VaultWindows<StorageGui> windows = new VaultWindows<>();
+    private final BooleanSupplier running;
 
     public VaultView(
             Messages messages,
             MessageSink sink,
-            SaveVault saveVault,
-            CloseVaultWindow closeWindow,
+            VaultWindows<StorageGui> windows,
             Scheduler scheduler,
             Permissions permissions,
             VaultItemPolicy itemPolicy,
-            @Nullable Sound openSound) {
+            @Nullable Sound openSound,
+            BooleanSupplier running) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
-        this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
-        this.closeWindow = Objects.requireNonNull(closeWindow, "closeWindow");
+        this.windows = Objects.requireNonNull(windows, "windows");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
         this.openSound = openSound;
+        this.running = Objects.requireNonNull(running, "running");
     }
 
     /**
@@ -148,12 +153,17 @@ public final class VaultView {
         if (rescued > 0) {
             // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
             // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
-            persistOpen(owner, vault, gui);
+            windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
+                    .ifPresent(this::write);
         }
-        gui.onClose(event -> windows.release(vault.id(), gui).ifPresent(window -> {
+        gui.onClose(event -> {
+            if (!windows.holds(vault.id(), gui)) {
+                return; // taken over by a newer window of the same viewer, which writes these items
+            }
             returnBlockedItems(event.getPlayer(), viewer, gui);
-            persistClosed(window);
-        }));
+            windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
+                    .ifPresent(this::write);
+        });
         gui.open(player);
         playOpenSound(player);
     }
@@ -194,7 +204,30 @@ public final class VaultView {
 
     /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
     public void flushAll() {
-        windows.releaseAll().forEach(this::persistClosed);
+        for (VaultWindows.Window<StorageGui> window : windows.held()) {
+            if (running.getAsBoolean()) {
+                scheduler.onEntity(window.viewer(), () -> closeOnViewerThread(window), () -> writeNow(window));
+            } else {
+                writeNow(window);
+            }
+        }
+    }
+
+    /**
+     * Close the window on its viewer's thread; its close handler writes it. A window whose viewer no longer looks at
+     * it raises no close, so it is written here instead.
+     */
+    private void closeOnViewerThread(VaultWindows.Window<StorageGui> window) {
+        StorageGui gui = window.window();
+        List.copyOf(gui.getInventory().getViewers()).forEach(HumanEntity::closeInventory);
+        writeNow(window);
+    }
+
+    /** Release and write {@code window} if it still holds its vault, with whatever it holds now. */
+    private void writeNow(VaultWindows.Window<StorageGui> window) {
+        StorageGui gui = window.window();
+        windows.release(window.vault().id(), gui, VaultItemCodec.encode(gui.contents()))
+                .ifPresent(this::write);
     }
 
     /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
@@ -274,19 +307,13 @@ public final class VaultView {
                         viewer, VaultsMessageKey.VAULT_OVERFLOW_RETURNED, Map.of("count", Integer.toString(count))));
     }
 
-    /**
-     * Write back a window that is still open. A vault deleted meanwhile is left deleted and nothing else happens:
-     * the items are still in the window, and its close hands them back.
-     */
-    private void persistOpen(PlayerRef owner, Vault vault, StorageGui gui) {
-        VaultContents contents = VaultItemCodec.encode(gui.contents());
-        scheduler.async(() -> saveVault.save(owner, vault, contents));
-    }
-
-    /** Write back a window that has closed, or that is still open when the module stops. */
-    private void persistClosed(VaultWindows.Window<StorageGui> window) {
-        VaultContents contents = VaultItemCodec.encode(window.window().contents());
-        scheduler.async(() -> closeWindow.close(window.viewer(), window.owner(), window.vault(), contents));
+    /** Run a write off the tick, or on this thread once the plugin has stopped and the scheduler runs nothing. */
+    private void write(Runnable write) {
+        if (running.getAsBoolean()) {
+            scheduler.async(write);
+        } else {
+            write.run();
+        }
     }
 
     private Component title(PlayerRef viewer, PlayerRef owner, int index) {

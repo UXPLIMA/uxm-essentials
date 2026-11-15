@@ -79,10 +79,18 @@ public final class CachedVaultRepository implements VaultRepository {
     }
 
     @Override
-    public boolean update(Vault vault) {
+    public boolean update(Vault vault, Columns columns) {
         Objects.requireNonNull(vault, "vault");
-        boolean updated = delegate.update(vault);
-        cache.invalidate(vault.id());
+        Objects.requireNonNull(columns, "columns");
+        boolean updated = delegate.update(vault, columns);
+        if (updated && columns == Columns.CONTENTS) {
+            // The cached copy takes exactly what was written, so the next open sees the items the window closed with.
+            // The name and icon stay as cached, since the write left them as they were.
+            cache.asMap()
+                    .computeIfPresent(vault.id(), (id, cached) -> cached.map(stale -> stale.withContentsOf(vault)));
+        } else {
+            cache.invalidate(vault.id());
+        }
         return updated;
     }
 
