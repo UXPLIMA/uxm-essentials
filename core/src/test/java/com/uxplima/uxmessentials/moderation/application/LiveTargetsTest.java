@@ -200,7 +200,26 @@ class LiveTargetsTest {
                 false,
                 CLOCK,
                 presence,
-                (viewer, target) -> target.equals(hidden));
+                new Hiding(hidden));
+    }
+
+    /** Vanish that hides one player from a viewer without any see level, here or elsewhere. */
+    private record Hiding(PlayerRef hidden) implements SeenVisibility {
+
+        @Override
+        public int seeLevel(PlayerRef viewer) {
+            return 0;
+        }
+
+        @Override
+        public boolean isHiddenHere(PlayerRef viewer, int viewerSeeLevel, PlayerRef target) {
+            return target.equals(hidden);
+        }
+
+        @Override
+        public boolean isHiddenElsewhere(int viewerSeeLevel, PlayerRef target) {
+            return target.equals(hidden);
+        }
     }
 
     /** The live side of this backend: who was kicked and who is frozen. */

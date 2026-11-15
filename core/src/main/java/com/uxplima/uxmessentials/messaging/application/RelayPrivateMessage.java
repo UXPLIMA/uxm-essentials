@@ -204,12 +204,19 @@ public final class RelayPrivateMessage {
     }
 
     private void giveUp(UUID id) {
-        RemoteMessage sent = awaitingAnswer.remove(id);
-        if (sent == null) {
+        RemoteMessage waiting = awaitingAnswer.get(id);
+        if (waiting == null) {
             return;
         }
-        // Kept a while longer, so an answer that was only slow still tells the sender what really happened.
-        overdue.put(id, sent);
+        // Kept a while longer, so an answer that was only slow still tells the sender what really happened. It moves
+        // to the overdue map before it leaves the waiting one, so an answer arriving in between finds it in one of the
+        // two; whichever side removes it from the waiting map first owns the outcome.
+        overdue.put(id, waiting);
+        RemoteMessage sent = awaitingAnswer.remove(id);
+        if (sent == null) {
+            overdue.remove(id);
+            return;
+        }
         scheduler.asyncAfter(ANSWER_TIMEOUT, () -> overdue.remove(id));
         scheduler.onEntity(
                 sent.sender(), () -> sendMessage.conclude(sent, RemoteAnswer.to(sent, RemoteOutcome.OFFLINE)));

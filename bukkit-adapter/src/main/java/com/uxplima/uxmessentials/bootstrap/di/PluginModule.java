@@ -2801,17 +2801,14 @@ public final class PluginModule {
      * authority here and the vanish rows every backend shares, or nothing to hide with the vanish module disabled.
      */
     private static com.uxplima.uxmessentials.moderation.application.port.SeenVisibility seenVisibility(
-            ContextLinks links, Persistence persistence, ModuleContext ctx) {
+            ContextLinks links, Persistence persistence) {
         com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
         com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver levels = links.vanishLevelResolver;
         if (vanishStore == null || levels == null) {
             return com.uxplima.uxmessentials.moderation.application.port.SeenVisibility.ALWAYS_VISIBLE;
         }
         return new com.uxplima.uxmessentials.moderation.adapter.outbound.VanishSeenVisibility(
-                vanishStore,
-                com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence),
-                levels,
-                ctx.kernel().playerLookup()::isOnline);
+                vanishStore, com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence), levels);
     }
 
     private static void wireModeration(
@@ -2857,7 +2854,7 @@ public final class PluginModule {
                 ipCapture.store(),
                 ipCapture.tokens(),
                 links.presence,
-                seenVisibility(links, persistence, ctx));
+                seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

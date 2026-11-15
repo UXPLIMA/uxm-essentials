@@ -63,13 +63,55 @@ public final class Seen {
         this.live = new LiveTargetCheck(presence, this.notifier);
     }
 
-    /** Report {@code target}'s first-join and last-seen to {@code actor}. */
+    /**
+     * What {@code /seen} learns about a target on the command thread, before it reads storage: where they are connected
+     * and the actor's vanish see level, both of which ask the server.
+     *
+     * @param actor who asked
+     * @param target who they asked about
+     * @param elsewhere the other backend the target is connected to, if any
+     * @param here whether the target is connected to this backend
+     * @param hiddenHere whether the target is connected here, vanished, and hidden from the actor
+     * @param seeLevel the actor's vanish see level, for the check against the shared vanish rows
+     */
+    public record Lookup(
+            PlayerRef actor,
+            PlayerRef target,
+            Optional<String> elsewhere,
+            boolean here,
+            boolean hiddenHere,
+            int seeLevel) {
+
+        public Lookup {
+            Objects.requireNonNull(actor, "actor");
+            Objects.requireNonNull(target, "target");
+            Objects.requireNonNull(elsewhere, "elsewhere");
+        }
+    }
+
+    /** Report {@code target}'s first-join and last-seen to {@code actor}, all on one thread. */
     public void seen(PlayerRef actor, PlayerRef target) {
+        report(look(actor, target));
+    }
+
+    /** The command-thread half of {@code /seen}: what the server knows about {@code target} right now. */
+    public Lookup look(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
-        Optional<String> elsewhere = live.elsewhere(target);
         boolean here = players.isOnline(target.uuid());
-        if ((elsewhere.isPresent() || here) && visibility.isHiddenFrom(actor, target)) {
+        int seeLevel = visibility.seeLevel(actor);
+        boolean hiddenHere = here && visibility.isHiddenHere(actor, seeLevel, target);
+        return new Lookup(actor, target, live.elsewhere(target), here, hiddenHere, seeLevel);
+    }
+
+    /** The off-tick half of {@code /seen}: read the records and tell the actor. */
+    public void report(Lookup lookup) {
+        Objects.requireNonNull(lookup, "lookup");
+        PlayerRef actor = lookup.actor();
+        PlayerRef target = lookup.target();
+        Optional<String> elsewhere = lookup.elsewhere();
+        boolean here = lookup.here();
+        if (lookup.hiddenHere() || (elsewhere.isPresent() && visibility.isHiddenElsewhere(lookup.seeLevel(), target))) {
             reportLastSeen(actor, target);
             return;
         }
