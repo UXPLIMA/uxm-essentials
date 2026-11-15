@@ -2,29 +2,31 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
-import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
+import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
 import com.uxplima.uxmessentials.shared.application.networkpresence.RosterStamp;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
-import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
-import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcast;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
@@ -35,7 +37,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A kick, a freeze or a /seen on a player connected to another backend says where they are instead of acting on
- * nothing, and writes no history, audit or broadcast.
+ * nothing, and writes no history, audit or broadcast. An unfreeze still runs, so the freeze record held here can
+ * always be cleared.
  */
 class LiveTargetsTest {
 
@@ -57,9 +60,22 @@ class LiveTargetsTest {
         public void learn(UUID uuid, String name) {}
     };
 
-    private final List<String> writes = new ArrayList<>();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final NetworkRoster presence = new NetworkRoster("survival-1", CLOCK, Duration.ofSeconds(90));
+    private final FakeSanctions sanctions = new FakeSanctions();
+    private final KeptHistory history = new KeptHistory();
+    private final List<MessageKey> broadcasts = new ArrayList<>();
+    private final RecordingAudit audit = new RecordingAudit();
+    private final Kick kick = new Kick(
+            sanctions,
+            new ModerationGuard(new FakePermissions()),
+            notifier.notifier(),
+            audit,
+            new SanctionHistoryRecorder(history, CLOCK),
+            (key, placeholders) -> broadcasts.add(key),
+            presence);
+    private final Freeze freeze =
+            new Freeze(sanctions, new ModerationGuard(new FakePermissions()), notifier.notifier(), audit, presence);
 
     LiveTargetsTest() {
         TrackNetworkPresence track = new TrackNetworkPresence(presence, NetworkPresenceBroadcast.NONE, NO_NAMES, CLOCK);
@@ -69,59 +85,51 @@ class LiveTargetsTest {
 
     @Test
     void aKickOnAPlayerOnAnotherBackendNamesTheBackendAndWritesNothing() {
-        Kick kick = new Kick(
-                recording(Sanctions.class),
-                new ModerationGuard(new FakePermissions()),
-                notifier.notifier(),
-                recording(ModerationAudit.class),
-                new SanctionHistoryRecorder(recording(SanctionHistory.class), CLOCK),
-                recording(SanctionBroadcast.class),
-                presence);
-
         assertThat(kick.kick(STAFF, REMOTE, Optional.of("spam"), false).errorOrThrow())
                 .isEqualTo(ModerationError.TARGET_ELSEWHERE);
+
         assertThat(notifier.sent())
                 .containsExactly(new RecordingNotifier.Sent(
                         STAFF, "moderation.target-elsewhere", Map.of("player", "Steve", "server", "lobby-1")));
-        assertThat(writes).isEmpty();
+        assertThat(sanctions.kicked).isEmpty();
+        assertThat(history.entries).isEmpty();
+        assertThat(broadcasts).isEmpty();
+        assertThat(audit.lines).isEmpty();
     }
 
     @Test
     void aKickOnAPlayerHereStillKicks() {
-        Kick kick = new Kick(
-                recording(Sanctions.class),
-                new ModerationGuard(new FakePermissions()),
-                notifier.notifier(),
-                recording(ModerationAudit.class),
-                new SanctionHistoryRecorder(recording(SanctionHistory.class), CLOCK),
-                recording(SanctionBroadcast.class),
-                presence);
-
         assertThat(kick.kick(STAFF, LOCAL, Optional.empty(), true).isErr()).isFalse();
-        assertThat(writes).contains("Sanctions.kick");
+
+        assertThat(sanctions.kicked).containsExactly(LOCAL);
+        assertThat(history.entries).extracting(SanctionHistoryEntry::target).containsExactly(LOCAL.uuid());
     }
 
     @Test
-    void aFreezeAndAnUnfreezeOnAPlayerOnAnotherBackendAreRefused() {
-        Freeze freeze = new Freeze(
-                recording(Sanctions.class),
-                new ModerationGuard(new FakePermissions()),
-                notifier.notifier(),
-                recording(ModerationAudit.class),
-                presence);
-
+    void aFreezeOnAPlayerOnAnotherBackendIsRefused() {
         assertThat(freeze.freeze(STAFF, REMOTE).errorOrThrow()).isEqualTo(ModerationError.TARGET_ELSEWHERE);
-        assertThat(freeze.unfreeze(STAFF, REMOTE).errorOrThrow()).isEqualTo(ModerationError.TARGET_ELSEWHERE);
-        assertThat(notifier.keys()).containsExactly("moderation.target-elsewhere", "moderation.target-elsewhere");
-        assertThat(writes).isEmpty();
+
+        assertThat(notifier.keys()).containsExactly("moderation.target-elsewhere");
+        assertThat(sanctions.frozen).isEmpty();
+        assertThat(audit.lines).isEmpty();
+    }
+
+    @Test
+    void anUnfreezeOnAPlayerOnAnotherBackendClearsTheFreezeHeldHere() {
+        sanctions.freeze(REMOTE);
+
+        assertThat(freeze.unfreeze(STAFF, REMOTE).isErr()).isFalse();
+
+        assertThat(sanctions.frozen).isEmpty();
+        assertThat(audit.lines).containsExactly("unfroze Steve");
     }
 
     @Test
     void seenReportsAPlayerOnAnotherBackendAsOnlineThere() {
         Seen seen = new Seen(
-                recording(ModerationRepository.class),
-                new IpAlts(recording(IpHistoryStore.class), recording(IpTokens.class)),
-                recording(PlayerLookup.class),
+                new InMemoryIpBans(),
+                new IpAlts(new NoIpHistory(), address -> address),
+                new NobodyOnline(),
                 notifier.notifier(),
                 false,
                 CLOCK,
@@ -134,35 +142,213 @@ class LiveTargetsTest {
                         STAFF, "moderation.seen.online-elsewhere", Map.of("player", "Steve", "server", "lobby-1")));
     }
 
-    /** A fake of {@code port} that records every call into {@link #writes} and answers empty. */
-    private <T> T recording(Class<T> port) {
-        Object proxy = Proxy.newProxyInstance(port.getClassLoader(), new Class<?>[] {port}, (self, method, args) -> {
-            if (method.getDeclaringClass() == Object.class) {
-                return switch (method.getName()) {
-                    case "equals" -> self == args[0];
-                    case "hashCode" -> System.identityHashCode(self);
-                    default -> port.getSimpleName();
-                };
-            }
-            writes.add(port.getSimpleName() + "." + method.getName());
-            Class<?> returns = method.getReturnType();
-            if (returns == boolean.class) {
-                return false;
-            }
-            if (returns == int.class) {
-                return 0;
-            }
-            if (returns == long.class) {
-                return 0L;
-            }
-            if (returns == Optional.class) {
-                return Optional.empty();
-            }
-            if (returns == List.class) {
-                return List.of();
-            }
-            return null;
-        });
-        return port.cast(proxy);
+    /** The live side of this backend: who was kicked and who is frozen. */
+    private static final class FakeSanctions implements Sanctions {
+
+        final List<PlayerRef> kicked = new ArrayList<>();
+        final Set<PlayerRef> frozen = new HashSet<>();
+
+        @Override
+        public void kick(PlayerRef target, MessageKey reasonKey, String reasonText) {
+            kicked.add(target);
+        }
+
+        @Override
+        public void kickAddress(String ip, Predicate<PlayerRef> kickable, Function<PlayerRef, String> reasonFor) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Collection<PlayerRef> onlinePlayers() {
+            return List.of();
+        }
+
+        @Override
+        public void freeze(PlayerRef target) {
+            frozen.add(target);
+        }
+
+        @Override
+        public void unfreeze(PlayerRef target) {
+            frozen.remove(target);
+        }
+
+        @Override
+        public boolean isFrozen(PlayerRef target) {
+            return frozen.contains(target);
+        }
+
+        @Override
+        public void sendToJail(PlayerRef target, String jail) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public void releaseFromJail(PlayerRef target) {
+            throw new UnsupportedOperationException();
+        }
+    }
+
+    /** A sanction history kept in memory. */
+    private static final class KeptHistory implements SanctionHistory {
+
+        final List<SanctionHistoryEntry> entries = new ArrayList<>();
+
+        @Override
+        public void append(SanctionHistoryEntry entry) {
+            entries.add(entry);
+        }
+
+        @Override
+        public List<SanctionHistoryEntry> banHistory(UUID target, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<SanctionHistoryEntry> muteHistory(UUID target, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<SanctionHistoryEntry> recentForTarget(UUID target, int limit) {
+            return entries.stream()
+                    .filter(entry -> entry.target().equals(target))
+                    .limit(limit)
+                    .toList();
+        }
+
+        @Override
+        public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
+            return List.of();
+        }
+
+        @Override
+        public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+            return List.copyOf(entries);
+        }
+    }
+
+    /** An audit log that keeps one line per event, naming the event and its target. */
+    private static final class RecordingAudit implements ModerationAudit {
+
+        final List<String> lines = new ArrayList<>();
+
+        @Override
+        public void muted(
+                PlayerRef actor, PlayerRef target, Optional<String> duration, boolean ok, Optional<String> reason) {
+            lines.add("muted " + target.name());
+        }
+
+        @Override
+        public void unmuted(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
+            lines.add("unmuted " + target.name());
+        }
+
+        @Override
+        public void jailed(
+                PlayerRef actor,
+                PlayerRef target,
+                String jail,
+                Optional<String> duration,
+                boolean ok,
+                Optional<String> reason) {
+            lines.add("jailed " + target.name());
+        }
+
+        @Override
+        public void unjailed(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
+            lines.add("unjailed " + target.name());
+        }
+
+        @Override
+        public void tempbanned(
+                PlayerRef actor, PlayerRef target, String duration, boolean ok, Optional<String> reason) {
+            lines.add("tempbanned " + target.name());
+        }
+
+        @Override
+        public void unbanned(PlayerRef actor, PlayerRef target, boolean ok) {
+            lines.add("unbanned " + target.name());
+        }
+
+        @Override
+        public void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
+            lines.add("warned " + target.name());
+        }
+
+        @Override
+        public void clearedWarns(PlayerRef actor, PlayerRef target, boolean ok, int count) {
+            lines.add("cleared warns of " + target.name());
+        }
+
+        @Override
+        public void kicked(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {
+            lines.add("kicked " + target.name());
+        }
+
+        @Override
+        public void kickedAll(PlayerRef actor, int affected, Optional<String> reason) {
+            lines.add("kicked all");
+        }
+
+        @Override
+        public void froze(PlayerRef actor, PlayerRef target, boolean frozen, boolean ok) {
+            lines.add((frozen ? "froze " : "unfroze ") + target.name());
+        }
+
+        @Override
+        public void ipBanned(
+                PlayerRef actor,
+                String targetIp,
+                Optional<UUID> target,
+                Optional<String> duration,
+                boolean ok,
+                Optional<String> reason) {
+            lines.add("ip banned " + targetIp);
+        }
+
+        @Override
+        public void ipUnbanned(PlayerRef actor, String targetIp, boolean ok) {
+            lines.add("ip unbanned " + targetIp);
+        }
+
+        @Override
+        public void altDetected(UUID uuid, String ip, List<UUID> matchedAlts, boolean kicked) {
+            lines.add("alt detected " + uuid);
+        }
+
+        @Override
+        public void jailLocationDefined(PlayerRef actor, String jail) {
+            lines.add("jail defined " + jail);
+        }
+
+        @Override
+        public void jailLocationRemoved(PlayerRef actor, String jail) {
+            lines.add("jail removed " + jail);
+        }
+
+        @Override
+        public void lockdown(UUID actor, boolean enabled) {
+            lines.add("lockdown " + enabled);
+        }
+    }
+
+    /** A server with nobody connected and no profile cache. */
+    private static final class NobodyOnline implements PlayerLookup {
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return false;
+        }
     }
 }

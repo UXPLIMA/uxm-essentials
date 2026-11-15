@@ -146,6 +146,18 @@ class NetworkPresenceTest {
     }
 
     @Test
+    void aStartingBackendsRosterInPartsAppliesAndIsAnsweredOnce() {
+        RosterStamp stamp = new RosterStamp(1L, 1L);
+
+        survival.track.remoteRoster("lobby-1", stamp, true, 1, 2, List.of(ALEX));
+        survival.track.remoteRoster("lobby-1", stamp, true, 0, 2, List.of(STEVE));
+
+        assertThat(survival.roster.onServer("lobby-1"))
+                .containsExactly(new OnlinePlayer(ALEX, "lobby-1"), new OnlinePlayer(STEVE, "lobby-1"));
+        assertThat(survival.out.sent).hasSize(1);
+    }
+
+    @Test
     void aRequestThatArrivesTwiceIsAnsweredOnce() {
         lobby.track.announce(true);
         Consumer<TrackNetworkPresence> request = lobby.out.sent.get(0);
@@ -216,9 +228,25 @@ class NetworkPresenceTest {
         for (int beat = 0; beat < 10; beat++) {
             clock.advance(HEARTBEAT);
             survival.track.remoteAlive("lobby-1");
+            lobby.track.announce(false);
+            lobby.out.deliverAll(survival.track);
         }
 
         assertThat(survival.roster.isOnline(STEVE.uuid())).isTrue();
+    }
+
+    @Test
+    void heartbeatsAloneDoNotKeepARosterFromAnEarlierRunAlive() {
+        survival.track.remoteJoined("lobby-1", new RosterStamp(2_000L, 1L), STEVE);
+
+        // Restarted with its clock set back: every roster of the new run reads as older than the run it replaces.
+        for (int beat = 0; beat < 10; beat++) {
+            clock.advance(HEARTBEAT);
+            survival.track.remoteAlive("lobby-1");
+            survival.track.remoteRoster("lobby-1", new RosterStamp(1_000L, beat + 1L), false, 0, 1, List.of(ALEX));
+        }
+
+        assertThat(survival.roster.onServer("lobby-1")).containsExactly(new OnlinePlayer(ALEX, "lobby-1"));
     }
 
     @Test

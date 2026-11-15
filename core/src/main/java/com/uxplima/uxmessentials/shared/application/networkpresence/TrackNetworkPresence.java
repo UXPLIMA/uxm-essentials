@@ -81,9 +81,11 @@ public final class TrackNetworkPresence {
      */
     public void announce(boolean replyRequested) {
         roster.expire();
-        synchronized (lock) {
-            broadcast.roster(nextStamp(), replyRequested, roster.localPlayers());
-        }
+        // A backend that went away would otherwise keep its bookkeeping for as long as this one runs. A first roster
+        // still being collected has no roster yet and can be dropped too; the next heartbeat announces it again.
+        partsByOrigin.keySet().removeIf(origin -> !roster.hasRoster(origin));
+        answeredByOrigin.keySet().removeIf(origin -> !roster.hasRoster(origin));
+        sendRoster(replyRequested);
     }
 
     /** {@code player} joined the backend {@code origin}. */
@@ -122,13 +124,21 @@ public final class TrackNetworkPresence {
         // Answered even when the roster itself was stale or incomplete: the starting backend needs our players
         // regardless, and a newer frame from the same start may have overtaken this one.
         if (replyRequested && !stamp.equals(answeredByOrigin.put(origin, stamp))) {
-            announce(false);
+            // Not announce: its pruning would drop the parts of the very roster that asked, which the reply is sent
+            // from the middle of.
+            sendRoster(false);
         }
     }
 
     /** The backend {@code origin} sent a heartbeat. */
     public void remoteAlive(String origin) {
         roster.heardFrom(Objects.requireNonNull(origin, "origin"));
+    }
+
+    private void sendRoster(boolean replyRequested) {
+        synchronized (lock) {
+            broadcast.roster(nextStamp(), replyRequested, roster.localPlayers());
+        }
     }
 
     /** Add one part; the whole roster once its last part arrives, otherwise {@code null}. */

@@ -36,7 +36,10 @@ import org.jspecify.annotations.Nullable;
  * A remote roster counts while its backend has been heard from within the liveness window, the same three
  * heartbeats the cluster-peer roster uses. A backend that dies without sending its quits therefore drops out of
  * every view once its heartbeats stop, instead of leaving its players online forever. Time is read on this backend
- * when a frame arrives, never from the sender, so clock skew between backends cannot hide a live one.
+ * when a frame arrives, never from the sender, so clock skew between backends cannot hide a live one. A heartbeat
+ * extends a roster only while a presence frame for it arrived within the window: a backend that restarted with its
+ * clock set back sends frames that read as older than the roster they replace, and its heartbeats alone must not keep
+ * that stale roster alive.
  *
  * <h2>Switching backends</h2>
  * While a player switches backends they can sit in two rosters for a moment: the new backend's join and the old
@@ -189,12 +192,22 @@ public final class NetworkRoster implements NetworkPresence {
     }
 
     /**
-     * {@code origin} is alive. Refreshes a roster that still counts; one that has already expired stays expired,
-     * because the players it lists may have left while its frames were not arriving.
+     * {@code origin} is alive. Refreshes a roster that still counts and was confirmed by a presence frame within the
+     * liveness window. One that has already expired stays expired, because the players it lists may have left while
+     * its frames were not arriving; one that only heartbeats still reach may belong to an earlier run of the origin.
      */
     void heardFrom(String origin) {
         long now = clock.millis();
-        remotes.computeIfPresent(origin, (key, remote) -> expired(remote, now) ? remote : remote.heardAt(now));
+        remotes.computeIfPresent(
+                origin,
+                (key, remote) -> expired(remote, now) || now - remote.framedMillis() > livenessMillis
+                        ? remote
+                        : remote.pingedAt(now));
+    }
+
+    /** Whether {@code origin} has a roster here, counting one that expired but was not pruned yet. */
+    boolean hasRoster(String origin) {
+        return remotes.containsKey(origin);
     }
 
     /** Drop the rosters of backends that have not been heard from within the liveness window. */
@@ -233,7 +246,7 @@ public final class NetworkRoster implements NetworkPresence {
             }
             Remote next = change.next(base, now);
             if (next == null) {
-                return base.heardAt(now);
+                return base.framedAt(now);
             }
             added.clear();
             for (Entry entry : next.entries().values()) {
@@ -242,7 +255,7 @@ public final class NetworkRoster implements NetworkPresence {
                     added.add(entry.player());
                 }
             }
-            return next.heardAt(now);
+            return next.framedAt(now);
         });
         return List.copyOf(added);
     }
@@ -370,20 +383,29 @@ public final class NetworkRoster implements NetworkPresence {
      * @param session the run of that backend the roster belongs to
      * @param rosterSequence the newest whole roster applied; {@link Long#MIN_VALUE} before the first
      * @param heardMillis when that backend was last heard from, on this backend's clock
+     * @param framedMillis when a presence frame of this run last arrived, on this backend's clock
      * @param entries its players and tombstones by account
      */
-    private record Remote(long session, long rosterSequence, long heardMillis, Map<UUID, Entry> entries) {
+    private record Remote(
+            long session, long rosterSequence, long heardMillis, long framedMillis, Map<UUID, Entry> entries) {
 
         static Remote fresh(long session, long now) {
-            return new Remote(session, Long.MIN_VALUE, now, Map.of());
+            return new Remote(session, Long.MIN_VALUE, now, now, Map.of());
         }
 
         Remote with(long nextRosterSequence, Map<UUID, Entry> nextEntries) {
-            return new Remote(session, nextRosterSequence, heardMillis, Map.copyOf(nextEntries));
+            return new Remote(session, nextRosterSequence, heardMillis, framedMillis, Map.copyOf(nextEntries));
         }
 
-        Remote heardAt(long now) {
-            return new Remote(session, rosterSequence, Math.max(heardMillis, now), entries);
+        /** A presence frame of this run arrived. */
+        Remote framedAt(long now) {
+            return new Remote(
+                    session, rosterSequence, Math.max(heardMillis, now), Math.max(framedMillis, now), entries);
+        }
+
+        /** Only a heartbeat arrived. */
+        Remote pingedAt(long now) {
+            return new Remote(session, rosterSequence, Math.max(heardMillis, now), framedMillis, entries);
         }
     }
 }

@@ -18,8 +18,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * it), not a DB-backed sanction, but each toggle is still audit-logged because it is an admin action. The
  * exempt target cannot be frozen.
  *
- * <p>A target connected to another backend is refused with that backend's name before anything is written: this
- * backend cannot pin or release them.
+ * <p>A freeze on a target connected to another backend is refused with that backend's name before anything is
+ * written: this backend cannot pin them. An unfreeze always runs here, because the freeze lives on the backend that
+ * applied it and clearing this backend's record is always safe; refusing it would leave the player frozen when they
+ * come back.
  */
 public final class Freeze {
 
@@ -65,9 +67,6 @@ public final class Freeze {
     public Result<Unit, ModerationError> unfreeze(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
-        if (live.refusedElsewhere(actor, target)) {
-            return Result.err(ModerationError.TARGET_ELSEWHERE);
-        }
         sanctions.unfreeze(target);
         notifier.send(target, ModerationMessageKey.UNFREEZE_NOTIFY_TARGET);
         audit.froze(actor, target, false, true);
