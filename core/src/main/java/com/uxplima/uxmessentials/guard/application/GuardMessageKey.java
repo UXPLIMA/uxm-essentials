@@ -84,6 +84,7 @@ public enum GuardMessageKey implements MessageKey {
 
     // selection
     WAND_GIVEN("guard.wand.given"),
+    WAND_NAME("guard.wand.name"),
     POS1_SET("guard.pos.first"),
     POS2_SET("guard.pos.second"),
     POINT_ADDED("guard.pos.point"),

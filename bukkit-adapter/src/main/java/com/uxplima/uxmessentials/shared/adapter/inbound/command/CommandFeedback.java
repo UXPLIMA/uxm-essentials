@@ -53,12 +53,19 @@ public final class CommandFeedback {
 
     /** Resolve {@code key} for {@code sender} with {@code placeholders} and send it with the prefix folded in. */
     public void send(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
+        sender.sendMessage(render(sender, key, placeholders));
+    }
+
+    /**
+     * {@code key} as {@code sender} reads it, for text that is drawn somewhere other than chat: an item's name, a
+     * sign's line, a reply an add-on sends on its own.
+     */
+    public Component render(CommandSender sender, MessageKey key, Map<String, String> placeholders) {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
         PlayerRef viewer = refOf(sender);
-        String rendered = messages.resolve(viewer, key, placeholders);
-        sender.sendMessage(parse(viewer, rendered));
+        return parse(viewer, messages.resolve(viewer, key, placeholders));
     }
 
     /** Send an already-resolved catalog source string to {@code sender}, folding the prefix in. */

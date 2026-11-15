@@ -149,6 +149,8 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_SIGN_NO_PERMISSION_USE("warp.sign.no-permission-use"),
     WARP_SIGN_EMPTY_NAME("warp.sign.empty-name"),
     WARP_SIGN_CREATED("warp.sign.created"),
+    // the colour an active sign's header is drawn in; {header} is the configured word and must stay its only text
+    WARP_SIGN_HEADER("warp.sign.header"),
 
     // manager GUI (the kit-editor-style /warp edit manager)
     WARP_MANAGER_TITLE("warp.manager.title"),

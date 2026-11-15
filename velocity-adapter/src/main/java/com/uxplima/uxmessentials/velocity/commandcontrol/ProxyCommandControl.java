@@ -64,7 +64,8 @@ public final class ProxyCommandControl {
         if (!config.enabled()) {
             return;
         }
-        proxy.getEventManager().register(plugin, buildListener(config, store, proxy, logger));
+        ProxyCatalog catalog = ProxyCatalog.load(dataDirectory, logger::warn);
+        proxy.getEventManager().register(plugin, buildListener(config, store, catalog, proxy, logger));
         warnIfChannelHideConfigured(config, logger);
         logger.info(
                 "uxmEssentials command-control active on the proxy (spam-guard {})",
@@ -83,12 +84,12 @@ public final class ProxyCommandControl {
     }
 
     private static CommandControlListener buildListener(
-            CommandControlConfig config, ConfigStore store, ProxyServer proxy, Logger logger) {
+            CommandControlConfig config, ConfigStore store, ProxyCatalog catalog, ProxyServer proxy, Logger logger) {
         RuleSet rules = config.toRuleSet(BYPASS);
         HidePolicy hide = config.toHidePolicy(VIEW);
         CommandRateLimiter limiter = config.toRateLimiter();
         ProxyGroupSource groups = ProxyGroupSources.create(proxy, logger);
-        ProxyCommandMessages messages = ProxyCommandMessages.from(store);
+        ProxyCommandMessages messages = ProxyCommandMessages.from(store, catalog, logger::info);
         ProxyCommandTreeFilter filter =
                 new ProxyCommandTreeFilter(rules, hide, config.tabCompletionEnabled(), config.blockNamespaceBypass());
         return new CommandControlListener(

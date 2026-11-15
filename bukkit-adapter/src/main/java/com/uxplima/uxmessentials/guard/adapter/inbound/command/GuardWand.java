@@ -7,7 +7,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 
 import org.jspecify.annotations.Nullable;
@@ -19,11 +18,11 @@ public final class GuardWand {
 
     private GuardWand() {}
 
-    /** A new wand. */
-    public static ItemStack create() {
+    /** A new wand called {@code name}, upright unless the name asks for italics itself. */
+    public static ItemStack create(Component name) {
         ItemStack item = new ItemStack(Material.BLAZE_ROD);
         ItemMeta meta = item.getItemMeta();
-        meta.displayName(Component.text("Guard", NamedTextColor.AQUA).decoration(TextDecoration.ITALIC, false));
+        meta.displayName(name.decorationIfAbsent(TextDecoration.ITALIC, TextDecoration.State.FALSE));
         meta.getPersistentDataContainer().set(MARK, PersistentDataType.BYTE, (byte) 1);
         item.setItemMeta(meta);
         return item;

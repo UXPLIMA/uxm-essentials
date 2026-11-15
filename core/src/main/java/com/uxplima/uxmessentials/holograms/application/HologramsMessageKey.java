@@ -229,7 +229,11 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_LINE_INDEX_INVALID("hologram.line-index-invalid"),
     HOLOGRAM_INVALID_COORDS("hologram.invalid-coords"),
     HOLOGRAM_MIN_ONE_LINE("hologram.min-one-line"),
-    HOLOGRAM_PLAYERS_ONLY("hologram.players-only");
+    HOLOGRAM_PLAYERS_ONLY("hologram.players-only"),
+
+    // a leaderboard hologram's rows, {rank}{name}{score}, and the line it shows while its provider has none
+    HOLOGRAM_LEADERBOARD_ROW("hologram.leaderboard.row"),
+    HOLOGRAM_LEADERBOARD_EMPTY("hologram.leaderboard.empty");
 
     private final String key;
 
