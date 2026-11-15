@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ReaderText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -422,7 +423,7 @@ public final class TablistRenderer {
      */
     private ConditionContext conditionContext(Player player) {
         return new ConditionContext(
-                player::hasPermission,
+                node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
                 PlaceholderApiSupport.messageBridge(player.getUniqueId()));

@@ -14,17 +14,28 @@ import java.util.UUID;
  * <p>{@code reach} says which players a peer may reward. The voter list has to travel with the frame because the
  * origin clears the shared participant set as soon as the party fires, before a peer could read it.
  *
+ * <p>{@code partyId} names the party, so a backend that receives the frame over two transports celebrates and pays
+ * it once.
+ *
  * @param originServer the backend on which the party fired
+ * @param partyId identifies this party, or {@link #NO_ID} on a frame from a peer that sends none
  * @param threshold the vote count at which the party fired, for broadcast and logging context
  * @param reach which of a peer's online players the party rewards
  * @param voters the voters of the party window a peer may reward, filled only when {@code reach} is
  *     {@link Reach#VOTERS}
  */
-public record VotePartyFired(String originServer, int threshold, Reach reach, Set<UUID> voters)
+public record VotePartyFired(String originServer, UUID partyId, int threshold, Reach reach, Set<UUID> voters)
         implements NetworkMessage {
+
+    /**
+     * The id a frame decodes with when its sender wrote none. A random id is never all zeros, so this cannot
+     * collide with a real party.
+     */
+    public static final UUID NO_ID = new UUID(0L, 0L);
 
     public VotePartyFired {
         Objects.requireNonNull(originServer, "originServer");
+        Objects.requireNonNull(partyId, "partyId");
         Objects.requireNonNull(reach, "reach");
         Objects.requireNonNull(voters, "voters");
         if (originServer.isBlank()) {
@@ -37,6 +48,11 @@ public record VotePartyFired(String originServer, int threshold, Reach reach, Se
             throw new IllegalArgumentException("voters travel only with reach VOTERS, not " + reach);
         }
         voters = Set.copyOf(voters);
+    }
+
+    /** Whether the frame names its party, so a second copy of it can be told apart from a new party. */
+    public boolean identified() {
+        return !NO_ID.equals(partyId);
     }
 
     @Override

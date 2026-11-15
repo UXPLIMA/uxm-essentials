@@ -7,6 +7,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmlib.condition.Comparison;
 import org.jspecify.annotations.Nullable;
 
@@ -34,7 +35,7 @@ public final class BukkitSubject implements GuardSubject {
 
     @Override
     public boolean has(String node) {
-        return player.hasPermission(node);
+        return CatalogPermissionCheck.has(player, node);
     }
 
     @Override
