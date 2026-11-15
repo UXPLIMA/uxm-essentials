@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
-import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -41,6 +40,8 @@ class TeleportEngineTest {
     private final Purse purse = new Purse(new BigDecimal("100"));
     private final List<PlayerRef> shielded = new ArrayList<>();
     private final RecordingNotifier notifier = new RecordingNotifier();
+    private final List<String> outcomes = new ArrayList<>();
+    private boolean jailed;
     private final TeleportEngine engine = new TeleportEngine(
             new ClockCooldowns(CLOCK),
             warmups,
@@ -48,7 +49,7 @@ class TeleportEngineTest {
             notifier.notifier(),
             new RecordingEvents(),
             new TeleportSettings(new CostOf("50")),
-            JailGate.NEVER,
+            who -> jailed,
             CombatGate.NEVER,
             purse,
             shielded::add);
@@ -56,6 +57,44 @@ class TeleportEngineTest {
     private void startRandomTeleport() {
         assertThat(engine.gateRandom(ALEX).isOk()).isTrue();
         engine.launchRandom(ALEX, Destination.at(LANDING));
+    }
+
+    private Result<Unit, TeleportError> arrive() {
+        return engine.arriveImmediately(
+                ALEX,
+                Destination.at(LANDING),
+                TeleportKind.WARP,
+                () -> outcomes.add("landed"),
+                () -> outcomes.add("missed"));
+    }
+
+    @Test
+    void aCrossServerArrivalLandsAtOnceWithNoWarmup() {
+        assertThat(arrive().isOk()).isTrue();
+
+        assertThat(warmups.pending).isEmpty();
+        assertThat(hops.arrived).containsExactly(LANDING);
+        assertThat(outcomes).containsExactly("landed");
+    }
+
+    @Test
+    void aCrossServerArrivalThatMissesReportsTheMiss() {
+        hops.outcome = Hop.MISS;
+
+        assertThat(arrive().isOk()).isTrue();
+
+        assertThat(hops.arrived).isEmpty();
+        assertThat(outcomes).containsExactly("missed");
+    }
+
+    @Test
+    void aJailedPlayerIsRefusedTheCrossServerArrivalWithoutAHop() {
+        jailed = true;
+
+        assertThat(arrive().asError()).contains(TeleportError.JAILED);
+
+        assertThat(hops.arrived).isEmpty();
+        assertThat(outcomes).isEmpty();
     }
 
     @Test

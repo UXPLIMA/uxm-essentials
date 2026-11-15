@@ -24,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  * flight. {@link #record} upserts on that key, so a fresh cross-server request overwrites a stale one in place
  * rather than leaving orphaned rows. The uuid is canonical 36-char text, the warp the surrogate {@code long}, the
  * request time epoch-millis, and the charged amount a {@code DECIMAL(20,4)} paired with its currency id, both
- * NULL when nothing was charged. {@link #clear} is one conditional {@code DELETE}, so the database decides which
+ * NULL when nothing was charged, and {@code accrue_on_arrival} 1 when the arrival is to pay the owner (NULL on a row
+ * an earlier release wrote). {@link #clear} is one conditional {@code DELETE}, so the database decides which
  * of two racing callers removed the row. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
  */
 @NullMarked
@@ -42,6 +43,7 @@ public final class JooqPendingTeleportStore extends JooqRepository implements Pe
         long requestedAt = pending.requestedAt().toEpochMilli();
         @Nullable BigDecimal amount = pending.paid().map(WarpCost::amount).orElse(null);
         @Nullable String currency = pending.paid().map(WarpCost::currencyId).orElse(null);
+        short accrueOnArrival = pending.accrueOnArrival() ? (short) 1 : (short) 0;
         write(dsl -> {
             dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                     .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, player)
@@ -51,6 +53,7 @@ public final class JooqPendingTeleportStore extends JooqRepository implements Pe
                     .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, requestedAt)
                     .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, amount)
                     .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, currency)
+                    .set(PLAYER_WARP_PENDING_TELEPORTS.ACCRUE_ON_ARRIVAL, accrueOnArrival)
                     .onConflict(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID)
                     .doUpdate()
                     .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, warp)
@@ -59,6 +62,7 @@ public final class JooqPendingTeleportStore extends JooqRepository implements Pe
                     .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, requestedAt)
                     .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, amount)
                     .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, currency)
+                    .set(PLAYER_WARP_PENDING_TELEPORTS.ACCRUE_ON_ARRIVAL, accrueOnArrival)
                     .execute();
             return null;
         });
@@ -94,7 +98,13 @@ public final class JooqPendingTeleportStore extends JooqRepository implements Pe
                 row.getTargetServer(),
                 row.getOriginServer(),
                 Instant.ofEpochMilli(row.getRequestedAt()),
-                paidOf(row.getPaidAmount(), row.getPaidCurrency()));
+                paidOf(row.getPaidAmount(), row.getPaidCurrency()),
+                isSet(row.getAccrueOnArrival()));
+    }
+
+    /** NULL is a row an earlier origin wrote, which already paid the owner, so only a stored 1 sets the flag. */
+    private static boolean isSet(@Nullable Short flag) {
+        return flag != null && flag != 0;
     }
 
     /** A charge is only present when both columns are non-NULL; a half-written pair reads as no charge. */

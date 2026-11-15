@@ -574,9 +574,9 @@ public final class PlayerwarpsWiring {
         Duration requestTtl =
                 Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
         CrossServerWatchdog watchdog =
-                new CrossServerWatchdog(store, repository, charges, kernel.scheduler(), requestTtl);
+                new CrossServerWatchdog(store, repository, charges, kernel.scheduler(), kernel.log(), requestTtl);
         CrossServerTeleport seam = new BukkitCrossServerTeleport(
-                connector, watchdog, charges, kernel.scheduler(), notifier, kernel.log(), localServerId, clock);
+                connector, watchdog, charges, kernel.scheduler(), notifier, localServerId, clock);
         CrossServerArrival arrival = new CrossServerArrival(
                 store,
                 repository,

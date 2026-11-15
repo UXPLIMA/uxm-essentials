@@ -47,7 +47,19 @@ class JooqPendingTeleportStoreTest {
                 "survival",
                 "lobby",
                 at,
-                Optional.of(WarpCost.of(new BigDecimal("25.5000"), "gold")));
+                Optional.of(WarpCost.of(new BigDecimal("25.5000"), "gold")),
+                true);
+    }
+
+    @Test
+    void whetherTheArrivalPaysTheOwnerSurvivesTheRoundTrip() {
+        store.record(request(ASKED));
+        assertThat(store.find(ALEX).map(PendingTeleport::accrueOnArrival)).contains(true);
+
+        PendingTeleport earlier =
+                new PendingTeleport(ALEX, PlayerWarpId.of(7), "survival", "lobby", ASKED, Optional.empty(), false);
+        store.record(earlier);
+        assertThat(store.find(ALEX).map(PendingTeleport::accrueOnArrival)).contains(false);
     }
 
     @Test

@@ -290,6 +290,32 @@ public final class TeleportEngine {
         executor.relocate(who, destination, TeleportKind.RESPAWN, () -> grace.applyOnArrival(who));
     }
 
+    /**
+     * Finish a hop the player already paid for and waited out on another backend: the cross-server arrival. No
+     * warmup and no cooldown gate, since both belong to the use on the origin and the player has just joined. A
+     * jailed player is still refused, and so is a hop the veto gate stops, each with its notice. Exactly one of
+     * {@code onLanded} and {@code onFailed} runs for a hop that was issued; a refusal runs neither and returns the
+     * error, so the caller can give the money back.
+     */
+    public Result<Unit, TeleportError> arriveImmediately(
+            PlayerRef mover, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
+        Objects.requireNonNull(mover, "mover");
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(onLanded, "onLanded");
+        Objects.requireNonNull(onFailed, "onFailed");
+        if (jail.isJailed(mover)) {
+            notifier.send(mover, TeleportMessageKey.JAILED);
+            return Result.err(TeleportError.JAILED);
+        }
+        if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
+            notifier.send(mover, TeleportError.VETOED.messageKey());
+            return Result.err(TeleportError.VETOED);
+        }
+        executor.teleport(mover, destination, kind, onLanded, onFailed);
+        return Result.ok();
+    }
+
     private void chargeThenHop(PlayerRef who, Destination destination) {
         BigDecimal cost = settings.rtpCost();
         if (cost.signum() <= 0) {

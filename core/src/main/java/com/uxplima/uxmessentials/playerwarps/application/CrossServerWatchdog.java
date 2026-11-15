@@ -8,6 +8,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -35,6 +36,7 @@ public final class CrossServerWatchdog {
     private final PlayerWarpRepository repository;
     private final CrossServerCharges charges;
     private final Scheduler scheduler;
+    private final Logger log;
     private final Duration requestTtl;
 
     public CrossServerWatchdog(
@@ -42,32 +44,60 @@ public final class CrossServerWatchdog {
             PlayerWarpRepository repository,
             CrossServerCharges charges,
             Scheduler scheduler,
+            Logger log,
             Duration requestTtl) {
         this.store = Objects.requireNonNull(store, "store");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.charges = Objects.requireNonNull(charges, "charges");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
         this.requestTtl = Objects.requireNonNull(requestTtl, "requestTtl");
     }
 
     /**
      * Record {@code pending} as {@code who}'s in-flight request, refunding an earlier unclaimed one it replaces,
-     * and start its TTL timer. Called by the origin immediately before it connects the player. A throw means the
-     * new request was not recorded, so the caller still owns its charge and must give it back.
+     * and start its TTL timer. Called by the origin immediately before it connects the player. Returns false when
+     * the request could not be tracked; its charge has then been dealt with here and the player must not be sent.
      */
-    public void track(PlayerRef who, PendingTeleport pending, String warpLabel) {
+    public boolean track(PlayerRef who, PendingTeleport pending, String warpLabel) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(pending, "pending");
         Objects.requireNonNull(warpLabel, "warpLabel");
-        Optional<PendingTeleport> earlier = store.find(who.uuid());
-        if (earlier.isPresent()) {
-            String earlierLabel = labelOf(earlier.get());
-            if (store.clear(earlier.get()) == 1) {
-                charges.refund(who, earlier.get().paid(), earlierLabel);
-            }
+        try {
+            replaceEarlier(who);
+            store.record(pending);
+        } catch (RuntimeException unrecorded) {
+            log.error("event=playerwarp_cross_server_record_failed player=" + who.uuid(), unrecorded);
+            // The player has not been sent yet, so no backend can have claimed the row. A write that landed despite
+            // the error is deleted before the refund where the database still answers, so a later join does not
+            // refund it a second time.
+            clearQuietly(pending);
+            unreachable(who, pending, warpLabel);
+            return false;
         }
-        store.record(pending);
-        scheduler.asyncAfter(requestTtl, () -> expire(who, pending, warpLabel));
+        try {
+            scheduler.asyncAfter(requestTtl, () -> expire(who, pending, warpLabel));
+            return true;
+        } catch (RuntimeException unscheduled) {
+            log.error("event=playerwarp_cross_server_timer_failed player=" + who.uuid(), unscheduled);
+            // The row is stored but has no timer. Only a claim that removes it may refund; if the delete fails the
+            // row stays for the player's next join to refund as expired.
+            if (clearQuietly(pending) == 1) {
+                unreachable(who, pending, warpLabel);
+            }
+            return false;
+        }
+    }
+
+    private void replaceEarlier(PlayerRef who) {
+        Optional<PendingTeleport> earlier = store.find(who.uuid());
+        if (earlier.isEmpty()) {
+            return;
+        }
+        String earlierLabel = labelOf(earlier.get());
+        if (store.clear(earlier.get()) == 1) {
+            charges.refund(who, earlier.get().paid(), earlierLabel);
+        }
     }
 
     private void expire(PlayerRef who, PendingTeleport pending, String warpLabel) {
@@ -75,6 +105,25 @@ public final class CrossServerWatchdog {
             return;
         }
         charges.fail(who, pending.paid(), PlayerwarpsMessageKey.PWARP_CROSS_SERVER_TIMED_OUT, Map.of(), warpLabel);
+    }
+
+    private void unreachable(PlayerRef who, PendingTeleport pending, String warpLabel) {
+        charges.fail(
+                who,
+                pending.paid(),
+                PlayerwarpsMessageKey.PWARP_CROSS_SERVER_UNAVAILABLE,
+                Map.of("server", pending.targetServer()),
+                warpLabel);
+    }
+
+    /** The removed-row count of a best-effort delete, or -1 when the delete itself failed. */
+    private int clearQuietly(PendingTeleport pending) {
+        try {
+            return store.clear(pending);
+        } catch (RuntimeException undeleted) {
+            log.error("event=playerwarp_cross_server_clear_failed player=" + pending.player(), undeleted);
+            return -1;
+        }
     }
 
     /** The earlier request's warp name, or its surrogate id when the warp is gone or cannot be read. */

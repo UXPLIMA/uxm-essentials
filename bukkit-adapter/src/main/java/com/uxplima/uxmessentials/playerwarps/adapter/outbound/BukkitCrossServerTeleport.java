@@ -17,7 +17,6 @@ import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleport;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
-import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
@@ -47,7 +46,6 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
     private final CrossServerCharges charges;
     private final Scheduler scheduler;
     private final Notifier notifier;
-    private final Logger log;
     private final String localServerId;
     private final Clock clock;
 
@@ -57,7 +55,6 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
             CrossServerCharges charges,
             Scheduler scheduler,
             Notifier notifier,
-            Logger log,
             String localServerId,
             Clock clock) {
         this.connector = Objects.requireNonNull(connector, "connector");
@@ -65,7 +62,6 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
         this.charges = Objects.requireNonNull(charges, "charges");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.log = Objects.requireNonNull(log, "log");
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -82,14 +78,9 @@ public final class BukkitCrossServerTeleport implements CrossServerTeleport {
             return;
         }
         PendingTeleport pending = new PendingTeleport(
-                who.uuid(), warp.id().orElseThrow(), target, localServerId, clock.instant(), charged);
-        try {
-            watchdog.track(who, pending, name);
-        } catch (RuntimeException trackFailure) {
-            // Nothing was recorded, so no backend and no timer will ever settle this charge: give it back now.
-            log.error(
-                    "event=playerwarp_cross_server_track_failed player=" + who.uuid() + " warp=" + name, trackFailure);
-            unreachable(who, charged, name, target);
+                who.uuid(), warp.id().orElseThrow(), target, localServerId, clock.instant(), charged, true);
+        // An untracked request has already been refunded by the watchdog, so the player must not be sent.
+        if (!watchdog.track(who, pending, name)) {
             return;
         }
         notifier.send(who, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_SENDING, Map.of("warp", name, "server", target));

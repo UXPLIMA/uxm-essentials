@@ -84,10 +84,14 @@ public final class CrossServerCharges {
         if (accrue(warp, cost)) {
             return;
         }
+        // The player has landed, so this refund hands back a hop that did happen; the line lets an operator see it.
         log.warn(
-                "event=playerwarp_cross_server_accrue_failed warp={} visitor={} amount={} currency={}",
+                "event=playerwarp_cross_server_accrue_failed warp={} label={} player={} name={} amount={} currency={}"
+                        + " outcome=visitor_refunded",
                 warp.value(),
+                warpLabel,
                 who.uuid(),
+                who.name(),
                 cost.amount(),
                 cost.currencyId());
         refund(who, paid, warpLabel);

@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleport;
 import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
@@ -20,8 +21,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * The arrival half of a cross-server teleport. When a player joins this backend the inbound listener hands them
  * here; if the shared store holds a pending teleport that targets this backend and is still fresh, the warp is
- * resolved and the player is hopped locally after a short settling delay, exactly as if they had run
- * {@code /pwarp} here, and only then is the warp's owner paid. A row past its expiry, or one aimed at another
+ * resolved and the player is hopped locally after a short settling delay. The hop is immediate, with no warmup and
+ * no cooldown gate, since the player paid and waited on the origin; a jailed player is still refused and refunded.
+ * The warp's owner is paid only once the player has landed, and only on a row whose origin left that payment to
+ * the arrival (an earlier release paid at charge time). A row past its expiry, or one aimed at another
  * backend, is refunded instead, and so is a warp that is gone, suspended, or has since moved off this backend.
  *
  * <p>Nothing is acted on before the row is claimed: the store's conditional delete must remove it, or this join
@@ -126,31 +129,57 @@ public final class CrossServerArrival {
         PlayerWarp warp = resolved.orElseThrow();
         String name = warp.name().value();
         try {
-            // A player who left during the settling delay was never moved, so the retired branch refunds them on
-            // the async lane, where IO belongs.
+            // A player who left during the settling delay, or a backend that is shutting down, never moved them,
+            // so the retired branch refunds.
             scheduler.onEntity(
-                    who,
-                    () -> hop(who, pending, warp),
-                    () -> scheduler.async(() -> charges.refund(who, pending.paid(), name)));
+                    who, () -> hop(who, pending, warp), () -> offTick(() -> charges.refund(who, pending.paid(), name)));
         } catch (RuntimeException scheduleFailure) {
             log.error("event=playerwarp_cross_server_hop_unscheduled player=" + who.uuid(), scheduleFailure);
             charges.fail(who, pending.paid(), PlayerwarpsMessageKey.PWARP_CROSS_SERVER_FAILED, Map.of(), name);
         }
     }
 
-    /** On the player's region thread: move them, then pay the owner off-tick and tell the player they arrived. */
+    /**
+     * On the player's region thread: move them at once, then pay the owner only once they have landed, or refund
+     * a hop that was refused or missed. The guard keeps that to one outcome even if a hop reports a miss and then
+     * throws as well.
+     */
     private void hop(PlayerRef who, PendingTeleport pending, PlayerWarp warp) {
         String name = warp.name().value();
+        AtomicBoolean settled = new AtomicBoolean();
+        Runnable landed = () -> {
+            if (settled.compareAndSet(false, true)) {
+                if (pending.accrueOnArrival()) {
+                    offTick(() -> charges.settle(who, pending.warp(), pending.paid(), name));
+                }
+                notifier.send(who, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_ARRIVED, Map.of("warp", name));
+            }
+        };
+        Runnable missed = () -> {
+            if (settled.compareAndSet(false, true)) {
+                offTick(() -> charges.fail(
+                        who, pending.paid(), PlayerwarpsMessageKey.PWARP_CROSS_SERVER_FAILED, Map.of(), name));
+            }
+        };
         try {
-            teleporter.teleportTo(who, warp);
+            teleporter.arrive(who, warp, landed, missed);
         } catch (RuntimeException hopFailure) {
             log.error("event=playerwarp_cross_server_hop_failed player=" + who.uuid(), hopFailure);
-            scheduler.async(() ->
-                    charges.fail(who, pending.paid(), PlayerwarpsMessageKey.PWARP_CROSS_SERVER_FAILED, Map.of(), name));
-            return;
+            missed.run();
         }
-        scheduler.async(() -> charges.settle(who, pending.warp(), pending.paid(), name));
-        notifier.send(who, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_ARRIVED, Map.of("warp", name));
+    }
+
+    /**
+     * Hand money work to the async lane, or run it here when the lane refuses it (a backend that is disabling), so a
+     * refund or an owner payment is never dropped with the task.
+     */
+    private void offTick(Runnable work) {
+        try {
+            scheduler.async(work);
+        } catch (RuntimeException rejected) {
+            log.warn("event=playerwarp_cross_server_async_rejected reason={}", rejected.toString());
+            work.run();
+        }
     }
 
     /** True once the request has aged past the expiry, so a long-abandoned row is refunded not honoured. */
