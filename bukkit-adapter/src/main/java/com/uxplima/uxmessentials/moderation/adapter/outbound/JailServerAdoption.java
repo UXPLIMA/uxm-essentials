@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.adapter.outbound;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Bukkit;
 import org.bukkit.World;
@@ -16,15 +17,19 @@ import org.jspecify.annotations.NullMarked;
  * worlds are up. The world list is read on the global region and the update runs on the async lane. The jail store
  * is read fresh on every use, so a claim needs no cache drop and no frame: every backend sends players here from the
  * next jail on.
+ *
+ * <p>It runs only on a network under a real server name ({@code server} present). A standalone server's name is not
+ * the one it may later join a network with, so claiming under it would leave every jail pointing at a server that
+ * does not exist; its jails stay unscoped until a networked start claims them.
  */
 @NullMarked
 public final class JailServerAdoption implements Runnable {
 
     private final Persistence persistence;
     private final KernelPorts kernel;
-    private final String server;
+    private final Optional<String> server;
 
-    public JailServerAdoption(Persistence persistence, KernelPorts kernel, String server) {
+    public JailServerAdoption(Persistence persistence, KernelPorts kernel, Optional<String> server) {
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
         this.server = Objects.requireNonNull(server, "server");
@@ -32,12 +37,16 @@ public final class JailServerAdoption implements Runnable {
 
     @Override
     public void run() {
-        if (server.isBlank() || server.equals(JailServerClaimer.UNSCOPED)) {
+        if (server.isEmpty()) {
+            return;
+        }
+        String name = server.get();
+        if (name.isBlank() || name.equals(JailServerClaimer.UNSCOPED)) {
             kernel.log()
                     .warn(
                             "event=jail_server_claim_skipped reason=reserved_server_name server={} fix=set a unique"
                                     + " network.server-name in config.conf",
-                            server);
+                            name);
             return;
         }
         kernel.scheduler().onGlobal(() -> {
@@ -45,11 +54,11 @@ public final class JailServerAdoption implements Runnable {
                     .map(World::getUID)
                     .map(Object::toString)
                     .toList();
-            kernel.scheduler().async(() -> claim(localWorlds));
+            kernel.scheduler().async(() -> claim(name, localWorlds));
         });
     }
 
-    private void claim(List<String> localWorlds) {
+    private void claim(String server, List<String> localWorlds) {
         try {
             List<String> claimed = JailServerClaimer.claim(persistence, server, localWorlds);
             if (claimed.isEmpty()) {

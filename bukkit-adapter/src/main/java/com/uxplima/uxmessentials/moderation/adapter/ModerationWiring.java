@@ -106,6 +106,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
@@ -337,7 +338,7 @@ public final class ModerationWiring {
         return new Wired(
                 commands,
                 listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
-                new JailServerAdoption(persistence, kernel, jailNetwork.server()),
+                new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
                 commandSpyStore,
                 mutePolicy,
@@ -399,7 +400,13 @@ public final class ModerationWiring {
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 kernel.scheduler(),
                 kernel.log());
-        return new JailNetwork(sync, transfer, alerts, hops.server());
+        // A standalone server, or one still on the shipped default name, records no server on a jail: the name is
+        // not the one it will be known by on a network, and a stamped row would then point at a server that does
+        // not exist. Its jails stay unscoped for the first networked start under a real name to claim.
+        Optional<String> recordedServer = networked && !NetworkConfig.isDefaultServerName(hops.server())
+                ? Optional.of(hops.server())
+                : Optional.empty();
+        return new JailNetwork(sync, transfer, alerts, recordedServer);
     }
 
     /**
@@ -408,9 +415,11 @@ public final class ModerationWiring {
      * @param sync announces jail changes and failed jail hops to the peers
      * @param transfer puts a player connected here into their jail, here or on the jail's backend
      * @param alerts tells staff about a jail hop that failed
-     * @param server this backend's network name, recorded on the jails set here
+     * @param recordedServer the network name recorded on the jails set or claimed here; empty off the network or
+     *     under the shipped default name
      */
-    private record JailNetwork(JailSync sync, JailTransfer transfer, JailHopAlerts alerts, String server) {}
+    private record JailNetwork(
+            JailSync sync, JailTransfer transfer, JailHopAlerts alerts, Optional<String> recordedServer) {}
 
     private static ModerationServices assemble(
             Plugin plugin,
@@ -523,7 +532,8 @@ public final class ModerationWiring {
                 .sanctionSummary(new SanctionSummary(repository, notifier, clock))
                 .listJails(new ListJails(jails, notifier))
                 .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
-                .setJail(new SetJail(jailLocations, notifier, audit, kernel.events(), clock, jailNetwork.server()))
+                .setJail(new SetJail(
+                        jailLocations, notifier, audit, kernel.events(), clock, jailNetwork.recordedServer()))
                 .delJail(new DelJail(jailLocations, notifier, audit, kernel.events(), clock))
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
