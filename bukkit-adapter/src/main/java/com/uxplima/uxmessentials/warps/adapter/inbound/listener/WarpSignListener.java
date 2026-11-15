@@ -14,11 +14,11 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -90,8 +90,7 @@ public final class WarpSignListener implements Listener {
             return;
         }
 
-        // Colorize sign header to mark it as an active warp sign.
-        event.line(0, Component.text(header, NamedTextColor.DARK_BLUE));
+        event.line(0, activeHeader(player, header));
         feedback.send(player, WarpsMessageKey.WARP_SIGN_CREATED);
     }
 
@@ -111,7 +110,7 @@ public final class WarpSignListener implements Listener {
         String header = config.getString("warp-sign-header", "[Warp]");
         org.bukkit.block.sign.SignSide front = sign.getSide(org.bukkit.block.sign.Side.FRONT);
         // Plain text strips any colour, so the same comparison matches both a freshly typed header and the
-        // dark-blue header the create handler applies to mark an active warp sign.
+        // coloured header the create handler applies to mark an active warp sign.
         String line0 = plain(front.line(0));
         if (!line0.equalsIgnoreCase(header)) {
             return;
@@ -135,6 +134,16 @@ public final class WarpSignListener implements Listener {
         // Execute teleport
         useWarp.use(ref, WarpName.of(warpName));
         event.setCancelled(true);
+    }
+
+    /**
+     * The header drawn on an active warp sign. Only the colour comes from the catalogue: a sign is matched by its plain
+     * text, so a line that would add or change a word (a translator's extra word) is passed over for the bare header.
+     */
+    private Component activeHeader(Player player, String header) {
+        Component drawn =
+                feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", StyledText.escape(header)));
+        return plain(drawn).equals(header) ? drawn : Component.text(header);
     }
 
     private static String plain(@org.jspecify.annotations.Nullable Component line) {

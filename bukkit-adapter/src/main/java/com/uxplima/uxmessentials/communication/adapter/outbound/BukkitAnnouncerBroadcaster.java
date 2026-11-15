@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.communication.adapter.outbound;
 
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -12,6 +13,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.JoinConfiguration;
 
+import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -20,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.ChannelBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.ChatCentre;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -40,9 +43,9 @@ import org.jspecify.annotations.Nullable;
  * never parity-checked. The announcement's optional sound is resolved once through {@link BukkitRegistryKeys} and
  * passed to the broadcaster.
  *
- * <p>The legacy one-off {@code /broadcast} path stays on the {@link MessageSink}: a single raw MiniMessage string
- * delivered to every opted-in viewer (optionally restricted to one world), with the sink performing the per-viewer
- * region hop and parse.
+ * <p>The one-off {@code /broadcast} path stays on the {@link MessageSink}: the operator's MiniMessage body, framed by
+ * the {@code communication.broadcast.line} entry in each viewer's own language, delivered to every opted-in viewer
+ * (optionally restricted to one world), with the sink performing the per-viewer region hop and parse.
  *
  * <p><b>Centring</b>: with {@link Announcement#centered()} set, every line is drawn in the middle of the chat, and a
  * single line asks for it on its own by opening with {@code <center>} (see {@link ChatCentre}). A line is rendered and
@@ -53,6 +56,7 @@ import org.jspecify.annotations.Nullable;
 public final class BukkitAnnouncerBroadcaster {
 
     private final MessageSink sink;
+    private final Messages messages;
     private final BroadcastOptOutStore optOut;
     private final ChannelBroadcaster channels;
     private final Function<Player, ConditionContext> conditionContext;
@@ -60,11 +64,13 @@ public final class BukkitAnnouncerBroadcaster {
 
     public BukkitAnnouncerBroadcaster(
             MessageSink sink,
+            Messages messages,
             BroadcastOptOutStore optOut,
             ChannelBroadcaster channels,
             Function<Player, ConditionContext> conditionContext,
             Scheduler scheduler) {
         this.sink = Objects.requireNonNull(sink, "sink");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.optOut = Objects.requireNonNull(optOut, "optOut");
         this.channels = Objects.requireNonNull(channels, "channels");
         this.conditionContext = Objects.requireNonNull(conditionContext, "conditionContext");
@@ -123,27 +129,26 @@ public final class BukkitAnnouncerBroadcaster {
         return centred || marked.isPresent() ? CenteredTextPadder.centred(drawn) : drawn;
     }
 
-    /** Send {@code line} to every online, opted-in player. */
-    public void broadcast(String line) {
-        Objects.requireNonNull(line, "line");
+    /** Send the operator's {@code body} to every online, opted-in player, framed in each one's language. */
+    public void broadcast(String body) {
+        Objects.requireNonNull(body, "body");
         scheduler.onGlobal(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
                 PlayerRef who = BukkitRefs.toRef(player);
                 if (optOut.receivesBroadcasts(who)) {
-                    sink.deliver(who, line);
+                    sink.deliver(who, framed(who, body));
                 }
             }
         });
     }
 
     /**
-     * Send {@code line} only to online, opted-in players in the world identified by {@code worldId}, the
-     * fan-out a {@code /broadcastworld} restricts to the sender's world. Same opt-out and per-viewer region
-     * hop as {@link #broadcast(String)}; a player who left the world between the scan and the send is simply
-     * skipped.
+     * Send the operator's {@code body} only to online, opted-in players in the world identified by {@code worldId},
+     * the fan-out a {@code /broadcastworld} restricts to the sender's world. Same opt-out, frame and per-viewer region
+     * hop as {@link #broadcast(String)}; a player who left the world between the scan and the send is simply skipped.
      */
-    public void broadcastToWorld(String line, UUID worldId) {
-        Objects.requireNonNull(line, "line");
+    public void broadcastToWorld(String body, UUID worldId) {
+        Objects.requireNonNull(body, "body");
         Objects.requireNonNull(worldId, "worldId");
         scheduler.onGlobal(() -> {
             for (Player player : Bukkit.getOnlinePlayers()) {
@@ -152,10 +157,15 @@ public final class BukkitAnnouncerBroadcaster {
                 }
                 PlayerRef who = BukkitRefs.toRef(player);
                 if (optOut.receivesBroadcasts(who)) {
-                    sink.deliver(who, line);
+                    sink.deliver(who, framed(who, body));
                 }
             }
         });
+    }
+
+    /** {@code body} inside the broadcast frame as {@code viewer} reads it. */
+    private String framed(PlayerRef viewer, String body) {
+        return messages.resolve(viewer, CommunicationMessageKey.BROADCAST_LINE, Map.of("message", body));
     }
 
     /**

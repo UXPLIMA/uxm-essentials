@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
@@ -20,11 +21,13 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *
  * <p>The Phase 4 connection illusions default on too. {@code fake-join-quit} makes a vanishing player broadcast a fake
  * "left the game" line (and a fake "joined the game" on reappear) so no viewer notices they merely went invisible; the
- * two staff variants let a different line (or nothing, when left blank) go to viewers who <em>can</em> see them. The
- * template strings are operator MiniMessage content ({@code {player}} is substituted), never a {@code MessageKey}, so
- * they mirror how the connection-message context treats join/quit lines. {@code action-bar} drives the persistent
- * "you are vanished" indicator (its text is the {@code vanish.actionbar} catalog key), and {@code join-vanished} lets a
- * player who holds {@code uxmessentials.vanish.persist} rejoin already hidden.
+ * two staff variants let a different line (or nothing, when left blank) go to viewers who <em>can</em> see them. A
+ * template that is an {@code @key} reference is read from the message catalogue in each viewer's language, which is
+ * what the shipped {@code @vanish.fake-quit} and {@code @vanish.fake-join} do; any other template is operator
+ * MiniMessage sent as written. Either way {@code <display_name>} is the player's name as the game draws it and
+ * {@code {player}} the bare name. {@code action-bar} drives the persistent "you are vanished" indicator (its text is
+ * the {@code vanish.actionbar} catalog key), and {@code join-vanished} lets a player who holds
+ * {@code uxmessentials.vanish.persist} rejoin already hidden.
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param silentChests suppress the open animation/sound when a vanished player opens a chest, shulker box, ender
@@ -44,10 +47,10 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *     default {@code true})
  * @param joinVanished let a player holding {@code uxmessentials.vanish.persist} rejoin already vanished, with their
  *     real join line suppressed ({@code join-vanished}, default {@code true})
- * @param fakeQuitMessage the MiniMessage broadcast a vanishing player fakes to viewers who cannot see them, with
- *     {@code {player}} substituted ({@code fake-quit-message})
- * @param fakeJoinMessage the MiniMessage broadcast a reappearing player fakes to viewers who cannot see them
- *     ({@code fake-join-message})
+ * @param fakeQuitMessage the line a vanishing player fakes to viewers who cannot see them, an {@code @key} reference
+ *     or MiniMessage, with {@code {player}} substituted ({@code fake-quit-message}, default {@code @vanish.fake-quit})
+ * @param fakeJoinMessage the line a reappearing player fakes to viewers who cannot see them ({@code fake-join-message},
+ *     default {@code @vanish.fake-join})
  * @param fakeQuitMessageStaff the MiniMessage shown instead to viewers who <em>can</em> see the vanishing player; a
  *     blank value sends them nothing ({@code fake-quit-message-staff})
  * @param fakeJoinMessageStaff the MiniMessage shown instead to viewers who can see the reappearing player; blank sends
@@ -88,8 +91,13 @@ public record VanishConfig(
         Duration hopWindow,
         Duration loadTimeout) {
 
-    private static final String DEFAULT_FAKE_QUIT = "<yellow>{player} left the game";
-    private static final String DEFAULT_FAKE_JOIN = "<yellow>{player} joined the game";
+    private static final String DEFAULT_FAKE_QUIT = "@vanish.fake-quit";
+    private static final String DEFAULT_FAKE_JOIN = "@vanish.fake-join";
+
+    // The English lines earlier versions shipped. A file still holding one was never edited, so it reads the catalogue
+    // line that replaced it rather than English for everybody.
+    private static final String SHIPPED_FAKE_QUIT = "<yellow>{player} left the game";
+    private static final String SHIPPED_FAKE_JOIN = "<yellow>{player} joined the game";
     private static final int DEFAULT_HOP_WINDOW_SECONDS = 30;
     private static final int DEFAULT_LOAD_TIMEOUT_SECONDS = 2;
 
@@ -102,9 +110,21 @@ public record VanishConfig(
         Objects.requireNonNull(loadTimeout, "loadTimeout");
     }
 
-    /** Resolve the vanish config from the module's scoped {@link ConfigStore} ({@code modules.vanish}). */
-    public static VanishConfig from(ConfigStore config) {
+    /**
+     * Resolve the vanish config from the module's scoped {@link ConfigStore} ({@code modules.vanish}). A fake line
+     * still holding the English an earlier version shipped is read as its catalogue line instead, and {@code log} is
+     * told so once, since the operator sees different words from that point on.
+     */
+    public static VanishConfig from(ConfigStore config, Logger log) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
+        String quit = config.getString("fake-quit-message", DEFAULT_FAKE_QUIT);
+        String join = config.getString("fake-join-message", DEFAULT_FAKE_JOIN);
+        if (quit.equals(SHIPPED_FAKE_QUIT) || join.equals(SHIPPED_FAKE_JOIN)) {
+            log.info("modules/vanish/config.conf still holds the shipped English fake join or quit line; reading"
+                    + " @vanish.fake-quit and @vanish.fake-join from the message files instead, in each viewer's"
+                    + " language. Write your own line there to keep one of your own.");
+        }
         return new VanishConfig(
                 config.getBoolean("enabled", true),
                 config.getBoolean("silent-chests", true),
@@ -117,8 +137,8 @@ public record VanishConfig(
                 config.getBoolean("fake-join-quit", true),
                 config.getBoolean("action-bar", true),
                 config.getBoolean("join-vanished", true),
-                config.getString("fake-quit-message", DEFAULT_FAKE_QUIT),
-                config.getString("fake-join-message", DEFAULT_FAKE_JOIN),
+                current(quit, SHIPPED_FAKE_QUIT, DEFAULT_FAKE_QUIT),
+                current(join, SHIPPED_FAKE_JOIN, DEFAULT_FAKE_JOIN),
                 config.getString("fake-quit-message-staff", ""),
                 config.getString("fake-join-message-staff", ""),
                 config.getBoolean("cross-server", false),
@@ -126,5 +146,10 @@ public record VanishConfig(
                 config.getInt("foreign.level", VanishLevel.MIN_LEVEL),
                 Duration.ofSeconds(Math.max(1, config.getInt("hop-window-seconds", DEFAULT_HOP_WINDOW_SECONDS))),
                 Duration.ofSeconds(Math.max(1, config.getInt("load-timeout-seconds", DEFAULT_LOAD_TIMEOUT_SECONDS))));
+    }
+
+    /** {@code read}, unless it is the line an earlier version shipped, which reads as today's default instead. */
+    private static String current(String read, String shipped, String now) {
+        return read.equals(shipped) ? now : read;
     }
 }
