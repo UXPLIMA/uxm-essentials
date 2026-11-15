@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.persistence.worlds.CachedWorldRepository;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
@@ -112,6 +113,7 @@ public final class WorldsWiring {
     public static Wired wire(
             ModuleContext ctx,
             Persistence persistence,
+            Bus bus,
             Server server,
             InProcessDomainEventPublisher events,
             TeleportEngine teleportEngine,
@@ -124,6 +126,7 @@ public final class WorldsWiring {
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
@@ -138,6 +141,11 @@ public final class WorldsWiring {
 
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
         repository.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
+        // No frame announces a peer's world edit, so the shared rows come back in only through the bus resync.
+        bus.registry().registerResync(() -> {
+            repository.invalidateAll();
+            repository.all();
+        });
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WorldsSettings settings = new WorldsSettings(ctx.config());

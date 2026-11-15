@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import org.jspecify.annotations.NullMarked;
@@ -22,10 +23,30 @@ import org.jspecify.annotations.NullMarked;
 public final class RemoteSyncRegistry {
 
     private final List<RemoteSyncListener> listeners = new CopyOnWriteArrayList<>();
+    private final List<Runnable> resyncs = new CopyOnWriteArrayList<>();
 
     /** Add a listener the bus invokes for every inbound frame from a peer. */
     public void register(RemoteSyncListener listener) {
         listeners.add(Objects.requireNonNull(listener, "listener"));
+    }
+
+    /**
+     * Add a reload of a cache a peer can change, run off the tick by {@link SharedCacheRefresh} when this backend
+     * may have missed frames. It reads the shared database itself, so it must not touch the Bukkit API.
+     */
+    public void registerResync(Runnable resync) {
+        resyncs.add(Objects.requireNonNull(resync, "resync"));
+    }
+
+    /** Run every registered resync; one failing never starves the others. */
+    void resync(Consumer<RuntimeException> onFailure) {
+        for (Runnable resync : resyncs) {
+            try {
+                resync.run();
+            } catch (RuntimeException failure) {
+                onFailure.accept(failure);
+            }
+        }
     }
 
     /** Invoke every registered listener for {@code message}; one failing never starves the others. */

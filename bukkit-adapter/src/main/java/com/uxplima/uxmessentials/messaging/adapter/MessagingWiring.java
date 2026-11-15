@@ -202,6 +202,7 @@ public final class MessagingWiring {
         // copied for the ignore list). The /msg delivery path reads this same cache, so the loop closes.
         CachedIgnoreStore cachedIgnores = MessagingStores.cachedIgnores(persistence);
         bus.registry().register(IgnoreSync.listener(cachedIgnores));
+        bus.registry().registerResync(cachedIgnores::invalidateAll);
         IgnoreStore ignores = IgnoreSync.store(cachedIgnores, bus.publisher());
         return new Stores(
                 MessagingStores.mail(persistence),

@@ -171,6 +171,8 @@ public final class NpcWiring {
         bus.registry()
                 .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.listener(
                         cached, renderer, kernel.scheduler()));
+        bus.registry()
+                .registerResync(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.resync(cached, renderer));
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
         NpcServices services = assemble(kernel, repository, renderer, notifier, quota);

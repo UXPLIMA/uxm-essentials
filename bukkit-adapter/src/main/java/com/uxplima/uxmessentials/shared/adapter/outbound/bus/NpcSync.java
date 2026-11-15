@@ -1,6 +1,8 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -69,6 +71,39 @@ public final class NpcSync {
             // the renderer, which hops onto the global region thread itself (the local edit path's route).
             scheduler.async(() -> reRender(cache, renderer, name));
         };
+    }
+
+    /**
+     * A resync for {@link SharedCacheRefresh}: reload the whole set from the shared DB, then render each NPC a missed
+     * frame left stale and despawn each one deleted meanwhile. NPCs that did not change are not redrawn, so a periodic
+     * run over an unchanged set costs one read. It runs on the async lane, as the listener's reload does.
+     */
+    public static Runnable resync(CachedNpcRepository cache, NpcView renderer) {
+        Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(renderer, "renderer");
+        return () -> {
+            Map<NpcName, Npc> before = byName(cache.all());
+            cache.invalidateAll();
+            Map<NpcName, Npc> after = byName(cache.all());
+            for (Npc npc : after.values()) {
+                if (!npc.equals(before.get(npc.name()))) {
+                    renderer.render(npc);
+                }
+            }
+            for (NpcName name : before.keySet()) {
+                if (!after.containsKey(name)) {
+                    renderer.despawn(name);
+                }
+            }
+        };
+    }
+
+    private static Map<NpcName, Npc> byName(List<Npc> npcs) {
+        Map<NpcName, Npc> map = new HashMap<>();
+        for (Npc npc : npcs) {
+            map.put(npc.name(), npc);
+        }
+        return map;
     }
 
     /** Reload the named NPC from the shared DB and render it if present, despawn it if it was deleted. */

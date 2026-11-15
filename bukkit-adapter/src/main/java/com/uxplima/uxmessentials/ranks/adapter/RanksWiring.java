@@ -103,6 +103,7 @@ public final class RanksWiring {
         CachedPlayerRankRepository cache = new CachedPlayerRankRepository(
                 PlayerRankRepositories.jooq(persistence), kernel.scheduler(), kernel.log());
         bus.registry().register(RankSync.listener(cache));
+        bus.registry().registerResync(cache::refreshOnline);
         PlayerRankRepository repository = RankSync.repository(cache, bus.publisher(), kernel.log());
         CurrentRank currentRank = new CurrentRank(cache, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);

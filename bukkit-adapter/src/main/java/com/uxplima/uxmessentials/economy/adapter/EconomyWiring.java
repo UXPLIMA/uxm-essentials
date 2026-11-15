@@ -156,6 +156,7 @@ public final class EconomyWiring {
         // change; the broadcasting decorator wraps it so this backend's balance writes notify peers.
         CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
         bus.registry().register(WalletSync.listener(cached));
+        bus.registry().registerResync(cached::invalidateAll);
 
         // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> general-bus WalletSync broadcaster.
         // Cross-server invalidation rides the general bus's WalletSync frame (network.transport selects the
