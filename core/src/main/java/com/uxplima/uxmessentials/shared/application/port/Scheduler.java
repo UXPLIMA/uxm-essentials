@@ -32,6 +32,18 @@ public interface Scheduler {
     /** Run on the global region thread: global game state only; serialises, so use sparingly. */
     void onGlobal(Runnable task);
 
+    /**
+     * Run on the global region thread, invoking {@code retired} instead when the task can never run there because the
+     * plugin is disabling. A caller that has already spent something on the outcome of {@code task} (a claimed hop it
+     * must land or refund) needs this branch, since the plain {@link #onGlobal(Runnable)} drops such a task.
+     *
+     * <p>The default ignores {@code retired} and delegates to {@link #onGlobal(Runnable)}, for a scheduler that always
+     * runs global work; the Folia adapter overrides it.
+     */
+    default void onGlobal(Runnable task, Runnable retired) {
+        onGlobal(task);
+    }
+
     /** Run on the region thread owning {@code position}, block, chunk, and location work. */
     void onRegion(Position position, Runnable task);
 

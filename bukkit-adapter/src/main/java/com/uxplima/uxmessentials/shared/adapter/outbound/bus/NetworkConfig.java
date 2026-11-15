@@ -54,6 +54,9 @@ public record NetworkConfig(
     /** The server id a backend runs on when its {@code network} block names none. */
     public static final String DEFAULT_SERVER_ID = "server-1";
 
+    /** The server name rows of no known server are kept under, which no backend should be given. */
+    public static final String UNSCOPED_SERVER_NAME = "unscoped";
+
     public NetworkConfig {
         Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(channel, "channel");
@@ -226,6 +229,11 @@ public record NetworkConfig(
             }
         }
         String name = serverId.isBlank() ? DEFAULT_SERVER_ID : serverId;
+        if (name.equals(UNSCOPED_SERVER_NAME)) {
+            problems.accept("network.server-name: " + name
+                    + " is the name rows of no known server are kept under, so nothing can be recorded as this"
+                    + " server's own; give it another name");
+        }
         if (!ServerScope.isScope("server:" + name)) {
             problems.accept("network.server-name: " + name
                     + " cannot be a scope (letters A to Z, digits, _ . - and at most 64 characters), so nothing can be"

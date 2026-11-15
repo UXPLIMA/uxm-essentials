@@ -13,4 +13,13 @@ dependencies {
 
     // The tests parse EssentialsX fixtures, so they need the YAML reader the server would otherwise provide.
     testImplementation(libs.configurate.yaml)
+    // The JDBC sources are read from real H2 (LiteBans, AxPlayerWarps) and SQLite (Olzie) fixture databases.
+    testImplementation(libs.h2)
+    testImplementation(libs.sqlite.jdbc)
+}
+
+// sqlite-jdbc loads its native library through System::load, which JDK 24 and later report as a restricted
+// method call unless the test JVM grants native access.
+tasks.named<Test>("test") {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
 }

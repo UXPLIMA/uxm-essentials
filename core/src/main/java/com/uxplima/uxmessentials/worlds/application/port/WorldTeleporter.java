@@ -21,4 +21,12 @@ public interface WorldTeleporter {
      *     silently.
      */
     boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause);
+
+    /**
+     * On {@code who}'s region thread: finish a hop from another server by moving {@code who} to {@code to} at once,
+     * with no warmup, since the origin already ran the teleport rules before the player left. Exactly one of
+     * {@code onLanded} and {@code onMissed} runs: {@code onLanded} once the player stands there, {@code onMissed} when
+     * the move is refused or fails, so the caller can give back what the hop cost.
+     */
+    void arrive(PlayerRef who, Position to, WorldTeleportCause cause, Runnable onLanded, Runnable onMissed);
 }

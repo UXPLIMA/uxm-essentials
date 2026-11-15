@@ -10,9 +10,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * One in-flight warmup's handle. The owning context calls {@link #cancel()} from its move/damage
  * listener; the countdown calls {@link #complete()} on the player's region thread when it elapses.
- * Both transitions are guarded by a single {@link AtomicReference} state machine so the move-cancel
- * and the warmup-fire can never both run their callback, whichever {@code compareAndSet}s first wins,
- * and the loser is a no-op.
+ * Every transition, including {@link #supersede()} when the same player begins another warmup, is
+ * guarded by a single {@link AtomicReference} state machine so a cancel and the warmup-fire can never both
+ * run their callback, whichever {@code compareAndSet}s first wins, and the loser is a no-op.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. {@code state} is an {@link AtomicReference} mutated only by
@@ -30,12 +30,14 @@ final class PendingWarmup implements WarmupHandle {
 
     private final Runnable onComplete;
     private final Runnable onCancel;
+    private final Runnable onSuperseded;
     private final AtomicReference<State> state = new AtomicReference<>(State.PENDING);
 
-    PendingWarmup(PlayerRef who, Runnable onComplete, Runnable onCancel) {
+    PendingWarmup(PlayerRef who, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         this.onComplete = Objects.requireNonNull(onComplete, "onComplete");
         this.onCancel = Objects.requireNonNull(onCancel, "onCancel");
+        this.onSuperseded = Objects.requireNonNull(onSuperseded, "onSuperseded");
     }
 
     /** Run the completion callback exactly once if the warmup has not been cancelled. */
@@ -49,6 +51,15 @@ final class PendingWarmup implements WarmupHandle {
     public void cancel() {
         if (state.compareAndSet(State.PENDING, State.CANCELLED)) {
             onCancel.run();
+        }
+    }
+
+    @Override
+    public void supersede() {
+        // The same transition as a cancel, so a supersede racing a move or the countdown still lets only one of
+        // the three callbacks run.
+        if (state.compareAndSet(State.PENDING, State.CANCELLED)) {
+            onSuperseded.run();
         }
     }
 

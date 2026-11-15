@@ -67,6 +67,7 @@ import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import org.junit.jupiter.api.Test;
@@ -243,7 +244,7 @@ class LiveImportTest {
 
     @Test
     void anImportedWorldIsListedByTheRunningWorldsModuleWithoutARestart() {
-        CachedWorldRepository live = new CachedWorldRepository(databases.worlds);
+        CachedWorldRepository live = new CachedWorldRepository(databases.worlds, WorldDatabase.SERVER);
         live.all();
         targets.worlds(live);
         ManagedWorld imported =
@@ -368,7 +369,7 @@ class LiveImportTest {
 
         @Override
         public WorldRepository worlds() {
-            return new CachedWorldRepository(worlds);
+            return new CachedWorldRepository(worlds, WorldDatabase.SERVER);
         }
 
         @Override
@@ -589,6 +590,8 @@ class LiveImportTest {
     /** The managed worlds table. */
     private static final class WorldDatabase implements WorldRepository {
 
+        static final String SERVER = "lobby";
+
         private final Map<WorldName, ManagedWorld> rows = new LinkedHashMap<>();
 
         @Override
@@ -614,6 +617,13 @@ class LiveImportTest {
         @Override
         public void delete(WorldName name) {
             rows.remove(name);
+        }
+
+        @Override
+        public List<NetworkWorld> network() {
+            return rows.values().stream()
+                    .map(world -> new NetworkWorld(SERVER, world))
+                    .toList();
         }
     }
 

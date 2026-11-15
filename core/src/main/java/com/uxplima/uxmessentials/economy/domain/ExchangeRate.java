@@ -58,7 +58,9 @@ public final class ExchangeRate {
             BigDecimal fee = gross.multiply(feePercent);
             gross = gross.subtract(fee);
         }
-        BigDecimal target = gross.setScale(targetPrecision, RoundingMode.HALF_UP);
+        // Rounded down: rounding a credit up would pay out a fraction nobody paid for, and a round trip between two
+        // currencies could then grow a balance from nothing.
+        BigDecimal target = gross.setScale(targetPrecision, RoundingMode.DOWN);
         return target.signum() <= 0 ? Optional.empty() : Optional.of(target);
     }
 }

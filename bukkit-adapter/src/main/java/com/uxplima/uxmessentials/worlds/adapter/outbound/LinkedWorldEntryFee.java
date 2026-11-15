@@ -38,6 +38,16 @@ public final class LinkedWorldEntryFee implements WorldEntryFee {
         return resolve().charge(who, amount);
     }
 
+    @Override
+    public String currencyId() {
+        return resolve().currencyId();
+    }
+
+    @Override
+    public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+        return resolve().refund(who, amount, currencyId);
+    }
+
     private WorldEntryFee resolve() {
         EconomyProvider live = provider.get();
         Currency unit = currency.get();

@@ -97,6 +97,8 @@ public final class MigrationWiring {
      *     messaging module is off; then imported mail is skipped and audited
      * @param targets the running modules' own repositories, which the import writes through so their caches see it
      * @param publisher the cross-server bus, which hears what an import changed once it ends
+     * @param worldScope the server imported worlds are recorded under when the worlds module is not running, the
+     *     same scope that module keeps this backend's worlds under
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -109,7 +111,8 @@ public final class MigrationWiring {
             boolean enabled,
             Optional<ConfigStore> messagingConfig,
             ImportTargets targets,
-            BusPublisher publisher) {
+            BusPublisher publisher,
+            String worldScope) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
@@ -118,11 +121,12 @@ public final class MigrationWiring {
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(publisher, "publisher");
+        Objects.requireNonNull(worldScope, "worldScope");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(
                 targets,
-                new DatabaseStores(plugin, persistence, economyConfig, log),
+                new DatabaseStores(plugin, persistence, economyConfig, log, worldScope),
                 ports(persistence, economyConfig, log, messagingConfig),
                 publisher,
                 scheduler);
@@ -136,7 +140,7 @@ public final class MigrationWiring {
         WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
         Currency defaultCurrency = new EconomyConfig(economyConfig).currencies().defaultCurrency();
         List<Convert> built = new ArrayList<>();
-        built.add(new EssentialsXConvert(worlds));
+        built.add(new EssentialsXConvert(worlds, log));
         built.add(new LiveBalanceConvert(
                 SourceId.of("vault"),
                 "Vault",
@@ -351,9 +355,11 @@ public final class MigrationWiring {
         private final Persistence persistence;
         private final ConfigStore economyConfig;
         private final Logger log;
+        private final String server;
 
-        DatabaseStores(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {
+        DatabaseStores(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log, String server) {
             this.plugin = plugin;
+            this.server = server;
             this.persistence = persistence;
             this.economyConfig = economyConfig;
             this.log = log;
@@ -387,7 +393,7 @@ public final class MigrationWiring {
 
         @Override
         public WorldRepository worlds() {
-            return WorldRepositories.cached(persistence);
+            return WorldRepositories.cached(persistence, server);
         }
 
         @Override

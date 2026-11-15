@@ -40,11 +40,7 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
             engine.relocateImmediately(who, Destination.at(to));
             return true;
         }
-        TeleportKind kind =
-                switch (cause) {
-                    case SPAWN -> TeleportKind.SPAWN;
-                    case ADMIN, VOID_RESCUE -> TeleportKind.ADMIN;
-                };
+        TeleportKind kind = kindOf(cause);
         if (cause == WorldTeleportCause.ADMIN) {
             // A staff /worlds tp (or login redirect) bypasses the access policy in WorldTeleportService;
             // mark the player so the cross-world access listener exempts the event this launch raises. Only
@@ -52,5 +48,31 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
             marker.mark(who.uuid());
         }
         return engine.launch(who, Destination.at(to), kind).isOk();
+    }
+
+    @Override
+    public void arrive(PlayerRef who, Position to, WorldTeleportCause cause, Runnable onLanded, Runnable onMissed) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(to, "to");
+        Objects.requireNonNull(cause, "cause");
+        Objects.requireNonNull(onLanded, "onLanded");
+        Objects.requireNonNull(onMissed, "onMissed");
+        if (cause != WorldTeleportCause.SPAWN) {
+            // A staff hop was ruled on by the staff member's own command; the access listener must not refuse it here.
+            marker.mark(who.uuid());
+        }
+        if (engine.arriveImmediately(who, Destination.at(to), kindOf(cause), onLanded, onMissed)
+                .isErr()) {
+            // No teleport was issued, so the mark would otherwise exempt the player's next unrelated teleport.
+            marker.consume(who.uuid());
+            onMissed.run();
+        }
+    }
+
+    private static TeleportKind kindOf(WorldTeleportCause cause) {
+        return switch (cause) {
+            case SPAWN -> TeleportKind.SPAWN;
+            case ADMIN, VOID_RESCUE -> TeleportKind.ADMIN;
+        };
     }
 }

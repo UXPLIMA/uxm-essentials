@@ -1,0 +1,20 @@
+kits:
+  starter:
+    delay: 60
+    items:
+    - stone_sword 1
+    - bread 16
+    - diamond_pickaxe 1 efficiency:5
+    - 'torch'
+    - ''
+  thisisakitnamethatislongerthanthesixtyfourcharactersakitidmayholdx:
+    delay: 0
+    items:
+    - dirt 1
+  welcome:
+    delay: -1
+    items:
+    - apple 3
+  tools:
+    items:
+    - iron_axe 0

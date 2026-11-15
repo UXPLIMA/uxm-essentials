@@ -107,7 +107,7 @@ public final class WorldAccessListener implements Listener {
             return;
         }
         engine.defaultWorldName()
-                .ifPresent(def -> scheduler.onEntity(who, () -> teleportService.forced(who, who, def)));
+                .ifPresent(def -> scheduler.onEntity(who, () -> teleportService.forcedHere(who, who, def)));
     }
 
     /** The managed world registered under {@code worldName}, or empty when unparseable or unmanaged. */

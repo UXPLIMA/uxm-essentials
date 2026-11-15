@@ -322,6 +322,7 @@ import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.adapter.outbound.RepositoryWarpRespawnLocator;
 import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmessentials.worlds.adapter.WorldScope;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.TeleportRescueTargets;
@@ -1088,7 +1089,9 @@ public final class PluginModule {
                         ? Optional.of(config.scoped(ModuleId.of("messaging").configRoot()))
                         : Optional.empty(),
                 importTargets,
-                bus.publisher());
+                bus.publisher(),
+                WorldScope.of(
+                        NetworkConfig.from(config).enabled(), bus.publisher().serverId()));
         return new MigrationImportNode(service, kernel.messages());
     }
 
@@ -2306,13 +2309,11 @@ public final class PluginModule {
         // plugin's Server. It delegates /worlds tp and /worlds spawn execution to the captured teleport engine (wired
         // earlier) and charges the per-world entry fee through the economy bridge, but economy lands after worlds, so
         // the fee resolves its provider/currency lazily at charge time (free until economy is up, free for good when
-        // economy is disabled). The enable-time reconcile (adopt already-loaded worlds, auto-load registered ones) is
-        // kicked on the global region thread the moment wiring completes, then drops the warm snapshot and refreshes
-        // the
-        // import-folder candidates off-tick. The in-process bus is the concrete publisher so the live-apply subscriber
-        // (re-apply stored settings on world load / setting change) can be registered here and unsubscribed on stop;
-        // the
-        // kernel port exposes only publish.
+        // economy is disabled). Once the worlds are up, this backend claims the unclaimed world rows it has, then the
+        // reconcile (adopt already-loaded worlds, auto-load registered ones) runs over this backend's rows only, and
+        // the import-folder candidates are refreshed off-tick. The in-process bus is the concrete publisher so the
+        // live-apply subscriber (re-apply stored settings on world load / setting change) can be registered here and
+        // unsubscribed on stop; the kernel port exposes only publish.
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine,
                 "worlds /worlds tp and /worlds spawn delegate teleport execution but the teleport engine is unavailable");
@@ -2341,6 +2342,10 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 rescueTargets,
+                links.hops,
+                // Off a network, or under the shipped default name, a backend records no server on its worlds.
+                links.network.enabled(),
+                links.presence,
                 plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
@@ -2362,7 +2367,8 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.api.action.UxmWorldsActions.class,
                 source -> new com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldActions(
                         wired.apiWrites(), ctx.kernel().scheduler(), source));
-        wired.startReconcile().run();
+        // The claim and reconcile read the loaded worlds, which exist only once the server has made them.
+        resources.worldPhase().run("worlds claim and reconcile", wired.startReconcile());
         resources.onClose(wired.stop());
         // Open the same /world gui world picker from the management hub, gated by the existing world-gui node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(

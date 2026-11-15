@@ -5,9 +5,11 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
@@ -120,18 +122,29 @@ public final class WorldFolders {
      * server that holds a {@code level.dat}.
      */
     public Set<String> onDisk() {
-        Set<String> names = new TreeSet<>();
+        return new TreeSet<>(onDiskFolders().keySet());
+    }
+
+    /**
+     * {@link #onDisk()} with the folder each name keeps its files in, the dimension folder winning over a folder
+     * beside the server as it does in {@link #of}. Reads only the level and container paths and the disk, never a
+     * loaded world, so it may run off the server threads.
+     */
+    public Map<String, Path> onDiskFolders() {
+        Map<String, Path> folders = new TreeMap<>();
         for (Path namespace : folders(level().resolve("dimensions"))) {
             for (Path dimension : folders(namespace)) {
-                names.add(nameOf(String.valueOf(namespace.getFileName()), String.valueOf(dimension.getFileName())));
+                folders.put(
+                        nameOf(String.valueOf(namespace.getFileName()), String.valueOf(dimension.getFileName())),
+                        dimension);
             }
         }
         for (Path beside : folders(container())) {
             if (Files.isRegularFile(beside.resolve("level.dat")) && !beside.equals(level())) {
-                names.add(String.valueOf(beside.getFileName()));
+                folders.putIfAbsent(String.valueOf(beside.getFileName()), beside);
             }
         }
-        return names;
+        return folders;
     }
 
     /** A name and not a path: a folder name must never climb out of the level or the container. */

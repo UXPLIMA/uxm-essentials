@@ -309,7 +309,13 @@ public final class TeleportWiring {
                 arrivalHud,
                 arrivalEffects);
         Warmups warmups = new TrackingWarmups(
-                kernel.warmups(), warmupTracker, settings::cancelToggles, kernel.permissions(), clock, notifier);
+                kernel.warmups(),
+                warmupTracker,
+                settings::cancelToggles,
+                kernel.permissions(),
+                clock,
+                notifier,
+                kernel.playerLocator());
         TeleportEngine engine = new TeleportEngine(
                 kernel.cooldowns(),
                 warmups,

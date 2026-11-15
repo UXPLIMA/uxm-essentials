@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
+import com.uxplima.uxmessentials.worlds.application.ClaimWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
+import com.uxplima.uxmessentials.worlds.application.SetWorldServer;
 import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
@@ -69,6 +71,10 @@ public final class WorldsServices {
     private final UnaryOperator<String> worldNames;
     private final BiConsumer<Player, PlayerRef> openWorldList;
     private final WorldMainOpener openWorldMain;
+    private final ClaimWorld claimWorld;
+    private final SetWorldServer setWorldServer;
+    private final String localScope;
+    private final boolean showRemote;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
 
     public WorldsServices(
@@ -95,7 +101,11 @@ public final class WorldsServices {
             ListBackups listBackups,
             RestoreWorld restoreWorld,
             BiConsumer<Player, PlayerRef> openWorldList,
-            WorldMainOpener openWorldMain) {
+            WorldMainOpener openWorldMain,
+            ClaimWorld claimWorld,
+            SetWorldServer setWorldServer,
+            String localScope,
+            boolean showRemote) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
         this.loadWorld = Objects.requireNonNull(loadWorld, "loadWorld");
@@ -120,6 +130,30 @@ public final class WorldsServices {
         this.restoreWorld = Objects.requireNonNull(restoreWorld, "restoreWorld");
         this.openWorldList = Objects.requireNonNull(openWorldList, "openWorldList");
         this.openWorldMain = Objects.requireNonNull(openWorldMain, "openWorldMain");
+        this.claimWorld = Objects.requireNonNull(claimWorld, "claimWorld");
+        this.setWorldServer = Objects.requireNonNull(setWorldServer, "setWorldServer");
+        this.localScope = Objects.requireNonNull(localScope, "localScope");
+        this.showRemote = showRemote;
+    }
+
+    /** The {@code /worlds setserver} use case. */
+    public SetWorldServer setWorldServer() {
+        return setWorldServer;
+    }
+
+    /** True while worlds of other servers can be reached, so they are worth suggesting. */
+    public boolean showRemote() {
+        return showRemote;
+    }
+
+    /** The {@code /worlds claim} use case. */
+    public ClaimWorld claimWorld() {
+        return claimWorld;
+    }
+
+    /** The server this backend's worlds are recorded under, {@code unscoped} when it records none. */
+    public String localScope() {
+        return localScope;
     }
 
     public CreateWorld createWorld() {
