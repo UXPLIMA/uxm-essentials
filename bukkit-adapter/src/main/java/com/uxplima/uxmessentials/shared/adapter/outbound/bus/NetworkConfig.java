@@ -90,6 +90,15 @@ public record NetworkConfig(
         return DEFAULT_SERVER_ID.equals(serverName);
     }
 
+    /**
+     * The server name this backend records on what it sets or claims (warps, player warps), or empty off a network or
+     * under the shipped default name: a name every standalone backend shares would point each row at a server that
+     * does not exist once the backend joins a network under its own name, so such rows stay for a later claim.
+     */
+    public java.util.Optional<String> recordedServer() {
+        return enabled && !isDefaultServerName(serverId) ? java.util.Optional.of(serverId) : java.util.Optional.empty();
+    }
+
     /** The heartbeat publish interval the {@code ClusterHeartbeat} schedules on. */
     public java.time.Duration heartbeatInterval() {
         return java.time.Duration.ofSeconds(heartbeatSeconds);

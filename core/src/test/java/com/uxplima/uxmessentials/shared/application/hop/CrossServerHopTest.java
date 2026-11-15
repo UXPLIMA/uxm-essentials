@@ -91,9 +91,13 @@ class CrossServerHopTest {
         return new HopArrival(store, resolvers, charges, scheduler, log, server, SETTLE, TTL, clock);
     }
 
+    private static HopDeparture toBase() {
+        return new HopDeparture(HopKind.HOME, BASE, SURVIVAL, BASE, at(0, 64, 0), Optional.empty());
+    }
+
     /** What a homes use case does with a home on another backend: ask the gate, charge, then send. */
     private boolean goHome() {
-        HopDeparture departure = new HopDeparture(HopKind.HOME, BASE, SURVIVAL, BASE, at(0, 64, 0), Optional.empty());
+        HopDeparture departure = toBase();
         if (!lobby.admit(ALEX, departure)) {
             return false;
         }
@@ -265,6 +269,61 @@ class CrossServerHopTest {
         scheduler.advance(TTL);
         assertThat(ledger.wallet).isEqualByComparingTo(START);
         assertThat(ledger.refunds).isEqualTo(2);
+    }
+
+    @Test
+    void twoHopsTrackedAtOnceRefundEachChargeExactlyOnce() {
+        // The second hop starts while the first has read no earlier row and not yet written its own.
+        store.afterNextFind(this::goHome);
+        goHome();
+
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+        assertThat(notifier.keys()).containsSubsequence("home.hop.unavailable", "home.hop.refunded");
+
+        scheduler.advance(TTL);
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isEqualTo(2);
+        assertThat(store.rows()).isEmpty();
+    }
+
+    @Test
+    void aFreeHopRefusedForRacingIsToldWhy() {
+        store.afterNextFind(() -> lobby.send(ALEX, toBase(), Optional.empty(), Optional.empty()));
+        goHome();
+
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(notifier.keys()).contains("home.hop.unavailable");
+        assertThat(ledger.refunds).isZero();
+    }
+
+    @Test
+    void aHopAfterTheRaceIsSentAndReplacesTheEarlierRowWithARefund() {
+        store.afterNextFind(this::goHome);
+        goHome();
+        scheduler.advance(Duration.ofSeconds(5));
+
+        goHome();
+
+        assertThat(connects).containsExactly("Alex->survival", "Alex->survival");
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+        scheduler.advance(TTL);
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isEqualTo(3);
+    }
+
+    @Test
+    void aHopAfterATrackThatCouldNotBeWrittenIsSent() {
+        store.failRecords(true);
+        goHome();
+        assertThat(connects).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+
+        store.failRecords(false);
+        goHome();
+
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(store.rows()).containsKey(ALEX.uuid());
     }
 
     @Test

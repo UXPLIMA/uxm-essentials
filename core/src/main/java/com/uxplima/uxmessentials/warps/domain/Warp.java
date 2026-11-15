@@ -188,12 +188,15 @@ public record Warp(
 
     /**
      * A copy re-anchored to {@code newLocation} on the backend {@code onServer}, keeping the name, owner, gates, and
-     * original creation time. The server moves with the position: a warp lives where its world is.
+     * original creation time. The server moves with the position: a warp lives where its world is. An empty
+     * {@code onServer} (a backend that records no server) records {@value #UNSCOPED}, never the old server, which no
+     * longer holds the new position; the backend holding its world claims it at its next start.
      */
-    public Warp movedTo(Position newLocation, String onServer) {
+    public Warp movedTo(Position newLocation, Optional<String> onServer) {
+        Objects.requireNonNull(onServer, "onServer");
         return toBuilder()
                 .location(Objects.requireNonNull(newLocation, "newLocation"))
-                .server(Optional.of(Objects.requireNonNull(onServer, "onServer")))
+                .server(Optional.of(onServer.orElse(UNSCOPED)))
                 .build();
     }
 

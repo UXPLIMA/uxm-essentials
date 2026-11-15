@@ -40,6 +40,10 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
  * through the {@link PlayerWarpPasswordStore} seam and never touch the plaintext beyond handing it to that store
  * it is never rendered back to the actor or logged. Setting a password does not by itself flip the access axis to
  * {@link WarpAccess#PASSWORD}; the two are independent operations the manage UI happens to pair.
+ *
+ * <p>A move records {@code recordedServer}, the backend whose world the warp now points into. It is empty off a
+ * network or under the shipped default server name, and the move then clears the server for the backend holding
+ * the world to claim.
  */
 public final class EditPlayerWarp {
 
@@ -48,18 +52,21 @@ public final class EditPlayerWarp {
     private final Notifier notifier;
     private final PlayerWarpPasswordStore passwords;
     private final Clock clock;
+    private final Optional<String> recordedServer;
 
     public EditPlayerWarp(
             PlayerWarpRepository repository,
             WarpAuthorization authorization,
             Notifier notifier,
             PlayerWarpPasswordStore passwords,
-            Clock clock) {
+            Clock clock,
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.passwords = Objects.requireNonNull(passwords, "passwords");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Set (or clear, with an empty value) {@code name}'s display name. Gate {@link WarpCapability#EDIT_METADATA}. */
@@ -172,7 +179,7 @@ public final class EditPlayerWarp {
                 actor,
                 name,
                 WarpCapability.MOVE,
-                warp -> warp.movedTo(at, clock.instant()),
+                warp -> warp.movedTo(at, recordedServer, clock.instant()),
                 PlayerwarpsMessageKey.PWARP_MOVED);
     }
 

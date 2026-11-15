@@ -70,6 +70,8 @@ public final class PlayerWarpEditorView {
     private final Messages messages;
     private final PlayerWarpEditorSubLayouts sub;
     private final EntityEditorView<OwnedWarp> view;
+    /** The server a warp moved here records; empty off a network or under the default name, which clears it. */
+    private final Optional<String> recordedServer;
 
     public PlayerWarpEditorView(
             Menus menus,
@@ -82,8 +84,10 @@ public final class PlayerWarpEditorView {
             Messages messages,
             EntityEditorLayout layout,
             PlayerWarpEditorSubLayouts sub,
-            BiConsumer<Player, PlayerRef> onBack) {
+            BiConsumer<Player, PlayerRef> onBack,
+            Optional<String> recordedServer) {
         Objects.requireNonNull(menus, "menus");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
         this.guiText = Objects.requireNonNull(guiText, "guiText");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -284,7 +288,7 @@ public final class PlayerWarpEditorView {
                 (player, reopen) -> {
                     Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "location"));
                     scheduler.async(() -> {
-                        mutate(owner, name, warp -> warp.movedTo(at, Instant.now()));
+                        mutate(owner, name, warp -> warp.movedTo(at, recordedServer, Instant.now()));
                         scheduler.entity(player, reopen);
                     });
                 },

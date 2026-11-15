@@ -120,12 +120,12 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                 .then(Commands.literal("setserver")
                         .requires(Gate.permission(SETSERVER_PERMISSION))
                         .then(Commands.literal("all")
-                                .executes(ctx -> runSetServerAll(ctx, services.localServer()))
+                                .executes(this::runSetServerAllHere)
                                 .then(Commands.argument("server", Args.token())
                                         .executes(
                                                 ctx -> runSetServerAll(ctx, ctx.getArgument("server", String.class)))))
                         .then(warpNameArgument()
-                                .executes(ctx -> runSetServer(ctx, services.localServer()))
+                                .executes(this::runSetServerHere)
                                 .then(Commands.argument("server", Args.token())
                                         .executes(ctx -> runSetServer(ctx, ctx.getArgument("server", String.class))))))
                 .then(Commands.literal("lock")
@@ -300,6 +300,19 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         PlayerRef actor = actor(ctx);
         WarpName name = WarpName.of(ctx.getArgument("name", String.class));
         services.scheduler().async(() -> services.setWarpServer().set(actor, name, server));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetServerHere(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = actor(ctx);
+        WarpName name = WarpName.of(ctx.getArgument("name", String.class));
+        services.scheduler().async(() -> services.setWarpServer().setHere(actor, name));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetServerAllHere(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = actor(ctx);
+        services.scheduler().async(() -> services.setWarpServer().setAllHere(actor));
         return Command.SINGLE_SUCCESS;
     }
 

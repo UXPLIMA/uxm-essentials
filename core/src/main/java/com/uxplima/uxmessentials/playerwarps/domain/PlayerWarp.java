@@ -22,6 +22,10 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
  * {@link Sponsorship} and {@link RentState} for paid placement; and the {@link WarpEffects} / {@link WarpTimingOverrides}
  * a warp customises its teleport with. The password itself is never held here, only a {@link #passwordSet} flag;
  * the hash lives in persistence and is verified through a hashing port, so the domain never touches a secret.
+ *
+ * <p>{@code serverId} is the network name of the backend the warp lives on, so a use on another backend can send the
+ * player there. It is empty while that backend is not known (set on a backend that records no server, or migrated)
+ * until the backend that holds its world claims it at its next start; such a warp is used wherever it is asked.
  */
 public record PlayerWarp(
         Optional<PlayerWarpId> id,
@@ -117,11 +121,27 @@ public record PlayerWarp(
         return new PlayerWarpBuilder(this);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping every other field and stamping {@code now} as the edit time. */
-    public PlayerWarp movedTo(Position newLocation, Instant now) {
+    /**
+     * A copy re-anchored to {@code newLocation} on the backend {@code onServer}, keeping every other field and
+     * stamping {@code now} as the edit time. The server moves with the position: a warp lives where its world is. An
+     * empty {@code onServer} (a backend that records no server) clears it rather than keep the old server, which no
+     * longer holds the new position; the backend holding its world claims it at its next start.
+     */
+    public PlayerWarp movedTo(Position newLocation, Optional<String> onServer, Instant now) {
         Objects.requireNonNull(newLocation, "newLocation");
+        Objects.requireNonNull(onServer, "onServer");
         Objects.requireNonNull(now, "now");
-        return toBuilder().location(newLocation).updatedAt(now).build();
+        return toBuilder()
+                .location(newLocation)
+                .serverId(onServer)
+                .updatedAt(now)
+                .build();
+    }
+
+    /** A copy recorded as living on {@code onServer}, or on no known backend when it is empty. */
+    public PlayerWarp onServer(Optional<String> onServer) {
+        Objects.requireNonNull(onServer, "onServer");
+        return toBuilder().serverId(onServer).build();
     }
 
     /** A copy with the access axis set to {@code newAccess}, stamping {@code now} as the edit time. */

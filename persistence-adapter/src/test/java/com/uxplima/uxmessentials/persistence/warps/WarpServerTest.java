@@ -4,7 +4,9 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.Warps.WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -13,9 +15,12 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.warps.application.MoveWarp;
+import com.uxplima.uxmessentials.warps.application.SetWarp;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.flywaydb.core.Flyway;
@@ -151,8 +156,9 @@ class WarpServerTest {
         warps.save(warpIn(MARKET, SURVIVAL_WORLD).onServer("survival"));
         assertThat(serverOf(MARKET)).contains("survival");
 
-        Warp moved =
-                warps.find(MARKET).orElseThrow().movedTo(new Position(CREATIVE_WORLD, 1, 70, 1, 0f, 0f), "creative");
+        Warp moved = warps.find(MARKET)
+                .orElseThrow()
+                .movedTo(new Position(CREATIVE_WORLD, 1, 70, 1, 0f, 0f), Optional.of("creative"));
         warps.save(moved);
 
         assertThat(serverOf(MARKET)).contains("creative");
@@ -162,5 +168,37 @@ class WarpServerTest {
                                 CREATIVE_WORLD.uid().toString(),
                                 SURVIVAL_WORLD.uid().toString())))
                 .isEmpty();
+    }
+
+    @Test
+    void aBackendThatRecordsNoServerStampsNoneAndARealNameClaimsItsWarpsLater() {
+        upgrade();
+        Notifier quiet = new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {});
+        SetWarp setWarp = new SetWarp(
+                warps,
+                quiet,
+                event -> {},
+                Clock.fixed(Instant.ofEpochMilli(1L), ZoneOffset.UTC),
+                List.of(),
+                Optional.empty());
+        MoveWarp moveWarp = new MoveWarp(warps, quiet, Optional.empty());
+
+        setWarp.set(SAM, MARKET, new Position(SURVIVAL_WORLD, 0, 64, 0, 0f, 0f));
+        warps.save(warpIn(PLOTS, SURVIVAL_WORLD).onServer("survival"));
+        moveWarp.move(SAM, PLOTS, new Position(CREATIVE_WORLD, 1, 70, 1, 0f, 0f));
+
+        assertThat(dsl.select(WARPS.NAME, WARPS.SERVER_ID)
+                        .from(WARPS)
+                        .orderBy(WARPS.NAME)
+                        .fetch()
+                        .map(row -> row.value1() + "=" + row.value2()))
+                .containsExactly("market=null", "plots=" + WarpServerClaimer.UNSCOPED);
+
+        assertThat(claimer.claim("survival", List.of(SURVIVAL_WORLD.uid().toString())))
+                .containsExactly("market");
+        assertThat(claimer.claim("creative", List.of(CREATIVE_WORLD.uid().toString())))
+                .containsExactly("plots");
+        assertThat(serverOf(MARKET)).contains("survival");
+        assertThat(serverOf(PLOTS)).contains("creative");
     }
 }

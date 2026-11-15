@@ -37,7 +37,6 @@ import org.jspecify.annotations.NullMarked;
  * @param scheduler the kernel scheduler the rating commands run their uncached database read/write through off
  *     the tick thread, bridging the confirmation back to the player's region thread
  * @param setWarpServer {@code /warp setserver}
- * @param localServer this backend's network name, the server {@code /warp setserver} names when none is given
  */
 @NullMarked
 public record WarpServices(
@@ -53,8 +52,7 @@ public record WarpServices(
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
         @org.jspecify.annotations.Nullable WarpManagerMenu managerView,
         Scheduler scheduler,
-        SetWarpServer setWarpServer,
-        String localServer) {
+        SetWarpServer setWarpServer) {
 
     public WarpServices {
         Objects.requireNonNull(useWarp, "useWarp");
@@ -68,6 +66,5 @@ public record WarpServices(
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(setWarpServer, "setWarpServer");
-        Objects.requireNonNull(localServer, "localServer");
     }
 }
