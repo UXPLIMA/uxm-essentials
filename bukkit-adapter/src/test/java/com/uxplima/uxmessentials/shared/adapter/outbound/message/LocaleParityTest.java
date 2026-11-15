@@ -22,11 +22,20 @@ class LocaleParityTest {
             List.of("en", "de", "es", "fr", "ja", "ko", "pl", "pt", "ru", "tr", "uk", "zh");
 
     private static final Pattern ENTRY = Pattern.compile("(?m)^\"([^\"]+)\"\\s*=");
-    private static final Pattern REFERENCE = Pattern.compile("= \"@([A-Za-z0-9_.-]+)\"");
+    /** A quoted value that opens with an at sign: a catalogue reference, alone or followed by its arguments. */
+    private static final Pattern REFERENCE = Pattern.compile("\"@([A-Za-z0-9_.-]+)[\" ]");
 
     /** Configs whose shipped values name catalogue lines. */
-    private static final List<String> REFERRING_CONFIGS =
-            List.of("/modules/vanish/config.conf", "/modules/staff/config.conf", "/modules/warps/config.conf");
+    private static final List<String> REFERRING_CONFIGS = List.of(
+            "/modules/vanish/config.conf",
+            "/modules/staff/config.conf",
+            "/modules/warps/config.conf",
+            "/modules/security/config.conf",
+            "/modules/communication/info-pages.conf",
+            "/modules/communication/advancements.conf",
+            "/modules/scoreboard/config.conf",
+            "/modules/tablist/config.conf",
+            "/modules/bossbar/config.conf");
 
     @Test
     void everyLanguageWritesTheSameLinesAsEnglish() throws IOException {
@@ -49,9 +58,14 @@ class LocaleParityTest {
         Set<String> english = keys("en");
 
         for (String config : REFERRING_CONFIGS) {
-            Matcher found = REFERENCE.matcher(resource(config));
-            while (found.find()) {
-                assertThat(english).as(config).contains(found.group(1));
+            for (String line : resource(config).lines().toList()) {
+                if (line.strip().startsWith("#")) {
+                    continue;
+                }
+                Matcher found = REFERENCE.matcher(line);
+                while (found.find()) {
+                    assertThat(english).as(config).contains(found.group(1));
+                }
             }
         }
     }

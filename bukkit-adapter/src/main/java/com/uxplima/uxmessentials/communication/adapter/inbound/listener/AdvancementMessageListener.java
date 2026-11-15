@@ -142,10 +142,18 @@ public final class AdvancementMessageListener implements Listener {
             if (vanished.test(earner)) {
                 return;
             }
-            String template =
-                    substitute(AdvancementFilter.templateFor(cfg, key), earner.getName(), key, display, locale);
+            String template = AdvancementFilter.templateFor(cfg, key);
+            String earnerName = earner.getName();
             @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
-            channels.broadcast(viewer -> render(viewer, template), cfg.channels(), sound);
+            // A template written as @key is read in each viewer's language first, so the {player} and {title} its
+            // catalogue line spells are filled like the ones an operator writes on the line itself.
+            channels.broadcast(
+                    viewer -> render(
+                            viewer,
+                            substitute(
+                                    HudText.lineFor(viewer.getUniqueId(), template), earnerName, key, display, locale)),
+                    cfg.channels(),
+                    sound);
         });
     }
 

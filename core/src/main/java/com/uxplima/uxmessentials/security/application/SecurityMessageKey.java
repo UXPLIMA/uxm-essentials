@@ -123,6 +123,9 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_VERIFY_FAILED_TITLE("security.verify.failed-title"),
     SECURITY_VERIFY_FAILED_SUBTITLE("security.verify.failed-subtitle"),
 
+    // the lockout ban reason the shipped config points at with @security.verify.lockout-ban-reason
+    SECURITY_VERIFY_LOCKOUT_BAN_REASON("security.verify.lockout-ban-reason"),
+
     // Phase 3. Op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
     // reply when the re-auth succeeds and the command is retried, the reply when the submitted code is wrong, and the
     // refusal when the shared lockout blocks any further attempt.

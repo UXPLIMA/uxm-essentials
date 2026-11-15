@@ -89,7 +89,7 @@ public final class SecurityWiring {
         Objects.requireNonNull(ipTokens, "ipTokens");
         Objects.requireNonNull(recorder, "recorder");
         KernelPorts kernel = ctx.kernel();
-        SecurityConfig config = SecurityConfig.from(ctx.config());
+        SecurityConfig config = SecurityConfig.from(ctx.config(), kernel.log());
         SecurityConfig.TwoFactorSettings twoFactor = config.twoFactor();
         Path keyFile = plugin.getDataFolder().toPath().resolve("modules/security/secret.key");
         TwoFactorRepository repository = TwoFactorRepositories.jooq(persistence, keyFile);
