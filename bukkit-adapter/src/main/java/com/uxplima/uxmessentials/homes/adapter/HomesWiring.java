@@ -146,7 +146,7 @@ public final class HomesWiring {
         HomeInviteRepository invites = HomeRepositories.homeInviteRepository(persistence);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         HomeQuota quota = new HomeQuota(kernel.permissions(), defaultLimit(ctx), limitMode(ctx));
-        HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine);
+        HomeTeleporter teleporter = new TeleportHomeAdapter(teleportEngine, kernel.scheduler());
         SafeLocationGuard safeGuard = buildSafeGuard(plugin, ctx);
         ClaimService claimService = buildClaimService(plugin, ctx, kernel, claimProviders);
         // A home records the backend it was set on. With cross-server.enabled on, a home of another backend is reached

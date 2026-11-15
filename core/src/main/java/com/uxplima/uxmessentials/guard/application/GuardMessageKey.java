@@ -141,6 +141,7 @@ public enum GuardMessageKey implements MessageKey {
     IMPORT_UNDONE("guard.import.undone"),
     IMPORT_NOTHING("guard.import.nothing"),
     IMPORT_FAILED("guard.import.failed"),
+    IMPORT_BUSY("guard.import.busy"),
 
     // help
     HELP_HEADER("guard.help.header"),

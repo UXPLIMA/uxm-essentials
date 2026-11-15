@@ -140,6 +140,26 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     @Override
+    public void laterEntity(PlayerRef player, Duration delay, Runnable task) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(delay, "delay");
+        Objects.requireNonNull(task, "task");
+        if (disabled()) {
+            return;
+        }
+        if (player.isSystem()) {
+            laterGlobal(delay, task);
+            return;
+        }
+        Player bukkit = Bukkit.getPlayer(player.uuid());
+        if (bukkit == null || !bukkit.isOnline()) {
+            return; // the entity scheduler refuses a despawned entity, silent no-op
+        }
+        // Ticks, floored to one, for the same reason as laterGlobal.
+        bukkit.getScheduler().execute(plugin, task, null, Math.max(1L, delay.toMillis() / 50L));
+    }
+
+    @Override
     public boolean onGlobalThread() {
         return Bukkit.isGlobalTickThread();
     }

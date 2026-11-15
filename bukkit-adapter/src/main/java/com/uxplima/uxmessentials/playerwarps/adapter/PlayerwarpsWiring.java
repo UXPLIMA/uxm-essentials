@@ -185,7 +185,7 @@ public final class PlayerwarpsWiring {
         com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry registry = teleportRegistry != null
                 ? teleportRegistry
                 : new com.uxplima.uxmessentials.warps.adapter.WarpTeleportRegistry();
-        PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine, registry);
+        PlayerWarpTeleporter teleporter = new TeleportPlayerWarpAdapter(teleportEngine, registry, kernel.scheduler());
         PlayerWarpQuota quota = new PlayerWarpQuota(kernel.permissions(), defaultLimit(ctx));
         // UsePlayerWarp is built once so the /pwarp command, the browse menu, and the shared warp editor's "go to"
         // button all teleport through the same path; the go-to handle the warps editor reads is bound to it here.

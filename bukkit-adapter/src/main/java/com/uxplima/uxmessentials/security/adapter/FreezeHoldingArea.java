@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
 public final class FreezeHoldingArea {
 
     /**
-     * Where the holding area is, resolved on first use rather than at construction.
+     * Where the holding area is, resolved once the worlds exist rather than at construction.
      *
      * <p>The plugin enables at {@code load: STARTUP}, so during wiring the server has no worlds and
      * {@code Bukkit.getWorld(name)} answers null for a perfectly good configured value. Resolving eagerly there
@@ -49,10 +49,11 @@ public final class FreezeHoldingArea {
      */
     private final Supplier<@Nullable Location> source;
 
-    /** The resolved destination, and whether the resolution has happened. Written under {@code this}. */
-    private @Nullable Location destination;
-
-    private boolean resolved;
+    /**
+     * The resolved destination. Only {@link #warmUp()} writes it, on the global thread, before any player can join;
+     * the players' region threads only read it, so the world lookup never runs under a lock or on a region thread.
+     */
+    private volatile @Nullable Location destination;
 
     private final FreezeTeleports ownTeleports;
     private final Logger log;
@@ -71,19 +72,17 @@ public final class FreezeHoldingArea {
 
     /**
      * Resolve the configured destination now, so a bad value is logged at startup instead of on the first freeze.
-     * Called once the worlds exist; resolving twice is a no-op.
+     * Called on the global thread once the worlds exist; until then no holding area is configured.
      */
     public void warmUp() {
-        destination();
+        destination = source.get();
     }
 
-    /** The destination, resolved on the first call and remembered after that. */
-    private synchronized @Nullable Location destination() {
-        if (!resolved) {
-            destination = source.get();
-            resolved = true;
-        }
-        return destination;
+    /** The destination, or null while unresolved or not configured. */
+    private @Nullable Location destination() {
+        Location resolved = destination;
+        // A copy, because a Location is mutable and every caller's region thread holds it.
+        return resolved == null ? null : resolved.clone();
     }
 
     /**

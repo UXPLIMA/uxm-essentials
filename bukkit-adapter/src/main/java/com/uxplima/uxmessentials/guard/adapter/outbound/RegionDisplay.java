@@ -20,6 +20,8 @@ import org.bukkit.util.Transformation;
 
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Shape;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
@@ -27,6 +29,9 @@ import org.joml.Vector3f;
  * Draws region borders for one viewer (E03). In {@code lines} mode each edge is a thin, glowing block display that
  * only the viewer is shown; in {@code particles} mode the edges are traced with dust particles sent to the viewer
  * alone. Either way nobody else sees anything, and everything goes away after the configured time or on hide.
+ *
+ * <p>The displays never move from the block they were spawned at, so the region thread owning that block owns all of
+ * them, and that is where they are removed, whichever thread asks.
  */
 public final class RegionDisplay {
 
@@ -34,11 +39,16 @@ public final class RegionDisplay {
     private static final int ROUND_SEGMENTS = 32;
 
     private final Plugin plugin;
-    private final Map<UUID, List<BlockDisplay>> shown = new ConcurrentHashMap<>();
+    private final Scheduler scheduler;
+    private final Map<UUID, Drawn> shown = new ConcurrentHashMap<>();
 
-    public RegionDisplay(Plugin plugin) {
+    public RegionDisplay(Plugin plugin, Scheduler scheduler) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
+
+    /** The displays drawn for one viewer and the block they all stand on. */
+    private record Drawn(Location anchor, List<BlockDisplay> entities) {}
 
     /** One straight edge between two points. */
     private record Edge(double x1, double y1, double z1, double x2, double y2, double z2) {}
@@ -82,7 +92,7 @@ public final class RegionDisplay {
             viewer.showEntity(plugin, display);
             entities.add(display);
         }
-        shown.put(viewer.getUniqueId(), entities);
+        shown.put(viewer.getUniqueId(), new Drawn(anchor.clone(), entities));
     }
 
     /** Draw the particle edges again; called every second while a particle display lasts. */
@@ -95,13 +105,11 @@ public final class RegionDisplay {
         particles(viewer, world, edges, color);
     }
 
-    /** Remove what was drawn for {@code viewer}. */
+    /** Remove what was drawn for {@code viewer}; also called when they quit, so nothing they were shown stays. */
     public void hide(Player viewer) {
-        List<BlockDisplay> entities = shown.remove(viewer.getUniqueId());
-        if (entities != null) {
-            for (BlockDisplay display : entities) {
-                display.getScheduler().run(plugin, task -> display.remove(), null);
-            }
+        Drawn drawn = shown.remove(viewer.getUniqueId());
+        if (drawn != null) {
+            remove(drawn);
         }
     }
 
@@ -110,10 +118,22 @@ public final class RegionDisplay {
         return shown.containsKey(viewer.getUniqueId());
     }
 
-    /** Remove everything, for a disable. */
+    /**
+     * Remove everything, for a disable. Displays whose block the calling thread owns go at once, which on Paper is
+     * every one of them, since the disable runs on the one main thread; the rest go on their region thread.
+     */
     public void clear() {
-        shown.values().forEach(list -> list.forEach(d -> d.getScheduler().run(plugin, task -> d.remove(), null)));
+        shown.values().forEach(this::remove);
         shown.clear();
+    }
+
+    private void remove(Drawn drawn) {
+        Runnable removal = () -> drawn.entities().forEach(BlockDisplay::remove);
+        if (plugin.getServer().isOwnedByCurrentRegion(drawn.anchor())) {
+            removal.run();
+        } else {
+            scheduler.onRegion(BukkitRefs.toPosition(drawn.anchor()), removal);
+        }
     }
 
     private static void particles(Player viewer, World world, List<Edge> edges, Color color) {

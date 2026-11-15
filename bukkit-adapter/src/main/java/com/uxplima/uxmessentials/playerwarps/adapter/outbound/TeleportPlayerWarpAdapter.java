@@ -4,6 +4,8 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -28,10 +30,12 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
 
     private final TeleportEngine engine;
     private final WarpTeleportRegistry registry;
+    private final Scheduler scheduler;
 
-    public TeleportPlayerWarpAdapter(TeleportEngine engine, WarpTeleportRegistry registry) {
+    public TeleportPlayerWarpAdapter(TeleportEngine engine, WarpTeleportRegistry registry, Scheduler scheduler) {
         this.engine = Objects.requireNonNull(engine, "engine");
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -46,7 +50,14 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
-        engine.launch(who, destinationOf(warp), TeleportKind.WARP);
+        // The use case runs on the async lane, but the launch reads where the player stands and what they may do,
+        // which only their own region thread may ask. A player who left before the hop lands hears nothing and their
+        // arrival notice is dropped, so it cannot play on a later, unrelated teleport.
+        PlayerThread.run(
+                scheduler,
+                who,
+                () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP),
+                () -> registry.getAndRemove(who.uuid()));
     }
 
     @Override
