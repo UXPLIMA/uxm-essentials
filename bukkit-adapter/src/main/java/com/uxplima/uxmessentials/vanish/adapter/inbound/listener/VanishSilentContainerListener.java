@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * block and therefore no animation. On close it writes the copy's contents back to the real container.
  *
  * <p>This is the same "live inventory mirror" pattern the invsee / endersee / offline-container views use, a raw
- * Bukkit inventory built and opened outside the menu engine, and is allow-listed with them in the architecture fence.
+ * Bukkit inventory built and opened outside the menu engine.
  * It is packet-free (our packet layer carries entity data, not block actions), which is the trade-off for not shipping
  * a ProtocolLib-style interceptor: the copy is a point-in-time snapshot, so if another actor mutates the real container
  * while the vanished player has the mirror open, the write-back on close wins. That window is negligible for a hidden

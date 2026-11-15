@@ -10,8 +10,8 @@ package com.uxplima.uxmessentials.shared.domain.message;
  * exactly as every feature menu does. The hub is shared infrastructure owned by no single context, so
  * its keys sit in the shared kernel under the {@code gui} prefix.
  *
- * <p>Like every {@link MessageKey} enum the constant name and the catalog key map 1:1
- * ({@code HUB_TITLE} ↔ {@code gui.hub.title}); the locale-parity guard asserts each has an {@code en}
+ * <p>Like every {@link MessageKey} enum the constant name follows the catalog key by convention
+ * ({@code HUB_TITLE} for {@code gui.hub.title}); the locale-parity guard asserts each has an {@code en}
  * entry and the catalog aggregate enumerates this enum.
  */
 public enum GuiMessageKey implements MessageKey {

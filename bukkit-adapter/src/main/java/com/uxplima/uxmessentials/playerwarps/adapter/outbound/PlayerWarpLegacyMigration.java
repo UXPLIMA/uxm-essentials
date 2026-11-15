@@ -30,9 +30,8 @@ import org.jspecify.annotations.NullMarked;
  * which it does not carry today.
  *
  * <p><strong>Why this is its own class.</strong> It reads the world list, and the plugin enables before any world
- * exists ({@code load: STARTUP}, see {@code WorldPhase}). Wiring is therefore forbidden from enumerating worlds at
- * all, which the {@code wiringDoesNotEnumerateOrCreateWorlds} ArchUnit rule enforces by class, so this belongs
- * outside the wiring rather than inside it behind a comment.
+ * exists ({@code load: STARTUP}, see {@code WorldPhase}). Wiring therefore never enumerates worlds, so this
+ * belongs outside the wiring rather than inside it behind a comment.
  *
  * <p><strong>Threading.</strong> Three hops, each for its own reason. Bootstrap holds the whole thing until
  * {@code ServerLoadEvent}, because before that there are no worlds to snapshot. The snapshot itself is taken on

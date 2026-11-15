@@ -12,9 +12,10 @@ package com.uxplima.uxmessentials.shared.domain.message;
  * <p>Per-module key ownership: each bounded context defines its own {@code enum} implementing this
  * interface (the teleport context owns the teleport keys, economy owns the wallet keys, …), so a
  * context references its own keys without a cross-context dependency and a disabled module still ships
- * its keys to keep the catalog whole. The constant name and the catalog key map 1:1 by convention
- * {@code HOME_NOT_FOUND} ↔ {@code home.not-found}, and that mapping is asserted by the locale-parity
- * guard. Catalog keys are kebab-case, dot-separated; the enum constant is {@code UPPER_SNAKE}.
+ * its keys to keep the catalog whole. The constant name usually follows its catalog key
+ * ({@code HOME_NOT_FOUND} for {@code home.not-found}), but only by convention: the locale-parity guard
+ * checks that every key the code names has a line in every language, not how a constant is spelled.
+ * Catalog keys are kebab-case, dot-separated; the enum constant is {@code UPPER_SNAKE}.
  */
 // A key is its catalog string and nothing else, which is what lets an error enum hold one as a plain field. Saying
 // so out loud is what stops Error Prone's enum-immutability check from flagging every such field.

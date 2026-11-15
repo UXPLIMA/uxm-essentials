@@ -22,8 +22,9 @@ import org.jspecify.annotations.NullMarked;
  * Discovers a foreign economy already on the server and wraps it in this plugin's {@code EconomyProvider}
  * port, Treasury first (modern, multi-currency), then Vault (legacy, single-currency).
  * This is the only place that reaches the foreign SDK
- * registrations through the {@code ServicesManager}; the actual SDK imports are confined to the adapter
- * classes in the {@code treasury}/{@code vault} packages, fenced by {@code economyDomainHasNoProviderSdk}.
+ * registrations through the {@code ServicesManager}; the bridges that import the SDKs sit in the
+ * {@code treasury}/{@code vault} packages, and {@code economyDomainHasNoProviderSdk} in
+ * {@code LayerDependenciesTest} keeps the SDKs out of the economy domain and application.
  *
  * <p>The lookups are gated on the soft-depend plugin being present, so the {@code me.lokka30}/{@code
  * net.milkbowl} symbols are never resolved on a server without the corresponding plugin, which is exactly

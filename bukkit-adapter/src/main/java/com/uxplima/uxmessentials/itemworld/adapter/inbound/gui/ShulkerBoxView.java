@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Opens a shulker box <em>item</em> the player is holding as a 27-slot view they edit in place, and writes the
  * edited contents back into the box's {@link BlockStateMeta} on close. The AxShulkers "open a shulker from the
- * inventory" surface. It is a sanctioned raw-inventory leaf (on the ArchUnit createInventory allow-list), built the
+ * inventory" surface. It is a sanctioned raw-inventory leaf, built the
  * same dupe-safe way as the playerstate invsee mirrors: the view is seeded from a <em>snapshot</em> of the box's
  * contents ({@link BlockStateMeta#getBlockState()} returns a copy), so the player's edits touch only the view until
  * the single write-back on close applies them in one pass.

@@ -6,8 +6,8 @@
  * consumes the incumbent), constructs the use cases and Brigadier commands over the resolved provider, and
  * produces the {@code WarpEconomy} bridge the warps context charges a per-warp cost through.
  *
- * <p>The provider-SDK imports are confined to the {@code treasury} and {@code vault} sub-packages, fenced by
- * {@code economyDomainHasNoProviderSdk}; this wiring touches only the foreign registrations through the
+ * <p>The economy's provider-SDK imports sit in the {@code treasury} and {@code vault} sub-packages; this wiring
+ * touches only the foreign registrations through the
  * {@code ServicesManager}, never the SDK types directly.
  */
 @org.jspecify.annotations.NullMarked

@@ -11,10 +11,10 @@ package com.uxplima.uxmessentials.shared.domain.message;
  * any context references them without a cross-context dependency, exactly as a per-feature
  * {@code MessageKey} enum does for its own block.
  *
- * <p>Like every {@link MessageKey} enum the constant name and the catalog key map 1:1
- * ({@code COMMAND_NO_PERMISSION} ↔ {@code command.no-permission}); the locale-parity guard asserts each
- * has an {@code en} entry and that the {@code command.*} / {@code cooldown.*} / {@code warmup.*} /
- * {@code lang.*} / {@code help.*} / {@code common.*} namespaces are owned here.
+ * <p>Like every {@link MessageKey} enum the constant name follows the catalog key by convention
+ * ({@code COMMAND_NO_PERMISSION} for {@code command.no-permission}); the locale-parity guard asserts each
+ * has an {@code en} entry. The {@code command.*} / {@code cooldown.*} / {@code warmup.*} / {@code lang.*} /
+ * {@code help.*} / {@code common.*} namespaces are owned here.
  */
 public enum SharedMessageKey implements MessageKey {
 
