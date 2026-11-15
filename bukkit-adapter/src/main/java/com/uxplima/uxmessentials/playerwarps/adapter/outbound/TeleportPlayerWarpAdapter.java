@@ -39,9 +39,7 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
-        var warmup = warp.timing().warmupSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
-        var cooldown = warp.timing().cooldownSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
-        engine.launch(who, Destination.at(warp.location(), warmup, cooldown), TeleportKind.WARP);
+        engine.launch(who, destinationOf(warp), TeleportKind.WARP);
     }
 
     @Override
@@ -51,11 +49,17 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         Objects.requireNonNull(onLanded, "onLanded");
         Objects.requireNonNull(onMissed, "onMissed");
         registry.register(who.uuid(), warp);
-        if (engine.arriveImmediately(who, Destination.at(warp.location()), TeleportKind.WARP, onLanded, onMissed)
+        // The warp's own cooldown rides along so the landing stamps the key the origin's gate checked.
+        if (engine.arriveImmediately(who, destinationOf(warp), TeleportKind.WARP, onLanded, onMissed)
                 .isErr()) {
             // No hop was issued, so the landing notice registered above would otherwise greet the next teleport.
             registry.getAndRemove(who.uuid());
             onMissed.run();
         }
+    }
+
+    private static Destination destinationOf(PlayerWarp warp) {
+        return Destination.at(
+                warp.location(), warp.timing().warmup(), warp.timing().cooldown());
     }
 }
