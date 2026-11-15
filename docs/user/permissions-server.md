@@ -2,7 +2,7 @@
 
 Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; the comment says whether the highest or the lowest granted number wins. The gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md).
 
-Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
 ## bossbar
 
@@ -21,6 +21,7 @@ Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communica
 | `uxmessentials.commandcontrol.channelhide.bypass` | Exempt from the plugin-channel hider - the full channel-registration list is sent to this player. | op |
 | `uxmessentials.commandcontrol.spam.bypass` | Exempt from the command-spam rate limiter - commands are never counted and no spam action fires. | op |
 | `uxmessentials.commandcontrol.viewplugins` | See the plugin-listing / help commands (/plugins, /pl, /help, ...) hidden by the plugin-hide feature. | op |
+| `uxmessentials.commandcontrol.viewproxycommands` | Checked on the Velocity proxy: see and run the proxy commands the proxy plugin-hide removes and blocks. | false |
 | `uxmessentials.module.commandcontrol` | Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide). | op |
 
 ## communication
@@ -281,6 +282,14 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.ranks.gui` | /ranks to open the ladder panel (config-gated; registered only when the GUI is enabled). | true |
 | `uxmessentials.ranks.prestige` | /prestige to reset to the first rank for a prestige level once you reach the top rank. | true |
 | `uxmessentials.ranks.rankup` | /rankup to advance to the next rank when you meet its requirements. | true |
+
+## rest add-on
+
+The add-on is a separate jar, so its node is kept with the shared ones: in game it is listed under `/uxmess permissions shared`.
+
+| Permission | What it allows | Default |
+|---|---|---|
+| `uxmessentials.rest.admin` | Checked by the optional uxmEssentials-rest add-on: /uxmapi token create\|list\|revoke and /uxmapi status to manage API tokens. | op |
 
 ## scoreboard
 

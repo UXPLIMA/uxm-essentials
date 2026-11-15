@@ -44,6 +44,8 @@ import com.uxplima.uxmessentials.rest.auth.TokenStore;
 public final class TokenCommand {
 
     private static final String LITERAL = "uxmapi";
+    // Declared in the host's permission catalog, which registers and lists it: this add-on compiles against the
+    // published API only and cannot read the catalog, and the host is a required dependency, so it is always there.
     private static final String PERMISSION = "uxmessentials.rest.admin";
     private static final DateTimeFormatter WHEN =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());

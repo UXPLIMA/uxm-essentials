@@ -64,6 +64,10 @@ final class SharedPermissions {
                         "/lang set <player> <language> and /lang reset <player>: set or clear another player's language, online or away.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
+                        "uxmessentials.rest.admin",
+                        "Checked by the optional uxmEssentials-rest add-on: /uxmapi token create|list|revoke and /uxmapi status to manage API tokens.",
+                        PermissionDefault.OP),
+                PermissionSpec.shared(
                         "uxmessentials.update.notify",
                         "Receive the join-time notice when a newer plugin version is available.",
                         PermissionDefault.OP));

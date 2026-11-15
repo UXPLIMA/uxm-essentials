@@ -371,6 +371,11 @@ final class EnforcementPermissions {
                         PermissionDefault.OP,
                         COMMANDCONTROL),
                 PermissionSpec.of(
+                        "uxmessentials.commandcontrol.viewproxycommands",
+                        "Checked on the Velocity proxy: see and run the proxy commands the proxy plugin-hide removes and blocks.",
+                        PermissionDefault.FALSE,
+                        COMMANDCONTROL),
+                PermissionSpec.of(
                         "uxmessentials.module.commandcontrol",
                         "Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide).",
                         PermissionDefault.OP,

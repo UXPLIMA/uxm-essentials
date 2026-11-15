@@ -32,6 +32,11 @@ final class EconomyPermissions {
                         PermissionDefault.OP,
                         ECONOMY),
                 PermissionSpec.of(
+                        "uxmessentials.economy.admin.backup",
+                        "/eco backup and /eco export: write every wallet balance to a timestamped JSON backup or a CSV export under backups/economy/.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
                         "uxmessentials.economy.admin.bulk",
                         "/eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations.",
                         PermissionDefault.OP,
@@ -39,6 +44,26 @@ final class EconomyPermissions {
                 PermissionSpec.of(
                         "uxmessentials.economy.admin.give",
                         "/eco give <player> <amount> [currency] only.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.admin.history",
+                        "/eco history [player]: open the transaction history of yourself or another player, online or not.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.admin.logs",
+                        "/eco logs: open the server-wide transaction log.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.admin.note",
+                        "/eco note give <player> <amount> [currency]: hand an online player a banknote without debiting anyone.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
+                        "uxmessentials.economy.admin.restore",
+                        "/eco restore <player> <backup>: put one player's wallet balances back from an /eco backup file.",
                         PermissionDefault.OP,
                         ECONOMY),
                 PermissionSpec.of(

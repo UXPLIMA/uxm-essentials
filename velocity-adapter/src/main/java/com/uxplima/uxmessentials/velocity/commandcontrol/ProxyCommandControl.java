@@ -25,6 +25,10 @@ import org.spongepowered.configurate.ConfigurationNode;
  * expose the client-facing channel-advertisement packets, so filtering them would need a packet library
  * (out of scope). When it is switched on, a warning is logged pointing the operator at the backend module,
  * rather than silently doing nothing.
+ *
+ * <p>Velocity keeps no registry of permission nodes, so the nodes below are declared in the core
+ * {@code PermissionCatalog} instead: the backend registers them and lists them in {@code /uxmess permissions}, which
+ * is where an operator looks for what to grant on the proxy too.
  */
 public final class ProxyCommandControl {
 
