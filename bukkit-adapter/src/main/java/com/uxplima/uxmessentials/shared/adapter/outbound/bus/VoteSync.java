@@ -104,7 +104,7 @@ public final class VoteSync {
 
     /**
      * Whether {@code fired} is a party not yet celebrated here. A frame without an id cannot be told apart from a new
-     * party, so it is always run, as it was before frames carried one.
+     * party, so it is always run rather than risk dropping a real party.
      */
     private static boolean firstCopy(VotePartyFired fired, RecentIds celebrated) {
         return !fired.identified() || celebrated.firstTime(fired.partyId());

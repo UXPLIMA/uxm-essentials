@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
 
@@ -82,6 +83,18 @@ class VotePartyFiredTest {
         assertThat(received)
                 .isEqualTo(new VotePartyFired(
                         "survival-1", VotePartyFired.NO_ID, 25, VotePartyFired.Reach.EVERYONE, Set.of()));
+    }
+
+    @Test
+    void aPartyCutBeforeItsIdDecodesAsTheSamePartyWithoutAnId() {
+        VotePartyFired sent = new VotePartyFired("survival-1", PARTY, 25, VotePartyFired.Reach.VOTERS, Set.of(ALEX));
+        byte[] frame = NetworkMessageCodec.encode(sent);
+
+        NetworkMessage received = NetworkMessageCodec.decode(Arrays.copyOf(frame, frame.length - 16));
+
+        assertThat(received)
+                .isEqualTo(new VotePartyFired(
+                        "survival-1", VotePartyFired.NO_ID, 25, VotePartyFired.Reach.VOTERS, Set.of(ALEX)));
     }
 
     private DataOutputStream header() throws IOException {
