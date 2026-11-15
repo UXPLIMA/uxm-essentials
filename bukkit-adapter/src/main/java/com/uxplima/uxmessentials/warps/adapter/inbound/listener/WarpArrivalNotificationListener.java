@@ -34,7 +34,9 @@ import org.jspecify.annotations.NullMarked;
 public final class WarpArrivalNotificationListener implements Listener {
 
     private final Scheduler scheduler;
+    /** Scoped to the warps module, so keys are named as they are written in modules/warps/config.conf. */
     private final ConfigStore config;
+
     private final WarpTeleportRegistry registry;
     private final MiniMessage miniMessage;
 
@@ -75,12 +77,11 @@ public final class WarpArrivalNotificationListener implements Listener {
         if (world == null) return;
 
         // Sound
-        String soundFallback =
-                config.getString("modules.warps.effects.sound.departure.type", "ENTITY_ENDERMAN_TELEPORT");
+        String soundFallback = config.getString("effects.sound.departure.type", "ENTITY_ENDERMAN_TELEPORT");
         playSound(world, loc, pending.departureSound(), soundFallback);
 
         // Particle
-        String particleFallback = config.getString("modules.warps.effects.particle.departure.type", "PORTAL");
+        String particleFallback = config.getString("effects.particle.departure.type", "PORTAL");
         playParticle(world, loc, pending.departureParticle(), particleFallback);
     }
 
@@ -89,11 +90,11 @@ public final class WarpArrivalNotificationListener implements Listener {
         if (world == null) return;
 
         // Sound
-        String soundFallback = config.getString("modules.warps.effects.sound.arrival.type", "ENTITY_ENDERMAN_TELEPORT");
+        String soundFallback = config.getString("effects.sound.arrival.type", "ENTITY_ENDERMAN_TELEPORT");
         playSound(world, loc, pending.arrivalSound(), soundFallback);
 
         // Particle
-        String particleFallback = config.getString("modules.warps.effects.particle.arrival.type", "PORTAL");
+        String particleFallback = config.getString("effects.particle.arrival.type", "PORTAL");
         playParticle(world, loc, pending.arrivalParticle(), particleFallback);
     }
 

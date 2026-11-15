@@ -35,7 +35,9 @@ public final class WarpSignListener implements Listener {
     private final WarpRepository repository;
     private final UseWarp useWarp;
     private final Permissions permissions;
+    /** Scoped to the warps module, so keys are named as they are written in modules/warps/config.conf. */
     private final ConfigStore config;
+
     private final CommandFeedback feedback;
 
     public WarpSignListener(
@@ -55,7 +57,7 @@ public final class WarpSignListener implements Listener {
     public void onSignChange(SignChangeEvent event) {
         Player player = event.getPlayer();
         PlayerRef ref = BukkitRefs.toRef(player);
-        String header = config.getString("modules.warps.warp-sign-header", "[Warp]");
+        String header = config.getString("warp-sign-header", "[Warp]");
 
         String line0 = plain(event.line(0));
         if (!line0.equalsIgnoreCase(header)) {
@@ -79,7 +81,7 @@ public final class WarpSignListener implements Listener {
         // Check if warp exists
         if (!repository.exists(WarpName.of(warpName))) {
             feedback.send(player, WarpsMessageKey.WARP_NOT_FOUND, Map.of("warp", warpName));
-            if (config.getBoolean("modules.warps.destroy-warp-sign-on-error", true)) {
+            if (config.getBoolean("destroy-warp-sign-on-error", true)) {
                 event.getBlock().breakNaturally();
             } else {
                 event.setCancelled(true);
@@ -105,7 +107,7 @@ public final class WarpSignListener implements Listener {
             return;
         }
 
-        String header = config.getString("modules.warps.warp-sign-header", "[Warp]");
+        String header = config.getString("warp-sign-header", "[Warp]");
         org.bukkit.block.sign.SignSide front = sign.getSide(org.bukkit.block.sign.Side.FRONT);
         // Plain text strips any colour, so the same comparison matches both a freshly typed header and the
         // dark-blue header the create handler applies to mark an active warp sign.
