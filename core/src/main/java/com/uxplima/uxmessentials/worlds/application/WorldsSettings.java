@@ -74,8 +74,9 @@ public final class WorldsSettings {
                 .with(WorldProperties.SPAWN_ANIMALS, settingFlag(WorldProperties.SPAWN_ANIMALS))
                 .with(WorldProperties.SPAWN_MONSTERS, settingFlag(WorldProperties.SPAWN_MONSTERS));
         return new WorldDefaults(
-                enumOr("defaults.environment", WorldEnvironment.class, vanilla.environment()),
-                enumOr("defaults.world-type", WorldGenType.class, vanilla.worldType()),
+                WorldEnvironment.parse(config.getString("defaults.environment", ""))
+                        .orElse(vanilla.environment()),
+                WorldGenType.parse(config.getString("defaults.world-type", "")).orElse(vanilla.worldType()),
                 config.getBoolean("defaults.generate-structures", vanilla.generateStructures()),
                 settings);
     }
@@ -87,16 +88,6 @@ public final class WorldsSettings {
     private <T> T settingValue(WorldProperty<T> property) {
         String raw = config.getString(SETTINGS_DEFAULTS + property.key(), property.encode(property.defaultValue()));
         return property.decode(raw).orElse(property.defaultValue());
-    }
-
-    private <E extends Enum<E>> E enumOr(String path, Class<E> type, E fallback) {
-        String raw = config.getString(path, fallback.name()).strip();
-        for (E constant : type.getEnumConstants()) {
-            if (constant.name().equalsIgnoreCase(raw)) {
-                return constant;
-            }
-        }
-        return fallback;
     }
 
     /**

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -248,12 +249,24 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (name == null) {
             return 0;
         }
-        // An environment or type left out, or not one the server knows, is taken from the configured defaults.
-        WorldCreateOptions options = new WorldCreateOptions(
-                optionalEnum(ctx, "environment", WorldEnvironment.class),
-                optionalEnum(ctx, "type", WorldGenType.class),
-                Optional.empty(),
-                parseGenerator(ctx));
+        // Left out, the environment and type come from the configured defaults. A typo is refused rather than read as
+        // the default, because the environment a world is made with can never be changed afterwards.
+        Optional<String> rawEnvironment = optionalString(ctx, "environment");
+        Optional<WorldEnvironment> environment = rawEnvironment.flatMap(WorldEnvironment::parse);
+        if (rawEnvironment.isPresent() && environment.isEmpty()) {
+            return refuseToken(
+                    sender,
+                    WorldsMessageKey.WORLD_CREATE_INVALID_ENVIRONMENT,
+                    rawEnvironment.get(),
+                    WorldEnvironment.values());
+        }
+        Optional<String> rawType = optionalString(ctx, "type");
+        Optional<WorldGenType> type = rawType.flatMap(WorldGenType::parse);
+        if (rawType.isPresent() && type.isEmpty()) {
+            return refuseToken(
+                    sender, WorldsMessageKey.WORLD_CREATE_INVALID_TYPE, rawType.get(), WorldGenType.values());
+        }
+        WorldCreateOptions options = new WorldCreateOptions(environment, type, Optional.empty(), parseGenerator(ctx));
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
         onGlobal(() -> services.createWorld().create(who, name, options, true));
@@ -700,15 +713,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         }
     }
 
-    private static <E extends Enum<E>> Optional<E> optionalEnum(
-            CommandContext<CommandSourceStack> ctx, String key, Class<E> type) {
-        return optionalString(ctx, key).flatMap(raw -> {
-            try {
-                return Optional.of(Enum.valueOf(type, raw.toUpperCase(Locale.ROOT)));
-            } catch (IllegalArgumentException unknown) {
-                return Optional.empty();
-            }
-        });
+    private int refuseToken(CommandSender sender, WorldsMessageKey key, String typed, Enum<?>[] accepted) {
+        String values = Arrays.stream(accepted).map(Enum::name).collect(Collectors.joining(", "));
+        feedback.send(sender, key, Map.of("value", typed, "values", values));
+        return 0;
     }
 
     private static Optional<String> optionalString(CommandContext<CommandSourceStack> ctx, String key) {

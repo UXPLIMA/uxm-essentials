@@ -20,6 +20,7 @@ public record PendingDeletion(WorldName name, UUID requester, Instant stagedAt) 
     public boolean expiredAt(Instant now, Duration timeout) {
         Objects.requireNonNull(now, "now");
         Objects.requireNonNull(timeout, "timeout");
-        return now.isAfter(stagedAt.plus(timeout));
+        // Compared as spans, so a huge configured timeout cannot overflow an Instant.
+        return Duration.between(stagedAt, now).compareTo(timeout) > 0;
     }
 }

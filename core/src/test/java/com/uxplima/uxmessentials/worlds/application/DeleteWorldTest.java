@@ -16,6 +16,8 @@ import com.uxplima.uxmessentials.worlds.domain.WorldError;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** A world delete is asked for, then confirmed: only within the timeout the worlds config gives. */
 class DeleteWorldTest {
@@ -26,22 +28,30 @@ class DeleteWorldTest {
     private final FakeWorldEngine engine = new FakeWorldEngine();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final MutableClock clock = new MutableClock(NOW);
-    // Two minutes rather than the shipped 30s, so a confirm that passes after 90 seconds proves the key is read.
-    private final WorldsSettings settings = new WorldsSettings(new MapConfig().set("delete-confirm-timeout", "2m"));
 
-    private final DeleteWorld deleteWorld = new DeleteWorld(
-            repository,
-            engine,
-            new InMemoryPendingDeletions(),
-            notifier.notifier(),
-            new RecordingEvents(),
-            new InlineScheduler(),
-            clock,
-            settings::protectDefaultWorld,
-            settings::deleteConfirmTimeout);
+    private DeleteWorld deleteWorld(String timeout) {
+        WorldsSettings settings = new WorldsSettings(new MapConfig().set("delete-confirm-timeout", timeout));
+        return new DeleteWorld(
+                repository,
+                engine,
+                new InMemoryPendingDeletions(),
+                notifier.notifier(),
+                new RecordingEvents(),
+                new InlineScheduler(),
+                clock,
+                settings::protectDefaultWorld,
+                settings::deleteConfirmTimeout);
+    }
+
+    private Result<Unit, WorldError> confirmAfter(DeleteWorld deleteWorld, Duration wait) {
+        deleteWorld.request(ALEX, GAMES);
+        clock.advance(wait);
+        return deleteWorld.confirm(ALEX, GAMES);
+    }
 
     @BeforeEach
     void aWorldExists() {
+        WorldsSettings settings = new WorldsSettings(new MapConfig());
         new CreateWorld(
                         repository,
                         engine,
@@ -55,10 +65,8 @@ class DeleteWorldTest {
 
     @Test
     void aConfirmWithinTheTimeoutDeletesTheWorld() {
-        deleteWorld.request(ALEX, GAMES);
-        clock.advance(Duration.ofSeconds(90));
-
-        Result<Unit, WorldError> confirmed = deleteWorld.confirm(ALEX, GAMES);
+        // Two minutes rather than the shipped 30s, so a confirm that passes after 90 seconds proves the key is read.
+        Result<Unit, WorldError> confirmed = confirmAfter(deleteWorld("2m"), Duration.ofSeconds(90));
 
         assertThat(confirmed.isOk())
                 .as("confirm 90s after the request, timeout 2m")
@@ -70,10 +78,10 @@ class DeleteWorldTest {
 
     @Test
     void aConfirmAfterTheTimeoutIsRefusedAndTheRequestIsDropped() {
-        deleteWorld.request(ALEX, GAMES);
-        clock.advance(Duration.ofMinutes(2).plusSeconds(1));
+        DeleteWorld deleteWorld = deleteWorld("2m");
 
-        Result<Unit, WorldError> late = deleteWorld.confirm(ALEX, GAMES);
+        Result<Unit, WorldError> late =
+                confirmAfter(deleteWorld, Duration.ofMinutes(2).plusSeconds(1));
 
         assertThat(late.asError()).contains(WorldError.DELETE_EXPIRED);
         assertThat(repository.exists(GAMES))
@@ -88,5 +96,18 @@ class DeleteWorldTest {
                 .as("a second confirm finds nothing staged")
                 .contains(WorldError.NOT_FOUND);
         assertThat(notifier.keys()).last().isEqualTo("world.delete-none");
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "abc"})
+    void aTimeoutThatIsNotALengthOfTimeActsAsThirtySeconds(String timeout) {
+        assertThat(confirmAfter(deleteWorld(timeout), Duration.ofSeconds(25)).isOk())
+                .as("confirm 25s after the request with delete-confirm-timeout = %s", timeout)
+                .isTrue();
+
+        aWorldExists();
+        assertThat(confirmAfter(deleteWorld(timeout), Duration.ofSeconds(31)).asError())
+                .as("confirm 31s after the request with delete-confirm-timeout = %s", timeout)
+                .contains(WorldError.DELETE_EXPIRED);
     }
 }

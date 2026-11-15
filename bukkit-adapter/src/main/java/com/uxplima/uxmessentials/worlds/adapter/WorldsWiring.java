@@ -283,11 +283,10 @@ public final class WorldsWiring {
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
-        // Re-apply a world's stored settings to the live world on load, once a new world's row is saved (the
-        // engine loads it before the row exists, so the load itself finds nothing to apply), and after any
-        // setting change, on the global region thread (the applier touches Bukkit world handles). Subscribed for
-        // the module's lifetime and dropped on stop so a reload never leaves a stale listener firing against
-        // torn-down state.
+        // Re-apply a world's stored settings to the live world on load and after any setting change, on the global
+        // region thread (the applier touches Bukkit world handles). Creating a world publishes no WorldLoaded, so a
+        // new world gets its stored settings here once its row is saved. Subscribed for the module's lifetime and
+        // dropped on stop so a reload never leaves a stale listener firing against torn-down state.
         Consumer<DomainEvent> applySubscriber = event -> {
             if (event instanceof WorldLoaded loaded) {
                 kernel.scheduler().onGlobal(() -> onLoad.apply(loaded.name()));
