@@ -40,7 +40,9 @@ import org.jspecify.annotations.NullMarked;
  * <p><strong>Ownership.</strong> The queue is written on the enable thread and drained on the main
  * thread at {@code ServerLoadEvent}. Those never overlap, but they are different threads, so every
  * method that touches the queue is synchronised on this instance and the drain takes a copy before
- * running anything.
+ * running anything. The lock guards only this class's own fields: the server is asked for its worlds before
+ * taking it, and that answer is safe to act on because a drain that ran in between has set the flag the
+ * locked check reads.
  */
 @NullMarked
 public final class WorldPhase {
@@ -69,8 +71,9 @@ public final class WorldPhase {
     public void run(String what, Runnable task) {
         Objects.requireNonNull(what, "what");
         Objects.requireNonNull(task, "task");
+        boolean noWorlds = server.getWorlds().isEmpty();
         synchronized (this) {
-            if (!worldsLoaded && server.getWorlds().isEmpty()) {
+            if (!worldsLoaded && noWorlds) {
                 queued.add(new Deferred(what, task));
                 return;
             }

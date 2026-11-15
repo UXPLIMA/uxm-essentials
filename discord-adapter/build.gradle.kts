@@ -10,6 +10,9 @@ uxplima {
 // Bukkit's ServicesManager. JDA is not shaded: UxmDiscordLoader downloads it at boot.
 dependencies {
     implementation(project(":core"))
+    // The scheduler the bridge runs its off-tick and global work through. Shaded without its configurate dependency,
+    // which the loader provides at boot.
+    implementation(uxm.uxmlib.common) { isTransitive = false }
     // The host jar carries :api and paper-plugin.yml joins its classpath. A shaded copy is a second class with
     // the same name, and a service the host registers under it is invisible to the bridge's lookup.
     compileOnly(project(":api"))

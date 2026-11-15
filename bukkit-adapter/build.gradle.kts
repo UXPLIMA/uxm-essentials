@@ -89,3 +89,20 @@ tasks.shadowJar {
 tasks.runServer {
     jvmArgs("-Xmx4G")
 }
+
+// The scheduling guard reads the main sources of every module, so a change in any of them has to rerun it rather than
+// let a cached result stand. The root reaches the test JVM through an argument provider whose path is internal, so the
+// result stays cacheable across machines that check the repository out in different places.
+class RepositoryRootArgument(
+    @get:Internal val root: File,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf("-Duxm.repositoryRoot=${root.absolutePath}")
+}
+
+tasks.test {
+    jvmArgumentProviders.add(RepositoryRootArgument(rootDir))
+    inputs
+        .files(fileTree(rootDir) { include("*/src/main/java/**/*.java") })
+        .withPropertyName("allMainSources")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+}
