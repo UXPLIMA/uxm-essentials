@@ -17,6 +17,7 @@ import java.util.concurrent.Executor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -72,6 +73,7 @@ public final class NetworkClaims {
     private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, CompletableFuture<Void>> chains = new ConcurrentHashMap<>();
     private final Executor lane = this::onLane;
+    private final AtomicLong sessions = new AtomicLong();
     private volatile boolean closing;
 
     public NetworkClaims(PlayerClaimLedger ledger, Scheduler scheduler, Clock clock, Logger log) {
@@ -90,16 +92,32 @@ public final class NetworkClaims {
         return hold(player, false).loaded;
     }
 
-    /** Mark {@code player} as in the world, reading their claims first if nothing holds them (a quick relog). */
-    public void joined(UUID player) {
-        hold(player, true);
+    /**
+     * Mark {@code player} as in the world, reading their claims first if nothing holds them (a quick relog). Answers
+     * the session this join opened, which {@link #drop} takes back.
+     */
+    public long joined(UUID player) {
+        return hold(player, true).session;
     }
 
-    /** Let go of {@code player}'s claims; they are read again on the next login. */
-    public void drop(UUID player) {
-        Entry entry = entries.remove(Objects.requireNonNull(player, "player"));
-        if (entry != null) {
-            entry.loaded.completeExceptionally(new CancellationException("the player left"));
+    /**
+     * Let go of {@code player}'s claims when they leave the world; they are read again on the next login. Only the
+     * {@code session} {@link #joined} answered is let go, so a late quit of an older session cannot take away the
+     * claims of the one that replaced it.
+     */
+    public void drop(UUID player, long session) {
+        Objects.requireNonNull(player, "player");
+        AtomicReference<@Nullable Entry> gone = new AtomicReference<>();
+        entries.computeIfPresent(player, (id, entry) -> {
+            if (entry.session != session) {
+                return entry;
+            }
+            gone.set(entry);
+            return null;
+        });
+        Entry removed = gone.get();
+        if (removed != null) {
+            removed.loaded.completeExceptionally(new CancellationException("the player left"));
         }
     }
 
@@ -285,6 +303,7 @@ public final class NetworkClaims {
             }
             if (joined) {
                 held.joined = true;
+                held.session = sessions.incrementAndGet();
             }
             return held;
         });
@@ -442,12 +461,22 @@ public final class NetworkClaims {
                 lane);
     }
 
+    /**
+     * Hand a step to the async lane, or run it here when the lane is shut. A stopping plugin is marked disabled before
+     * its teardown runs, and from then the lane refuses work; a refused step would never run, leave the player's chain
+     * waiting forever and lose every write behind it. Running it here costs a blocking call on a server that is going
+     * down anyway.
+     */
     private void onLane(Runnable task) {
         if (closing) {
             task.run();
             return;
         }
-        scheduler.async(task);
+        try {
+            scheduler.async(task);
+        } catch (RuntimeException refused) {
+            task.run();
+        }
     }
 
     private record Carry(LocalClaims local, Runnable carried) {}
@@ -458,6 +487,8 @@ public final class NetworkClaims {
         private final Map<String, Long> cooldowns = new ConcurrentHashMap<>();
         private volatile boolean ready;
         private volatile boolean joined;
+        // Written inside the map's compute for this player, read inside it by drop.
+        private long session;
         // Guarded by the entry's monitor: set by a join that arrived before the login read finished.
         private @Nullable Carry pendingCarry;
         // Touched only by this player's read steps, which run one at a time on the player's chain.

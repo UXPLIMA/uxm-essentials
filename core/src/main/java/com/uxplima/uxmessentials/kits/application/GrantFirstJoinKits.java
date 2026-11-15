@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.kits.application;
 
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletionException;
 
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
@@ -46,20 +45,42 @@ public final class GrantFirstJoinKits {
             }
             var unused = access.acquireOneTime(who, kit).whenComplete((won, failure) -> {
                 if (failure != null) {
-                    Throwable cause = failure instanceof CompletionException && failure.getCause() != null
-                            ? failure.getCause()
-                            : failure;
-                    if (!(cause instanceof CancellationException)) {
-                        log.error(
-                                "could not hand the first-join kit " + kit.id().value() + " to " + who.name(), cause);
-                    }
+                    // This server will not try again: the player has played here from now on.
+                    log.warn(
+                            "event=first_join_kit_not_given kit={} player={} reason={}",
+                            kit.id().value(),
+                            who.name(),
+                            String.valueOf(unwrap(failure)));
                     return;
                 }
                 if (Boolean.TRUE.equals(won)) {
-                    granter.grant(who, granted);
-                    access.recordClaim(who, kit);
+                    handOver(who, kit, granted);
                 }
             });
         }
+    }
+
+    /**
+     * Give a kit whose claim this server won. A grant that fails gives the claim back, so the kit is not lost on every
+     * server; once the items are handed over the claim stays.
+     */
+    private void handOver(PlayerRef who, KitDefinition kit, KitDefinition granted) {
+        try {
+            granter.grant(who, granted);
+        } catch (RuntimeException failure) {
+            access.releaseOneTime(who, kit);
+            log.error("could not hand the first-join kit " + kit.id().value() + " to " + who.name(), failure);
+            return;
+        }
+        try {
+            access.recordClaim(who, kit);
+        } catch (RuntimeException failure) {
+            log.error("could not record the first-join kit " + kit.id().value() + " for " + who.name(), failure);
+        }
+    }
+
+    private static Throwable unwrap(Throwable failure) {
+        Throwable cause = failure.getCause();
+        return failure instanceof CompletionException && cause != null ? cause : failure;
     }
 }

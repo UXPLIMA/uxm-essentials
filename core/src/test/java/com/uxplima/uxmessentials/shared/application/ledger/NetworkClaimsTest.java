@@ -11,7 +11,9 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -105,12 +107,12 @@ class NetworkClaimsTest {
 
     @Test
     void aPlayerLetGoIsAnsweredFromTheLedgerAgainOnTheirNextLogin() {
-        claims.joined(ALEX.uuid());
+        long session = claims.joined(ALEX.uuid());
         scheduler.runAll();
         claims.markKit(ALEX.uuid(), "starter");
         scheduler.runAll();
 
-        claims.drop(ALEX.uuid());
+        claims.drop(ALEX.uuid(), session);
         assertThat(claims.hasKit(ALEX.uuid(), "starter")).isFalse();
 
         claims.joined(ALEX.uuid());
@@ -167,5 +169,58 @@ class NetworkClaimsTest {
         claims.stampCooldown(ALEX.uuid(), "warp", 5_000L);
 
         assertThat(ledger.cooldown(ALEX.uuid(), "warp")).isEqualTo(5_000L);
+    }
+
+    @Test
+    void aLateQuitOfAnOlderSessionKeepsTheNewSessionsClaims() {
+        long older = claims.joined(ALEX.uuid());
+        scheduler.runAll();
+        claims.joined(ALEX.uuid());
+        claims.markKit(ALEX.uuid(), "starter");
+
+        claims.drop(ALEX.uuid(), older);
+
+        assertThat(claims.hasKit(ALEX.uuid(), "starter")).isTrue();
+    }
+
+    @Test
+    void aLaneThatRefusesWorkWhileStoppingStillWritesEveryStepInOrder() {
+        NetworkClaims stopping = new NetworkClaims(ledger, new RefusingScheduler(), clock, new RecordingLogger());
+        stopping.joined(ALEX.uuid());
+
+        stopping.stampCooldown(ALEX.uuid(), "warp", 1_000L);
+        stopping.stampCooldown(ALEX.uuid(), "warp", 2_000L);
+        boolean won = stopping.acquireKit(ALEX, "starter").join();
+
+        assertThat(won).isTrue();
+        assertThat(ledger.cooldown(ALEX.uuid(), "warp")).isEqualTo(2_000L);
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isTrue();
+    }
+
+    /** A plugin marked disabled: the async lane refuses every task, entity tasks run where they are asked. */
+    private static final class RefusingScheduler implements Scheduler {
+
+        @Override
+        public void onGlobal(Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            throw new IllegalStateException("the plugin is disabled");
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {}
     }
 }

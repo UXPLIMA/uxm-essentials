@@ -36,6 +36,7 @@ class GrantFirstJoinKitsTest {
     private final MemoryClaimLedger ledger = new MemoryClaimLedger();
     private final FakePermissions permissions = new FakePermissions();
     private final List<String> received = new ArrayList<>();
+    private boolean handsBroken;
 
     /** One backend of the network, with Alex joining it for the first time. */
     private void firstJoinOn(QueuedScheduler backend) {
@@ -53,6 +54,17 @@ class GrantFirstJoinKitsTest {
     @Test
     void aOneTimeStarterKitIsHandedOutOnceAcrossTheNetwork() {
         firstJoinOn(new QueuedScheduler());
+        firstJoinOn(new QueuedScheduler());
+
+        assertThat(received).containsExactly("Alex:starter");
+    }
+
+    @Test
+    void aStarterKitThatCouldNotBeHandedOverIsLeftForTheNextServer() {
+        handsBroken = true;
+        firstJoinOn(new QueuedScheduler());
+        handsBroken = false;
+
         firstJoinOn(new QueuedScheduler());
 
         assertThat(received).containsExactly("Alex:starter");
@@ -86,6 +98,9 @@ class GrantFirstJoinKitsTest {
 
         @Override
         public Grant grant(PlayerRef recipient, KitDefinition kit) {
+            if (handsBroken) {
+                throw new IllegalStateException("the inventory could not be reached");
+            }
             received.add(recipient.name() + ":" + kit.id().value());
             return Grant.complete();
         }

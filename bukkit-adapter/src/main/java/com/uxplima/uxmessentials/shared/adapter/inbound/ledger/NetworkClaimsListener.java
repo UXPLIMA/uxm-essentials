@@ -2,6 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.ledger;
 
 import java.time.Duration;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
@@ -45,6 +48,9 @@ public final class NetworkClaimsListener implements Listener {
     private final PdcLocalClaims local;
     private final Scheduler scheduler;
     private final Logger log;
+    // The session each joined player's claims were opened under, by the very Player object, so the quit of an older
+    // session of the same account lets go of its own session only.
+    private final Map<Player, Long> sessions = Collections.synchronizedMap(new IdentityHashMap<>());
 
     public NetworkClaimsListener(NetworkClaims claims, PdcLocalClaims local, Scheduler scheduler, Logger log) {
         this.claims = Objects.requireNonNull(claims, "claims");
@@ -81,12 +87,18 @@ public final class NetworkClaimsListener implements Listener {
     /** Lowest, so the claims are marked in the world before another join listener can act on them. */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onJoin(PlayerJoinEvent event) {
-        adopt(event.getPlayer());
+        Player player = event.getPlayer();
+        join(player);
+        carryOver(player);
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        claims.drop(event.getPlayer().getUniqueId());
+        Player player = event.getPlayer();
+        Long session = sessions.remove(player);
+        if (session != null) {
+            claims.drop(player.getUniqueId(), session);
+        }
     }
 
     /** A login that was read but never reached the world (refused after the pre-login) lets its claims go here. */
@@ -95,16 +107,22 @@ public final class NetworkClaimsListener implements Listener {
         claims.dropUnjoined(event.getPlayerUniqueId());
     }
 
-    /** Read and carry over for players already online when the plugin enabled, each on their own thread. */
+    /**
+     * Hold players already online when the plugin enabled at once, so no check finds them unknown, and carry their PDC
+     * over on each one's own thread, the only place their PDC may be read.
+     */
     public void adoptOnline(Collection<? extends Player> online) {
         for (Player player : online) {
-            scheduler.onEntity(BukkitRefs.toRef(player), () -> adopt(player));
+            join(player);
+            scheduler.onEntity(BukkitRefs.toRef(player), () -> carryOver(player));
         }
     }
 
-    private void adopt(Player player) {
-        UUID id = player.getUniqueId();
-        claims.joined(id);
+    private void join(Player player) {
+        sessions.put(player, claims.joined(player.getUniqueId()));
+    }
+
+    private void carryOver(Player player) {
         if (local.carried(player)) {
             return;
         }
@@ -114,6 +132,6 @@ public final class NetworkClaimsListener implements Listener {
             return;
         }
         PlayerRef ref = BukkitRefs.toRef(player);
-        claims.carryOver(id, stamps, () -> scheduler.onEntity(ref, () -> local.markCarried(player)));
+        claims.carryOver(player.getUniqueId(), stamps, () -> scheduler.onEntity(ref, () -> local.markCarried(player)));
     }
 }
