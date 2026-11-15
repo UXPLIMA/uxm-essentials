@@ -1,8 +1,27 @@
 # Permissions: staff, server and item modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; the comment says whether the highest or the lowest granted number wins. The gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md).
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The plugin-wide nodes are under [shared](#shared), and the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
 
-Contents: [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+
+## shared
+
+| Permission | What it allows | Default |
+|---|---|---|
+| `uxmessentials.admin` | Access to the /uxmess administration root. | op |
+| `uxmessentials.admin.backup` | /backup to snapshot the plugin data directory on demand. | op |
+| `uxmessentials.admin.import` | /uxmess import <plugin>: run the one-shot data import from another essentials plugin. | op |
+| `uxmessentials.admin.permissions` | /uxmess permissions [area] [page] and /uxmess permissions export: read the permission catalogue in game or write it to a file. | op |
+| `uxmessentials.admin.placeholders` | /uxmess placeholders [area] [page] and /uxmess placeholders export: read the placeholder catalogue in game or write it to a file. | op |
+| `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
+| `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
+| `uxmessentials.cooldown.<feature>.<seconds>` | The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait. | true |
+| `uxmessentials.cooldown.bypass.<feature>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses). | op |
+| `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
+| `uxmessentials.help` | /help to list the commands you can use. | true |
+| `uxmessentials.lang.use` | /lang to set or clear your personal language override. | true |
+| `uxmessentials.lang.others` | /lang set <player> <language> and /lang reset <player>: set or clear another player's language, online or away. | op |
+| `uxmessentials.update.notify` | Receive the join-time notice when a newer plugin version is available. | op |
 
 ## bossbar
 

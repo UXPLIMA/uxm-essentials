@@ -69,7 +69,7 @@ public final class PoseModule implements FeatureModule {
     public boolean enabled(ConfigStore config) {
         // The module ships enabled: the bundled config turns on the common poses (player-sit is opt-in), so the
         // default surface is the sit/pose verbs available to players. The default here is true (the steady-state
-        // contexts default on); an operator opts out via modules.conf.
+        // contexts default on); an operator opts out via modules/poses/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

@@ -11,11 +11,10 @@ import java.util.stream.Stream;
  *
  * <p>This is the source the rest of the permission surface is derived from. The adapter registers the fixed entries
  * with the server on enable, so a permission plugin can suggest and complete them; {@code /uxmess permissions} reads
- * the same list back to an operator in game; and the published reference page is checked against it, so a node
- * cannot quietly exist without being documented. Nothing else declares a node, which is the point: the audit that
- * produced this catalogue found thirty-nine live nodes the server was never told about, two that were advertised
- * under a name no code reads, and four that nothing read at all, all because a node had to be written down in three
- * places that nothing kept in step.
+ * the same list back to an operator in game, and {@code /uxmess permissions export} writes it to a markdown file.
+ * Nothing else declares a node: {@code paper-plugin.yml} lists none. The permission pages under {@code docs/user/}
+ * mirror this catalogue by hand, and nothing checks them against it, so a node added here is added there in the same
+ * change.
  *
  * <p>The tables are split by area purely so no one file carries four hundred rows. Order within an area is
  * alphabetical by node, and {@link #all()} returns them area by area.

@@ -68,7 +68,7 @@ public final class TradeModule implements FeatureModule {
     @Override
     public boolean enabled(ConfigStore config) {
         // The module ships enabled: a fresh install offers /trade out of the box, like the steady-state contexts. An
-        // operator opts out via modules.conf.
+        // operator opts out via modules/trade/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

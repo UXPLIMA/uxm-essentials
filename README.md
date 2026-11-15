@@ -46,13 +46,18 @@ publishes itself to Vault, so every shop and job plugin pays in it.
 
 ### One server or a network
 
-Homes, warps, the economy and vaults stay in step across servers. Add the Velocity jar on the proxy, or the
-Redis jar with no proxy at all. Optional jars bring a Discord bridge and a REST and WebSocket API.
+Thirteen modules keep their data in step across servers: the economy, homes, warps, player warps, vaults, bans
+and mutes, ignore lists, vanish, guard regions, holograms, NPCs, trades and votes. Some things also act across
+servers: a player warp on another server takes the player there, two players on different servers can trade, a ban
+kicks the player wherever they are, and vanish hides a player on every server. Add the Velocity jar on the proxy,
+or the Redis jar with no proxy at all. Optional jars bring a Discord bridge and a REST and WebSocket API.
 
 ### Moving in from another plugin
 
-`/uxmess import` reads bans, mutes and warnings from LiteBans and player warps from AxPlayerWarps. Guard imports
-WorldGuard regions with a dry run and an undo.
+With the migration module switched on, `/uxmess import` reads EssentialsX (homes, balances, mail, warps, kits,
+jails and mutes), LiteBans (bans, mutes and warnings), player warps from AxPlayerWarps, AthelionPlayerWarps and
+OlziePlayerWarps, holograms from DecentHolograms and FancyHolograms, worlds from Multiverse, and balances from
+PlayerPoints or the running Vault economy. Guard imports WorldGuard regions with a dry run and an undo.
 
 Every line a player reads is in `messages/`, in twelve languages: English, Turkish, German, Spanish, French,
 Portuguese, Russian, Ukrainian, Polish, Japanese, Korean and Chinese.
@@ -62,8 +67,8 @@ Portuguese, Russian, Ukrainian, Polish, Japanese, Korean and Chinese.
 1. Download `uxmEssentials-<version>.jar` from the [latest release](https://github.com/UXPLIMA/uxm-essentials/releases/latest)
    and check it against `SHA256SUMS`.
 2. Put it in `plugins/` and start the server.
-3. Turn modules on and off with `enabled` in `plugins/uxmEssentials/modules/<module>/config.conf`, then run
-   `/uxmess reload`. `/uxmess doctor` checks the setup.
+3. Turn modules on and off with `enabled` in `plugins/uxmEssentials/modules/<module>/config.conf`, then restart
+   the server; `/uxmess reload` applies the other settings. `/uxmess doctor` checks the setup.
 
 Paper or Folia 26.2 or later, and Java 25. SQLite out of the box; MySQL, MariaDB and PostgreSQL with the
 `storage` block in `config.conf`. The files it writes are listed in [docs/user/reference.md](docs/user/reference.md).

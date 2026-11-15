@@ -31,8 +31,8 @@ final class SharedPlaceholderKeys {
     private static List<PlaceholderSpec> modules() {
         return List.of(PlaceholderSpec.sharedFamily(
                 "module_<id>",
-                "Whether that feature module is switched on (yes/no); the id is the one in modules.conf, as "
-                        + "homes or economy. Reading it lets a scoreboard hide the lines a disabled module would "
+                "Whether that feature module is switched on (yes/no); the id is the folder name under modules/, "
+                        + "as homes or economy. Reading it lets a scoreboard hide the lines a disabled module would "
                         + "answer with a dash.",
                 PlaceholderScope.GLOBAL));
     }

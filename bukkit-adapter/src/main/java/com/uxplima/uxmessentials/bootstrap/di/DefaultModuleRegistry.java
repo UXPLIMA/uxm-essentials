@@ -107,7 +107,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // communication is the round-3 feature context (the 13th module). The operator's broadcast surface:
         // connection-message policies, the rotating announcer, and the info pages. It carries no hard dependency
         // edge (its only collaborators are the shared Scheduler, messages, and event ports), and it ships DISABLED
-        // by default, so it lands last and wires nothing until an operator enables it in modules.conf.
+        // by default, so it lands last and wires nothing until an operator enables it in its config.conf.
         delegate.register(new CommunicationModule());
         // holograms is a world-placed display feature (named, multi-line TextDisplay holograms behind
         // /hologram). It carries no hard dependency edge (its only collaborators are the shared persistence
@@ -126,7 +126,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // tablist is the 16th context, the per-player tab-list header/footer split out of scoreboard so the sidebar
         // and the tablist enable, author, and refresh independently. It owns its own Scheduler refresh timer over
         // uxmlib-hud's Tablist, carries no hard dependency edge, and like scoreboard ships DISABLED by default (its
-        // content is operator data), so it wires nothing until enabled in modules.conf. It lands next to scoreboard.
+        // content is operator data), so it wires nothing until enabled in its config.conf. It lands next to scoreboard.
         delegate.register(new TablistModule());
         // vote is the 17th context: a Votifier-bridged vote-rewards and vote-party feature. It carries no hard
         // dependency edge (its only collaborators are the shared persistence DSL, the Scheduler, messages, and

@@ -82,7 +82,7 @@ public interface UxmEssentialsApi {
     String version();
 
     /**
-     * Whether the module with this id is enabled. The id is the one the operator writes in {@code modules.conf},
+     * Whether the module with this id is enabled. The id is the folder name under {@code modules/},
      * for example {@code homes} or {@code economy}.
      */
     boolean isModuleEnabled(String moduleId);

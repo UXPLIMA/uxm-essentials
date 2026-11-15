@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Builds the cross-server bus once from the plugin-wide {@code network.conf}. The bus is a shared-kernel
+ * Builds the cross-server bus once from the {@code network} block of {@code config.conf}. The bus is a shared-kernel
  * concern, not a feature context, every backend has at most one, so it is wired here in the bootstrap
  * surface alongside the other kernel adapters, and handed to the contexts that opt into sync.
  *
@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * the returned {@link Bus} handle), then {@link Wired#start()} the core so the channel is registered after
  * every listener is in place. On disable {@link Wired#stop()} unregisters the channel and drops the buffer.
  *
- * <p>When {@code network.conf > enabled} is false the bus is built in a disabled shape: a no-op publisher and
+ * <p>When {@code network.enabled} is false the bus is built in a disabled shape: a no-op publisher and
  * an unread registry ({@link Bus#disabled}), and no plugin-messaging channel is registered, the backend runs
  * purely local with no behavioural change, which is the optional-jar contract.
  */
@@ -46,7 +46,7 @@ public final class BusWiring {
         Objects.requireNonNull(log, "log");
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
-            log.info("network sync disabled (network.conf > enabled=false); bus runs local-only");
+            log.info("network sync disabled (network.enabled = false in config.conf); bus runs local-only");
             return new Wired(Bus.disabled(network.serverId()), null, null, null, network, scheduler);
         }
         if (NetworkConfig.isDefaultServerName(network.serverId())) {

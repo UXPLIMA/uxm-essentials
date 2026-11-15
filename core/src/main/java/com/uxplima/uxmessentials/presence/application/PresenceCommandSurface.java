@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The presence inbound adapter realises the Brigadier node
  * from the started module's context on the next {@code COMMANDS} fire. Collected here so {@code PresenceModule}
- * stays small and the command/permission pairing is one greppable table the permissions guard checks against
- * {@code paper-plugin.yml}.
+ * stays small and the command/permission pairing is one greppable table.
  *
  * <p>Seven commands: {@code /afk [reason]} ({@code uxmessentials.afk.use}), {@code /list}
  * ({@code uxmessentials.list.use}), {@code /realname <player>} ({@code uxmessentials.realname.use}),

@@ -13,8 +13,8 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * the kernel-side {@link BrigadierCommand} description; the teleport inbound adapter realises the
  * Brigadier node from the started module's context on the next {@code COMMANDS} fire.
  *
- * <p>Collected here so {@code TeleportModule} stays small and the command/permission pairing is a single
- * greppable table the permissions guard can check against {@code paper-plugin.yml}.
+ * <p>Collected here so {@code TeleportModule} stays small and the command/permission pairing is a single greppable
+ * table.
  */
 final class TeleportCommandSurface {
 

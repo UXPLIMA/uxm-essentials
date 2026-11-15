@@ -12,7 +12,8 @@ import org.jspecify.annotations.NullMarked;
  * above-head nametag). Each is a per-player display driven by a self-rescheduling render timer on the
  * {@code Scheduler} port: it owns no command (there is no per-player visibility toggle), registers its
  * Bukkit-facing connection listener and renderer in the adapter wiring, and persists nothing (the content is
- * config-authored). It ships enabled by default and is toggled through {@code modules.conf}.
+ * config-authored). It ships enabled by default and is toggled by {@code enabled} in its
+ * {@code modules/<id>/config.conf}.
  *
  * <p>What differs between the two is only the {@link #id() module id} and the adapters each starts; everything
  * shared lives here: the enabled-by-default gate, the empty command/listener/migration surfaces, and the

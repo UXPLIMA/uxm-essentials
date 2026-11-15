@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The messaging inbound adapter realises the Brigadier
  * node from the started module's context on the next {@code COMMANDS} fire. Collected here so
- * {@code MessagingModule} stays small and the command/permission pairing is one greppable table the
- * permissions guard checks against {@code paper-plugin.yml}.
+ * {@code MessagingModule} stays small and the command/permission pairing is one greppable table.
  *
  * <p>Only {@code /msg} {@code /reply} {@code /mail} are the private-channel surface; {@code /msgtoggle}
  * {@code /ignore} {@code /unignore} {@code /ignorelist} {@code /socialspy} {@code /mailclear} {@code /helpop}

@@ -14,8 +14,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * The communication context's command surface as platform-neutral {@link CommandSpec}s. It has two halves. The
  * <em>static</em> half is the plugin's own operator commands, {@code /broadcast}
  * ({@code uxmessentials.communication.broadcast}) and {@code /broadcasttoggle}
- * ({@code uxmessentials.communication.broadcasttoggle}), which are fixed and greppable so the permissions guard
- * checks them against {@code paper-plugin.yml}. The
+ * ({@code uxmessentials.communication.broadcasttoggle}), which are fixed and greppable. The
  * <em>dynamic</em> half is the operator-configured info pages: one command per {@link InfoPage} in the
  * {@code InfoRegistry} ({@code /rules}, {@code /motd}, {@code /info}, any custom page), each guarded by a
  * per-page permission node derived from its command name.
