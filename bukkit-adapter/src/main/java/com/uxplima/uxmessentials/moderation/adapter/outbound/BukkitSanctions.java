@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -176,6 +177,12 @@ public final class BukkitSanctions implements Sanctions, JailCells {
                 onMissed.run();
             }
         });
+    }
+
+    @Override
+    public boolean hasWorld(WorldRef world) {
+        Objects.requireNonNull(world, "world");
+        return server.getWorld(world.uid()) != null;
     }
 
     private Optional<Location> jailLocation(String jail) {

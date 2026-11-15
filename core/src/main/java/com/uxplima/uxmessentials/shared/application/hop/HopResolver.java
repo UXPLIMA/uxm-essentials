@@ -34,8 +34,10 @@ public interface HopResolver {
 
     /**
      * A hop of this kind to {@code label} ended without moving {@code who}, for {@code reason}; they have been told.
-     * Called once per hop that fails, after its claim. A kind somebody other than the player must hear about (staff,
-     * for a hop the player did not choose) answers here; the others need nothing.
+     * Called once for each hop that fails with a notice, after its claim. A hop refunded without one (its player left
+     * during the settling delay, its backend stopped, it was withdrawn or replaced) does not call this. A kind somebody
+     * other than the player must hear about (staff, for a hop the player did not choose) answers here; the others
+     * need nothing.
      */
     default void failed(PlayerRef who, String label, HopNotice reason) {}
 }

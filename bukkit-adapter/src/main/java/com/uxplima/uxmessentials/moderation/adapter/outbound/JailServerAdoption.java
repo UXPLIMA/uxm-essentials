@@ -58,9 +58,26 @@ public final class JailServerAdoption implements Runnable {
         });
     }
 
+    /**
+     * Name the jails whose world is here but which another server holds. While that server does not answer they are
+     * still applied here; once a server under that name answers, players are sent there instead.
+     */
+    private void warnAboutForeign(String server, List<String> localWorlds) {
+        List<String> foreign = JailServerClaimer.foreign(persistence, server, localWorlds);
+        if (!foreign.isEmpty()) {
+            kernel.log()
+                    .warn(
+                            "event=jail_server_mismatch server={} jails={} reason=world loaded here but jail names"
+                                    + " another server fix=/setjail <jail> on the server that should hold it",
+                            server,
+                            String.join(",", foreign));
+        }
+    }
+
     private void claim(String server, List<String> localWorlds) {
         try {
             List<String> claimed = JailServerClaimer.claim(persistence, server, localWorlds);
+            warnAboutForeign(server, localWorlds);
             if (claimed.isEmpty()) {
                 return;
             }

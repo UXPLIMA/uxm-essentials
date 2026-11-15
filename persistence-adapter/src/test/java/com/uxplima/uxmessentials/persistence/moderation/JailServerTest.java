@@ -124,6 +124,19 @@ class JailServerTest {
     }
 
     @Test
+    void jailsWhoseWorldIsHereButWhichNameAnotherServerAreFound() {
+        upgrade();
+        jails.save(StoredJail.of("cell", in(PRISON_WORLD, 1), "old-prison"));
+        jails.save(StoredJail.of("yard", in(PRISON_WORLD, 2), "prison"));
+        jails.save(StoredJail.of("pit", in(LOBBY_WORLD, 3), "lobby"));
+        oldReleaseSets("hold", PRISON_WORLD);
+
+        assertThat(claimer.foreign("prison", List.of(PRISON_WORLD.uid().toString())))
+                .containsExactly("cell");
+        assertThat(claimer.foreign("prison", List.of())).isEmpty();
+    }
+
+    @Test
     void setJailRecordsTheServerAndASaveWithoutOneKeepsIt() {
         upgrade();
 

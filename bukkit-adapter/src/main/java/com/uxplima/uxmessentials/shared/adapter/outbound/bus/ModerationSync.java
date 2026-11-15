@@ -85,8 +85,8 @@ public final class ModerationSync {
         /** A peer jailed ({@code jailed}) or released {@code target}. */
         void jailChanged(UUID frameId, UUID target, boolean jailed);
 
-        /** A peer could not take {@code targetName} to {@code jail}. */
-        void hopFailed(UUID frameId, String targetName, String jail);
+        /** A peer could not take {@code target}, named {@code targetName}, to {@code jail}. */
+        void hopFailed(UUID frameId, UUID target, String targetName, String jail);
     }
 
     /** A listener that hands a peer's {@link JailChanged} and {@link JailHopFailed} frames to {@code frames}. */
@@ -96,7 +96,7 @@ public final class ModerationSync {
             if (message instanceof JailChanged changed) {
                 frames.jailChanged(changed.frameId(), changed.target(), changed.jailed());
             } else if (message instanceof JailHopFailed failed) {
-                frames.hopFailed(failed.frameId(), failed.targetName(), failed.jail());
+                frames.hopFailed(failed.frameId(), failed.target(), failed.targetName(), failed.jail());
             }
         };
     }

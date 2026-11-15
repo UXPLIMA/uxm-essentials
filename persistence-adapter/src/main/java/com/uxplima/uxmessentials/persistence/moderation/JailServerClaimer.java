@@ -33,6 +33,12 @@ public final class JailServerClaimer extends JooqRepository {
         super(dsl);
     }
 
+    /** {@link #foreign} over the shared {@link Persistence} handle. */
+    public static List<String> foreign(Persistence persistence, String serverId, Collection<String> localWorldUids) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JailServerClaimer(persistence.dsl()).foreign(serverId, localWorldUids);
+    }
+
     /** Claim over the shared {@link Persistence} handle, keeping jOOQ off the bukkit-adapter's classpath. */
     public static List<String> claim(Persistence persistence, String serverId, Collection<String> localWorldUids) {
         Objects.requireNonNull(persistence, "persistence");
@@ -83,5 +89,25 @@ public final class JailServerClaimer extends JooqRepository {
                     .orderBy(MODERATION_JAIL_LOCATIONS.NAME)
                     .fetch(MODERATION_JAIL_LOCATIONS.NAME);
         });
+    }
+
+    /**
+     * The jails whose world is loaded here but which name another server: a server renamed since they were set, or a
+     * copied world sharing its uid. Such a jail is sent to a server that may not exist, so the operator is told.
+     */
+    public List<String> foreign(String serverId, Collection<String> localWorldUids) {
+        Objects.requireNonNull(serverId, "serverId");
+        Objects.requireNonNull(localWorldUids, "localWorldUids");
+        if (localWorldUids.isEmpty()) {
+            return List.of();
+        }
+        return read(dsl -> dsl.select(MODERATION_JAIL_LOCATIONS.NAME)
+                .from(MODERATION_JAIL_LOCATIONS)
+                .where(MODERATION_JAIL_LOCATIONS.WORLD.in(localWorldUids))
+                .and(MODERATION_JAIL_LOCATIONS.SERVER_ID.isNotNull())
+                .and(MODERATION_JAIL_LOCATIONS.SERVER_ID.ne(UNSCOPED))
+                .and(MODERATION_JAIL_LOCATIONS.SERVER_ID.ne(serverId))
+                .orderBy(MODERATION_JAIL_LOCATIONS.NAME)
+                .fetch(MODERATION_JAIL_LOCATIONS.NAME));
     }
 }

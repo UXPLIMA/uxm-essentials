@@ -207,7 +207,8 @@ public final class ModerationWiring {
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
-        JailNetwork jailNetwork = jailNetwork(plugin, kernel, bus, jailLocations, sanctions, hops, networked, presence);
+        JailNetwork jailNetwork = jailNetwork(
+                plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -241,7 +242,7 @@ public final class ModerationWiring {
                 repository,
                 jailNetwork.transfer(),
                 sanctions,
-                kernel.playerLookup(),
+                presence,
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 clock);
         bus.registry().register(ModerationSync.jailListener(new ModerationSync.JailFrames() {
@@ -251,8 +252,8 @@ public final class ModerationWiring {
             }
 
             @Override
-            public void hopFailed(java.util.UUID frameId, String targetName, String jail) {
-                jailNetwork.alerts().failedOnPeer(frameId, targetName, jail);
+            public void hopFailed(java.util.UUID frameId, java.util.UUID target, String targetName, String jail) {
+                jailNetwork.alerts().failedOnPeer(frameId, target, targetName, jail);
             }
         }));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
@@ -371,11 +372,13 @@ public final class ModerationWiring {
             Plugin plugin,
             KernelPorts kernel,
             Bus bus,
+            ModerationRepository repository,
             JailLocationStore jailLocations,
             BukkitSanctions sanctions,
             CrossServerHops hops,
             boolean networked,
-            NetworkPresence presence) {
+            NetworkPresence presence,
+            Clock clock) {
         JailSync sync = networked ? ModerationSync.jailPublisher(bus.publisher()) : JailSync.NONE;
         SanctionBroadcast staff = new PermissionSanctionBroadcast(
                 plugin.getServer(),
@@ -383,23 +386,26 @@ public final class ModerationWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 broadcastPrefix(kernel));
-        JailHopAlerts alerts = new JailHopAlerts(staff, sync);
-        Optional<HopDepartures> departures = Optional.empty();
-        if (networked) {
-            hops.register(new JailHopResolver(jailLocations, sanctions, alerts, hops.server()));
-            // No gate: the player did not choose a jail hop, and being jailed is exactly what must not stop it.
-            departures = Optional.of(hops.departures(HopGate.OPEN));
-        }
+        JailHopAlerts alerts = new JailHopAlerts(staff, sync, clock);
+        // No gate: the player did not choose a jail hop, and being jailed is exactly what must not stop it.
+        Optional<HopDepartures> departures = networked ? Optional.of(hops.departures(HopGate.OPEN)) : Optional.empty();
         JailTransfer transfer = new JailTransfer(
+                repository,
                 jailLocations,
                 sanctions,
-                kernel.playerLookup(),
+                sanctions,
                 presence,
                 departures,
                 alerts,
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 kernel.scheduler(),
-                kernel.log());
+                kernel.log(),
+                clock);
+        if (networked) {
+            // Registered before the module's listeners run, so the first join already finds it.
+            hops.register(
+                    new JailHopResolver(repository, jailLocations, sanctions, alerts, transfer, hops.server(), clock));
+        }
         // A standalone server, or one still on the shipped default name, records no server on a jail: the name is
         // not the one it will be known by on a network, and a stamped row would then point at a server that does
         // not exist. Its jails stay unscoped for the first networked start under a real name to claim.

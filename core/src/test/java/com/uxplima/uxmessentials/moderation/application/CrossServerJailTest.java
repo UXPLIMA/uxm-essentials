@@ -26,7 +26,6 @@ import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.network.JailChanged;
@@ -54,6 +53,7 @@ class CrossServerJailTest {
     private static final Duration TTL = Duration.ofSeconds(30);
     private static final Duration SETTLE = Duration.ofSeconds(1);
     private static final String STAFF_FAILED = "moderation.jail.cross-server.staff-failed Alex cell";
+    private static final String IN_CELL = "Alex@7";
 
     private final MutableClock clock = new MutableClock(NOW);
     private final SteppedScheduler scheduler = new SteppedScheduler(clock);
@@ -91,9 +91,9 @@ class CrossServerJailTest {
 
         assertThat(jailAlex().isOk()).isTrue();
 
-        assertThat(survival.live.jailed).containsExactly("Alex->cell");
-        assertThat(lobby.live.jailed).isEmpty();
-        assertThat(prison.live.jailed).isEmpty();
+        assertThat(survival.live.moved).containsExactly(IN_CELL);
+        assertThat(lobby.live.moved).isEmpty();
+        assertThat(prison.live.moved).isEmpty();
         assertThat(survival.read).containsExactly("Alex moderation.jail.notify-target");
         assertThat(records.loadJail(ALEX).isActiveAt(clock.instant())).isTrue();
     }
@@ -128,7 +128,8 @@ class CrossServerJailTest {
         arriveAt(prison);
         scheduler.advance(TTL);
 
-        assertThat(prison.live.moved).containsExactly("Alex@7");
+        // Once by the join re-apply, once by the hop landing: both put the player in the same cell.
+        assertThat(prison.live.moved).containsExactly(IN_CELL, IN_CELL);
         assertThat(prison.read).contains("Alex moderation.jail.cross-server.arrived");
         assertThat(hops.rows()).isEmpty();
         assertThat(staffLines()).isEmpty();
@@ -159,9 +160,92 @@ class CrossServerJailTest {
         assertThat(survival.staff.lines).containsExactly(STAFF_FAILED);
         assertThat(prison.staff.lines).containsExactly(STAFF_FAILED);
 
-        // The jail is applied again when the player next joins, so the hop is tried again.
-        arriveAt(lobby);
+        // Without a relog, the transfer is tried again.
+        scheduler.advance(JailTransfer.FIRST_RETRY);
         assertThat(connects).containsExactly("Alex->prison", "Alex->prison");
+    }
+
+    @Test
+    void aPrisonerDroppedWhileTheJailServerIsDownIsSentThereOnceItIsBackWithoutRelogging() {
+        jailSetOn(PRISON);
+        network.live.remove(PRISON);
+        connect(ALEX, lobby);
+
+        jailAlex();
+        scheduler.advance(JailTransfer.FIRST_RETRY);
+
+        assertThat(connects).isEmpty();
+        assertThat(lobby.read).containsOnlyOnce("Alex moderation.jail.cross-server.failed");
+
+        network.live.add(PRISON);
+        scheduler.advance(JailTransfer.FIRST_RETRY.multipliedBy(2));
+
+        assertThat(connects).containsExactly("Alex->prison");
+        assertThat(lobby.staff.lines).containsExactly(STAFF_FAILED);
+        assertThat(survival.staff.lines).containsExactly(STAFF_FAILED);
+    }
+
+    @Test
+    void aPrisonerWhoKeepsReloggingWhileTheJailServerIsDownIsReportedOnce() {
+        jailSetOn(PRISON);
+        network.live.remove(PRISON);
+        connect(ALEX, lobby);
+        jailAlex();
+
+        for (int join = 0; join < 5; join++) {
+            arriveAt(lobby);
+        }
+        arriveAt(survival);
+
+        assertThat(lobby.staff.lines).containsExactly(STAFF_FAILED);
+        assertThat(survival.staff.lines).containsExactly(STAFF_FAILED);
+        assertThat(prison.staff.lines).containsExactly(STAFF_FAILED);
+
+        scheduler.advance(JailHopAlerts.QUIET);
+        arriveAt(lobby);
+
+        assertThat(lobby.staff.lines).containsExactly(STAFF_FAILED, STAFF_FAILED);
+    }
+
+    @Test
+    void aMisroutedJailHopIsNotReportedBecauseTheBackendReachedSendsThePlayerOn() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        jailAlex();
+
+        arriveAt(survival);
+
+        assertThat(staffLines()).isEmpty();
+        assertThat(connects).containsExactly("Alex->prison", "Alex->prison");
+    }
+
+    @Test
+    void aJailNamingAServerThatNoLongerAnswersIsAppliedWhereItsWorldIsLoaded() {
+        locations.save(StoredJail.of("cell", at(7, 64, 7), "old-prison"));
+        lobby.live.hasCellWorld = true;
+        connect(ALEX, lobby);
+
+        jailAlex();
+
+        assertThat(lobby.live.moved).containsExactly(IN_CELL);
+        assertThat(connects).isEmpty();
+        assertThat(staffLines()).isEmpty();
+    }
+
+    @Test
+    void aPlayerReleasedWhileOnTheWayIsNotPutInTheCellAndNobodyIsTold() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        jailAlex();
+        lobby.unjail.unjail(SAM, ALEX);
+
+        arriveAt(prison);
+        scheduler.advance(TTL);
+
+        assertThat(prison.live.moved).isEmpty();
+        assertThat(prison.read).isEmpty();
+        assertThat(hops.rows()).isEmpty();
+        assertThat(staffLines()).isEmpty();
     }
 
     @Test
@@ -181,21 +265,6 @@ class CrossServerJailTest {
     }
 
     @Test
-    void aJailOnAServerThatIsNotRunningIsNotTriedAndTellsStaff() {
-        jailSetOn(PRISON);
-        network.live.remove(PRISON);
-        connect(ALEX, lobby);
-
-        jailAlex();
-
-        assertThat(connects).isEmpty();
-        assertThat(hops.rows()).isEmpty();
-        assertThat(lobby.read).contains("Alex moderation.jail.cross-server.failed");
-        assertThat(survival.staff.lines).containsExactly(STAFF_FAILED);
-        assertThat(records.loadJail(ALEX).isActiveAt(clock.instant())).isTrue();
-    }
-
-    @Test
     void framesDeliveredTwiceAreActedOnOnce() {
         deliveredTwice = true;
         jailSetOn(SURVIVAL);
@@ -207,7 +276,7 @@ class CrossServerJailTest {
         network.live.remove(PRISON);
         jailAlex();
 
-        assertThat(survival.live.jailed).containsExactly("Alex->cell");
+        assertThat(survival.live.moved).containsExactly(IN_CELL);
         assertThat(survival.live.released).containsExactly("Alex");
         assertThat(survival.read)
                 .containsExactly(
@@ -229,8 +298,7 @@ class CrossServerJailTest {
 
         arriveAt(survival);
 
-        assertThat(survival.live.moved).containsExactly("Alex@7");
-        assertThat(survival.live.jailed).containsExactly("Alex->cell", "Alex->cell");
+        assertThat(survival.live.moved).containsExactly(IN_CELL, IN_CELL, IN_CELL);
     }
 
     @Test
@@ -241,7 +309,7 @@ class CrossServerJailTest {
 
         single.jail.jail(SAM, ALEX, "cell", "", Optional.empty());
 
-        assertThat(single.live.jailed).containsExactly("Alex->cell");
+        assertThat(single.live.moved).containsExactly(IN_CELL);
         assertThat(connects).isEmpty();
     }
 
@@ -254,7 +322,7 @@ class CrossServerJailTest {
     }
 
     private void connect(PlayerRef player, Backend backend) {
-        network.where.put(player.uuid(), backend.name);
+        network.connect(player, backend.name);
         scheduler.online(player);
     }
 
@@ -308,39 +376,33 @@ class CrossServerJailTest {
                     read.add(viewer.name() + " " + text);
                 }
             });
-            PlayerLookup here = new PlayerLookup() {
-                @Override
-                public Optional<PlayerRef> findOnlineByName(String player) {
-                    return Optional.empty();
-                }
-
-                @Override
-                public Optional<PlayerRef> findByUuid(UUID uuid) {
-                    return List.of(ALEX, SAM).stream()
-                            .filter(known -> known.uuid().equals(uuid))
-                            .findFirst();
-                }
-
-                @Override
-                public boolean isOnline(UUID uuid) {
-                    return name.equals(network.where.get(uuid));
-                }
-            };
             JailSync sync = networked ? new BusSync(name) : JailSync.NONE;
             QuietLog log = new QuietLog();
-            this.alerts = new JailHopAlerts(staff, sync);
+            this.alerts = new JailHopAlerts(staff, sync, clock);
             HopResolvers resolvers = new HopResolvers();
             HopCharges charges = new HopCharges(notifier, log);
             Optional<HopDepartures> departures = Optional.empty();
             if (networked) {
-                resolvers.register(new JailHopResolver(locations, live, alerts, name));
                 HopWatchdog watchdog = new HopWatchdog(hops, resolvers, charges, scheduler, log, TTL, clock);
                 departures = Optional.of(
                         new HopDepartures(HopGate.OPEN, proxy, watchdog, charges, resolvers, scheduler, name, clock));
             }
             this.arrival = new HopArrival(hops, resolvers, charges, scheduler, log, name, SETTLE, TTL, clock);
             JailTransfer transfer = new JailTransfer(
-                    locations, live, here, network.seenFrom(name), departures, alerts, notifier, scheduler, log);
+                    records,
+                    locations,
+                    live,
+                    live,
+                    network.seenFrom(name),
+                    departures,
+                    alerts,
+                    notifier,
+                    scheduler,
+                    log,
+                    clock);
+            if (networked) {
+                resolvers.register(new JailHopResolver(records, locations, live, alerts, transfer, name, clock));
+            }
             SilentAudit audit = new SilentAudit();
             RecordingEvents events = new RecordingEvents();
             this.jail = new Jail(
@@ -355,7 +417,7 @@ class CrossServerJailTest {
                     clock);
             this.unjail = new Unjail(records, live, sync, notifier, audit, events, clock);
             this.countdown = new JailCountdown(records, live, transfer, audit, events, clock);
-            this.apply = new ApplyRemoteJail(records, transfer, live, here, notifier, clock);
+            this.apply = new ApplyRemoteJail(records, transfer, live, network.seenFrom(name), notifier, clock);
             backends.add(this);
         }
 
@@ -363,7 +425,7 @@ class CrossServerJailTest {
             if (message instanceof JailChanged changed) {
                 apply.onJailChanged(changed.frameId(), changed.target(), changed.jailed());
             } else if (message instanceof JailHopFailed failed) {
-                alerts.failedOnPeer(failed.frameId(), failed.targetName(), failed.jail());
+                alerts.failedOnPeer(failed.frameId(), failed.target(), failed.targetName(), failed.jail());
             }
         }
     }

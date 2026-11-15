@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 
 /** Hand-written stand-ins for the shared database and the live side of each backend in the jail network tests. */
 final class JailNetworkFakes {
@@ -198,7 +200,13 @@ final class JailNetworkFakes {
     static final class Network {
 
         final Map<UUID, String> where = new HashMap<>();
+        final Map<UUID, PlayerRef> players = new HashMap<>();
         final Set<String> live = new HashSet<>();
+
+        void connect(PlayerRef player, String server) {
+            where.put(player.uuid(), server);
+            players.put(player.uuid(), player);
+        }
 
         NetworkPresence seenFrom(String localServer) {
             return new NetworkPresence() {
@@ -209,7 +217,8 @@ final class JailNetworkFakes {
 
                 @Override
                 public Optional<OnlinePlayer> find(UUID player) {
-                    return Optional.empty();
+                    return Optional.ofNullable(where.get(player))
+                            .map(server -> new OnlinePlayer(Objects.requireNonNull(players.get(player)), server));
                 }
 
                 @Override
@@ -247,6 +256,7 @@ final class JailNetworkFakes {
         final List<String> released = new ArrayList<>();
         final List<String> moved = new ArrayList<>();
         boolean cellWorldMissing;
+        boolean hasCellWorld;
 
         LiveSide(String server, Network network) {
             this.server = server;
@@ -279,6 +289,11 @@ final class JailNetworkFakes {
             }
             moved.add(target.name() + "@" + (int) cell.x());
             onLanded.run();
+        }
+
+        @Override
+        public boolean hasWorld(WorldRef world) {
+            return hasCellWorld;
         }
 
         @Override

@@ -133,7 +133,7 @@ final class EnforcementPermissions {
         return List.of(
                 PermissionSpec.of(
                         "uxmessentials.moderation.broadcast.receive",
-                        "Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits, and the line when a jailed player could not be taken to a jail on another server. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited).",
+                        "Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Holders also read the line when a jailed player could not be taken to a jail on another server, which -s does not suppress. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited).",
                         PermissionDefault.OP,
                         MODERATION),
                 PermissionSpec.of(
