@@ -331,7 +331,7 @@ public record SecurityConfig(
      * The op-command protection tunables ({@code op-protection.*}): whether dangerous commands are gated at all, the
      * list of command roots that demand a recent second-factor proof, and how long a verification counts as recent.
      * Only players who have enrolled a factor are gated, a re-auth needs something to prove against, and a holder of
-     * {@code uxmessentials.security.bypass} is exempt. The command list is matched leniently (leading slash, namespace
+     * {@code uxmessentials.bypass.security} is exempt. The command list is matched leniently (leading slash, namespace
      * prefix and arguments are ignored) so an operator listing {@code op} catches {@code /op Steve} and
      * {@code minecraft:op} alike.
      *

@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
  * world-free {@link HidePolicy} hides it, or when the {@link RuleSet} denies it (whitelist/blacklist), nothing
  * typed after it may run, and the tab filter is on. When {@code block-namespace-bypass} is on, a namespaced node ({@code velocity:glist})
  * whose bare form is denied is removed too, closing the same escape the backend blocks. The filter never
- * sees a {@code .bypass} holder: the listener short-circuits one before calling in, so the bypass keeps the
+ * sees a bypass holder: the listener short-circuits one before calling in, so the bypass keeps the
  * full tree.
  *
  * <p>Child names are collected first and removed in a second pass so the tree is not mutated while it is

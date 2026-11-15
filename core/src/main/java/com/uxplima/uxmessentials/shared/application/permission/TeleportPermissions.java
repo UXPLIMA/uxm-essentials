@@ -31,7 +31,7 @@ public final class TeleportPermissions {
     public static final String RTP_GUI = "uxmessentials.rtp.gui";
     public static final String RTP_OTHERS = "uxmessentials.rtp.others";
     public static final String RTP_USE = "uxmessentials.rtp.use";
-    public static final String SPAWN_JOIN_EXEMPT = "uxmessentials.spawn.join.exempt";
+    public static final String SPAWN_JOIN_EXEMPT = "uxmessentials.bypass.join-spawn";
     public static final String SPAWN_NAMED = "uxmessentials.spawn.named";
     public static final String SPAWN_SET = "uxmessentials.spawn.set";
     public static final String SPAWN_USE = "uxmessentials.spawn.use";
@@ -43,7 +43,7 @@ public final class TeleportPermissions {
     public static final String TP_POSITION = "uxmessentials.tp.position";
     public static final String TP_USE = "uxmessentials.tp.use";
     public static final String TP_VERTICAL = "uxmessentials.tp.vertical";
-    public static final String TP_WARMUP_BYPASS = "uxmessentials.tp.warmup.bypass";
+    public static final String TP_WARMUP_BYPASS = "uxmessentials.bypass.warmup.tp";
 
     /** The head of the random-teleport radius quota; the blocks held are appended to it. */
     public static final String RTP_RADIUS = "uxmessentials.rtp.radius";

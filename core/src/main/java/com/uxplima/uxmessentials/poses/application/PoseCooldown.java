@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * The one place the poses context consults the shared {@link Cooldowns} port, so all six pose starters gate against
  * a single rate limit rather than duplicating the wiring. The wait is a per-player tier read from the numbered
  * {@code uxmessentials.poses.cooldown.<seconds>} permission (the shortest matching tier wins, {@code 0}, the
- * default when a player holds no tier node. Means no wait), and {@code uxmessentials.poses.cooldown.bypass} skips
+ * default when a player holds no tier node. Means no wait), and {@code uxmessentials.bypass.cooldown.poses} skips
  * the gate entirely; the stamp is a transient PDC "ready-at" the adapter keeps. This mirrors how {@code /kit} and
  * the teleport verbs resolve their own {@code <seconds>} tiers through the same port.
  *

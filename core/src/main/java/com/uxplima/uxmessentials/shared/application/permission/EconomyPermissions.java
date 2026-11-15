@@ -32,13 +32,13 @@ public final class EconomyPermissions {
     public static final String ECONOMY_BALANCE = "uxmessentials.economy.balance";
     public static final String ECONOMY_BALANCE_OTHERS = "uxmessentials.economy.balance.others";
     public static final String ECONOMY_BALTOP = "uxmessentials.economy.baltop";
-    public static final String ECONOMY_BALTOP_EXEMPT = "uxmessentials.economy.baltop.exempt";
+    public static final String ECONOMY_BALTOP_EXEMPT = "uxmessentials.bypass.baltop";
     public static final String ECONOMY_BANK = "uxmessentials.economy.bank";
     public static final String ECONOMY_BANK_CREATE = "uxmessentials.economy.bank.create";
     public static final String ECONOMY_BANK_DEPOSIT = "uxmessentials.economy.bank.deposit";
     public static final String ECONOMY_BANK_WITHDRAW = "uxmessentials.economy.bank.withdraw";
     public static final String ECONOMY_BANK_MEMBERS = "uxmessentials.economy.bank.members";
-    public static final String ECONOMY_BYPASSCMDCOST = "uxmessentials.economy.bypasscmdcost";
+    public static final String ECONOMY_BYPASSCMDCOST = "uxmessentials.bypass.cost.command";
     public static final String ECONOMY_DEPOSIT = "uxmessentials.economy.deposit";
     public static final String ECONOMY_EXCHANGE = "uxmessentials.economy.exchange";
     public static final String ECONOMY_LOAN = "uxmessentials.economy.loan";
@@ -48,7 +48,7 @@ public final class EconomyPermissions {
     public static final String ECONOMY_PAYALL = "uxmessentials.economy.payall";
     public static final String ECONOMY_SELL = "uxmessentials.economy.sell";
     public static final String ECONOMY_SETWORTH = "uxmessentials.economy.setworth";
-    public static final String ECONOMY_TAX_BYPASS = "uxmessentials.economy.tax.bypass";
+    public static final String ECONOMY_TAX_BYPASS = "uxmessentials.bypass.tax";
     public static final String ECONOMY_WALLET = "uxmessentials.economy.wallet";
     public static final String ECONOMY_WITHDRAW = "uxmessentials.economy.withdraw";
     public static final String ECONOMY_WORTH = "uxmessentials.economy.worth";

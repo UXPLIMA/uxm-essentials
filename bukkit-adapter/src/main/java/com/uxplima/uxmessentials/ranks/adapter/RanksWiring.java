@@ -241,7 +241,7 @@ public final class RanksWiring {
      *     register it, then load the players already online through it
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
-     * @param ladder the parsed ladder, exposed for the {@code %uxmessentials_rank_next%} placeholder seam
+     * @param ladder the parsed ladder, exposed for the {@code %uxm_essentials_rank_next%} placeholder seam
      * @param requirements the evaluator the published query checks a pending rankup's conditions with
      * @param apiWrites the same use cases the published rank actions run
      * @param stop the teardown hook the module registers, cancelling the autorank scan's repeating task
