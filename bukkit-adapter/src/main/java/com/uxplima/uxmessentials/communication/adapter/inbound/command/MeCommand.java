@@ -16,6 +16,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MeCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.communication.me";
+    private static final String PERMISSION = SocialPermissions.COMMUNICATION_ME;
     private static final String ACTION_ARG = "action";
 
     private final Notifier notifier;

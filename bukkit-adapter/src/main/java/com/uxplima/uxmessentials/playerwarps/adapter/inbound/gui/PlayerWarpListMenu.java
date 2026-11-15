@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -58,7 +59,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PlayerWarpListMenu {
 
     /** The node an operator holds to manage every player's warps (and to open this list as an admin). */
-    public static final String MANAGE_PERMISSION = "uxmessentials.pwarp.gui";
+    public static final String MANAGE_PERMISSION = DestinationPermissions.PWARP_GUI;
 
     /** The engine spec id this menu registers and opens under. */
     public static final String SPEC_ID = "playerwarp-list";

@@ -16,6 +16,8 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -38,8 +40,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffListCommand extends StaffCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.staff.list";
-    private static final String STAFF_MEMBER_NODE = "uxmessentials.staff.member";
+    private static final String PERMISSION = EnforcementPermissions.STAFF_LIST;
+    private static final String STAFF_MEMBER_NODE = SocialPermissions.STAFF_MEMBER;
 
     private final Scheduler scheduler;
     private final Server server;

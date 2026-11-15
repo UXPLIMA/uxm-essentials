@@ -14,6 +14,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -83,7 +84,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VaultView {
 
-    private static final String BYPASS_BLACKLIST = "uxmessentials.vault.bypass-blacklist";
+    private static final String BYPASS_BLACKLIST = DestinationPermissions.VAULT_BYPASS_BLACKLIST;
 
     private final Messages messages;
     private final MessageSink sink;

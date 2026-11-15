@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 
 /**
  * The vaults context's command surface as a platform-neutral
@@ -21,7 +22,8 @@ final class VaultCommandSurface {
     private VaultCommandSurface() {}
 
     static List<CommandSpec> all() {
-        return List.of(spec("vault", "uxmessentials.vault.use", new VaultCommand("vault", "Open one of your vaults")));
+        return List.of(
+                spec("vault", DestinationPermissions.VAULT_USE, new VaultCommand("vault", "Open one of your vaults")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

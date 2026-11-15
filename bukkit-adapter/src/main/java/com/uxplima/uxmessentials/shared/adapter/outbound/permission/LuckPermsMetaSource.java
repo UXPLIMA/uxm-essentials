@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.cacheddata.CachedMetaData;
@@ -58,8 +59,9 @@ public final class LuckPermsMetaSource implements MetaSource {
 
     /** Maps {@code uxmessentials.home.limit} to the meta key {@code home-limit}. */
     private static String metaKey(String familyNode) {
-        String tail =
-                familyNode.startsWith("uxmessentials.") ? familyNode.substring("uxmessentials.".length()) : familyNode;
+        String tail = familyNode.startsWith(SharedPermissions.NAMESPACE)
+                ? familyNode.substring(SharedPermissions.NAMESPACE.length())
+                : familyNode;
         return tail.replace('.', '-');
     }
 }

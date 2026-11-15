@@ -17,6 +17,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -39,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GcCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.gc.use";
+    private static final String PERMISSION = SocialPermissions.GC_USE;
     private static final long BYTES_PER_MIB = 1024L * 1024L;
     private static final double MAX_TPS = 20.0;
 

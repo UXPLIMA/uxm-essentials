@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PermissionSanctionBroadcast implements SanctionBroadcast {
 
     /** The node a player must hold to receive the staff/public sanction broadcast. */
-    private static final String RECEIVE_NODE = "uxmessentials.moderation.broadcast.receive";
+    private static final String RECEIVE_NODE = EnforcementPermissions.MODERATION_BROADCAST_RECEIVE;
 
     /** The locale dimension the console line is resolved against: the console has no per-viewer locale. */
     private static final PlayerRef CONSOLE = PlayerRef.system("console");

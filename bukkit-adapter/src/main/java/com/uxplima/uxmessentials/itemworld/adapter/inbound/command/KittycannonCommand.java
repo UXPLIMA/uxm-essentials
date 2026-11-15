@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -30,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class KittycannonCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.kittycannon.use";
+    private static final String PERMISSION = ItemworldPermissions.KITTYCANNON_USE;
     private static final double SPEED = 1.5F;
     private static final float COSMETIC_YIELD = 0.0F;
 

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.FoodLevel;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class FoodLevelCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.foodlevel.use";
+    private static final String PERMISSION = PlayerstatePermissions.FOODLEVEL_USE;
 
     public FoodLevelCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -40,7 +41,7 @@ public final class FoodLevelCommand extends PlayerstateCommandSupport implements
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.foodlevel.others";
+        return PlayerstatePermissions.FOODLEVEL_OTHERS;
     }
 
     @Override

@@ -13,6 +13,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class TpRandomPlayerCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.tp.use";
+    private static final String PERMISSION = TeleportPermissions.TP_USE;
 
     public TpRandomPlayerCommand(TeleportServices services, Messages messages) {
         super(services, messages);

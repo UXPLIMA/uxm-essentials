@@ -14,6 +14,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -38,7 +39,7 @@ import org.jspecify.annotations.Nullable;
 public final class NoFlyWorldListener implements Listener {
 
     /** The node that exempts a player from no-fly worlds. */
-    public static final String BYPASS_NODE = "uxmessentials.playerstate.fly.allworlds";
+    public static final String BYPASS_NODE = PlayerstatePermissions.PLAYERSTATE_FLY_ALLWORLDS;
 
     private final NoFlyWorldPolicy policy;
     private final Scheduler scheduler;

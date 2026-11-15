@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.survival.adapter.inbound.gui.SurvivalSettingsView;
 import com.uxplima.uxmlib.command.Gate;
@@ -30,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SurvivalCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.survival.gui";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_GUI;
 
     private final SurvivalSettingsView settingsView;
     private final CommandFeedback feedback;

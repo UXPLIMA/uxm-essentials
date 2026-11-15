@@ -21,6 +21,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -39,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 abstract class AbstractTreeCommand extends ItemworldCommandSupport {
 
-    private static final String PERMISSION = "uxmessentials.tree.use";
+    private static final String PERMISSION = ItemworldPermissions.TREE_USE;
     private static final int REACH = 64;
 
     protected AbstractTreeCommand(

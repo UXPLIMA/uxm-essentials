@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RankSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.Menus;
@@ -73,7 +74,7 @@ import org.jspecify.annotations.NullMarked;
 public final class RanksWiring {
 
     /** The node that gates the ladder panel, shared by {@code /ranks} and the hub entry. */
-    private static final String RANKS_GUI_PERMISSION = "uxmessentials.ranks.gui";
+    private static final String RANKS_GUI_PERMISSION = EconomyPermissions.RANKS_GUI;
 
     private RanksWiring() {}
 

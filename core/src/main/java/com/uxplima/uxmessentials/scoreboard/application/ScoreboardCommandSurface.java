@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The scoreboard context's command surface as a single platform-neutral {@link CommandSpec}: {@code /scoreboard} (alias
@@ -14,7 +15,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  */
 final class ScoreboardCommandSurface {
 
-    private static final String USE_PERMISSION = "uxmessentials.scoreboard.use";
+    private static final String USE_PERMISSION = ContentPermissions.SCOREBOARD_USE;
 
     private ScoreboardCommandSurface() {}
 

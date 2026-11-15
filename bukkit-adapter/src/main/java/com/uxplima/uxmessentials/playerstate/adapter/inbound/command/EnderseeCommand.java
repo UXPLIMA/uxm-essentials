@@ -12,6 +12,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class EnderseeCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.endersee.use";
+    private static final String PERMISSION = PlayerstatePermissions.ENDERSEE_USE;
 
     public EnderseeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -37,7 +38,7 @@ public final class EnderseeCommand extends PlayerstateCommandSupport implements 
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.endersee.others";
+        return PlayerstatePermissions.ENDERSEE_OTHERS;
     }
 
     @Override

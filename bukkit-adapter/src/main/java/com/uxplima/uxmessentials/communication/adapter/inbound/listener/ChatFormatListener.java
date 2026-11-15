@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.communication.adapter.outbound.ChatPlaceholderE
 import com.uxplima.uxmessentials.communication.domain.ChatFormatPolicy;
 import com.uxplima.uxmessentials.communication.domain.LegacyChatCodes;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.text.Text;
 import org.jspecify.annotations.NullMarked;
@@ -60,7 +61,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ChatFormatListener implements Listener {
 
-    private static final String FORMAT_PERMISSION = "uxmessentials.communication.chat.format";
+    private static final String FORMAT_PERMISSION = SocialPermissions.COMMUNICATION_CHAT_FORMAT;
     /** True while uxmChat runs this feature, which leaves it to uxmChat. */
     private final BooleanSupplier leftToChat;
 

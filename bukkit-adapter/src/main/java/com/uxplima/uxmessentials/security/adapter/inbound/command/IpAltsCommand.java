@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -47,7 +48,7 @@ import org.jspecify.annotations.NullMarked;
 public final class IpAltsCommand extends SecurityCommandSupport implements CommandRegistration {
 
     /** The staff permission to inspect a player's same-IP alts. */
-    public static final String PERMISSION = "uxmessentials.security.alts";
+    public static final String PERMISSION = EnforcementPermissions.SECURITY_ALTS;
 
     private final FindAlts findAlts;
     private final PlayerLookup lookup;

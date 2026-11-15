@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 public final class HomeHopResolver implements HopResolver {
 
     /** Lets a player land at a home whose spot fails the safety check, as it skips the warning on a local teleport. */
-    static final String BYPASS_UNSAFE = "uxmessentials.home.bypass.unsafe";
+    static final String BYPASS_UNSAFE = DestinationPermissions.HOME_BYPASS_UNSAFE;
 
     private static final HopNotices NOTICES = new HopNotices(
             "home",

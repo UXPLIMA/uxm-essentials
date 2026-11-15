@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ExtinguishCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.extinguish.use";
+    private static final String PERMISSION = PlayerstatePermissions.EXTINGUISH_USE;
 
     public ExtinguishCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -36,7 +37,7 @@ public final class ExtinguishCommand extends PlayerstateCommandSupport implement
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.extinguish.others";
+        return PlayerstatePermissions.EXTINGUISH_OTHERS;
     }
 
     @Override

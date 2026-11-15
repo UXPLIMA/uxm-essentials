@@ -11,6 +11,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class TpSetToggleCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.tpa.toggle";
+    private static final String PERMISSION = TeleportPermissions.TPA_TOGGLE;
 
     private final String literal;
     private final boolean accepting;

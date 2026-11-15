@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -59,13 +60,13 @@ import org.jspecify.annotations.NullMarked;
 public final class SecurityCommand extends SecurityCommandSupport implements CommandRegistration {
 
     /** Gates the whole {@code /security} tree, including the read-only status verb. */
-    public static final String PERMISSION = "uxmessentials.security.admin";
+    public static final String PERMISSION = EnforcementPermissions.SECURITY_ADMIN;
 
     /** The extra node {@code /security force <player>} carries on top of {@link #PERMISSION}. */
-    public static final String FORCE_PERMISSION = "uxmessentials.security.force";
+    public static final String FORCE_PERMISSION = EnforcementPermissions.SECURITY_FORCE;
 
     /** The extra node {@code /security reset <player>} carries on top of {@link #PERMISSION}. */
-    public static final String RESET_PERMISSION = "uxmessentials.security.reset";
+    public static final String RESET_PERMISSION = EnforcementPermissions.SECURITY_RESET;
 
     private static final List<String> SCOPES = List.of("totp", "pin", "all");
 

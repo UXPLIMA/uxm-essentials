@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.worlds.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -25,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
 public final class WorldAccessPolicy {
 
     /** The node that lets a player bypass every world entry restriction. */
-    public static final String BYPASS_NODE = "uxmessentials.world.access.bypass";
+    public static final String BYPASS_NODE = DestinationPermissions.WORLD_ACCESS_BYPASS;
 
     private final Permissions permissions;
     private final WorldEngine engine;
@@ -37,7 +38,7 @@ public final class WorldAccessPolicy {
 
     /** The per-world node a restricted world requires for entry. */
     public static String enterNode(WorldName name) {
-        return "uxmessentials.world." + name.value() + ".enter";
+        return DestinationPermissions.worldEnter(name.value());
     }
 
     /** Evaluate whether {@code who} may enter {@code world}, returning the reason when denied. */

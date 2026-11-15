@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.adapter.inbound.gui.PresenceSettingsView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PresenceSettingsCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.presencesettings.use";
+    private static final String PERMISSION = SocialPermissions.PRESENCESETTINGS_USE;
 
     private final PresenceSettingsView view;
 

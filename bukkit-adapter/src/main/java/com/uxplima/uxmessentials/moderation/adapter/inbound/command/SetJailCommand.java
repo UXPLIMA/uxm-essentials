@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SetJailCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.jail";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_JAIL;
 
     public SetJailCommand(ModerationServices services, Messages messages, MessageSink sink) {
         super(services, messages, sink);

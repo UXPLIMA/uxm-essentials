@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The npc context's command surface as a platform-neutral {@link CommandSpec}: the single {@code /npc} literal,
@@ -20,7 +21,7 @@ final class NpcCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("npc", "uxmessentials.npc.admin", new NpcCommand("npc", "Create and manage fake-player NPCs")));
+                spec("npc", ContentPermissions.NPC_ADMIN, new NpcCommand("npc", "Create and manage fake-player NPCs")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

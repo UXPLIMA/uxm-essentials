@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -41,7 +42,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WhoisCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.whois.use";
+    private static final String PERMISSION = SocialPermissions.WHOIS_USE;
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     public WhoisCommand(PresenceServices services, Messages messages, Scheduler scheduler) {

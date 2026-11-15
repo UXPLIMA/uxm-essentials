@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 
 /**
  * The presence context's command surface as platform-neutral
@@ -27,13 +28,13 @@ final class PresenceCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("afk", "uxmessentials.afk.use", cmd("afk", "Toggle your AFK state")),
-                spec("list", "uxmessentials.list.use", cmd("list", "List online players")),
-                spec("realname", "uxmessentials.realname.use", cmd("realname", "Look up a player's real name")),
-                spec("nick", "uxmessentials.nick.use", cmd("nick", "Set or clear a player's display name")),
-                spec("whois", "uxmessentials.whois.use", cmd("whois", "Show information about an online player")),
-                spec("gc", "uxmessentials.gc.use", cmd("gc", "Show server health")),
-                spec("staff", "uxmessentials.staff.use", cmd("staff", "List online staff")));
+                spec("afk", SocialPermissions.AFK_USE, cmd("afk", "Toggle your AFK state")),
+                spec("list", SocialPermissions.LIST_USE, cmd("list", "List online players")),
+                spec("realname", SocialPermissions.REALNAME_USE, cmd("realname", "Look up a player's real name")),
+                spec("nick", SocialPermissions.NICK_USE, cmd("nick", "Set or clear a player's display name")),
+                spec("whois", SocialPermissions.WHOIS_USE, cmd("whois", "Show information about an online player")),
+                spec("gc", SocialPermissions.GC_USE, cmd("gc", "Show server health")),
+                spec("staff", SocialPermissions.STAFF_USE, cmd("staff", "List online staff")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

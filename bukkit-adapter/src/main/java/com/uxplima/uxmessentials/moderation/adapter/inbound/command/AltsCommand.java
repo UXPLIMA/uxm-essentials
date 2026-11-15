@@ -12,6 +12,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AltsCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.seen";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_SEEN;
 
     private final Scheduler scheduler;
 

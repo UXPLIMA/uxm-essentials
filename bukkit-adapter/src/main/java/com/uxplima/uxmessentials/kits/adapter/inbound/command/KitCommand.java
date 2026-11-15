@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -73,11 +74,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class KitCommand extends KitCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.kit.use";
-    private static final String OTHERS_PERMISSION = "uxmessentials.kit.others";
-    private static final String PREVIEW_PERMISSION = "uxmessentials.kit.preview";
-    private static final String EDIT_PERMISSION = "uxmessentials.kit.edit";
-    private static final String RESET_PERMISSION = "uxmessentials.kit.reset";
+    private static final String PERMISSION = ContentPermissions.KIT_USE;
+    private static final String OTHERS_PERMISSION = ContentPermissions.KIT_OTHERS;
+    private static final String PREVIEW_PERMISSION = ContentPermissions.KIT_PREVIEW;
+    private static final String EDIT_PERMISSION = ContentPermissions.KIT_EDIT;
+    private static final String RESET_PERMISSION = ContentPermissions.KIT_RESET;
 
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 

@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.ItemQuery;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -53,7 +54,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class RecipeCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.recipe.use";
+    private static final String PERMISSION = ItemworldPermissions.RECIPE_USE;
     private static final int GRID_CELLS = 9;
 
     private final @Nullable RecipeGridMenu gridView;

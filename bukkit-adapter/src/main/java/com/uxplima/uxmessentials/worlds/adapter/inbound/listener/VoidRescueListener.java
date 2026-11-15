@@ -15,6 +15,7 @@ import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 public final class VoidRescueListener implements Listener {
 
     /** Holders keep falling: staff inspecting a world floor should not be teleported out of it. */
-    public static final String EXEMPT_NODE = "uxmessentials.world.voidrescue.exempt";
+    public static final String EXEMPT_NODE = DestinationPermissions.WORLD_VOIDRESCUE_EXEMPT;
 
     private final ResolveVoidRescue rescue;
     private final WorldTeleporter teleporter;

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.messaging.domain.event.HelpOpRaised;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -36,7 +37,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  */
 public final class HelpOp {
 
-    private static final String RECEIVE_NODE = "uxmessentials.helpop.receive";
+    private static final String RECEIVE_NODE = SocialPermissions.HELPOP_RECEIVE;
 
     private final StaffAudience staff;
     private final MessageDelivery delivery;

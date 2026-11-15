@@ -18,6 +18,7 @@ import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
@@ -61,7 +62,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class TreeFellerListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.survival.treefeller";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_TREEFELLER;
 
     private final TreeFeller config;
     private final PdcSurvivalToggles toggles;

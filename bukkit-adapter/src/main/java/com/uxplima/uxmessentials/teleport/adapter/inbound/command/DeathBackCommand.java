@@ -11,6 +11,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
@@ -28,8 +29,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class DeathBackCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.back.use";
-    private static final String DEATH_BACK_NODE = "uxmessentials.back.ondeath";
+    private static final String PERMISSION = TeleportPermissions.BACK_USE;
+    private static final String DEATH_BACK_NODE = TeleportPermissions.BACK_ONDEATH;
 
     public DeathBackCommand(TeleportServices services, Messages messages) {
         super(services, messages);

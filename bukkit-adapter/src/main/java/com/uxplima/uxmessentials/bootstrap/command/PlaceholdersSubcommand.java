@@ -21,6 +21,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalogRenderer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -44,7 +45,7 @@ public final class PlaceholdersSubcommand {
     /** The exported file, written next to the config so it sits with everything else an operator reads. */
     static final String EXPORT_FILE = "placeholders.md";
 
-    private static final String PERMISSION = "uxmessentials.admin.placeholders";
+    private static final String PERMISSION = SharedPermissions.ADMIN_PLACEHOLDERS;
 
     /** The arguments the hint shows, which are command syntax and the same in every language. */
     private static final String ARGUMENTS = "<area> [page]";

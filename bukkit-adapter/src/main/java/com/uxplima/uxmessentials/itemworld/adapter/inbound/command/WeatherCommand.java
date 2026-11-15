@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.WeatherSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WeatherCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.weather.use";
+    private static final String PERMISSION = ItemworldPermissions.WEATHER_USE;
 
     public WeatherCommand(ItemworldServices services) {
         super(services, "weather", SubFeatureGroup.TIME_WEATHER, "Set the weather.");

@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -36,8 +37,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.staff.use";
-    private static final String STAFF_NODE = "uxmessentials.staff.member";
+    private static final String PERMISSION = SocialPermissions.STAFF_USE;
+    private static final String STAFF_NODE = SocialPermissions.STAFF_MEMBER;
     private static final MessageKey STAFF_LIST = PresenceMessageKey.STAFF_LIST;
     private static final MessageKey STAFF_EMPTY = PresenceMessageKey.STAFF_EMPTY;
 

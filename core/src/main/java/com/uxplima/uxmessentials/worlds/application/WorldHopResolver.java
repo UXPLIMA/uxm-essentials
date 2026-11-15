@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolver;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -38,7 +39,7 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldEntryDenied;
 public final class WorldHopResolver implements HopResolver {
 
     /** Lets a player land on a world spawn the safety check refuses. */
-    public static final String BYPASS_SAFETY = "uxmessentials.world.bypass.safety";
+    public static final String BYPASS_SAFETY = DestinationPermissions.WORLD_BYPASS_SAFETY;
 
     private static final HopNotices NOTICES = new HopNotices(
             "world",

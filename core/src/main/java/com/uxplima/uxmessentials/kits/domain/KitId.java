@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.kits.domain;
 import java.util.Locale;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
+
 /**
  * A kit's identity, normalised to its canonical lowercase form so lookup and the per-kit permission node are
  * case-insensitive, {@code /kit create Starter} and {@code /kit starter} address the same kit.
@@ -38,7 +40,7 @@ public record KitId(String value) {
 
     /** The per-kit permission node segment for this kit: {@code uxmessentials.kit.<id>}. */
     public String permissionNode() {
-        return "uxmessentials.kit." + value;
+        return ContentPermissions.kit(value);
     }
 
     @Override

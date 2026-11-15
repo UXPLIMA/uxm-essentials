@@ -29,7 +29,7 @@ public record PermissionSpec(
         Objects.requireNonNull(fallback, "fallback");
         Objects.requireNonNull(shape, "shape");
         Objects.requireNonNull(owner, "owner");
-        if (!node.startsWith("uxmessentials.")) {
+        if (!node.startsWith(SharedPermissions.NAMESPACE)) {
             throw new IllegalArgumentException("every node belongs to the uxmessentials space: " + node);
         }
         if (description.isBlank()) {

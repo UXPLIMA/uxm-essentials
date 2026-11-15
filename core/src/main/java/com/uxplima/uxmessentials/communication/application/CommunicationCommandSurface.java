@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 
 /**
  * The communication context's command surface as platform-neutral {@link CommandSpec}s. It has two halves. The
@@ -27,8 +28,6 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  */
 final class CommunicationCommandSurface {
 
-    private static final String INFO_PERMISSION_PREFIX = "uxmessentials.communication.info.";
-
     private CommunicationCommandSurface() {}
 
     /**
@@ -39,27 +38,27 @@ final class CommunicationCommandSurface {
         return List.of(
                 spec(
                         "broadcast",
-                        "uxmessentials.communication.broadcast",
+                        SocialPermissions.COMMUNICATION_BROADCAST,
                         command("broadcast", "Send an announcement to all online players")),
                 spec(
                         "broadcastworld",
-                        "uxmessentials.communication.broadcastworld",
+                        SocialPermissions.COMMUNICATION_BROADCASTWORLD,
                         command("broadcastworld", "Send an announcement to players in your world")),
                 spec(
                         "me",
-                        "uxmessentials.communication.me",
+                        SocialPermissions.COMMUNICATION_ME,
                         command("me", "Broadcast an action message about yourself")),
                 spec(
                         "broadcasttoggle",
-                        "uxmessentials.communication.broadcasttoggle",
+                        SocialPermissions.COMMUNICATION_BROADCASTTOGGLE,
                         command("broadcasttoggle", "Toggle whether you receive server announcements")),
                 spec(
                         "clearchat",
-                        "uxmessentials.communication.clearchat",
+                        SocialPermissions.COMMUNICATION_CLEARCHAT,
                         command("clearchat", "Flush the chat for online players")),
                 spec(
                         "togglechat",
-                        "uxmessentials.communication.togglechat",
+                        SocialPermissions.COMMUNICATION_TOGGLECHAT,
                         command("togglechat", "Lock or unlock public chat for non-staff")));
     }
 
@@ -70,7 +69,7 @@ final class CommunicationCommandSurface {
         for (InfoPage page : registry.all()) {
             commands.add(spec(
                     page.command(),
-                    INFO_PERMISSION_PREFIX + page.command(),
+                    SocialPermissions.infoPage(page.command()),
                     command(page.command(), "Show the " + page.command() + " info page")));
         }
         return List.copyOf(commands);

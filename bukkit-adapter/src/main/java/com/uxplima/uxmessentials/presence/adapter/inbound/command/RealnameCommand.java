@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -39,7 +40,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class RealnameCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.realname.use";
+    private static final String PERMISSION = SocialPermissions.REALNAME_USE;
     private static final PlainTextComponentSerializer PLAIN = PlainTextComponentSerializer.plainText();
 
     public RealnameCommand(PresenceServices services, Messages messages, Scheduler scheduler) {

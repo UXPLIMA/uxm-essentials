@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -135,49 +136,49 @@ public final class SurvivalSettingsView {
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_TREEFELLER,
                         Material.OAK_LOG,
-                        "uxmessentials.survival.treefeller.toggle",
+                        ContentPermissions.SURVIVAL_TREEFELLER_TOGGLE,
                         config.treeFeller().enabled(),
                         p -> toggles.treeFellerActive(p, true),
                         p -> toggles.toggleTreeFeller(p, true)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_VEINMINER,
                         Material.IRON_ORE,
-                        "uxmessentials.survival.veinminer.toggle",
+                        ContentPermissions.SURVIVAL_VEINMINER_TOGGLE,
                         config.veinminer().enabled(),
                         p -> toggles.veinminerActive(p, true),
                         p -> toggles.toggleVeinminer(p, true)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_FARMPROTECT,
                         Material.FARMLAND,
-                        "uxmessentials.survival.farmprotect.toggle",
+                        ContentPermissions.SURVIVAL_FARMPROTECT_TOGGLE,
                         config.farmProtect().enabled(),
                         p -> toggles.farmProtectActive(p, true),
                         p -> toggles.toggleFarmProtect(p, true)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_AUTOPICKUP,
                         Material.HOPPER,
-                        "uxmessentials.survival.autopickup.toggle",
+                        ContentPermissions.SURVIVAL_AUTOPICKUP_TOGGLE,
                         config.autoPickup().enabled(),
                         p -> toggles.autoPickupActive(p, true),
                         p -> toggles.toggleAutoPickup(p, true)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_AUTOSMELT,
                         Material.FURNACE,
-                        "uxmessentials.survival.autosmelt.toggle",
+                        ContentPermissions.SURVIVAL_AUTOSMELT_TOGGLE,
                         config.autoSmelt().enabled(),
                         p -> toggles.autoSmeltActive(p, true),
                         p -> toggles.toggleAutoSmelt(p, true)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_AUTOSELL,
                         Material.GOLD_INGOT,
-                        "uxmessentials.survival.autosell.toggle",
+                        ContentPermissions.SURVIVAL_AUTOSELL_TOGGLE,
                         config.autoSell().enabled(),
                         p -> toggles.autoSellActive(p, false),
                         p -> toggles.toggleAutoSell(p, false)),
                 new Mechanic(
                         SurvivalMessageKey.SURVIVAL_GUI_AUTOTOOL,
                         Material.DIAMOND_PICKAXE,
-                        "uxmessentials.survival.autotool.toggle",
+                        ContentPermissions.SURVIVAL_AUTOTOOL_TOGGLE,
                         config.autoTool().enabled(),
                         p -> toggles.autoToolActive(p, true),
                         p -> toggles.toggleAutoTool(p, true)));

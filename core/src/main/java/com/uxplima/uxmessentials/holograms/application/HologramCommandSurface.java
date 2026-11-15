@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The holograms context's command surface as a platform-neutral {@link CommandSpec}: the single
@@ -23,7 +24,7 @@ final class HologramCommandSurface {
     static List<CommandSpec> all() {
         return List.of(spec(
                 "hologram",
-                "uxmessentials.hologram.use",
+                ContentPermissions.HOLOGRAM_USE,
                 new HologramCommand("hologram", "Create and manage Display-entity holograms")));
     }
 

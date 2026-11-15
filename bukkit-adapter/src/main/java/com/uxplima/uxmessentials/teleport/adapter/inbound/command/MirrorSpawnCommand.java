@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
@@ -25,7 +26,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MirrorSpawnCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.spawn.set";
+    private static final String PERMISSION = TeleportPermissions.SPAWN_SET;
 
     public MirrorSpawnCommand(TeleportServices services, Messages messages) {
         super(services, messages);

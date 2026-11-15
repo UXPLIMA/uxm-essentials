@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.AdminTpCommand.Pull;
@@ -30,31 +31,37 @@ public final class TeleportCommands {
                         s,
                         m,
                         "tpa",
-                        "uxmessentials.tpa.use",
+                        TeleportPermissions.TPA_USE,
                         "Request to teleport to a player",
                         RequestDirection.TO_TARGET),
                 new TpaRequestCommand(
                         s,
                         m,
                         "tpahere",
-                        "uxmessentials.tpahere.use",
+                        TeleportPermissions.TPAHERE_USE,
                         "Ask a player to teleport to you",
                         RequestDirection.TO_REQUESTER),
                 new TpaResolveCommand(
                         s,
                         m,
                         "tpaccept",
-                        "uxmessentials.tpa.use",
+                        TeleportPermissions.TPA_USE,
                         "Accept a teleport request",
                         List.of("tpyes"),
                         Mode.ACCEPT),
                 new TpaResolveCommand(
-                        s, m, "tpdeny", "uxmessentials.tpa.use", "Deny a teleport request", List.of("tpno"), Mode.DENY),
+                        s,
+                        m,
+                        "tpdeny",
+                        TeleportPermissions.TPA_USE,
+                        "Deny a teleport request",
+                        List.of("tpno"),
+                        Mode.DENY),
                 new TpaResolveCommand(
                         s,
                         m,
                         "tpcancel",
-                        "uxmessentials.tpa.cancel",
+                        TeleportPermissions.TPA_CANCEL,
                         "Withdraw your outgoing request",
                         List.of("tpacancel"),
                         Mode.CANCEL),
@@ -78,14 +85,15 @@ public final class TeleportCommands {
                 new RemoveSpawnCommand(s, m),
                 new MirrorSpawnCommand(s, m),
                 // admin direct tp
-                new AdminTpCommand(s, m, "tp", "uxmessentials.tp.use", "Teleport to a player", Pull.GO),
-                new AdminTpCommand(s, m, "tphere", "uxmessentials.tp.use", "Pull a player to you", Pull.BRING),
-                new AdminTpCommand(s, m, "goto", "uxmessentials.tp.use", "Teleport to a player", Pull.GO),
-                new AdminTpCommand(s, m, "bring", "uxmessentials.tp.use", "Pull a player to you", Pull.BRING),
+                new AdminTpCommand(s, m, "tp", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO),
+                new AdminTpCommand(s, m, "tphere", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING),
+                new AdminTpCommand(s, m, "goto", TeleportPermissions.TP_USE, "Teleport to a player", Pull.GO),
+                new AdminTpCommand(s, m, "bring", TeleportPermissions.TP_USE, "Pull a player to you", Pull.BRING),
                 new TpRandomPlayerCommand(s, m),
-                new AdminTpCommand(s, m, "tpo", "uxmessentials.tp.others", "Teleport overriding no-tp flags", Pull.GO),
                 new AdminTpCommand(
-                        s, m, "tpohere", "uxmessentials.tp.others", "Pull a player overriding flags", Pull.BRING),
+                        s, m, "tpo", TeleportPermissions.TP_OTHERS, "Teleport overriding no-tp flags", Pull.GO),
+                new AdminTpCommand(
+                        s, m, "tpohere", TeleportPermissions.TP_OTHERS, "Pull a player overriding flags", Pull.BRING),
                 new TpPosCommand(s, m),
                 new TpAllCommand(s, m),
                 new TpOfflineCommand(s, m, "tpoffline", "Teleport to a player's logout point"),

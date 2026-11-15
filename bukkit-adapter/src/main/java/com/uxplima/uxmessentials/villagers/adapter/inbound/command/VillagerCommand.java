@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.gui.VillagerManagerView;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerFollowService;
@@ -41,7 +42,7 @@ import org.jspecify.annotations.Nullable;
 public final class VillagerCommand implements CommandRegistration {
 
     /** The base node gating whether the {@code /villager} root is visible at all (its subcommands self-gate further). */
-    private static final String USE_PERMISSION = "uxmessentials.villagers.use";
+    private static final String USE_PERMISSION = ContentPermissions.VILLAGERS_USE;
 
     /** How far the player's line of sight (and the nearest-villager fallback) reaches for a target, in blocks. */
     private static final int REACH = 5;

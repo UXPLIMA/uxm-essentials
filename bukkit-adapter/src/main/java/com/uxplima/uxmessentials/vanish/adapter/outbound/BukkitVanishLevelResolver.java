@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
@@ -35,9 +36,8 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class BukkitVanishLevelResolver implements VanishLevelResolver {
 
-    private static final String USE_BASE = "uxmessentials.vanish.use";
-    private static final String SEE_BASE = "uxmessentials.vanish.see";
-    private static final String LEVEL_SEGMENT = ".level";
+    private static final String USE_BASE = EnforcementPermissions.VANISH_USE;
+    private static final String SEE_BASE = EnforcementPermissions.VANISH_SEE;
 
     /** A level nobody grants explicitly; only op or a family wildcard makes {@code base.level<probe>} resolve true. */
     private static final int WILDCARD_PROBE = 1_000_000;
@@ -48,24 +48,24 @@ public final class BukkitVanishLevelResolver implements VanishLevelResolver {
     @Override
     public VanishLevel useLevel(PlayerRef who) {
         Objects.requireNonNull(who, "who");
-        return VanishLevel.of(resolve(who, USE_BASE, VanishLevel.MIN_LEVEL));
+        return VanishLevel.of(resolve(who, USE_BASE, EnforcementPermissions.VANISH_USE_LEVEL, VanishLevel.MIN_LEVEL));
     }
 
     @Override
     public int seeLevel(PlayerRef who) {
         Objects.requireNonNull(who, "who");
-        return resolve(who, SEE_BASE, VanishLevels.NO_SEE_LEVEL);
+        return resolve(who, SEE_BASE, EnforcementPermissions.VANISH_SEE_LEVEL, VanishLevels.NO_SEE_LEVEL);
     }
 
-    private int resolve(PlayerRef who, String base, int noNodeDefault) {
+    private int resolve(PlayerRef who, String base, String levelPrefix, int noNodeDefault) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null) {
             return noNodeDefault;
         }
-        if (player.hasPermission(base + LEVEL_SEGMENT + WILDCARD_PROBE)) {
+        if (player.hasPermission(levelPrefix + WILDCARD_PROBE)) {
             return WILDCARD_LEVEL;
         }
-        int numbered = highestNumberedLevel(player, base + LEVEL_SEGMENT);
+        int numbered = highestNumberedLevel(player, levelPrefix);
         if (numbered > 0) {
             return numbered;
         }

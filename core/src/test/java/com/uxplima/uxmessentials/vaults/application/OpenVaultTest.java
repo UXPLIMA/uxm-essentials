@@ -11,6 +11,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.testing.FakePermissions;
@@ -136,7 +137,7 @@ class OpenVaultTest {
         permissions.quota(VaultAmountQuota.FAMILY.node(), QuotaResult.limited(3));
         openVault(CREATE_10_OPEN_2, Optional.empty()).open(ALEX, 2);
         openVault(VaultChargeSettings.allFree()).open(ALEX, 3);
-        permissions.grant(ALEX, "uxmessentials.vault.free");
+        permissions.grant(ALEX, DestinationPermissions.VAULT_FREE);
         openVault(CREATE_10_OPEN_2).open(ALEX, 1);
 
         assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid()).isEmpty();
@@ -221,7 +222,7 @@ class OpenVaultTest {
 
     @Test
     void theBypassNodeOpensANewVaultForFree() {
-        permissions.grant(ALEX, "uxmessentials.vault.free");
+        permissions.grant(ALEX, DestinationPermissions.VAULT_FREE);
 
         assertThat(openVault(CREATE_10_OPEN_2).open(ALEX, 1).isOk()).isTrue();
 

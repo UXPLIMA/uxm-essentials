@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -45,7 +46,7 @@ abstract class MessagingCommandSupport {
     static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;
 
     /** Holding this lets a sender's MiniMessage tags render instead of arriving as text. */
-    static final String COLOUR = "uxmessentials.msg.color";
+    static final String COLOUR = SocialPermissions.MSG_COLOR;
 
     final MessagingServices services;
     final Messages messages;

@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -51,18 +52,18 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class HologramCommand extends HologramCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.hologram.use";
-    private static final String GUI_PERMISSION = "uxmessentials.holograms.gui";
+    private static final String PERMISSION = ContentPermissions.HOLOGRAM_USE;
+    private static final String GUI_PERMISSION = ContentPermissions.HOLOGRAMS_GUI;
 
-    private static final String CREATE = "uxmessentials.hologram.create";
-    private static final String DELETE = "uxmessentials.hologram.delete";
-    private static final String MOVE = "uxmessentials.hologram.move";
-    private static final String APPEARANCE = "uxmessentials.hologram.appearance";
-    private static final String VISIBILITY = "uxmessentials.hologram.visibility";
-    private static final String ACTION = "uxmessentials.hologram.action";
-    private static final String VIEW = "uxmessentials.hologram.view";
-    private static final String EDIT = "uxmessentials.hologram.edit";
-    private static final String SCOPE = "uxmessentials.hologram.scope";
+    private static final String CREATE = ContentPermissions.HOLOGRAM_CREATE;
+    private static final String DELETE = ContentPermissions.HOLOGRAM_DELETE;
+    private static final String MOVE = ContentPermissions.HOLOGRAM_MOVE;
+    private static final String APPEARANCE = ContentPermissions.HOLOGRAM_APPEARANCE;
+    private static final String VISIBILITY = ContentPermissions.HOLOGRAM_VISIBILITY;
+    private static final String ACTION = ContentPermissions.HOLOGRAM_ACTION;
+    private static final String VIEW = ContentPermissions.HOLOGRAM_VIEW;
+    private static final String EDIT = ContentPermissions.HOLOGRAM_EDIT;
+    private static final String SCOPE = ContentPermissions.HOLOGRAM_SCOPE;
 
     /**
      * Which capability each verb belongs to, so the many verbs of {@code /hologram} are grantable in the shapes an
