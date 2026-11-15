@@ -111,6 +111,8 @@ public final class KitActions implements UxmKitActions {
             case NOT_FOUND, NONE_DEFINED -> UxmFailure.of(UxmFailure.NOT_FOUND, "no kit by that id");
             case CANNOT_AFFORD -> UxmFailure.of(UxmFailure.INSUFFICIENT_FUNDS, "the player cannot pay for the kit");
             case VETOED, CANCELLED -> UxmFailure.of(UxmFailure.CANCELLED, "another plugin refused it");
+            case PLAYER_LEFT ->
+                UxmFailure.of(UxmFailure.PLAYER_OFFLINE, "the player left before the kit could be handed over");
             default ->
                 UxmFailure.of(
                         UxmFailure.REFUSED, "kits refused it: " + error.name().toLowerCase(java.util.Locale.ROOT));

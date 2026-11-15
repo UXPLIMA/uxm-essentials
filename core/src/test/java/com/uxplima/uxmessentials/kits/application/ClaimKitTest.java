@@ -60,7 +60,8 @@ class ClaimKitTest {
 
     private ClaimKit claimKit() {
         KitAccess access = new KitAccess(permissions, new ClockCooldowns(clock), claims, Optional.of(purse));
-        return new ClaimKit(kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse));
+        return new ClaimKit(
+                kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), new RecordingLogger());
     }
 
     /** A claim path on one backend of a network, sharing {@code ledger} with the others, with Alex logging in. */
@@ -72,7 +73,8 @@ class ClaimKitTest {
                 new NetworkCooldowns(shared, permissions, clock),
                 new NetworkKitClaims(shared),
                 Optional.of(purse));
-        return new ClaimKit(kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse));
+        return new ClaimKit(
+                kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), new RecordingLogger());
     }
 
     private void define(KitDefinition kit) {
@@ -274,6 +276,54 @@ class ClaimKitTest {
         assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
     }
 
+    @Test
+    void aFaultDuringAOneTimeClaimIsReportedAndLeavesTheKitClaimable() {
+        define(starter().oneTime(true).cost(KitCost.of(BigDecimal.TEN)).build());
+        purse.broken = true;
+        RecordingLogger log = new RecordingLogger();
+        KitAccess access = new KitAccess(permissions, new ClockCooldowns(clock), claims, Optional.of(purse));
+        ClaimKit claim =
+                new ClaimKit(kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), log);
+
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.FAILED);
+        assertThat(notifier.keys()).containsExactly("command.error");
+        assertThat(log.errors()).hasSize(1);
+        assertThat(claims.hasClaimed(ALEX, STARTER)).isFalse();
+    }
+
+    @Test
+    void aFaultAfterTheSharedClaimWasTakenGivesItBack() {
+        define(starter().oneTime(true).cost(KitCost.of(BigDecimal.TEN)).build());
+        purse.broken = true;
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(ledger, scheduler);
+        scheduler.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> failed = claim.claim(ALEX, STARTER);
+        scheduler.runAll();
+
+        assertThat(failed.join().asError()).contains(KitError.FAILED);
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
+    }
+
+    @Test
+    void aPlayerWhoLeavesBeforeTheSharedClaimAnswersGetsNothingAndTheClaimGoesBack() {
+        define(starter().oneTime(true).build());
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(ledger, scheduler);
+        scheduler.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> abandoned = claim.claim(ALEX, STARTER);
+        scheduler.leave(ALEX);
+        scheduler.runAll();
+
+        assertThat(abandoned.join().asError()).contains(KitError.PLAYER_LEFT);
+        assertThat(inventory.received).isEmpty();
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
+    }
+
     private static final class Kits implements KitRepository {
 
         private final Map<KitId, KitDefinition> byId = new HashMap<>();
@@ -332,6 +382,7 @@ class ClaimKitTest {
     private static final class Purse implements KitEconomy {
 
         private BigDecimal balance = BigDecimal.ZERO;
+        private boolean broken;
 
         @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
@@ -340,6 +391,9 @@ class ClaimKitTest {
 
         @Override
         public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (broken) {
+                throw new IllegalStateException("the economy is unreachable");
+            }
             if (!canAfford(who, amount, currencyId)) {
                 return false;
             }

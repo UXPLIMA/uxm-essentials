@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.application.ledger;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
+import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Duration;
@@ -10,6 +11,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
 import com.uxplima.uxmessentials.testing.MutableClock;
@@ -102,13 +104,68 @@ class NetworkClaimsTest {
     }
 
     @Test
-    void aDroppedPlayerIsHeldBackUntilReadAgain() {
+    void aPlayerLetGoIsAnsweredFromTheLedgerAgainOnTheirNextLogin() {
         claims.joined(ALEX.uuid());
+        scheduler.runAll();
+        claims.markKit(ALEX.uuid(), "starter");
         scheduler.runAll();
 
         claims.drop(ALEX.uuid());
+        assertThat(claims.hasKit(ALEX.uuid(), "starter")).isFalse();
 
-        assertThat(claims.ready(ALEX.uuid())).isFalse();
+        claims.joined(ALEX.uuid());
+        scheduler.runAll();
         assertThat(claims.hasKit(ALEX.uuid(), "starter")).isTrue();
+    }
+
+    @Test
+    void theConsoleAndPlayersNotOnlineHerePassAndTheConsoleIsNeverHeldBack() {
+        PlayerRef console = PlayerRef.system("CONSOLE");
+
+        assertThat(cooldowns.check(console, WARP).isOk()).isTrue();
+        assertThat(cooldowns.checkLabel(SAM, "spawn").isOk()).isTrue();
+
+        cooldowns.stamp(console, WARP);
+        scheduler.runAll();
+        assertThat(cooldowns.check(console, WARP).isOk()).isTrue();
+        assertThat(ledger.cooldown(PlayerRef.SYSTEM_UUID, "warp")).isZero();
+    }
+
+    @Test
+    void aReadThatFailsIsTriedAgainAndKeepsThePendingCarryOver() {
+        ledger.failNextLoads(2);
+        claims.joined(ALEX.uuid());
+        claims.carryOver(ALEX.uuid(), new LocalClaims(Set.of("starter"), Map.of()), () -> {});
+
+        scheduler.runAll();
+
+        assertThat(claims.ready(ALEX.uuid())).isTrue();
+        assertThat(cooldowns.check(ALEX, WARP).isOk()).isTrue();
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isTrue();
+    }
+
+    @Test
+    void writesForOnePlayerReachTheLedgerInTheOrderTheyWereMade() {
+        QueuedScheduler pool = new QueuedScheduler().lastFirst();
+        NetworkClaims onPool = new NetworkClaims(ledger, pool, clock, new RecordingLogger());
+
+        onPool.stampCooldown(ALEX.uuid(), "warp", 1_000L);
+        onPool.stampCooldown(ALEX.uuid(), "warp", 2_000L);
+        onPool.markKit(ALEX.uuid(), "starter");
+        onPool.releaseKit(ALEX.uuid(), "starter");
+        pool.runAll();
+
+        assertThat(ledger.cooldown(ALEX.uuid(), "warp")).isEqualTo(2_000L);
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
+    }
+
+    @Test
+    void aWriteMadeWhileStoppingReachesTheLedgerAtOnce() {
+        claims.drain(Duration.ZERO);
+
+        claims.releaseKit(ALEX.uuid(), "starter");
+        claims.stampCooldown(ALEX.uuid(), "warp", 5_000L);
+
+        assertThat(ledger.cooldown(ALEX.uuid(), "warp")).isEqualTo(5_000L);
     }
 }

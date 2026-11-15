@@ -57,7 +57,17 @@ instead of each server's player data, so a player who switches servers cannot cl
 holds for every other cooldown and for the economy's daily login reward. A player's claims are read while they log
 in; in the rare case the database has not answered by the time they claim a kit, the claim is refused with a
 "still loading" line and works a moment later. The first time a player joins a server with the network on, what
-that server already knew about them is carried into the database, and the stricter value wins.
+that server already knew about them is carried into the database, and the stricter value wins. A `first-join` kit
+that is also `one-time` is handed out once across the network, not once per server.
+
+Some limits to know:
+
+- A `/kit reset` run on one server reaches a player who is online on another server when they next log in. Until
+  then that server still treats the kit as claimed.
+- Cooldowns are not locked across servers the way one-time claims are: a player who switches servers in the instant
+  after claiming a repeatable kit may claim it once more before the new server sees the cooldown.
+- While the network is on, the player data on each server is no longer updated. Turning the network off later goes
+  back to that older data, so kits claimed in the meantime can be claimed again.
 
 ## Commands
 

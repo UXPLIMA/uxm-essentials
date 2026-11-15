@@ -17,7 +17,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@link NetworkClaims} so every server on the database sees one clock per player.
  *
  * <p>While a player's cooldowns are still being read, every check answers "wait" with {@link #UNREAD_WAIT}, so a
- * slow database never lets an action through that another server put on cooldown.
+ * slow database never lets an action through that another server put on cooldown. A player nothing is held for
+ * (not online here) passes, as with PDC. A system actor (the console, a command block, another plugin) passes and
+ * stamps nothing: they all share one identity, and a stamp on it would hold every one of them back.
  */
 public final class NetworkCooldowns implements Cooldowns {
 
@@ -85,6 +87,9 @@ public final class NetworkCooldowns implements Cooldowns {
     }
 
     private Result<Unit, Duration> gate(PlayerRef who, String name) {
+        if (who.isSystem()) {
+            return Result.ok();
+        }
         OptionalLong readyAt = claims.cooldownEnd(who.uuid(), CooldownScope.normalize(name));
         if (readyAt.isEmpty()) {
             return Result.err(UNREAD_WAIT);
@@ -95,7 +100,7 @@ public final class NetworkCooldowns implements Cooldowns {
     }
 
     private void write(PlayerRef who, String name, long seconds) {
-        if (seconds <= 0) {
+        if (seconds <= 0 || who.isSystem()) {
             return;
         }
         claims.stampCooldown(who.uuid(), CooldownScope.normalize(name), clock.millis() + seconds * 1000L);

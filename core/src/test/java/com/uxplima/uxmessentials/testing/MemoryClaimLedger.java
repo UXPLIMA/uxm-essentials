@@ -13,9 +13,19 @@ public final class MemoryClaimLedger implements PlayerClaimLedger {
 
     private final Set<String> kits = new HashSet<>();
     private final Map<String, Long> cooldowns = new HashMap<>();
+    private int failingLoads;
+
+    /** Make the next {@code count} reads fail, as an unreachable database would. */
+    public void failNextLoads(int count) {
+        failingLoads = count;
+    }
 
     @Override
     public Claims load(UUID player, long now) {
+        if (failingLoads > 0) {
+            failingLoads--;
+            throw new IllegalStateException("the database is unreachable");
+        }
         Set<String> claimed = new HashSet<>();
         String prefix = player + "/";
         kits.stream().filter(key -> key.startsWith(prefix)).forEach(key -> claimed.add(key.substring(prefix.length())));

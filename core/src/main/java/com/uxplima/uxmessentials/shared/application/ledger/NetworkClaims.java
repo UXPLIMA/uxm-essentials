@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.application.ledger;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -11,6 +12,12 @@ import java.util.UUID;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
@@ -24,26 +31,48 @@ import org.jspecify.annotations.Nullable;
  * in and held in memory, so a check on the tick never waits on the database. Every change is applied to memory at
  * once and written through on the async lane.
  *
- * <p>A player whose claims have not been read yet is treated as having claimed everything and as waiting on every
- * cooldown: {@link #ready} is false, {@link #hasKit} is true and {@link #cooldownEnd} is empty. A slow database then
- * delays a grant instead of handing one out twice.
+ * <p>Three states, by what is known about a player:
+ *
+ * <ul>
+ *   <li><b>Read.</b> Checks answer from memory.
+ *   <li><b>Being read.</b> The player is logging in, or a failed read is being retried with a growing pause. Checks
+ *       fail safe: {@link #ready} is false, {@link #hasKit} is true and {@link #cooldownEnd} is empty, so a slow
+ *       database delays a grant instead of handing one out twice.
+ *   <li><b>Unknown.</b> Nothing is held: the console, a command block, another plugin's system actor, or a player
+ *       who is not online here. Checks pass as they did in PDC, and a one-time claim still goes to the ledger's
+ *       unique key.
+ * </ul>
  *
  * <p>Memory alone cannot stop two servers from granting the same one-time kit: a player switching servers is read by
  * the new server before the old one has finished writing. {@link #acquireKit} therefore asks the ledger's unique key
- * before the kit is handed over, and only the server whose insert landed grants it.
+ * before the kit is handed over, and only the server whose insert landed grants it. Cooldowns are last write wins, so
+ * a repeatable kit can be claimed once more by a player who switches servers faster than the old server writes the
+ * stamp; the window is the length of one database write.
+ *
+ * <p>A change made on another server (an admin's {@code /kit reset} there) reaches a player's memory here on their
+ * next login. Until then it errs on the strict side: a reset kit stays claimed here, a claim made there is caught by
+ * the unique key.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. Entries live in a {@link ConcurrentHashMap}; each entry's sets are
  * concurrent, and the hand-over between the login read and the join carry-over is one short critical section on the
- * entry. No ledger call is made inside it.
+ * entry. No ledger call is made inside it. Every ledger call for one player runs in order, one after another, on a
+ * per-player chain, so a reset and a later claim, or two stamps of one cooldown, reach the database in the order they
+ * were made.
  */
 public final class NetworkClaims {
+
+    private static final Duration FIRST_RETRY = Duration.ofSeconds(1);
+    private static final Duration LONGEST_RETRY = Duration.ofSeconds(30);
 
     private final PlayerClaimLedger ledger;
     private final Scheduler scheduler;
     private final Clock clock;
     private final Logger log;
     private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, CompletableFuture<Void>> chains = new ConcurrentHashMap<>();
+    private final Executor lane = this::onLane;
+    private volatile boolean closing;
 
     public NetworkClaims(PlayerClaimLedger ledger, Scheduler scheduler, Clock clock, Logger log) {
         this.ledger = Objects.requireNonNull(ledger, "ledger");
@@ -53,33 +82,25 @@ public final class NetworkClaims {
     }
 
     /**
-     * Start reading {@code player}'s claims on the async lane, unless they are already held or being read. The future
-     * completes once they are in memory, or exceptionally when the read failed (the player then stays locked until
-     * the next attempt).
+     * Start reading {@code player}'s claims, unless they are already held or being read. The future completes once
+     * they are in memory, and is cancelled when the player is let go first. A failed read is retried while the player
+     * is held, so the future does not fail on a database hiccup.
      */
     public CompletableFuture<Void> load(UUID player) {
-        Objects.requireNonNull(player, "player");
-        Entry fresh = new Entry();
-        Entry existing = entries.putIfAbsent(player, fresh);
-        if (existing != null) {
-            return existing.loaded;
-        }
-        scheduler.async(() -> read(player, fresh));
-        return fresh.loaded;
+        return hold(player, false).loaded;
     }
 
     /** Mark {@code player} as in the world, reading their claims first if nothing holds them (a quick relog). */
     public void joined(UUID player) {
-        var unused = load(player);
-        Entry entry = entries.get(player);
-        if (entry != null) {
-            entry.joined = true;
-        }
+        hold(player, true);
     }
 
     /** Let go of {@code player}'s claims; they are read again on the next login. */
     public void drop(UUID player) {
-        entries.remove(Objects.requireNonNull(player, "player"));
+        Entry entry = entries.remove(Objects.requireNonNull(player, "player"));
+        if (entry != null) {
+            entry.loaded.completeExceptionally(new CancellationException("the player left"));
+        }
     }
 
     /**
@@ -88,12 +109,28 @@ public final class NetworkClaims {
      * throw away the claims of the session that replaced it.
      */
     public void dropUnjoined(UUID player) {
-        entries.computeIfPresent(Objects.requireNonNull(player, "player"), (id, entry) -> entry.joined ? entry : null);
+        Objects.requireNonNull(player, "player");
+        AtomicReference<@Nullable Entry> gone = new AtomicReference<>();
+        entries.computeIfPresent(player, (id, entry) -> {
+            if (entry.joined) {
+                return entry;
+            }
+            gone.set(entry);
+            return null;
+        });
+        Entry removed = gone.get();
+        if (removed != null) {
+            removed.loaded.completeExceptionally(new CancellationException("the login was refused"));
+        }
     }
 
-    /** Whether {@code player}'s claims are in memory, so a check answers from fact rather than failing safe. */
+    /**
+     * Whether a check for {@code player} answers from fact. False only while their claims are being read; a player
+     * nothing is held for (the console, an offline player) is not waited on.
+     */
     public boolean ready(UUID player) {
-        return readyEntry(player) != null;
+        Entry entry = entries.get(Objects.requireNonNull(player, "player"));
+        return entry == null || entry.ready;
     }
 
     /**
@@ -118,51 +155,41 @@ public final class NetworkClaims {
             }
             writes = merge(player, entry, local);
         }
-        scheduler.async(() -> applyCarry(writes, carried));
-    }
-
-    /** Whether {@code player} has claimed the one-time kit {@code kit}; true while their claims are not read yet. */
-    public boolean hasKit(UUID player, String kit) {
-        Objects.requireNonNull(kit, "kit");
-        Entry entry = readyEntry(player);
-        return entry == null || entry.kits.contains(kit);
+        enqueue(player, () -> applyCarry(writes, carried));
     }
 
     /**
-     * Take {@code who}'s claim on the one-time kit {@code kit} in the ledger before the kit is granted. The future
-     * completes on the thread that owns {@code who}: true when this server's insert landed, false when the claim was
-     * already taken (here or on another server). It completes exceptionally when the ledger failed, or with a
-     * {@link CancellationException} when the player left before the answer came back, in which case a claim this
-     * server won is given back.
+     * Whether {@code player} has claimed the one-time kit {@code kit}: true while their claims are being read, false
+     * for a player nothing is held for.
+     */
+    public boolean hasKit(UUID player, String kit) {
+        Objects.requireNonNull(kit, "kit");
+        Entry entry = entries.get(Objects.requireNonNull(player, "player"));
+        if (entry == null) {
+            return false;
+        }
+        return !entry.ready || entry.kits.contains(kit);
+    }
+
+    /**
+     * Take {@code who}'s claim on the one-time kit {@code kit} in the ledger before the kit is granted, after their
+     * read when one is running. The future completes on the thread that owns {@code who}: true when this server's
+     * insert landed, false when the claim was already taken (here or on another server). It completes exceptionally
+     * when the ledger failed, or with a {@link CancellationException} when the player left before the answer came
+     * back, in which case a claim this server won is given back.
      */
     public CompletableFuture<Boolean> acquireKit(PlayerRef who, String kit) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kit, "kit");
         CompletableFuture<Boolean> answer = new CompletableFuture<>();
-        Entry entry = readyEntry(who.uuid());
-        if (entry == null) {
-            answer.complete(false);
-            return answer;
-        }
-        long now = clock.millis();
-        scheduler.async(() -> {
-            boolean inserted;
-            try {
-                inserted = ledger.claimKit(who.uuid(), kit, now);
-            } catch (RuntimeException failure) {
-                log.error("could not record the one-time kit " + kit + " for " + who.name(), failure);
-                scheduler.onEntity(
-                        who, () -> answer.completeExceptionally(failure), () -> answer.completeExceptionally(failure));
+        Entry entry = entries.get(who.uuid());
+        CompletableFuture<Void> readFirst = entry == null ? CompletableFuture.completedFuture(null) : entry.loaded;
+        var unused = readFirst.whenComplete((ignored, failure) -> {
+            if (failure != null) {
+                answer.completeExceptionally(failure);
                 return;
             }
-            // Claimed either way now: by this insert, or by the one that beat it.
-            entry.kits.add(kit);
-            scheduler.onEntity(who, () -> answer.complete(inserted), () -> {
-                if (inserted) {
-                    releaseKit(who.uuid(), kit);
-                }
-                answer.completeExceptionally(new CancellationException("the player left before the kit was granted"));
-            });
+            enqueue(who.uuid(), () -> insert(who, kit, entry, answer));
         });
         return answer;
     }
@@ -176,7 +203,7 @@ public final class NetworkClaims {
             return;
         }
         long now = clock.millis();
-        write("record the one-time kit " + kit, () -> ledger.claimKit(player, kit, now));
+        write(player, "record the one-time kit " + kit, () -> ledger.claimKit(player, kit, now));
     }
 
     /** Forget {@code player}'s claim on {@code kit}, in memory and in the ledger. */
@@ -187,7 +214,7 @@ public final class NetworkClaims {
         if (entry != null) {
             entry.kits.remove(kit);
         }
-        write("reset the one-time kit " + kit, () -> ledger.releaseKit(player, kit));
+        write(player, "reset the one-time kit " + kit, () -> ledger.releaseKit(player, kit));
     }
 
     /** Forget every one-time kit claim {@code player} holds, in memory and in the ledger. */
@@ -197,17 +224,20 @@ public final class NetworkClaims {
         if (entry != null) {
             entry.kits.clear();
         }
-        write("reset the one-time kits", () -> ledger.releaseAllKits(player));
+        write(player, "reset the one-time kits", () -> ledger.releaseAllKits(player));
     }
 
     /**
-     * When {@code player}'s cooldown under {@code scope} ends, in epoch milliseconds, {@code 0} when there is none;
-     * empty while their claims are not read yet.
+     * When {@code player}'s cooldown under {@code scope} ends, in epoch milliseconds, {@code 0} when there is none or
+     * nothing is held for them; empty while their claims are being read.
      */
     public OptionalLong cooldownEnd(UUID player, String scope) {
         Objects.requireNonNull(scope, "scope");
-        Entry entry = readyEntry(player);
+        Entry entry = entries.get(Objects.requireNonNull(player, "player"));
         if (entry == null) {
+            return OptionalLong.of(0L);
+        }
+        if (!entry.ready) {
             return OptionalLong.empty();
         }
         return OptionalLong.of(entry.cooldowns.getOrDefault(scope, 0L));
@@ -221,19 +251,58 @@ public final class NetworkClaims {
         if (entry != null) {
             entry.cooldowns.put(scope, readyAt);
         }
-        write("save the cooldown " + scope, () -> ledger.saveCooldown(player, scope, readyAt));
+        write(player, "save the cooldown " + scope, () -> ledger.saveCooldown(player, scope, readyAt));
+    }
+
+    /**
+     * Finish every write still waiting, for shutdown: from here on queued and new writes run on the calling thread,
+     * because a stopping plugin may no longer hand work to the async lane. Waits at most {@code timeout} for writes
+     * already running.
+     */
+    public void drain(Duration timeout) {
+        Objects.requireNonNull(timeout, "timeout");
+        closing = true;
+        CompletableFuture<?>[] pending = chains.values().toArray(CompletableFuture[]::new);
+        try {
+            CompletableFuture.allOf(pending).get(timeout.toMillis(), TimeUnit.MILLISECONDS);
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+        } catch (ExecutionException | TimeoutException unfinished) {
+            log.warn("event=network_claims_drain_incomplete pending={}", String.valueOf(pending.length));
+        }
+    }
+
+    private Entry hold(UUID player, boolean joined) {
+        Objects.requireNonNull(player, "player");
+        AtomicBoolean fresh = new AtomicBoolean();
+        // One compute, so a late dropUnjoined from an older connection cannot remove the entry between the lookup
+        // and the joined mark.
+        Entry entry = entries.compute(player, (id, existing) -> {
+            Entry held = existing;
+            if (held == null) {
+                held = new Entry();
+                fresh.set(true);
+            }
+            if (joined) {
+                held.joined = true;
+            }
+            return held;
+        });
+        if (fresh.get()) {
+            enqueue(player, () -> read(player, entry));
+        }
+        return entry;
     }
 
     private void read(UUID player, Entry entry) {
+        if (entries.get(player) != entry) {
+            return;
+        }
         Claims claims;
         try {
             claims = ledger.load(player, clock.millis());
         } catch (RuntimeException failure) {
-            entries.remove(player, entry);
-            log.error(
-                    "could not read the kit claims and cooldowns of " + player + "; they stay locked until read",
-                    failure);
-            entry.loaded.completeExceptionally(failure);
+            retry(player, entry, failure);
             return;
         }
         List<Runnable> writes = List.of();
@@ -252,6 +321,57 @@ public final class NetworkClaims {
             applyCarry(writes, pending.carried());
         }
         entry.loaded.complete(null);
+    }
+
+    /** Read again after a pause that doubles with each failure, for as long as the player is held. */
+    private void retry(UUID player, Entry entry, RuntimeException failure) {
+        entry.failures++;
+        long seconds = Math.min(LONGEST_RETRY.toSeconds(), FIRST_RETRY.toSeconds() << Math.min(entry.failures - 1, 5));
+        Duration pause = Duration.ofSeconds(seconds);
+        if (entry.failures == 1) {
+            log.error(
+                    "could not read the kit claims and cooldowns of " + player + "; they stay locked and the read is"
+                            + " tried again while they are online",
+                    failure);
+        } else {
+            log.warn(
+                    "event=network_claims_read_failed player={} attempt={} retry_in_s={} reason={}",
+                    player,
+                    String.valueOf(entry.failures),
+                    String.valueOf(seconds),
+                    failure.toString());
+        }
+        if (closing) {
+            return;
+        }
+        scheduler.asyncAfter(pause, () -> {
+            if (entries.get(player) == entry) {
+                enqueue(player, () -> read(player, entry));
+            }
+        });
+    }
+
+    private void insert(PlayerRef who, String kit, @Nullable Entry entry, CompletableFuture<Boolean> answer) {
+        long now = clock.millis();
+        boolean inserted;
+        try {
+            inserted = ledger.claimKit(who.uuid(), kit, now);
+        } catch (RuntimeException failure) {
+            log.error("could not record the one-time kit " + kit + " for " + who.name(), failure);
+            scheduler.onEntity(
+                    who, () -> answer.completeExceptionally(failure), () -> answer.completeExceptionally(failure));
+            return;
+        }
+        if (entry != null) {
+            // Claimed either way now: by this insert, or by the one that beat it.
+            entry.kits.add(kit);
+        }
+        scheduler.onEntity(who, () -> answer.complete(inserted), () -> {
+            if (inserted) {
+                releaseKit(who.uuid(), kit);
+            }
+            answer.completeExceptionally(new CancellationException("the player left before the kit was granted"));
+        });
     }
 
     private List<Runnable> merge(UUID player, Entry entry, LocalClaims local) {
@@ -273,7 +393,7 @@ public final class NetworkClaims {
         return writes;
     }
 
-    /** Run the carry's writes on the calling (async) thread; {@code carried} only after every one of them landed. */
+    /** Run the carry's writes on the player's chain; {@code carried} only after every one of them landed. */
     private void applyCarry(List<Runnable> writes, Runnable carried) {
         try {
             writes.forEach(Runnable::run);
@@ -286,8 +406,8 @@ public final class NetworkClaims {
         carried.run();
     }
 
-    private void write(String what, Runnable io) {
-        scheduler.async(() -> {
+    private void write(UUID player, String what, Runnable io) {
+        enqueue(player, () -> {
             try {
                 io.run();
             } catch (RuntimeException failure) {
@@ -296,9 +416,38 @@ public final class NetworkClaims {
         });
     }
 
-    private @Nullable Entry readyEntry(UUID player) {
-        Entry entry = entries.get(Objects.requireNonNull(player, "player"));
-        return entry != null && entry.ready ? entry : null;
+    /** Run {@code step} after every earlier step for {@code player}; a failing step never stalls the ones after it. */
+    private void enqueue(UUID player, Runnable step) {
+        Runnable guarded = () -> {
+            try {
+                step.run();
+            } catch (RuntimeException failure) {
+                log.error("a database step for " + player + " failed", failure);
+            }
+        };
+        CompletableFuture<Void> done = new CompletableFuture<>();
+        // The swap is atomic, so each step waits on exactly the one queued before it. The step itself runs outside
+        // the map, because while stopping it runs on this thread and may queue another step.
+        CompletableFuture<Void> previous = chains.put(player, done);
+        CompletableFuture<Void> before = previous == null ? CompletableFuture.completedFuture(null) : previous;
+        var unused = before.whenCompleteAsync(
+                (ignored, failure) -> {
+                    try {
+                        guarded.run();
+                    } finally {
+                        chains.remove(player, done);
+                        done.complete(null);
+                    }
+                },
+                lane);
+    }
+
+    private void onLane(Runnable task) {
+        if (closing) {
+            task.run();
+            return;
+        }
+        scheduler.async(task);
     }
 
     private record Carry(LocalClaims local, Runnable carried) {}
@@ -311,5 +460,7 @@ public final class NetworkClaims {
         private volatile boolean joined;
         // Guarded by the entry's monitor: set by a join that arrived before the login read finished.
         private @Nullable Carry pendingCarry;
+        // Touched only by this player's read steps, which run one at a time on the player's chain.
+        private int failures;
     }
 }

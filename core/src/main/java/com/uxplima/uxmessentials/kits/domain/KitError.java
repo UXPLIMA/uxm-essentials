@@ -54,7 +54,16 @@ public enum KitError {
     /** The recipient's inventory could not hold the kit and its {@code on-full} policy is {@code DENY}. */
     INVENTORY_FULL(KitsMessageKey.KIT_INVENTORY_FULL),
     /** Another plugin refused the action through the developer API. Nothing was written. */
-    VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
+    VETOED(SharedMessageKey.COMMON_ACTION_VETOED),
+
+    /**
+     * The recipient left before a shared one-time claim came back. Nothing was granted and the claim was given back;
+     * the line is for a staff member who gave the kit.
+     */
+    PLAYER_LEFT(KitsMessageKey.KIT_CLAIM_CANCELLED),
+
+    /** The claim broke partway through on a fault, not a rule. The operator finds the cause in the log. */
+    FAILED(SharedMessageKey.COMMAND_ERROR);
 
     // Typed as the MessageKey interface rather than this context's own enum: a veto is refused for the same reason
     // in every context, so it renders one shared key rather than twenty near-identical ones.

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.kits.domain.event.KitClaiming;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.DurationText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -69,6 +70,7 @@ public final class ClaimKit {
     private final Optional<KitEconomy> economy;
     private final Optional<KitActionRunner> actions;
     private final DomainGate gate;
+    private final Logger log;
 
     /** Wire the claim path with no action runner: a kit's claim/deny actions are then recorded but not run. */
     public ClaimKit(
@@ -78,8 +80,9 @@ public final class ClaimKit {
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
-            Optional<KitEconomy> economy) {
-        this(repository, access, granter, notifier, events, clock, economy, Optional.empty());
+            Optional<KitEconomy> economy,
+            Logger log) {
+        this(repository, access, granter, notifier, events, clock, economy, Optional.empty(), log);
     }
 
     /** The use case with nothing outside the plugin able to refuse a claim. The form the pure tests use. */
@@ -91,8 +94,9 @@ public final class ClaimKit {
             DomainEventPublisher events,
             Clock clock,
             Optional<KitEconomy> economy,
-            Optional<KitActionRunner> actions) {
-        this(repository, access, granter, notifier, events, clock, economy, actions, DomainGate.allowAll());
+            Optional<KitActionRunner> actions,
+            Logger log) {
+        this(repository, access, granter, notifier, events, clock, economy, actions, DomainGate.allowAll(), log);
     }
 
     public ClaimKit(
@@ -104,7 +108,8 @@ public final class ClaimKit {
             Clock clock,
             Optional<KitEconomy> economy,
             Optional<KitActionRunner> actions,
-            DomainGate gate) {
+            DomainGate gate,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.granter = Objects.requireNonNull(granter, "granter");
@@ -114,6 +119,7 @@ public final class ClaimKit {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.actions = Objects.requireNonNull(actions, "actions");
         this.gate = Objects.requireNonNull(gate, "gate");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Claim the kit {@code id} for {@code who} themselves. */
@@ -153,12 +159,12 @@ public final class ClaimKit {
             return refused(actor, recipient, kit, KitError.VETOED);
         }
         if (!access.claimsBeforeGrant(recipient, kit)) {
-            return CompletableFuture.completedFuture(chargeAndGrant(actor, recipient, kit, granted, false));
+            return CompletableFuture.completedFuture(grantGuarded(actor, recipient, kit, granted, false));
         }
         return access.acquireOneTime(recipient, kit).<Result<Unit, KitError>>handle((won, failure) -> {
             if (failure != null) {
                 KitError error =
-                        unwrap(failure) instanceof CancellationException ? KitError.CANCELLED : KitError.LOADING;
+                        unwrap(failure) instanceof CancellationException ? KitError.PLAYER_LEFT : KitError.LOADING;
                 deny(actor, recipient, kit, error);
                 return Result.err(error);
             }
@@ -166,8 +172,24 @@ public final class ClaimKit {
                 deny(actor, recipient, kit, KitError.ALREADY_CLAIMED);
                 return Result.err(KitError.ALREADY_CLAIMED);
             }
-            return chargeAndGrant(actor, recipient, kit, granted, true);
+            return grantGuarded(actor, recipient, kit, granted, true);
         });
+    }
+
+    /**
+     * {@link #chargeAndGrant}, with a fault turned into a refusal the actor sees and the operator finds in the log. The
+     * future a caller holds is often dropped, so a fault left in it would vanish without a word.
+     */
+    private Result<Unit, KitError> grantGuarded(
+            PlayerRef actor, PlayerRef recipient, KitDefinition kit, KitDefinition granted, boolean claimed) {
+        try {
+            return chargeAndGrant(actor, recipient, kit, granted, claimed);
+        } catch (RuntimeException failure) {
+            log.error("claiming the kit " + kit.id().value() + " for " + recipient.name() + " failed", failure);
+            notifier.send(
+                    actor, KitError.FAILED.messageKey(), Map.of("kit", kit.id().value()));
+            return Result.err(KitError.FAILED);
+        }
     }
 
     /**
@@ -176,16 +198,22 @@ public final class ClaimKit {
      */
     private Result<Unit, KitError> chargeAndGrant(
             PlayerRef actor, PlayerRef recipient, KitDefinition kit, KitDefinition granted, boolean claimed) {
-        Result<Unit, KitError> charged = access.reserveAndCharge(recipient, kit);
-        if (charged.isErr()) {
+        try {
+            Result<Unit, KitError> charged = access.reserveAndCharge(recipient, kit);
+            if (charged.isErr()) {
+                giveBack(recipient, kit, claimed);
+                deny(actor, recipient, kit, charged.errorOrThrow());
+                return charged;
+            }
+            if (!granter.preGrant(recipient, granted)) {
+                giveBack(recipient, kit, claimed);
+                deny(actor, recipient, kit, KitError.CANCELLED);
+                return Result.err(KitError.CANCELLED);
+            }
+        } catch (RuntimeException failure) {
+            // Nothing was handed over yet, so the claim goes back; past this point the items are the player's.
             giveBack(recipient, kit, claimed);
-            deny(actor, recipient, kit, charged.errorOrThrow());
-            return charged;
-        }
-        if (!granter.preGrant(recipient, granted)) {
-            giveBack(recipient, kit, claimed);
-            deny(actor, recipient, kit, KitError.CANCELLED);
-            return Result.err(KitError.CANCELLED);
+            throw failure;
         }
         runActions(recipient, granted, beforeItems(granted));
         granter.grant(recipient, granted);

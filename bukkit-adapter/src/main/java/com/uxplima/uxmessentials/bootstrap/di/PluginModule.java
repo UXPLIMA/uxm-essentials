@@ -503,6 +503,9 @@ public final class PluginModule {
                             kernel.log());
             resources.addListener(listener);
             listener.adoptOnline(plugin.getServer().getOnlinePlayers());
+            // Closed before the pool (resources close last-in first-out), so a reset or a stamp queued while the
+            // server stops still reaches the database.
+            resources.onClose(() -> claims.drain(java.time.Duration.ofSeconds(10)));
         });
 
         // The name index is where a typed name becomes an account, for every context. The warm reads the database,

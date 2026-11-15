@@ -244,7 +244,8 @@ public final class KitsWiring {
         List<Listener> listeners = List.of(
                 new KitPreviewListener(),
                 new KitEditorListener(services.kitEditorView()),
-                new KitsJoinListener(repository, granter, access));
+                new KitsJoinListener(new com.uxplima.uxmessentials.kits.application.GrantFirstJoinKits(
+                        repository, granter, access, kernel.log())));
 
         // The kit's claim/deny effects (sound, particles, title, firework, commands, the wait-ticks delay) now run
         // through the KitActionRunner inside ClaimKit, ordered around the item grant, so there is no longer a
@@ -298,7 +299,8 @@ public final class KitsWiring {
                 clock,
                 economy,
                 Optional.of(actionRunner),
-                kernel.gate());
+                kernel.gate(),
+                kernel.log());
         KitPreviewView kitPreview = new KitPreviewView(kernel.messages(), kernel.scheduler(), previewLayout);
         // The read-only /kit browse menu now renders through the always-on menu engine. It claims through the same
         // ClaimKit path the command drives and resolves its tiles off the warm kit/category sets, so the engine

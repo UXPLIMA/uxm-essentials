@@ -9,7 +9,7 @@
 -- player_daily_rewards: when the player last took the daily reward, epoch milliseconds. A server takes the reward with
 -- an update conditioned on the stored stamp (or an insert when there is none), so only one server pays it.
 --
--- Same portability contract as V1-V90: plain CREATE TABLE in the subset SQLite, MySQL/MariaDB and PostgreSQL all
+-- Same portability contract as V1-V92: plain CREATE TABLE in the subset SQLite, MySQL/MariaDB and PostgreSQL all
 -- accept. `player` is the canonical 36-character UUID text; `scope` is the stamp name folded to [a-z0-9._-].
 CREATE TABLE ${prefix}player_kit_claims (
     player      VARCHAR(36)  NOT NULL,

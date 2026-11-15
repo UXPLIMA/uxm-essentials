@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -31,8 +32,8 @@ import org.jspecify.annotations.NullMarked;
  * asynchronous pre-login, carried over from this server's PDC on join, and let go on quit.
  *
  * <p>The pre-login waits for the read for at most {@link #LOGIN_WAIT}, so a slow database delays a login a little
- * instead of holding it open. A read that is still running when the wait ends simply lands later; until then the
- * player's checks fail safe.
+ * instead of holding it open. A read that is still running when the wait ends simply lands later, and a failed read
+ * is retried while the player is online; until then the player's checks fail safe.
  */
 @NullMarked
 public final class NetworkClaimsListener implements Listener {
@@ -71,9 +72,9 @@ public final class NetworkClaimsListener implements Listener {
                     "event=network_claims_slow player={} waited_ms={}; kits and cooldowns stay locked until read",
                     event.getName(),
                     String.valueOf(LOGIN_WAIT.toMillis()));
-        } catch (ExecutionException failed) {
-            // NetworkClaims logged the cause at ERROR already; the join reads again.
-            log.debug("event=network_claims_read_failed player={}", event.getName());
+        } catch (ExecutionException | CancellationException ended) {
+            // Let go before the read landed (the login was refused meanwhile); nothing is waited on any more.
+            log.debug("event=network_claims_read_abandoned player={}", event.getName());
         }
     }
 
