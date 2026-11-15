@@ -38,11 +38,11 @@ public final class SetVaultIcon {
         Objects.requireNonNull(owner, "owner");
         VaultId id = VaultId.of(owner, index);
         Vault vault = repository.find(id).orElse(null);
-        if (vault == null) {
+        // An update rather than an upsert: a vault deleted since it was read must stay deleted, items and all.
+        if (vault == null || !repository.update(vault.iconSet(materialName))) {
             notifier.renameUnknown(owner, index);
             return Result.err(VaultError.VAULT_UNKNOWN);
         }
-        repository.save(vault.iconSet(materialName));
         // There is no dedicated icon-cleared key in the catalog yet (D3); a clear persists silently and the GUI
         // simply falls back to the default icon. A set confirms with the material name.
         if (materialName != null) {

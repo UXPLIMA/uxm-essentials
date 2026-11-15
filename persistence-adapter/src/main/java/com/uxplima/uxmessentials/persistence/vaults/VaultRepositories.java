@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.persistence.vaults;
 
+import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.vaults.application.port.VaultItemReturns;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import org.jspecify.annotations.NullMarked;
 
@@ -33,5 +35,11 @@ public final class VaultRepositories {
     public static CachedVaultRepository cachedConcrete(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new CachedVaultRepository(new JooqVaultRepository(persistence.dsl()));
+    }
+
+    /** The {@link VaultItemReturns} store over the shared persistence DSL. */
+    public static VaultItemReturns itemReturns(Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqVaultItemReturns(persistence.dsl(), clock);
     }
 }

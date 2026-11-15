@@ -1,21 +1,28 @@
 package com.uxplima.uxmessentials.vaults.application;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultEconomy;
 
-/** One balance that a withdraw guards and a deposit may refuse, logging every move that took. */
+/**
+ * One balance per currency: fees come out of the currency the purse currently charges in, a refund lands in the
+ * currency it names, a withdraw guards the balance and a deposit may refuse. Every move that took is logged.
+ */
 final class VaultPurse implements VaultEconomy {
 
-    private BigDecimal balance;
+    private final Map<String, BigDecimal> balances = new HashMap<>();
+    private String charging = "coins";
     private boolean refusesDeposits;
     private final List<String> moves = new ArrayList<>();
 
     VaultPurse(String balance) {
-        this.balance = new BigDecimal(balance);
+        balances.put(charging, new BigDecimal(balance));
     }
 
     /** Make every deposit fail, as a provider at its max-balance clamp does. */
@@ -23,37 +30,62 @@ final class VaultPurse implements VaultEconomy {
         refusesDeposits = true;
     }
 
-    BigDecimal balance() {
-        return balance;
+    /** Charge later fees in {@code currency}, as a server whose default currency changed does. */
+    void chargeIn(String currency) {
+        charging = currency;
     }
 
-    /** Each applied move as {@code -amount} or {@code +amount}, in order. */
+    /** The balance in the currency fees are charged in. */
+    BigDecimal balance() {
+        return balance(charging);
+    }
+
+    BigDecimal balance(String currency) {
+        return balances.getOrDefault(currency, BigDecimal.ZERO);
+    }
+
+    /** Each applied move as {@code -amount} for a fee or {@code +amount currency} for a refund, in order. */
     List<String> moves() {
         return List.copyOf(moves);
     }
 
     @Override
     public boolean canAfford(PlayerRef who, BigDecimal amount) {
-        return balance.compareTo(amount) >= 0;
+        return balance().compareTo(amount) >= 0;
     }
 
     @Override
     public boolean withdraw(PlayerRef who, BigDecimal amount) {
-        if (balance.compareTo(amount) < 0) {
+        if (balance().compareTo(amount) < 0) {
             return false;
         }
-        balance = balance.subtract(amount);
-        moves.add("-" + amount.stripTrailingZeros().toPlainString());
+        balances.put(charging, balance().subtract(amount));
+        moves.add("-" + plain(amount));
         return true;
     }
 
     @Override
-    public boolean deposit(PlayerRef who, BigDecimal amount) {
+    public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
         if (refusesDeposits) {
             return false;
         }
-        balance = balance.add(amount);
-        moves.add("+" + amount.stripTrailingZeros().toPlainString());
+        balances.put(currencyId, balance(currencyId).add(amount));
+        moves.add("+" + plain(amount) + " " + currencyId);
         return true;
+    }
+
+    @Override
+    public String currencyId() {
+        return charging;
+    }
+
+    /** Coins and gems both carry two decimals, rounded half up, as a typical currency does. */
+    @Override
+    public BigDecimal denominate(BigDecimal amount) {
+        return amount.setScale(2, RoundingMode.HALF_UP);
+    }
+
+    private static String plain(BigDecimal amount) {
+        return amount.stripTrailingZeros().toPlainString();
     }
 }
