@@ -72,7 +72,8 @@ public final class CustomCommandsWiring {
         Objects.requireNonNull(currencies, "currencies");
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(prompt, "prompt");
-        CustomCommandsConfig config = CustomCommandsConfig.from(ctx.config());
+        CustomCommandsConfig config =
+                CustomCommandsConfig.from(ctx.config(), ctx.kernel().log());
         Path directory = dataFolder.resolve(DEFINITIONS_DIRECTORY);
         CustomCommandLoader loader = new CustomCommandLoader(ctx.kernel().log());
         CustomCommandLoader.LoadResult initial = loader.loadFrom(directory, config.chainLimits());
@@ -95,6 +96,7 @@ public final class CustomCommandsWiring {
                 actions,
                 new MenuRequirementCheck(menus),
                 fee,
+                config.onBackendMissing(),
                 new MessageRunFeedback(ctx.kernel().messages(), ctx.kernel().messageSink(), fee),
                 new ChainDepth(config.maxChainDepth()),
                 ctx.kernel().log());
