@@ -253,6 +253,9 @@ public final class HologramsWiring {
         bus.registry()
                 .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.listener(
                         cached, renderer, kernel.scheduler()));
+        bus.registry()
+                .registerResync(
+                        com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.resync(cached, renderer));
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
         events.subscribe(npcSubscriber);

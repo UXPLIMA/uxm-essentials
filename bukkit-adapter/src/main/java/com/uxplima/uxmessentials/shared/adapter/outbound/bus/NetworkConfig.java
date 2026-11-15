@@ -25,6 +25,8 @@ import org.jspecify.annotations.NullMarked;
  * @param transportRecognized whether {@code transport} parsed cleanly; {@code false} means it fell back to
  *     {@code velocity} from an unknown value, so the wiring can WARN without crashing enable
  * @param redis the canonical Redis connection block the Redis transport consumes
+ * @param cacheRefreshSeconds how often the caches a peer can change are reloaded from the shared database as a
+ *     safety net for frames the transport lost; {@code 0} turns the timer off
  */
 @NullMarked
 public record NetworkConfig(
@@ -35,10 +37,12 @@ public record NetworkConfig(
         int heartbeatSeconds,
         Transport transport,
         boolean transportRecognized,
-        Redis redis) {
+        Redis redis,
+        int cacheRefreshSeconds) {
 
     private static final int DEFAULT_QUEUE = 256;
     private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
+    private static final int DEFAULT_CACHE_REFRESH_SECONDS = 300;
     /** The server id a backend runs on when its {@code network} block names none. */
     public static final String DEFAULT_SERVER_ID = "server-1";
 
@@ -55,6 +59,9 @@ public record NetworkConfig(
         }
         if (heartbeatSeconds < 1) {
             throw new IllegalArgumentException("heartbeat-seconds must be positive: " + heartbeatSeconds);
+        }
+        if (cacheRefreshSeconds < 0) {
+            throw new IllegalArgumentException("cache-refresh-seconds must not be negative: " + cacheRefreshSeconds);
         }
     }
 
@@ -77,6 +84,19 @@ public record NetworkConfig(
      */
     public java.time.Duration peerLivenessWindow() {
         return heartbeatInterval().multipliedBy(3);
+    }
+
+    /** The period of the shared-cache safety refresh; {@link java.time.Duration#ZERO} when it is off. */
+    public java.time.Duration cacheRefreshInterval() {
+        return java.time.Duration.ofSeconds(cacheRefreshSeconds);
+    }
+
+    /**
+     * Whether frames ride the proxy, which reaches a backend only through a player online there and keeps no queue,
+     * so a backend that sat empty may have missed frames.
+     */
+    public boolean relaysThroughProxy() {
+        return transport != Transport.REDIS;
     }
 
     /** The carrier(s) the bus rides. {@link #VELOCITY} is the proxy default: no Redis connection is opened. */
@@ -154,6 +174,8 @@ public record NetworkConfig(
         int heartbeat = Math.max(1, config.getInt("network.heartbeat-seconds", DEFAULT_HEARTBEAT_SECONDS));
         String rawTransport = config.getString("network.transport", Transport.VELOCITY.name());
         java.util.Optional<Transport> parsed = Transport.parse(rawTransport);
+        // A negative value reads as off, the same as 0, rather than failing the enable.
+        int cacheRefresh = Math.max(0, config.getInt("network.cache-refresh-seconds", DEFAULT_CACHE_REFRESH_SECONDS));
         return new NetworkConfig(
                 enabled,
                 serverId.isBlank() ? DEFAULT_SERVER_ID : serverId,
@@ -162,6 +184,7 @@ public record NetworkConfig(
                 heartbeat,
                 parsed.orElse(Transport.VELOCITY),
                 parsed.isPresent(),
-                Redis.from(config));
+                Redis.from(config),
+                cacheRefresh);
     }
 }

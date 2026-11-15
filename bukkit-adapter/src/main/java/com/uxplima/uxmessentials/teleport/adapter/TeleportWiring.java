@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
@@ -133,6 +134,7 @@ public final class TeleportWiring {
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -143,6 +145,7 @@ public final class TeleportWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
@@ -168,7 +171,7 @@ public final class TeleportWiring {
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
         MutableWarpRespawnLocator warpRespawnLocator = new MutableWarpRespawnLocator();
-        SpawnDirectory spawns = spawns(plugin, persistence);
+        SpawnDirectory spawns = spawns(plugin, persistence, bus);
         RtpBundle rtp = buildRtp(plugin, kernel, config, settings, persistence, running, claimProviders, guardRegions);
         // The post-arrival grace shields an /rtp landing (Resistance + Slow-Falling + a no-fall-damage window);
         // it is both the engine's ArrivalGrace port and the fall-damage listener, so it is registered below.
@@ -446,12 +449,14 @@ public final class TeleportWiring {
             BiomeTargetedSearch biomeSearch,
             @Nullable Listener hotspotListener) {}
 
-    private static SpawnDirectory spawns(Plugin plugin, Persistence persistence) {
+    private static SpawnDirectory spawns(Plugin plugin, Persistence persistence, Bus bus) {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror
         // redirects; the decorator adds the vanilla world spawn as the bottom-of-chain last resort so
         // /spawn answers on a fresh server before any /setspawn.
         CachedSpawnDirectory cached = SpawnDirectories.cachedConcrete(persistence);
         cached.warmAll();
+        // No frame announces a peer's /setspawn, so the shared rows come back in only through the bus resync.
+        bus.registry().registerResync(cached::warmAll);
         return new VanillaFallbackSpawnDirectory(cached, plugin.getServer());
     }
 

@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.persistence.runtime.SnapshotSwap;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 
@@ -59,6 +60,15 @@ public final class CachedWarpCategoryRepository implements WarpCategoryRepositor
         Objects.requireNonNull(id, "id");
         delegate.delete(id);
         republish(next -> next.remove(id));
+    }
+
+    /**
+     * Load the whole set again and swap it in, for rows another server wrote. Readers keep the old set until the
+     * swap, so none of them loads on its own thread meanwhile; a local write during the load wins over it. Blocks on
+     * the database, so call it off the tick.
+     */
+    public Optional<SnapshotSwap<WarpCategory>> reloadAll() {
+        return SnapshotSwap.reload(loaded, this::loadAll);
     }
 
     /** Drop the loaded set so the next read rebuilds it from the delegate; call on a module reload or peer sync. */
