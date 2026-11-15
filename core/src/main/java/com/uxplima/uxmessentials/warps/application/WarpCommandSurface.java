@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The warps inbound adapter realises the Brigadier node
  * from the started module's context on the next {@code COMMANDS} fire. Collected here so {@code
- * WarpsModule} stays small and the command/permission pairing is one greppable table the permissions guard
- * checks against {@code paper-plugin.yml}.
+ * WarpsModule} stays small and the command/permission pairing is one greppable table.
  *
  * <p>There is a single command literal, {@code /warp}, gated by {@code uxmessentials.warp.use}. Everything
  * a player does with server warps hangs off it: {@code <name>} teleports, while {@code list}, {@code set},

@@ -8,12 +8,11 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The economy context's command surface as platform-neutral
- * {@link CommandSpec}s: each pairs a literal with its base permission node (mirroring {@code permissions.md}
- * §Economy) and a factory that produces the kernel-side {@link BrigadierCommand} description. The economy
- * inbound adapter realises the Brigadier node from the started module's context on the next {@code COMMANDS}
- * fire. Collected here so {@code EconomyModule} stays small and the command/permission pairing is one
- * greppable table the permissions guard checks against {@code paper-plugin.yml}.
+ * The economy context's command surface as platform-neutral {@link CommandSpec}s: each pairs a literal with its base
+ * permission node (declared in {@code EconomyPermissions}) and a factory that produces the kernel-side {@link
+ * BrigadierCommand} description. The economy inbound adapter realises the Brigadier node from the started module's
+ * context on the next {@code COMMANDS} fire. Collected here so {@code EconomyModule} stays small and the
+ * command/permission pairing is one greppable table.
  *
  * <p>The fine-grained eco-admin nodes ({@code uxmessentials.economy.admin.give|take|set|bulk}) and the
  * data-driven {@code uxmessentials.economy.baltop.exempt} marker are not command base permissions: they are

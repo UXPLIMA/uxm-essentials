@@ -15,8 +15,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * are Brigadier subcommands the inbound adapter gates with their own permission nodes
  * ({@code uxmessentials.home.visit}, {@code .invite}, {@code .admin}) via {@code .requires(...)}. Those are
  * not separate command literals, so they are not in this table: only the top-level {@code home} literal is.
- * Collected here so {@code HomesModule} stays small and the command/permission pairing is one greppable
- * table the permissions guard checks against {@code paper-plugin.yml}.
+ * Collected here so {@code HomesModule} stays small and the command/permission pairing is one greppable table.
  */
 final class HomeCommandSurface {
 

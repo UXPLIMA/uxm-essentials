@@ -1,6 +1,6 @@
 # Permissions: gameplay modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; the comment says whether the highest or the lowest granted number wins. The staff, server and item modules are in [permissions-server.md](permissions-server.md).
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The staff, server and item modules and the plugin-wide nodes are in [permissions-server.md](permissions-server.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
 
 Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstate](#playerstate) · [playerwarps](#playerwarps) · [poses](#poses) · [survival](#survival) · [teleport](#teleport) · [trade](#trade) · [vaults](#vaults) · [villagers](#villagers) · [warps](#warps) · [worlds](#worlds)
 
@@ -317,23 +317,23 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.module.worlds` | Hot-reload / inspect the worlds module (world creation, properties and access). | op |
 | `uxmessentials.world.<world>` | Enter one world that is configured as restricted. | op |
 | `uxmessentials.world.access.bypass` | Enter a restricted world without holding that world's own entry node. | op |
-| `uxmessentials.world.backup` | /world backup <name>: snapshot a world's folder. | op |
-| `uxmessentials.world.create` | /world create <name>: generate and register a new world. | op |
-| `uxmessentials.world.delete` | /world delete <name>: unregister a world and delete its folder from disk. | op |
+| `uxmessentials.world.backup` | /worlds backup <name>: snapshot a world's folder. | op |
+| `uxmessentials.world.create` | /worlds create <name>: generate and register a new world. | op |
+| `uxmessentials.world.delete` | /worlds delete <name>: unregister a world and delete its folder from disk. | op |
 | `uxmessentials.world.gamemode.bypass` | Keep your own game mode in a world that forces one on entry. | op |
-| `uxmessentials.world.gamerule` | /world gamerule <name> <rule> <value>: change one gamerule on a world. | op |
-| `uxmessentials.world.gui` | /world: open the world management GUI. | op |
-| `uxmessentials.world.import` | /world import <folder>: adopt an existing world folder into the registry. | op |
-| `uxmessentials.world.info` | /world info <name>: read one world's generator, properties, gamerules and spawn. | op |
-| `uxmessentials.world.list` | /world list: list every registered world with its load state and player count. | op |
-| `uxmessentials.world.load` | /world load <name>: load a registered world that is currently unloaded. | op |
-| `uxmessentials.world.pregen` | /world pregen <name> <radius>: pre-generate a world's chunks in the background. | op |
-| `uxmessentials.world.restore` | /world restore <name> <backup>: restore a world from one of its snapshots. | op |
-| `uxmessentials.world.set` | /world set <name> <property> <value>: change a world property such as difficulty or PvP. | op |
-| `uxmessentials.world.setspawn` | /world setspawn [name]: set a world's spawn point to where you are standing. | op |
+| `uxmessentials.world.gamerule` | /worlds gamerule <name> <rule> <value>: change one gamerule on a world. | op |
+| `uxmessentials.world.gui` | /worlds gui: open the world management GUI. | op |
+| `uxmessentials.world.import` | /worlds import <folder>: adopt an existing world folder into the registry. | op |
+| `uxmessentials.world.info` | /worlds info <name>: read one world's generator, properties, gamerules and spawn. | op |
+| `uxmessentials.world.list` | /worlds list: list every registered world with its load state and player count. | op |
+| `uxmessentials.world.load` | /worlds load <name>: load a registered world that is currently unloaded. | op |
+| `uxmessentials.world.pregen` | /worlds pregen <name> <radius>: pre-generate a world's chunks in the background. | op |
+| `uxmessentials.world.restore` | /worlds restore <name> <backup>: restore a world from one of its snapshots. | op |
+| `uxmessentials.world.set` | /worlds set <name> <property> <value>: change a world property such as difficulty or PvP. | op |
+| `uxmessentials.world.setspawn` | /worlds setspawn [name]: set a world's spawn point to where you are standing. | op |
 | `uxmessentials.world.spawn` | /worlds spawn to teleport to a world's spawn (subject to per-world access rules). | true |
-| `uxmessentials.world.tp` | /world tp <name>: teleport yourself to a world's spawn. | op |
-| `uxmessentials.world.tp.others` | /world tp <name> <player>: teleport somebody else to a world's spawn. | op |
-| `uxmessentials.world.unload` | /world unload <name>: unload a loaded world, moving anybody inside to spawn. | op |
-| `uxmessentials.world.unregister` | /world unregister <name>: drop a world from the registry, leaving its folder on disk. | op |
+| `uxmessentials.world.tp` | /worlds tp <name>: teleport yourself to a world's spawn. | op |
+| `uxmessentials.world.tp.others` | /worlds tp <name> <player>: teleport somebody else to a world's spawn. | op |
+| `uxmessentials.world.unload` | /worlds unload <name>: unload a loaded world, moving anybody inside to spawn. | op |
+| `uxmessentials.world.unregister` | /worlds unregister <name>: drop a world from the registry, leaving its folder on disk. | op |
 | `uxmessentials.world.voidrescue.exempt` | Keep falling in a world that catches players out of the void. | false |

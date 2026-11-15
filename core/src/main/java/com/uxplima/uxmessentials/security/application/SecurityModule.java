@@ -72,7 +72,7 @@ public final class SecurityModule implements FeatureModule {
     @Override
     public boolean enabled(ConfigStore config) {
         // The module ships enabled but inert (nothing happens until a player enrols a factor); an operator opts
-        // out via modules.conf.
+        // out via modules/security/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

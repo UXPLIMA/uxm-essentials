@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * gated by {@code uxmessentials.npc.admin}, that serves every form through its subcommands, {@code create},
  * {@code delete}, {@code list}, {@code movehere}, {@code skin}, and {@code command}. The npc inbound adapter
  * realises the Brigadier node from the started module's context on the next {@code COMMANDS} fire. Collected
- * here so {@code NpcModule} stays small and the command/permission pairing is one greppable row the permissions
- * guard checks against {@code paper-plugin.yml}.
+ * here so {@code NpcModule} stays small and the command/permission pairing is one greppable row.
  */
 final class NpcCommandSurface {
 

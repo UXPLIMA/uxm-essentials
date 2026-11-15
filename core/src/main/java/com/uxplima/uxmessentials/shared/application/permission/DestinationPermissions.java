@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 
 /**
  * The permission table for the contexts that own a place or a stash. Data, not logic: one row per node, read by {@link
- * PermissionCatalog} and through it by the server registration, the reference page and the in-game listing.
+ * PermissionCatalog} and through it by the server registration, the in-game listing and its export.
  */
 final class DestinationPermissions {
 
@@ -359,17 +359,17 @@ final class DestinationPermissions {
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.backup",
-                        "/world backup <name>: snapshot a world's folder.",
+                        "/worlds backup <name>: snapshot a world's folder.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.create",
-                        "/world create <name>: generate and register a new world.",
+                        "/worlds create <name>: generate and register a new world.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.delete",
-                        "/world delete <name>: unregister a world and delete its folder from disk.",
+                        "/worlds delete <name>: unregister a world and delete its folder from disk.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
@@ -379,52 +379,52 @@ final class DestinationPermissions {
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.gamerule",
-                        "/world gamerule <name> <rule> <value>: change one gamerule on a world.",
+                        "/worlds gamerule <name> <rule> <value>: change one gamerule on a world.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.gui",
-                        "/world: open the world management GUI.",
+                        "/worlds gui: open the world management GUI.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.import",
-                        "/world import <folder>: adopt an existing world folder into the registry.",
+                        "/worlds import <folder>: adopt an existing world folder into the registry.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.info",
-                        "/world info <name>: read one world's generator, properties, gamerules and spawn.",
+                        "/worlds info <name>: read one world's generator, properties, gamerules and spawn.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.list",
-                        "/world list: list every registered world with its load state and player count.",
+                        "/worlds list: list every registered world with its load state and player count.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.load",
-                        "/world load <name>: load a registered world that is currently unloaded.",
+                        "/worlds load <name>: load a registered world that is currently unloaded.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.pregen",
-                        "/world pregen <name> <radius>: pre-generate a world's chunks in the background.",
+                        "/worlds pregen <name> <radius>: pre-generate a world's chunks in the background.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.restore",
-                        "/world restore <name> <backup>: restore a world from one of its snapshots.",
+                        "/worlds restore <name> <backup>: restore a world from one of its snapshots.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.set",
-                        "/world set <name> <property> <value>: change a world property such as difficulty or PvP.",
+                        "/worlds set <name> <property> <value>: change a world property such as difficulty or PvP.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.setspawn",
-                        "/world setspawn [name]: set a world's spawn point to where you are standing.",
+                        "/worlds setspawn [name]: set a world's spawn point to where you are standing.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
@@ -434,22 +434,22 @@ final class DestinationPermissions {
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.tp",
-                        "/world tp <name>: teleport yourself to a world's spawn.",
+                        "/worlds tp <name>: teleport yourself to a world's spawn.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.tp.others",
-                        "/world tp <name> <player>: teleport somebody else to a world's spawn.",
+                        "/worlds tp <name> <player>: teleport somebody else to a world's spawn.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.unload",
-                        "/world unload <name>: unload a loaded world, moving anybody inside to spawn.",
+                        "/worlds unload <name>: unload a loaded world, moving anybody inside to spawn.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
                         "uxmessentials.world.unregister",
-                        "/world unregister <name>: drop a world from the registry, leaving its folder on disk.",
+                        "/worlds unregister <name>: drop a world from the registry, leaving its folder on disk.",
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(

@@ -81,7 +81,7 @@ public final class CommunicationModule implements FeatureModule {
     public boolean enabled(ConfigStore config) {
         // The module ships ENABLED, but every content file ships inert (channels keep the vanilla message, the
         // announcer has no lines), so being on changes nothing until an operator authors templates. The default here
-        // is true (the landed contexts default to on); an operator opts out via modules.conf.
+        // is true (the landed contexts default to on); an operator opts out via modules/communication/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

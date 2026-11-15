@@ -10,8 +10,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *
  * <p>There is exactly one registration site, so the registry is the single answer to "which contexts
  * exist?" Registration is explicit (no classpath scanning, no reflection, no service loader) so the
- * set stays greppable and the drift guard can compare it against the package tree and {@code
- * modules.conf}.
+ * set stays greppable.
  *
  * <p>Order is part of the contract: {@link #all()} is dependency-first (prerequisites before
  * dependents), and teardown on disable walks it in reverse so dependents stop before prerequisites.

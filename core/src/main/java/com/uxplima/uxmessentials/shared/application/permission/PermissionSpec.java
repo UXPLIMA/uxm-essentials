@@ -9,11 +9,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * One permission the plugin publishes, described once.
  *
- * <p>A node used to be written down in three places that nothing kept in step: a string literal at the site that
- * checks it, an entry in {@code paper-plugin.yml} so the server and the permission plugin know it exists, and a row
- * on the reference page so an operator can find it. This record is the one place, and the other two are derived from
- * it: the adapter registers the fixed nodes with the server on enable, and the reference page is checked against the
- * catalogue by a guard, so a node cannot be added without becoming visible to operators.
+ * <p>This record is the one place a node is declared. The adapter registers the fixed nodes with the server on
+ * enable, so the server and the permission plugin know they exist, and {@code /uxmess permissions} lists every entry
+ * to an operator in game. The permission pages under {@code docs/user/} are kept in step with the catalogue by hand.
  *
  * @param node the node, written with its placeholder visible when the shape is a family
  *     ({@code uxmessentials.home.limit.<n>})

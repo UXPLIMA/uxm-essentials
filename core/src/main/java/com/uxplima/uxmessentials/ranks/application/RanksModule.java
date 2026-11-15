@@ -70,7 +70,7 @@ public final class RanksModule implements FeatureModule {
     @Override
     public boolean enabled(ConfigStore config) {
         // The module ships enabled but inert (nothing happens until a ladder is authored); an operator opts out
-        // via modules.conf.
+        // via modules/ranks/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

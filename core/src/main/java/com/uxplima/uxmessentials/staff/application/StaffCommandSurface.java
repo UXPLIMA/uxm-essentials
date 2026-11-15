@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * by {@code uxmessentials.staff.mode} (toggle staff mode on or off), {@code /staffchat} (alias {@code /sc})
  * guarded by {@code uxmessentials.staff.chat} (send a line on the staff channel), and {@code /stafflist}
  * guarded by {@code uxmessentials.staff.list} (show who is currently in staff mode). The literals and nodes
- * are fixed and greppable so the surface guard checks them against {@code paper-plugin.yml}; the realised
+ * are fixed and greppable; the realised
  * Brigadier handlers are built in the adapter.
  *
  * <p>There is deliberately no sanction command here: staff mode only orchestrates the existing modules.

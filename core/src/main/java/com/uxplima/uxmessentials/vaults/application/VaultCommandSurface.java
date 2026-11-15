@@ -14,8 +14,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * <n>} (open the Nth), and {@code /vault <player> [n]} (the audit-logged staff override, gated inside the
  * handler by {@code uxmessentials.vault.others}). The vaults inbound adapter realises the Brigadier node from
  * the started module's context on the next {@code COMMANDS} fire. Collected here so {@code VaultsModule} stays
- * small and the command/permission pairing is one greppable row the permissions guard checks against
- * {@code paper-plugin.yml}.
+ * small and the command/permission pairing is one greppable row.
  */
 final class VaultCommandSurface {
 

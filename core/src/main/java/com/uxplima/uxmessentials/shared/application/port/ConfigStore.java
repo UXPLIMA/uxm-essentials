@@ -13,7 +13,7 @@ import java.util.Objects;
  *
  * <p>Each {@code getX} takes a default returned when the path is absent, which is how a feature
  * module's {@code enabled} flag defaults to {@code true} when an operator has not declared it in
- * {@code modules.conf}. The numeric and list getters carry default implementations atop the three
+ * {@code modules/<id>/config.conf}. The numeric and list getters carry default implementations atop the three
  * primitive getters so an existing adapter keeps satisfying the contract; an adapter backed by a real
  * typed tree overrides them for native typing.
  */

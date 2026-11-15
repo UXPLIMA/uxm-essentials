@@ -5,7 +5,7 @@ import java.util.stream.Stream;
 
 /**
  * The permission table for the cross-cutting surfaces no single module owns. Data, not logic: one row per node, read
- * by {@link PermissionCatalog} and through it by the server registration, the reference page and the in-game listing.
+ * by {@link PermissionCatalog} and through it by the server registration, the in-game listing and its export.
  */
 final class SharedPermissions {
 

@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The player-warps inbound adapter realises the Brigadier
  * node from the started module's context on the next {@code COMMANDS} fire. Collected here so
- * {@code PlayerwarpsModule} stays small and the command/permission pairing is one greppable table the
- * permissions guard checks against {@code paper-plugin.yml}.
+ * {@code PlayerwarpsModule} stays small and the command/permission pairing is one greppable table.
  *
  * <p>The {@code public}/{@code private} visibility toggles and {@code del} (gated by
  * {@code uxmessentials.pwarp.delete}) are subcommands of {@code /pwarp}, not separate command literals, so they

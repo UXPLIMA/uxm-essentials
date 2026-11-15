@@ -17,8 +17,8 @@ dependencies {
     api(project(":api"))
 
     compileOnly(libs.bundles.db) // Hikari, SQLite, Flyway, jOOQ: the default backend
-    compileOnly(libs.bundles.db.mysql) // MySQL and MariaDB drivers, activated by modules.conf
-    compileOnly(libs.bundles.db.pg) // PostgreSQL driver, activated by modules.conf
+    compileOnly(libs.bundles.db.mysql) // MySQL and MariaDB drivers, picked by storage.type in config.conf
+    compileOnly(libs.bundles.db.pg) // PostgreSQL driver, picked by storage.type in config.conf
     compileOnly(libs.caffeine)
     compileOnly(libs.gson)
     compileOnly(libs.slf4j.api)
