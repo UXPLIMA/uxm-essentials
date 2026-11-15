@@ -7,6 +7,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.bukkit.command.CommandSender;
@@ -42,6 +44,7 @@ import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
 import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldCreateOptions;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
@@ -75,6 +78,11 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String PREGEN = "uxmessentials.world.pregen";
     private static final String BACKUP = "uxmessentials.world.backup";
     private static final String RESTORE = "uxmessentials.world.restore";
+    private static final String CLAIM = "uxmessentials.world.claim";
+    private static final String SETSERVER = "uxmessentials.world.setserver";
+
+    /** A network name, as the warps' server column holds it: what may follow the {@code @} of a destination. */
+    private static final Pattern SERVER_NAME = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
 
     private static final DateTimeFormatter BACKUP_DATE =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC);
@@ -135,10 +143,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("spawn")
                         .requires(p(SPAWN))
                         .executes(this::runSpawnCurrent)
-                        .then(nameArg().executes(this::runSpawnNamed)))
+                        .then(destinationArg().executes(this::runSpawnNamed)))
                 .then(Commands.literal("tp")
                         .requires(p(TP))
-                        .then(nameArg()
+                        .then(destinationArg()
                                 .executes(this::runTpSelf)
                                 .then(Commands.argument("player", ArgumentTypes.player())
                                         .suggests(CommandSuggestions.singlePlayerTarget())
@@ -169,13 +177,25 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .then(Commands.literal("restoreconfirm")
                         .requires(p(RESTORE))
                         .then(nameArg().executes(this::runRestoreConfirm)))
+                .then(Commands.literal("claim")
+                        .requires(p(CLAIM))
+                        .then(Commands.argument("name", Args.token())
+                                .suggests(CommandSuggestions.fromStrings(this::unclaimedNames))
+                                .executes(this::runClaim)))
+                .then(Commands.literal("setserver")
+                        .requires(p(SETSERVER))
+                        .then(Commands.argument("from", Args.token())
+                                .suggests(CommandSuggestions.fromStrings(this::recordedServers))
+                                .then(Commands.argument("to", Args.token())
+                                        .suggests(CommandSuggestions.fromStrings(this::targetServers))
+                                        .executes(this::runSetServer))))
                 .build();
     }
 
     @Override
     public String description() {
         return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui, pregen,"
-                + " backup, backups, restore, restoreconfirm.";
+                + " backup, backups, restore, restoreconfirm, claim, setserver.";
     }
 
     /**
@@ -197,6 +217,61 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 .suggests(CommandSuggestions.fromStrings(() -> services.repository().all().stream()
                         .map(w -> w.name().value())
                         .toList()));
+    }
+
+    /**
+     * A world to teleport to: one of this server's by name, or one another server runs, suggested as
+     * {@code world@server} so a name several servers share can still be picked.
+     */
+    private RequiredArgumentBuilder<CommandSourceStack, String> destinationArg() {
+        return Commands.argument("name", Args.token()).suggests(CommandSuggestions.fromStrings(this::destinations));
+    }
+
+    private List<String> destinations() {
+        String local = services.localScope();
+        List<String> names = new java.util.ArrayList<>();
+        for (NetworkWorld world : services.repository().network()) {
+            if (world.livesOn(local)) {
+                names.add(world.name().value());
+            } else if (services.showRemote()) {
+                world.knownServer().ifPresent(server -> names.add(world.name().value() + "@" + server));
+            }
+        }
+        return names;
+    }
+
+    /** The servers some world is recorded on, the ones {@code setserver} can move worlds from. */
+    private List<String> recordedServers() {
+        return services.repository().network().stream()
+                .flatMap(world -> world.knownServer().stream())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<String> targetServers() {
+        List<String> servers = new java.util.ArrayList<>(recordedServers());
+        servers.add(NetworkWorld.UNSCOPED);
+        return servers;
+    }
+
+    /**
+     * The unclaimed worlds {@code /worlds claim} can copy here: every template this backend does not keep yet, those
+     * another backend already copied included, since this backend may hold the same world.
+     */
+    private List<String> unclaimedNames() {
+        String local = services.localScope();
+        List<NetworkWorld> network = services.repository().network();
+        Set<String> kept = network.stream()
+                .filter(world -> world.livesOn(local))
+                .map(world -> world.name().value())
+                .collect(Collectors.toSet());
+        return network.stream()
+                .filter(world -> world.unclaimed() && !world.livesOn(local))
+                .map(world -> world.name().value())
+                .filter(name -> !kept.contains(name))
+                .distinct()
+                .toList();
     }
 
     private RequiredArgumentBuilder<CommandSourceStack, String> folderArg() {
@@ -359,14 +434,55 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         }
         feedback.send(sender, WorldsMessageKey.WORLD_LIST_HEADER, Map.of("count", Integer.toString(entries.size())));
         for (ListWorlds.WorldListEntry entry : entries) {
-            feedback.send(
-                    sender,
-                    WorldsMessageKey.WORLD_LIST_ENTRY,
-                    Map.of(
-                            "world", entry.name().value(),
-                            "loaded", Boolean.toString(entry.loaded()),
-                            "environment", entry.environment().name()));
+            String world = entry.name().value();
+            String environment = entry.environment().name();
+            if (entry.unclaimed()) {
+                feedback.send(
+                        sender,
+                        WorldsMessageKey.WORLD_LIST_ENTRY_UNCLAIMED,
+                        Map.of("world", world, "environment", environment));
+            } else if (entry.here()) {
+                feedback.send(
+                        sender,
+                        WorldsMessageKey.WORLD_LIST_ENTRY,
+                        Map.of(
+                                "world",
+                                world,
+                                "loaded",
+                                Boolean.toString(entry.loaded()),
+                                "environment",
+                                environment,
+                                "server",
+                                entry.server().orElseThrow()));
+            } else {
+                feedback.send(
+                        sender,
+                        WorldsMessageKey.WORLD_LIST_ENTRY_REMOTE,
+                        Map.of(
+                                "world",
+                                world,
+                                "environment",
+                                environment,
+                                "server",
+                                entry.server().orElseThrow()));
+            }
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetServer(CommandContext<CommandSourceStack> ctx) {
+        services.setWorldServer()
+                .rename(actor(ctx), ctx.getArgument("from", String.class), ctx.getArgument("to", String.class));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runClaim(CommandContext<CommandSourceStack> ctx) {
+        CommandSender sender = Sender.audience(ctx.getSource());
+        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
+        if (name == null) {
+            return 0;
+        }
+        services.claimWorld().claim(actor(ctx), name);
         return Command.SINGLE_SUCCESS;
     }
 
@@ -514,26 +630,48 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private int spawnTo(Player sender, String raw) {
-        WorldName name = parseName(sender, raw);
-        if (name == null) {
+        Destination destination = parseDestination(sender, raw);
+        if (destination == null) {
             return 0;
         }
         PlayerRef who = ref(sender);
-        onGlobal(() -> services.worldTeleport().spawn(who, name));
+        onGlobal(() -> services.worldTeleport().spawn(who, destination.name(), destination.server()));
         return Command.SINGLE_SUCCESS;
     }
+
+    /**
+     * A world to teleport to, written as {@code world} or {@code world@server}, or {@code null} after the
+     * invalid-name reply. The server picks the backend whose world of that name is meant.
+     */
+    private @Nullable Destination parseDestination(CommandSender sender, String raw) {
+        int at = raw.lastIndexOf('@');
+        if (at < 0) {
+            WorldName name = parseName(sender, raw);
+            return name == null ? null : new Destination(name, Optional.empty());
+        }
+        String server = raw.substring(at + 1);
+        if (!SERVER_NAME.matcher(server).matches()) {
+            feedback.send(sender, WorldsMessageKey.WORLD_NAME_INVALID, Map.of("world", raw));
+            return null;
+        }
+        WorldName name = parseName(sender, raw.substring(0, at));
+        return name == null ? null : new Destination(name, Optional.of(server));
+    }
+
+    /** A parsed teleport destination: the world, and the server whose world of that name is meant, if named. */
+    private record Destination(WorldName name, Optional<String> server) {}
 
     private int runTpSelf(CommandContext<CommandSourceStack> ctx) {
         Player sender = player(ctx);
         if (sender == null) {
             return 0;
         }
-        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
-        if (name == null) {
+        Destination destination = parseDestination(sender, ctx.getArgument("name", String.class));
+        if (destination == null) {
             return 0;
         }
         PlayerRef who = ref(sender);
-        onGlobal(() -> services.worldTeleport().forced(who, who, name));
+        onGlobal(() -> services.worldTeleport().forced(who, who, destination.name(), destination.server()));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -543,13 +681,13 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (target.isEmpty()) {
             return 0;
         }
-        WorldName name = parseName(sender, ctx.getArgument("name", String.class));
-        if (name == null) {
+        Destination destination = parseDestination(sender, ctx.getArgument("name", String.class));
+        if (destination == null) {
             return 0;
         }
         PlayerRef actor = actor(ctx);
         PlayerRef subject = ref(target.get());
-        onGlobal(() -> services.worldTeleport().forced(actor, subject, name));
+        onGlobal(() -> services.worldTeleport().forced(actor, subject, destination.name(), destination.server()));
         return Command.SINGLE_SUCCESS;
     }
 

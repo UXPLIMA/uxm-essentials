@@ -5,18 +5,16 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-
-import org.bukkit.Bukkit;
-import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLocator;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -46,6 +44,10 @@ import org.jspecify.annotations.NullMarked;
  * {@code SchedulerWarmups} applies, and records the resulting completion instant with the tracker, so the
  * {@code teleport_warmup_remaining} placeholder can read the remaining wait the kernel port does not surface
  * back through its handle.
+ *
+ * <p>Before a new warmup begins, the player's earlier one, if any is still armed, is superseded. Doing it here
+ * rather than only when the tracker is armed also covers a new teleport that skips its warmup: it lands at once and
+ * is never armed, and the earlier warmup must not land after it.
  */
 @NullMarked
 public final class TrackingWarmups implements Warmups {
@@ -56,6 +58,7 @@ public final class TrackingWarmups implements Warmups {
     private final Permissions permissions;
     private final Clock clock;
     private final Notifier notifier;
+    private final PlayerLocator locator;
 
     public TrackingWarmups(
             Warmups delegate,
@@ -63,28 +66,43 @@ public final class TrackingWarmups implements Warmups {
             Supplier<WarmupCancelToggles> toggles,
             Permissions permissions,
             Clock clock,
-            Notifier notifier) {
+            Notifier notifier,
+            PlayerLocator locator) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.locator = Objects.requireNonNull(locator, "locator");
     }
 
     @Override
     public WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel) {
+        return begin(who, kind, onComplete, onCancel, onCancel);
+    }
+
+    @Override
+    public WarmupHandle begin(
+            PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
-        Optional<Position> origin = currentPosition(who);
-        WarmupHandle handle = delegate.begin(who, kind, wrapComplete(who, onComplete), onCancel);
+        Optional<Position> origin = locator.locate(who);
+        tracker.supersede(who.uuid());
+        AtomicReference<WarmupHandle> started = new AtomicReference<>();
+        WarmupHandle handle = delegate.begin(who, kind, wrapComplete(who, started, onComplete), onCancel, onSuperseded);
+        started.set(handle);
         origin.ifPresent(at -> arm(who, kind, at, handle));
         return handle;
     }
 
-    private Runnable wrapComplete(PlayerRef who, Runnable onComplete) {
+    private Runnable wrapComplete(PlayerRef who, AtomicReference<WarmupHandle> started, Runnable onComplete) {
         return () -> {
-            tracker.forget(who.uuid());
+            // Empty only for a warmup that completed inside begin, which was never armed and has nothing to forget.
+            WarmupHandle self = started.get();
+            if (self != null) {
+                tracker.forget(who.uuid(), self);
+            }
             onComplete.run();
         };
     }
@@ -112,10 +130,5 @@ public final class TrackingWarmups implements Warmups {
                 .resolveQuota(who, family, null, kind.defaultSeconds())
                 .orElse(kind.defaultSeconds());
         return Duration.ofSeconds(Math.max(0L, seconds));
-    }
-
-    private static Optional<Position> currentPosition(PlayerRef who) {
-        Player player = Bukkit.getPlayer(who.uuid());
-        return player == null || !player.isOnline() ? Optional.empty() : Optional.of(TeleportRefs.positionOf(player));
     }
 }

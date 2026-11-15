@@ -220,7 +220,7 @@ public final class BukkitWorldArchive implements WorldArchive {
         engine.defaultWorldName().ifPresent(def -> {
             for (Player p : List.copyOf(w.getPlayers())) {
                 marker.mark(p.getUniqueId());
-                teleporter.forced(initiator, BukkitRefs.toRef(p), def);
+                teleporter.forcedHere(initiator, BukkitRefs.toRef(p), def);
             }
         });
     }

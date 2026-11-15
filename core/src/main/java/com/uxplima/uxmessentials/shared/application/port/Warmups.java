@@ -33,6 +33,17 @@ public interface Warmups {
     WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel);
 
     /**
+     * Begin a warmup like {@link #begin(PlayerRef, WarmupKind, Runnable, Runnable)}, running {@code onSuperseded}
+     * in place of {@code onCancel} when the warmup is stopped through {@link WarmupHandle#supersede()} because the
+     * same player began another one. Exactly one of the three callbacks ever runs. An implementation that cannot
+     * tell the two stops apart runs {@code onCancel} for both, which is still a correct cancel.
+     */
+    default WarmupHandle begin(
+            PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+        return begin(who, kind, onComplete, onCancel);
+    }
+
+    /**
      * A tiered warmup's identity: the feature segment used to build the permission nodes and the
      * config-default duration in seconds when the player holds no matching tier node.
      *
@@ -76,6 +87,15 @@ public interface Warmups {
 
         /** Request cancellation; idempotent, and a no-op after completion. */
         void cancel();
+
+        /**
+         * Cancel because the same player began another warmup. It is a cancel in every respect, once-only and a
+         * no-op after completion or an earlier cancel, except that the superseded callback runs instead of the
+         * cancel one, so the player can be told why without being told they moved.
+         */
+        default void supersede() {
+            cancel();
+        }
 
         /** True once the countdown has elapsed and {@code onComplete} has run. */
         boolean isComplete();

@@ -19,4 +19,16 @@ public interface WorldEntryFee {
      * implementation deducts nothing and always succeeds.
      */
     boolean charge(PlayerRef who, BigDecimal amount);
+
+    /**
+     * The id of the currency fees are taken in, carried with a fee paid for a world on another server so the backend
+     * that ends the hop can give back exactly what was taken.
+     */
+    String currencyId();
+
+    /**
+     * Gives {@code amount}, taken in {@code currencyId}, back to {@code who}, returning whether the credit landed. The
+     * free implementation credits nothing and always succeeds.
+     */
+    boolean refund(PlayerRef who, BigDecimal amount, String currencyId);
 }
