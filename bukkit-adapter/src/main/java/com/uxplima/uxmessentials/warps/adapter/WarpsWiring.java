@@ -105,10 +105,8 @@ public final class WarpsWiring {
         // read lazily reloads.
         cached.all();
         bus.registry().registerResync(() -> {
-            cached.invalidateAll();
-            cached.all();
-            categoryRepository.invalidateAll();
-            categoryRepository.all();
+            cached.reloadAll();
+            categoryRepository.reloadAll();
         });
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 

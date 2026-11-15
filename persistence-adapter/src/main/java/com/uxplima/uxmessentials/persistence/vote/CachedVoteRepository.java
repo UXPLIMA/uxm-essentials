@@ -32,8 +32,13 @@ public final class CachedVoteRepository extends ForwardingVoteRepository {
             return cached;
         }
         int loaded = delegate.partyCount();
-        cachedCount.set(loaded);
-        return loaded;
+        // Only fill an empty slot: a write that landed during the read holds a newer count than this one.
+        return cachedCount.compareAndSet(UNLOADED, loaded) ? loaded : orLoaded(loaded);
+    }
+
+    private int orLoaded(int loaded) {
+        int current = cachedCount.get();
+        return current == UNLOADED ? loaded : current;
     }
 
     @Override
@@ -58,6 +63,16 @@ public final class CachedVoteRepository extends ForwardingVoteRepository {
             cachedCount.set(0);
         }
         return won;
+    }
+
+    /**
+     * Read the counter again and swap it in, for a count another server moved. Readers keep the old count until the
+     * swap, and a local write during the read wins over it. Blocks on the database, so call it off the tick.
+     */
+    public void reloadCount() {
+        int current = cachedCount.get();
+        int fresh = delegate.partyCount();
+        cachedCount.compareAndSet(current, fresh);
     }
 
     /** Drop the cached counter so the next read reloads it from the database; call on a module reload. */

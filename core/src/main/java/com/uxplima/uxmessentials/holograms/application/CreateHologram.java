@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.holograms.application;
 
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -58,7 +59,9 @@ public final class CreateHologram {
             notifier.send(creator, HologramError.NAME_TAKEN.messageKey(), Map.of("name", name.value()));
             return Result.err(HologramError.NAME_TAKEN);
         }
-        Hologram hologram = Hologram.create(name, at, List.of(firstLine), clock.instant());
+        // Rows keep epoch millis, so the cached copy matches the stored one and a resync sees no change.
+        Hologram hologram =
+                Hologram.create(name, at, List.of(firstLine), clock.instant().truncatedTo(ChronoUnit.MILLIS));
         repository.save(hologram);
         view.render(hologram);
         events.publish(new HologramCreated(name, creator, at));

@@ -118,7 +118,7 @@ public final class VaultsWiring {
         // reports changed, and the broadcasting decorator announces this backend's own saves to peers.
         CachedVaultRepository cached = VaultRepositories.cachedConcrete(persistence);
         bus.registry().register(VaultSync.listener(cached));
-        bus.registry().registerResync(cached::invalidateAll);
+        bus.registry().registerPlayerCacheDrop(cached::invalidateAll);
         VaultRepository repository = VaultSync.repository(cached, bus.publisher());
         VaultAudit audit = new LoggingVaultAudit(auditChannel.logger());
         // The two quota reducers are built once here so the placeholder seam reads the same resolved

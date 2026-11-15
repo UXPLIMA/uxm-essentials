@@ -176,9 +176,6 @@ public final class GuardWiring {
             }
         });
 
-        // The poll reloads only when the store's stamp moved, so a resync with nothing missed costs one small query.
-        bus.registry().registerResync(service::poll);
-
         var loaded = service.load().whenComplete((ok, error) -> {
             if (service.loadFailed()) {
                 kernel.scheduler().onGlobal(() -> {

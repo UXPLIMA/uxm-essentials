@@ -46,12 +46,14 @@ class SharedCacheRefreshTest {
     private final ManualScheduler scheduler = new ManualScheduler();
     private final RemoteSyncRegistry registry = new RemoteSyncRegistry();
     private final AtomicInteger reloads = new AtomicInteger();
+    private final AtomicInteger playerDrops = new AtomicInteger();
 
     private SharedCacheRefresh refresh(String network, int onlineNow) throws IOException {
         Path file = folder.resolve("config.conf");
         Files.writeString(file, "network {\n" + network + "\n}\n");
         NetworkConfig config = NetworkConfig.from(ConfigurateConfigStore.load(file, QUIET));
         registry.registerResync(reloads::incrementAndGet);
+        registry.registerPlayerCacheDrop(playerDrops::incrementAndGet);
         return SharedCacheRefresh.wire(config, registry, scheduler, QUIET, onlineNow);
     }
 
@@ -60,6 +62,8 @@ class SharedCacheRefreshTest {
         SharedCacheRefresh refresh = refresh("enabled = true", 0);
 
         refresh.playerJoined();
+        // The per-player caches drop on the joining thread, before the join handlers warm the joiner.
+        assertThat(playerDrops).hasValue(1);
         scheduler.runAsync();
 
         assertThat(reloads).hasValue(1);
@@ -73,18 +77,22 @@ class SharedCacheRefreshTest {
         scheduler.runAsync();
 
         assertThat(reloads).hasValue(0);
+        assertThat(playerDrops).hasValue(0);
     }
 
     @Test
     void aBackendThatEmptiedReloadsOnTheNextJoin() throws IOException {
-        SharedCacheRefresh refresh = refresh("enabled = true", 1);
+        SharedCacheRefresh refresh = refresh("enabled = true", 2);
 
-        refresh.playerLeft(0);
+        // Two quits that each ran on their own region thread still empty the backend.
+        refresh.playerLeft();
+        refresh.playerLeft();
         refresh.playerJoined();
         refresh.playerJoined();
         scheduler.runAsync();
 
         assertThat(reloads).hasValue(1);
+        assertThat(playerDrops).hasValue(1);
     }
 
     @Test
@@ -119,6 +127,19 @@ class SharedCacheRefreshTest {
 
         assertThat(reloads).hasValue(2);
         assertThat(scheduler.delays).containsOnly(Duration.ofSeconds(60));
+        assertThat(playerDrops).hasValue(0);
+    }
+
+    @Test
+    void aJoinAndATimerTickTogetherReloadOnce() throws IOException {
+        SharedCacheRefresh refresh = refresh("enabled = true\n  cache-refresh-seconds = 60", 0);
+
+        refresh.start();
+        refresh.playerJoined();
+        scheduler.runNextDelayed();
+        scheduler.runAsync();
+
+        assertThat(reloads).hasValue(1);
     }
 
     @Test
@@ -170,6 +191,7 @@ class SharedCacheRefreshTest {
             if (!delayed.isEmpty()) {
                 delayed.removeFirst().run();
             }
+            runAsync();
         }
 
         @Override

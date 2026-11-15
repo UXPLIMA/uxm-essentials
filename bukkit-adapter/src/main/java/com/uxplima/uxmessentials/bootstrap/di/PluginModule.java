@@ -872,7 +872,7 @@ public final class PluginModule {
                 kernel.scheduler(),
                 kernel.log(),
                 plugin.getServer().getOnlinePlayers().size());
-        resources.addListener(new SharedCacheRefreshListener(cacheRefresh, plugin.getServer()));
+        resources.addListener(new SharedCacheRefreshListener(cacheRefresh));
         cacheRefresh.start();
         resources.onClose(cacheRefresh::stop);
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is

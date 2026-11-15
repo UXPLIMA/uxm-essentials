@@ -142,10 +142,7 @@ public final class WorldsWiring {
         CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
         repository.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
         // No frame announces a peer's world edit, so the shared rows come back in only through the bus resync.
-        bus.registry().registerResync(() -> {
-            repository.invalidateAll();
-            repository.all();
-        });
+        bus.registry().registerResync(repository::reloadAll);
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WorldsSettings settings = new WorldsSettings(ctx.config());

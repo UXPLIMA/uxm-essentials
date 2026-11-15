@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.ranks.application;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -142,13 +141,6 @@ public final class CachedPlayerRankRepository implements PlayerRankRepository {
         Long generation = online.computeIfPresent(playerId, (id, previous) -> generations.incrementAndGet());
         if (generation != null) {
             scheduler.async(() -> load(playerId, generation));
-        }
-    }
-
-    /** Re-read every online player's pointer on the async lane, for a backend that may have missed remote changes. */
-    public void refreshOnline() {
-        for (UUID playerId : List.copyOf(online.keySet())) {
-            refresh(playerId);
         }
     }
 

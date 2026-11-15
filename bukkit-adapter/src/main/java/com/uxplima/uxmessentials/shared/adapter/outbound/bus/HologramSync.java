@@ -1,8 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -78,36 +76,23 @@ public final class HologramSync {
     }
 
     /**
-     * A resync for {@link SharedCacheRefresh}: reload the whole set from the shared DB, then render each hologram a
-     * missed frame left stale and despawn each one deleted meanwhile. Holograms that did not change are not redrawn,
-     * so a periodic run over an unchanged set costs one read. It runs on the async lane, as the listener's reload does.
+     * A resync for {@link SharedCacheRefresh}: reload the whole set from the shared DB without emptying it, then
+     * render each hologram a missed frame left stale and despawn each one deleted meanwhile. Holograms that did not
+     * change are not redrawn. It runs on the async lane, as the listener's reload does.
      */
     public static Runnable resync(CachedHologramRepository cache, HologramView renderer) {
         Objects.requireNonNull(cache, "cache");
         Objects.requireNonNull(renderer, "renderer");
-        return () -> {
-            Map<HologramName, Hologram> before = byName(cache.all());
-            cache.invalidateAll();
-            Map<HologramName, Hologram> after = byName(cache.all());
-            for (Hologram hologram : after.values()) {
-                if (!hologram.equals(before.get(hologram.name()))) {
-                    renderer.render(hologram);
+        return () -> cache.reloadAll().ifPresent(swap -> {
+            for (String key : swap.changedKeys()) {
+                Hologram fresh = swap.after().get(key);
+                if (fresh != null) {
+                    renderer.render(fresh);
+                } else {
+                    renderer.despawn(HologramName.of(key));
                 }
             }
-            for (HologramName name : before.keySet()) {
-                if (!after.containsKey(name)) {
-                    renderer.despawn(name);
-                }
-            }
-        };
-    }
-
-    private static Map<HologramName, Hologram> byName(List<Hologram> holograms) {
-        Map<HologramName, Hologram> map = new HashMap<>();
-        for (Hologram hologram : holograms) {
-            map.put(hologram.name(), hologram);
-        }
-        return map;
+        });
     }
 
     /** Reload the named hologram from the shared DB and render it if present, despawn it if it was deleted. */
