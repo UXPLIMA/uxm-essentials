@@ -19,12 +19,12 @@ import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.persistence.staff.StaffLoadoutAdoption;
 import com.uxplima.uxmessentials.persistence.staff.StaffStores;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -121,7 +121,10 @@ public final class StaffWiring {
         // save/load/delete to THIS backend's network.server-name, so two backends sharing one DB never clobber
         // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);
-        adoptDefaultIdLoadouts(persistence, serverId, kernel);
+        // /staffmode stays shut until the move lands, so enter sees a moved row and recovers it instead of
+        // capturing over it. A join inside that window recovers on the player's next join or /staffmode.
+        AtomicBoolean adopted = new AtomicBoolean(false);
+        adoptUnscopedLoadouts(persistence, serverId, kernel, adopted);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
 
         // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
@@ -187,7 +190,11 @@ public final class StaffWiring {
                 "staff", StaffMessageKey.STAFF_LIST_TITLE, Material.SHIELD, STAFF_LIST_PERMISSION, staffList::open));
         List<CommandRegistration> commands = List.of(
                 new StaffModeCommand(
-                        services, kernel.messages(), kernel.scheduler(), kernel.playerLookup(), running::get),
+                        services,
+                        kernel.messages(),
+                        kernel.scheduler(),
+                        kernel.playerLookup(),
+                        () -> running.get() && adopted.get()),
                 new StaffChatCommand(services, kernel.messages()),
                 staffList);
         List<Listener> listeners = List.of(
@@ -202,33 +209,31 @@ public final class StaffWiring {
     }
 
     /**
-     * Move the loadouts held under the default server id onto {@code serverId}, off the tick, so a backend that
-     * names itself still restores a loadout kept under the default id. Nothing records which backend wrote such
-     * a row, so the first named backend to start takes them all.
+     * Move the unscoped loadouts onto {@code serverId} off the tick, then set {@code adopted}. A row the move
+     * leaves behind belongs to a player who already holds one here, so it is named for the operator to restore.
+     * A failed move leaves the rows unscoped for the next start; {@code adopted} is set either way so staff mode
+     * is not held shut by a database fault.
      */
-    private static void adoptDefaultIdLoadouts(Persistence persistence, String serverId, KernelPorts kernel) {
-        if (serverId.equals(NetworkConfig.DEFAULT_SERVER_ID)) {
-            return;
-        }
+    private static void adoptUnscopedLoadouts(
+            Persistence persistence, String serverId, KernelPorts kernel, AtomicBoolean adopted) {
         kernel.scheduler().async(() -> {
             try {
-                int moved = StaffStores.adoptLoadouts(persistence, serverId, NetworkConfig.DEFAULT_SERVER_ID);
-                if (moved > 0) {
+                StaffLoadoutAdoption adoption = StaffStores.adoptLoadouts(persistence, serverId);
+                if (adoption.moved() > 0) {
+                    kernel.log().info("event=staff_loadout_adopted to={} rows={}", serverId, adoption.moved());
+                }
+                if (!adoption.leftBehind().isEmpty()) {
                     kernel.log()
-                            .info(
-                                    "event=staff_loadout_adopted from={} to={} rows={}",
-                                    NetworkConfig.DEFAULT_SERVER_ID,
+                            .warn(
+                                    "event=staff_loadout_left_unscoped server={} rows={} players={}",
                                     serverId,
-                                    moved);
+                                    adoption.leftBehind().size(),
+                                    adoption.leftBehind());
                 }
             } catch (PersistenceException failure) {
-                // A failed move leaves the rows where they were, so the next start tries again.
-                kernel.log()
-                        .warn(
-                                "event=staff_loadout_adopt_failed from={} to={}",
-                                NetworkConfig.DEFAULT_SERVER_ID,
-                                serverId,
-                                failure);
+                kernel.log().error("event=staff_loadout_adopt_failed server=" + serverId, failure);
+            } finally {
+                adopted.set(true);
             }
         });
     }

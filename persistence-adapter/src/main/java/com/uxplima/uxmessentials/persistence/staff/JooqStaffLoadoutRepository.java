@@ -31,6 +31,12 @@ import org.jooq.DSLContext;
  */
 public final class JooqStaffLoadoutRepository extends JooqRepository implements StaffLoadoutRepository {
 
+    /**
+     * The server id of a row whose backend is unknown. Each backend adopts these rows on start, and none saves
+     * under it, so an adopted row is never one a running backend still holds.
+     */
+    public static final String UNSCOPED_SERVER_ID = "unscoped";
+
     private final Clock clock;
     private final String serverId;
 
@@ -40,6 +46,10 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
         this.serverId = Objects.requireNonNull(serverId, "serverId");
         if (serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank");
+        }
+        if (serverId.equals(UNSCOPED_SERVER_ID)) {
+            // Saving under the sentinel would hand this backend's live rows to whichever backend starts next.
+            throw new IllegalArgumentException("server id '" + UNSCOPED_SERVER_ID + "' is reserved");
         }
     }
 
@@ -77,19 +87,13 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
     }
 
     /**
-     * Move every row held under {@code fromServerId} to this repository's server id, returning how many moved. A
-     * player who already holds a row under this server id keeps it and their {@code fromServerId} row stays where
-     * it is, since overwriting would drop a loadout that was captured on this backend. Moving onto the same id is
-     * a no-op.
+     * Move every unscoped row to this repository's server id. A player who already holds a row under this server
+     * id keeps it, and their unscoped row stays where it is and is reported, since overwriting would drop a
+     * loadout captured on this backend.
      *
-     * @param fromServerId the server id the rows were written under
-     * @return the number of rows now held under this repository's server id that were not before
+     * @return how many rows moved and which players' unscoped rows were left behind
      */
-    public int adopt(String fromServerId) {
-        Objects.requireNonNull(fromServerId, "fromServerId");
-        if (fromServerId.equals(serverId)) {
-            return 0;
-        }
+    public StaffLoadoutAdoption adopt() {
         return write(dsl -> {
             // Read first rather than a NOT EXISTS subquery: MySQL refuses an UPDATE whose subquery reads the
             // table being updated.
@@ -97,14 +101,24 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
                     .from(STAFF_LOADOUT)
                     .where(STAFF_LOADOUT.SERVER_ID.eq(serverId))
                     .fetch(STAFF_LOADOUT.PLAYER);
-            Condition movable = STAFF_LOADOUT.SERVER_ID.eq(fromServerId);
-            if (!held.isEmpty()) {
-                movable = movable.and(STAFF_LOADOUT.PLAYER.notIn(held));
-            }
-            return dsl.update(STAFF_LOADOUT)
+            Condition unscoped = STAFF_LOADOUT.SERVER_ID.eq(UNSCOPED_SERVER_ID);
+            List<UUID> leftBehind = held.isEmpty()
+                    ? List.of()
+                    : dsl
+                            .select(STAFF_LOADOUT.PLAYER)
+                            .from(STAFF_LOADOUT)
+                            .where(unscoped)
+                            .and(STAFF_LOADOUT.PLAYER.in(held))
+                            .fetch(STAFF_LOADOUT.PLAYER)
+                            .stream()
+                            .map(UUID::fromString)
+                            .toList();
+            Condition movable = held.isEmpty() ? unscoped : unscoped.and(STAFF_LOADOUT.PLAYER.notIn(held));
+            int moved = dsl.update(STAFF_LOADOUT)
                     .set(STAFF_LOADOUT.SERVER_ID, serverId)
                     .where(movable)
                     .execute();
+            return new StaffLoadoutAdoption(moved, leftBehind);
         });
     }
 

@@ -36,12 +36,12 @@ public final class StaffStores {
     }
 
     /**
-     * Move the loadout rows saved under {@code fromServerId} to {@code serverId}, returning how many moved. A
-     * player who already holds a row under {@code serverId} keeps it.
+     * Move the unscoped loadout rows onto {@code serverId}. A player who already holds a row under {@code serverId}
+     * keeps it, and their unscoped row is reported as left behind.
      */
-    public static int adoptLoadouts(Persistence persistence, String serverId, String fromServerId) {
+    public static StaffLoadoutAdoption adoptLoadouts(Persistence persistence, String serverId) {
         Objects.requireNonNull(persistence, "persistence");
         // The clock only stamps a save, which a move never performs.
-        return new JooqStaffLoadoutRepository(persistence.dsl(), Clock.systemUTC(), serverId).adopt(fromServerId);
+        return new JooqStaffLoadoutRepository(persistence.dsl(), Clock.systemUTC(), serverId).adopt();
     }
 }
