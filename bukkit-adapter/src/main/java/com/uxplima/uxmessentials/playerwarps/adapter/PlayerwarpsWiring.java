@@ -475,7 +475,8 @@ public final class PlayerwarpsWiring {
                 archivePlayerWarp,
                 rentSweep,
                 sponsorSweep,
-                legacyMigration);
+                legacyMigration,
+                cached);
     }
 
     /**
@@ -877,6 +878,8 @@ public final class PlayerwarpsWiring {
      * @param archivePlayerWarp the removal use case, handed on for the published archive, restore and delete
      * @param rentSweep the off-tick rent lifecycle sweep, or {@code null} when the rent sub-group is disabled
      * @param sponsorSweep the off-tick sponsor expiry sweep, or {@code null} when the sponsor sub-group is disabled
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -889,7 +892,8 @@ public final class PlayerwarpsWiring {
             ArchivePlayerWarp archivePlayerWarp,
             @org.jspecify.annotations.Nullable RentSweep rentSweep,
             @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep,
-            Runnable legacyMigration) {
+            Runnable legacyMigration,
+            com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);

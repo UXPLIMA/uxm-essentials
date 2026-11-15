@@ -185,7 +185,8 @@ public final class HomesWiring {
                 repository,
                 quota,
                 services.homeList(),
-                services.apiWrites());
+                services.apiWrites(),
+                cached);
     }
 
     private static HomeServices assemble(
@@ -476,6 +477,8 @@ public final class HomesWiring {
      * @param repository the home store the {@code homes_count} placeholder reads
      * @param quota the home-limit reducer the {@code homes_limit}/{@code homes_left} placeholders read
      * @param listView the slot-grid home list the {@code /home} command and the management hub both open
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -483,7 +486,8 @@ public final class HomesWiring {
             HomeRepository repository,
             HomeQuota quota,
             HomeListMenu listView,
-            HomeApiWrites apiWrites) {
+            HomeApiWrites apiWrites,
+            CachedHomeRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);
