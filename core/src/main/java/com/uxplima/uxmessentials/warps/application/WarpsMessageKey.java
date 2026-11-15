@@ -33,6 +33,8 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_CROSS_SERVER_REFUNDED("warp.cross-server.refunded"),
     WARP_SERVER_SET("warp.server-set"),
     WARP_SERVER_SET_ALL("warp.server-set-all"),
+    WARP_SERVER_INVALID("warp.server-invalid"),
+    WARP_SERVER_NOT_RUNNING("warp.server-not-running"),
 
     // listing
     WARP_LIST_HEADER("warp.list.header"),

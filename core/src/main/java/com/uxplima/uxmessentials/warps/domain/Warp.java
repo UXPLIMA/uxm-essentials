@@ -37,6 +37,9 @@ public record Warp(
         Optional<String> categoryId,
         Optional<String> server) {
 
+    /** The server of a warp whose backend is not known; never the name of a running backend. */
+    public static final String UNSCOPED = "unscoped";
+
     public Warp {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
@@ -204,7 +207,15 @@ public record Warp(
     /** True when the warp is known to live on a backend other than {@code localServer}. */
     public boolean livesElsewhere(String localServer) {
         Objects.requireNonNull(localServer, "localServer");
-        return server.filter(name -> !name.equals(localServer)).isPresent();
+        return knownServer().filter(name -> !name.equals(localServer)).isPresent();
+    }
+
+    /**
+     * The backend the warp lives on, when it is known. {@value #UNSCOPED} is stored to clear a warp's server, so the
+     * backend that holds its world claims it again, and reads as not known.
+     */
+    public Optional<String> knownServer() {
+        return server.filter(name -> !name.equals(UNSCOPED));
     }
 
     public Warp withCost(WarpCost newCost) {

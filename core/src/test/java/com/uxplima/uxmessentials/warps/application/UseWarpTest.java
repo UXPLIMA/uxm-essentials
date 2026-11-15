@@ -62,6 +62,7 @@ class UseWarpTest {
                 position -> !unsafe,
                 permissions,
                 scheduler,
+                new WarpFakes.Online(),
                 WarpHops.local(LOBBY));
     }
 

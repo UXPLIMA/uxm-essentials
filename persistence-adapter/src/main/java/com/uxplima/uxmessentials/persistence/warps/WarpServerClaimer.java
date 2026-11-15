@@ -29,7 +29,7 @@ public final class WarpServerClaimer extends JooqRepository {
      * The server of a warp that existed before warps recorded one. Never saved by a running backend; a backend
      * configured under this name is refused, since its warps would read as unknown.
      */
-    public static final String UNSCOPED = "unscoped";
+    public static final String UNSCOPED = com.uxplima.uxmessentials.warps.domain.Warp.UNSCOPED;
 
     public WarpServerClaimer(DSLContext dsl) {
         super(dsl);

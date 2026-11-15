@@ -104,7 +104,7 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
                         .WARP_ID
                         .eq(NO_PLAYER_WARP)
                         .and(kindIs(pending.kind()))
-                        .and(PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF.eq(pending.target()));
+                        .and(targetIs(pending.target()));
         return write(dsl -> dsl.deleteFrom(PLAYER_WARP_PENDING_TELEPORTS)
                 .where(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID.eq(
                         pending.player().toString()))
@@ -124,7 +124,19 @@ public final class JooqPendingHopStore extends JooqRepository implements Pending
                 .filter(each -> each != HopKind.UNKNOWN)
                 .map(HopKind::name)
                 .toList();
-        return PLAYER_WARP_PENDING_TELEPORTS.KIND.notIn(known);
+        // A NULL kind with no player warp is no row this release writes, so it reads as unknown too.
+        return PLAYER_WARP_PENDING_TELEPORTS.KIND.notIn(known).or(PLAYER_WARP_PENDING_TELEPORTS.KIND.isNull());
+    }
+
+    /** The stored target of a row read back as {@code target}; an empty one is how a missing target_ref reads. */
+    private static Condition targetIs(String target) {
+        if (target.isEmpty()) {
+            return PLAYER_WARP_PENDING_TELEPORTS
+                    .TARGET_REF
+                    .isNull()
+                    .or(PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF.eq(target));
+        }
+        return PLAYER_WARP_PENDING_TELEPORTS.TARGET_REF.eq(target);
     }
 
     /** Rebuild the hop from a row; the charge is present only when both the amount and currency survived. */

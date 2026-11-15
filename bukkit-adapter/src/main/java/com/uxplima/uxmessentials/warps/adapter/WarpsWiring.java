@@ -17,6 +17,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.network.WarpChanged;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommands;
@@ -78,6 +80,7 @@ public final class WarpsWiring {
             Optional<WarpEconomy> economy,
             Bus bus,
             CrossServerHops hops,
+            NetworkPresence presence,
             GuiLayouts guiLayouts,
             TextInput textInput,
             com.uxplima.uxmlib.menu.Menus menus,
@@ -88,6 +91,7 @@ public final class WarpsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -151,6 +155,7 @@ public final class WarpsWiring {
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions(),
                 kernel.scheduler(),
+                kernel.playerLookup(),
                 warpHops);
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
@@ -251,8 +256,20 @@ public final class WarpsWiring {
         var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
         browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
 
-        WarpServices services =
-                assemble(kernel, repository, notifier, browseMenu, editorView, ctx, useWarp, managerView, localServer);
+        // Writes through the cache under the broadcasting repository, so a bulk change reaches peers as one frame.
+        SetWarpServer setWarpServer = new SetWarpServer(
+                cached, notifier, presence, () -> bus.publisher().publish(new WarpChanged(localServer, "*")));
+        WarpServices services = assemble(
+                kernel,
+                repository,
+                notifier,
+                browseMenu,
+                editorView,
+                ctx,
+                useWarp,
+                managerView,
+                setWarpServer,
+                localServer);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         // The editor and its welcome / sound / particle / category sub-screens all render through the always-on menu
         // engine now, routed and torn down by the one shared menu listener, so the warps context registers no editor
@@ -289,6 +306,7 @@ public final class WarpsWiring {
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
             UseWarp useWarp,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView,
+            SetWarpServer setWarpServer,
             String localServer) {
         Clock clock = Clock.systemUTC();
         return new WarpServices(
@@ -311,7 +329,7 @@ public final class WarpsWiring {
                 editorView,
                 managerView,
                 kernel.scheduler(),
-                new SetWarpServer(repository, notifier),
+                setWarpServer,
                 localServer);
     }
 

@@ -2537,6 +2537,7 @@ public final class PluginModule {
                 Optional.ofNullable(links.warpEconomy),
                 bus,
                 links.hops,
+                links.presence,
                 guiLayouts,
                 textInput,
                 menus,

@@ -67,7 +67,7 @@ public final class WarpHops {
         return new HopDeparture(
                 HopKind.WARP,
                 warp.name().value(),
-                warp.server().orElseThrow(),
+                warp.knownServer().orElseThrow(),
                 warp.name().value(),
                 warp.location(),
                 cooldown);

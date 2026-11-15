@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -50,6 +51,7 @@ public final class UseWarp {
     private final WarpSafetyChecker safetyChecker;
     private final Permissions permissions;
     private final Scheduler scheduler;
+    private final PlayerLookup players;
     private final WarpHops hops;
 
     public UseWarp(
@@ -60,6 +62,7 @@ public final class UseWarp {
             WarpSafetyChecker safetyChecker,
             Permissions permissions,
             Scheduler scheduler,
+            PlayerLookup players,
             WarpHops hops) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
@@ -68,6 +71,7 @@ public final class UseWarp {
         this.safetyChecker = Objects.requireNonNull(safetyChecker, "safetyChecker");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.players = Objects.requireNonNull(players, "players");
         this.hops = Objects.requireNonNull(hops, "hops");
     }
 
@@ -148,13 +152,23 @@ public final class UseWarp {
             notifier.send(
                     recipient,
                     WarpsMessageKey.WARP_CROSS_SERVER_UNAVAILABLE,
-                    Map.of("warp", warp.name().value(), "server", warp.server().orElse("")));
+                    Map.of(
+                            "warp",
+                            warp.name().value(),
+                            "server",
+                            warp.knownServer().orElse("")));
             return Result.err(WarpError.TELEPORT_REFUSED);
         }
     }
 
-    /** Off-tick: the teleport rules, then the charge, then the hop that carries it. */
+    /**
+     * Off-tick: the teleport rules, then the charge, then the hop that carries it. A player who left before the task
+     * ran is neither charged nor sent: the connect could not reach them, and the charge would wait out the TTL.
+     */
     private void sendRemote(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        if (!players.isOnline(recipient.uuid())) {
+            return;
+        }
         if (!hops.admit(recipient, warp)) {
             teleportRefused(actor, recipient, warp);
             return;

@@ -215,6 +215,23 @@ class JooqPendingHopStoreTest {
     }
 
     @Test
+    void aRowWithNoKindNoPlayerWarpAndNoTargetReadsAsUnknownAndCanBeClaimed() {
+        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
+                .execute();
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.UNKNOWN);
+        assertThat(store.clear(found)).isEqualTo(1);
+        assertThat(store.find(ALEX)).isEmpty();
+    }
+
+    @Test
     void aKindANewerReleaseAddedReadsAsUnknownAndCanStillBeClaimed() {
         dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())

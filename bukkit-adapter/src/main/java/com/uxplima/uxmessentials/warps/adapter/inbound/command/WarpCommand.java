@@ -54,7 +54,8 @@ import org.jspecify.annotations.NullMarked;
  *   <li>{@code /warp move <name>} re-anchors an existing warp to the operator's current position. Gated by
  *       {@code uxmessentials.warp.move}.
  *   <li>{@code /warp setserver <name|all> [server]} records which backend a warp lives on without moving it,
- *       this backend when no server is named. Gated by {@code uxmessentials.warp.setserver}.
+ *       this backend when no server is named, and {@code unscoped} clears it. Gated by
+ *       {@code uxmessentials.warp.setserver}.
  *   <li>{@code /warp lock|password|rate|rating|editor <name>} keep their prior per-warp management behaviour.
  * </ul>
  *

@@ -103,18 +103,22 @@ public final class WarpHopResolver implements HopResolver {
     /**
      * Judge the destination on its own region thread, the only one that may read its blocks, then move the player on
      * theirs. An unsafe destination is refused as a local use would be, unless the player may bypass the check, and
-     * the miss gives the charge back. A failure anywhere on the way is a miss too, so the claimed hop always ends in
-     * exactly one outcome.
+     * the miss gives the charge back. The hop is already claimed by now, so every way the move can fail to happen is
+     * a miss: a world that is not loaded here or a backend that is stopping (the region task can never run), a player
+     * who left, or a failure on the way. The claimed hop always ends in exactly one outcome.
      */
     private void land(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed) {
-        scheduler.onRegion(warp.location(), () -> {
-            boolean safe = isSafe(warp);
-            try {
-                scheduler.onEntity(who, () -> arriveIfAllowed(who, warp, safe, onLanded, onMissed), onMissed);
-            } catch (RuntimeException unscheduled) {
-                onMissed.run();
-            }
-        });
+        scheduler.onRegion(
+                warp.location(),
+                () -> {
+                    boolean safe = isSafe(warp);
+                    try {
+                        scheduler.onEntity(who, () -> arriveIfAllowed(who, warp, safe, onLanded, onMissed), onMissed);
+                    } catch (RuntimeException unscheduled) {
+                        onMissed.run();
+                    }
+                },
+                onMissed);
     }
 
     private void arriveIfAllowed(PlayerRef who, Warp warp, boolean safe, Runnable onLanded, Runnable onMissed) {
@@ -169,6 +173,6 @@ public final class WarpHopResolver implements HopResolver {
 
     /** A warp moved to another backend since the hop was sent can no longer be landed at from here. */
     private boolean isHere(Warp warp) {
-        return warp.server().map(localServer::equals).orElse(false);
+        return warp.knownServer().map(localServer::equals).orElse(false);
     }
 }

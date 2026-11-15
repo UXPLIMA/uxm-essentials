@@ -36,6 +36,19 @@ public interface Scheduler {
     void onRegion(Position position, Runnable task);
 
     /**
+     * Run on the region thread owning {@code position}, invoking {@code retired} instead when the task can never run
+     * there: the position's world is not loaded, or the plugin is disabling. A caller that has already spent
+     * something on the outcome of {@code task} (a claimed hop it must land or refund) needs this branch, since the
+     * plain {@link #onRegion(Position, Runnable)} drops such a task without a word.
+     *
+     * <p>The default ignores {@code retired} and delegates to {@link #onRegion(Position, Runnable)}, for a scheduler
+     * that always runs region work; the Folia adapter overrides it.
+     */
+    default void onRegion(Position position, Runnable task, Runnable retired) {
+        onRegion(position, task);
+    }
+
+    /**
      * Run on the region thread owning {@code player}'s entity. Silently no-ops when the player is
      * offline (the Folia entity scheduler refuses a despawned entity); callers needing to wait for a
      * relog listen for the join instead.

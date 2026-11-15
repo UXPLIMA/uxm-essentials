@@ -45,6 +45,9 @@ public enum WarpError {
      */
     TELEPORT_REFUSED(SharedMessageKey.COMMON_ACTION_VETOED),
 
+    /** A server name {@code /warp setserver} cannot record: empty, too long, or with a character no backend name has. */
+    INVALID_SERVER(WarpsMessageKey.WARP_SERVER_INVALID),
+
     /** Another plugin refused the action through the developer API. Nothing was written. */
     VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 

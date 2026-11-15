@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.application;
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
+import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -67,6 +68,7 @@ class CrossServerWarpTest {
     private final WarpFakes.Warps warps = new WarpFakes.Warps();
     private final WarpFakes.Purse purse = new WarpFakes.Purse();
     private final WarpFakes.Moves moves = new WarpFakes.Moves();
+    private final WarpFakes.Online online = new WarpFakes.Online();
     private final RecordingLogger log = new RecordingLogger();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
@@ -84,6 +86,7 @@ class CrossServerWarpTest {
     CrossServerWarpTest() {
         warps.put(marketOn(SURVIVAL));
         scheduler.online(ALEX);
+        online.here.add(ALEX.uuid());
         purse.wallet = START;
     }
 
@@ -132,6 +135,7 @@ class CrossServerWarpTest {
                 position -> !unsafe,
                 permissions,
                 lanes,
+                online,
                 hops);
     }
 
@@ -421,6 +425,33 @@ class CrossServerWarpTest {
         });
     }
 
+    @Test
+    void aLandingInAWorldThatIsNotLoadedHereIsRefundedOnce() {
+        useMarket();
+        scheduler.unload(WORLD);
+
+        join(survival);
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(store.rows()).isEmpty();
+        assertThat(notifier.keys())
+                .containsExactly("warp.cross-server.sending", "warp.cross-server.failed", "warp.cross-server.refunded");
+    }
+
+    @Test
+    void aPlayerWhoLeftBeforeTheHopTaskRanIsNeitherChargedNorSent() {
+        online.here.remove(ALEX.uuid());
+
+        useMarket();
+
+        assertThat(purse.charges).isZero();
+        assertThat(store.rows()).isEmpty();
+        assertThat(connects).isEmpty();
+    }
+
     /** Runs every task like the scheduler it wraps, and knows whether the task running now is on the async lane. */
     private static final class Lanes implements Scheduler {
 
@@ -443,6 +474,11 @@ class CrossServerWarpTest {
         @Override
         public void onRegion(Position position, Runnable task) {
             delegate.onRegion(position, task);
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task, Runnable retired) {
+            delegate.onRegion(position, task, retired);
         }
 
         @Override

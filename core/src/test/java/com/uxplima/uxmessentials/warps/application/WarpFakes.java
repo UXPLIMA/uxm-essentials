@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -200,6 +201,27 @@ final class WarpFakes {
             Optional<Duration> cooldown =
                     warp.cooldownOverrideSeconds().map(seconds -> Duration.ofMillis((long) (seconds * 1000)));
             return Destination.at(warp.location(), Optional.empty(), cooldown);
+        }
+    }
+
+    /** Which players are connected to this backend. */
+    static final class Online implements PlayerLookup {
+
+        final java.util.Set<UUID> here = new java.util.HashSet<>();
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return here.contains(uuid);
         }
     }
 
