@@ -59,6 +59,17 @@ public final class ClusterPeers {
         return live;
     }
 
+    /** The server ids of the peers whose last heartbeat is within the liveness window as of {@code now}. */
+    public java.util.Set<String> liveServerIds(long now) {
+        java.util.Set<String> live = new java.util.HashSet<>();
+        lastSeenByOrigin.forEach((origin, lastSeen) -> {
+            if (now - lastSeen <= livenessWindowMillis) {
+                live.add(origin);
+            }
+        });
+        return java.util.Set.copyOf(live);
+    }
+
     /** The most recent heartbeat seen from any peer, or empty when no peer has ever been heard from. */
     public Optional<Long> lastActivity() {
         long latest = Long.MIN_VALUE;
