@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The vaults context's cross-server sync seam, the same shape as {@link HomeSync} and {@link WalletSync},
@@ -100,17 +101,22 @@ public final class VaultSync {
         }
 
         @Override
-        public VaultStamp save(Vault vault) {
-            VaultStamp written = delegate.save(vault);
+        public VaultStamp save(Vault vault, String writer) {
+            VaultStamp written = delegate.save(vault, writer);
             announce(vault.id());
             return written;
         }
 
         @Override
-        public Optional<VaultStamp> writeContents(Vault vault) {
-            Optional<VaultStamp> written = delegate.writeContents(vault);
+        public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
+            Optional<VaultStamp> written = delegate.writeContents(vault, writer, onlyAt);
             announce(vault.id());
             return written;
+        }
+
+        @Override
+        public Optional<LastWrite> lastWrite(VaultId id) {
+            return delegate.lastWrite(id);
         }
 
         @Override

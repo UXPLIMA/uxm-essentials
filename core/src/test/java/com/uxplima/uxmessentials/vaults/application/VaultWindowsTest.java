@@ -326,7 +326,7 @@ class VaultWindowsTest {
     }
 
     @Test
-    void aWriteAppliedWithoutAnAnswerIsRecognisedByTheRowsVersion() {
+    void aWriteAppliedWithoutAnAnswerIsRecognisedByItsWriterToken() {
         vaultHolding(X);
         Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
         a.items = Y;
@@ -341,6 +341,91 @@ class VaultWindowsTest {
         assertThat(stored(SECOND).contents()).isEqualTo(Y);
         assertThat(handedBack).isEmpty();
         assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+    }
+
+    /**
+     * Another server on the same rows, with its own windows and no memory of this server's writes. Its connection
+     * is its own, so the failures armed on this server's store never reach it.
+     */
+    private VaultWindows<Chest> anotherServer() {
+        return new VaultWindows<>(
+                new SaveVault(vaults, new RecordingEvents(), clock),
+                vaults,
+                (owner, items) -> handedBack.add("there " + owner.name() + ":" + bytes(items)),
+                new QueuedScheduler(),
+                () -> true,
+                clock,
+                new QuietLog());
+    }
+
+    /** Open, change and close ALEX's vault 2 on {@code server}, writing {@code items} there. */
+    private void editOn(VaultWindows<Chest> server, VaultContents expected, VaultContents items) {
+        Chest there = new Chest();
+        there.items = server.claim(ALEX, ALEX, openVault.open(ALEX, 2).orElseThrow(), there, old -> old.items)
+                .orElseThrow();
+        assertThat(there.items).isEqualTo(expected);
+        there.items = items;
+        server.release(SECOND, there, there.items).orElseThrow().run();
+    }
+
+    @Test
+    void aRetryNeverWritesOverWhatAnotherServerWroteAfterTheWriteFailed() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y; // X taken out, Y put in on this server
+        store.failNextWrite();
+        close(SECOND, a);
+        runWrites();
+
+        // Before the retry, the player opens the vault on another server, still holding X, and empties it.
+        editOn(anotherServer(), X, VaultContents.empty());
+        retries.runAll();
+
+        assertThat(stored(SECOND).contents()).isEqualTo(VaultContents.empty());
+        assertThat(handedBack).isEmpty();
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
+        assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
+        assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isTrue();
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+    }
+
+    @Test
+    void aWriteAnotherServerMadeWhileThisOneFailedIsNotTakenForThisOne() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        VaultWindows<Chest> survival = anotherServer();
+        // The other server's write lands at the moment this server's write is lost.
+        store.beforeNextWrite(() -> editOn(survival, X, VaultContents.empty()));
+        store.failNextWrite();
+
+        close(SECOND, a);
+        runWrites();
+        retries.runAll();
+
+        assertThat(stored(SECOND).contents()).isEqualTo(VaultContents.empty());
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
+        assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
+    }
+
+    @Test
+    void aRetryOfAStoppedInstanceNeverWritesOverTheReloadedInstancesWrite() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        store.failNextWrite();
+        close(SECOND, a);
+        runWrites();
+        assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isFalse(); // the stop gives up waiting on the retry
+
+        // The module comes back as a new instance, which reads the row and writes the player's next close.
+        editOn(anotherServer(), X, VaultContents.of(new byte[] {9}));
+        retries.runAll(); // the old instance's retry fires after the reload
+
+        assertThat(stored(SECOND).contents()).isEqualTo(VaultContents.of(new byte[] {9}));
+        assertThat(handedBack).isEmpty();
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
     }
 
     @Test

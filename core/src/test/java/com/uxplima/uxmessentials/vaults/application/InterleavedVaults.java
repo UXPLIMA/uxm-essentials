@@ -23,6 +23,8 @@ final class InterleavedVaults implements VaultRepository {
     private @Nullable Runnable beforeDelete;
     private @Nullable Runnable beforeCreate;
     private @Nullable Runnable beforeUpdate;
+    private @Nullable Runnable beforeWrite;
+    private int lastWriteFailures;
     private boolean createFails;
     private boolean createFailsAfterWriting;
     private int writeFailures;
@@ -45,6 +47,16 @@ final class InterleavedVaults implements VaultRepository {
     /** Run {@code step} once, right before the next update reaches the rows. */
     void beforeNextUpdate(Runnable step) {
         beforeUpdate = step;
+    }
+
+    /** Run {@code step} once, right before the next item write reaches the rows. */
+    void beforeNextWrite(Runnable step) {
+        beforeWrite = step;
+    }
+
+    /** Make the next {@code count} reads of who wrote a row last throw, as a lost database connection does. */
+    void failLastWrites(int count) {
+        lastWriteFailures = count;
     }
 
     /** Make the next create throw, as a lost database connection does. */
@@ -93,20 +105,39 @@ final class InterleavedVaults implements VaultRepository {
     }
 
     @Override
-    public VaultStamp save(Vault vault) {
+    public VaultStamp save(Vault vault, String writer) {
+        runBeforeWrite();
         failWriteIfArmed();
-        return rows.save(vault);
+        return rows.save(vault, writer);
     }
 
     @Override
-    public Optional<VaultStamp> writeContents(Vault vault) {
+    public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
+        runBeforeWrite();
         failWriteIfArmed();
-        Optional<VaultStamp> written = rows.writeContents(vault);
+        Optional<VaultStamp> written = rows.writeContents(vault, writer, onlyAt);
         if (writeFailsAfterCommit) {
             writeFailsAfterCommit = false;
             throw new IllegalStateException("the answer to the commit was lost");
         }
         return written;
+    }
+
+    @Override
+    public Optional<LastWrite> lastWrite(VaultId id) {
+        if (lastWriteFailures > 0) {
+            lastWriteFailures--;
+            throw new IllegalStateException("the database went away");
+        }
+        return rows.lastWrite(id);
+    }
+
+    private void runBeforeWrite() {
+        Runnable step = beforeWrite;
+        beforeWrite = null;
+        if (step != null) {
+            step.run();
+        }
     }
 
     private void failWriteIfArmed() {

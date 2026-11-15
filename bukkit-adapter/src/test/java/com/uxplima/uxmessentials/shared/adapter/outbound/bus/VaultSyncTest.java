@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -125,21 +126,26 @@ class VaultSyncTest {
         }
 
         @Override
-        public VaultStamp save(Vault vault) {
+        public VaultStamp save(Vault vault, String writer) {
             held.put(vault.id(), vault);
             return vault.stamp();
         }
 
         @Override
-        public Optional<VaultStamp> writeContents(Vault vault) {
+        public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
             Vault stored = held.get(vault.id());
-            if (stored == null) {
+            if (stored == null || (onlyAt != null && !stored.stamp().equals(onlyAt))) {
                 return Optional.empty();
             }
             VaultStamp stamp =
                     new VaultStamp(stored.stamp().lineage(), stored.stamp().version() + 1);
             held.put(vault.id(), stored.withContentsOf(vault, stamp));
             return Optional.of(stamp);
+        }
+
+        @Override
+        public Optional<LastWrite> lastWrite(VaultId id) {
+            return find(id).map(stored -> new LastWrite(stored.stamp(), null));
         }
 
         @Override

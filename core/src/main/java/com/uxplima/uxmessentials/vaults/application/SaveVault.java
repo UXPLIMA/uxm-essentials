@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -11,6 +12,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The write-through that runs when an open vault GUI closes ({@code InventoryCloseEvent}). The adapter resolves
@@ -47,12 +49,28 @@ public final class SaveVault {
      * row's stamp after the write, or empty when the vault was gone.
      */
     public Optional<VaultStamp> save(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
+        return save(owner, vault, newContents, at, UUID.randomUUID().toString(), null);
+    }
+
+    /**
+     * {@link #save(PlayerRef, Vault, VaultContents, Instant)} recording {@code writer} as the row's writer, and with
+     * {@code onlyAt} writing only while the row is still at that stamp or already carries {@code writer} (see
+     * {@link VaultRepository#writeContents(Vault, String, VaultStamp)}). Empty when nothing was written.
+     */
+    public Optional<VaultStamp> save(
+            PlayerRef owner,
+            Vault vault,
+            VaultContents newContents,
+            Instant at,
+            String writer,
+            @Nullable VaultStamp onlyAt) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(writer, "writer");
         Vault.Change change = vault.withContents(owner, newContents, at);
-        Optional<VaultStamp> written = repository.writeContents(change.result());
+        Optional<VaultStamp> written = repository.writeContents(change.result(), writer, onlyAt);
         if (written.isPresent()) {
             events.publish(change.event());
         }
@@ -73,12 +91,18 @@ public final class SaveVault {
      * row's stamp after the write.
      */
     public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
+        return keep(owner, vault, newContents, at, UUID.randomUUID().toString());
+    }
+
+    /** {@link #keep(PlayerRef, Vault, VaultContents, Instant)} recording {@code writer} as the row's writer. */
+    public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at, String writer) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(writer, "writer");
         Vault.Change change = vault.withContents(owner, newContents, at);
-        VaultStamp written = repository.save(change.result());
+        VaultStamp written = repository.save(change.result(), writer);
         events.publish(change.event());
         return written;
     }

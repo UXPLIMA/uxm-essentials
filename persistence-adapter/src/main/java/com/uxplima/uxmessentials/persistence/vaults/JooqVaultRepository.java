@@ -20,8 +20,11 @@ import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.impl.DSL;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The jOOQ-backed {@link VaultRepository} over the generated {@code VAULTS} table. A point read resolves one
@@ -29,7 +32,9 @@ import org.jooq.Field;
  * order off the {@code idx_vaults_owner} index; the count is a {@code COUNT(*)} so the amount-quota check never
  * materialises the rows. A {@code save} upserts on the primary key (an existing row takes the contents columns
  * only) and an {@code update} rewrites the named columns of an existing row only, so a vault deleted in the meantime
- * stays deleted. Neither writes the payment columns: only
+ * stays deleted. Every item write records its writer token beside the items, and a retried one carries a condition so
+ * it applies only over the row it was written against or over its own earlier attempt. Neither {@code save} nor
+ * {@code update} writes the payment columns: only
  * {@code create} does, as a plain insert that does nothing when the row exists. A {@code delete} removes the one
  * {@code (owner, idx)} row only while it still records the expected payment, compared with
  * {@code IS NOT DISTINCT FROM} so a row with no payment matches an empty expectation, and reports whether it
@@ -80,32 +85,52 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     }
 
     @Override
-    public VaultStamp save(Vault vault) {
+    public VaultStamp save(Vault vault, String writer) {
         Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(writer, "writer");
         return write(dsl -> {
-            upsert(dsl, vault);
+            upsert(dsl, vault, writer);
             return stampOf(dsl, vault.id()).orElseThrow();
         });
     }
 
     @Override
-    public Optional<VaultStamp> writeContents(Vault vault) {
+    public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
         Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(writer, "writer");
         return write(dsl -> {
             VaultsRecord record = dsl.newRecord(VAULTS);
             VaultRows.apply(record, vault);
+            Condition at = onlyAt == null
+                    ? DSL.noCondition()
+                    : VAULTS.LINEAGE
+                            .isNotDistinctFrom(onlyAt.lineage())
+                            .and(VAULTS.VERSION.eq(onlyAt.version()))
+                            .or(VAULTS.WRITER.eq(writer));
             int updated = dsl.update(VAULTS)
                     .set(VAULTS.SIZE, record.getSize())
                     .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
                     .set(VAULTS.CONTENTS, record.getContents())
                     .set(VAULTS.VERSION, VAULTS.VERSION.plus(1L))
+                    .set(VAULTS.WRITER, writer)
                     .where(VAULTS.OWNER.eq(record.getOwner()))
                     .and(VAULTS.IDX.eq(record.getIdx()))
+                    .and(at)
                     .execute();
             // Read in the same transaction: the row is locked by the update until commit, so this is the version
             // this write produced, not one a concurrent write on another server produced after it.
             return updated > 0 ? stampOf(dsl, vault.id()) : Optional.<VaultStamp>empty();
         });
+    }
+
+    @Override
+    public Optional<LastWrite> lastWrite(VaultId id) {
+        Objects.requireNonNull(id, "id");
+        return read(dsl -> dsl.select(VAULTS.LINEAGE, VAULTS.VERSION, VAULTS.WRITER)
+                .from(VAULTS)
+                .where(VAULTS.OWNER.eq(id.owner().toString()))
+                .and(VAULTS.IDX.eq(id.index()))
+                .fetchOptional(row -> new LastWrite(new VaultStamp(row.value1(), row.value2()), row.value3())));
     }
 
     @Override
@@ -173,12 +198,12 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .execute());
     }
 
-    private static void upsert(DSLContext dsl, Vault vault) {
+    private static void upsert(DSLContext dsl, Vault vault, String writer) {
         VaultsRecord record = dsl.newRecord(VAULTS);
         VaultRows.apply(record, vault);
         // An inserted row is always a new lineage: reusing the copy's would make every old copy of a deleted row look
         // like a copy of this one, and the version restarting at one would let them pass as fresh.
-        record.setLineage(UUID.randomUUID().toString()).setVersion(1L);
+        record.setLineage(UUID.randomUUID().toString()).setVersion(1L).setWriter(writer);
         dsl.insertInto(VAULTS)
                 .set(record)
                 .onConflict(VAULTS.OWNER, VAULTS.IDX)
@@ -187,6 +212,7 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
                 .set(VAULTS.CONTENTS, record.getContents())
                 .set(VAULTS.VERSION, VAULTS.VERSION.plus(1L))
+                .set(VAULTS.WRITER, writer)
                 .execute();
     }
 

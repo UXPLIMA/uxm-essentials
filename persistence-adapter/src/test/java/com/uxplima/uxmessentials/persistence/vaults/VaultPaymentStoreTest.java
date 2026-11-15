@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultItemReturns;
+import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository.Columns;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
@@ -374,5 +375,45 @@ class VaultPaymentStoreTest {
         assertThat(back.lineage()).isNotEqualTo(old.stamp().lineage());
         assertThat(old.stamp().sameRow(back)).isFalse();
         assertThat(stored(1).stamp()).isEqualTo(back);
+    }
+
+    @Test
+    void aRetryWritesOnlyOverTheRowItWasWrittenAgainstOrOverItsOwnEarlierAttempt() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault base = stored(1);
+        Vault mine =
+                base.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result();
+        Vault theirs =
+                base.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result();
+
+        VaultStamp first = vaults.writeContents(mine, "mine", base.stamp()).orElseThrow();
+        Optional<VaultStamp> again = vaults.writeContents(mine, "mine", base.stamp());
+        VaultStamp other = vaults.writeContents(theirs, "theirs", null).orElseThrow();
+        Optional<VaultStamp> late = vaults.writeContents(mine, "mine", base.stamp());
+
+        assertThat(first.version()).isEqualTo(base.stamp().version() + 1);
+        assertThat(again).contains(new VaultStamp(base.stamp().lineage(), first.version() + 1));
+        assertThat(late).isEmpty();
+        assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {2}));
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(other, "theirs"));
+    }
+
+    @Test
+    void theLastWriterOfARowIsReadWithItsStamp() {
+        upgrade();
+        assertThat(vaults.lastWrite(vault(1))).isEmpty();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault created = stored(1);
+
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(created.stamp(), null));
+        VaultStamp kept = vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {3}), NOW)
+                        .result(),
+                "staff");
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(kept, "staff"));
+        assertThat(vaults.update(created.renamedTo("loot"), Columns.PRESENTATION))
+                .isTrue();
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(kept, "staff"));
     }
 }

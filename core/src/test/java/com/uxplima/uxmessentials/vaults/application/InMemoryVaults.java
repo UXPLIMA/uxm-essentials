@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.application;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,11 +15,15 @@ import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 
 /** Vault rows keyed by owner and index, upserted on save, with a count of every write for no-churn checks. */
 final class InMemoryVaults implements VaultRepository {
 
     private final Map<VaultId, Vault> rows = new LinkedHashMap<>();
+    /** The writer of each row's last item write, the column the real store keeps beside the items. */
+    private final Map<VaultId, String> writers = new HashMap<>();
+
     private int saves;
 
     void put(Vault vault) {
@@ -62,8 +67,9 @@ final class InMemoryVaults implements VaultRepository {
      * existing row takes the contents columns only.
      */
     @Override
-    public VaultStamp save(Vault vault) {
+    public VaultStamp save(Vault vault, String writer) {
         saves++;
+        writers.put(vault.id(), writer);
         Vault stored = rows.get(vault.id());
         if (stored == null) {
             // An inserted row is always a new lineage, as the real store does it.
@@ -85,13 +91,25 @@ final class InMemoryVaults implements VaultRepository {
     }
 
     @Override
-    public Optional<VaultStamp> writeContents(Vault vault) {
+    public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
         Vault stored = rows.get(vault.id());
         if (stored == null) {
             return Optional.empty();
         }
+        if (onlyAt != null
+                && !writer.equals(writers.get(vault.id()))
+                && !stored.stamp().equals(onlyAt)) {
+            return Optional.empty();
+        }
         saves++;
+        writers.put(vault.id(), writer);
         return Optional.of(writeOver(stored, vault));
+    }
+
+    @Override
+    public Optional<LastWrite> lastWrite(VaultId id) {
+        Vault stored = rows.get(id);
+        return stored == null ? Optional.empty() : Optional.of(new LastWrite(stored.stamp(), writers.get(id)));
     }
 
     /** The row takes the written items and its version goes up by one, as the database does it. */
@@ -131,6 +149,7 @@ final class InMemoryVaults implements VaultRepository {
             return false;
         }
         rows.remove(id);
+        writers.remove(id);
         return true;
     }
 
@@ -142,7 +161,10 @@ final class InMemoryVaults implements VaultRepository {
                 stale.add(id);
             }
         });
-        stale.forEach(rows::remove);
+        stale.forEach(id -> {
+            rows.remove(id);
+            writers.remove(id);
+        });
         return stale.size();
     }
 }
