@@ -22,9 +22,10 @@ import org.jspecify.annotations.NullMarked;
  * The self-rescheduling rent sweep (the {@code SalaryTask}/{@code BankInterestTask} pattern): on a fixed interval,
  * off the tick thread, it charges the warps whose paid term has lapsed, retries or archives the suspended ones,
  * deletes for good the warps that have stayed archived past the configured delay, and mails any owners a heads-up
- * whose term is approaching. Every pass is bounded: each query is capped at
- * {@link #BATCH_LIMIT} rows and indexed on {@code rent_paid_until}, never a full-table scan, and each warp is settled
- * in isolation, so one warp's fault (a transient DB error, say) is logged and the sweep carries on.
+ * whose term is approaching. Every pass is bounded: each query is capped at {@link #BATCH_LIMIT} rows, and each warp
+ * is settled in isolation, so one warp's fault (a transient DB error, say) is logged and the sweep carries on. The
+ * charge and reminder queries range over {@code idx_player_warps_rent}; the suspended and archived pages filter on
+ * the status index and sort on {@code rent_archive_after}, which has no index of its own.
  *
  * <p>The scheduling, stop flag and enable gate live in {@link AbstractPeriodicSweep}; this sweep supplies only the
  * per-pass work.
@@ -70,32 +71,12 @@ public final class RentSweep extends AbstractPeriodicSweep {
         Instant now = clock.instant();
         int charged = settleBatch(repository.dueForRent(now, BATCH_LIMIT));
         int retried = settleBatch(repository.suspendedForRent(BATCH_LIMIT));
-        int purged = purgeBatch();
+        // Logs its own summary with the deleted ids and names, and never throws, so the reminders below still run.
+        purge.purgeDue(BATCH_LIMIT);
         int reminded = remindBatch(now);
         if (charged + retried + reminded > 0) {
             log.info("event=playerwarp_rent_sweep charged={} retried={} reminded={}", charged, retried, reminded);
         }
-        // A hard delete cannot be undone, so the operator always sees how many went, even in an otherwise quiet pass.
-        if (purged > 0) {
-            log.info(
-                    "event=playerwarp_rent_hard_deleted count={} after_days={}",
-                    purged,
-                    config.hardDeleteAfter().toDays());
-        }
-    }
-
-    private int purgeBatch() {
-        int deleted = 0;
-        for (PlayerWarp warp : purge.due(BATCH_LIMIT)) {
-            try {
-                if (purge.purge(warp)) {
-                    deleted++;
-                }
-            } catch (RuntimeException failure) {
-                log.error("event=playerwarp_rent_hard_delete_failed warp=" + warpId(warp), failure);
-            }
-        }
-        return deleted;
     }
 
     private int settleBatch(List<PlayerWarp> warps) {

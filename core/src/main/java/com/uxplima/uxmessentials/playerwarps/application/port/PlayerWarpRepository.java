@@ -132,6 +132,17 @@ public interface PlayerWarpRepository {
     }
 
     /**
+     * Delete the warp {@code id} and its side rows only if, at the moment of the delete, it still matches
+     * {@link #archivedForRent} for {@code cutoff} and its earnings bank is empty, and report whether it was deleted.
+     * The condition is part of the delete itself, so a warp restored, edited or paid into after the page was read
+     * survives, and when several backends sweep the same table only one of them deletes it. The default deletes
+     * nothing; the jOOQ adapter overrides it.
+     */
+    default boolean deleteIfArchivedForRent(PlayerWarpId id, Instant cutoff) {
+        return false;
+    }
+
+    /**
      * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active} warps whose
      * paid term falls within {@code (now, horizon]} and whose {@code rent_reminded_stage} is still below
      * {@code maxStage}, for the reminder pass: the candidates that might still owe a heads-up mail. Capped at

@@ -164,6 +164,17 @@ public final class PlayerWarpSync {
         }
 
         @Override
+        public boolean deleteIfArchivedForRent(PlayerWarpId id, Instant cutoff) {
+            // Resolved first for the owner to drop, as deleteById does; only a delete that happened reaches the owner.
+            Optional<PlayerWarp> existing = delegate.findById(id);
+            boolean deleted = delegate.deleteIfArchivedForRent(id, cutoff);
+            if (deleted) {
+                existing.ifPresent(warp -> announce(warp.owner()));
+            }
+            return deleted;
+        }
+
+        @Override
         public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
             return delegate.remindableForRent(now, horizon, maxStage, limit);
         }

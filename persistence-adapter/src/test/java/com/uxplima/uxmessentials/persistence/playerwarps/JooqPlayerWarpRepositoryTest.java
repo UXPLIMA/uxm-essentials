@@ -1,7 +1,10 @@
 package com.uxplima.uxmessentials.persistence.playerwarps;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpFavourites.PLAYER_WARP_FAVOURITES;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
@@ -13,12 +16,14 @@ import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.RentState;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -36,6 +41,7 @@ class JooqPlayerWarpRepositoryTest {
     @TempDir
     Path folder;
 
+    private DSLContext dsl;
     private JooqPlayerWarpRepository repository;
 
     @BeforeEach
@@ -43,8 +49,8 @@ class JooqPlayerWarpRepositoryTest {
         SQLiteDataSource data = new SQLiteDataSource();
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
         new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        repository =
-                new JooqPlayerWarpRepository(DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), ""));
+        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+        repository = new JooqPlayerWarpRepository(dsl);
     }
 
     private static PlayerWarp warp(String name) {
@@ -76,5 +82,51 @@ class JooqPlayerWarpRepositoryTest {
 
         assertThat(due).containsExactly("older", "late");
         assertThat(repository.archivedForRent(CUTOFF, 1)).hasSize(1);
+    }
+
+    private void favourite(PlayerWarpId warp) {
+        dsl.insertInto(PLAYER_WARP_FAVOURITES)
+                .set(PLAYER_WARP_FAVOURITES.PLAYER_UUID, SAM.uuid().toString())
+                .set(PLAYER_WARP_FAVOURITES.WARP_ID, warp.value())
+                .set(PLAYER_WARP_FAVOURITES.ADDED_AT, NOW.toEpochMilli())
+                .execute();
+    }
+
+    private int favourites(PlayerWarpId warp) {
+        return dsl.fetchCount(PLAYER_WARP_FAVOURITES, PLAYER_WARP_FAVOURITES.WARP_ID.eq(warp.value()));
+    }
+
+    @Test
+    void theGuardedDeleteRemovesAQualifyingWarpWithItsSideRowsOnlyOnce() {
+        Instant old = CUTOFF.minus(Duration.ofDays(1));
+        PlayerWarpId id = repository.save(archivedForRent("older", old, old));
+        favourite(id);
+
+        assertThat(repository.deleteIfArchivedForRent(id, CUTOFF)).isTrue();
+        assertThat(repository.findById(id)).isEmpty();
+        assertThat(favourites(id)).isZero();
+
+        assertThat(repository.deleteIfArchivedForRent(id, CUTOFF)).isFalse();
+    }
+
+    @Test
+    void theGuardedDeleteKeepsAWarpThatChangedOrStillHoldsEarnings() {
+        Instant old = CUTOFF.minus(Duration.ofDays(1));
+        PlayerWarp archived = archivedForRent("restored", old, old);
+        PlayerWarpId restored = repository.save(archived);
+        repository.save(archived.withId(restored).withStatus(WarpStatus.ACTIVE, NOW));
+        favourite(restored);
+        PlayerWarpId rich = repository.save(archivedForRent("rich", old, old));
+        dsl.update(PLAYER_WARPS)
+                .set(PLAYER_WARPS.EARNED_AMOUNT, new BigDecimal("40"))
+                .where(PLAYER_WARPS.ID.eq(rich.value()))
+                .execute();
+
+        assertThat(repository.deleteIfArchivedForRent(restored, CUTOFF)).isFalse();
+        assertThat(repository.deleteIfArchivedForRent(rich, CUTOFF)).isFalse();
+
+        assertThat(repository.findById(restored)).isPresent();
+        assertThat(favourites(restored)).isEqualTo(1);
+        assertThat(repository.findById(rich)).isPresent();
     }
 }
