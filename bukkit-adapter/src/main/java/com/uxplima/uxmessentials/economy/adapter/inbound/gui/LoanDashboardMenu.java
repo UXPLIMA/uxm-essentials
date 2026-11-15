@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 
 import org.bukkit.entity.Player;
 
@@ -27,7 +28,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
@@ -227,10 +227,11 @@ public final class LoanDashboardMenu {
                     EconomyMessageKey.LOAN_GUI_PAID_OFF_FAILED);
             return;
         }
+        // The service works out the installment, so a stored one that rounds to nothing still collects the remainder.
         applyRepayment(
                 player,
                 loan,
-                loan.installmentAmount(),
+                viewerRef -> loanService.payInstallment(viewerRef, loan.id()),
                 EconomyMessageKey.LOAN_GUI_INSTALLMENT_PAID,
                 EconomyMessageKey.LOAN_GUI_INSTALLMENT_FAILED);
     }
@@ -268,17 +269,33 @@ public final class LoanDashboardMenu {
     /** Dispatch the repayment off the click thread, report the outcome, then reopen the dashboard. */
     private void applyRepayment(
             Player player, Loan loan, Money amount, EconomyMessageKey okKey, EconomyMessageKey errKey) {
+        applyRepayment(
+                player,
+                loan,
+                viewerRef ->
+                        loanService.payInstallment(viewerRef, loan.id(), amount).map(paid -> amount),
+                okKey,
+                errKey);
+    }
+
+    /** Run {@code pay}, which answers the settled amount, off the click thread, report it, then reopen. */
+    private void applyRepayment(
+            Player player,
+            Loan loan,
+            Function<PlayerRef, Result<Money, LoanError>> pay,
+            EconomyMessageKey okKey,
+            EconomyMessageKey errKey) {
         PlayerRef viewerRef = new PlayerRef(player.getUniqueId(), player.getName());
         Currency currency = loan.remainingAmount().currency();
         scheduler.async(() -> {
-            Result<Unit, LoanError> res = loanService.payInstallment(viewerRef, loan.id(), amount);
+            Result<Money, LoanError> res = pay.apply(viewerRef);
             scheduler.onEntity(viewerRef, () -> {
                 if (res.isOk()) {
                     notifier.send(
                             viewerRef,
                             okKey,
                             Map.of(
-                                    "amount", amount.amount().toPlainString(),
+                                    "amount", res.orElseThrow().amount().toPlainString(),
                                     "currency", currency.id().value()));
                 } else {
                     notifier.send(viewerRef, errKey);

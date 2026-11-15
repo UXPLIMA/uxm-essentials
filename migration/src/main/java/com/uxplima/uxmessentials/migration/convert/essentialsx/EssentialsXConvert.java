@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.map.KitMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.UserdataMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WarpMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WorldNameResolver;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -34,9 +35,15 @@ public final class EssentialsXConvert implements Convert {
     private final WarpMapper warpMapper;
     private final KitMapper kitMapper;
     private final JailMuteMapper jailMuteMapper;
+    private final Logger log;
 
-    public EssentialsXConvert(WorldNameResolver worlds) {
+    /**
+     * @param worlds the live world resolver
+     * @param log where each file, warp or kit the import has to leave out is reported
+     */
+    public EssentialsXConvert(WorldNameResolver worlds, Logger log) {
         Objects.requireNonNull(worlds, "worlds");
+        this.log = Objects.requireNonNull(log, "log");
         this.userMapper = new UserdataMapper(worlds);
         this.warpMapper = new WarpMapper(worlds);
         this.kitMapper = new KitMapper();
@@ -68,6 +75,6 @@ public final class EssentialsXConvert implements Convert {
     @Override
     public ImportPlan plan(ImportOptions options) {
         Objects.requireNonNull(options, "options");
-        return new EssentialsXPlan(options.sourcePath(), userMapper, warpMapper, kitMapper, jailMuteMapper);
+        return new EssentialsXPlan(options.sourcePath(), userMapper, warpMapper, kitMapper, jailMuteMapper, log);
     }
 }

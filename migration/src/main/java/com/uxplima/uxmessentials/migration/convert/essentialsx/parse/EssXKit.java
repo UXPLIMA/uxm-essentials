@@ -13,7 +13,8 @@ import org.jspecify.annotations.NullMarked;
  * of Minecraft materials.
  *
  * @param name the kit name as the entry declares it
- * @param delaySeconds the claim cooldown in seconds; {@code 0} when the entry sets none
+ * @param delaySeconds the claim cooldown in seconds; {@code 0} when the entry sets none, negative for a kit
+ *     EssentialsX lets each player claim only once
  * @param items the raw item descriptor lines in definition order
  */
 @NullMarked
@@ -22,8 +23,5 @@ public record EssXKit(String name, long delaySeconds, List<String> items) {
     public EssXKit {
         Objects.requireNonNull(name, "name");
         items = List.copyOf(Objects.requireNonNull(items, "items"));
-        if (delaySeconds < 0) {
-            throw new IllegalArgumentException("kit delay must not be negative: " + delaySeconds);
-        }
     }
 }

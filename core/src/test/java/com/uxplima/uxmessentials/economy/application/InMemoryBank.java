@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
-/** Balances per player and currency, transferring only when the payer can cover it. */
+/** Balances per player and currency, transferring only when the payer can cover it and crediting up to the maximum. */
 final class InMemoryBank implements EconomyProvider {
 
     private final Set<Currency> currencies;
@@ -58,7 +58,11 @@ final class InMemoryBank implements EconomyProvider {
             throw new IllegalStateException(
                     "storage down for " + amount.currency().id().value());
         }
-        set(owner, balance(owner, amount.currency()).plus(amount));
+        Money next = balance(owner, amount.currency()).plus(amount);
+        if (next.amount().compareTo(amount.currency().max()) > 0) {
+            return Result.err(TransferError.BALANCE_MAX_EXCEEDED);
+        }
+        set(owner, next);
         return Result.ok();
     }
 
@@ -77,6 +81,13 @@ final class InMemoryBank implements EconomyProvider {
         Money have = balance(from, amount.currency());
         if (have.isLessThan(amount)) {
             return TransferResult.insufficientFunds(amount, have);
+        }
+        if (balance(to, amount.currency())
+                        .plus(amount)
+                        .amount()
+                        .compareTo(amount.currency().max())
+                > 0) {
+            return TransferResult.denyWith(TransferError.BALANCE_MAX_EXCEEDED.messageKey());
         }
         debit(from, amount);
         credit(to, amount);

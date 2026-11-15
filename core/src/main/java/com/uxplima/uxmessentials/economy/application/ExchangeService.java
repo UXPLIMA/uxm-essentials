@@ -61,7 +61,10 @@ public final class ExchangeService {
         if (!sourceCurrency.exchangeAllowed() || !targetCurrency.exchangeAllowed()) {
             return ExchangeOutcome.currencyDisabled();
         }
-        if (sourceAmount.compareTo(BigDecimal.ZERO) <= 0) {
+        // The debit is taken at the source currency's precision, so the target is worked out from that same figure:
+        // a typed amount finer than the precision would otherwise debit a rounded figure and credit the raw one.
+        BigDecimal debited = sourceCurrency.normalize(sourceAmount);
+        if (debited.signum() <= 0) {
             return ExchangeOutcome.failed(TransferError.BELOW_MINIMUM);
         }
 
@@ -71,14 +74,14 @@ public final class ExchangeService {
         }
 
         ExchangeRate rate = rateOpt.get();
-        Optional<BigDecimal> targetOpt = rate.calculateTargetAmount(sourceAmount, targetCurrency.precision());
+        Optional<BigDecimal> targetOpt = rate.calculateTargetAmount(debited, targetCurrency.precision());
         if (targetOpt.isEmpty()) {
             // The source is so small the target rounds to zero: refuse rather than debit for nothing.
             return ExchangeOutcome.failed(TransferError.BELOW_MINIMUM);
         }
         BigDecimal targetAmount = targetOpt.get();
 
-        Money debit = Money.of(sourceCurrency, sourceAmount);
+        Money debit = Money.of(sourceCurrency, debited);
         Money credit = Money.of(targetCurrency, targetAmount);
         Result<Unit, TransferError> moved = walletRepository.exchange(player, debit, credit);
         if (moved.isErr()) {
@@ -90,6 +93,6 @@ public final class ExchangeService {
             };
         }
 
-        return ExchangeOutcome.success(sourceAmount, targetAmount);
+        return ExchangeOutcome.success(debited, targetAmount);
     }
 }

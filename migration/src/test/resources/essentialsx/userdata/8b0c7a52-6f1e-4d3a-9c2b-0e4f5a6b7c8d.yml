@@ -1,0 +1,37 @@
+lastAccountName: Alex
+money: 'a lot'
+homes:
+  farm:
+    world: world
+    x: 100.0
+    y: 70.0
+    z: 100.0
+    yaw: 0.0
+    pitch: 0.0
+  old:
+    world: nether_gone
+    x: 1.0
+    y: 2.0
+    z: 3.0
+    yaw: 0.0
+    pitch: 0.0
+  mine:
+    world: 00000000-0000-0000-0000-00000000a001
+    world-name: world
+    x: -50.0
+    y: 12.0
+    z: 75.5
+    yaw: 45.0
+    pitch: 0.0
+  broken:
+    x: 5.0
+    y: 6.0
+    z: 7.0
+muted: true
+muteReason: ' spamming '
+jailed: true
+jail: ' cells '
+timestamps:
+  mute: 1900000000000
+  jail: 0
+  onlinejail: 600000

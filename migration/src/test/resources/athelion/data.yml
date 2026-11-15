@@ -1,0 +1,74 @@
+# Athelion PlayerWarps serialises every warp under warps:, keyed by the warp uuid.
+warps:
+  0b1c2d3e-0000-4000-8000-000000000001:
+    ==: dev.revivalo.playerwarps.warp.Warp
+    uuid: 0b1c2d3e-0000-4000-8000-000000000001
+    owner-id: 11111111-1111-4111-8111-111111111111
+    name: Shop
+    display-name: '&6The Shop'
+    lore: '  Best prices in town  '
+    loc:
+      ==: org.bukkit.Location
+      world: world
+      x: 10.5
+      y: 64.0
+      z: -3.5
+      pitch: 5.0
+      yaw: 90.0
+    password: ' s3cret '
+    status: PASSWORD_PROTECTED
+    admission: 25
+    visits: 120
+    ratings: 14
+    reviewers:
+    - 22222222-2222-4222-8222-222222222222
+    - 33333333-3333-4333-8333-333333333333
+    - not-a-uuid
+    - 44444444-4444-4444-8444-444444444444
+    blocked-players:
+    - 55555555-5555-4555-8555-555555555555
+    category: shops
+    date-created: 1700000000000
+  0b1c2d3e-0000-4000-8000-000000000002:
+    owner-id: 11111111-1111-4111-8111-111111111111
+    name: Vault
+    loc:
+      world: world
+      x: 0.0
+      y: 10.0
+      z: 0.0
+    password: 'null'
+    status: CLOSED
+    category: all
+  0b1c2d3e-0000-4000-8000-000000000003:
+    owner-id: 22222222-2222-4222-8222-222222222222
+    name: Farm
+    loc:
+      world: world
+      x: 1.0
+      y: 2.0
+      z: 3.0
+    status: OPENED
+    ratings: 30
+    reviewers:
+    - 11111111-1111-4111-8111-111111111111
+  0b1c2d3e-0000-4000-8000-000000000004:
+    owner-id: 22222222-2222-4222-8222-222222222222
+    name: Old Base
+    loc:
+      world: deleted_world
+      x: 1.0
+      y: 2.0
+      z: 3.0
+  0b1c2d3e-0000-4000-8000-000000000005:
+    name: Orphan
+    loc:
+      world: world
+      x: 1.0
+      y: 2.0
+      z: 3.0
+  0b1c2d3e-0000-4000-8000-000000000006:
+    owner-id: 22222222-2222-4222-8222-222222222222
+    name: Nowhere
+    loc:
+      x: 1.0
