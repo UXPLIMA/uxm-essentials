@@ -96,6 +96,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -174,7 +175,8 @@ public final class ModerationWiring {
             Path dataFolder,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
-            NetworkPresence presence) {
+            NetworkPresence presence,
+            SeenVisibility seenVisibility) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -191,6 +193,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(ipHistory, "ipHistory");
         Objects.requireNonNull(ipTokens, "ipTokens");
         Objects.requireNonNull(presence, "presence");
+        Objects.requireNonNull(seenVisibility, "seenVisibility");
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
         ModerationSettings settings = new ModerationSettings(ctx.config(), kernel.log());
@@ -221,6 +224,7 @@ public final class ModerationWiring {
                 ipHistory,
                 ipTokens,
                 presence,
+                seenVisibility,
                 clock);
         // The live kick: on a remote ban frame, re-evaluate the now-authoritative ban here and kick an online
         // target. Self-origin frames are dropped by the bus client before dispatch, so the local /ban (which
@@ -425,6 +429,7 @@ public final class ModerationWiring {
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
             NetworkPresence presence,
+            SeenVisibility seenVisibility,
             Clock clock) {
         // One alt lookup for every flow that asks "who else uses this address": the login audit, /banip,
         // /tempbanip and /seenip. It tokenises first, so all four match the same rows /alts groups over.
@@ -561,7 +566,8 @@ public final class ModerationWiring {
                         notifier,
                         settings.censorIpAddresses(),
                         clock,
-                        presence))
+                        presence,
+                        seenVisibility))
                 .listAlts(new ListAlts(ipHistory, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .staffRollback(staffRollback)

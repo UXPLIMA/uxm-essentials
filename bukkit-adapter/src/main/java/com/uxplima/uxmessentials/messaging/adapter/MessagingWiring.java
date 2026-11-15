@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.messaging.adapter.inbound.command.MessagingComm
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitMessageDelivery;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience;
+import com.uxplima.uxmessentials.messaging.adapter.outbound.BusMessagingNetwork;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemoryConversationStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.InMemorySocialSpyStore;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.MailExpirySweep;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
+import com.uxplima.uxmessentials.messaging.application.RelayPrivateMessage;
 import com.uxplima.uxmessentials.messaging.application.Reply;
 import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
@@ -45,10 +47,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.IgnoreSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.StoresMessagingPlaceholders;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -83,6 +87,7 @@ public final class MessagingWiring {
             Optional<MutePolicy> mute,
             VanishVisibility vanish,
             Bus bus,
+            NetworkPresence presence,
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -94,6 +99,7 @@ public final class MessagingWiring {
         Objects.requireNonNull(mute, "mute");
         Objects.requireNonNull(vanish, "vanish");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -110,8 +116,16 @@ public final class MessagingWiring {
         // The AFK status starts on AfkStatus.NEVER; presence rebinds it through this holder when it wires
         // (presence is wired after messaging), and stays NEVER when presence is disabled (soft couple).
         MutableAfkStatus afkStatus = new MutableAfkStatus();
-        MessagingServices services =
-                assemble(kernel, settings, stores, mutePolicy, afkStatus, vanish, Clock.systemUTC());
+        // Private messages to players on other backends and help requests for their staff ride the shared bus; with
+        // the network off the publisher discards them and presence knows only this backend, so nothing changes.
+        BusMessagingNetwork network = new BusMessagingNetwork(bus.publisher(), kernel.log());
+        // Where uxmChat runs private messages, its ignore lists and toggles decide; a message from another backend is
+        // then answered as offline here rather than judged by this module's own, unused stores.
+        UxmChatStepBack chat = new UxmChatStepBack(plugin.getServer());
+        MessagingServices services = assemble(
+                kernel, settings, stores, mutePolicy, afkStatus, vanish, network, presence, chat, Clock.systemUTC());
+        network.bind(services.relay(), services.helpOp());
+        bus.registry().register(network::onFrame);
         MailExpirySweep sweep = new MailExpirySweep(
                 kernel.scheduler(),
                 stores.mail(),
@@ -153,6 +167,9 @@ public final class MessagingWiring {
             MutePolicy mute,
             AfkStatus afk,
             VanishVisibility vanish,
+            BusMessagingNetwork network,
+            NetworkPresence presence,
+            UxmChatStepBack chat,
             Clock clock) {
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         MessageDelivery delivery = new BukkitMessageDelivery(kernel.messages(), kernel.messageSink());
@@ -169,8 +186,18 @@ public final class MessagingWiring {
                 notifier,
                 kernel.events(),
                 clock);
+        RelayPrivateMessage relay = new RelayPrivateMessage(
+                sendMessage,
+                stores.replyRouting(),
+                vanish,
+                presence,
+                network,
+                notifier,
+                kernel.scheduler(),
+                () -> chat.covers(UxmChatStepBack.PRIVATE_MESSAGES));
         return new MessagingServices(
                 sendMessage,
+                relay,
                 new Reply(
                         sendMessage,
                         stores.conversations(),
@@ -179,7 +206,8 @@ public final class MessagingWiring {
                         stores.replyRouting(),
                         notifier,
                         settings.replyTtl(),
-                        clock),
+                        clock,
+                        relay),
                 new SendMail(stores.mail(), stores.ignores(), delivery, mute, notifier, kernel.events(), clock),
                 new SendMailToAll(stores.mail(), clock),
                 new ReadMail(stores.mail(), delivery, notifier),
@@ -190,7 +218,16 @@ public final class MessagingWiring {
                 new Unignore(stores.ignores(), notifier),
                 new ListIgnores(stores.ignores(), notifier),
                 new SocialSpy(stores.socialSpy(), notifier),
-                new HelpOp(new BukkitStaffAudience(), delivery, mute, notifier, kernel.events(), clock),
+                new HelpOp(
+                        new BukkitStaffAudience(),
+                        delivery,
+                        mute,
+                        notifier,
+                        kernel.events(),
+                        clock,
+                        network,
+                        presence,
+                        kernel.scheduler()),
                 kernel.playerLookup(),
                 vanish,
                 kernel.scheduler());

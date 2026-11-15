@@ -61,6 +61,7 @@ public enum MessagingMessageKey implements MessageKey {
     // /helpop
     HELPOP_SENT("helpop.sent"),
     HELPOP_RECEIVED("helpop.received"),
+    HELPOP_RECEIVED_REMOTE("helpop.received-remote"),
     HELPOP_NO_STAFF("helpop.no-staff"),
 
     // management GUIs: /msgsettings settings panel

@@ -24,6 +24,11 @@ public interface StaffChannel {
         }
 
         @Override
+        public void sendRemote(String server, PlayerRef from, List<PlayerRef> recipients, String message) {
+            // No messaging module to fan out through; staff chat degrades to silence.
+        }
+
+        @Override
         public List<PlayerRef> onlineStaff() {
             return List.of();
         }
@@ -31,6 +36,9 @@ public interface StaffChannel {
 
     /** Deliver {@code message} from {@code from} to each of {@code recipients} on the staff channel. */
     void send(PlayerRef from, List<PlayerRef> recipients, String message);
+
+    /** Deliver {@code message}, sent by {@code from} on another {@code server}, to each of {@code recipients}. */
+    void sendRemote(String server, PlayerRef from, List<PlayerRef> recipients, String message);
 
     /** Every online player holding the staff-chat node, the staff-chat audience. */
     List<PlayerRef> onlineStaff();

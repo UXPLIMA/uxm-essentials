@@ -33,6 +33,9 @@ public interface MessageDelivery {
     /** Fan a {@code /helpop} request from {@code requester} out to one staff {@code viewer}. */
     void deliverHelpOp(PlayerRef requester, PlayerRef viewer, MessageBody body);
 
+    /** Show one staff {@code viewer} a {@code /helpop} request {@code requester} raised on another {@code server}. */
+    void deliverRemoteHelpOp(PlayerRef requester, String server, PlayerRef viewer, MessageBody body);
+
     /** Show a socialspy {@code observer} a private message between {@code sender} and {@code recipient}. */
     void deliverSpy(PlayerRef observer, PlayerRef sender, PlayerRef recipient, MessageBody body);
 }

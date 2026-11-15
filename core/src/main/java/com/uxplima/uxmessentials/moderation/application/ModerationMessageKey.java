@@ -180,6 +180,7 @@ public enum ModerationMessageKey implements MessageKey {
     SEEN_REPORT("moderation.seen.report"),
     SEEN_NEVER("moderation.seen.never"),
     SEEN_ONLINE_ELSEWHERE("moderation.seen.online-elsewhere"),
+    SEEN_ONLINE_HERE("moderation.seen.online-here"),
     SEENIP_REPORT("moderation.seenip.report"),
     SEENIP_ALTS("moderation.seenip.alts"),
     SEENIP_NO_IP("moderation.seenip.no-ip"),

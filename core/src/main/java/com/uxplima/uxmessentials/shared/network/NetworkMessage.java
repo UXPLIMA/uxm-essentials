@@ -39,6 +39,10 @@ public sealed interface NetworkMessage
                 RankChanged,
                 PresenceChanged,
                 PresenceSnapshot,
+                PrivateMessageFrame,
+                PrivateMessageAnswerFrame,
+                HelpOpFrame,
+                StaffChatFrame,
                 JailChanged,
                 JailHopFailed {
 
@@ -74,6 +78,10 @@ public sealed interface NetworkMessage
         IP_BAN_CHANGED(18),
         PRESENCE_CHANGED(19),
         PRESENCE_SNAPSHOT(20),
+        PRIVATE_MESSAGE(21),
+        PRIVATE_MESSAGE_ANSWER(22),
+        HELP_OP(23),
+        STAFF_CHAT(24),
         JAIL_CHANGED(28),
         JAIL_HOP_FAILED(29);
 

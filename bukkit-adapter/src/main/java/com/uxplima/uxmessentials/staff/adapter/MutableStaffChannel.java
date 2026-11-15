@@ -25,6 +25,11 @@ public final class MutableStaffChannel implements StaffChannel {
     }
 
     @Override
+    public void sendRemote(String server, PlayerRef from, List<PlayerRef> recipients, String message) {
+        Objects.requireNonNull(delegate.get(), "delegate").sendRemote(server, from, recipients, message);
+    }
+
+    @Override
     public List<PlayerRef> onlineStaff() {
         return Objects.requireNonNull(delegate.get(), "delegate").onlineStaff();
     }

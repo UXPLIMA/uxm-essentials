@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.messaging.application.Ignore;
 import com.uxplima.uxmessentials.messaging.application.ListIgnores;
 import com.uxplima.uxmessentials.messaging.application.MsgToggle;
 import com.uxplima.uxmessentials.messaging.application.ReadMail;
+import com.uxplima.uxmessentials.messaging.application.RelayPrivateMessage;
 import com.uxplima.uxmessentials.messaging.application.Reply;
 import com.uxplima.uxmessentials.messaging.application.ReplyToggle;
 import com.uxplima.uxmessentials.messaging.application.SendMail;
@@ -29,6 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * offered as unknown.
  *
  * @param sendMessage {@code /msg}
+ * @param relay {@code /msg} to a player on another backend of the network
  * @param reply {@code /reply}
  * @param sendMail {@code /mail send}
  * @param sendMailToAll {@code /mail sendall}
@@ -48,6 +50,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record MessagingServices(
         SendMessage sendMessage,
+        RelayPrivateMessage relay,
         Reply reply,
         SendMail sendMail,
         SendMailToAll sendMailToAll,
@@ -66,6 +69,7 @@ public record MessagingServices(
 
     public MessagingServices {
         Objects.requireNonNull(sendMessage, "sendMessage");
+        Objects.requireNonNull(relay, "relay");
         Objects.requireNonNull(reply, "reply");
         Objects.requireNonNull(sendMail, "sendMail");
         Objects.requireNonNull(sendMailToAll, "sendMailToAll");
