@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vanish.application.port;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -29,6 +30,18 @@ public interface VanishRecords {
      */
     void markDeparted(UUID player, String server, Instant at);
 
-    /** Record that the vanished {@code player} is now on {@code server}; nothing happens unless the row says vanished. */
-    void markArrived(UUID player, String server);
+    /**
+     * Record that the vanished {@code player} is now on {@code server}, seen there at {@code at}; nothing happens unless
+     * the row says vanished.
+     */
+    void markArrived(UUID player, String server, Instant at);
+
+    /** Confirm that the vanished {@code players} are still on {@code server} at {@code at}, for rows it holds. */
+    void touch(Collection<UUID> players, String server, Instant at);
+
+    /**
+     * Record a departure at {@code at} for every vanished player whose row {@code server} holds without a departure,
+     * except {@code stillHere}: they cannot be on a backend that is starting or stopping.
+     */
+    void releaseHeld(String server, Collection<UUID> stillHere, Instant at);
 }

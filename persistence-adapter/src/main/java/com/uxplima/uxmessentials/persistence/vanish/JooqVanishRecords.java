@@ -3,8 +3,13 @@ package com.uxplima.uxmessentials.persistence.vanish;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerVanish.PLAYER_VANISH;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -12,6 +17,7 @@ import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.vanish.application.port.VanishRecords;
 import com.uxplima.uxmessentials.vanish.domain.StoredVanish;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Record;
 import org.jspecify.annotations.Nullable;
@@ -24,14 +30,17 @@ import org.jspecify.annotations.Nullable;
  * an insert. Two backends inserting the same new player at once lose one insert to the primary key; that loser then
  * settles by the same conditional update.
  *
- * <p>A vanish or reveal replaces the whole row and clears the departure. A departure only stamps {@code departed_at}
- * on a row that still says vanished on the departing server, and an arrival moves a vanished row to its new server,
- * so a departure that arrives after the next backend claimed the player changes nothing.
+ * <p>A vanish or reveal replaces the whole row and clears the departure. A departure, a sighting or a release only
+ * touches a row that still says vanished on the server that writes it, and an arrival moves a vanished row to its new
+ * server, so a late write from the backend a player left changes nothing.
  */
 public final class JooqVanishRecords extends JooqRepository implements VanishRecords {
 
     private static final short VANISHED = 1;
     private static final short VISIBLE = 0;
+
+    /** Well under the smallest bound-parameter limit of the four backends, so one sighting batch is one statement. */
+    private static final int BATCH = 500;
 
     public JooqVanishRecords(DSLContext dsl) {
         super(dsl);
@@ -63,7 +72,8 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
                     .set(PLAYER_VANISH.VANISH_LEVEL, levelColumn(state))
                     .set(PLAYER_VANISH.LAST_SERVER, state.server().orElse(null))
                     .set(PLAYER_VANISH.UPDATED_AT, state.updatedAt().toEpochMilli())
-                    .set(PLAYER_VANISH.DEPARTED_AT, departedColumn(state))
+                    .set(PLAYER_VANISH.SEEN_AT, millis(state.seenAt()))
+                    .set(PLAYER_VANISH.DEPARTED_AT, millis(state.departedAt()))
                     .execute());
         } catch (PersistenceException raced) {
             // Another backend inserted the row between the existence check and this insert.
@@ -79,21 +89,66 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
         write(dsl -> dsl.update(PLAYER_VANISH)
                 .set(PLAYER_VANISH.DEPARTED_AT, at.toEpochMilli())
                 .where(PLAYER_VANISH.PLAYER_UUID.eq(player.toString()))
-                .and(PLAYER_VANISH.VANISHED.eq(VANISHED))
-                .and(PLAYER_VANISH.LAST_SERVER.eq(server))
+                .and(heldBy(server))
                 .execute());
     }
 
     @Override
-    public void markArrived(UUID player, String server) {
+    public void markArrived(UUID player, String server, Instant at) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(at, "at");
         write(dsl -> dsl.update(PLAYER_VANISH)
                 .set(PLAYER_VANISH.LAST_SERVER, server)
+                .set(PLAYER_VANISH.SEEN_AT, at.toEpochMilli())
                 .setNull(PLAYER_VANISH.DEPARTED_AT)
                 .where(PLAYER_VANISH.PLAYER_UUID.eq(player.toString()))
                 .and(PLAYER_VANISH.VANISHED.eq(VANISHED))
                 .execute());
+    }
+
+    @Override
+    public void touch(Collection<UUID> players, String server, Instant at) {
+        Objects.requireNonNull(players, "players");
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(at, "at");
+        List<String> ids = players.stream().map(UUID::toString).toList();
+        for (int from = 0; from < ids.size(); from += BATCH) {
+            List<String> batch = ids.subList(from, Math.min(ids.size(), from + BATCH));
+            write(dsl -> dsl.update(PLAYER_VANISH)
+                    .set(PLAYER_VANISH.SEEN_AT, at.toEpochMilli())
+                    .where(PLAYER_VANISH.PLAYER_UUID.in(batch))
+                    .and(heldBy(server))
+                    .and(PLAYER_VANISH.DEPARTED_AT.isNull())
+                    .execute());
+        }
+    }
+
+    @Override
+    public void releaseHeld(String server, Collection<UUID> stillHere, Instant at) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(stillHere, "stillHere");
+        Objects.requireNonNull(at, "at");
+        Set<String> keep = new HashSet<>();
+        stillHere.forEach(player -> keep.add(player.toString()));
+        List<String> held = new ArrayList<>(read(dsl -> dsl.select(PLAYER_VANISH.PLAYER_UUID)
+                .from(PLAYER_VANISH)
+                .where(heldBy(server))
+                .and(PLAYER_VANISH.DEPARTED_AT.isNull())
+                .fetch(PLAYER_VANISH.PLAYER_UUID)));
+        held.removeAll(keep);
+        for (String player : held) {
+            write(dsl -> dsl.update(PLAYER_VANISH)
+                    .set(PLAYER_VANISH.DEPARTED_AT, at.toEpochMilli())
+                    .where(PLAYER_VANISH.PLAYER_UUID.eq(player))
+                    .and(heldBy(server))
+                    .and(PLAYER_VANISH.DEPARTED_AT.isNull())
+                    .execute());
+        }
+    }
+
+    private static Condition heldBy(String server) {
+        return PLAYER_VANISH.VANISHED.eq(VANISHED).and(PLAYER_VANISH.LAST_SERVER.eq(server));
     }
 
     private static int updateIfNotNewer(DSLContext dsl, UUID player, StoredVanish state) {
@@ -103,7 +158,8 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
                 .set(PLAYER_VANISH.VANISH_LEVEL, levelColumn(state))
                 .set(PLAYER_VANISH.LAST_SERVER, state.server().orElse(null))
                 .set(PLAYER_VANISH.UPDATED_AT, at)
-                .set(PLAYER_VANISH.DEPARTED_AT, departedColumn(state))
+                .set(PLAYER_VANISH.SEEN_AT, millis(state.seenAt()))
+                .set(PLAYER_VANISH.DEPARTED_AT, millis(state.departedAt()))
                 .where(PLAYER_VANISH.PLAYER_UUID.eq(player.toString()))
                 .and(PLAYER_VANISH.UPDATED_AT.le(at))
                 .execute();
@@ -113,8 +169,12 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
         return state.level().map(VanishLevel::level).orElse(null);
     }
 
-    private static @Nullable Long departedColumn(StoredVanish state) {
-        return state.departedAt().map(Instant::toEpochMilli).orElse(null);
+    private static @Nullable Long millis(Optional<Instant> instant) {
+        return instant.map(Instant::toEpochMilli).orElse(null);
+    }
+
+    private static Optional<Instant> instant(@Nullable Long millis) {
+        return millis == null ? Optional.empty() : Optional.of(Instant.ofEpochMilli(millis));
     }
 
     private static StoredVanish toStored(Record row) {
@@ -123,14 +183,12 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
             return StoredVanish.visible(at);
         }
         Integer level = row.get(PLAYER_VANISH.VANISH_LEVEL);
-        String server = row.get(PLAYER_VANISH.LAST_SERVER);
-        StoredVanish vanished = new StoredVanish(
+        return new StoredVanish(
                 true,
                 Optional.of(level == null ? VanishLevel.DEFAULT : VanishLevel.of(level)),
-                Optional.ofNullable(server),
+                Optional.ofNullable(row.get(PLAYER_VANISH.LAST_SERVER)),
                 at,
-                Optional.empty());
-        Long departed = row.get(PLAYER_VANISH.DEPARTED_AT);
-        return departed == null ? vanished : vanished.departed(Instant.ofEpochMilli(departed));
+                instant(row.get(PLAYER_VANISH.SEEN_AT)),
+                instant(row.get(PLAYER_VANISH.DEPARTED_AT)));
     }
 }

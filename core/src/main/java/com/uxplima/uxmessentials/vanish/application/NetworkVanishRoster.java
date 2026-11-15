@@ -7,6 +7,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -15,9 +16,9 @@ import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
- * The live {@link NetworkVanishStore}: who each peer reports vanished, keyed by player, with the reporting backend and
- * when the report arrived here. Every time is this backend's own clock at arrival, so clock skew between backends
- * never decides anything.
+ * The live {@link NetworkVanishStore}: who each peer reports vanished, keyed by player, with the reporting backend, the
+ * run of that backend that sent the report, and when the report arrived here. Every time is this backend's own clock at
+ * arrival, so clock skew between backends never decides anything.
  *
  * <ul>
  *   <li>An entry counts while {@link NetworkPresence} says its backend is running. A report from a backend presence has
@@ -25,8 +26,8 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *       its first heartbeat arrives.
  *   <li>A departure turns the entry into a tombstone that hides an arriving player for one hop window and is never
  *       listed.
- *   <li>The first heartbeat of a backend's new run drops what arrived before its previous heartbeat, which can only be
- *       the old run's; what the new run reported before its first heartbeat is kept.
+ *   <li>The first heartbeat of a backend's new run drops every entry another run of it sent, whenever that arrived, and
+ *       a late frame from an ended run is ignored; what the new run reported before its first heartbeat is kept.
  * </ul>
  *
  * <p>Reads and writes are lock-free map operations, so the bus dispatch thread and a command thread see a coherent
@@ -34,10 +35,12 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  */
 public final class NetworkVanishRoster implements NetworkVanishStore {
 
-    private record Entry(String origin, String name, VanishLevel level, Instant seen, Optional<Instant> departed) {}
+    private record Entry(
+            String origin, long run, String name, VanishLevel level, Instant seen, Optional<Instant> departed) {}
 
     private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<String, Instant> lastHeartbeat = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Set<Long>> endedRuns = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> currentRun = new ConcurrentHashMap<>();
     private final NetworkPresence presence;
     private final Clock clock;
     private final Duration hopWindow;
@@ -49,13 +52,16 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
     }
 
     @Override
-    public void apply(String origin, VanishSync change) {
+    public void apply(String origin, long run, VanishSync change) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(change, "change");
+        if (ended(origin, run)) {
+            return;
+        }
         if (change.vanished()) {
             entries.put(
                     change.player(),
-                    new Entry(origin, change.playerName(), change.level(), clock.instant(), Optional.empty()));
+                    new Entry(origin, run, change.playerName(), change.level(), clock.instant(), Optional.empty()));
         } else {
             // A reveal is a real /vanish off wherever it came from, so it ends the vanish whoever reported it.
             entries.remove(change.player());
@@ -70,19 +76,33 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
         entries.computeIfPresent(
                 player,
                 (id, entry) -> entry.origin().equals(origin) && entry.departed().isEmpty()
-                        ? new Entry(entry.origin(), entry.name(), entry.level(), entry.seen(), Optional.of(now))
+                        ? new Entry(
+                                entry.origin(),
+                                entry.run(),
+                                entry.name(),
+                                entry.level(),
+                                entry.seen(),
+                                Optional.of(now))
                         : entry);
     }
 
     @Override
-    public void heartbeat(String origin, boolean newRun) {
+    public void heartbeat(String origin, long run, boolean newRun) {
         Objects.requireNonNull(origin, "origin");
-        Instant before = lastHeartbeat.put(origin, clock.instant());
-        if (newRun && before != null) {
-            entries.values()
-                    .removeIf(entry ->
-                            entry.origin().equals(origin) && !entry.seen().isAfter(before));
+        Long before = currentRun.put(origin, run);
+        if (!newRun) {
+            return;
         }
+        Set<Long> ended = endedRuns.computeIfAbsent(origin, key -> ConcurrentHashMap.newKeySet());
+        if (before != null && before != run) {
+            ended.add(before);
+        }
+        entries.forEach((id, entry) -> {
+            if (entry.origin().equals(origin) && entry.run() != run) {
+                ended.add(entry.run());
+                entries.remove(id, entry);
+            }
+        });
     }
 
     @Override
@@ -111,7 +131,13 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
     @Override
     public void clear() {
         entries.clear();
-        lastHeartbeat.clear();
+        endedRuns.clear();
+        currentRun.clear();
+    }
+
+    private boolean ended(String origin, long run) {
+        Set<Long> runs = endedRuns.get(origin);
+        return runs != null && runs.contains(run);
     }
 
     private Optional<Entry> current(UUID who) {

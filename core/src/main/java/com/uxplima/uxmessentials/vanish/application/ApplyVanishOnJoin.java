@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
@@ -23,10 +24,11 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * <p>A vanish ends when the player leaves the network unless they may persist it. The kept state carries over only when
  * {@link StoredVanish#restores} says so. On a server switch the proxy keeps the old connection until the new login
  * succeeds, so the login read here sees no departure from the origin yet; that counts as a switch when
- * {@link NetworkPresence} still sees the player on another backend, or sees their last backend running. A backend that
- * cannot see any peer yet (it just started, or the transport drops frames while it is empty) cannot rule a switch out
- * and keeps the player hidden. A peer that is hiding the player right now, or let them go within the hop window, as the
- * network view reports, counts too. A kept vanish that does not carry over is cleared, so it cannot come back later.
+ * {@link NetworkPresence} still sees the player on another backend, or when the row shows their last backend confirmed
+ * them within the hop window. That sighting lives in the database, so it holds whether or not the transport reaches this
+ * backend, and it goes stale once the backend that wrote it stops, so a crash cannot keep a player hidden for long. A
+ * peer that is hiding the player right now, or let them go within the hop window, as the network view reports, counts
+ * too. A kept vanish that does not carry over is cleared, so it cannot come back later.
  *
  * <p>Once seeded, a joiner who may rejoin vanished is hidden if they are not already, and otherwise a vanished joiner
  * has their level re-derived from this backend's permissions, which also re-applies the hide and the buffs and tells
@@ -34,7 +36,8 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *
  * <p>The kept state is normally read during login. When that read did not finish in time, a joiner who may vanish is
  * hidden for now and their join line stays quiet, so a vanished player never flashes into view; {@link #lateLoad}
- * then decides, and reveals them if the kept state does not carry over.
+ * then decides, and reveals them if the kept state does not carry over, telling the peers too in case this backend
+ * announced them meanwhile.
  */
 public final class ApplyVanishOnJoin {
 
@@ -45,6 +48,7 @@ public final class ApplyVanishOnJoin {
     private final VanishStore store;
     private final VanishView view;
     private final VanishLevelResolver levels;
+    private final VanishBus bus;
     private final NetworkPresence presence;
     private final Clock clock;
     private final Duration hopWindow;
@@ -58,6 +62,7 @@ public final class ApplyVanishOnJoin {
             VanishStore store,
             VanishView view,
             VanishLevelResolver levels,
+            VanishBus bus,
             NetworkPresence presence,
             Clock clock,
             Duration hopWindow) {
@@ -68,6 +73,7 @@ public final class ApplyVanishOnJoin {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.levels = Objects.requireNonNull(levels, "levels");
+        this.bus = Objects.requireNonNull(bus, "bus");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.hopWindow = Objects.requireNonNull(hopWindow, "hopWindow");
@@ -129,6 +135,7 @@ public final class ApplyVanishOnJoin {
         } else if (wasProvisional) {
             store.reveal(joiner.uuid());
             view.reveal(joiner);
+            bus.publish(VanishSync.revealed(joiner));
         }
         boolean vanished = store.isVanished(joiner.uuid());
         afterDecision(joiner, stored, vanished);
@@ -165,12 +172,9 @@ public final class ApplyVanishOnJoin {
         if (where.isPresent() && !where.get().server().equals(here)) {
             return true;
         }
-        Optional<String> from = state.server().filter(server -> !server.equals(here));
-        return from.isPresent() && (presence.isLive(from.get()) || cannotSeePeers(here));
-    }
-
-    private boolean cannotSeePeers(String here) {
-        return presence.online().stream().allMatch(online -> online.server().equals(here));
+        boolean fromElsewhere =
+                state.server().filter(server -> !server.equals(here)).isPresent();
+        return fromElsewhere && state.seenWithin(clock.instant(), hopWindow);
     }
 
     private void afterDecision(PlayerRef joiner, Optional<StoredVanish> stored, boolean vanished) {

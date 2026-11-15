@@ -15,26 +15,28 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * <p>Every entry remembers the backend that reported it. When a player leaves that backend the entry turns into a
  * departure, which still hides the player if they arrive here within the hop window (on a server switch the origin's
  * departure can arrive before the destination's join) but no longer lists them. A departure from a backend other than
- * the one the entry came from is ignored. The entries of a backend that stops running, or starts a new run, are
- * dropped, so the view never keeps a player nobody is hiding any more.
+ * the one the entry came from is ignored. The entries of a backend that stops running, or of an earlier run of a
+ * backend that started again, are dropped, so the view never keeps a player nobody is hiding any more.
  *
  * <p>The name rides along so the list can render a hidden player who is not online on the reading backend. When
  * {@code cross-server} is off the module wires {@link #empty()}, so the reconcile and list paths stay inert.
  */
 public interface NetworkVanishStore {
 
-    /** Apply a change reported by peer {@code origin}: record the player vanished, or drop them on a reveal. */
-    void apply(String origin, VanishSync change);
+    /**
+     * Apply a change reported by run {@code run} of peer {@code origin}: record the player vanished, or drop them on a
+     * reveal. A change from a run that already ended is ignored.
+     */
+    void apply(String origin, long run, VanishSync change);
 
     /** Peer {@code origin} says {@code player} left it; their entry from that backend becomes a departure. */
     void depart(String origin, UUID player);
 
     /**
-     * Peer {@code origin} sent a heartbeat. When it is the first of a new run ({@code newRun}), every entry that arrived
-     * before the previous heartbeat belongs to the run that ended and is dropped; what the new run already reported is
-     * kept.
+     * Run {@code run} of peer {@code origin} sent a heartbeat. When it is the first of a new run ({@code newRun}), every
+     * entry another run of that peer sent is dropped; what the new run already reported is kept.
      */
-    void heartbeat(String origin, boolean newRun);
+    void heartbeat(String origin, long run, boolean newRun);
 
     /**
      * The use level {@code who} is vanished at on a peer, or empty when no peer reports them vanished. A departure
@@ -61,7 +63,7 @@ public interface NetworkVanishStore {
         INSTANCE;
 
         @Override
-        public void apply(String origin, VanishSync change) {
+        public void apply(String origin, long run, VanishSync change) {
             // Nothing to track with cross-server off.
         }
 
@@ -71,7 +73,7 @@ public interface NetworkVanishStore {
         }
 
         @Override
-        public void heartbeat(String origin, boolean newRun) {
+        public void heartbeat(String origin, long run, boolean newRun) {
             // Nothing tracked, so nothing to drop.
         }
 

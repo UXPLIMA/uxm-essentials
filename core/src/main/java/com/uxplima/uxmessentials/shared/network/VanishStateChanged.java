@@ -26,9 +26,11 @@ import java.util.UUID;
  * @param vanished {@code true} when the player is now vanished, {@code false} when they reappeared
  * @param level the player's resolved use level (always {@code >= 1}); meaningful only when {@code vanished} is true
  * @param departed {@code true} when the player left the origin backend rather than changed their vanish
+ * @param run the boot nonce of the origin's run that sent the frame, the same one its heartbeats carry, so a peer can
+ *     drop what an earlier run reported once a new run starts; {@link ServerPing#NO_NONCE} from a peer that predates it
  */
 public record VanishStateChanged(
-        String originServer, UUID player, String playerName, boolean vanished, int level, boolean departed)
+        String originServer, UUID player, String playerName, boolean vanished, int level, boolean departed, long run)
         implements NetworkMessage {
 
     public VanishStateChanged {
@@ -46,9 +48,9 @@ public record VanishStateChanged(
         }
     }
 
-    /** A change of the player's vanish, not a departure. */
+    /** A change of the player's vanish, not a departure, from a run that names no nonce. */
     public VanishStateChanged(String originServer, UUID player, String playerName, boolean vanished, int level) {
-        this(originServer, player, playerName, vanished, level, false);
+        this(originServer, player, playerName, vanished, level, false, ServerPing.NO_NONCE);
     }
 
     @Override

@@ -23,7 +23,9 @@ import org.jspecify.annotations.Nullable;
  * dispatch thread, which does its own region hop for any Bukkit touch.
  *
  * <p>The heartbeats are read too and passed on with what they say about the sender's run, from its boot nonce: the
- * first heard, the same run, or a new run after a restart. Only the nonce is compared, never the sender's clock.
+ * first heard, the same run, or a new run after a restart. Every frame this backend sends carries its own boot nonce,
+ * the one its heartbeats carry, so a peer can tell which run sent it. Only the nonce is compared, never the sender's
+ * clock.
  *
  * <p>The publisher stamps this backend's {@code server-id} as the frame origin, so the shared loop sentinel drops the
  * echo on the origin backend. With the network bus disabled the injected publisher is the no-op one, so publishing is
@@ -33,12 +35,14 @@ import org.jspecify.annotations.Nullable;
 public final class BusVanishBus implements VanishBus {
 
     private final BusPublisher publisher;
+    private final long bootNonce;
     private final boolean enabled;
     private final Map<String, Long> bootByPeer = new ConcurrentHashMap<>();
     private volatile @Nullable Listener listener;
 
-    public BusVanishBus(BusPublisher publisher, boolean enabled) {
+    public BusVanishBus(BusPublisher publisher, long bootNonce, boolean enabled) {
         this.publisher = Objects.requireNonNull(publisher, "publisher");
+        this.bootNonce = bootNonce;
         this.enabled = enabled;
     }
 
@@ -50,15 +54,17 @@ public final class BusVanishBus implements VanishBus {
                 change.player(),
                 change.playerName(),
                 change.vanished(),
-                change.level().level()));
+                change.level().level(),
+                false,
+                bootNonce));
     }
 
     @Override
     public void publishDeparture(PlayerRef who, VanishLevel level) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(level, "level");
-        publisher.publish(
-                new VanishStateChanged(publisher.serverId(), who.uuid(), who.name(), true, level.level(), true));
+        publisher.publish(new VanishStateChanged(
+                publisher.serverId(), who.uuid(), who.name(), true, level.level(), true, bootNonce));
     }
 
     @Override
@@ -83,6 +89,7 @@ public final class BusVanishBus implements VanishBus {
             case VanishStateChanged frame ->
                 target.changed(
                         frame.originServer(),
+                        frame.run(),
                         new VanishSync(
                                 frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
             case ServerPing ping -> {
@@ -95,7 +102,7 @@ public final class BusVanishBus implements VanishBus {
                 } else {
                     run = PeerRun.NEW_RUN;
                 }
-                target.pinged(ping.originServer(), run);
+                target.pinged(ping.originServer(), ping.bootNonce(), run);
             }
             default -> {
                 // Every other frame belongs to another context.

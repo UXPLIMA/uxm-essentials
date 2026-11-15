@@ -8,6 +8,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -196,11 +197,9 @@ class VanishAcrossBackendsTest {
     }
 
     @Test
-    void aPlayerWithoutPersistWhoseBackendCrashedReturnsVisibleWhereThePeersAreSeen() {
+    void aPlayerWithoutPersistWhoseBackendCrashedReturnsVisibleOnceItsSightingIsStale() {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
-        Backend creative = network.start("creative");
-        creative.join(SAM);
         network.beat();
         survival.join(ALEX);
         survival.toggle(ALEX);
@@ -211,6 +210,67 @@ class VanishAcrossBackendsTest {
 
         assertThat(lobby.isHidden(ALEX)).isFalse();
         assertThat(database.find(ALEX.uuid()).map(StoredVanish::vanished)).contains(false);
+    }
+
+    @Test
+    void aPlayerWithoutPersistWhoseBackendCrashedAndCameBackReturnsVisibleDaysLater() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        network.start("survival");
+        network.beat();
+        clock.advance(Duration.ofDays(2));
+        lobby.join(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aPlayerWithoutPersistReturnsVisibleOnTheOnlyBackendLeftAfterTheirsWentDownForGood() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        clock.advance(Duration.ofDays(2));
+        lobby.join(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aPlayerWithoutPersistOnABackendThatStoppedReturnsVisibleAfterTheHopWindow() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.stop("survival");
+        clock.advance(HOP_WINDOW.plusSeconds(1));
+        lobby.join(ALEX);
+
+        assertThat(lobby.isHidden(ALEX)).isFalse();
+    }
+
+    @Test
+    void aPlayerLongOnTheirBackendStillSwitchesHiddenBecauseItKeepsSeeingThem() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+        for (int refresh = 0; refresh < 360; refresh++) {
+            clock.advance(HOP_WINDOW.dividedBy(3));
+            survival.refresh();
+        }
+
+        network.switchServer(ALEX, survival, lobby);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
     }
 
     @Test
@@ -261,6 +321,7 @@ class VanishAcrossBackendsTest {
         Backend survival = network.start("survival");
         Backend lobby = network.start("lobby");
         network.beat();
+        clock.advance(Duration.ofSeconds(5));
         survival.join(ALEX);
         survival.toggle(ALEX);
 
@@ -288,6 +349,34 @@ class VanishAcrossBackendsTest {
         network.beat();
 
         assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aLateFrameFromARunThatEndedIsIgnored() {
+        network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        long endedRun = network.runOf("survival");
+        network.crash("survival");
+        network.start("survival");
+        network.beat();
+
+        lobby.sync.changed("survival", endedRun, VanishSync.vanished(ALEX, VanishLevel.DEFAULT));
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
+    }
+
+    @Test
+    void aPlayerHiddenOnlyUntilTheReadIsNotLeftListedOnPeers() {
+        Backend lobby = network.start("lobby");
+        lobby.joinUnread(ALEX, true);
+        Backend survival = network.start("survival");
+        network.beat();
+        assertThat(survival.listFor(SAM)).containsExactly(ALEX.uuid());
+
+        lobby.lateRead(ALEX);
+
+        assertThat(survival.listFor(SAM)).isEmpty();
     }
 
     @Test
@@ -376,7 +465,21 @@ class VanishAcrossBackendsTest {
             runSeen.remove(name);
             Backend started = new Backend(name, this);
             running.put(name, started);
+            started.remember.releaseOrphans(Set.of());
             return started;
+        }
+
+        /** The backend stops cleanly: it records a departure for everyone it holds, then goes quiet. */
+        void stop(String name) {
+            Backend stopping = running.get(name);
+            if (stopping != null) {
+                stopping.remember.releaseAllNow();
+            }
+            crash(name);
+        }
+
+        long runOf(String name) {
+            return runs.getOrDefault(name, 0);
         }
 
         /** The backend stops at once: no departure, no more heartbeats. */
@@ -406,7 +509,7 @@ class VanishAcrossBackendsTest {
                     } else {
                         run = PeerRun.NEW_RUN;
                     }
-                    receiver.sync.pinged(origin, run);
+                    receiver.sync.pinged(origin, runOf(origin), run);
                 }
             }
         }
@@ -419,7 +522,7 @@ class VanishAcrossBackendsTest {
         }
 
         void changed(String origin, VanishSync change) {
-            others(origin).forEach(peer -> peer.sync.changed(origin, change));
+            others(origin).forEach(peer -> peer.sync.changed(origin, runOf(origin), change));
         }
 
         void departed(String origin, UUID player) {
@@ -520,6 +623,7 @@ class VanishAcrossBackendsTest {
                     store,
                     view,
                     levels,
+                    bus,
                     presence,
                     clock,
                     HOP_WINDOW);
@@ -566,6 +670,11 @@ class VanishAcrossBackendsTest {
 
         void toggle(PlayerRef who) {
             toggleVanish.toggle(who);
+        }
+
+        /** The sighting timer fires. */
+        void refresh() {
+            remember.refresh(store.vanished());
         }
 
         void quit(PlayerRef who) {
@@ -668,13 +777,26 @@ class VanishAcrossBackendsTest {
         }
 
         @Override
-        public void markArrived(UUID player, String server) {
-            rows.computeIfPresent(
-                    player,
-                    (id, kept) -> kept.vanished()
-                            ? new StoredVanish(
-                                    true, kept.level(), Optional.of(server), kept.updatedAt(), Optional.empty())
-                            : kept);
+        public void markArrived(UUID player, String server, Instant at) {
+            rows.computeIfPresent(player, (id, kept) -> kept.vanished() ? kept.seenOn(server, at) : kept);
+        }
+
+        @Override
+        public void touch(Collection<UUID> players, String server, Instant at) {
+            for (UUID player : players) {
+                rows.computeIfPresent(player, (id, kept) -> heldBy(kept, server) ? kept.seenOn(server, at) : kept);
+            }
+        }
+
+        @Override
+        public void releaseHeld(String server, Collection<UUID> stillHere, Instant at) {
+            rows.replaceAll((id, kept) -> heldBy(kept, server) && !stillHere.contains(id) ? kept.departed(at) : kept);
+        }
+
+        private static boolean heldBy(StoredVanish kept, String server) {
+            return kept.vanished()
+                    && kept.server().equals(Optional.of(server))
+                    && kept.departedAt().isEmpty();
         }
 
         /** The row never reached the database, as when its write failed. */

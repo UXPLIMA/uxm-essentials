@@ -48,10 +48,10 @@ public final class VanishNetworkSync implements VanishBus.Listener {
     }
 
     @Override
-    public void changed(String origin, VanishSync change) {
+    public void changed(String origin, long run, VanishSync change) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(change, "change");
-        network.apply(origin, change);
+        network.apply(origin, run, change);
         PlayerRef target = new PlayerRef(change.player(), change.playerName());
         // The scheduler drops the task when the player is not online here, which is the usual case.
         scheduler.onEntity(target, () -> reconcileOnline(target, change));
@@ -63,11 +63,11 @@ public final class VanishNetworkSync implements VanishBus.Listener {
     }
 
     @Override
-    public void pinged(String origin, VanishBus.PeerRun run) {
+    public void pinged(String origin, long run, VanishBus.PeerRun kind) {
         Objects.requireNonNull(origin, "origin");
-        Objects.requireNonNull(run, "run");
-        network.heartbeat(origin, run == VanishBus.PeerRun.NEW_RUN);
-        if (run != VanishBus.PeerRun.SAME_RUN) {
+        Objects.requireNonNull(kind, "kind");
+        network.heartbeat(origin, run, kind == VanishBus.PeerRun.NEW_RUN);
+        if (kind != VanishBus.PeerRun.SAME_RUN) {
             scheduler.onGlobal(this::announceLocal);
         }
     }

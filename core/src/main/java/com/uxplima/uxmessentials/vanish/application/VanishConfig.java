@@ -60,9 +60,9 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *     neither plugin is installed
  * @param foreignVanishLevel the use level a foreign-hidden player is folded in at, so the usual see-level rule decides
  *     who still sees them ({@code foreign.level}, default {@code 1})
- * @param hopWindow how long after a vanished player left a backend their arrival on another still counts as a server
- *     switch and keeps them hidden, and how long a peer's report counts before that peer is known to be running
- *     ({@code hop-window-seconds}, default 30, at least 1)
+ * @param hopWindow how long after a vanished player left a backend, or was last confirmed on it, their arrival on
+ *     another still counts as a server switch and keeps them hidden, and how long a peer's report counts before that
+ *     peer is known to be running ({@code hop-window-seconds}, default 30, at least 1)
  * @param loadTimeout how long a login waits for the player's kept vanish state before it goes ahead and applies the
  *     state once it arrives ({@code load-timeout-seconds}, default 2, at least 1)
  */

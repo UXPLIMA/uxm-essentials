@@ -80,6 +80,9 @@ public final class VanishWiring {
     /** How often the action-bar indicator is re-sent to a vanished player, chosen to outrun the vanilla bar fade. */
     private static final Duration ACTION_BAR_REFRESH = Duration.ofSeconds(1);
 
+    /** A server-name longer than this does not fit the {@code last_server} column, so vanish cannot record it. */
+    private static final int MAX_SERVER_NAME = 255;
+
     /** How often a foreign vanish plugin's hidden players are re-read; five ticks, well under a human's notice. */
     private static final Duration FOREIGN_VANISH_POLL = Duration.ofMillis(250);
 
@@ -108,6 +111,14 @@ public final class VanishWiring {
                 plugin.getServer(), kernel.scheduler(), config.nightVision(), config.allowFlight());
         VanishPickupPreferences pickup = new PdcVanishPickup(plugin.getServer(), config.pickupItems());
 
+        if (presence.localServer().length() > MAX_SERVER_NAME) {
+            kernel.log()
+                    .warn(
+                            "network.server-name in config.conf is longer than {} characters, so vanish cannot record"
+                                    + " which backend a vanished player is on and a server switch shows them."
+                                    + " Shorten it.",
+                            MAX_SERVER_NAME);
+        }
         RememberVanish remember = new RememberVanish(
                 VanishRecordStores.jooq(persistence),
                 presence.localServer(),
@@ -129,6 +140,7 @@ public final class VanishWiring {
                 store,
                 view,
                 levels,
+                cross.bus(),
                 presence,
                 Clock.systemUTC(),
                 config.hopWindow());
@@ -171,6 +183,12 @@ public final class VanishWiring {
                 ? kernel.scheduler().repeatGlobal(actionBar::refresh, ACTION_BAR_REFRESH, ACTION_BAR_REFRESH)
                 : null;
         Foreign foreign = foreign(config, store, plugin.getServer(), kernel);
+        // Rows this backend held when it last went down still say the player is here; nobody is, yet.
+        remember.releaseOrphans(store.vanished());
+        // A third of the hop window keeps a vanished player's sighting fresh across two missed refreshes.
+        Duration sighting = config.hopWindow().dividedBy(3);
+        AutoCloseable sightingTask =
+                kernel.scheduler().repeatGlobal(() -> remember.refresh(store.vanished()), sighting, sighting);
         return new Wired(
                 commands,
                 listeners,
@@ -180,6 +198,8 @@ public final class VanishWiring {
                 levels,
                 network,
                 login,
+                remember,
+                sightingTask,
                 actionBarTask,
                 foreign.poll());
     }
@@ -227,7 +247,7 @@ public final class VanishWiring {
             return new CrossServer(VanishBus.disabled(), NetworkVanishStore.empty());
         }
         NetworkVanishRoster network = new NetworkVanishRoster(presence, Clock.systemUTC(), config.hopWindow());
-        BusVanishBus vanishBus = new BusVanishBus(bus.publisher(), true);
+        BusVanishBus vanishBus = new BusVanishBus(bus.publisher(), bus.bootNonce(), true);
         vanishBus.subscribe(
                 new VanishNetworkSync(network, store, view, vanishBus, kernel.playerLookup(), kernel.scheduler()));
         bus.registry().register(vanishBus::onFrame);
@@ -252,6 +272,9 @@ public final class VanishWiring {
      * @param levels the see/use level resolver, exposed for the messaging/nametags vanish gates
      * @param network the network-wide vanish view, cleared on stop; the empty view when cross-server is off
      * @param login the pre-login read of each player's kept vanish, whose held answers are dropped on stop
+     * @param remember the writer of each player's kept vanish, which records a departure for everyone still held on
+     *     stop
+     * @param sightingTask the repeating refresh of the online vanished players' sightings, cancelled on stop
      * @param actionBarTask the repeating action-bar refresh handle, cancelled on stop; {@code null} when the indicator
      *     is disabled and no timer was armed
      * @param foreignVanishPoll the repeating global-region read of a foreign vanish plugin's hidden players, cancelled
@@ -266,6 +289,8 @@ public final class VanishWiring {
             VanishLevelResolver levels,
             NetworkVanishStore network,
             VanishLoginListener login,
+            RememberVanish remember,
+            AutoCloseable sightingTask,
             @Nullable AutoCloseable actionBarTask,
             @Nullable AutoCloseable foreignVanishPoll) {
 
@@ -278,6 +303,8 @@ public final class VanishWiring {
             Objects.requireNonNull(levels, "levels");
             Objects.requireNonNull(network, "network");
             Objects.requireNonNull(login, "login");
+            Objects.requireNonNull(remember, "remember");
+            Objects.requireNonNull(sightingTask, "sightingTask");
         }
 
         /** Expose the shared {@link VanishStore} authority the consumers' vanish gates read. */
@@ -285,8 +312,14 @@ public final class VanishWiring {
             return shared;
         }
 
-        /** Drop the vanish state and cancel both timers so a disable or reload leaves no residual state. */
+        /**
+         * Record a departure for every vanished player still held here, drop the vanish state and cancel the timers, so
+         * a disable or reload leaves no residual state. The departures are written on the stopping thread because the
+         * server disables plugins before it lets the players go, so no quit reaches this module.
+         */
         public void stop() {
+            cancel(sightingTask, "sighting");
+            remember.releaseAllNow();
             store.clear();
             network.clear();
             login.clear();

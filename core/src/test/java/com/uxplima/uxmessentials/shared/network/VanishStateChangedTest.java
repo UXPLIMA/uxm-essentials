@@ -9,14 +9,14 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-/** A vanish frame says whether the player left the origin, and a frame from an older peer reads as a plain change. */
+/** A vanish frame says whether the player left the origin and which run sent it; an older peer's frame reads as a plain change. */
 class VanishStateChangedTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-000000000a1e");
 
     @Test
-    void aDepartureCrossesTheWireAsADeparture() {
-        VanishStateChanged sent = new VanishStateChanged("survival-1", ALEX, "Alex", true, 3, true);
+    void aDepartureCrossesTheWireWithItsRun() {
+        VanishStateChanged sent = new VanishStateChanged("survival-1", ALEX, "Alex", true, 3, true, 0x5eed_cafeL);
 
         NetworkMessage received = NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
 
@@ -24,7 +24,7 @@ class VanishStateChangedTest {
     }
 
     @Test
-    void aFrameFromAPeerWithoutTheFlagIsNotADeparture() throws IOException {
+    void aFrameFromAPeerWithoutTheTrailingFieldsIsAChangeFromNoNamedRun() throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(bytes)) {
             out.writeByte(NetworkMessageCodec.VERSION);
@@ -39,6 +39,7 @@ class VanishStateChangedTest {
 
         NetworkMessage received = NetworkMessageCodec.decode(bytes.toByteArray());
 
-        assertThat(received).isEqualTo(new VanishStateChanged("survival-2", ALEX, "Alex", true, 2, false));
+        assertThat(received)
+                .isEqualTo(new VanishStateChanged("survival-2", ALEX, "Alex", true, 2, false, ServerPing.NO_NONCE));
     }
 }

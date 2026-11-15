@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vanish.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -61,7 +62,50 @@ public final class RememberVanish {
     /** Record that the vanished {@code who} is now on this backend, so a late departure from the last one is ignored. */
     public void arrived(UUID who) {
         Objects.requireNonNull(who, "who");
-        run(who, "arrival", () -> records.markArrived(who, server));
+        Instant at = clock.instant();
+        run(who, "arrival", () -> records.markArrived(who, server, at));
+    }
+
+    /**
+     * Confirm that the vanished {@code online} players are still on this backend. Called on a timer well inside the hop
+     * window, so a reader can tell them from players whose backend went down without writing a departure.
+     */
+    public void refresh(Collection<UUID> online) {
+        Objects.requireNonNull(online, "online");
+        if (online.isEmpty()) {
+            return;
+        }
+        Set<UUID> players = Set.copyOf(online);
+        Instant at = clock.instant();
+        scheduler.async(() -> {
+            try {
+                records.touch(players, server, at);
+            } catch (RuntimeException failed) {
+                log.warn(
+                        "event=vanish_write_failed kind=sighting players={} reason={}",
+                        players.size(),
+                        failed.toString());
+            }
+        });
+    }
+
+    /**
+     * Record a departure for every vanished player this backend holds a row for but does not have online
+     * ({@code stillHere}): what a backend that went down without writing departures left behind. Called on start.
+     */
+    public void releaseOrphans(Collection<UUID> stillHere) {
+        Objects.requireNonNull(stillHere, "stillHere");
+        Set<UUID> keep = Set.copyOf(stillHere);
+        Instant at = clock.instant();
+        scheduler.async(() -> release(keep, at));
+    }
+
+    /**
+     * Record a departure for every vanished player this backend holds, on the calling thread. Called on stop, when the
+     * async lane no longer runs and the server disables plugins before it lets the players go, so no quit is seen.
+     */
+    public void releaseAllNow() {
+        release(Set.of(), clock.instant());
     }
 
     /**
@@ -90,6 +134,15 @@ public final class RememberVanish {
     public void forget(UUID who) {
         Objects.requireNonNull(who, "who");
         changedHere.remove(who);
+    }
+
+    private void release(Set<UUID> keep, Instant at) {
+        try {
+            records.releaseHeld(server, keep, at);
+        } catch (RuntimeException failed) {
+            // The rows keep a sighting that ages out within the hop window, so no player stays hidden for long.
+            log.warn("event=vanish_write_failed kind=release server={} reason={}", server, failed.toString());
+        }
     }
 
     private void save(UUID who, StoredVanish state) {

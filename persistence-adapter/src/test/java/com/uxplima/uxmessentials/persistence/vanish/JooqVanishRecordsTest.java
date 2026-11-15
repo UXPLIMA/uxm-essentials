@@ -73,15 +73,39 @@ class JooqVanishRecordsTest {
                 .contains(StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY)
                         .departed(LATE));
 
-        records.markArrived(ALEX, "lobby");
-        assertThat(records.find(ALEX)).contains(StoredVanish.vanished(VanishLevel.of(2), "lobby", EARLY));
+        records.markArrived(ALEX, "lobby", LATE);
+        assertThat(records.find(ALEX))
+                .contains(StoredVanish.vanished(VanishLevel.of(2), "survival", EARLY)
+                        .seenOn("lobby", LATE));
+    }
+
+    @Test
+    void aSightingIsKeptOnlyForTheRowsTheServerHolds() {
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
+        records.save(SAM, StoredVanish.vanished(VanishLevel.DEFAULT, "lobby", EARLY));
+
+        records.touch(List.of(ALEX, SAM), "survival", LATE);
+
+        assertThat(records.find(ALEX).flatMap(StoredVanish::seenAt)).contains(LATE);
+        assertThat(records.find(SAM).flatMap(StoredVanish::seenAt)).contains(EARLY);
+    }
+
+    @Test
+    void aReleaseRecordsADepartureForEveryHeldPlayerNotStillHere() {
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
+        records.save(SAM, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
+
+        records.releaseHeld("survival", List.of(SAM), LATE);
+
+        assertThat(records.find(ALEX).flatMap(StoredVanish::departedAt)).contains(LATE);
+        assertThat(records.find(SAM).flatMap(StoredVanish::departedAt)).isEmpty();
     }
 
     @Test
     void aDepartureOrArrivalOnAClearedRowChangesNothing() {
         records.save(ALEX, StoredVanish.visible(EARLY));
         records.markDeparted(ALEX, "survival", LATE);
-        records.markArrived(ALEX, "lobby");
+        records.markArrived(ALEX, "lobby", LATE);
 
         assertThat(records.find(ALEX)).contains(StoredVanish.visible(EARLY));
     }

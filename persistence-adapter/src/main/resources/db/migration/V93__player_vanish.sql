@@ -7,18 +7,20 @@
 -- BOOLEAN so there is no dialect-specific boolean handling. `vanish_level` is the tier the player was hidden at, NULL
 -- when they are not vanished; the next join re-derives it from permissions. `last_server` is the server-name of the
 -- backend the vanished player was last on, NULL when they are not vanished. `updated_at` is when the vanish or reveal
--- was written, epoch milliseconds, and a write older than the kept row is dropped, so two writes that land out of
--- order settle on the newer one. `departed_at` is when the vanished player left `last_server`, epoch milliseconds,
--- NULL while they are on it.
+-- was written. `seen_at` is when `last_server` last confirmed the vanished player was on it; that backend refreshes it
+-- while they stay, so a stale value means it went down without writing a departure. `departed_at` is when the vanished
+-- player left `last_server`, NULL while they are on it. Every time is epoch milliseconds in a BIGINT, and a vanish or
+-- reveal older than the kept row is dropped, so two writes that land out of order settle on the newer one.
 --
--- Same portability contract as V1-V91: plain CREATE TABLE in the subset SQLite, MySQL/MariaDB and PostgreSQL all
+-- Same portability contract as V1-V92: plain CREATE TABLE in the subset SQLite, MySQL/MariaDB and PostgreSQL all
 -- accept.
 CREATE TABLE ${prefix}player_vanish (
-    player_uuid  VARCHAR(36) NOT NULL,
-    vanished     SMALLINT    NOT NULL,
+    player_uuid  VARCHAR(36)  NOT NULL,
+    vanished     SMALLINT     NOT NULL,
     vanish_level INT,
-    last_server  VARCHAR(64),
-    updated_at   BIGINT      NOT NULL,
+    last_server  VARCHAR(255),
+    updated_at   BIGINT       NOT NULL,
+    seen_at      BIGINT,
     departed_at  BIGINT,
     CONSTRAINT ${prefix}pk_player_vanish PRIMARY KEY (player_uuid)
 );
