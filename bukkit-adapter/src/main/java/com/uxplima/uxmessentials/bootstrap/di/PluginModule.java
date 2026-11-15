@@ -854,6 +854,9 @@ public final class PluginModule {
                 resources,
                 log,
                 bus.bus(),
+                () -> bus.peers()
+                        .map(peers -> peers.liveServerIds(System.currentTimeMillis()))
+                        .orElse(java.util.Set.of()),
                 hooks,
                 guiRegistry,
                 menus,
@@ -1163,6 +1166,7 @@ public final class PluginModule {
             CloseableResources resources,
             Logger log,
             Bus bus,
+            java.util.function.Supplier<java.util.Set<String>> livePeers,
             Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -1174,6 +1178,7 @@ public final class PluginModule {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence);
+        links.livePeers = livePeers;
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1943,7 +1948,8 @@ public final class PluginModule {
                 bus,
                 menus,
                 menuBindings,
-                plugin.getDataFolder().toPath());
+                plugin.getDataFolder().toPath(),
+                links.livePeers);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);
@@ -3564,6 +3570,8 @@ public final class PluginModule {
 
     /** Cross-context handles captured during wiring so a dependent context reaches its prerequisite. */
     private static final class ContextLinks {
+        // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
+        private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
         // economy admin GUI open it rather than each building one of their own.
         private com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView

@@ -115,7 +115,12 @@ public final class TradeCommand implements CommandRegistration {
                     com.mojang.brigadier.suggestion.SuggestionsBuilder builder) {
         if (Sender.audience(ctx.getSource()) instanceof Player player) {
             String prefix = builder.getRemaining().toLowerCase(java.util.Locale.ROOT);
-            for (String name : requests.pendingRequesterNames(player.getUniqueId())) {
+            java.util.List<String> names =
+                    new java.util.ArrayList<>(requests.pendingRequesterNames(player.getUniqueId()));
+            if (crossServer != null) {
+                names.addAll(crossServer.pendingInviterNames(player.getUniqueId()));
+            }
+            for (String name : names) {
                 if (name.toLowerCase(java.util.Locale.ROOT).startsWith(prefix)) {
                     builder.suggest(name);
                 }
@@ -154,7 +159,7 @@ public final class TradeCommand implements CommandRegistration {
     /**
      * Open a cross-server trade request to a player who is not on this backend. Refused when cross-server trading is
      * off (no view wired), and gated on the same self / busy / cooldown checks the local send applies; the target's
-     * backend answers over the bus.
+     * backend answers over the bus. The view starts the cooldown and gives it back when the request reaches nobody.
      */
     void sendRemote(Player sender, String name) {
         if (crossServer == null) {
@@ -170,7 +175,6 @@ public final class TradeCommand implements CommandRegistration {
                 return;
             }
             crossServer.invite(sender, name);
-            cooldown.stamp(sender.getUniqueId());
         }
     }
 
@@ -197,7 +201,10 @@ public final class TradeCommand implements CommandRegistration {
         }
     }
 
-    /** Accept a pending request (the newest, or the one from {@code requesterName}) and open the window. */
+    /**
+     * Accept a pending request (the newest, or the one from {@code requesterName}) and open the window. A request from
+     * this backend is looked up first, then one from another backend.
+     */
     void accept(Player sender, @Nullable String requesterName) {
         if (sessions.isTrading(sender.getUniqueId())) {
             notify(sender, TradeMessageKey.TRADE_ALREADY_TRADING, Map.of());
@@ -205,7 +212,11 @@ public final class TradeCommand implements CommandRegistration {
         }
         TradeRequests.Match match = requests.resolve(sender.getUniqueId(), requesterName);
         switch (match.status()) {
-            case NONE -> notify(sender, TradeMessageKey.TRADE_NO_REQUEST, Map.of());
+            case NONE -> {
+                if (crossServer == null || !crossServer.accept(sender, requesterName)) {
+                    notify(sender, TradeMessageKey.TRADE_NO_REQUEST, Map.of());
+                }
+            }
             case EXPIRED -> notifyExpired(sender, requireRequest(match));
             case MATCHED -> openAccepted(sender, requireRequest(match));
         }
@@ -215,7 +226,11 @@ public final class TradeCommand implements CommandRegistration {
     void deny(Player sender, @Nullable String requesterName) {
         TradeRequests.Match match = requests.resolve(sender.getUniqueId(), requesterName);
         switch (match.status()) {
-            case NONE -> notify(sender, TradeMessageKey.TRADE_NO_REQUEST, Map.of());
+            case NONE -> {
+                if (crossServer == null || !crossServer.deny(sender, requesterName)) {
+                    notify(sender, TradeMessageKey.TRADE_NO_REQUEST, Map.of());
+                }
+            }
             case EXPIRED -> notifyExpired(sender, requireRequest(match));
             case MATCHED ->
                 notify(
