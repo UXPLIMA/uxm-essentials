@@ -190,7 +190,8 @@ class LiveImportTest {
                 new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {}),
                 events,
                 Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC),
-                List.of());
+                List.of(),
+                "lobby");
         Position moved = Position.of(WORLD, 50, 70, 50);
 
         setWarp.set(STAFF, WarpName.of("market"), moved);

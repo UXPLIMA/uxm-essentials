@@ -53,6 +53,9 @@ import org.jspecify.annotations.NullMarked;
  *       {@code uxmessentials.warp.info}.
  *   <li>{@code /warp move <name>} re-anchors an existing warp to the operator's current position. Gated by
  *       {@code uxmessentials.warp.move}.
+ *   <li>{@code /warp setserver <name|all> [server]} records which backend a warp lives on without moving it,
+ *       this backend when no server is named, and {@code unscoped} clears it. Gated by
+ *       {@code uxmessentials.warp.setserver}.
  *   <li>{@code /warp lock|password|rate|rating|editor <name>} keep their prior per-warp management behaviour.
  * </ul>
  *
@@ -75,6 +78,7 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
     private static final String DELETE_PERMISSION = "uxmessentials.warp.delete";
     private static final String INFO_PERMISSION = "uxmessentials.warp.info";
     private static final String MOVE_PERMISSION = "uxmessentials.warp.move";
+    private static final String SETSERVER_PERMISSION = "uxmessentials.warp.setserver";
 
     private final Supplier<ListDisplayMode> displayMode;
 
@@ -112,6 +116,18 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
                                 .executes(this::runMove)
                                 .then(Commands.literal("at").then(explicitPositionArguments(this::runMoveAt)))))
                 .then(explicitPositionNode("moveat", MOVE_PERMISSION, this::runMoveAt))
+                // `all` is a literal, so it wins over a warp of that name, which is reached through the editor instead.
+                .then(Commands.literal("setserver")
+                        .requires(Gate.permission(SETSERVER_PERMISSION))
+                        .then(Commands.literal("all")
+                                .executes(ctx -> runSetServerAll(ctx, services.localServer()))
+                                .then(Commands.argument("server", Args.token())
+                                        .executes(
+                                                ctx -> runSetServerAll(ctx, ctx.getArgument("server", String.class)))))
+                        .then(warpNameArgument()
+                                .executes(ctx -> runSetServer(ctx, services.localServer()))
+                                .then(Commands.argument("server", Args.token())
+                                        .executes(ctx -> runSetServer(ctx, ctx.getArgument("server", String.class))))))
                 .then(Commands.literal("lock")
                         .requires(Gate.permission(LOCK_PERMISSION))
                         .then(Commands.argument("name", Args.token())
@@ -276,6 +292,20 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         }
         WarpName name = WarpName.of(ctx.getArgument("name", String.class));
         services.moveWarp().move(ref(sender), name, position(sender));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Writes the server off the tick: it is a database write, and {@code all} is one per warp. */
+    private int runSetServer(CommandContext<CommandSourceStack> ctx, String server) {
+        PlayerRef actor = actor(ctx);
+        WarpName name = WarpName.of(ctx.getArgument("name", String.class));
+        services.scheduler().async(() -> services.setWarpServer().set(actor, name, server));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetServerAll(CommandContext<CommandSourceStack> ctx, String server) {
+        PlayerRef actor = actor(ctx);
+        services.scheduler().async(() -> services.setWarpServer().setAll(actor, server));
         return Command.SINGLE_SUCCESS;
     }
 

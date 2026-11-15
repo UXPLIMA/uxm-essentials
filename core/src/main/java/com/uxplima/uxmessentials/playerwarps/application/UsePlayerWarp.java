@@ -214,9 +214,11 @@ public final class UsePlayerWarp {
         if (safety != null) {
             return Admission.refused(safety);
         }
-        // A remote warp's hop leaves the engine's own launch gate behind, so the same jail, combat and cooldown
-        // checks run here, before the charge, and a refused hop costs nothing.
-        if (isRemote(warp) && !hops.admit(actor, warp)) {
+        // The jail, combat and cooldown checks run here, before the charge, so a refused use costs the visitor
+        // nothing and pays the owner nothing: a remote warp's hop leaves the engine's launch gate behind, and a
+        // local launch that refused after the charge would keep the money.
+        boolean admitted = isRemote(warp) ? hops.admit(actor, warp) : teleporter.admits(actor, warp);
+        if (!admitted) {
             return Admission.refusedQuietly(PlayerWarpError.TELEPORT_REFUSED);
         }
         return member ? Admission.free() : charge(actor, warp);

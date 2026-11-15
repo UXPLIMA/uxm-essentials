@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -14,22 +15,34 @@ import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmessentials.warps.application.port.WarpTeleporter;
 import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmessentials.warps.domain.WarpError;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /warp <name>}: teleport a player to a server warp. The warp is resolved by name, the player is run
- * through the {@link WarpAccess} gate (per-warp permission, the warp's optional extra permission, and, only
- * when an economy provider is present. The per-warp cost), and only then is execution <em>delegated</em> to
- * the teleport context through {@link WarpTeleporter}. This use case never moves the player itself, so the
- * shared cooldown, the move-cancellable warmup, and the region-aware async hop are all the teleport
- * context's concern.
+ * {@code /warp <name>}: teleport a player to a server warp. The warp is resolved by name and the player is run
+ * through every check in order: the warp's permissions, its lock, its password, the safety of the destination, and
+ * only then the cost. Execution is then <em>delegated</em> to the teleport context through {@link WarpTeleporter}:
+ * this use case never moves the player itself, so the shared cooldown, the move-cancellable warmup and the
+ * region-aware async hop are the teleport context's concern.
  *
- * <p>The charge (if any) is taken inside the access gate before the hop is queued, so a warp the player
- * cannot afford never teleports them. With no economy provider wired, a priced warp's cost is ignored and
- * the warp is usable for free: the soft coupling to the economy context.
+ * <p>The jail, combat and cooldown checks of the teleport run before the charge too, so a use they refuse costs
+ * nothing.
+ *
+ * <p>A warp set on another backend, while the warps {@code cross-server} block is on, is handed to the shared
+ * cross-server hop through {@link WarpHops} instead, on the async lane, since the hop writes to the shared database.
+ * The teleport rules and the charge run there, in that order; the destination's safety is checked on the target,
+ * the only backend that holds its world, when the player lands. The charge travels with the hop and comes back on
+ * every miss.
+ *
+ * <p>With no economy provider wired, a priced warp's cost is ignored and the warp is usable for free: the soft
+ * coupling to the economy context.
  */
 public final class UseWarp {
+
+    /** Lets a player use a warp whose destination fails the safety check, here and on a landing elsewhere. */
+    static final String BYPASS_SAFETY = "uxmessentials.warp.bypass.safety";
 
     private final WarpRepository repository;
     private final WarpAccess access;
@@ -38,6 +51,8 @@ public final class UseWarp {
     private final WarpSafetyChecker safetyChecker;
     private final Permissions permissions;
     private final Scheduler scheduler;
+    private final PlayerLookup players;
+    private final WarpHops hops;
 
     public UseWarp(
             WarpRepository repository,
@@ -46,7 +61,9 @@ public final class UseWarp {
             Notifier notifier,
             WarpSafetyChecker safetyChecker,
             Permissions permissions,
-            Scheduler scheduler) {
+            Scheduler scheduler,
+            PlayerLookup players,
+            WarpHops hops) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
@@ -54,6 +71,8 @@ public final class UseWarp {
         this.safetyChecker = Objects.requireNonNull(safetyChecker, "safetyChecker");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.players = Objects.requireNonNull(players, "players");
+        this.hops = Objects.requireNonNull(hops, "hops");
     }
 
     /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
@@ -91,49 +110,23 @@ public final class UseWarp {
 
     private Result<Unit, WarpError> admitAndGo(
             PlayerRef actor, PlayerRef recipient, Warp warp, Optional<String> enteredPassword) {
-        Result<Unit, WarpError> admitted = access.admit(recipient, warp);
-        if (admitted.isErr()) {
-            WarpError error = admitted.errorOrThrow();
-            notifier.send(actor, error.messageKey(), Map.of("warp", warp.name().value()));
-            return admitted;
-        }
-
-        // Lock check
-        if (warp.isLocked() && !permissions.has(recipient, "uxmessentials.warp.bypass.lock")) {
-            notifier.send(
-                    actor,
-                    WarpError.LOCKED.messageKey(),
-                    Map.of("warp", warp.name().value()));
-            return Result.err(WarpError.LOCKED);
-        }
-
-        // Password check
-        if (warp.password().isPresent() && !permissions.has(recipient, "uxmessentials.warp.bypass.password")) {
-            String required = warp.password().get();
-            if (enteredPassword.isEmpty() || !enteredPassword.get().equals(required)) {
-                notifier.send(
-                        actor,
-                        WarpError.WRONG_PASSWORD.messageKey(),
-                        Map.of("warp", warp.name().value()));
-                return Result.err(WarpError.WRONG_PASSWORD);
-            }
-        }
-
-        // Safety check
-        if (!safetyChecker.isSafe(warp.location()) && !permissions.has(recipient, "uxmessentials.warp.bypass.safety")) {
-            notifier.send(
-                    actor,
-                    WarpError.UNSAFE_LOCATION.messageKey(),
-                    Map.of("warp", warp.name().value()));
-            return Result.err(WarpError.UNSAFE_LOCATION);
-        }
-
         Map<String, String> placeholders = Map.of("warp", warp.name().value());
-        notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
-        if (!actor.uuid().equals(recipient.uuid())) {
-            notifier.send(
-                    actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
+        WarpError refusal = refusal(recipient, warp, enteredPassword);
+        if (refusal != null) {
+            notifier.send(actor, refusal.messageKey(), placeholders);
+            return Result.err(refusal);
         }
+        if (hops.routes(warp)) {
+            return dispatchRemote(actor, recipient, warp);
+        }
+        if (!teleporter.admits(recipient, warp)) {
+            return teleportRefused(actor, recipient, warp);
+        }
+        Result<Optional<WarpCost>, WarpError> charged = charge(actor, recipient, warp);
+        if (charged.isErr()) {
+            return Result.err(charged.errorOrThrow());
+        }
+        notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
 
         // Increment the visitor counter. The write persists to the DB (a single-writer SQLite by default),
         // so it is handed to the async scheduler rather than run on the caller's region thread, the counter
@@ -144,5 +137,98 @@ public final class UseWarp {
 
         teleporter.teleportTo(recipient, updated);
         return Result.ok();
+    }
+
+    /**
+     * Hand a use of a warp on another backend to the async lane: the hop records its pending row in the shared
+     * database, so none of it may run on the command, menu or sign thread that called. Nothing has been charged
+     * yet, so a lane that refuses the task only has to say the warp cannot be reached.
+     */
+    private Result<Unit, WarpError> dispatchRemote(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        try {
+            scheduler.async(() -> sendRemote(actor, recipient, warp));
+            return Result.ok();
+        } catch (RuntimeException refused) {
+            notifier.send(
+                    recipient,
+                    WarpsMessageKey.WARP_CROSS_SERVER_UNAVAILABLE,
+                    Map.of(
+                            "warp",
+                            warp.name().value(),
+                            "server",
+                            warp.knownServer().orElse("")));
+            return Result.err(WarpError.TELEPORT_REFUSED);
+        }
+    }
+
+    /**
+     * Off-tick: the teleport rules, then the charge, then the hop that carries it. A player who left before the task
+     * ran is neither charged nor sent: the connect could not reach them, and the charge would wait out the TTL.
+     */
+    private void sendRemote(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        if (!players.isOnline(recipient.uuid())) {
+            return;
+        }
+        if (!hops.admit(recipient, warp)) {
+            teleportRefused(actor, recipient, warp);
+            return;
+        }
+        Result<Optional<WarpCost>, WarpError> charged = charge(actor, recipient, warp);
+        if (charged.isOk()) {
+            hops.send(recipient, warp, charged.orElseThrow());
+        }
+    }
+
+    /** Charge the use to {@code recipient}, telling {@code actor} a failed charge or a staff send that went through. */
+    private Result<Optional<WarpCost>, WarpError> charge(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        Result<Optional<WarpCost>, WarpError> charged = access.charge(recipient, warp);
+        if (charged.isErr()) {
+            notifier.send(
+                    actor,
+                    charged.errorOrThrow().messageKey(),
+                    Map.of("warp", warp.name().value()));
+            return charged;
+        }
+        if (!actor.uuid().equals(recipient.uuid())) {
+            notifier.send(
+                    actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
+        }
+        return charged;
+    }
+
+    /**
+     * The teleport rules refused the use and have told {@code recipient} why; a staff member who sent them is told
+     * the send did not go through, since those rules speak only to the player they stop.
+     */
+    private Result<Unit, WarpError> teleportRefused(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        if (!actor.uuid().equals(recipient.uuid())) {
+            notifier.send(
+                    actor,
+                    WarpsMessageKey.WARP_SENT_REFUSED,
+                    Map.of("warp", warp.name().value(), "player", recipient.name()));
+        }
+        return Result.err(WarpError.TELEPORT_REFUSED);
+    }
+
+    /** The first check {@code recipient} fails before any money moves, or null when they pass them all. */
+    private @Nullable WarpError refusal(PlayerRef recipient, Warp warp, Optional<String> enteredPassword) {
+        if (!access.permits(recipient, warp)) {
+            return WarpError.NO_PERMISSION;
+        }
+        if (warp.isLocked() && !permissions.has(recipient, "uxmessentials.warp.bypass.lock")) {
+            return WarpError.LOCKED;
+        }
+        if (warp.password().isPresent()
+                && !permissions.has(recipient, "uxmessentials.warp.bypass.password")
+                && !enteredPassword.equals(warp.password())) {
+            return WarpError.WRONG_PASSWORD;
+        }
+        // A warp on another backend points into a world this one does not hold, so only the target can judge it.
+        if (!hops.routes(warp)
+                && !safetyChecker.isSafe(warp.location())
+                && !permissions.has(recipient, BYPASS_SAFETY)) {
+            return WarpError.UNSAFE_LOCATION;
+        }
+        return null;
     }
 }

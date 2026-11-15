@@ -96,7 +96,7 @@ class CrossServerTeleportTest {
     private final List<String> connects = new ArrayList<>();
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = resolversOn(LOBBY);
-    private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL);
+    private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
     private HopGate gate = HopGate.OPEN;
     private boolean tagged;
@@ -528,6 +528,21 @@ class CrossServerTeleportTest {
     }
 
     @Test
+    void aLocalUseTheTeleportRulesRefuseChargesTheVisitorNothingAndPaysTheOwnerNothing() {
+        warps.put(marketOn(LOBBY));
+        moves.engine = engine();
+        tagged = true;
+
+        Result<Unit, PlayerWarpError> used = lobbyGate().useFor(ALEX, MARKET_NAME);
+
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(moves.made).isEmpty();
+        assertThat(notifier.keys()).containsExactly("teleport.combat-tagged");
+    }
+
+    @Test
     void aLandedCrossServerWarpStartsItsCooldownAndTheNextUseIsRefusedBeforeTheCharge() {
         warps.put(marketOn(SURVIVAL).withTiming(new WarpTimingOverrides(Optional.empty(), Optional.of(60.0)), NOW));
         TeleportEngine engine = engine();
@@ -690,6 +705,20 @@ class CrossServerTeleportTest {
         private final List<String> made = new ArrayList<>();
         private boolean refuses;
         private @Nullable TeleportEngine engine;
+
+        @Override
+        public boolean admits(PlayerRef who, PlayerWarp warp) {
+            TeleportEngine through = engine;
+            return through == null
+                    || through.gateHop(
+                                    who,
+                                    Destination.at(
+                                            warp.location(),
+                                            warp.timing().warmup(),
+                                            warp.timing().cooldown()),
+                                    TeleportKind.WARP)
+                            .isOk();
+        }
 
         @Override
         public void teleportTo(PlayerRef who, PlayerWarp warp) {
