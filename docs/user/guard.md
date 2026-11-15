@@ -28,8 +28,8 @@ grants and reads.
 | `uxmessentials.guard.template` | /guard template <region> <template\|clear>: apply a rule template. | op |
 | `uxmessentials.guard.scope` | /guard scope <region> <server\|set:name>: choose which servers a region applies on. | op |
 | `uxmessentials.guard.lock` | /guard lock and unlock; edit and WorldEdit inside a locked region. | op |
-| `uxmessentials.guard.bypass` | /guard bypass: toggle ignoring every guard rule. | op |
-| `uxmessentials.guard.bypass.gamemode` | Keep your own game mode in a region whose gamemode behaviour would change it. | false |
+| `uxmessentials.bypass.guard` | /guard bypass: toggle ignoring every guard rule. | op |
+| `uxmessentials.bypass.gamemode.guard` | Keep your own game mode in a region whose gamemode behaviour would change it. | false |
 | `uxmessentials.guard.show` | /guard show and hide: draw region borders for yourself. | op |
 | `uxmessentials.guard.near` | /guard near [radius]: list regions around you. | op |
 | `uxmessentials.guard.test` | /guard test <player> <action> [region]: check a verdict for another player. | op |
@@ -46,8 +46,8 @@ grants and reads.
 
 ## Placeholders
 
-Registered as `%uxmessentials_<key>%` when PlaceholderAPI is installed. Every `regions_` key is also readable as
-`guard_`, for example `%uxmessentials_guard_here%`.
+Registered as `%uxm_essentials_<key>%` when PlaceholderAPI is installed. Every `regions_` key is also readable as
+`guard_`, for example `%uxm_essentials_guard_here%`.
 
 | Key | Module | Value | Scope |
 |---|---|---|---|

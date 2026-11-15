@@ -8,6 +8,7 @@
 - [Economy](user/economy.md): currencies, payments, tax and the admin commands.
 - [Guard](user/guard.md): the region protection nodes and placeholders.
 - [Worlds and dimensions](user/worlds.md): how the worlds module names and imports the dimensions of Paper 26.2.
+- [Upgrading](user/upgrading.md): what an operator edits when a release renames a node or a placeholder.
 - [Overview](internals/overview.md): how the plugin is put together.
 - [Guard internals](internals/guard.md): how a protection check is answered, and the traps.
 - [Development](operations/development.md): build, run, release.

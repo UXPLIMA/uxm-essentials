@@ -57,7 +57,7 @@ the action is free.
 | `economy.currency` | The currency id; `default` is the server's main currency. |
 
 The cost is taken only after every other check passes, so a refused home never costs money. A player who cannot
-pay gets no home. `uxmessentials.home.bypass.cost` makes every action free.
+pay gets no home. `uxmessentials.bypass.cost.home` makes every action free.
 
 ### Land claims
 
@@ -87,7 +87,7 @@ With `cross-server.enabled = true`, a teleport to a home of another server (from
 anything is charged, the teleport cost is taken only once they pass, and it is refunded if the player does not arrive.
 When the owner travels to their own home, the claim access check runs on arrival, and so does the unsafe spot check
 while `confirm-unsafe-teleport` is on: there is nobody to confirm with on arrival, so an unsafe home refuses the
-player, with a refund, unless they hold `uxmessentials.home.bypass.unsafe`. A visit or a staff teleport skips those
+player, with a refund, unless they hold `uxmessentials.bypass.safety.home`. A visit or a staff teleport skips those
 checks, as it does on one server. A respawn at home never changes server; it uses the lowest-slot home of the server
 the player respawns on.
 
@@ -124,18 +124,18 @@ claim's to take. A home relocated on a server that records no server is cleared 
 | `/home setserver <from> <to>` | `uxmessentials.home.setserver` | Moves every home recorded on one server to another, without moving any home. |
 
 Slots in commands count from 1, as in the grid. Other nodes: `uxmessentials.home.icon` (pick an icon, everyone),
-`uxmessentials.home.bypass.unsafe` (no warning before an unsafe teleport, and landing at an unsafe home on another
+`uxmessentials.bypass.safety.home` (no warning before an unsafe teleport, and landing at an unsafe home on another
 server, operators).
 
 ## Placeholders
 
 | Placeholder | Value |
 |---|---|
-| `%uxmessentials_homes_count%` | How many homes the player has. |
-| `%uxmessentials_homes_limit%` | How many the player may keep. |
-| `%uxmessentials_homes_left%` | How many more the player may set. |
-| `%uxmessentials_homes_list%` | The names of the player's homes, comma separated. |
-| `%uxmessentials_homes_<n>_world%` | The world of the nth home; `_x`, `_y` and `_z` give its block. |
+| `%uxm_essentials_homes_count%` | How many homes the player has. |
+| `%uxm_essentials_homes_limit%` | How many the player may keep. |
+| `%uxm_essentials_homes_left%` | How many more the player may set. |
+| `%uxm_essentials_homes_list%` | The names of the player's homes, comma separated. |
+| `%uxm_essentials_homes_<n>_world%` | The world of the nth home; `_x`, `_y` and `_z` give its block. |
 
 ## Examples
 
@@ -143,7 +143,7 @@ server, operators).
 `disabled-worlds = ["world_nether"]`.
 
 **Homes cost money to set but are free to use.** Set `economy.enabled = true` and `economy.create-cost = 500`,
-leave the other costs at 0, and grant `uxmessentials.home.bypass.cost` to staff.
+leave the other costs at 0, and grant `uxmessentials.bypass.cost.home` to staff.
 
 **A shared base.** A player opens their home in `/home`, clicks the visibility dye to make it public, and others
 reach it with `/home visit <player> <slot>`. To keep it private, use `/home invite <player> <slot>` instead.

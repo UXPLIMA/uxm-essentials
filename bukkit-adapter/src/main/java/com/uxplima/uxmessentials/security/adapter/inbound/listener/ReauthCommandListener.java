@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
  * Gates the op/dangerous commands an operator lists behind a fresh second-factor proof. When a player runs a protected
  * command they have not verified for within the re-auth window, the dispatch is cancelled before the command runs and
  * the {@link ReauthController} prompts them on the PIN keypad; a successful proof stamps the window and retries the
- * command. A holder of {@code uxmessentials.security.bypass} is exempt, and the console is never gated (this listens
+ * command. A holder of {@code uxmessentials.bypass.security} is exempt, and the console is never gated (this listens
  * only to the player-command event).
  *
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but the

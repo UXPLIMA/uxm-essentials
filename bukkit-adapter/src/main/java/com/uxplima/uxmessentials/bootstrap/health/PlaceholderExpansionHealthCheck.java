@@ -23,18 +23,28 @@ import org.jspecify.annotations.NullMarked;
 public final class PlaceholderExpansionHealthCheck implements HealthCheck {
 
     private final BooleanSupplier published;
+    private final BooleanSupplier currentForm;
+    private final BooleanSupplier groupsEnabled;
     private final BooleanSupplier placeholderApiPresent;
 
-    public PlaceholderExpansionHealthCheck(boolean published, BooleanSupplier placeholderApiPresent) {
-        this(() -> published, placeholderApiPresent);
-    }
-
     /**
-     * As above, with whether the expansion published asked when the doctor runs. The expansion is registered on
-     * {@code ServerLoadEvent}, after this check is built, because this plugin enables before PlaceholderAPI does.
+     * Every state is asked when the doctor runs: the expansion is registered on {@code ServerLoadEvent}, after this
+     * check is built, because this plugin enables before PlaceholderAPI does, and another plugin can take an
+     * identifier from it at any time after.
+     *
+     * @param published whether any expansion of ours answers right now
+     * @param currentForm whether the {@code %uxm_essentials_<key>%} form answers, rather than only the older one
+     * @param groupsEnabled whether at least one placeholder group is enabled, so there was something to publish
+     * @param placeholderApiPresent whether PlaceholderAPI is on the server
      */
-    public PlaceholderExpansionHealthCheck(BooleanSupplier published, BooleanSupplier placeholderApiPresent) {
+    public PlaceholderExpansionHealthCheck(
+            BooleanSupplier published,
+            BooleanSupplier currentForm,
+            BooleanSupplier groupsEnabled,
+            BooleanSupplier placeholderApiPresent) {
         this.published = Objects.requireNonNull(published, "published");
+        this.currentForm = Objects.requireNonNull(currentForm, "currentForm");
+        this.groupsEnabled = Objects.requireNonNull(groupsEnabled, "groupsEnabled");
         this.placeholderApiPresent = Objects.requireNonNull(placeholderApiPresent, "placeholderApiPresent");
     }
 
@@ -46,13 +56,22 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
     @Override
     public HealthResult check() {
         if (published.getAsBoolean()) {
+            if (!currentForm.getAsBoolean()) {
+                return HealthResult.warn("only the older %uxmessentials_<key>% form answers: another plugin holds the"
+                        + " uxm identifier, so %uxm_essentials_<key>% reads as written; the log names the holder");
+            }
             return HealthResult.ok("published");
         }
         if (!placeholderApiPresent.getAsBoolean()) {
             return HealthResult.warn("PlaceholderAPI is not on this server, so our placeholders publish nothing:"
                     + " every other part of the plugin works");
         }
-        return HealthResult.warn("PlaceholderAPI is here and no placeholder group is enabled, so nothing was"
-                + " published and every placeholder of ours reads as empty");
+        if (!groupsEnabled.getAsBoolean()) {
+            return HealthResult.warn("PlaceholderAPI is here and no placeholder group is enabled, so nothing was"
+                    + " published and every placeholder of ours reads as empty");
+        }
+        return HealthResult.warn("our placeholders are not held: another plugin took the uxm and uxmessentials"
+                + " identifiers, at start or since, so every placeholder of ours reads as written; the log names the"
+                + " holder (papi_expansion_identifier_taken or papi_expansion_evicted)");
     }
 }

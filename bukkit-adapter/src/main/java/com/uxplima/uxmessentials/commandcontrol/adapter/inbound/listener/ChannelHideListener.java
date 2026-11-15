@@ -25,9 +25,9 @@ import org.jspecify.annotations.Nullable;
  * can never throw on the I/O thread and can never break a player's connection: the worst case is a channel list left
  * unfiltered.
  *
- * <p>The {@code channelhide.bypass} escape is handled upstream: the connection listener injects this interceptor only
- * into a non-bypass player's pipeline, so a bypass holder's channels are never touched and the listener needs no
- * per-packet permission check on the I/O thread.
+ * <p>The {@code uxmessentials.bypass.channel-hide} escape is handled upstream: the connection listener injects this
+ * interceptor only into a non-bypass player's pipeline, so a bypass holder's channels are never touched and the
+ * listener needs no per-packet permission check on the I/O thread.
  */
 @NullMarked
 public final class ChannelHideListener implements PacketListener {

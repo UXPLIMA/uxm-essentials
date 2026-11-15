@@ -149,7 +149,7 @@ Listed by module in [permissions-gameplay.md](permissions-gameplay.md) and [perm
 
 ## Placeholders
 
-Registered when PlaceholderAPI is installed, as `%uxmessentials_<key>%`. A `player` placeholder reads the player it is asked about; a `global` one is the same for everybody. `<n>` and other angle brackets are filled in by you, for example `%uxmessentials_homes_1_world%`. The guard placeholders are in [guard.md](guard.md#placeholders).
+Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `player` placeholder reads the player it is asked about; a `global` one is the same for everybody. `<n>` and other angle brackets are filled in by you, for example `%uxm_essentials_homes_1_world%`. The guard placeholders are in [guard.md](guard.md#placeholders). The earlier `%uxmessentials_<key>%` form still answers in this release and logs a warning the first time it is read; [upgrading.md](upgrading.md) says what to change.
 
 | Key | Module | Value | Scope |
 |---|---|---|---|
