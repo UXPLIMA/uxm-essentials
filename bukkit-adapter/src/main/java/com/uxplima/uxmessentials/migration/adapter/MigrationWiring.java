@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 import org.bukkit.plugin.Plugin;
 
@@ -55,6 +56,8 @@ import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -92,6 +95,8 @@ public final class MigrationWiring {
      * @param enabled the {@link MigrationModule} enable gate (ships disabled)
      * @param messagingConfig the {@code modules.messaging} config subtree (the mail retention), empty when the
      *     messaging module is off; then imported mail is skipped and audited
+     * @param targets the running modules' own repositories, which the import writes through so their caches see it
+     * @param publisher the cross-server bus, which hears what an import changed once it ends
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -102,16 +107,25 @@ public final class MigrationWiring {
             Logger log,
             AuditChannel auditChannel,
             boolean enabled,
-            Optional<ConfigStore> messagingConfig) {
+            Optional<ConfigStore> messagingConfig,
+            ImportTargets targets,
+            BusPublisher publisher) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
         Objects.requireNonNull(economyConfig, "economyConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(publisher, "publisher");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
-        Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig);
+        Writers writers = writers(
+                targets,
+                new DatabaseStores(plugin, persistence, economyConfig, log),
+                ports(persistence, economyConfig, log, messagingConfig),
+                publisher,
+                scheduler);
         ImportOptions options = options(plugin, migrationConfig, log);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
@@ -206,36 +220,60 @@ public final class MigrationWiring {
                 Optional.of(jdbcUrl), username, password, tablePrefix, Optional.ofNullable(pluginsDir));
     }
 
-    private static Writers writers(
-            Plugin plugin,
-            Persistence persistence,
-            ConfigStore economyConfig,
-            Logger log,
-            Optional<ConfigStore> messagingConfig) {
-        HomeRepository homes = HomeRepositories.cached(persistence);
-        WarpRepository warps = WarpRepositories.cached(persistence);
-        ModerationRepository moderation = ModerationStores.repository(persistence);
-        KitRepository kits = kitRepository(plugin, log);
-        HologramRepository holograms = HologramRepositories.cached(persistence);
-        WorldRepository worldRegistry = WorldRepositories.cached(persistence);
-        CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
-        Currency defaultCurrency = currencies.defaultCurrency();
+    /**
+     * The live and dry-run writers. Each module target is the running module's own cache, taken from
+     * {@code targets}; only a module that is off gets a store from {@code stores}. The live writer tells peers what
+     * changed once an import ends.
+     */
+    static Writers writers(
+            ImportTargets targets,
+            FallbackStores stores,
+            WriterPorts ports,
+            BusPublisher publisher,
+            Scheduler scheduler) {
+        // The conflict checks read each imported owner's homes and wallet through these caches, so a large import
+        // passes every owner through them. The home and wallet caches are bounded and expire, so that churns the
+        // cache for a while but cannot grow it, and the port has no read that skips the cache to use instead.
+        HomeRepository homes = targets.homesOr(stores::homes);
+        WalletRepository wallets = targets.walletsOr(stores::wallets);
+        WarpRepository warps = targets.warpsOr(stores::warps);
+        KitRepository kits = targets.kitsOr(stores::kits);
+        HologramRepository holograms = targets.hologramsOr(stores::holograms);
+        WorldRepository worldRegistry = targets.worldsOr(stores::worlds);
+        PlayerWarpRecordWriter playerWarps = ports.playerWarps().apply(targets.playerWarpsOr(stores::playerWarps));
+        UserRecordWriter users = new UserRecordWriter(
+                homes,
+                wallets,
+                ports.mail(),
+                ports.mailRetention(),
+                StyledText::escape,
+                ports.defaultCurrency(),
+                ports.clock());
+        RecordWriter repositories = new RepositoryRecordWriter(
+                users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
+        RecordWriter dryRun = new DryRunRecordWriter(
+                users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
+        return new Writers(new AnnouncingRecordWriter(repositories, publisher, scheduler), dryRun);
+    }
+
+    private static WriterPorts ports(
+            Persistence persistence, ConfigStore economyConfig, Logger log, Optional<ConfigStore> messagingConfig) {
         Clock clock = Clock.systemUTC();
-        WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
-        PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
         // The mail table ships with every install, but a disabled messaging module means the operator does not want
         // mail, so the import leaves it out rather than filling a mailbox nobody can open.
         Optional<MailRepository> mail = messagingConfig.map(ignored -> MessagingStores.mail(persistence));
         Duration mailRetention = messagingConfig
                 .map(config -> new MessagingSettings(config).mailRetention())
                 .orElse(Duration.ZERO);
-        UserRecordWriter users =
-                new UserRecordWriter(homes, wallets, mail, mailRetention, StyledText::escape, defaultCurrency, clock);
-        RecordWriter live = new RepositoryRecordWriter(
-                users, warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
-        RecordWriter dryRun =
-                new DryRunRecordWriter(users, warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
-        return new Writers(live, dryRun);
+        // Moderation, mail and the player-warp side stores keep no cache: every reader queries the database, so a
+        // fresh store sees exactly what the running modules see.
+        return new WriterPorts(
+                ModerationStores.repository(persistence),
+                repository -> playerWarpWriter(repository, persistence, clock, log),
+                mail,
+                mailRetention,
+                new EconomyConfig(economyConfig).currencies().defaultCurrency(),
+                clock);
     }
 
     /**
@@ -244,9 +282,10 @@ public final class MigrationWiring {
      * can never reach a state a live command could not. The AxPlayerWarps, Athelion and Olzie sources all funnel
      * through this one writer.
      */
-    private static PlayerWarpRecordWriter playerWarpWriter(Persistence persistence, Clock clock, Logger log) {
+    private static PlayerWarpRecordWriter playerWarpWriter(
+            PlayerWarpRepository repository, Persistence persistence, Clock clock, Logger log) {
         return new PlayerWarpRecordWriter(
-                PlayerWarpRepositories.cached(persistence),
+                repository,
                 PlayerWarpRepositories.passwordStore(persistence),
                 PlayerWarpRepositories.memberStore(persistence, log),
                 PlayerWarpRepositories.whitelistStore(persistence, clock),
@@ -256,10 +295,9 @@ public final class MigrationWiring {
     }
 
     /**
-     * The file-backed kit catalog the import writes through. The same {@code modules/kits/kits/} tree the kits
-     * module owns, since kits are deliberately file-based rather than in the relational store. The kits module
-     * caches its own instance, so an imported kit becomes visible to {@code /kit} after a {@code reload kits} or
-     * a restart, exactly as a hand-edited kit file would.
+     * The file-backed kit catalog, the same {@code modules/kits/kits/} tree the kits module owns, since kits are
+     * deliberately file-based rather than in the relational store. Used only when the kits module is off; a running
+     * kits module hands its own catalog in, so an imported kit is offered by {@code /kit} at once.
      */
     private static KitRepository kitRepository(Plugin plugin, Logger log) {
         Path dataFolder = plugin.getDataFolder().toPath();
@@ -284,6 +322,89 @@ public final class MigrationWiring {
         return new ImportOptions(sourcePath, ImportMode.LIVE, policies.onConflict(), policies.balancePolicy());
     }
 
-    /** Bundles the live and dry-run writers built over the persistence repositories. */
-    private record Writers(RecordWriter live, RecordWriter dryRun) {}
+    /**
+     * The stores an import falls back to for a module that is off: plain caches over the database, and the kit
+     * files for kits. None carries a cross-server broadcaster, since the live writer announces once per import
+     * rather than once per row. A seam so a test can stand in stores over a fake database.
+     */
+    interface FallbackStores {
+
+        HomeRepository homes();
+
+        WalletRepository wallets();
+
+        WarpRepository warps();
+
+        KitRepository kits();
+
+        HologramRepository holograms();
+
+        WorldRepository worlds();
+
+        PlayerWarpRepository playerWarps();
+    }
+
+    /** The stores over the shared database. Each is built only for a module that is off. */
+    private static final class DatabaseStores implements FallbackStores {
+
+        private final Plugin plugin;
+        private final Persistence persistence;
+        private final ConfigStore economyConfig;
+        private final Logger log;
+
+        DatabaseStores(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {
+            this.plugin = plugin;
+            this.persistence = persistence;
+            this.economyConfig = economyConfig;
+            this.log = log;
+        }
+
+        @Override
+        public HomeRepository homes() {
+            return HomeRepositories.cached(persistence);
+        }
+
+        @Override
+        public WalletRepository wallets() {
+            CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
+            return WalletRepositories.repository(persistence, currencies, Clock.systemUTC());
+        }
+
+        @Override
+        public WarpRepository warps() {
+            return WarpRepositories.cached(persistence);
+        }
+
+        @Override
+        public KitRepository kits() {
+            return kitRepository(plugin, log);
+        }
+
+        @Override
+        public HologramRepository holograms() {
+            return HologramRepositories.cached(persistence);
+        }
+
+        @Override
+        public WorldRepository worlds() {
+            return WorldRepositories.cached(persistence);
+        }
+
+        @Override
+        public PlayerWarpRepository playerWarps() {
+            return PlayerWarpRepositories.cached(persistence);
+        }
+    }
+
+    /** What the writers need besides the module targets: the uncached stores and the import settings. */
+    record WriterPorts(
+            ModerationRepository moderation,
+            Function<PlayerWarpRepository, PlayerWarpRecordWriter> playerWarps,
+            Optional<MailRepository> mail,
+            Duration mailRetention,
+            Currency defaultCurrency,
+            Clock clock) {}
+
+    /** The live writer, which announces what an import changed, and the dry-run writer. */
+    record Writers(AnnouncingRecordWriter live, RecordWriter dryRun) {}
 }

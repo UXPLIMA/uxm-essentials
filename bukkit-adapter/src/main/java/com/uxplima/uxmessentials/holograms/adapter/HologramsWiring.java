@@ -327,7 +327,8 @@ public final class HologramsWiring {
                 npcSubscriber,
                 connector,
                 listMenu,
-                List.of(clicks, quitListener, aimListener));
+                List.of(clicks, quitListener, aimListener),
+                cached);
     }
 
     /** The editor's property-button slots, the code default matching the bundled hologram-editor.conf. */
@@ -446,6 +447,8 @@ public final class HologramsWiring {
      * @param connector the proxy connect channel the click-action engine uses, unregistered on stop so nothing outlives a disable
      * @param listMenu the management-GUI list, opened by /hologram (no args) and the /uxmess gui hub entry
      * @param listeners the click router, the far click and the quit hook, unregistered on stop so a re-wire does not answer twice
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -457,7 +460,8 @@ public final class HologramsWiring {
             Consumer<DomainEvent> npcSubscriber,
             BukkitServerConnector connector,
             HologramListMenu listMenu,
-            List<Listener> listeners) {
+            List<Listener> listeners,
+            com.uxplima.uxmessentials.persistence.holograms.CachedHologramRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);
