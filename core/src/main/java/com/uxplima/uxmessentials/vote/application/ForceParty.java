@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 
 /**
  * Admin use case: fire the vote party immediately, regardless of the current counter value. Uses

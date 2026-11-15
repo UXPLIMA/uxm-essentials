@@ -11,12 +11,13 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * The ban-on-login enforcement the {@code PlayerLoginEvent} (priority HIGHEST) listener consults before

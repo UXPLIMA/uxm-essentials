@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -66,7 +67,7 @@ public final class ListKits {
     }
 
     private boolean claimable(PlayerRef viewer, KitDefinition kit) {
-        if (kit.requiresPermission() && !permissions.has(viewer, kit.permissionNode())) {
+        if (kit.requiresPermission() && !permissions.has(viewer, KitAccess.permissionNode(kit))) {
             return false;
         }
         return !(kit.isOneTime() && claims.hasClaimed(viewer, kit.id()));

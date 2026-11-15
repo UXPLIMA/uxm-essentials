@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 

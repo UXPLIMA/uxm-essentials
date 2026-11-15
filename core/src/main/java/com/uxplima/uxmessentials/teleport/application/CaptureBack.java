@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.teleport.domain.BackLocation;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.event.BackLocationCaptured;
 
 /**

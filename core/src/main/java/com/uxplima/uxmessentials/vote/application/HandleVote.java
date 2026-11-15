@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.BroadcastType;
 import com.uxplima.uxmessentials.vote.domain.PartyResetSchedule;
 import com.uxplima.uxmessentials.vote.domain.Vote;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmessentials.vote.domain.event.VoteReceived;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;

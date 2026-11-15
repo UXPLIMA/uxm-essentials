@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.bossbar.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.bossbar.application.port.BossBarVisibilityStore;
+import com.uxplima.uxmessentials.bossbar.domain.BossBarMessageKey;
 import com.uxplima.uxmessentials.bossbar.domain.event.BossBarVisibilityToggled;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;

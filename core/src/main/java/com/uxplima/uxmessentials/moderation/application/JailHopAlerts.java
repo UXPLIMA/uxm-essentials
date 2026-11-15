@@ -11,6 +11,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.RecentIds;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 

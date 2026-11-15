@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.EquipmentSlot;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
+import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;

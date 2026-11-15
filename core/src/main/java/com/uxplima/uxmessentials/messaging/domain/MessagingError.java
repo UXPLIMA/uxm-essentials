@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.messaging.domain;
 
-import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
-
 /**
  * The modelled failures a messaging operation can produce. Each value carries the
  * {@link MessagingMessageKey} the command adapter renders, so a use case returns

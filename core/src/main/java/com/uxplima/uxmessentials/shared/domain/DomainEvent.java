@@ -11,7 +11,7 @@ package com.uxplima.uxmessentials.shared.domain;
  * event through this single type.
  *
  * <p>Every concrete implementation is a {@code record}. Value equality backs bus de-duplication,
- * codec round-trips, and equality-based test consumers. The ArchUnit rule
- * {@code domainEventConcreteImplementationsAreRecords} enforces this.
+ * codec round-trips, and equality-based test consumers. {@code domainEventConcreteImplementationsAreRecords} in
+ * {@code LayerDependenciesTest} enforces this.
  */
 public interface DomainEvent {}

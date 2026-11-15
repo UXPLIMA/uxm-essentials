@@ -6,11 +6,11 @@ import java.util.Objects;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
-import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;

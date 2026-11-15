@@ -17,7 +17,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
-import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
+import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;

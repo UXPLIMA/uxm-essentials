@@ -118,7 +118,7 @@ public final class KitAccess {
     public Result<Unit, KitError> admissible(PlayerRef who, KitDefinition kit) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kit, "kit");
-        if (kit.requiresPermission() && !permissions.has(who, kit.permissionNode())) {
+        if (kit.requiresPermission() && !permissions.has(who, permissionNode(kit))) {
             return Result.err(KitError.NO_PERMISSION);
         }
         if (kit.isOneTime() && !permissions.has(who, COOLDOWN_BYPASS_NODE)) {
@@ -270,8 +270,19 @@ public final class KitAccess {
         return CooldownKind.scoped("kit", "kit." + kit.id().value(), seconds, CooldownStartPhase.TELEPORT);
     }
 
+    /**
+     * The permission node that gates {@code kit}: its {@code customPermission} when set, else the default per-kit node
+     * {@code uxmessentials.kit.<id>}, so several kits can share one permission. Node names belong to the permission
+     * catalogue, which the domain does not see, so the gate resolves them rather than the kit.
+     */
+    public static String permissionNode(KitDefinition kit) {
+        Objects.requireNonNull(kit, "kit");
+        return kit.customPermission()
+                .orElseGet(() -> ContentPermissions.kit(kit.id().value()));
+    }
+
     public boolean hasPermission(PlayerRef who, KitDefinition kit) {
-        return !kit.requiresPermission() || permissions.has(who, kit.permissionNode());
+        return !kit.requiresPermission() || permissions.has(who, permissionNode(kit));
     }
 
     /**

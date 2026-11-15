@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 

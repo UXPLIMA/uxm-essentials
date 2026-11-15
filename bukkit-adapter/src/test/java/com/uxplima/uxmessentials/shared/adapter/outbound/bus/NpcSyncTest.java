@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.persistence.npc.CachedNpcRepository;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import org.junit.jupiter.api.Test;
 

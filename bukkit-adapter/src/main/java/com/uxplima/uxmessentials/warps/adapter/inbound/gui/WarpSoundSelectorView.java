@@ -15,12 +15,12 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;

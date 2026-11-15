@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishView;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
+import com.uxplima.uxmessentials.vanish.domain.VanishMessageKey;
 import com.uxplima.uxmessentials.vanish.domain.event.VanishToggled;
 
 /**

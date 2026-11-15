@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.menu.property.EditableProperty;

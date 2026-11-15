@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.teleport.application.port.TeleportNetwork;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 
 /**
  * Staff {@code /tp} when one of the two players is on another backend. The backend the subject is on moves them:

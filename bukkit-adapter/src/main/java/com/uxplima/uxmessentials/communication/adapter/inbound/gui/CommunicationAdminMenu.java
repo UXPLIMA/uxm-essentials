@@ -13,9 +13,9 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
-import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;

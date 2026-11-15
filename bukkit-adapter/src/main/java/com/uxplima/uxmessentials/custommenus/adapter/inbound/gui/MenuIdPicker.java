@@ -9,11 +9,11 @@ import java.util.function.Consumer;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
+import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.menu.property.PropertyClick;
 import com.uxplima.uxmlib.menu.property.SelectorButton;

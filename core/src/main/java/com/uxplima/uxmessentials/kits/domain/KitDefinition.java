@@ -17,7 +17,7 @@ import java.util.Optional;
  * <seconds>} node; the {@code Cooldowns} port resolves the effective wait per claim against it. The
  * {@code oneTime} flag is enforced by a persisted claim stamp (PDC), independent of the cooldown clock: a
  * one-time kit is consumed forever after the first claim, a repeatable kit is merely rate-limited by its
- * cooldown. The {@code permission} flag, when set, requires {@link #permissionNode()} on top of the base
+ * cooldown. The {@code permission} flag, when set, requires the per-kit node on top of the base
  * {@code uxmessentials.kit.use} command node; {@code customPermission}, when present, is consulted in place
  * of the default per-kit node so several kits can share one permission.
  *
@@ -296,14 +296,6 @@ public record KitDefinition(
     /** True when this kit requires a permission node beyond the base command node. */
     public boolean requiresPermission() {
         return permission;
-    }
-
-    /**
-     * The permission node that gates this kit: the kit's {@code customPermission} when set, else the default
-     * per-kit node {@code uxmessentials.kit.<id>}. Resolved here so several kits can share one permission.
-     */
-    public String permissionNode() {
-        return customPermission.orElseGet(() -> id.permissionNode());
     }
 
     /** True when the kit sets a cost the economy gate should charge (a non-free price). */

@@ -16,10 +16,10 @@ import com.uxplima.uxmessentials.staff.adapter.StaffGadget;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffExamineMenu;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
 import com.uxplima.uxmessentials.staff.adapter.outbound.StaffFollowService;
-import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
 import com.uxplima.uxmessentials.staff.application.port.StaffFreeze;
 import com.uxplima.uxmessentials.staff.application.port.StaffTeleport;
 import com.uxplima.uxmessentials.staff.application.port.StaffVanish;
+import com.uxplima.uxmessentials.staff.domain.StaffMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

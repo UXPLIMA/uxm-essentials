@@ -17,17 +17,17 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditLocks;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService;
 import com.uxplima.uxmessentials.custommenus.adapter.MenuEditorService.EditOutcome;
-import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
+import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.ItemBuilder;
@@ -141,8 +141,8 @@ public final class MenuEditorView {
                 .title(CustomMenusMessageKey.MENU_EDITOR_TITLE)
                 .emptyTitle(CustomMenusMessageKey.MENU_EDITOR_EMPTY_TITLE)
                 .navNames(
-                        com.uxplima.uxmessentials.shared.application.message.GuiMessageKey.PAGE_PREVIOUS,
-                        com.uxplima.uxmessentials.shared.application.message.GuiMessageKey.PAGE_NEXT)
+                        com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey.PAGE_PREVIOUS,
+                        com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey.PAGE_NEXT)
                 .entities(menuNames)
                 .iconRenderer(this::listIcon)
                 .onSelect((player, id) -> overview.open(player, id))

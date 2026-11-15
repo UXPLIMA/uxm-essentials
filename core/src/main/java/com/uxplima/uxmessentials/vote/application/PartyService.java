@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.vote.application.port.RewardApplier;
 import com.uxplima.uxmessentials.vote.application.port.VoteAudience;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
 import org.jspecify.annotations.Nullable;

@@ -19,9 +19,9 @@ import com.uxplima.uxmessentials.communication.adapter.inbound.gui.AnnouncementE
 import com.uxplima.uxmessentials.communication.adapter.outbound.AnnouncerTask;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
-import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
+import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;

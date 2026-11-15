@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.kits.domain.KitAction;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaimed;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaiming;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;

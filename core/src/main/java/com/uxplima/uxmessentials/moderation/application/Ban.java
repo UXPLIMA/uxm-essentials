@@ -17,15 +17,16 @@ import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerTempbanned;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * {@code /ban <player> [reason]}: a permanent UUID ban. A permanent ban reuses the tempban row: it is a

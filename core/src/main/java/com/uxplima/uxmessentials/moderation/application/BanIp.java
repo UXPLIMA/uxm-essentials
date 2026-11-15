@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.event.AltDetected;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerIpBanned;

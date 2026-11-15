@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.communication.application.port.BroadcastOptOutStore;
+import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.domain.event.BroadcastOptOutToggled;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;

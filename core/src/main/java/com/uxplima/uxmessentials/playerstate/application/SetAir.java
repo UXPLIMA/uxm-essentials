@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
 import com.uxplima.uxmessentials.playerstate.domain.AirAmount;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 

@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
+import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.event.NpcRescoped;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;

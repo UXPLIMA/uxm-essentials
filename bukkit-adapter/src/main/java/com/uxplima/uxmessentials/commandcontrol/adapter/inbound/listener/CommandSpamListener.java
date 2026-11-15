@@ -16,7 +16,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
+import com.uxplima.uxmessentials.commandcontrol.domain.CommandControlMessageKey;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandWindow;
 import com.uxplima.uxmessentials.commandcontrol.domain.SpamAction;

@@ -9,8 +9,8 @@ import io.papermc.paper.command.brigadier.CommandSourceStack;
 
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.tree.LiteralCommandNode;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.CommandGates;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;

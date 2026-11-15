@@ -123,7 +123,7 @@ public final class KitQueries implements UxmKitsQuery {
                 kit.cooldown(),
                 kit.oneTime(),
                 kit.requiresPermission(),
-                kit.requiresPermission() ? Optional.of(kit.permissionNode()) : Optional.empty(),
+                kit.requiresPermission() ? Optional.of(KitAccess.permissionNode(kit)) : Optional.empty(),
                 cost(kit.cost()),
                 kit.categoryId(),
                 kit.items().size(),

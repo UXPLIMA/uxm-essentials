@@ -38,7 +38,6 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsServices;
 import com.uxplima.uxmessentials.worlds.application.ListWorlds;
-import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.BackupId;
 import com.uxplima.uxmessentials.worlds.domain.BackupRef;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
@@ -51,6 +50,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldCreateOptions;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -601,8 +601,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                 || !Float.isFinite(yaw)
                 || !Float.isFinite(pitch)) {
             feedback.send(
-                    sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_INVALID_POSITION);
+                    sender, com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey.COMMAND_INVALID_POSITION);
             return 0;
         }
         Position spawn = new Position(new WorldRef(uid.orElseThrow(), name.value()), x, y, z, yaw, pitch);

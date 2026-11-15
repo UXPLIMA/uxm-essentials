@@ -3,13 +3,13 @@ package com.uxplima.uxmessentials.shared.adapter.outbound;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

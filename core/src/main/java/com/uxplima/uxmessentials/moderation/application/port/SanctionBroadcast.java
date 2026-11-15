@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.util.Map;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Outbound port for the staff/public sanction broadcast. The one-line "{@code <actor> banned <target>}"

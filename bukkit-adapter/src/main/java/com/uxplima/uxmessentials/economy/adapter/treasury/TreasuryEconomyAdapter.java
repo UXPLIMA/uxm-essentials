@@ -17,10 +17,10 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BoundedAwait;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import me.lokka30.treasury.api.economy.account.PlayerAccount;
 import me.lokka30.treasury.api.economy.response.EconomySubscriber;
 import me.lokka30.treasury.api.economy.transaction.EconomyTransactionInitiator;
@@ -28,9 +28,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Bridges a foreign Treasury economy into this plugin's {@link EconomyProvider} port, the primary bridge
- * when Treasury is on the server. This is one of only two
- * classes (with {@code VaultEconomyAdapter}) allowed to import a provider SDK; the ArchUnit fence
- * {@code economyDomainHasNoProviderSdk} forbids {@code me.lokka30.treasury..} anywhere above this adapter.
+ * when Treasury is on the server. {@code economyDomainHasNoProviderSdk} in {@code LayerDependenciesTest} keeps
+ * {@code me.lokka30.treasury..} out of the economy domain and application, so the SDK stops at this adapter.
  *
  * <p>Treasury's API is asynchronous/subscriber-based; each call is bridged to the synchronous port through
  * {@link EconomySubscriber#asFuture} and joined. Every port call already runs off the tick thread (the

@@ -9,9 +9,9 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
+import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;

@@ -8,9 +8,9 @@ import org.bukkit.command.CommandSender;
 
 import com.uxplima.uxmessentials.poses.application.PoseCooldown;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

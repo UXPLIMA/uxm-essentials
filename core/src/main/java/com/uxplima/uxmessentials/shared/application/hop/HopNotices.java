@@ -4,7 +4,7 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * How one kind words its hop notices: a catalog key for every {@link HopNotice}, and the placeholder its lines

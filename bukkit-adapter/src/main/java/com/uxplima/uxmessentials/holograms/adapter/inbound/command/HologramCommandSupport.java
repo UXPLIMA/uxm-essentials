@@ -17,7 +17,7 @@ import com.mojang.brigadier.builder.RequiredArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
-import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
+import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;

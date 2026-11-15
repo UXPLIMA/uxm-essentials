@@ -73,7 +73,7 @@ class CrossServerWarpTest {
     private final RecordingLogger log = new RecordingLogger();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
-    private final FakePermissions permissions = new FakePermissions().grant(ALEX, MARKET.useNode());
+    private final FakePermissions permissions = new FakePermissions().grant(ALEX, WarpAccess.useNode(MARKET));
     private final List<String> connects = new ArrayList<>();
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = resolversOn(LOBBY);

@@ -18,10 +18,10 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.ApplyQueuedRewards;
-import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.VoteReminderEligibility;
 import com.uxplima.uxmessentials.vote.application.port.ReminderPreferences;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

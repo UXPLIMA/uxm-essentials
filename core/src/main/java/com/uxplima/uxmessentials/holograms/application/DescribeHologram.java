@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.holograms.domain.Appearance;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.Rotation;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;

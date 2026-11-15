@@ -8,12 +8,12 @@ import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.port.RentMailer;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

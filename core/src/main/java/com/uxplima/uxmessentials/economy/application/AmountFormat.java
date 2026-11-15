@@ -2,6 +2,8 @@ package com.uxplima.uxmessentials.economy.application;
 
 import java.util.Locale;
 
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
+
 /**
  * How {@link MoneyFormat} renders an amount into the value a {@link EconomyMessageKey} interpolates: {@link
  * #FULL} keeps every digit with the currency's grouping pattern ({@code 1,234,500.00}), while {@link #COMPACT}

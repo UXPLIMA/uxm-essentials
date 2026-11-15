@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 
 /**
  * The {@code /rtp biome <biome>} use case: land the player in a specific biome. It resolves the operator-typed key

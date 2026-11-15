@@ -2,8 +2,8 @@ package com.uxplima.uxmessentials.playerwarps.application.port;
 
 import java.util.Map;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * The narrow outbound seam the rent reminder pass uses to leave an owner a piece of durable mail, a rent-due

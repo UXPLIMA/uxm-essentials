@@ -8,8 +8,9 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /** The players connected to one backend, each from one address, and the kick screens they were shown. */
 final class OnlinePlayers implements Sanctions {

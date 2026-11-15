@@ -8,9 +8,9 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;

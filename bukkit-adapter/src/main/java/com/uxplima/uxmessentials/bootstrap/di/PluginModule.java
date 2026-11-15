@@ -1783,7 +1783,7 @@ public final class PluginModule {
                         kernel.permissions(),
                         Optional.empty(),
                         kernel.messages(),
-                        com.uxplima.uxmessentials.guard.application.GuardMessageKey.DENY,
+                        com.uxplima.uxmessentials.guard.domain.GuardMessageKey.DENY,
                         com.uxplima.uxmlib.item.SerializedItems::decode,
                         kernel.log());
         com.uxplima.uxmessentials.shared.application.port.Logger audit = links.auditChannel.logger();
@@ -1805,7 +1805,7 @@ public final class PluginModule {
         // The /uxmess gui hub tile opens what /guard menu opens.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "guard",
-                com.uxplima.uxmessentials.guard.application.GuardMessageKey.GUI_HUB_TILE,
+                com.uxplima.uxmessentials.guard.domain.GuardMessageKey.GUI_HUB_TILE,
                 Material.BRICKS,
                 ContentPermissions.GUARD_MENU,
                 (player, viewer) -> wired.openMenu().accept(player)));
@@ -2404,7 +2404,7 @@ public final class PluginModule {
         // Open the same /world gui world picker from the management hub, gated by the existing world-gui node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "worlds",
-                com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.LIST_TITLE,
+                com.uxplima.uxmessentials.worlds.domain.WorldEditorMessageKey.LIST_TITLE,
                 Material.GRASS_BLOCK,
                 DestinationPermissions.WORLD_GUI,
                 (player, viewer) -> wired.openWorldList().accept(player, viewer)));
@@ -2471,7 +2471,7 @@ public final class PluginModule {
         // Open the same /home slot-grid menu from the management hub, gated by the existing home-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "homes",
-                com.uxplima.uxmessentials.homes.application.HomesMessageKey.HOME_MENU_TITLE,
+                com.uxplima.uxmessentials.homes.domain.HomesMessageKey.HOME_MENU_TITLE,
                 Material.RED_BED,
                 DestinationPermissions.HOME_USE,
                 (player, viewer) -> wired.listView().open(player)));
@@ -2538,7 +2538,7 @@ public final class PluginModule {
         // Open the same /wallet dashboard from the management hub, gated by the existing wallet node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "economy",
-                com.uxplima.uxmessentials.economy.application.EconomyMessageKey.WALLET_GUI_TITLE,
+                com.uxplima.uxmessentials.economy.domain.EconomyMessageKey.WALLET_GUI_TITLE,
                 Material.GOLD_INGOT,
                 EconomyPermissions.ECONOMY_WALLET,
                 (player, viewer) -> wired.walletView().open(player, wired.defaultCurrency())));
@@ -2645,7 +2645,7 @@ public final class PluginModule {
         // through the identical ListWarps filter the command uses, gated by the existing warp-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "warps",
-                com.uxplima.uxmessentials.warps.application.WarpsMessageKey.WARP_MENU_TITLE,
+                com.uxplima.uxmessentials.warps.domain.WarpsMessageKey.WARP_MENU_TITLE,
                 Material.ENDER_PEARL,
                 DestinationPermissions.WARP_USE,
                 (player, viewer) ->
@@ -2699,7 +2699,7 @@ public final class PluginModule {
         // the identical ListKits filter the command uses, gated by the existing kit-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "kits",
-                com.uxplima.uxmessentials.kits.application.KitsMessageKey.KIT_MENU_TITLE,
+                com.uxplima.uxmessentials.kits.domain.KitsMessageKey.KIT_MENU_TITLE,
                 Material.CHEST,
                 ContentPermissions.KIT_USE,
                 (player, viewer) ->
@@ -2849,13 +2849,13 @@ public final class PluginModule {
         // node. The ignore-list opens from /ignore with no args; it is not a hub entry of its own.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "messaging-settings",
-                com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_SETTINGS_TITLE,
+                com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey.GUI_SETTINGS_TITLE,
                 Material.WRITABLE_BOOK,
                 SocialPermissions.MESSAGING_GUI,
                 (player, viewer) -> wired.guiViews().openSettings(player, viewer)));
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "messaging-mailbox",
-                com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_MAIL_TITLE,
+                com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey.GUI_MAIL_TITLE,
                 Material.PAPER,
                 SocialPermissions.MESSAGING_GUI,
                 (player, viewer) -> wired.guiViews().openMailbox(player, viewer)));
@@ -2948,7 +2948,7 @@ public final class PluginModule {
         // Register the moderation management GUI on the /uxmess gui hub, gated by the moderation GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "moderation",
-                com.uxplima.uxmessentials.moderation.application.ModerationMessageKey.MOD_GUI_LIST_TITLE,
+                com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey.MOD_GUI_LIST_TITLE,
                 org.bukkit.Material.IRON_BARS,
                 EnforcementPermissions.MODERATION_GUI,
                 (player, viewer) -> wired.guiViews().open(player, viewer)));
@@ -2986,7 +2986,7 @@ public final class PluginModule {
         // Register the itemworld utilities hub on the /uxmess gui hub, gated by the itemworld GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "itemworld",
-                com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey.GUI_HUB_TITLE,
+                com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey.GUI_HUB_TITLE,
                 Material.CRAFTING_TABLE,
                 ItemworldPermissions.ITEMWORLD_GUI,
                 (player, viewer) -> wired.hubView().open(player)));
@@ -3057,7 +3057,7 @@ public final class PluginModule {
         // Open the same /vault selector from the management hub, gated by the existing vault-use node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "vaults",
-                com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_SELECTOR_TITLE,
+                com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey.VAULT_SELECTOR_TITLE,
                 Material.ENDER_CHEST,
                 DestinationPermissions.VAULT_USE,
                 (player, viewer) -> wired.selector().open(player)));
@@ -3233,7 +3233,7 @@ public final class PluginModule {
         // Register the communication admin panel on the /uxmess gui hub, gated by the communication GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "communication",
-                com.uxplima.uxmessentials.communication.application.CommunicationMessageKey.GUI_PANEL_TITLE,
+                com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey.GUI_PANEL_TITLE,
                 Material.WRITABLE_BOOK,
                 SocialPermissions.COMMUNICATION_GUI,
                 (player, viewer) -> wired.adminMenu().open(player)));
@@ -3296,7 +3296,7 @@ public final class PluginModule {
         // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "holograms",
-                com.uxplima.uxmessentials.holograms.application.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
+                com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
                 org.bukkit.Material.ARMOR_STAND,
                 ContentPermissions.HOLOGRAMS_GUI,
                 (player, viewer) -> wired.listMenu().open(player)));
@@ -3425,7 +3425,7 @@ public final class PluginModule {
         // Register the scoreboard settings panel on the /uxmess gui hub, gated by the player-facing GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "scoreboard",
-                com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey.GUI_TITLE,
+                com.uxplima.uxmessentials.scoreboard.domain.ScoreboardMessageKey.GUI_TITLE,
                 Material.PAINTING,
                 ContentPermissions.SCOREBOARD_GUI,
                 (player, viewer) -> wired.settingsView().open(player, viewer)));

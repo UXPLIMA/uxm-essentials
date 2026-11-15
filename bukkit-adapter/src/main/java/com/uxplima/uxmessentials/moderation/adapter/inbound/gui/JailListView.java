@@ -11,9 +11,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
-import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocator;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;

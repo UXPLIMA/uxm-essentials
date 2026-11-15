@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.warps.application;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -10,6 +11,7 @@ import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import com.uxplima.uxmessentials.warps.domain.WarpError;
+import com.uxplima.uxmessentials.warps.domain.WarpName;
 
 /**
  * The access gate a {@code /warp} passes before the hop is delegated: the per-warp permission node, the
@@ -35,13 +37,22 @@ public final class WarpAccess {
     }
 
     /**
+     * The per-warp node {@code uxmessentials.warp.use.<warp>}. Node names belong to the permission catalogue, which the
+     * domain does not see, so the gate resolves them rather than the name.
+     */
+    public static String useNode(WarpName name) {
+        Objects.requireNonNull(name, "name");
+        return DestinationPermissions.warpUse(name.value());
+    }
+
+    /**
      * Whether {@code who} holds every permission {@code warp} asks for: the per-warp node and its optional extra
      * one. Asked before anything else, and before {@link #charge}, so a refused use costs nothing.
      */
     public boolean permits(PlayerRef who, Warp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
-        if (!permissions.has(who, warp.name().useNode())) {
+        if (!permissions.has(who, useNode(warp.name()))) {
             return false;
         }
         return warp.requiredPermission().map(node -> permissions.has(who, node)).orElse(true);

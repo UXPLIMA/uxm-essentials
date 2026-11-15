@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.npc.domain;
 
-import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
-
 /**
  * The modelled failures an NPC operation can produce. Each value carries the {@link NpcMessageKey} the command
  * adapter renders, so a use case returns a {@code Result.err(NpcError.X)} and the caller never re-derives the

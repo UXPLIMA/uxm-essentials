@@ -6,9 +6,10 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * {@code /kickall [reason]}: eject every connected player except the actor and any exempt holder. Emits one

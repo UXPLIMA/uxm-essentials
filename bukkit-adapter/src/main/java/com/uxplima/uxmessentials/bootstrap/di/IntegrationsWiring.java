@@ -18,13 +18,13 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinks
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import com.uxplima.uxmlib.scheduler.Scheduler;
 import com.uxplima.uxmlib.scheduler.TaskHandle;

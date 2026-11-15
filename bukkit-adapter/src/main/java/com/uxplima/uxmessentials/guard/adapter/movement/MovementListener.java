@@ -18,7 +18,7 @@ import org.bukkit.event.player.PlayerTeleportEvent;
 import org.bukkit.event.vehicle.VehicleMoveEvent;
 
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 
 /**
  * Feeds player movement into {@link PlayerTracks}. A move inside one block does nothing; a move to another block

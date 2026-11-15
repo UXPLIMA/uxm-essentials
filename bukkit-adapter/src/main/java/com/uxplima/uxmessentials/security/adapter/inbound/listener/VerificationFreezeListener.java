@@ -30,8 +30,8 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 
 import com.uxplima.uxmessentials.security.adapter.FreezeTeleports;
 import com.uxplima.uxmessentials.security.adapter.VerificationSessions;
-import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.domain.FreezeRestriction;
+import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;

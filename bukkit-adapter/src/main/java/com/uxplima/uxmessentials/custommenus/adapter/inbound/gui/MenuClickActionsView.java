@@ -10,7 +10,7 @@ import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
-import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
+import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmlib.item.ItemBuilder;

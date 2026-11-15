@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.kits.domain;
 
-import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The modelled failures a kit operation can produce. Each value carries the {@link KitsMessageKey} the

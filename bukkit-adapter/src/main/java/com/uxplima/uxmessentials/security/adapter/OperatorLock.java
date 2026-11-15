@@ -12,8 +12,8 @@ import org.bukkit.Server;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.security.domain.OperatorList;
+import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;

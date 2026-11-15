@@ -7,15 +7,15 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.ShowPlaytime;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.property.EditableProperty;

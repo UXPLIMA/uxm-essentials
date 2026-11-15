@@ -6,7 +6,7 @@ import java.util.Objects;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
+import com.uxplima.uxmessentials.security.domain.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;

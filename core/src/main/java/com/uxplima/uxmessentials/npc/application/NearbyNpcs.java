@@ -9,6 +9,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;

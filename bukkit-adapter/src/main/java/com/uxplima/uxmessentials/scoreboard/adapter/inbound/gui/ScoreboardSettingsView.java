@@ -7,9 +7,9 @@ import java.util.Objects;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
+import com.uxplima.uxmessentials.scoreboard.domain.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.SettingsPanelView;

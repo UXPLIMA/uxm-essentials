@@ -1,7 +1,7 @@
 /**
  * The moderation context's application layer. The use cases that orchestrate the domain through the
- * outbound ports, the {@link com.uxplima.uxmessentials.moderation.application.ModerationModule} feature
- * module, and the {@link com.uxplima.uxmessentials.moderation.application.ModerationMessageKey} catalog.
+ * outbound ports, and the {@link com.uxplima.uxmessentials.moderation.application.ModerationModule} feature
+ * module.
  *
  * <p>Each sanction is one use case ({@code Mute}, {@code Jail}, {@code TempBan}, {@code Kick}, {@code
  * IssueWarn}, {@code BanIp}, {@code Freeze}, {@code Seen}, …) returning a {@code Result} for its modelled

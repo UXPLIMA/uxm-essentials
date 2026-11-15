@@ -24,7 +24,6 @@ import org.bukkit.util.Vector;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
@@ -34,6 +33,7 @@ import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.holograms.domain.HologramType;
+import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;

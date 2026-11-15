@@ -6,7 +6,7 @@ import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;

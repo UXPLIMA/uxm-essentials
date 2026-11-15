@@ -14,11 +14,11 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
-import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 

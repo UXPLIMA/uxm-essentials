@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.moderation.domain.event.JailLocationRemoved;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;

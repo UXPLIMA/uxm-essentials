@@ -32,12 +32,12 @@ import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /** Hand-written stand-ins for the shared database and the live side of each backend in the jail network tests. */
 final class JailNetworkFakes {

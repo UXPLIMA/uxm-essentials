@@ -102,9 +102,13 @@ class PermissionLiteralsTest {
                 String b = \"""
                     "uxmessentials.in.a.text.block"
                     \""";
+                String c = \"""
+                    ends in a backslash \\\\\""";
+                String d = "uxmessentials.after.a.backslash";
                 """;
 
-        assertThat(stringLiterals(source)).containsExactly("uxmessentials.real", "with \\\" escaped");
+        assertThat(stringLiterals(source))
+                .containsExactly("uxmessentials.real", "with \\\" escaped", "uxmessentials.after.a.backslash");
     }
 
     private static boolean isCatalog(Path relative) {
@@ -165,11 +169,13 @@ class PermissionLiteralsTest {
                 int end = source.indexOf("*/", i + 2);
                 i = end < 0 ? n : end + 2;
             } else if (source.startsWith("\"\"\"", i)) {
-                int end = source.indexOf("\"\"\"", i + 3);
-                while (end > 0 && source.charAt(end - 1) == '\\') {
-                    end = source.indexOf("\"\"\"", end + 1);
+                // Stepped over one escape at a time, so an escaped backslash right before the closing quotes ends
+                // the block rather than being read as an escaped quote.
+                int end = i + 3;
+                while (end < n && !source.startsWith("\"\"\"", end)) {
+                    end += source.charAt(end) == '\\' ? 2 : 1;
                 }
-                i = end < 0 ? n : end + 3;
+                i = Math.min(end + 3, n);
             } else if (source.charAt(i) == '"' || source.charAt(i) == '\'') {
                 char quote = source.charAt(i);
                 int end = i + 1;

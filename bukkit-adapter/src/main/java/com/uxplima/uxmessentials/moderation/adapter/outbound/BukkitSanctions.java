@@ -19,18 +19,18 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationSettings;
-import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.JailCells;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

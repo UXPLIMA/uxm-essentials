@@ -3,7 +3,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 import java.util.Locale;
 import java.util.Set;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Outbound port that resolves a {@link MessageKey} to its template in a locale, with the {@code en}

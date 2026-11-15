@@ -7,14 +7,14 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.messaging.application.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

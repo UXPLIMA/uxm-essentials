@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 
 /**

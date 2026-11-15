@@ -11,7 +11,7 @@ import org.bukkit.event.Listener;
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
-import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;

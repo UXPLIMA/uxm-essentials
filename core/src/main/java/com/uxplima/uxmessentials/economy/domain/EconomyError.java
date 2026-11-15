@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.economy.domain;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
-
 /**
  * The modelled failures a single-sided wallet operation (a credit or a debit) can produce. Each value
  * carries the {@link EconomyMessageKey} the command adapter renders, so a use case returns a

@@ -50,7 +50,6 @@ import com.uxplima.uxmessentials.survival.adapter.outbound.ThreadLocalRandomSour
 import com.uxplima.uxmessentials.survival.adapter.outbound.TogglesSurvivalPlaceholders;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig.SaleNotice;
-import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
 import com.uxplima.uxmessentials.survival.domain.AutoToolSelector;
 import com.uxplima.uxmessentials.survival.domain.Crops;
@@ -58,6 +57,7 @@ import com.uxplima.uxmessentials.survival.domain.DropChance;
 import com.uxplima.uxmessentials.survival.domain.SellPrices;
 import com.uxplima.uxmessentials.survival.domain.SleepThreshold;
 import com.uxplima.uxmessentials.survival.domain.SmeltMap;
+import com.uxplima.uxmessentials.survival.domain.SurvivalMessageKey;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

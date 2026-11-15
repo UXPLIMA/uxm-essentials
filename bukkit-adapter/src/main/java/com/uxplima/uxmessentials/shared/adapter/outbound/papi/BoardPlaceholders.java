@@ -9,9 +9,9 @@ import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The boards in the grammar every UXM plugin shares, written in the conventions' Leaderboards section:

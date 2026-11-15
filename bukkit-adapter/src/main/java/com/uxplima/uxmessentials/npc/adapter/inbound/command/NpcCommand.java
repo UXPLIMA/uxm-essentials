@@ -25,7 +25,7 @@ import com.uxplima.uxmessentials.npc.adapter.NpcServices;
 import com.uxplima.uxmessentials.npc.adapter.inbound.gui.NpcListMenu;
 import com.uxplima.uxmessentials.npc.adapter.outbound.BukkitNpcSkins;
 import com.uxplima.uxmessentials.npc.application.NearbyNpcs;
-import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
+import com.uxplima.uxmessentials.npc.domain.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -398,7 +398,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
         if (world == null) {
             feedback.send(
                     sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
                     Map.of("world", ctx.getArgument("world", String.class)));
             return null;
         }

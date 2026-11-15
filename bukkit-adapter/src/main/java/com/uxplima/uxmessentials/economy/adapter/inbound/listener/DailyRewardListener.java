@@ -16,10 +16,10 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.economy.application.ClaimDailyReward;
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;

@@ -5,8 +5,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.LongFunction;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.board.Board;
 import com.uxplima.uxmlib.board.BoardText;
 import org.jspecify.annotations.Nullable;

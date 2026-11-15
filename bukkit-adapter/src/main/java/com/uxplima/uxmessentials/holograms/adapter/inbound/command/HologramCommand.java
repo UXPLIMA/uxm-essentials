@@ -23,9 +23,9 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.adapter.inbound.gui.HologramListMenu;
-import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.holograms.domain.HologramsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
@@ -407,7 +407,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         if (world == null) {
             feedback.send(
                     sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
                     Map.of("world", ctx.getArgument("world", String.class)));
             return null;
         }
