@@ -266,7 +266,7 @@ public final class TeleportEngine {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onComplete, "onComplete");
         WarmupKind warmupKind = new WarmupKind(FEATURE, settings.defaultWarmupSeconds());
-        return warmups.begin(mover, warmupKind, onComplete, () -> onWarmupCancelled(mover, kind));
+        return startWarmup(mover, warmupKind, kind, onComplete);
     }
 
     private static void nothingToUndo() {
@@ -543,7 +543,16 @@ public final class TeleportEngine {
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
-        return warmups.begin(mover, warmupKind, onComplete, () -> onWarmupCancelled(mover, kind));
+        return startWarmup(mover, warmupKind, kind, onComplete);
+    }
+
+    private WarmupHandle startWarmup(PlayerRef mover, WarmupKind warmupKind, TeleportKind kind, Runnable onComplete) {
+        return warmups.begin(
+                mover,
+                warmupKind,
+                onComplete,
+                () -> onWarmupCancelled(mover, kind, TeleportMessageKey.WARMUP_CANCELLED),
+                () -> onWarmupCancelled(mover, kind, TeleportMessageKey.WARMUP_REPLACED));
     }
 
     private void hop(
@@ -558,8 +567,10 @@ public final class TeleportEngine {
         postArrival.run();
     }
 
-    private void onWarmupCancelled(PlayerRef mover, TeleportKind kind) {
-        notifier.send(mover, TeleportMessageKey.WARMUP_CANCELLED);
+    private void onWarmupCancelled(PlayerRef mover, TeleportKind kind, TeleportMessageKey notice) {
+        // A warmup stopped by a move and one replaced by the player's next teleport both end here and differ only in
+        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped.
+        notifier.send(mover, notice);
         events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
     }
 

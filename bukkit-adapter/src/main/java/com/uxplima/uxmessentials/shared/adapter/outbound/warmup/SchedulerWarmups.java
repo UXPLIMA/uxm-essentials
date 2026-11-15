@@ -36,16 +36,23 @@ public final class SchedulerWarmups implements Warmups {
 
     @Override
     public WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel) {
+        return begin(who, kind, onComplete, onCancel, onCancel);
+    }
+
+    @Override
+    public WarmupHandle begin(
+            PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onComplete, "onComplete");
         Objects.requireNonNull(onCancel, "onCancel");
+        Objects.requireNonNull(onSuperseded, "onSuperseded");
         Duration duration = resolveDuration(who, kind);
         if (duration.isZero() || duration.isNegative()) {
             onComplete.run();
             return new CompletedWarmup(who);
         }
-        PendingWarmup handle = new PendingWarmup(who, onComplete, onCancel);
+        PendingWarmup handle = new PendingWarmup(who, onComplete, onCancel, onSuperseded);
         scheduler.asyncAfter(duration, () -> fire(who, handle));
         return handle;
     }

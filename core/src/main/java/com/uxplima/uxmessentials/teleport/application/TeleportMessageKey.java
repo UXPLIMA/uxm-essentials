@@ -114,6 +114,7 @@ public enum TeleportMessageKey implements MessageKey {
     COOLDOWN_ACTIVE("teleport.cooldown.active"),
     WARMUP_STARTED("teleport.warmup.started"),
     WARMUP_CANCELLED("teleport.warmup.cancelled"),
+    WARMUP_REPLACED("teleport.warmup.replaced"),
 
     // /tpsettings. The per-player teleport settings panel
     GUI_SETTINGS_TITLE("teleport.gui.settings.title"),
