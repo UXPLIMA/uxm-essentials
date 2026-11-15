@@ -21,8 +21,11 @@ public enum HopKind {
     /** A jail cell; the player did not choose this hop. */
     JAIL,
 
-    /** Another player's position. */
-    PLAYER,
+    /** Another player's position, reached through a teleport request that player or the mover accepted. */
+    PLAYER_REQUEST,
+
+    /** Another player's position, reached through a staff teleport; ruled as the staff teleport it stands for. */
+    PLAYER_STAFF,
 
     /**
      * A kind a newer release wrote that this one does not know. No resolver ever serves it, so such a row is left for

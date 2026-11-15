@@ -51,6 +51,16 @@ public final class TeleportRequest {
      */
     public static Transition open(
             PlayerRef requester, PlayerRef target, RequestDirection direction, Instant expiresAt) {
+        return open(RequestId.random(), requester, target, direction, expiresAt);
+    }
+
+    /**
+     * Open a pending request under an id chosen elsewhere: a request sent from another backend keeps the id both
+     * backends know it by, so their answers about it name the same request.
+     */
+    public static Transition open(
+            RequestId id, PlayerRef requester, PlayerRef target, RequestDirection direction, Instant expiresAt) {
+        Objects.requireNonNull(id, "id");
         Objects.requireNonNull(requester, "requester");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(direction, "direction");
@@ -58,10 +68,9 @@ public final class TeleportRequest {
         if (requester.equals(target)) {
             throw new IllegalArgumentException("a teleport request cannot target the requester");
         }
-        RequestId newId = RequestId.random();
         TeleportRequest request =
-                new TeleportRequest(newId, requester, target, direction, expiresAt, RequestState.pending());
-        return new Transition(request, new TeleportRequested(newId, requester, target, direction, expiresAt));
+                new TeleportRequest(id, requester, target, direction, expiresAt, RequestState.pending());
+        return new Transition(request, new TeleportRequested(id, requester, target, direction, expiresAt));
     }
 
     /** The target accepts; the request moves to {@code ACCEPTED} and the mover's warmup may begin. */

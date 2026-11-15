@@ -234,6 +234,36 @@ public final class NetworkMessageCodec {
                 out.writeUTF(failed.targetName());
                 out.writeUTF(failed.jail());
             }
+            case TeleportRequestFrame request -> {
+                writeUuid(out, request.requestId());
+                writeUuid(out, request.requesterUuid());
+                out.writeUTF(request.requesterName());
+                writeUuid(out, request.targetUuid());
+                out.writeUTF(request.targetName());
+                out.writeUTF(request.targetServer());
+                out.writeUTF(request.direction());
+                out.writeInt(request.seeLevel());
+                out.writeLong(request.ttlMillis());
+            }
+            case TeleportAnswerFrame answer -> {
+                writeUuid(out, answer.requestId());
+                out.writeUTF(answer.answer());
+                out.writeUTF(answer.toServer());
+                writeUuid(out, answer.aboutUuid());
+                out.writeUTF(answer.aboutName());
+                out.writeUTF(answer.detail());
+            }
+            case StaffTeleportFrame staff -> {
+                writeUuid(out, staff.requestId());
+                writeUuid(out, staff.actorUuid());
+                out.writeUTF(staff.actorName());
+                writeUuid(out, staff.subjectUuid());
+                out.writeUTF(staff.subjectName());
+                writeUuid(out, staff.destinationUuid());
+                out.writeUTF(staff.destinationName());
+                out.writeUTF(staff.subjectServer());
+                out.writeInt(staff.seeLevel());
+            }
         }
     }
 
@@ -299,6 +329,33 @@ public final class NetworkMessageCodec {
             case STAFF_CHAT -> new StaffChatFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case JAIL_CHANGED -> new JailChanged(origin, readUuid(in), readUuid(in), in.readBoolean());
             case JAIL_HOP_FAILED -> new JailHopFailed(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
+            case TELEPORT_REQUEST ->
+                new TeleportRequestFrame(
+                        origin,
+                        readUuid(in),
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readInt(),
+                        in.readLong());
+            case TELEPORT_ANSWER ->
+                new TeleportAnswerFrame(
+                        origin, readUuid(in), in.readUTF(), in.readUTF(), readUuid(in), in.readUTF(), in.readUTF());
+            case STAFF_TELEPORT ->
+                new StaffTeleportFrame(
+                        origin,
+                        readUuid(in),
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readInt());
         };
     }
 
