@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -42,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CrawlCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.crawl.use";
+    private static final String PERMISSION = SocialPermissions.CRAWL_USE;
 
     private final StartCrawl startCrawl;
     private final StopPose stopPose;

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.domain.EnchantSpec;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class EnchantCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.enchant.use";
+    private static final String PERMISSION = ItemworldPermissions.ENCHANT_USE;
 
     // The level arg parses any integer >= 1 (clamped to max-enchant-level in the domain); the type-ahead offers a
     // small, sensible ladder rather than every vanilla max, which varies per enchantment.
@@ -90,7 +91,11 @@ public final class EnchantCommand extends ItemworldCommandSupport implements Com
             reply(ctx, ItemworldMessageKey.ENCHANT_UNKNOWN, Map.of("enchant", rawId));
             return;
         }
-        if (!allowsType(ctx, player, "enchant", enchantment.get().getKey().getKey())) {
+        if (!allowsType(
+                ctx,
+                player,
+                ItemworldPermissions::enchantment,
+                enchantment.get().getKey().getKey())) {
             return;
         }
         EnchantSpec resolved = spec.get();

@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -71,7 +72,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class ItemEditCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.itemworld.itemedit";
+    private static final String PERMISSION = ItemworldPermissions.ITEMWORLD_ITEMEDIT;
 
     /**
      * The click-driven editor a bare {@code /itemedit} opens; {@code null} on a wiring (or test) with no GUI, in which
@@ -133,7 +134,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int rename(CommandContext<CommandSourceStack> ctx, String name) {
-        Held held = resolve(ctx, "rename");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_RENAME);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -147,7 +148,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int resetName(CommandContext<CommandSourceStack> ctx) {
-        Held held = resolve(ctx, "rename");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_RENAME);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -156,7 +157,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int loreAdd(CommandContext<CommandSourceStack> ctx, String text) {
-        Held held = resolve(ctx, "lore");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_LORE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -170,7 +171,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int loreClear(CommandContext<CommandSourceStack> ctx) {
-        Held held = resolve(ctx, "lore");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_LORE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -179,7 +180,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int loreSet(CommandContext<CommandSourceStack> ctx, int index, String text) {
-        Held held = resolve(ctx, "lore");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_LORE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -193,7 +194,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int loreInsert(CommandContext<CommandSourceStack> ctx, int index, String text) {
-        Held held = resolve(ctx, "lore");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_LORE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -207,7 +208,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
     }
 
     private int loreRemove(CommandContext<CommandSourceStack> ctx, int index) {
-        Held held = resolve(ctx, "lore");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_LORE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -236,7 +237,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Apply (or, at level 0, remove) an enchant on the held item, clamping the level through {@link EnchantSpec}. */
     private int enchant(CommandContext<CommandSourceStack> ctx, int level) {
-        Held held = resolve(ctx, "enchant");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_ENCHANT);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -298,7 +299,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Toggle an {@link ItemFlag}; a bare {@code flag <name>} flips the current state, {@code on}/{@code off} set it. */
     private int flag(CommandContext<CommandSourceStack> ctx, Optional<Boolean> requested) {
-        Held held = resolve(ctx, "flag");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_FLAG);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -333,7 +334,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Add an {@code add_number} attribute modifier, keyed uniquely under {@code uxmessentials:} per attribute. */
     private int attributeAdd(CommandContext<CommandSourceStack> ctx, @Nullable String rawSlot) {
-        Held held = resolve(ctx, "attribute");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_ATTRIBUTE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -382,7 +383,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Remove every modifier the held item carries for the named attribute. */
     private int attributeRemove(CommandContext<CommandSourceStack> ctx) {
-        Held held = resolve(ctx, "attribute");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_ATTRIBUTE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -411,7 +412,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Set the held item's durability damage, bounded by its max durability; non-damageable items are rejected. */
     private int durability(CommandContext<CommandSourceStack> ctx, int value) {
-        Held held = resolve(ctx, "durability");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_DURABILITY);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -435,7 +436,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Reset the held item's durability damage to zero; an undamaged item is a no-op with a note. */
     private int repair(CommandContext<CommandSourceStack> ctx) {
-        Held held = resolve(ctx, "durability");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_DURABILITY);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -456,7 +457,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Set the held item's unbreakable flag; a bare {@code unbreakable} flips the current state. */
     private int unbreakable(CommandContext<CommandSourceStack> ctx, Optional<Boolean> requested) {
-        Held held = resolve(ctx, "unbreakable");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_UNBREAKABLE);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -480,7 +481,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
 
     /** Set or clear the held item's custom model data, written as the 1.21 float-list selector. */
     private int model(CommandContext<CommandSourceStack> ctx, Optional<Integer> id) {
-        Held held = resolve(ctx, "model");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_MODEL);
         if (held == null) {
             return Command.SINGLE_SUCCESS;
         }
@@ -517,7 +518,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
      * being run. Every verb node defaults to allowed, so a base-perm holder keeps every verb until an operator
      * negates one; negating {@code …itemedit.attribute} leaves the rest of the editor working.
      */
-    private @Nullable Held resolve(CommandContext<CommandSourceStack> ctx, String verb) {
+    private @Nullable Held resolve(CommandContext<CommandSourceStack> ctx, String verbNode) {
         if (!services.config().itemEditEnabled()) {
             reply(ctx, ItemworldMessageKey.COMMAND_DISABLED, Map.of("command", literal()));
             return null;
@@ -527,7 +528,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
             return null;
         }
         if (!services.kernel().permissions().has(ref(player), PERMISSION)
-                || !services.kernel().permissions().has(ref(player), PERMISSION + "." + verb)) {
+                || !services.kernel().permissions().has(ref(player), verbNode)) {
             reply(ctx, SharedMessageKey.COMMAND_NO_PERMISSION);
             return null;
         }
@@ -565,7 +566,7 @@ public final class ItemEditCommand extends ItemworldCommandSupport implements Co
      * then does nothing, so the bare verb never opens an empty window.
      */
     private int openEditor(CommandContext<CommandSourceStack> ctx) {
-        Held held = resolve(ctx, "gui");
+        Held held = resolve(ctx, ItemworldPermissions.ITEMWORLD_ITEMEDIT_GUI);
         if (held == null || view == null) {
             return Command.SINGLE_SUCCESS;
         }

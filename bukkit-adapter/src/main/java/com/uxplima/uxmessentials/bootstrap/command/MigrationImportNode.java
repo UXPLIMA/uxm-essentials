@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -42,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MigrationImportNode {
 
-    private static final String PERMISSION_IMPORT = "uxmessentials.admin.import";
+    private static final String PERMISSION_IMPORT = SharedPermissions.ADMIN_IMPORT;
     /** The arguments the usage line shows, which are command syntax and the same in every language. */
     static final String ARGUMENTS = "<source> [--dry-run]";
 

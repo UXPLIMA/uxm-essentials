@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 
 /**
  * The messaging context's command surface as platform-neutral
@@ -24,20 +25,23 @@ final class MessagingCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("msg", "uxmessentials.msg.use", command("msg", "Send a private message")),
-                spec("reply", "uxmessentials.msg.reply", command("reply", "Reply to your last conversation")),
-                spec("mail", "uxmessentials.mail.use", command("mail", "Read, send or clear your mail")),
-                spec("msgtoggle", "uxmessentials.msg.toggle", command("msgtoggle", "Refuse incoming private messages")),
-                spec("rtoggle", "uxmessentials.msg.toggle", command("rtoggle", "Toggle whether you receive replies")),
-                spec("ignore", "uxmessentials.msg.ignore", command("ignore", "Ignore a player")),
-                spec("unignore", "uxmessentials.msg.ignore", command("unignore", "Stop ignoring a player")),
-                spec("ignorelist", "uxmessentials.msg.ignore", command("ignorelist", "List the players you ignore")),
+                spec("msg", SocialPermissions.MSG_USE, command("msg", "Send a private message")),
+                spec("reply", SocialPermissions.MSG_REPLY, command("reply", "Reply to your last conversation")),
+                spec("mail", SocialPermissions.MAIL_USE, command("mail", "Read, send or clear your mail")),
+                spec(
+                        "msgtoggle",
+                        SocialPermissions.MSG_TOGGLE,
+                        command("msgtoggle", "Refuse incoming private messages")),
+                spec("rtoggle", SocialPermissions.MSG_TOGGLE, command("rtoggle", "Toggle whether you receive replies")),
+                spec("ignore", SocialPermissions.MSG_IGNORE, command("ignore", "Ignore a player")),
+                spec("unignore", SocialPermissions.MSG_IGNORE, command("unignore", "Stop ignoring a player")),
+                spec("ignorelist", SocialPermissions.MSG_IGNORE, command("ignorelist", "List the players you ignore")),
                 spec(
                         "socialspy",
-                        "uxmessentials.msg.socialspy",
+                        SocialPermissions.MSG_SOCIALSPY,
                         command("socialspy", "Observe private messages, globally or for one player")),
-                spec("mailclear", "uxmessentials.mail.use", command("mailclear", "Clear your mailbox")),
-                spec("helpop", "uxmessentials.helpop.use", command("helpop", "Open a staff support request")));
+                spec("mailclear", SocialPermissions.MAIL_USE, command("mailclear", "Clear your mailbox")),
+                spec("helpop", SocialPermissions.HELPOP_USE, command("helpop", "Open a staff support request")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

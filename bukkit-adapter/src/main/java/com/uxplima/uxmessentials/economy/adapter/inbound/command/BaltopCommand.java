@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BaltopCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.baltop";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_BALTOP;
 
     public BaltopCommand(EconomyServices services, Messages messages) {
         super(services, messages);
@@ -48,7 +49,7 @@ public final class BaltopCommand extends EconomyCommandSupport implements Comman
                 .requires(Gate.permission(PERMISSION))
                 .executes(this::runDefault)
                 .then(Commands.literal("refresh")
-                        .requires(Gate.permission("uxmessentials.economy.admin"))
+                        .requires(Gate.permission(EconomyPermissions.ECONOMY_ADMIN))
                         .executes(this::runRefresh))
                 .then(Commands.argument("page", IntegerArgumentType.integer(1)).executes(this::runDefaultPage))
                 .then(currencyArgument()

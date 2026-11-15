@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -55,7 +56,7 @@ public final class CustomCommandsModule implements FeatureModule {
         // literal and its base node so the command catalog and the feature-module drift guard see the surface.
         return List.of(spec(
                 "customcmd",
-                "uxmessentials.customcommand.admin",
+                ContentPermissions.CUSTOMCOMMAND_ADMIN,
                 descriptor("customcmd", "Manage operator-defined custom commands")));
     }
 

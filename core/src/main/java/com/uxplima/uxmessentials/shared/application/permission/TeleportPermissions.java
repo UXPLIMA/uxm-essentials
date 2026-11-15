@@ -8,10 +8,45 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 /**
  * The permission table for the teleport context. Data, not logic: one row per node, read by {@link PermissionCatalog}
  * and through it by the server registration, the in-game listing and its export.
+ *
+ * <p>Every node is also a constant here, or a factory for a family named at runtime, and the code checks it through
+ * that constant, so the code holds no second copy of the string for a rename to miss.
  */
-final class TeleportPermissions {
+public final class TeleportPermissions {
 
     private static final ModuleId TELEPORT = ModuleId.of("teleport");
+
+    public static final String TPA_ALL = "uxmessentials.tpa.all";
+    public static final String TPA_AUTO = "uxmessentials.tpa.auto";
+    public static final String TPA_BLOCK = "uxmessentials.tpa.block";
+    public static final String TPA_CANCEL = "uxmessentials.tpa.cancel";
+    public static final String TPA_TOGGLE = "uxmessentials.tpa.toggle";
+    public static final String TPA_USE = "uxmessentials.tpa.use";
+    public static final String TPAHERE_USE = "uxmessentials.tpahere.use";
+    public static final String TPSETTINGS_USE = "uxmessentials.tpsettings.use";
+    public static final String BACK_ONDEATH = "uxmessentials.back.ondeath";
+    public static final String BACK_USE = "uxmessentials.back.use";
+    public static final String MODULE_TELEPORT = "uxmessentials.module.teleport";
+    public static final String RTP_BIOME = "uxmessentials.rtp.biome";
+    public static final String RTP_GUI = "uxmessentials.rtp.gui";
+    public static final String RTP_OTHERS = "uxmessentials.rtp.others";
+    public static final String RTP_USE = "uxmessentials.rtp.use";
+    public static final String SPAWN_JOIN_EXEMPT = "uxmessentials.spawn.join.exempt";
+    public static final String SPAWN_NAMED = "uxmessentials.spawn.named";
+    public static final String SPAWN_SET = "uxmessentials.spawn.set";
+    public static final String SPAWN_USE = "uxmessentials.spawn.use";
+    public static final String TELEPORT_GUI = "uxmessentials.teleport.gui";
+    public static final String TELEPORT_SETTPR = "uxmessentials.teleport.settpr";
+    public static final String TP_ALL = "uxmessentials.tp.all";
+    public static final String TP_OFFLINE = "uxmessentials.tp.offline";
+    public static final String TP_OTHERS = "uxmessentials.tp.others";
+    public static final String TP_POSITION = "uxmessentials.tp.position";
+    public static final String TP_USE = "uxmessentials.tp.use";
+    public static final String TP_VERTICAL = "uxmessentials.tp.vertical";
+    public static final String TP_WARMUP_BYPASS = "uxmessentials.tp.warmup.bypass";
+
+    /** The head of the random-teleport radius quota; the blocks held are appended to it. */
+    public static final String RTP_RADIUS = "uxmessentials.rtp.radius";
 
     private TeleportPermissions() {}
 
@@ -25,42 +60,39 @@ final class TeleportPermissions {
     private static List<PermissionSpec> teleportRequests() {
         return List.of(
                 PermissionSpec.of(
-                        "uxmessentials.tpa.all",
+                        TPA_ALL,
                         "/tpaall to request every online player to teleport to you.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpa.auto",
+                        TPA_AUTO,
                         "/tpauto to auto-accept incoming teleport requests.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpa.block",
+                        TPA_BLOCK,
                         "/tpblock / /tpunblock to block a player's requests.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpa.cancel",
+                        TPA_CANCEL,
                         "/tpcancel / /tpacancel to withdraw your outgoing request.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpa.toggle",
+                        TPA_TOGGLE,
                         "/tptoggle to refuse all incoming teleport requests.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpa.use",
+                        TPA_USE,
                         "/tpa, /tpaccept, /tpdeny to request and resolve a teleport.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpahere.use",
-                        "/tpahere to ask a player to come to you.",
-                        PermissionDefault.TRUE,
-                        TELEPORT),
+                        TPAHERE_USE, "/tpahere to ask a player to come to you.", PermissionDefault.TRUE, TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tpsettings.use",
+                        TPSETTINGS_USE,
                         "/tpsettings opens your personal teleport settings panel.",
                         PermissionDefault.TRUE,
                         TELEPORT));
@@ -70,114 +102,104 @@ final class TeleportPermissions {
     private static List<PermissionSpec> teleportMovement() {
         return List.of(
                 PermissionSpec.of(
-                        "uxmessentials.back.ondeath",
+                        BACK_ONDEATH,
                         "Allow /back and /deathback to return to a death location.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.back.use",
+                        BACK_USE,
                         "/back to return to your last captured location; /deathback (alias /dback) to return to your last death location.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.module.teleport",
+                        MODULE_TELEPORT,
                         "Hot-reload / inspect the teleport module (/tp, /tpa, /back, /spawn and /rtp).",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.rtp.biome",
+                        RTP_BIOME,
                         "/rtp biome <biome> to random teleport into a specific biome.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.rtp.gui",
+                        RTP_GUI,
                         "/rtp gui to open the random-teleport world picker.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.rtp.others",
+                        RTP_OTHERS,
                         "/rtp <player> to force another online player to random teleport (staff).",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.family(
-                        "uxmessentials.rtp.radius.<blocks>",
+                        RTP_RADIUS + ".<blocks>",
                         "How far from the world centre /rtp may drop you; the largest tier held wins.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.rtp.use",
+                        RTP_USE,
                         "/rtp random teleport from the pre-warmed safe-location queue.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.spawn.join.exempt",
+                        SPAWN_JOIN_EXEMPT,
                         "Exempt the player from automatic first-join/every-join spawn movement.",
                         PermissionDefault.FALSE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.spawn.named",
-                        "/spawn <name> to teleport to a named spawn.",
-                        PermissionDefault.TRUE,
-                        TELEPORT),
+                        SPAWN_NAMED, "/spawn <name> to teleport to a named spawn.", PermissionDefault.TRUE, TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.spawn.set",
+                        SPAWN_SET,
                         "/setspawn, /setmainspawn, /removespawn and /mirrorspawn to define and manage spawns.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.spawn.use",
+                        SPAWN_USE,
                         "/spawn to teleport to the resolved server spawn.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.teleport.gui",
+                        TELEPORT_GUI,
                         "Show the teleport settings panel on the /uxmess gui hub.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.teleport.settpr",
+                        TELEPORT_SETTPR,
                         "/settpr <minRange> <maxRange> to set the /rtp search zone at runtime.",
                         PermissionDefault.OP,
                         TELEPORT),
+                PermissionSpec.of(TP_ALL, "/tpall to pull every online player to you.", PermissionDefault.OP, TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.all",
-                        "/tpall to pull every online player to you.",
-                        PermissionDefault.OP,
-                        TELEPORT),
-                PermissionSpec.of(
-                        "uxmessentials.tp.offline",
+                        TP_OFFLINE,
                         "/tpoffline / /tpofflinehere to a player's logout location.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.others",
+                        TP_OTHERS,
                         "/tpo and /tpohere to teleport overriding no-tp flags.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.position",
-                        "/tppos to teleport to raw coordinates.",
-                        PermissionDefault.OP,
-                        TELEPORT),
+                        TP_POSITION, "/tppos to teleport to raw coordinates.", PermissionDefault.OP, TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.use",
+                        TP_USE,
                         "/tp, /tphere, /goto, /bring and /tprandomplayer (/tprp) direct staff teleport.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.vertical",
+                        TP_VERTICAL,
                         "/top, /bottom, /jump, /up, /down, /ascend, /descend, /thru vertical teleports.",
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.family(
-                        "uxmessentials.tp.warmup.<seconds>",
+                        SharedPermissions.featureWarmup("tp") + ".<seconds>",
                         "The stand-still countdown before a teleport runs, in seconds; the shortest tier held wins and 0 removes it.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         TELEPORT),
                 PermissionSpec.of(
-                        "uxmessentials.tp.warmup.bypass",
+                        TP_WARMUP_BYPASS,
                         "Start teleports with no warmup, immune to move-cancel.",
                         PermissionDefault.OP,
                         TELEPORT));

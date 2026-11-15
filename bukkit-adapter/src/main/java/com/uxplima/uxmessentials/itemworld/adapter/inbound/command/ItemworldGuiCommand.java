@@ -15,6 +15,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.ItemworldHubMenu;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ItemworldGuiCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.itemworld.gui";
+    private static final String PERMISSION = ItemworldPermissions.ITEMWORLD_GUI;
 
     private final ItemworldHubMenu view;
     private final Messages messages;

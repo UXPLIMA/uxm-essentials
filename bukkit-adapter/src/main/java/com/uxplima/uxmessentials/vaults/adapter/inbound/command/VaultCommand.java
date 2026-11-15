@@ -25,6 +25,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -65,11 +66,11 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VaultCommand implements CommandRegistration {
 
-    private static final String USE = "uxmessentials.vault.use";
-    private static final String OTHERS = "uxmessentials.vault.others";
-    private static final String ADMIN_DELETE = "uxmessentials.vault.admin.delete";
-    private static final String RENAME = "uxmessentials.vault.rename";
-    private static final String ICON = "uxmessentials.vault.icon";
+    private static final String USE = DestinationPermissions.VAULT_USE;
+    private static final String OTHERS = DestinationPermissions.VAULT_OTHERS;
+    private static final String ADMIN_DELETE = DestinationPermissions.VAULT_ADMIN_DELETE;
+    private static final String RENAME = DestinationPermissions.VAULT_RENAME;
+    private static final String ICON = DestinationPermissions.VAULT_ICON;
     private static final int DEFAULT_INDEX = 1;
 
     private final VaultServices services;

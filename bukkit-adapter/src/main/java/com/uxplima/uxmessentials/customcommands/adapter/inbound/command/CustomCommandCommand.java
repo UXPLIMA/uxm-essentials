@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -51,10 +52,10 @@ import com.uxplima.uxmlib.command.Sender;
 public final class CustomCommandCommand implements CommandRegistration {
 
     /** The node gating the whole surface. */
-    private static final String ADMIN = "uxmessentials.customcommand.admin";
+    private static final String ADMIN = ContentPermissions.CUSTOMCOMMAND_ADMIN;
 
     /** The node needed to run a chain for somebody other than yourself. */
-    private static final String RUN_OTHERS = "uxmessentials.customcommand.run.others";
+    private static final String RUN_OTHERS = ContentPermissions.CUSTOMCOMMAND_RUN_OTHERS;
 
     private final AtomicReference<CustomCommandLoader.LoadResult> state;
     private final Supplier<CustomCommandLoader.LoadResult> reloadAll;

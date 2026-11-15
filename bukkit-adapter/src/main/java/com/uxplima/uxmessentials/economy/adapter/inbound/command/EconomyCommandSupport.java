@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -50,9 +51,6 @@ abstract class EconomyCommandSupport {
 
     /** The catalog key for a console invoking a player-only command. */
     static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
-
-    /** Prefix of the per-currency node a {@code permission-required} currency gates on. */
-    private static final String CURRENCY_PERMISSION_PREFIX = "uxmessentials.economy.currency.";
 
     final EconomyServices services;
     final CommandFeedback feedback;
@@ -185,7 +183,7 @@ abstract class EconomyCommandSupport {
     final boolean currencyPermitted(Player sender, Currency currency) {
         if (!currency.permissionRequired()
                 || sender.hasPermission(
-                        CURRENCY_PERMISSION_PREFIX + currency.id().value())) {
+                        EconomyPermissions.currency(currency.id().value()))) {
             return true;
         }
         services.notifier().send(ref(sender), EconomyMessageKey.CURRENCY_NO_PERMISSION, Map.of());

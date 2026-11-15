@@ -16,6 +16,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffModeCommand extends StaffCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.staff.mode";
+    private static final String PERMISSION = EnforcementPermissions.STAFF_MODE;
 
     private final Scheduler scheduler;
     private final PlayerLookup players;

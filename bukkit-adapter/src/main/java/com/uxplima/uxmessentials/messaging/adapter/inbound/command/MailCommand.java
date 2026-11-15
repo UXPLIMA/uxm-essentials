@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,8 +49,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MailCommand extends MessagingCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.mail.use";
-    private static final String SENDALL_PERMISSION = "uxmessentials.mail.sendall";
+    private static final String PERMISSION = SocialPermissions.MAIL_USE;
+    private static final String SENDALL_PERMISSION = SocialPermissions.MAIL_SENDALL;
 
     private final MessagingGuiViews views;
 

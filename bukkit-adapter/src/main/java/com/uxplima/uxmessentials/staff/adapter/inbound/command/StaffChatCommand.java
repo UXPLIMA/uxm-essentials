@@ -12,6 +12,7 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
 import com.uxplima.uxmlib.command.Gate;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffChatCommand extends StaffCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.staff.chat";
+    private static final String PERMISSION = EnforcementPermissions.STAFF_CHAT;
 
     public StaffChatCommand(StaffServices services, Messages messages) {
         super(services, messages);

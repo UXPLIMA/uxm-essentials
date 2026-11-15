@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.commandcontrol.domain.ChannelHidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.CommandRateLimiter;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.velocitypowered.api.proxy.ProxyServer;
 import org.jspecify.annotations.Nullable;
@@ -33,13 +34,13 @@ import org.spongepowered.configurate.ConfigurationNode;
 public final class ProxyCommandControl {
 
     /** The node that exempts a holder from the proxy command gate and tree scrub: sees and runs everything. */
-    public static final String BYPASS = "uxmessentials.commandcontrol.bypass";
+    public static final String BYPASS = EnforcementPermissions.COMMANDCONTROL_BYPASS;
 
     /** The node that reveals the hidden proxy-native commands the plugin-hide otherwise removes and blocks. */
-    public static final String VIEW = "uxmessentials.commandcontrol.viewproxycommands";
+    public static final String VIEW = EnforcementPermissions.COMMANDCONTROL_VIEWPROXYCOMMANDS;
 
     /** The node that exempts a holder from the proxy command-spam limiter (never counted, never actioned). */
-    public static final String SPAM_BYPASS = "uxmessentials.commandcontrol.spam.bypass";
+    public static final String SPAM_BYPASS = EnforcementPermissions.COMMANDCONTROL_SPAM_BYPASS;
 
     private static final String CONFIG_ROOT = "command-control";
 

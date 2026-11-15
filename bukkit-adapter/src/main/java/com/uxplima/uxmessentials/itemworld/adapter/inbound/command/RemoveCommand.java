@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.event.EntitiesPurged;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmlib.command.Gate;
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RemoveCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.remove.use";
+    private static final String PERMISSION = ItemworldPermissions.REMOVE_USE;
     private static final int DEFAULT_RADIUS = 64;
 
     private final PurgePolicy policy;

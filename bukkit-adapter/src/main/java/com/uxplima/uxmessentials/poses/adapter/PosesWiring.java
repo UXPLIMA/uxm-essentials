@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimServic
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmlib.claim.ClaimProvidersConfig;
 import com.uxplima.uxmlib.menu.Menus;
@@ -208,7 +209,7 @@ public final class PosesWiring {
                 "poses",
                 PosesMessageKey.POSES_GUI_TITLE,
                 Material.ARMOR_STAND,
-                "uxmessentials.poses.gui",
+                SocialPermissions.POSES_GUI,
                 settingsView::open));
 
         List<CommandRegistration> commands = List.of(
@@ -223,7 +224,7 @@ public final class PosesWiring {
                         config.maxDistance()),
                 new PoseCommand(
                         "lay",
-                        "uxmessentials.lay.use",
+                        SocialPermissions.LAY_USE,
                         PoseType.LAY,
                         PosesMessageKey.POSES_NOW_LAYING,
                         "Lie down where you stand; run again to stand up.",
@@ -234,7 +235,7 @@ public final class PosesWiring {
                         cooldownNotice),
                 new PoseCommand(
                         "bellyflop",
-                        "uxmessentials.bellyflop.use",
+                        SocialPermissions.BELLYFLOP_USE,
                         PoseType.BELLYFLOP,
                         PosesMessageKey.POSES_NOW_BELLYFLOPPING,
                         "Flop onto your front; run again to stand up.",
@@ -245,7 +246,7 @@ public final class PosesWiring {
                         cooldownNotice),
                 new PoseCommand(
                         "spin",
-                        "uxmessentials.spin.use",
+                        SocialPermissions.SPIN_USE,
                         PoseType.SPIN,
                         PosesMessageKey.POSES_NOW_SPINNING,
                         "Spin in place; run again to stop.",

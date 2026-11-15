@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -99,7 +100,7 @@ class WarpAccessTest {
         assertThat(useWarp().use(ALEX, VAULT).asError()).contains(WarpError.LOCKED);
         assertThat(purse.wallet).isEqualByComparingTo("100");
 
-        permissions.grant(ALEX, "uxmessentials.warp.bypass.lock");
+        permissions.grant(ALEX, DestinationPermissions.WARP_BYPASS_LOCK);
         assertThat(useWarp().use(ALEX, VAULT).isOk()).isTrue();
         assertThat(purse.wallet).isEqualByComparingTo("75");
     }
@@ -113,7 +114,7 @@ class WarpAccessTest {
         assertThat(useWarp().use(ALEX, VAULT, "open").isOk()).isTrue();
         assertThat(purse.charges).isEqualTo(1);
 
-        permissions.grant(ALEX, "uxmessentials.warp.bypass.password");
+        permissions.grant(ALEX, DestinationPermissions.WARP_BYPASS_PASSWORD);
         assertThat(useWarp().use(ALEX, VAULT).isOk()).isTrue();
         assertThat(purse.charges).isEqualTo(2);
         assertThat(moves.made).containsExactly("Alex->vault", "Alex->vault");

@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -35,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class EditSignCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.editsign.use";
+    private static final String PERMISSION = ItemworldPermissions.EDITSIGN_USE;
     private static final int REACH = 8;
 
     public EditSignCommand(ItemworldServices services) {

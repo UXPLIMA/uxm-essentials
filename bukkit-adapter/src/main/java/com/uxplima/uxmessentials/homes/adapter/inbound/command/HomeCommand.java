@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -58,11 +59,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class HomeCommand extends HomeCommandSupport implements CommandRegistration {
 
-    private static final String USE_PERMISSION = "uxmessentials.home.use";
-    private static final String VISIT_PERMISSION = "uxmessentials.home.visit";
-    private static final String INVITE_PERMISSION = "uxmessentials.home.invite";
-    private static final String ADMIN_PERMISSION = "uxmessentials.home.admin";
-    private static final String SETSERVER_PERMISSION = "uxmessentials.home.setserver";
+    private static final String USE_PERMISSION = DestinationPermissions.HOME_USE;
+    private static final String VISIT_PERMISSION = DestinationPermissions.HOME_VISIT;
+    private static final String INVITE_PERMISSION = DestinationPermissions.HOME_INVITE;
+    private static final String ADMIN_PERMISSION = DestinationPermissions.HOME_ADMIN;
+    private static final String SETSERVER_PERMISSION = DestinationPermissions.HOME_SETSERVER;
 
     private final Scheduler scheduler;
 

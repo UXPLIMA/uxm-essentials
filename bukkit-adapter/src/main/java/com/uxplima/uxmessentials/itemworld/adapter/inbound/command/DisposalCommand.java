@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.gui.Guis;
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class DisposalCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.disposal.use";
+    private static final String PERMISSION = ItemworldPermissions.DISPOSAL_USE;
 
     public DisposalCommand(ItemworldServices services) {
         super(services, "disposal", SubFeatureGroup.CLEANUP, "Open a throwaway window.");

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -62,14 +63,14 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class SkinCommand implements CommandRegistration {
 
-    private static final String USE = "uxmessentials.skin.use";
-    private static final String URL = "uxmessentials.skin.url";
-    private static final String FILE = "uxmessentials.skin.file";
-    private static final String UPDATE = "uxmessentials.skin.update";
-    private static final String OTHER = "uxmessentials.skin.other";
-    private static final String DROP = "uxmessentials.skin.drop";
-    private static final String INFO = "uxmessentials.skin.info";
-    private static final String PURGE = "uxmessentials.skin.purge";
+    private static final String USE = ContentPermissions.SKIN_USE;
+    private static final String URL = ContentPermissions.SKIN_URL;
+    private static final String FILE = ContentPermissions.SKIN_FILE;
+    private static final String UPDATE = ContentPermissions.SKIN_UPDATE;
+    private static final String OTHER = ContentPermissions.SKIN_OTHER;
+    private static final String DROP = ContentPermissions.SKIN_DROP;
+    private static final String INFO = ContentPermissions.SKIN_INFO;
+    private static final String PURGE = ContentPermissions.SKIN_PURGE;
 
     /** The word a player appends to say the image was drawn for the three-pixel arm. */
     private static final String SLIM = "slim";

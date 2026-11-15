@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The kits context's command surface as platform-neutral
@@ -30,7 +31,7 @@ final class KitCommandSurface {
     private KitCommandSurface() {}
 
     static List<CommandSpec> all() {
-        return List.of(spec("kit", "uxmessentials.kit.use", KitCommand.of("kit", "Claim a kit")));
+        return List.of(spec("kit", ContentPermissions.KIT_USE, KitCommand.of("kit", "Claim a kit")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

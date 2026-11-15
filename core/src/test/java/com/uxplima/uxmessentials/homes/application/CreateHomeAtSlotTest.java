@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.homes.domain.event.HomeCreated;
 import com.uxplima.uxmessentials.homes.domain.event.HomeLimitReached;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -95,17 +96,17 @@ class CreateHomeAtSlotTest {
 
     @Test
     void aHigherPermissionTierRaisesTheLimit() {
-        permissions.quota("uxmessentials.home.limit", QuotaResult.limited(5));
+        permissions.quota(DestinationPermissions.HOME_LIMIT, QuotaResult.limited(5));
 
         assertThat(useCase().create(ALEX, HomeSlot.of(4), at(0, 64, 0)).isOk()).isTrue();
     }
 
     @Test
     void aPlayerWhoLostARankCannotFillAGapBelowTheNewLimit() {
-        permissions.quota("uxmessentials.home.limit", QuotaResult.limited(3));
+        permissions.quota(DestinationPermissions.HOME_LIMIT, QuotaResult.limited(3));
         useCase().create(ALEX, HomeSlot.of(1), at(1, 64, 0));
         useCase().create(ALEX, HomeSlot.of(2), at(2, 64, 0));
-        permissions.quota("uxmessentials.home.limit", QuotaResult.limited(2));
+        permissions.quota(DestinationPermissions.HOME_LIMIT, QuotaResult.limited(2));
 
         Result<?, HomeError> refused = useCase().create(ALEX, HomeSlot.of(0), at(0, 64, 0));
 
@@ -119,7 +120,7 @@ class CreateHomeAtSlotTest {
 
     @Test
     void anUnlimitedPlayerCanUseAnySlotOfTheGrid() {
-        permissions.quota("uxmessentials.home.limit", QuotaResult.unlimited());
+        permissions.quota(DestinationPermissions.HOME_LIMIT, QuotaResult.unlimited());
 
         assertThat(useCase().create(ALEX, HomeSlot.of(53), at(0, 64, 0)).isOk()).isTrue();
         assertThat(useCase().create(ALEX, HomeSlot.of(54), at(0, 64, 0)).asError())
@@ -176,7 +177,7 @@ class CreateHomeAtSlotTest {
 
     @Test
     void theCostBypassMakesItFree() {
-        permissions.grant(ALEX, "uxmessentials.home.bypass.cost");
+        permissions.grant(ALEX, DestinationPermissions.HOME_BYPASS_COST);
 
         assertThat(useCase(List.of(), DomainGate.allowAll(), createCosts("40"))
                         .create(ALEX, HomeSlot.of(0), at(0, 64, 0))

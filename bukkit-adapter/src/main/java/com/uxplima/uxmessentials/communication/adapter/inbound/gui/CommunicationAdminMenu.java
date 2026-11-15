@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -60,7 +61,7 @@ public final class CommunicationAdminMenu {
     private static final String PANEL_RESOURCE = "modules/communication/gui/communication-admin.conf";
     private static final String ANNOUNCER_RESOURCE = "modules/communication/gui/communication-announcer.conf";
 
-    private static final String CLEARCHAT_EXEMPT = "uxmessentials.communication.clearchat.exempt";
+    private static final String CLEARCHAT_EXEMPT = SocialPermissions.COMMUNICATION_CLEARCHAT_EXEMPT;
     private static final int CLEARCHAT_BLANK_LINES = 100;
     private static final String BROADCAST_INPUT_KEY = "communication.broadcast";
 

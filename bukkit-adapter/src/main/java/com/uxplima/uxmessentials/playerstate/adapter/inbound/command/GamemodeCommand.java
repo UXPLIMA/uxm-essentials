@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.domain.GameModeRef;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GamemodeCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.gamemode.use";
+    private static final String PERMISSION = PlayerstatePermissions.GAMEMODE_USE;
 
     // Every form GameModeRef.parse accepts (the full name, the short alias, and the numeric id) derived from the
     // enum so the type-ahead never drifts from what the parser resolves.
@@ -49,7 +50,7 @@ public final class GamemodeCommand extends PlayerstateCommandSupport implements 
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.gamemode.others";
+        return PlayerstatePermissions.GAMEMODE_OTHERS;
     }
 
     @Override

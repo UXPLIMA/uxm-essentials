@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.survival.adapter.outbound.AutoSellNotices;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.port.SurvivalSales;
@@ -44,9 +45,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AutoDropsPipeline {
 
-    private static final String PICKUP_PERMISSION = "uxmessentials.survival.autopickup";
-    private static final String SMELT_PERMISSION = "uxmessentials.survival.autosmelt";
-    private static final String SELL_PERMISSION = "uxmessentials.survival.autosell";
+    private static final String PICKUP_PERMISSION = ContentPermissions.SURVIVAL_AUTOPICKUP;
+    private static final String SMELT_PERMISSION = ContentPermissions.SURVIVAL_AUTOSMELT;
+    private static final String SELL_PERMISSION = ContentPermissions.SURVIVAL_AUTOSELL;
 
     private final boolean pickupEnabled;
     private final boolean smeltEnabled;

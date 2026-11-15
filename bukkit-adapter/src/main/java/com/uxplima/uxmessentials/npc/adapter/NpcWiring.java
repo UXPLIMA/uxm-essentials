@@ -91,6 +91,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.teleport.BukkitDirectTe
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -204,7 +205,7 @@ public final class NpcWiring {
                 "npc",
                 NpcMessageKey.NPC_GUI_LIST_TITLE,
                 org.bukkit.Material.PLAYER_HEAD,
-                "uxmessentials.npc.gui",
+                ContentPermissions.NPC_GUI,
                 listMenu::open));
         // Names come from the stored set rather than the shown one, so an NPC scoped to other servers still
         // completes here and can be scoped back.

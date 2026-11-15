@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommandCostListener implements Listener {
 
-    private static final String BYPASS_PERMISSION = "uxmessentials.economy.bypasscmdcost";
+    private static final String BYPASS_PERMISSION = EconomyPermissions.ECONOMY_BYPASSCMDCOST;
 
     private final EconomyProvider economy;
     private final Map<String, EconomyConfig.CommandCost> commandCosts;

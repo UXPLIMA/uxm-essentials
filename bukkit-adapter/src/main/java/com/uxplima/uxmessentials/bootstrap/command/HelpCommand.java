@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandDescripti
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.CommandGates;
 import com.uxplima.uxmlib.command.Gate;
@@ -42,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
 public final class HelpCommand implements CommandRegistration {
 
     private static final String LITERAL = "help";
-    private static final String PERMISSION = "uxmessentials.help";
+    private static final String PERMISSION = SharedPermissions.HELP;
     private static final String DESCRIPTION = "List the commands you can use.";
     private static final int PAGE_SIZE = 8;
     private static final Splitter SPACE = Splitter.on(' ').omitEmptyStrings();

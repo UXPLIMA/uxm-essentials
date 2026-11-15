@@ -49,6 +49,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -301,7 +302,7 @@ public final class CustomMenusWiring {
                 "custommenus",
                 CustomMenusMessageKey.MENU_EDITOR_TITLE,
                 org.bukkit.Material.CHEST,
-                "uxmessentials.menu.editor",
+                ContentPermissions.MENU_EDITOR,
                 editorView::open));
         MenuCommand command = new MenuCommand(
                 menus,

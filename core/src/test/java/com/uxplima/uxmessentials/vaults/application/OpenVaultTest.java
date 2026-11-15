@@ -10,6 +10,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.testing.FakePermissions;
@@ -131,7 +132,7 @@ class OpenVaultTest {
 
     @Test
     void theBypassNodeOpensANewVaultForFree() {
-        permissions.grant(ALEX, "uxmessentials.vault.free");
+        permissions.grant(ALEX, DestinationPermissions.VAULT_FREE);
 
         assertThat(openVault(CREATE_10_OPEN_2).open(ALEX, 1).isOk()).isTrue();
 

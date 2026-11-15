@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -118,12 +119,12 @@ public interface Cooldowns {
 
         /** The permission node prefix this kind resolves its tier against. */
         public String cooldownNode() {
-            return "uxmessentials." + feature + ".cooldown";
+            return SharedPermissions.featureCooldown(feature);
         }
 
         /** The bypass node that skips the gate entirely. */
         public String bypassNode() {
-            return cooldownNode() + ".bypass";
+            return SharedPermissions.featureCooldownBypass(feature);
         }
 
         /** The default duration as a {@link Duration}. */

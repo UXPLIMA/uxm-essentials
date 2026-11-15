@@ -30,6 +30,8 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -59,27 +61,27 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class WorldCommand extends WorldCommandSupport implements CommandRegistration {
 
-    private static final String USE = "uxmessentials.world.use";
-    private static final String CREATE = "uxmessentials.world.create";
-    private static final String IMPORT = "uxmessentials.world.import";
-    private static final String LOAD = "uxmessentials.world.load";
-    private static final String UNLOAD = "uxmessentials.world.unload";
-    private static final String UNREGISTER = "uxmessentials.world.unregister";
-    private static final String DELETE = "uxmessentials.world.delete";
-    private static final String LIST = "uxmessentials.world.list";
-    private static final String INFO = "uxmessentials.world.info";
-    private static final String SET = "uxmessentials.world.set";
-    private static final String GAMERULE = "uxmessentials.world.gamerule";
-    private static final String SETSPAWN = "uxmessentials.world.setspawn";
-    private static final String SPAWN = "uxmessentials.world.spawn";
-    private static final String TP = "uxmessentials.world.tp";
-    private static final String TP_OTHERS = "uxmessentials.world.tp.others";
-    private static final String GUI = "uxmessentials.world.gui";
-    private static final String PREGEN = "uxmessentials.world.pregen";
-    private static final String BACKUP = "uxmessentials.world.backup";
-    private static final String RESTORE = "uxmessentials.world.restore";
-    private static final String CLAIM = "uxmessentials.world.claim";
-    private static final String SETSERVER = "uxmessentials.world.setserver";
+    private static final String USE = PlayerstatePermissions.WORLD_USE;
+    private static final String CREATE = DestinationPermissions.WORLD_CREATE;
+    private static final String IMPORT = DestinationPermissions.WORLD_IMPORT;
+    private static final String LOAD = DestinationPermissions.WORLD_LOAD;
+    private static final String UNLOAD = DestinationPermissions.WORLD_UNLOAD;
+    private static final String UNREGISTER = DestinationPermissions.WORLD_UNREGISTER;
+    private static final String DELETE = DestinationPermissions.WORLD_DELETE;
+    private static final String LIST = DestinationPermissions.WORLD_LIST;
+    private static final String INFO = DestinationPermissions.WORLD_INFO;
+    private static final String SET = DestinationPermissions.WORLD_SET;
+    private static final String GAMERULE = DestinationPermissions.WORLD_GAMERULE;
+    private static final String SETSPAWN = DestinationPermissions.WORLD_SETSPAWN;
+    private static final String SPAWN = DestinationPermissions.WORLD_SPAWN;
+    private static final String TP = DestinationPermissions.WORLD_TP;
+    private static final String TP_OTHERS = DestinationPermissions.WORLD_TP_OTHERS;
+    private static final String GUI = DestinationPermissions.WORLD_GUI;
+    private static final String PREGEN = DestinationPermissions.WORLD_PREGEN;
+    private static final String BACKUP = DestinationPermissions.WORLD_BACKUP;
+    private static final String RESTORE = DestinationPermissions.WORLD_RESTORE;
+    private static final String CLAIM = DestinationPermissions.WORLD_CLAIM;
+    private static final String SETSERVER = DestinationPermissions.WORLD_SETSERVER;
 
     /** A network name, as the warps' server column holds it: what may follow the {@code @} of a destination. */
     private static final Pattern SERVER_NAME = Pattern.compile("[A-Za-z0-9_.-]{1,64}");

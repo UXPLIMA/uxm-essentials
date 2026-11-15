@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -39,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GuiSubcommand {
 
-    private static final String PERMISSION_GUI = "uxmessentials.gui";
+    private static final String PERMISSION_GUI = SharedPermissions.GUI;
 
     private final ManagementGuiRegistry registry;
     private final ManagementHubView hub;

@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.inbound.gui.EntityCountMenu;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -55,7 +56,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class EntityCountCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.entitycount.use";
+    private static final String PERMISSION = ItemworldPermissions.ENTITYCOUNT_USE;
     private static final int DEFAULT_RADIUS = 64;
     private static final int MAX_RADIUS = 256;
 

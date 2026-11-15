@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class CheckMuteCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.check";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_CHECK;
     private static final String INPUT_KEY = "moderation.check-mute";
 
     private final Scheduler scheduler;

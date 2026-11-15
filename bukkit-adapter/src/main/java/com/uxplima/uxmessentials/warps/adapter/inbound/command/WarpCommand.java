@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -68,17 +69,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WarpCommand extends WarpCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.warp.use";
-    private static final String OTHERS_PERMISSION = "uxmessentials.warp.others";
-    private static final String LOCK_PERMISSION = "uxmessentials.warp.lock";
-    private static final String PASSWORD_PERMISSION = "uxmessentials.warp.password";
-    private static final String EDIT_PERMISSION = "uxmessentials.warp.edit";
-    private static final String LIST_PERMISSION = "uxmessentials.warp.list";
-    private static final String SET_PERMISSION = "uxmessentials.warp.set";
-    private static final String DELETE_PERMISSION = "uxmessentials.warp.delete";
-    private static final String INFO_PERMISSION = "uxmessentials.warp.info";
-    private static final String MOVE_PERMISSION = "uxmessentials.warp.move";
-    private static final String SETSERVER_PERMISSION = "uxmessentials.warp.setserver";
+    private static final String PERMISSION = DestinationPermissions.WARP_USE;
+    private static final String OTHERS_PERMISSION = DestinationPermissions.WARP_OTHERS;
+    private static final String LOCK_PERMISSION = DestinationPermissions.WARP_LOCK;
+    private static final String PASSWORD_PERMISSION = DestinationPermissions.WARP_PASSWORD;
+    private static final String EDIT_PERMISSION = DestinationPermissions.WARP_EDIT;
+    private static final String LIST_PERMISSION = DestinationPermissions.WARP_LIST;
+    private static final String SET_PERMISSION = DestinationPermissions.WARP_SET;
+    private static final String DELETE_PERMISSION = DestinationPermissions.WARP_DELETE;
+    private static final String INFO_PERMISSION = DestinationPermissions.WARP_INFO;
+    private static final String MOVE_PERMISSION = DestinationPermissions.WARP_MOVE;
+    private static final String SETSERVER_PERMISSION = DestinationPermissions.WARP_SETSERVER;
 
     private final Supplier<ListDisplayMode> displayMode;
 

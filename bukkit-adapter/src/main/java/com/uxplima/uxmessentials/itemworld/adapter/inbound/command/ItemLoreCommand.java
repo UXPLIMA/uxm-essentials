@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ItemLoreCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.itemlore.use";
+    private static final String PERMISSION = ItemworldPermissions.ITEMLORE_USE;
 
     public ItemLoreCommand(ItemworldServices services) {
         super(services, "itemlore", SubFeatureGroup.ITEM_UTILS, "Edit held-item lore.");

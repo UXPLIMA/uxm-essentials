@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.VillagersPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerCommand;
 import com.uxplima.uxmessentials.villagers.adapter.inbound.command.VillagerProtectToggle;
@@ -67,17 +68,17 @@ import org.jspecify.annotations.Nullable;
 public final class VillagersWiring {
 
     /** The permission gating the {@code /villager manager} staff tool. */
-    private static final String MANAGER_PERMISSION = "uxmessentials.villagers.manager";
+    private static final String MANAGER_PERMISSION = ContentPermissions.VILLAGERS_MANAGER;
     /** The permission gating click-to-trade access. */
-    private static final String TRADE_PERMISSION = "uxmessentials.villagers.trade";
+    private static final String TRADE_PERMISSION = ContentPermissions.VILLAGERS_TRADE;
     /** The permission gating the {@code /villager protect} toggle. */
-    private static final String PROTECT_PERMISSION = "uxmessentials.villagers.protect";
+    private static final String PROTECT_PERMISSION = ContentPermissions.VILLAGERS_PROTECT;
     /** The permission gating villager pickup with the villager-in-a-bucket item. */
-    private static final String BUCKET_PERMISSION = "uxmessentials.villagers.bucket";
+    private static final String BUCKET_PERMISSION = ContentPermissions.VILLAGERS_BUCKET;
     /** The permission gating the {@code /villager follow} toggle. */
-    private static final String FOLLOW_PERMISSION = "uxmessentials.villagers.follow";
+    private static final String FOLLOW_PERMISSION = ContentPermissions.VILLAGERS_FOLLOW;
     /** The permission gating villager leashing. */
-    private static final String LEASH_PERMISSION = "uxmessentials.villagers.leash";
+    private static final String LEASH_PERMISSION = ContentPermissions.VILLAGERS_LEASH;
 
     private VillagersWiring() {}
 

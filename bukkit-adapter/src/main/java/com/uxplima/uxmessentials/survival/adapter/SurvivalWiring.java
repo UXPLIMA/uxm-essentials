@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.SurvivalPlaceholders;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoPickupCommand;
 import com.uxplima.uxmessentials.survival.adapter.inbound.command.AutoSellCommand;
@@ -78,7 +79,7 @@ import org.jspecify.annotations.Nullable;
 public final class SurvivalWiring {
 
     /** The node that gates the settings panel, shared by {@code /survival} and the hub entry. */
-    private static final String SURVIVAL_GUI_PERMISSION = "uxmessentials.survival.gui";
+    private static final String SURVIVAL_GUI_PERMISSION = ContentPermissions.SURVIVAL_GUI;
 
     private SurvivalWiring() {}
 
