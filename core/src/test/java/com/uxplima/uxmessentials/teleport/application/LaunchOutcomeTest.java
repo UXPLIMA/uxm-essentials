@@ -177,6 +177,17 @@ class LaunchOutcomeTest {
     }
 
     @Test
+    void anExecutorThatThrowsAfterTheWarmupReportsAMiss() {
+        hops.throwsAtOnce = true;
+        List<TeleportOutcome> outcomes = launch(HOME);
+
+        warmups.finish(ALEX);
+
+        assertThat(outcomes).containsExactly(TeleportOutcome.MISSED);
+        assertThat(hops.landed).isEmpty();
+    }
+
+    @Test
     void anExecutorThatReportsBothALandingAndAMissIsHeardOnceAsALanding() {
         hops.reportsBoth = true;
         List<TeleportOutcome> outcomes = launch(HOME);
@@ -213,6 +224,7 @@ class LaunchOutcomeTest {
         final List<Position> landed = new ArrayList<>();
         boolean misses;
         boolean reportsBoth;
+        boolean throwsAtOnce;
 
         @Override
         public void teleport(PlayerRef who, Destination destination, TeleportKind kind) {
@@ -222,6 +234,9 @@ class LaunchOutcomeTest {
         @Override
         public void teleport(
                 PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
+            if (throwsAtOnce) {
+                throw new IllegalStateException("the hop could not be issued");
+            }
             if (misses) {
                 onFailed.run();
                 return;

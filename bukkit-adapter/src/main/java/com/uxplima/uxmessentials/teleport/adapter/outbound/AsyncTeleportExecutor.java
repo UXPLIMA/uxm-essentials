@@ -203,7 +203,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             arrival.failed();
             return;
         }
-        if (Boolean.FALSE.equals(ok)) {
+        if (!Boolean.TRUE.equals(ok)) {
             arrival.failed(); // Paper refused the hop (e.g. unloaded target), so the player stayed put
             return;
         }

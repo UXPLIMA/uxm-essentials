@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
@@ -58,10 +59,18 @@ class TeleportHomeAdapterTest {
     private final List<String> locatedOn = new ArrayList<>();
     private final List<Position> arrived = new CopyOnWriteArrayList<>();
     private final WarmupTracker tracker = new WarmupTracker();
+    private volatile boolean sinkBroken;
     private final TeleportHomeAdapter teleporter = new TeleportHomeAdapter(engine(0), threads);
 
     private TeleportEngine engine(int warmupSeconds) {
-        Notifier notifier = new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {});
+        Notifier notifier = new Notifier(
+                (viewer, key, placeholders) -> {
+                    if (sinkBroken && key.key().equals("teleport.warmup.started")) {
+                        throw new IllegalStateException("the message sink is broken");
+                    }
+                    return key.key();
+                },
+                (viewer, text) -> {});
         TeleportSettings settings = new TeleportSettings(new Warmup(warmupSeconds));
         TrackingWarmups warmups = new TrackingWarmups(
                 new SchedulerWarmups(threads, new NoNodes()),
@@ -73,7 +82,8 @@ class TeleportHomeAdapterTest {
                 who -> {
                     locatedOn.add(threads.current);
                     return Optional.of(STANDING);
-                });
+                },
+                new QuietLog());
         TeleportExecutor hops = (who, destination, kind) -> arrived.add(destination.position());
         return new TeleportEngine(new NoCooldowns(), warmups, hops, notifier, event -> {}, settings, who -> false);
     }
@@ -144,6 +154,23 @@ class TeleportHomeAdapterTest {
 
         assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.CANCELLED);
         assertThat(arrived).isEmpty();
+    }
+
+    @Test
+    void aWarmupNoticeThatCannotBeSentNeitherStopsTheWarmupNorReportsARefusal() {
+        TeleportHomeAdapter warming = new TeleportHomeAdapter(engine(3), threads);
+        sinkBroken = true;
+        threads.current = "player";
+
+        CompletionStage<TeleportOutcome> outcome = warming.teleportTo(ALEX, home());
+        assertThat(outcome.toCompletableFuture())
+                .as("the warmup started, so it is not a refusal")
+                .isNotDone();
+        threads.runDelayed();
+        threads.runPlayerThread();
+
+        assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.LANDED);
+        assertThat(arrived).containsExactly(HOME);
     }
 
     @Test
@@ -329,5 +356,21 @@ class TeleportHomeAdapterTest {
         public int getInt(String path, int fallback) {
             return path.equals("default-warmup") ? seconds : fallback;
         }
+    }
+
+    /** A logger nobody reads. */
+    private static final class QuietLog implements Logger {
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

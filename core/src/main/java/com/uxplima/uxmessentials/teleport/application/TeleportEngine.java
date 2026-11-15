@@ -197,25 +197,28 @@ public final class TeleportEngine {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(outcome, "outcome");
         OneOutcome reported = new OneOutcome(outcome, log);
+        WarmupHandle handle;
         try {
             Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
             if (admitted.isErr()) {
                 reported.report(TeleportOutcome.REFUSED);
                 return admitted;
             }
-            if (beginGatedWarmup(mover, destination, kind, reported).isCancelled()) {
-                // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
-                // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
-                return Result.err(TeleportError.VETOED);
-            }
-            return Result.ok();
+            handle = beginGatedWarmup(mover, destination, kind, reported);
         } catch (RuntimeException failure) {
-            // A fault in the gates or while the warmup starts (reading where the player stands, replacing an earlier
-            // warmup) leaves no teleport for the caller to wait on, so it hears a refusal and can give a charge back.
-            // A warmup that did start before the fault and lands later is then a free teleport, never a second payout.
+            // A fault in the gates or before the warmup port hands back a handle (reading where the player stands,
+            // replacing an earlier warmup) leaves no teleport for the caller to wait on, so it hears a refusal and
+            // can give a charge back. Once a handle exists its own callbacks report the outcome, which is why the
+            // warmup port must not throw after its countdown has started.
             reported.report(TeleportOutcome.REFUSED);
             throw failure;
         }
+        if (handle.isCancelled()) {
+            // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
+            // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
+            return Result.err(TeleportError.VETOED);
+        }
+        return Result.ok();
     }
 
     /**
@@ -281,20 +284,27 @@ public final class TeleportEngine {
     private WarmupHandle beginGatedWarmup(
             PlayerRef mover, Destination destination, TeleportKind kind, OneOutcome reported) {
         return beginWarmup(
-                mover,
-                destination,
-                kind,
-                () -> executor.teleport(
-                        mover,
-                        destination,
-                        kind,
-                        () -> {
-                            // Reported before the stamp, so a stamp that throws cannot turn a landing into a miss.
-                            reported.report(TeleportOutcome.LANDED);
-                            stampLanding(mover, destination, kind);
-                        },
-                        () -> reported.report(TeleportOutcome.MISSED)),
-                reported);
+                mover, destination, kind, () -> hopAfterWarmup(mover, destination, kind, reported), reported);
+    }
+
+    private void hopAfterWarmup(PlayerRef mover, Destination destination, TeleportKind kind, OneOutcome reported) {
+        try {
+            executor.teleport(
+                    mover,
+                    destination,
+                    kind,
+                    () -> {
+                        // Reported before the stamp, so a stamp that throws cannot turn a landing into a miss.
+                        reported.report(TeleportOutcome.LANDED);
+                        stampLanding(mover, destination, kind);
+                    },
+                    () -> reported.report(TeleportOutcome.MISSED));
+        } catch (RuntimeException failure) {
+            // The warmup has already completed, so no cancel will follow: an executor that throws before it could
+            // report anything leaves the player where they stood, which is a miss.
+            log.error("teleport of " + mover.name() + " failed after its warmup", failure);
+            reported.report(TeleportOutcome.MISSED);
+        }
     }
 
     /**
