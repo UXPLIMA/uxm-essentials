@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.event.WalletCredited;
 import com.uxplima.uxmessentials.economy.domain.event.WalletDebited;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import org.junit.jupiter.api.Test;
 
 class CountedMoneyTest {
@@ -24,7 +25,7 @@ class CountedMoneyTest {
 
     private final RecordingEvents events = new RecordingEvents();
     private final PublishingEconomyProvider economy =
-            new PublishingEconomyProvider(new InMemoryBank(COINS), events, CLOCK);
+            new PublishingEconomyProvider(new InMemoryBank(COINS), events, CLOCK, new RecordingLogger());
 
     private List<Boolean> counted() {
         return events.published().stream()

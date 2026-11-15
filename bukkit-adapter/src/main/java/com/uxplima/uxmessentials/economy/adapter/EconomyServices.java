@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.economy.application.LookupWorth;
 import com.uxplima.uxmessentials.economy.application.Pay;
 import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
+import com.uxplima.uxmessentials.economy.application.ReturnUnsoldItems;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.application.SetWorth;
@@ -42,6 +43,7 @@ public record EconomyServices(
         LookupWorth lookupWorth,
         SellItem sellItem,
         SellAll sellAll,
+        ReturnUnsoldItems returnUnsoldItems,
         SetWorth setWorth,
         EcoAdmin ecoAdmin,
         ExchangeService exchangeService,
@@ -74,6 +76,7 @@ public record EconomyServices(
         Objects.requireNonNull(lookupWorth, "lookupWorth");
         Objects.requireNonNull(sellItem, "sellItem");
         Objects.requireNonNull(sellAll, "sellAll");
+        Objects.requireNonNull(returnUnsoldItems, "returnUnsoldItems");
         Objects.requireNonNull(setWorth, "setWorth");
         Objects.requireNonNull(ecoAdmin, "ecoAdmin");
         Objects.requireNonNull(exchangeService, "exchangeService");

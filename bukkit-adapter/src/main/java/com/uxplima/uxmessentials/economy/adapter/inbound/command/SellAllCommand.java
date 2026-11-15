@@ -15,7 +15,6 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
-import com.uxplima.uxmessentials.economy.application.SellAllOutcome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -26,10 +25,10 @@ import org.jspecify.annotations.NullMarked;
  * {@code /sellall}: sell every sellable item in the inventory at its configured worth, the bulk counterpart to
  * {@code /sell}. The pricing, the single-credit, and the per-item tally are the
  * {@link com.uxplima.uxmessentials.economy.application.SellAll} use case's job; this handler snapshots the
- * inventory's materials and counts on the seller's region thread, runs the worth lookups and the credit off the
- * tick thread (so a foreign provider never wedges the command, the same shape {@link SellCommand} uses), and
- * only when the credit actually applied hops back to the seller's region thread to remove the sold stacks, so
- * the inventory and the balance never diverge.
+ * inventory's plain stacks on the seller's region thread, takes them, and has
+ * {@link com.uxplima.uxmessentials.economy.application.ReturnUnsoldItems} run the worth lookups and the credit off
+ * the tick thread (so a foreign provider never wedges the command, the same shape {@link SellCommand} uses) and give
+ * back every stack the sale does not pay for, so the inventory and the balance never diverge.
  */
 @NullMarked
 public final class SellAllCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -63,10 +62,8 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
 
     /**
      * Sell every plain stack the player carries: take them here, on the seller's own thread, ask for the sale off the
-     * tick, and give back every item the sale does not buy.
-     *
-     * <p>It used to count every stack by material, armour and off hand included, pay for the lot and then remove with
-     * a plain {@code removeItem} whose shortfall nobody read, so a renamed stack was paid for and kept.
+     * tick, and give back every item the sale does not buy. Armour, the off hand and renamed stacks are left alone,
+     * since {@code removeItem} would not find them and they would be paid for and kept.
      */
     void sell(Player sender) {
         Map<Material, Integer> taken = new LinkedHashMap<>();
@@ -79,19 +76,13 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
         PlayerRef seller = ref(sender);
         Map<String, Integer> byId = new LinkedHashMap<>();
         taken.forEach((material, count) -> byId.put(material.name().toLowerCase(Locale.ROOT), count));
-        offTick(() -> {
-            SellAllOutcome outcome = services.sellAll().sellAll(seller, byId);
-            services.scheduler()
-                    .onEntity(
-                            seller,
-                            () -> taken.forEach((material, count) -> {
-                                int sold = outcome.sold()
-                                        .getOrDefault(material.name().toLowerCase(Locale.ROOT), 0);
-                                if (count > sold) {
-                                    SoldItems.giveBack(seller, material, count - sold);
-                                }
-                            }));
-        });
+        services.returnUnsoldItems()
+                .sell(
+                        seller,
+                        byId,
+                        (items, paid) -> services.sellAll()
+                                .sellAll(seller, items, paid::paid)
+                                .sold());
     }
 
     /** The plain stacks of the player's own storage, counted by material: no armour, no off hand, no renamed item. */

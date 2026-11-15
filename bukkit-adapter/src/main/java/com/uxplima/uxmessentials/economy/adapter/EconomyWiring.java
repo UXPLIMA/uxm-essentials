@@ -20,8 +20,10 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistory
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.ItemReturnListener;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
+import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitSellerInventory;
 import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistrar;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoggingEconomyAudit;
@@ -52,6 +54,7 @@ import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayTaxation;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
 import com.uxplima.uxmessentials.economy.application.PublishingEconomyProvider;
+import com.uxplima.uxmessentials.economy.application.ReturnUnsoldItems;
 import com.uxplima.uxmessentials.economy.application.RoutingEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
@@ -222,11 +225,15 @@ public final class EconomyWiring {
         // In front of whichever provider is in play, so every change of money raises its event: the ledger moves
         // money in one statement and never passes through the aggregate that would raise one.
         EconomyProvider nativeProvider = new PublishingEconomyProvider(
-                new RoutingEconomyProvider(backends, currencies, clock, kernel.log()), kernel.events(), clock);
+                new RoutingEconomyProvider(backends, currencies, clock, kernel.log()),
+                kernel.events(),
+                clock,
+                kernel.log());
         Optional<EconomyProvider> foreign = ForeignEconomyProviders.discover(plugin, currencies, kernel.log());
         if (foreign.isPresent()) {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
-            return new ResolvedEconomy(new PublishingEconomyProvider(foreign.get(), kernel.events(), clock), backends);
+            return new ResolvedEconomy(
+                    new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()), backends);
         }
         logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
@@ -367,6 +374,9 @@ public final class EconomyWiring {
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
                 resolved, pendingRepo, services.notifier(), kernel.scheduler()));
+        // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
+        // operator turned selling off.
+        listenersList.add(new ItemReturnListener(services.returnUnsoldItems(), kernel.scheduler()));
 
         if (settings.commandCostsEnabled()) {
             listenersList.add(new CommandCostListener(
@@ -452,6 +462,7 @@ public final class EconomyWiring {
                 bankInterestTask,
                 services.walletView(),
                 services.ecoAdmin(),
+                services.returnUnsoldItems(),
                 settings.allowNonAtomicRecurring());
     }
 
@@ -700,8 +711,14 @@ public final class EconomyWiring {
                 new PayToggle(preferences, notifier),
                 new BalTop(baltopProvider, notifier, settings.baltopPageSize()),
                 new LookupWorth(worth, notifier, defaultCurrency, currencies.all()),
-                new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
-                new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
+                new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all(), kernel.log()),
+                new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all(), kernel.log()),
+                new ReturnUnsoldItems(
+                        kernel.scheduler(),
+                        new BukkitSellerInventory(kernel.log()),
+                        WalletRepositories.itemReturnStore(persistence, clock),
+                        notifier,
+                        kernel.log()),
                 new SetWorth(worthOverrides, notifier, audit, defaultCurrency, currencies.all()),
                 // An admin change is neither earned nor spent, so the money boards leave it off.
                 new EcoAdmin(
@@ -756,6 +773,7 @@ public final class EconomyWiring {
      * @param amountFormat the operator-selected amount format the {@code balance_formatted} placeholder uses
      * @param walletView the wallet dashboard the {@code /wallet} command and the management hub both open
      * @param admin the eco-admin use case, which is also what a published API write runs
+     * @param returns the sale give-backs, whose items still in flight are kept on stop
      * @param allowNonAtomicRecurring whether a charge on a timer may run on a backend that cannot guard its take,
      *     which the modules that bill on a timer ask before they start
      */
@@ -782,6 +800,7 @@ public final class EconomyWiring {
             com.uxplima.uxmessentials.economy.adapter.outbound.BankInterestTask bankInterestTask,
             WalletPanelMenu walletView,
             EcoAdmin admin,
+            ReturnUnsoldItems returns,
             boolean allowNonAtomicRecurring) {
 
         public Wired {
@@ -804,6 +823,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(bankInterestTask, "bankInterestTask");
             Objects.requireNonNull(admin, "admin");
             Objects.requireNonNull(walletView, "walletView");
+            Objects.requireNonNull(returns, "returns");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */
@@ -822,6 +842,9 @@ public final class EconomyWiring {
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */
         public void stop() {
+            // First, while storage is still open: once the plugin is disabling the scheduler runs nothing, so items
+            // a sale took and has not handed back yet are kept now or not at all.
+            returns.stop();
             bankInterestTask.stop();
             maintenanceTask.stop();
             if (loanRepaymentTask != null) {

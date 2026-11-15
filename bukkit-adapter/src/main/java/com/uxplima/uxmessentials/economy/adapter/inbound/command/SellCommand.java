@@ -28,8 +28,8 @@ import org.jspecify.annotations.NullMarked;
  * whole held stack is sold; with an amount that many are sold (clamped to what is held). The worth lookup and
  * the credit are the {@link com.uxplima.uxmessentials.economy.application.SellItem} use case's job and run off
  * the tick thread so a foreign provider never wedges the command (the same off-tick shape {@link PayCommand}
- * uses); only when the credit actually applied does the handler hop back to the seller's region thread to
- * remove the items, so the inventory and the balance never diverge.
+ * uses). The items are taken first, and {@link com.uxplima.uxmessentials.economy.application.ReturnUnsoldItems}
+ * gives back whatever the sale does not pay for, so the inventory and the balance never diverge.
  */
 @NullMarked
 public final class SellCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -67,9 +67,8 @@ public final class SellCommand extends EconomyCommandSupport implements CommandR
      * Sell from the held stack: take the items here, on the seller's own thread, then ask for the sale off the tick,
      * and give back what it does not pay for.
      *
-     * <p>It used to pay first and remove afterwards with a plain {@code removeItem}, which finds only a plain stack
-     * and says so in a return value nobody read. A player holding renamed diamonds was paid for them and kept them.
-     * So only a plain stack is sold, it is taken before anything is paid, and a refused sale puts it back.
+     * <p>Only a plain stack is sold, because {@code removeItem} finds nothing else and a renamed stack would be paid
+     * for and kept. It is taken before anything is paid, and a refused or failed sale puts it back.
      */
     void sell(Player sender, Optional<Integer> requested) {
         ItemStack held = sender.getInventory().getItemInMainHand();
@@ -90,10 +89,14 @@ public final class SellCommand extends EconomyCommandSupport implements CommandR
             services.notifier().send(seller, EconomyMessageKey.SELL_NO_ITEM_IN_HAND);
             return;
         }
-        offTick(() -> {
-            if (!services.sellItem().sell(seller, id, taken).sold()) {
-                services.scheduler().onEntity(seller, () -> SoldItems.giveBack(seller, material, taken));
-            }
-        });
+        services.returnUnsoldItems()
+                .sell(
+                        seller,
+                        Map.of(id, taken),
+                        (items, paid) -> services.sellItem()
+                                        .sell(seller, id, taken, () -> paid.paid(items))
+                                        .sold()
+                                ? items
+                                : Map.of());
     }
 }

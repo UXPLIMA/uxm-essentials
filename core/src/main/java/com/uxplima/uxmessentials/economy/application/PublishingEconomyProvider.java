@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.domain.event.WalletCredited;
 import com.uxplima.uxmessentials.economy.domain.event.WalletDebited;
 import com.uxplima.uxmessentials.economy.domain.event.WalletRejected;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -34,6 +35,10 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The balance an event carries is read back after the change, because the ledger's guarded statement does not
  * return one. A transfer carries the two transactions the provider already minted, so it reads nothing.
+ *
+ * <p>The read-back and the publish come after the money has moved, so a failure in either is logged and never
+ * thrown: a caller that saw an exception would take the change for one that did not happen, and a sale would hand
+ * back items it had already been paid for.
  */
 @NullMarked
 public final class PublishingEconomyProvider implements EconomyProvider {
@@ -41,11 +46,13 @@ public final class PublishingEconomyProvider implements EconomyProvider {
     private final EconomyProvider inner;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final Logger log;
 
-    public PublishingEconomyProvider(EconomyProvider inner, DomainEventPublisher events, Clock clock) {
+    public PublishingEconomyProvider(EconomyProvider inner, DomainEventPublisher events, Clock clock, Logger log) {
         this.inner = Objects.requireNonNull(inner, "inner");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** The provider this one publishes for, which decides where the money actually lives. */
@@ -71,38 +78,42 @@ public final class PublishingEconomyProvider implements EconomyProvider {
     @Override
     public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
         Result<Unit, TransferError> result = inner.credit(owner, amount);
-        Instant now = clock.instant();
-        Money resulting = inner.balance(owner, amount.currency());
-        if (result.isOk()) {
-            events.publish(new WalletCredited(
-                    owner,
-                    amount,
-                    resulting,
-                    Transaction.credit(owner, amount, resulting, now),
-                    now,
-                    UncountedMoney.counted()));
-        } else if (result.errorOrThrow() == TransferError.BALANCE_MAX_EXCEEDED) {
-            events.publish(new WalletRejected(owner, amount, resulting, EconomyError.BALANCE_MAX_EXCEEDED, now));
-        }
+        afterChange("credit", owner, () -> {
+            Instant now = clock.instant();
+            Money resulting = inner.balance(owner, amount.currency());
+            if (result.isOk()) {
+                events.publish(new WalletCredited(
+                        owner,
+                        amount,
+                        resulting,
+                        Transaction.credit(owner, amount, resulting, now),
+                        now,
+                        UncountedMoney.counted()));
+            } else if (result.errorOrThrow() == TransferError.BALANCE_MAX_EXCEEDED) {
+                events.publish(new WalletRejected(owner, amount, resulting, EconomyError.BALANCE_MAX_EXCEEDED, now));
+            }
+        });
         return result;
     }
 
     @Override
     public Result<Unit, TransferError> debit(PlayerRef owner, Money amount) {
         Result<Unit, TransferError> result = inner.debit(owner, amount);
-        Instant now = clock.instant();
-        Money resulting = inner.balance(owner, amount.currency());
-        if (result.isOk()) {
-            events.publish(new WalletDebited(
-                    owner,
-                    amount,
-                    resulting,
-                    Transaction.debit(owner, amount, resulting, now),
-                    now,
-                    UncountedMoney.counted()));
-        } else if (result.errorOrThrow() == TransferError.INSUFFICIENT_FUNDS) {
-            events.publish(new WalletRejected(owner, amount, resulting, EconomyError.INSUFFICIENT_FUNDS, now));
-        }
+        afterChange("debit", owner, () -> {
+            Instant now = clock.instant();
+            Money resulting = inner.balance(owner, amount.currency());
+            if (result.isOk()) {
+                events.publish(new WalletDebited(
+                        owner,
+                        amount,
+                        resulting,
+                        Transaction.debit(owner, amount, resulting, now),
+                        now,
+                        UncountedMoney.counted()));
+            } else if (result.errorOrThrow() == TransferError.INSUFFICIENT_FUNDS) {
+                events.publish(new WalletRejected(owner, amount, resulting, EconomyError.INSUFFICIENT_FUNDS, now));
+            }
+        });
         return result;
     }
 
@@ -123,6 +134,15 @@ public final class PublishingEconomyProvider implements EconomyProvider {
             }
         }
         return result;
+    }
+
+    /** Run the read-back and publish that follow a change, logging a failure instead of letting it escape. */
+    private void afterChange(String change, PlayerRef owner, Runnable publish) {
+        try {
+            publish.run();
+        } catch (RuntimeException failure) {
+            log.error("event=economy_publish_failed change=" + change + " owner=" + owner.uuid(), failure);
+        }
     }
 
     @Override
