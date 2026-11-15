@@ -70,7 +70,7 @@ public final class BusWiring {
         registry.register(peers.listener());
         ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval(), bootNonce, log);
         return new Wired(
-                new Bus(core, registry),
+                new Bus(core, registry, bootNonce),
                 new Lifecycle(core, heartbeat, log, network),
                 peers,
                 duplicates,

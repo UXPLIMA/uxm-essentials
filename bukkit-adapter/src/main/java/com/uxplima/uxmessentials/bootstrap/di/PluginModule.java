@@ -1533,7 +1533,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("vanish"))) {
-            wireVanish(plugin, ctx, resources, links, bus);
+            wireVanish(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -2993,14 +2993,21 @@ public final class PluginModule {
     }
 
     private static void wireVanish(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links, Bus bus) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links,
+            Bus bus) {
         // vanish is the single vanish authority: an in-memory ConcurrentHashMap of who is vanished, the /vanish
         // command, the Bukkit hide-show view (which drops both the player entity and their tab entry for ineligible
-        // viewers), and the join/quit listener. It persists nothing. It wires before the contexts it informs
-        // (messaging, presence, nametags, staff), so its store and toggle are captured here and threaded into their
+        // viewers), and the login/join/quit listeners. Each player's vanish is written to the player_vanish table so it
+        // survives a server switch (and a restart for a persist holder), and the network presence ages out the
+        // network entries of a backend that stopped. It wires before the contexts it informs (messaging, presence,
+        // nametags, staff), so its store and toggle are captured here and threaded into their
         // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
-        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, bus);
+        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, persistence, bus, links.presence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);

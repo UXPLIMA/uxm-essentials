@@ -1,24 +1,32 @@
 package com.uxplima.uxmessentials.vanish.adapter.outbound;
 
+import java.util.Map;
 import java.util.Objects;
-import java.util.function.Consumer;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import com.uxplima.uxmessentials.shared.network.ServerPing;
 import com.uxplima.uxmessentials.shared.network.VanishStateChanged;
 import com.uxplima.uxmessentials.vanish.application.VanishSync;
+import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
+import com.uxplima.uxmessentials.vanish.application.port.VanishBus.PeerRun;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Bridges the vanish context's {@link VanishBus} port to the shared cross-server bus: a local {@link VanishSync} is
- * published as a {@link VanishStateChanged} frame through the {@link BusPublisher}, and every inbound frame the bus
- * dispatches to {@link #onFrame} is translated back to a {@link VanishSync} and handed to the subscribed handler. The
- * wiring registers {@link #onFrame} as a {@code RemoteSyncListener}, so this runs on the bus's off-tick dispatch
- * thread. The handler it feeds ({@link VanishNetworkApplier}) does its own region hop for any Bukkit touch, matching
- * the {@code RemoteSyncListener} contract. This is {@code BusTradeBus} copied for the vanish frame.
+ * Bridges the vanish context's {@link VanishBus} port to the shared cross-server bus. A local change or departure is
+ * published as a {@link VanishStateChanged} frame through the {@link BusPublisher}; every inbound frame the bus
+ * dispatches to {@link #onFrame} is translated back and handed to the subscribed listener on the bus's off-tick
+ * dispatch thread, which does its own region hop for any Bukkit touch.
+ *
+ * <p>The heartbeats are read too and passed on with what they say about the sender's run, from its boot nonce: the
+ * first heard, the same run, or a new run after a restart. Every frame this backend sends carries its own boot nonce,
+ * the one its heartbeats carry, so a peer can tell which run sent it. Only the nonce is compared, never the sender's
+ * clock.
  *
  * <p>The publisher stamps this backend's {@code server-id} as the frame origin, so the shared loop sentinel drops the
  * echo on the origin backend. With the network bus disabled the injected publisher is the no-op one, so publishing is
@@ -28,11 +36,14 @@ import org.jspecify.annotations.Nullable;
 public final class BusVanishBus implements VanishBus {
 
     private final BusPublisher publisher;
+    private final long bootNonce;
     private final boolean enabled;
-    private @Nullable Consumer<VanishSync> handler;
+    private final Map<String, Long> bootByPeer = new ConcurrentHashMap<>();
+    private volatile @Nullable Listener listener;
 
-    public BusVanishBus(BusPublisher publisher, boolean enabled) {
+    public BusVanishBus(BusPublisher publisher, long bootNonce, boolean enabled) {
         this.publisher = Objects.requireNonNull(publisher, "publisher");
+        this.bootNonce = bootNonce;
         this.enabled = enabled;
     }
 
@@ -44,12 +55,22 @@ public final class BusVanishBus implements VanishBus {
                 change.player(),
                 change.playerName(),
                 change.vanished(),
-                change.level().level()));
+                change.level().level(),
+                false,
+                bootNonce));
     }
 
     @Override
-    public void subscribe(Consumer<VanishSync> handler) {
-        this.handler = Objects.requireNonNull(handler, "handler");
+    public void publishDeparture(PlayerRef who, VanishLevel level) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(level, "level");
+        publisher.publish(new VanishStateChanged(
+                publisher.serverId(), who.uuid(), who.name(), true, level.level(), true, bootNonce));
+    }
+
+    @Override
+    public void subscribe(Listener listener) {
+        this.listener = Objects.requireNonNull(listener, "listener");
     }
 
     @Override
@@ -57,12 +78,41 @@ public final class BusVanishBus implements VanishBus {
         return enabled;
     }
 
-    /** Register this with the bus registry: translate a vanish frame and hand it to the subscribed applier. */
+    /** The run a nonce names; the bus's no-nonce marker is the vanish context's unknown run. */
+    private static long runOf(long nonce) {
+        return nonce == ServerPing.NO_NONCE ? NetworkVanishStore.UNKNOWN_RUN : nonce;
+    }
+
+    /** Register this with the bus registry: translate a vanish frame or a heartbeat for the subscribed listener. */
     public void onFrame(NetworkMessage message) {
-        if (!(message instanceof VanishStateChanged frame) || handler == null) {
+        Listener target = listener;
+        if (target == null) {
             return;
         }
-        handler.accept(
-                new VanishSync(frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
+        switch (message) {
+            case VanishStateChanged frame
+            when frame.departed() -> target.departed(frame.originServer(), frame.player());
+            case VanishStateChanged frame ->
+                target.changed(
+                        frame.originServer(),
+                        runOf(frame.run()),
+                        new VanishSync(
+                                frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
+            case ServerPing ping -> {
+                Long previous = bootByPeer.put(ping.originServer(), ping.bootNonce());
+                PeerRun run;
+                if (previous == null) {
+                    run = PeerRun.FIRST_HEARD;
+                } else if (previous == ping.bootNonce()) {
+                    run = PeerRun.SAME_RUN;
+                } else {
+                    run = PeerRun.NEW_RUN;
+                }
+                target.pinged(ping.originServer(), runOf(ping.bootNonce()), run);
+            }
+            default -> {
+                // Every other frame belongs to another context.
+            }
+        }
     }
 }

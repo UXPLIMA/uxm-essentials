@@ -6,20 +6,18 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
+import com.uxplima.uxmessentials.vanish.domain.StoredVanish;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
- * Seeds a joining player's local vanish state from the network-wide view on arrival, so a player vanished on another
- * backend is <em>already marked vanished</em> in this server's {@link VanishStore} before the join listener hides them.
- * This is the destination half of a cross-server hop: server A published the player's vanish over the bus, every
- * backend's {@link NetworkVanishStore} recorded it, and when the player lands on server B this reconciler reads that
- * network view and marks them locally, after which the normal join flow ({@code SetVanishLevel#reapply}) re-derives
- * their level from B's permissions and hides them.
+ * Seeds a joining player's local vanish state before the join flow hides them, from the two places that can know they
+ * are vanished: the kept {@link StoredVanish} that carries over to this join (the caller decides that, from the
+ * persist permission and the hop window), and the {@link NetworkVanishStore}, where a peer that is hiding them right
+ * now has reported them. The live network report wins on the level, since it is the fresher of the two; the kept
+ * state covers a backend that has not heard of them, such as one that just started.
  *
- * <p>Pure and side-effect-scoped: it only reads the network view and, when it reports the joiner vanished, writes the
- * one local store entry. A joiner the network does not report vanished is left untouched, and with {@code cross-server}
- * off the network view is {@link NetworkVanishStore#empty() empty} so this is a no-op. The single-server join path is
- * unchanged.
+ * <p>Either source saying vanished is enough. The two only disagree for the moment a write is in flight, and hiding a
+ * player for that moment costs less than showing one who meant to stay hidden.
  */
 public final class JoinVanishReconciler {
 
@@ -32,13 +30,15 @@ public final class JoinVanishReconciler {
     }
 
     /**
-     * Seed {@code joiner}'s local vanish state from the network view; returns the level they were seeded at, or empty
-     * when the network does not report them vanished (nothing to seed).
+     * Seed {@code joiner}'s local vanish state; returns the level they were seeded at, or empty when neither source
+     * reports them vanished (nothing to seed).
      */
-    public Optional<VanishLevel> reconcile(UUID joiner) {
+    public Optional<VanishLevel> reconcile(UUID joiner, Optional<StoredVanish> stored) {
         Objects.requireNonNull(joiner, "joiner");
-        Optional<VanishLevel> networkLevel = network.levelOf(joiner);
-        networkLevel.ifPresent(level -> store.vanish(joiner, level));
-        return networkLevel;
+        Objects.requireNonNull(stored, "stored");
+        Optional<VanishLevel> level = network.levelOf(joiner)
+                .or(() -> stored.filter(StoredVanish::vanished).map(StoredVanish::levelOrDefault));
+        level.ifPresent(found -> store.vanish(joiner, found));
+        return level;
     }
 }

@@ -88,6 +88,16 @@ public final class NetworkRoster implements NetworkPresence {
     }
 
     @Override
+    public boolean isLive(String server) {
+        Objects.requireNonNull(server, "server");
+        if (server.equals(localServer)) {
+            return true;
+        }
+        Remote remote = remotes.get(server);
+        return remote != null && !expired(remote, clock.millis());
+    }
+
+    @Override
     public Optional<OnlinePlayer> find(UUID player) {
         Objects.requireNonNull(player, "player");
         PlayerRef here = local.get(player);
