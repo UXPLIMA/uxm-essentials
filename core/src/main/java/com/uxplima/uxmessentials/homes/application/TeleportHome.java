@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports.Settlement;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -72,17 +73,23 @@ public final class TeleportHome {
         if (charged.isErr()) {
             return Result.err(charged.errorOrThrow());
         }
-        notifier.send(who, HomesMessageKey.HOME_TELEPORTING, slotPlaceholder(slot));
-        var outcome = teleporter.teleportTo(who, home.get());
-        charged.orElseThrow().ifPresent(cost -> refundUnlessLanded(outcome, who, home.get(), cost));
+        // Opened before anything else can fail, so a fault between the charge and the launch gives the money back.
+        Optional<Settlement> settlement = charged.orElseThrow().map(cost -> settlementFor(who, home.get(), cost));
+        try {
+            notifier.send(who, HomesMessageKey.HOME_TELEPORTING, slotPlaceholder(slot));
+            CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(who, home.get());
+            settlement.ifPresent(open -> open.follow(outcome));
+        } catch (RuntimeException failure) {
+            settlement.ifPresent(Settlement::refuse);
+            throw failure;
+        }
         return Result.ok();
     }
 
     /** Give {@code who} back what the teleport cost them if it does not land, and tell them once. */
-    private void refundUnlessLanded(CompletionStage<TeleportOutcome> outcome, PlayerRef who, Home home, HomeCost cost) {
+    private Settlement settlementFor(PlayerRef who, Home home, HomeCost cost) {
         String label = HomeHops.labelOf(home);
-        paid.settle(
-                outcome,
+        return paid.open(
                 PaidTeleports.subject("home", label, who, cost.amount(), cost.currencyId()),
                 () -> charge.refund(who, cost),
                 () -> notifier.send(who, HomesMessageKey.HOME_CROSS_SERVER_REFUNDED, Map.of("home", label)));

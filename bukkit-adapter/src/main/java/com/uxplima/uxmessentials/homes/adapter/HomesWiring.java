@@ -114,6 +114,7 @@ public final class HomesWiring {
             ModuleContext ctx,
             Persistence persistence,
             TeleportEngine teleportEngine,
+            PaidTeleports paid,
             Optional<HomeEconomy> homeEconomy,
             Bus bus,
             CrossServerHops hops,
@@ -129,6 +130,7 @@ public final class HomesWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(paid, "paid");
         Objects.requireNonNull(homeEconomy, "homeEconomy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
@@ -193,6 +195,7 @@ public final class HomesWiring {
                 notifier,
                 quota,
                 teleporter,
+                paid,
                 homeEconomy,
                 homeHops,
                 safeGuard,
@@ -223,6 +226,7 @@ public final class HomesWiring {
             Notifier notifier,
             HomeQuota quota,
             HomeTeleporter teleporter,
+            PaidTeleports paid,
             Optional<HomeEconomy> homeEconomy,
             HomeHops homeHops,
             SafeLocationGuard safeGuard,
@@ -286,13 +290,7 @@ public final class HomesWiring {
                         recordedServer),
                 renameHome,
                 deleteHome);
-        TeleportHome teleportHome = new TeleportHome(
-                repository,
-                teleporter,
-                notifier,
-                charge,
-                homeHops,
-                new PaidTeleports(kernel.scheduler(), kernel.log()));
+        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge, homeHops, paid);
         ListHomes listHomes = new ListHomes(repository);
         ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);

@@ -207,15 +207,20 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             arrival.failed(); // Paper refused the hop (e.g. unloaded target), so the player stayed put
             return;
         }
-        scheduler.onEntity(who, () -> {
-            events.publish(new PlayerTeleported(who, kind, from, to));
-            if (showArrival) {
-                arrivalHud.arrived(who, kind);
-                arrivalEffects.arrived(who, kind);
-            }
-            // The cooldown stamp and arrival grace hang off a real landing only, never a refusal.
-            arrival.landed();
-        });
+        // The cooldown stamp and arrival grace hang off a real landing only, never a refusal. The player has moved
+        // by now, so the landing is reported even when they leave in this tick or an arrival effect throws.
+        LandedHop.report(
+                scheduler,
+                log,
+                who,
+                () -> {
+                    events.publish(new PlayerTeleported(who, kind, from, to));
+                    if (showArrival) {
+                        arrivalHud.arrived(who, kind);
+                        arrivalEffects.arrived(who, kind);
+                    }
+                },
+                arrival::landed);
     }
 
     private Position applyCentering(Position target) {

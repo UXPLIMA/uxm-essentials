@@ -197,17 +197,25 @@ public final class TeleportEngine {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(outcome, "outcome");
         OneOutcome reported = new OneOutcome(outcome, log);
-        Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
-        if (admitted.isErr()) {
+        try {
+            Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
+            if (admitted.isErr()) {
+                reported.report(TeleportOutcome.REFUSED);
+                return admitted;
+            }
+            if (beginGatedWarmup(mover, destination, kind, reported).isCancelled()) {
+                // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
+                // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
+                return Result.err(TeleportError.VETOED);
+            }
+            return Result.ok();
+        } catch (RuntimeException failure) {
+            // A fault in the gates or while the warmup starts (reading where the player stands, replacing an earlier
+            // warmup) leaves no teleport for the caller to wait on, so it hears a refusal and can give a charge back.
+            // A warmup that did start before the fault and lands later is then a free teleport, never a second payout.
             reported.report(TeleportOutcome.REFUSED);
-            return admitted;
+            throw failure;
         }
-        if (beginGatedWarmup(mover, destination, kind, reported).isCancelled()) {
-            // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
-            // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
-            return Result.err(TeleportError.VETOED);
-        }
-        return Result.ok();
     }
 
     /**
@@ -283,7 +291,7 @@ public final class TeleportEngine {
                         () -> {
                             // Reported before the stamp, so a stamp that throws cannot turn a landing into a miss.
                             reported.report(TeleportOutcome.LANDED);
-                            onLanded(mover, destination, kind, TeleportEngine::noPostArrival);
+                            stampLanding(mover, destination, kind);
                         },
                         () -> reported.report(TeleportOutcome.MISSED)),
                 reported);
@@ -634,6 +642,19 @@ public final class TeleportEngine {
     private void hop(
             PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival, Runnable onFailed) {
         executor.teleport(mover, destination, kind, () -> onLanded(mover, destination, kind, postArrival), onFailed);
+    }
+
+    /**
+     * Stamp a gated landing's cooldown. The executor reports a landing whose player left right after teleportAsync
+     * moved them from the thread that retired the hop, where the stamp has nobody to write to; a stamp that fails
+     * there, or anywhere, is logged, since the landing it follows has already been reported.
+     */
+    private void stampLanding(PlayerRef mover, Destination destination, TeleportKind kind) {
+        try {
+            onLanded(mover, destination, kind, TeleportEngine::noPostArrival);
+        } catch (RuntimeException stampFailure) {
+            log.error("cooldown stamp for the landing of " + mover.name() + " failed", stampFailure);
+        }
     }
 
     private void onLanded(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {

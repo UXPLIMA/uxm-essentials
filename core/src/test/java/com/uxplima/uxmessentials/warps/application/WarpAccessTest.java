@@ -66,7 +66,8 @@ class WarpAccessTest {
                 new SteppedScheduler(clock),
                 new WarpFakes.Online(),
                 WarpHops.local(LOBBY),
-                new PaidTeleports(new SteppedScheduler(clock), new RecordingLogger()));
+                new PaidTeleports(new SteppedScheduler(clock), new RecordingLogger()),
+                new RecordingLogger());
     }
 
     private UseWarp useWarp() {

@@ -23,8 +23,10 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports.Settlement;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -100,6 +102,7 @@ public final class UsePlayerWarp {
     private final PlayerWarpHops hops;
     private final Clock clock;
     private final PaidTeleports paid;
+    private final Logger log;
 
     public UsePlayerWarp(
             PlayerWarpRepository repository,
@@ -116,7 +119,8 @@ public final class UsePlayerWarp {
             String localServerId,
             PlayerWarpHops hops,
             Clock clock,
-            PaidTeleports paid) {
+            PaidTeleports paid,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -132,6 +136,7 @@ public final class UsePlayerWarp {
         this.hops = Objects.requireNonNull(hops, "hops");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.paid = Objects.requireNonNull(paid, "paid");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Teleport {@code actor} to the warp {@code name} with no password supplied. */
@@ -185,17 +190,38 @@ public final class UsePlayerWarp {
             hops.send(actor, warp, admission.charged());
             return Result.ok();
         }
-        notifier.send(
-                actor,
-                PlayerwarpsMessageKey.PWARP_TELEPORTING,
-                Map.of("warp", warp.name().value()));
-        // Bump the visit counter in storage rather than read-modify-write here. The atomic increment avoids a
-        // last-writer-wins race and needless cross-server cache invalidation. It runs only after the whole gate
-        // (including the charge) has passed, so a refused teleport leaves no phantom visit.
-        repository.recordVisit(warp.id().orElseThrow());
-        var outcome = teleporter.teleportTo(actor, warp);
-        admission.charged().ifPresent(cost -> settleOnOutcome(outcome, actor, warp, cost));
+        // Opened before anything else can fail, so a fault between the charge and the launch gives the money back.
+        Optional<Settlement> settlement = admission.charged().map(cost -> settlementFor(actor, warp, cost));
+        try {
+            notifier.send(
+                    actor,
+                    PlayerwarpsMessageKey.PWARP_TELEPORTING,
+                    Map.of("warp", warp.name().value()));
+            countVisit(warp);
+            CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(actor, warp);
+            settlement.ifPresent(open -> open.follow(outcome));
+        } catch (RuntimeException failure) {
+            settlement.ifPresent(Settlement::refuse);
+            throw failure;
+        }
         return Result.ok();
+    }
+
+    /**
+     * Bump the visit counter in storage rather than read-modify-write here. The atomic increment avoids a
+     * last-writer-wins race and needless cross-server cache invalidation. It runs only after the whole gate (including
+     * the charge) has passed, so a refused teleport leaves no phantom visit. The count is a statistic the teleport
+     * does not depend on, so a failed write costs the count, not the use.
+     */
+    private void countVisit(PlayerWarp warp) {
+        try {
+            repository.recordVisit(warp.id().orElseThrow());
+        } catch (RuntimeException failure) {
+            log.warn(
+                    "event=pwarp_visit_not_counted warp={} reason={}",
+                    warp.name().value(),
+                    failure.toString());
+        }
     }
 
     /**
@@ -203,11 +229,9 @@ public final class UsePlayerWarp {
      * teleport did not land or the share could not be banked. Only a charge taken here reaches this, so a provider is
      * wired.
      */
-    private void settleOnOutcome(
-            CompletionStage<TeleportOutcome> outcome, PlayerRef actor, PlayerWarp warp, WarpCost cost) {
+    private Settlement settlementFor(PlayerRef actor, PlayerWarp warp, WarpCost cost) {
         PlayerWarpEconomy provider = economy.orElseThrow();
-        paid.settle(
-                outcome,
+        return paid.open(
                 PaidTeleports.subject("pwarp", warp.name().value(), actor, cost.amount(), cost.currencyId()),
                 () -> provider.accrue(warp.id().orElseThrow(), cost.amount(), cost.currencyId())
                         .isOk(),

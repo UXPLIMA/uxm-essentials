@@ -138,7 +138,8 @@ class CrossServerWarpTest {
                 lanes,
                 online,
                 hops,
-                new PaidTeleports(lanes, log));
+                new PaidTeleports(lanes, log),
+                log);
     }
 
     private Result<Unit, WarpError> useMarket() {

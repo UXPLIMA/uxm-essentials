@@ -3,14 +3,19 @@ package com.uxplima.uxmessentials.teleport.application;
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
@@ -40,14 +45,21 @@ class LaunchOutcomeTest {
     private boolean jailed;
     private boolean tagged;
     private boolean vetoed;
+    private boolean gateFails;
+    private final StampedCooldowns cooldowns = new StampedCooldowns();
     private final TeleportEngine engine = new TeleportEngine(
-            new ClockCooldowns(CLOCK),
+            cooldowns,
             warmups,
             hops,
             notifier.notifier(),
             new RecordingEvents(),
             new TeleportSettings(new WithCooldown()),
-            who -> jailed,
+            who -> {
+                if (gateFails) {
+                    throw new IllegalStateException("the jail store is down");
+                }
+                return jailed;
+            },
             who -> tagged,
             TeleportFee.FREE,
             ArrivalGrace.NONE,
@@ -142,6 +154,29 @@ class LaunchOutcomeTest {
     }
 
     @Test
+    void aGateThatThrowsBeforeTheWarmupReportsARefusalAndStillFails() {
+        gateFails = true;
+        List<TeleportOutcome> outcomes = new ArrayList<>();
+
+        assertThatThrownBy(() -> engine.launch(ALEX, Destination.at(HOME), TeleportKind.HOME, outcomes::add))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(outcomes).containsExactly(TeleportOutcome.REFUSED);
+        assertThat(warmups.waiting(ALEX)).isFalse();
+    }
+
+    @Test
+    void aCooldownStampThatThrowsStillReportsTheLanding() {
+        cooldowns.stampFails = true;
+        List<TeleportOutcome> outcomes = launch(HOME);
+
+        warmups.finish(ALEX);
+
+        assertThat(outcomes).containsExactly(TeleportOutcome.LANDED);
+        assertThat(hops.landed).containsExactly(HOME);
+    }
+
+    @Test
     void anExecutorThatReportsBothALandingAndAMissIsHeardOnceAsALanding() {
         hops.reportsBoth = true;
         List<TeleportOutcome> outcomes = launch(HOME);
@@ -196,6 +231,36 @@ class LaunchOutcomeTest {
             if (reportsBoth) {
                 onFailed.run();
             }
+        }
+    }
+
+    /** The clock-driven cooldowns, whose stamp can be told to fail. */
+    private static final class StampedCooldowns implements Cooldowns {
+
+        private final ClockCooldowns real = new ClockCooldowns(CLOCK);
+        boolean stampFails;
+
+        @Override
+        public Result<Unit, Duration> check(PlayerRef who, CooldownKind kind) {
+            return real.check(who, kind);
+        }
+
+        @Override
+        public void stamp(PlayerRef who, CooldownKind kind) {
+            if (stampFails) {
+                throw new IllegalStateException("the stamp write failed");
+            }
+            real.stamp(who, kind);
+        }
+
+        @Override
+        public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
+            return real.checkLabel(who, label);
+        }
+
+        @Override
+        public void stampLabel(PlayerRef who, String label) {
+            real.stampLabel(who, label);
         }
     }
 

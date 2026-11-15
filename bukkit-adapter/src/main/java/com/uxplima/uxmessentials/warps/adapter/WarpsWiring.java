@@ -81,6 +81,7 @@ public final class WarpsWiring {
             ModuleContext ctx,
             Persistence persistence,
             TeleportEngine teleportEngine,
+            PaidTeleports paid,
             Optional<WarpEconomy> economy,
             Bus bus,
             CrossServerHops hops,
@@ -93,6 +94,7 @@ public final class WarpsWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(paid, "paid");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
@@ -163,7 +165,8 @@ public final class WarpsWiring {
                 kernel.scheduler(),
                 kernel.playerLookup(),
                 warpHops,
-                new PaidTeleports(kernel.scheduler(), kernel.log()));
+                paid,
+                kernel.log());
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
         // sub-screen back buttons reopen it. Its category/welcome/sound/particle sub-screens are all engine now and

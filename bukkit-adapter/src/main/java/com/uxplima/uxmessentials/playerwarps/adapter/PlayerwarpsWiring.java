@@ -132,6 +132,7 @@ public final class PlayerwarpsWiring {
             ModuleContext ctx,
             Persistence persistence,
             TeleportEngine teleportEngine,
+            PaidTeleports paid,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             CrossServerHops hops,
             Optional<String> recordedServer,
@@ -157,6 +158,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(paid, "paid");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
         Objects.requireNonNull(recordedServer, "recordedServer");
@@ -234,7 +236,8 @@ public final class PlayerwarpsWiring {
                 localServerId,
                 new PlayerWarpHops(departures, hops.charges(), hopResolver),
                 Clock.systemUTC(),
-                new PaidTeleports(kernel.scheduler(), kernel.log()));
+                paid,
+                kernel.log());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
         }

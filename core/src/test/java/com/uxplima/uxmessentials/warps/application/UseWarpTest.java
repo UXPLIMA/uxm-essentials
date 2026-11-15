@@ -5,6 +5,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.Optional;
@@ -81,7 +82,8 @@ class UseWarpTest {
                 scheduler,
                 new WarpFakes.Online(),
                 WarpHops.local(LOBBY),
-                new PaidTeleports(scheduler, log));
+                new PaidTeleports(scheduler, log),
+                log);
     }
 
     /** The engine with a warmup the test ends itself, by letting it count down or by moving. */
@@ -236,6 +238,32 @@ class UseWarpTest {
                 .satisfies(line ->
                         assertThat(line).contains(ALEX.uuid().toString()).contains("10"));
         assertThat(notifier.keys()).containsExactly("warp.teleporting");
+    }
+
+    @Test
+    void aLaunchThatThrowsAfterTheChargeGivesTheMoneyBackOnceAndStillFails() {
+        moves.throwsOnTeleport = true;
+
+        assertThatThrownBy(() -> useWarp().use(ALEX, SHOP)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("warp.teleporting", "warp.cross-server.refunded");
+    }
+
+    @Test
+    void aVisitorCountTheAsyncLaneRefusesCostsTheCountNotTheUse() {
+        scheduler.rejectAsync(true);
+        moves.holds = true;
+
+        Result<Unit, WarpError> used = useWarp().use(ALEX, SHOP);
+
+        assertThat(used.isOk()).isTrue();
+        assertThat(moves.held).hasSize(1);
+        assertThat(warps.visitors(SHOP)).isZero();
+        assertThat(log.warnings())
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("warp_visit_not_counted"));
     }
 
     @Test

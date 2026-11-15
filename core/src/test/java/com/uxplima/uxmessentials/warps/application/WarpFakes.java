@@ -166,6 +166,9 @@ final class WarpFakes {
         /** Leave each local teleport's outcome to the test instead of landing it. */
         boolean holds;
 
+        /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
+        boolean throwsOnTeleport;
+
         @Nullable TeleportEngine engine;
 
         @Override
@@ -178,6 +181,9 @@ final class WarpFakes {
 
         @Override
         public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, Warp warp) {
+            if (throwsOnTeleport) {
+                throw new IllegalStateException("the launch failed");
+            }
             CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
             if (holds) {
                 held.add(outcome);

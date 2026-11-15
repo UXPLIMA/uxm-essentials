@@ -5,6 +5,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -156,7 +157,8 @@ class CrossServerTeleportTest {
                 new PlayerWarpHops(
                         departures, charges, new PlayerWarpHopResolver(warps, moves, Optional.of(purse), LOBBY)),
                 clock,
-                new PaidTeleports(scheduler, log));
+                new PaidTeleports(scheduler, log),
+                log);
     }
 
     private UsePlayerWarp lobbyGate() {
@@ -631,6 +633,35 @@ class CrossServerTeleportTest {
     }
 
     @Test
+    void aVisitCountThatFailsCostsTheCountNotTheUse() {
+        warps.put(marketOn(LOBBY));
+        warps.visitFails = true;
+        moves.holds = true;
+
+        Result<Unit, PlayerWarpError> used = lobbyGate().useFor(ALEX, MARKET_NAME);
+        moves.finish(TeleportOutcome.LANDED);
+
+        assertThat(used.isOk()).isTrue();
+        assertThat(wallet()).isEqualByComparingTo("74.50");
+        assertThat(vault()).isEqualByComparingTo("25.50");
+        assertThat(log.warnings())
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("pwarp_visit_not_counted"));
+    }
+
+    @Test
+    void aLocalLaunchThatThrowsAfterTheChargeRefundsTheVisitorAndNeverPaysTheOwner() {
+        warps.put(marketOn(LOBBY));
+        moves.throwsOnTeleport = true;
+
+        assertThatThrownBy(() -> lobbyGate().useFor(ALEX, MARKET_NAME)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+    }
+
+    @Test
     void aCrossServerUseThatMissesIsRefundedOnceByTheHopAlone() {
         moves.holds = true;
         moves.refuses = true;
@@ -734,8 +765,15 @@ class CrossServerTeleportTest {
             byId.remove(id);
         }
 
+        /** Make the visit counter's write fail, as a database fault would. */
+        private boolean visitFails;
+
         @Override
-        public void recordVisit(PlayerWarpId id) {}
+        public void recordVisit(PlayerWarpId id) {
+            if (visitFails) {
+                throw new IllegalStateException("the visit write failed");
+            }
+        }
 
         @Override
         public void updateRating(PlayerWarpId id, RatingSummary summary) {}
@@ -761,16 +799,6 @@ class CrossServerTeleportTest {
             }
             wallets.put(payer.uuid(), balance.subtract(price));
             return Result.ok();
-        }
-
-        @Override
-        public Result<Unit, ChargeError> chargeAndAccrue(
-                PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId) {
-            Result<Unit, ChargeError> charged = charge(payer, price, currencyId);
-            if (charged.isOk()) {
-                vaults.merge(warp, price, BigDecimal::add);
-            }
-            return charged;
         }
 
         @Override
@@ -829,6 +857,9 @@ class CrossServerTeleportTest {
         /** Leave each local teleport's outcome to the test instead of landing it. */
         private boolean holds;
 
+        /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
+        private boolean throwsOnTeleport;
+
         @Override
         public boolean admits(PlayerRef who, PlayerWarp warp) {
             TeleportEngine through = engine;
@@ -845,6 +876,9 @@ class CrossServerTeleportTest {
 
         @Override
         public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, PlayerWarp warp) {
+            if (throwsOnTeleport) {
+                throw new IllegalStateException("the launch failed");
+            }
             CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
             if (holds) {
                 held.add(outcome);

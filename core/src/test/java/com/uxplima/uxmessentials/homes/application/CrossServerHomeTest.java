@@ -6,6 +6,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -463,6 +464,18 @@ class CrossServerHomeTest {
     }
 
     @Test
+    void aLocalLaunchThatThrowsAfterTheChargeGivesTheMoneyBackOnceAndStillFails() {
+        homes.save(baseOn(LOBBY));
+        moves.throwsOnTeleport = true;
+
+        assertThatThrownBy(this::goHome).isInstanceOf(IllegalStateException.class);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.teleporting", "home.cross-server.refunded");
+    }
+
+    @Test
     void aLocalTeleportForAPlayerWhoMayTeleportFreeMovesNoMoneyWhenItNeverLands() {
         homes.save(baseOn(LOBBY));
         permissions.grant(ALEX, DestinationPermissions.HOME_BYPASS_COST);
@@ -649,10 +662,16 @@ class CrossServerHomeTest {
         /** Leave each local teleport's outcome to the test instead of landing it. */
         boolean holds;
 
+        /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
+        boolean throwsOnTeleport;
+
         @Nullable TeleportEngine engine;
 
         @Override
         public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, Home home) {
+            if (throwsOnTeleport) {
+                throw new IllegalStateException("the launch failed");
+            }
             CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
             if (holds) {
                 held.add(outcome);

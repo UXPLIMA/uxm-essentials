@@ -45,13 +45,6 @@ public final class ReceiptedPlayerWarpEconomy implements PlayerWarpEconomy {
     }
 
     @Override
-    public Result<Unit, ChargeError> chargeAndAccrue(
-            PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId) {
-        Result<Unit, ChargeError> charged = delegate.chargeAndAccrue(payer, warp, price, currencyId);
-        return report(charged, payer, price, currencyId);
-    }
-
-    @Override
     public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
         return report(delegate.charge(payer, price, currencyId), payer, price, currencyId);
     }
