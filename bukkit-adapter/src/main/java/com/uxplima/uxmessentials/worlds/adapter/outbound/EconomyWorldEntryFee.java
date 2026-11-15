@@ -40,4 +40,20 @@ public final class EconomyWorldEntryFee implements WorldEntryFee {
         Objects.requireNonNull(amount, "amount");
         return provider.debit(who, Money.of(currency, amount)).isOk();
     }
+
+    @Override
+    public String currencyId() {
+        return currency.id().value();
+    }
+
+    /**
+     * Fees are only ever taken in the one currency this module is wired with, so the credit goes back in it whatever
+     * id the hop carried: a peer configured with another currency cannot make this backend pay out in a third.
+     */
+    @Override
+    public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        return provider.credit(who, Money.of(currency, amount)).isOk();
+    }
 }

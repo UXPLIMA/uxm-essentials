@@ -42,3 +42,28 @@ imported from.
 
 Every command that takes a world takes either form: `/worlds tp the_nether`, `/worlds info minecraft:the_end` and
 `/worlds tp mypack_mining` all work.
+
+## Worlds on a network
+
+Every server of a network keeps its own worlds in the shared database, recorded under its `network.server-name`. Two
+servers may each run a world called `world`, each with its own settings, and `auto-adopt-loaded` and
+`auto-load-registered` touch only the worlds of the server they run on. `/worlds list` and the world picker show every
+server's worlds with the server that runs them; a world of another server is managed on that server.
+
+With `cross-server.enabled` on in `modules/worlds/config.conf`, `/worlds spawn <world>` and `/worlds tp <world>` reach
+a world another server runs by sending the player there, to that world's spawn. A world of this server wins over one
+of the same name elsewhere, and `<world>@<server>` picks one when several servers run it:
+
+```
+/worlds spawn arena@minigames
+/worlds tp world_nether@survival Alex
+```
+
+The entry fee is taken once the jail, combat and cooldown checks pass, and given back if the player does not land:
+the proxy never moves them, the world is gone, full or will not load, or its spawn is unsafe. A player holding
+`uxmessentials.world.bypass.safety` lands on an unsafe spawn anyway.
+
+A world from before servers were recorded is claimed, on start, by the server that has it: a world loaded under the
+recorded uid, or a world folder of that name when no world of another uid is loaded under it. One no server has is
+listed as unclaimed. `/worlds claim <world>` on the server it belongs to takes it there; `/worlds load <world>` then
+loads it.

@@ -42,7 +42,8 @@ public sealed interface NetworkMessage
                 PrivateMessageFrame,
                 PrivateMessageAnswerFrame,
                 HelpOpFrame,
-                StaffChatFrame {
+                StaffChatFrame,
+                WorldChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -79,7 +80,8 @@ public sealed interface NetworkMessage
         PRIVATE_MESSAGE(21),
         PRIVATE_MESSAGE_ANSWER(22),
         HELP_OP(23),
-        STAFF_CHAT(24);
+        STAFF_CHAT(24),
+        WORLD_CHANGED(30);
 
         private final byte wireTag;
 

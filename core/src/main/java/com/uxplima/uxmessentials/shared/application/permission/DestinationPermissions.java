@@ -368,6 +368,16 @@ final class DestinationPermissions {
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
+                        "uxmessentials.world.bypass.safety",
+                        "Land on the spawn of a world on another server even when the safe-landing check refuses it.",
+                        PermissionDefault.OP,
+                        WORLDS),
+                PermissionSpec.of(
+                        "uxmessentials.world.claim",
+                        "/worlds claim <name>: take a world no server has claimed onto this server.",
+                        PermissionDefault.OP,
+                        WORLDS),
+                PermissionSpec.of(
                         "uxmessentials.world.create",
                         "/worlds create <name>: generate and register a new world.",
                         PermissionDefault.OP,

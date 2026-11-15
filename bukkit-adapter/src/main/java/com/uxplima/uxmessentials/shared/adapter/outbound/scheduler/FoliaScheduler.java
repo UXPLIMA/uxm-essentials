@@ -54,6 +54,18 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     @Override
+    public void onGlobal(Runnable task, Runnable retired) {
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(retired, "retired");
+        if (disabled()) {
+            // The task can never run: the caller gets its fallback rather than silence.
+            retired.run();
+            return;
+        }
+        Bukkit.getGlobalRegionScheduler().execute(plugin, task);
+    }
+
+    @Override
     public void onRegion(Position position, Runnable task) {
         Objects.requireNonNull(position, "position");
         Objects.requireNonNull(task, "task");

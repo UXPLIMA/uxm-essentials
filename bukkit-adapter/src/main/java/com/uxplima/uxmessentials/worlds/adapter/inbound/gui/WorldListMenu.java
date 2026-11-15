@@ -3,19 +3,24 @@ package com.uxplima.uxmessentials.worlds.adapter.inbound.gui;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
+import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -37,9 +42,11 @@ import org.jspecify.annotations.NullMarked;
  * {@code world_icon} / {@code world_name} / {@code world_environment} / {@code world_loaded} placeholders read the
  * bound row, so the menu touches no Bukkit API off-thread.
  *
- * <p>A left click runs {@code worlds:edit}, opening that world's engine-rendered {@link WorldMainMenu} hub; a right
- * click runs {@code worlds:teleport}, the forced staff hand-off {@code /worlds tp <self>} drives (it skips the access
- * gate and entry fee, and loads-then-teleports on the global region thread); the create button runs
+ * <p>The picker lists every world of the network a backend has claimed, each with the server that runs it. A left
+ * click runs {@code worlds:edit}, opening that world's engine-rendered {@link WorldMainMenu} hub, or, for a world of
+ * another server, saying where it is managed; a right click runs {@code worlds:teleport}, the forced staff hand-off
+ * {@code /worlds tp <self>} drives (it skips the access gate and entry fee, loads-then-teleports on the global region
+ * thread, and sends the viewer across the network for a world of another server); the create button runs
  * {@code worlds:create}, opening the engine-rendered {@link WorldCreateMenu}, so the list adds no domain logic of its
  * own.
  */
@@ -59,6 +66,8 @@ public final class WorldListMenu {
     private final WorldTeleportService worldTeleport;
     private final WorldMainMenu mainMenu;
     private final WorldCreateMenu createMenu;
+    private final Notifier notifier;
+    private final String localServer;
 
     public WorldListMenu(
             Menus menus,
@@ -67,7 +76,9 @@ public final class WorldListMenu {
             WorldEngine engine,
             WorldTeleportService worldTeleport,
             WorldMainMenu mainMenu,
-            WorldCreateMenu createMenu) {
+            WorldCreateMenu createMenu,
+            Notifier notifier,
+            String localServer) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -75,6 +86,8 @@ public final class WorldListMenu {
         this.worldTeleport = Objects.requireNonNull(worldTeleport, "worldTeleport");
         this.mainMenu = Objects.requireNonNull(mainMenu, "mainMenu");
         this.createMenu = Objects.requireNonNull(createMenu, "createMenu");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
     /** Register the bindings the spec names and the spec itself; called once at worlds wiring time. */
@@ -87,6 +100,7 @@ public final class WorldListMenu {
         bindings.placeholder("world_name", ctx -> rowOf(ctx).world().name().value());
         bindings.placeholder("world_environment", ctx -> environment(rowOf(ctx)).name());
         bindings.placeholder("world_loaded", ctx -> String.valueOf(rowOf(ctx).loaded()));
+        bindings.placeholder("world_server", ctx -> rowOf(ctx).server());
         bindings.action("worlds:edit", this::edit);
         bindings.action("worlds:teleport", this::teleport);
         bindings.action("worlds:create", this::create);
@@ -104,11 +118,20 @@ public final class WorldListMenu {
         scheduler.onEntity(viewer, () -> menus.open(player, SPEC_ID, snapshot()));
     }
 
-    /** The current managed worlds paired with their live loaded state, read on the calling region thread. */
+    /**
+     * The claimed worlds of the network paired with their live loaded state, read on the calling region thread. Only
+     * this backend's worlds can be loaded here; an unclaimed world has no server to manage or reach it on, so it is
+     * left to {@code /worlds list}.
+     */
     private WorldGrid snapshot() {
         List<WorldRow> rows = new ArrayList<>();
-        for (ManagedWorld world : repository.all()) {
-            rows.add(new WorldRow(world, engine.isLoaded(world.name())));
+        for (NetworkWorld world : repository.network()) {
+            Optional<String> server = world.knownServer();
+            if (server.isEmpty()) {
+                continue;
+            }
+            boolean here = world.livesOn(localServer);
+            rows.add(new WorldRow(world.world(), here && engine.isLoaded(world.name()), server.get(), here));
         }
         return new WorldGrid(rows);
     }
@@ -124,10 +147,17 @@ public final class WorldListMenu {
 
     /** Left-click a world icon: open that world's engine main editor hub on the viewer's entity thread. */
     private void edit(MenuActionContext ctx) {
-        mainMenu.open(
-                ctx.player(),
-                BukkitRefs.toRef(ctx.viewer()),
-                ctx.entry(WorldRow.class).world().name());
+        WorldRow row = ctx.entry(WorldRow.class);
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        if (!row.here()) {
+            // A world's settings are kept by the server that runs it, so it is edited there.
+            notifier.send(
+                    viewer,
+                    WorldsMessageKey.WORLD_ON_OTHER_SERVER,
+                    Map.of("world", row.world().name().value(), "server", row.server()));
+            return;
+        }
+        mainMenu.open(ctx.player(), viewer, row.world().name());
     }
 
     /**
@@ -137,10 +167,10 @@ public final class WorldListMenu {
      */
     private void teleport(MenuActionContext ctx) {
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
-        com.uxplima.uxmessentials.worlds.domain.WorldName world =
-                ctx.entry(WorldRow.class).world().name();
+        WorldRow row = ctx.entry(WorldRow.class);
         ctx.player().closeInventory();
-        scheduler.onGlobal(() -> worldTeleport.forced(viewer, viewer, world));
+        scheduler.onGlobal(
+                () -> worldTeleport.forced(viewer, viewer, row.world().name(), Optional.of(row.server())));
     }
 
     /** Left-click the create button: open the engine new-world configuration screen, exactly as the old button did. */
@@ -171,16 +201,19 @@ public final class WorldListMenu {
     }
 
     /**
-     * One cell of the picker grid: a managed world and whether it is currently loaded. The loaded flag is resolved on
-     * the region thread at snapshot time, so the placeholders never read the Bukkit API.
+     * One cell of the picker grid: a managed world, the server that runs it and whether it is currently loaded. The
+     * loaded flag is resolved on the region thread at snapshot time, so the placeholders never read the Bukkit API.
      *
      * @param world the managed world this cell stands for
-     * @param loaded whether that world was loaded when the snapshot was taken
+     * @param loaded whether that world was loaded here when the snapshot was taken
+     * @param server the network name of the server that runs it
+     * @param here true when this server runs it
      */
-    public record WorldRow(ManagedWorld world, boolean loaded) {
+    public record WorldRow(ManagedWorld world, boolean loaded, String server, boolean here) {
 
         public WorldRow {
             Objects.requireNonNull(world, "world");
+            Objects.requireNonNull(server, "server");
         }
     }
 }

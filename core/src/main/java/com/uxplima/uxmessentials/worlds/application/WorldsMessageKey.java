@@ -35,6 +35,8 @@ public enum WorldsMessageKey implements MessageKey {
 
     WORLD_LIST_HEADER("world.list.header"),
     WORLD_LIST_ENTRY("world.list.entry"),
+    WORLD_LIST_ENTRY_REMOTE("world.list.entry-remote"),
+    WORLD_LIST_ENTRY_UNCLAIMED("world.list.entry-unclaimed"),
     WORLD_LIST_EMPTY("world.list.empty"),
 
     WORLD_INFO_HEADER("world.info.header"),
@@ -57,6 +59,19 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_ENTER_FEE_CHARGED("world.enter.fee-charged"),
     WORLD_TP_DESTINATION_UNRESOLVED("world.tp.destination-unresolved"),
     WORLD_TP_OTHER("world.tp.other"),
+
+    WORLD_CROSS_SERVER_SENDING("world.cross-server.sending"),
+    WORLD_CROSS_SERVER_UNAVAILABLE("world.cross-server.unavailable"),
+    WORLD_CROSS_SERVER_ARRIVED("world.cross-server.arrived"),
+    WORLD_CROSS_SERVER_FAILED("world.cross-server.failed"),
+    WORLD_CROSS_SERVER_TIMED_OUT("world.cross-server.timed-out"),
+    WORLD_CROSS_SERVER_MISROUTED("world.cross-server.misrouted"),
+    WORLD_CROSS_SERVER_REFUNDED("world.cross-server.refunded"),
+    WORLD_CROSS_SERVER_AMBIGUOUS("world.cross-server.ambiguous"),
+    WORLD_CROSS_SERVER_UNSAFE("world.cross-server.unsafe"),
+    WORLD_ON_OTHER_SERVER("world.on-other-server"),
+    WORLD_CLAIMED("world.claimed"),
+    WORLD_CLAIM_NONE("world.claim-none"),
 
     WORLD_PREGEN_STARTED("world.pregen.started"),
     WORLD_PREGEN_DONE("world.pregen.done"),

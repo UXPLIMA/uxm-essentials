@@ -56,4 +56,20 @@ public final class WorldAccessPolicy {
         }
         return AccessDecision.ALLOWED;
     }
+
+    /**
+     * The part of {@link #decide} a backend can answer for a world another backend runs: the bypass and the entry
+     * node. The player count lives on the backend that runs the world, which checks the limit when the player lands.
+     */
+    public AccessDecision decideAhead(PlayerRef who, ManagedWorld world) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(world, "world");
+        if (permissions.has(who, BYPASS_NODE)) {
+            return AccessDecision.ALLOWED;
+        }
+        if (world.settings().get(WorldProperties.ACCESS_RESTRICTED) && !permissions.has(who, enterNode(world.name()))) {
+            return AccessDecision.DENIED_PERMISSION;
+        }
+        return AccessDecision.ALLOWED;
+    }
 }

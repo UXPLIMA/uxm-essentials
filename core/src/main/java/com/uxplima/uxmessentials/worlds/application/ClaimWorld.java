@@ -1,0 +1,38 @@
+package com.uxplima.uxmessentials.worlds.application;
+
+import java.util.Map;
+import java.util.Objects;
+
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.worlds.application.port.WorldClaims;
+import com.uxplima.uxmessentials.worlds.domain.WorldName;
+
+/**
+ * {@code /worlds claim <world>}: an operator takes a world no backend has claimed onto this backend, for a world the
+ * start-up claim could not place (no backend has its folder, or it arrives later). The claim is a database write, so
+ * it runs on the async lane and only the answer comes back to the requester.
+ */
+public final class ClaimWorld {
+
+    private final WorldClaims claims;
+    private final Notifier notifier;
+    private final Scheduler scheduler;
+
+    public ClaimWorld(WorldClaims claims, Notifier notifier, Scheduler scheduler) {
+        this.claims = Objects.requireNonNull(claims, "claims");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+    }
+
+    public void claim(PlayerRef who, WorldName name) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(name, "name");
+        scheduler.async(() -> {
+            WorldsMessageKey answer =
+                    claims.claim(name) ? WorldsMessageKey.WORLD_CLAIMED : WorldsMessageKey.WORLD_CLAIM_NONE;
+            scheduler.onEntity(who, () -> notifier.send(who, answer, Map.of("world", name.value())));
+        });
+    }
+}

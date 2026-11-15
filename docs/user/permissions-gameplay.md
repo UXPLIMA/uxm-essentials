@@ -319,6 +319,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.world.<world>` | Enter one world that is configured as restricted. | op |
 | `uxmessentials.world.access.bypass` | Enter a restricted world without holding that world's own entry node. | op |
 | `uxmessentials.world.backup` | /worlds backup <name>: snapshot a world's folder. | op |
+| `uxmessentials.world.bypass.safety` | Land on the spawn of a world on another server even when the safe-landing check refuses it. | op |
+| `uxmessentials.world.claim` | /worlds claim <name>: take a world no server has claimed onto this server. | op |
 | `uxmessentials.world.create` | /worlds create <name>: generate and register a new world. | op |
 | `uxmessentials.world.delete` | /worlds delete <name>: unregister a world and delete its folder from disk. | op |
 | `uxmessentials.world.gamemode.bypass` | Keep your own game mode in a world that forces one on entry. | op |

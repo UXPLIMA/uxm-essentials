@@ -15,6 +15,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class FreeWorldEntryFee implements WorldEntryFee {
 
+    /** Nothing is ever taken, so the id only labels a zero charge that is never refunded. */
+    static final String FREE_CURRENCY = "default";
+
     @Override
     public boolean canAfford(PlayerRef who, BigDecimal amount) {
         return true;
@@ -22,6 +25,16 @@ public final class FreeWorldEntryFee implements WorldEntryFee {
 
     @Override
     public boolean charge(PlayerRef who, BigDecimal amount) {
+        return true;
+    }
+
+    @Override
+    public String currencyId() {
+        return FREE_CURRENCY;
+    }
+
+    @Override
+    public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
         return true;
     }
 }

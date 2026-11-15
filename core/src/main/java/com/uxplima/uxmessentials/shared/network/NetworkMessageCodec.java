@@ -223,6 +223,11 @@ public final class NetworkMessageCodec {
                 out.writeUTF(staffChat.senderName());
                 out.writeUTF(staffChat.message());
             }
+            case WorldChanged world -> {
+                writeUuid(out, world.changeId());
+                out.writeUTF(world.server());
+                out.writeUTF(world.world());
+            }
         }
     }
 
@@ -286,6 +291,7 @@ public final class NetworkMessageCodec {
                         in.readUTF());
             case HELP_OP -> new HelpOpFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case STAFF_CHAT -> new StaffChatFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
+            case WORLD_CHANGED -> new WorldChanged(origin, readUuid(in), in.readUTF(), in.readUTF());
         };
     }
 

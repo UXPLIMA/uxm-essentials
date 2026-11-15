@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
+import com.uxplima.uxmessentials.worlds.application.ClaimWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
@@ -69,6 +70,8 @@ public final class WorldsServices {
     private final UnaryOperator<String> worldNames;
     private final BiConsumer<Player, PlayerRef> openWorldList;
     private final WorldMainOpener openWorldMain;
+    private final ClaimWorld claimWorld;
+    private final String localServer;
     private final AtomicReference<List<String>> importable = new AtomicReference<>(List.of());
 
     public WorldsServices(
@@ -95,7 +98,9 @@ public final class WorldsServices {
             ListBackups listBackups,
             RestoreWorld restoreWorld,
             BiConsumer<Player, PlayerRef> openWorldList,
-            WorldMainOpener openWorldMain) {
+            WorldMainOpener openWorldMain,
+            ClaimWorld claimWorld,
+            String localServer) {
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
         this.importWorld = Objects.requireNonNull(importWorld, "importWorld");
         this.loadWorld = Objects.requireNonNull(loadWorld, "loadWorld");
@@ -120,6 +125,18 @@ public final class WorldsServices {
         this.restoreWorld = Objects.requireNonNull(restoreWorld, "restoreWorld");
         this.openWorldList = Objects.requireNonNull(openWorldList, "openWorldList");
         this.openWorldMain = Objects.requireNonNull(openWorldMain, "openWorldMain");
+        this.claimWorld = Objects.requireNonNull(claimWorld, "claimWorld");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
+    }
+
+    /** The {@code /worlds claim} use case. */
+    public ClaimWorld claimWorld() {
+        return claimWorld;
+    }
+
+    /** This backend's network name, the server its worlds are recorded under. */
+    public String localServer() {
+        return localServer;
     }
 
     public CreateWorld createWorld() {

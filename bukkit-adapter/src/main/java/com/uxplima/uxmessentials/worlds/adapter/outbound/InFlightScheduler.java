@@ -33,6 +33,11 @@ public final class InFlightScheduler implements Scheduler {
     }
 
     @Override
+    public void onGlobal(Runnable task, Runnable retired) {
+        inner.onGlobal(task, retired);
+    }
+
+    @Override
     public void onRegion(Position position, Runnable task) {
         inner.onRegion(position, task);
     }

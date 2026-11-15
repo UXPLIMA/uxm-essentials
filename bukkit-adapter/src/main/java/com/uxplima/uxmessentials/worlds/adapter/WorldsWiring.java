@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -19,9 +20,12 @@ import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WorldSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.RepositoryWorldsPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.WorldsPlaceholders;
+import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -29,6 +33,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
+import com.uxplima.uxmessentials.teleport.domain.Destination;
+import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.command.WorldCommands;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldCreateMenu;
 import com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldGenerationMenu;
@@ -42,6 +49,7 @@ import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldAccessList
 import com.uxplima.uxmessentials.worlds.adapter.inbound.listener.WorldPortalListener;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitChunkGenSource;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitGameRuleCatalog;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitSpawnSafety;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldArchive;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldEngine;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.BukkitWorldPregen;
@@ -55,9 +63,11 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.InMemoryPendingRestoreR
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldArchiver;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldAutoUnloadSweep;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
+import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldServerAdoption;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.api.WorldApiWrites;
 import com.uxplima.uxmessentials.worlds.application.ApplyWorldSettingsOnLoad;
 import com.uxplima.uxmessentials.worlds.application.BackupWorld;
+import com.uxplima.uxmessentials.worlds.application.ClaimWorld;
 import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.DeleteWorld;
 import com.uxplima.uxmessentials.worlds.application.ImportWorld;
@@ -76,6 +86,8 @@ import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
+import com.uxplima.uxmessentials.worlds.application.WorldHopResolver;
+import com.uxplima.uxmessentials.worlds.application.WorldHops;
 import com.uxplima.uxmessentials.worlds.application.WorldInfo;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
@@ -83,6 +95,7 @@ import com.uxplima.uxmessentials.worlds.application.port.GameRuleCatalog;
 import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
+import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldCreated;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
@@ -97,11 +110,12 @@ import org.jspecify.annotations.NullMarked;
  * DSL, and the Bukkit {@link Server}, and produces the Brigadier command list the plugin registers. This
  * is the one place the worlds context is wired: nothing else news up its classes.
  *
- * <p>The repository is the cached jOOQ adapter; its in-memory snapshot is warmed once on enable so every
- * later {@code /worlds} resolve and tab-complete is served from memory rather than a synchronous SQLite
- * read on the command thread. The enable-time reconcile runs on the global region thread (Bukkit world
- * handles require it), then invalidates the warmed snapshot, its adopt/auto-load phases mutated rows, so
- * the next read reloads, and refreshes the import-folder snapshot off-tick.
+ * <p>The repository is the cached jOOQ adapter scoped to this backend's network name, behind a decorator that
+ * announces every write to the peers; its in-memory snapshot is warmed once on enable so every later
+ * {@code /worlds} resolve and tab-complete is served from memory rather than a synchronous database read on the
+ * command thread. On start this backend first claims the unclaimed rows of the worlds it has, off the tick, then
+ * the enable-time reconcile runs on the global region thread (Bukkit world handles require it), reloads the
+ * snapshot off the tick, and refreshes the import-folder snapshot.
  */
 @NullMarked
 public final class WorldsWiring {
@@ -123,6 +137,7 @@ public final class WorldsWiring {
             Menus menus,
             MenuBindings menuBindings,
             RescueTargets rescueTargets,
+            CrossServerHops hops,
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -136,13 +151,19 @@ public final class WorldsWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(rescueTargets, "rescueTargets");
+        Objects.requireNonNull(hops, "hops");
         Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
-        CachedWorldRepository repository = WorldRepositories.cachedConcrete(persistence);
-        repository.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
-        // No frame announces a peer's world edit, so the shared rows come back in only through the bus resync.
-        bus.registry().registerResync(repository::reloadAll);
+        // Every backend keeps its own rows in the shared table, keyed by its network name; the cache holds the whole
+        // network's set so the list and the cross-server teleport read it from memory. A peer's change arrives as a
+        // WorldChanged frame and reloads the set off the tick; the periodic resync covers a frame that was lost.
+        String localServer = hops.server();
+        CachedWorldRepository cache = WorldRepositories.cachedConcrete(persistence, localServer);
+        cache.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
+        bus.registry().registerResync(cache::reloadAll);
+        bus.registry().register(WorldSync.listener(() -> kernel.scheduler().async(cache::reloadAll)));
+        WorldRepository repository = WorldSync.repository(cache, bus.publisher());
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WorldsSettings settings = new WorldsSettings(ctx.config());
@@ -164,6 +185,32 @@ public final class WorldsWiring {
         // and the access listener (which consumes the mark to exempt those worlds-initiated teleports).
         ForcedWorldEntryMarker forcedEntries = new ForcedWorldEntryMarker();
         BukkitWorldTeleporter teleporter = new BukkitWorldTeleporter(teleportEngine, forcedEntries);
+        // With cross-server.enabled on, /worlds spawn and /worlds tp reach a world another backend runs by sending the
+        // player there through the hop the bootstrap shares between every kind: the teleport rules run here before the
+        // fee, and the fee comes back on every miss. Off, the resolver is not registered and only this backend's
+        // worlds can be reached, as before.
+        WorldHops worldHops = WorldHops.local(localServer);
+        if (ctx.config().getBoolean("cross-server.enabled", false)) {
+            hops.register(new WorldHopResolver(
+                    repository,
+                    engine,
+                    policy,
+                    teleporter,
+                    entryFee,
+                    new BukkitSpawnSafety(),
+                    kernel.permissions(),
+                    kernel.events(),
+                    notifier,
+                    kernel.scheduler()));
+            // A staff send passes the rules of a staff teleport, as a local /worlds tp does, not those of /spawn.
+            HopGate staffGate = (who, departure) -> teleportEngine
+                    .gateHop(who, Destination.at(departure.destination()), TeleportKind.ADMIN)
+                    .isOk();
+            worldHops = new WorldHops(
+                    Optional.of(hops.departures(new TeleportHopGate(teleportEngine))),
+                    Optional.of(hops.departures(staffGate)),
+                    localServer);
+        }
         WorldTeleportService worldTeleport = new WorldTeleportService(
                 repository,
                 engine,
@@ -173,7 +220,9 @@ public final class WorldsWiring {
                 kernel.permissions(),
                 kernel.events(),
                 notifier,
-                tracked);
+                tracked,
+                kernel.playerLookup(),
+                worldHops);
         WorldAccessListener accessListener = new WorldAccessListener(
                 repository,
                 policy,
@@ -230,6 +279,8 @@ public final class WorldsWiring {
         WorldListMenu[] listHolder = new WorldListMenu[1];
         BiConsumer<Player, PlayerRef> reopenList = (player, viewer) -> listHolder[0].open(player, viewer);
         WorldMainMenu mainMenu = new WorldMainMenu(menus, tracked, repository, engine, reopenList);
+        WorldServerAdoption adoption = new WorldServerAdoption(
+                persistence, tracked, kernel.log(), localServer, engine, cache, bus.publisher());
         WorldsServices services = assemble(
                 kernel,
                 tracked,
@@ -246,7 +297,9 @@ public final class WorldsWiring {
                 listBackups,
                 restoreWorld,
                 reopenList,
-                mainMenu::open);
+                mainMenu::open,
+                new ClaimWorld(adoption, notifier, tracked),
+                localServer);
         // The create screen reopens the engine list on cancel/create through the shared reopen seam, runs the started
         // CreateWorld use case, and captures text through the shared input seam.
         WorldCreateMenu createMenu = new WorldCreateMenu(
@@ -277,8 +330,8 @@ public final class WorldsWiring {
         // Build the engine list over the engine screens it launches (left-click opens the hub, the create button opens
         // the create screen) and the forced-teleport service (right-click), then close the cycle and register every
         // editor screen's bindings and spec with the menu engine.
-        WorldListMenu worldListMenu =
-                new WorldListMenu(menus, tracked, repository, engine, worldTeleport, mainMenu, createMenu);
+        WorldListMenu worldListMenu = new WorldListMenu(
+                menus, tracked, repository, engine, worldTeleport, mainMenu, createMenu, notifier, localServer);
         listHolder[0] = worldListMenu;
         worldListMenu.register(menuBindings, dataFolder, kernel.log());
         mainMenu.register(menuBindings, dataFolder, kernel.log());
@@ -310,9 +363,11 @@ public final class WorldsWiring {
                 voidRescueListener,
                 portalListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
-        Runnable startReconcile = () -> kernel.scheduler().onGlobal(() -> {
+        // The claim of the unclaimed rows this backend has comes first, so the reconcile that follows adopts and
+        // auto-loads only this backend's rows and never adds a second row beside an unclaimed one.
+        Runnable startReconcile = () -> adoption.claimThen(() -> {
             reconcile.run();
-            repository.invalidateAll(); // reconciliation mutated rows; drop the warm snapshot so the next read reloads
+            tracked.async(cache::reloadAll);
             services.refreshImportableFolders();
         });
         return new Wired(
@@ -367,7 +422,9 @@ public final class WorldsWiring {
             ListBackups listBackups,
             RestoreWorld restoreWorld,
             BiConsumer<Player, PlayerRef> openWorldList,
-            com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener openWorldMain) {
+            com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener openWorldMain,
+            ClaimWorld claimWorld,
+            String localServer) {
         CreateWorld createWorld = new CreateWorld(
                 repository, engine, notifier, kernel.events(), scheduler, clock, settings::creationDefaults);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
@@ -384,7 +441,7 @@ public final class WorldsWiring {
                 clock,
                 settings::protectDefaultWorld,
                 settings::deleteConfirmTimeout);
-        ListWorlds listWorlds = new ListWorlds(repository, engine);
+        ListWorlds listWorlds = new ListWorlds(repository, engine, localServer);
         WorldInfo worldInfo = new WorldInfo(repository);
         SetWorldProperty setProperty = new SetWorldProperty(repository, notifier, kernel.events(), scheduler);
         SetGamerule setGamerule = new SetGamerule(repository, ruleCatalog, notifier, kernel.events(), scheduler);
@@ -414,7 +471,9 @@ public final class WorldsWiring {
                 listBackups,
                 restoreWorld,
                 openWorldList,
-                openWorldMain);
+                openWorldMain,
+                claimWorld,
+                localServer);
     }
 
     /**

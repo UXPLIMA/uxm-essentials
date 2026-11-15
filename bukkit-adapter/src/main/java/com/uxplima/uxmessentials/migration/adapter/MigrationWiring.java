@@ -122,7 +122,7 @@ public final class MigrationWiring {
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(
                 targets,
-                new DatabaseStores(plugin, persistence, economyConfig, log),
+                new DatabaseStores(plugin, persistence, economyConfig, log, publisher.serverId()),
                 ports(persistence, economyConfig, log, messagingConfig),
                 publisher,
                 scheduler);
@@ -351,9 +351,11 @@ public final class MigrationWiring {
         private final Persistence persistence;
         private final ConfigStore economyConfig;
         private final Logger log;
+        private final String server;
 
-        DatabaseStores(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {
+        DatabaseStores(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log, String server) {
             this.plugin = plugin;
+            this.server = server;
             this.persistence = persistence;
             this.economyConfig = economyConfig;
             this.log = log;
@@ -387,7 +389,7 @@ public final class MigrationWiring {
 
         @Override
         public WorldRepository worlds() {
-            return WorldRepositories.cached(persistence);
+            return WorldRepositories.cached(persistence, server);
         }
 
         @Override
