@@ -39,7 +39,16 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String BASE = "uxmessentials.economy.admin";
+    private static final String ADMIN = "uxmessentials.economy.admin";
+    private static final String GIVE = "uxmessentials.economy.admin.give";
+    private static final String TAKE = "uxmessentials.economy.admin.take";
+    private static final String SET = "uxmessentials.economy.admin.set";
+    private static final String BULK = "uxmessentials.economy.admin.bulk";
+    private static final String HISTORY = "uxmessentials.economy.admin.history";
+    private static final String LOGS = "uxmessentials.economy.admin.logs";
+    private static final String NOTE = "uxmessentials.economy.admin.note";
+    private static final String BACKUP = "uxmessentials.economy.admin.backup";
+    private static final String RESTORE = "uxmessentials.economy.admin.restore";
 
     private final BanknoteMinter minter;
     private final @Nullable EconomyAdminGuiViews adminGui;
@@ -58,26 +67,26 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         return Commands.literal("eco")
-                .requires(Gate.permission(BASE))
-                .then(targetVerb("give", "give"))
-                .then(targetVerb("take", "take"))
-                .then(targetVerb("set", "set"))
+                .requires(Gate.permission(ADMIN))
+                .then(targetVerb("give", GIVE))
+                .then(targetVerb("take", TAKE))
+                .then(targetVerb("set", SET))
                 .then(resetVerb())
-                .then(bulkAmountVerb("giveall", "bulk"))
-                .then(bulkAmountVerb("giverandom", "bulk"))
+                .then(bulkAmountVerb("giveall", BULK))
+                .then(bulkAmountVerb("giverandom", BULK))
                 .then(resetAllVerb())
                 .then(giveRandomRangeVerb())
                 .then(historyVerb())
                 .then(logsVerb())
                 .then(noteVerb())
                 .then(Commands.literal("backup")
-                        .requires(Gate.permission(BASE + ".backup"))
+                        .requires(Gate.permission(BACKUP))
                         .executes(this::runBackup))
                 .then(Commands.literal("export")
-                        .requires(Gate.permission(BASE + ".backup"))
+                        .requires(Gate.permission(BACKUP))
                         .executes(this::runExport))
                 .then(Commands.literal("restore")
-                        .requires(Gate.permission(BASE + ".restore"))
+                        .requires(Gate.permission(RESTORE))
                         .then(CommandSuggestions.playerArgument("player")
                                 .then(Commands.argument("date", Args.token())
                                         .suggests((ctx, builder) -> {
@@ -121,9 +130,9 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         });
     }
 
-    private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String node) {
+    private LiteralArgumentBuilder<CommandSourceStack> targetVerb(String literal, String permission) {
         return Commands.literal(literal)
-                .requires(Gate.permission(BASE + "." + node))
+                .requires(Gate.permission(permission))
                 .executes(ctx -> usage(ctx, "eco " + literal, "<player> <amount> [currency]", "Economy " + literal))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx ->
@@ -135,15 +144,15 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> resetVerb() {
         return Commands.literal("reset")
-                .requires(Gate.permission(BASE + ".set"))
+                .requires(Gate.permission(SET))
                 .then(CommandSuggestions.playerArgument("player")
                         .executes(ctx -> runReset(ctx))
                         .then(currencyArgument().executes(ctx -> runReset(ctx))));
     }
 
-    private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String node) {
+    private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String permission) {
         return Commands.literal(literal)
-                .requires(Gate.permission(BASE + "." + node))
+                .requires(Gate.permission(permission))
                 .then(Commands.argument("amount", Args.token())
                         .executes(ctx -> runBulk(ctx, literal))
                         .then(currencyArgument().executes(ctx -> runBulk(ctx, literal))));
@@ -151,7 +160,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
         return Commands.literal("resetall")
-                .requires(Gate.permission(BASE + ".bulk"))
+                .requires(Gate.permission(BULK))
                 // A bare resetall is the question, not the reset. Without this branch Brigadier answered its
                 // own parse error and eco.admin.resetall-confirm, the line that names the flag, went unsent.
                 .executes(this::askForResetAllConfirm)
@@ -162,7 +171,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> giveRandomRangeVerb() {
         return Commands.literal("give-random")
-                .requires(Gate.permission(BASE + ".give"))
+                .requires(Gate.permission(GIVE))
                 .then(CommandSuggestions.playerArgument("player")
                         .then(Commands.argument("min", Args.token())
                                 .then(Commands.argument("max", Args.token())
@@ -172,20 +181,18 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
 
     private LiteralArgumentBuilder<CommandSourceStack> historyVerb() {
         return Commands.literal("history")
-                .requires(Gate.permission(BASE + ".history"))
+                .requires(Gate.permission(HISTORY))
                 .executes(this::runHistorySelf)
                 .then(CommandSuggestions.playerArgument("player").executes(this::runHistoryTarget));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> logsVerb() {
-        return Commands.literal("logs")
-                .requires(Gate.permission(BASE + ".logs"))
-                .executes(this::runLogs);
+        return Commands.literal("logs").requires(Gate.permission(LOGS)).executes(this::runLogs);
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> noteVerb() {
         return Commands.literal("note")
-                .requires(Gate.permission(BASE + ".note"))
+                .requires(Gate.permission(NOTE))
                 .then(Commands.literal("give")
                         .then(CommandSuggestions.playerArgument("player")
                                 .then(Commands.argument("amount", Args.token())

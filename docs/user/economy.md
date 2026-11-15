@@ -102,8 +102,13 @@ and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never mo
 | `/eco giveall\|resetall` | `uxmessentials.economy.admin.bulk` | Changes every balance; `resetall` needs `--confirm`. |
 | `/eco give-random` | `uxmessentials.economy.admin.give` | Gives a random amount between a minimum and a maximum. |
 | `/eco note give <player> <amount> [currency]` | `uxmessentials.economy.admin.note` | Gives a banknote without taking money from anyone. |
+| `/eco history [player]` | `uxmessentials.economy.admin.history` | Opens a player's transaction history, your own when none is named. In game only. |
+| `/eco logs` | `uxmessentials.economy.admin.logs` | Opens the transaction log of the whole server. In game only. |
+| `/eco backup` | `uxmessentials.economy.admin.backup` | Writes every wallet balance to `backups/economy/backup_<time>.json` in the plugin folder. |
+| `/eco export` | `uxmessentials.economy.admin.backup` | Writes every wallet balance to `backups/economy/export_<time>.csv` as `owner,currency,balance`. |
+| `/eco restore <player> <backup>` | `uxmessentials.economy.admin.restore` | Puts one player's wallet balances back from a backup; tab completion lists them. Currencies no longer configured are skipped. |
 
-Every node is listed in [permissions-gameplay.md](permissions-gameplay.md#economy).
+Every `/eco` subcommand also needs `uxmessentials.economy.admin`, which opens `/eco` itself. Every node is listed in [permissions-gameplay.md](permissions-gameplay.md#economy).
 
 ## Placeholders
 
