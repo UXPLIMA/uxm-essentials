@@ -1330,8 +1330,12 @@ public final class PluginModule {
         // The relational keys read across two players. Vanish visibility is the same gate messaging resolves a
         // target through, built here from the one vanish authority; with vanish disabled the seam stays absent and
         // "can see" answers yes, which is what a server without vanish means.
-        if (links.vanishStore != null && links.vanishLevelResolver != null) {
-            links.placeholders.visibility(new AuthorityVanishVisibility(links.vanishStore, links.vanishLevelResolver));
+        if (links.vanishStore != null && links.vanishLevelResolver != null && links.vanishNetwork != null) {
+            links.placeholders.visibility(new AuthorityVanishVisibility(
+                    links.vanishStore,
+                    links.vanishNetwork,
+                    links.vanishLevelResolver,
+                    kernel.playerLookup()::isOnline));
         }
         if (links.tradeSessions != null) {
             links.placeholders.trade(new SessionsTradePlaceholders(links.tradeSessions));
@@ -2735,7 +2739,10 @@ public final class PluginModule {
         com.uxplima.uxmessentials.messaging.application.port.VanishVisibility vanish = vanishStore == null
                 ? com.uxplima.uxmessentials.messaging.application.port.VanishVisibility.ALWAYS_VISIBLE
                 : new com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility(
-                        vanishStore, java.util.Objects.requireNonNull(links.vanishLevelResolver));
+                        vanishStore,
+                        java.util.Objects.requireNonNull(links.vanishNetwork),
+                        java.util.Objects.requireNonNull(links.vanishLevelResolver),
+                        ctx.kernel().playerLookup()::isOnline);
         MessagingWiring.Wired wired = MessagingWiring.wire(
                 plugin,
                 ctx,
@@ -2743,6 +2750,7 @@ public final class PluginModule {
                 Optional.empty(),
                 vanish,
                 bus,
+                links.presence,
                 guiText,
                 guiLayouts,
                 textInput,
@@ -2790,6 +2798,21 @@ public final class PluginModule {
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }
 
+    /**
+     * What keeps {@code /seen} from showing a vanished player as online to someone who may not see them: the vanish
+     * authority here and the vanish rows every backend shares, or nothing to hide with the vanish module disabled.
+     */
+    private static com.uxplima.uxmessentials.moderation.application.port.SeenVisibility seenVisibility(
+            ContextLinks links, Persistence persistence) {
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver levels = links.vanishLevelResolver;
+        if (vanishStore == null || levels == null) {
+            return com.uxplima.uxmessentials.moderation.application.port.SeenVisibility.ALWAYS_VISIBLE;
+        }
+        return new com.uxplima.uxmessentials.moderation.adapter.outbound.VanishSeenVisibility(
+                vanishStore, com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence), levels);
+    }
+
     private static void wireModeration(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -2832,7 +2855,8 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
                 ipCapture.tokens(),
-                links.presence);
+                links.presence,
+                seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3026,6 +3050,7 @@ public final class PluginModule {
         links.vanishStore = wired.vanishStore();
         links.vanishToggle = wired.toggleVanish();
         links.vanishLevelResolver = wired.levels();
+        links.vanishNetwork = wired.network();
         links.queries.register(
                 UxmVanishQuery.class,
                 new VanishQueries(
@@ -3540,8 +3565,8 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired = StaffWiring.wire(
-                plugin, ctx, persistence, bus.publisher().serverId(), seams, events, guiRegistry, menus, menuBindings);
+        StaffWiring.Wired wired =
+                StaffWiring.wire(plugin, ctx, persistence, bus, seams, events, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
@@ -3707,6 +3732,10 @@ public final class PluginModule {
         // see level the world does. Null when the vanish module is disabled (the gates degrade to fully-visible).
         private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable VanishLevelResolver
                 vanishLevelResolver;
+        // Who is vanished on the other backends, captured with the store so the messaging gate hides a player vanished
+        // elsewhere. Null when the vanish module is disabled.
+        private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable NetworkVanishStore
+                vanishNetwork;
         // The live trade registry, captured during trade wiring so the relational trade placeholders can read it
         // after every module has wired. Null when the trade module is disabled, which reads as "nobody is trading".
         private @org.jspecify.annotations.Nullable TradeSessions tradeSessions;

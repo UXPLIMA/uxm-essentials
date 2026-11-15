@@ -28,6 +28,8 @@ public enum StaffMessageKey implements MessageKey {
 
     // staff-chat broadcast format, {player}{message}
     STAFF_CHAT_FORMAT("staff.chat.format"),
+    // the same line sent from another backend of the network, {server}{player}{message}
+    STAFF_CHAT_FORMAT_REMOTE("staff.chat.format-remote"),
 
     // EXAMINE gadget info line, {target}{ping}{gamemode}{health}{world}
     STAFF_EXAMINE_INFO("staff.examine.info"),

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -24,6 +25,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@link MessagingError#NO_REPLY_TARGET} rather than misdirecting the reply to whoever the player last spoke
  * to long ago. A fresh-but-now-offline or vanished-and-unseeable partner resolves as offline, so a reply
  * never leaks that a vanished partner is still on the server.
+ *
+ * <p>A partner on another backend of the network is answered there through {@link RelayPrivateMessage}, so a
+ * conversation started across servers can be replied to from either side.
  *
  * <p>Once the target is resolved and fresh, delivery and every downstream gate (mute, ignore, toggle,
  * socialspy, the both-sides reply capture, the event) are the {@link SendMessage} engine's job: this use
@@ -39,6 +43,7 @@ public final class Reply {
     private final Notifier notifier;
     private final Duration replyTtl;
     private final Clock clock;
+    private final RelayPrivateMessage relay;
 
     public Reply(
             SendMessage sendMessage,
@@ -48,7 +53,8 @@ public final class Reply {
             ReplyRoutingStore replyRouting,
             Notifier notifier,
             Duration replyTtl,
-            Clock clock) {
+            Clock clock,
+            RelayPrivateMessage relay) {
         this.sendMessage = Objects.requireNonNull(sendMessage, "sendMessage");
         this.conversations = Objects.requireNonNull(conversations, "conversations");
         this.players = Objects.requireNonNull(players, "players");
@@ -57,6 +63,7 @@ public final class Reply {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.replyTtl = Objects.requireNonNull(replyTtl, "replyTtl");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.relay = Objects.requireNonNull(relay, "relay");
     }
 
     /** Reply with {@code body} to {@code sender}'s last fresh conversation. */
@@ -71,8 +78,17 @@ public final class Reply {
     }
 
     private Result<Unit, MessagingError> resolveAndSend(PlayerRef sender, PlayerRef partner, MessageBody body) {
+        if (!players.isOnline(partner.uuid())) {
+            // A partner on another backend gets the reply there; their backend applies the reply-routing switch.
+            Optional<OnlinePlayer> elsewhere = relay.elsewhere(partner.uuid());
+            if (elsewhere.isEmpty()) {
+                return reject(sender);
+            }
+            relay.reply(sender, elsewhere.get(), body);
+            return Result.ok();
+        }
         Optional<PlayerRef> online = players.findByUuid(partner.uuid());
-        if (online.isEmpty() || !players.isOnline(partner.uuid()) || vanish.isHiddenFrom(sender, partner)) {
+        if (online.isEmpty() || vanish.isHiddenFrom(sender, partner)) {
             return reject(sender);
         }
         if (!replyRouting.acceptsReplies(online.get())) {
