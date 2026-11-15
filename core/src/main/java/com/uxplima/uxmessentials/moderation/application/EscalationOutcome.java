@@ -5,7 +5,7 @@ package com.uxplima.uxmessentials.moderation.application;
  * to leave the player under at least its own sanction, never under less, so a running sanction that already
  * lasts as long or longer is kept rather than cut short.
  */
-public enum EscalationOutcome {
+enum EscalationOutcome {
 
     /** Nothing of this kind was in force, so the rung's sanction now is. */
     APPLIED,

@@ -98,10 +98,11 @@ public final class Mute {
      * in. Unlike {@link #mute}, a mute already in force is no refusal here, because a ladder rung fires on
      * every warning that reaches it and the earlier rung's mute is usually still running. A rung that lasts
      * longer replaces the running mute as a fresh one (stored, recorded, announced and synced like any mute);
-     * a running mute that lasts as long or longer, or a permanent one, is kept and the rung is audited as not
-     * applied. Only the caller is told the outcome, since the actor here is the server rule, not a person.
+     * a running mute that ends at the same instant or later, or a permanent one, is kept and the rung is
+     * audited as held. Only the caller is told the outcome, since the actor here is the server rule, not a
+     * person.
      */
-    public Result<EscalationOutcome, ModerationError> escalate(
+    Result<EscalationOutcome, ModerationError> escalate(
             PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -120,7 +121,7 @@ public final class Mute {
             return apply(actor, target, plan, reason, silent, now).map(mute -> EscalationOutcome.APPLIED);
         }
         if (!SanctionStrength.outlasts(plan.effective().map(now::plus), current.expiry())) {
-            audit.muted(actor, target, plan.effective().map(SanctionDuration::format), false, reason);
+            audit.muted(actor, target, plan.effective().map(SanctionDuration::format), false, SanctionStrength.HELD);
             return Result.ok(EscalationOutcome.ALREADY_STRONGER);
         }
         return apply(actor, target, plan, reason, silent, now).map(mute -> EscalationOutcome.EXTENDED);

@@ -119,10 +119,10 @@ public final class Ban {
      * Leave {@code target} banned at least as long as a ban by {@code actor} would: the warn escalation's way
      * in. A timed ban already in force is replaced by this one (stored, recorded, announced and synced like any
      * ban); a permanent ban already in force, or a timed one that outlasts what {@code actor}'s tier allows, is
-     * kept and the rung is audited as not applied. Only the caller is told the outcome, since the actor here is
-     * the server rule, not a person.
+     * kept and the rung is audited as held. Only the caller is told the outcome, since the actor here is the
+     * server rule, not a person.
      */
-    public Result<EscalationOutcome, ModerationError> escalate(
+    Result<EscalationOutcome, ModerationError> escalate(
             PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -137,7 +137,7 @@ public final class Ban {
             Optional<Instant> proposed = capped ? Optional.of(now.plus(effective)) : Optional.empty();
             if (!SanctionStrength.outlasts(proposed, SanctionStrength.endOf(running))) {
                 String label = capped ? SanctionDuration.format(effective) : PERMANENT_LABEL;
-                audit.tempbanned(actor, target, label, false, reason);
+                audit.tempbanned(actor, target, label, false, SanctionStrength.HELD);
                 return Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
             return apply(actor, target, reason, silent, now).map(ban -> EscalationOutcome.EXTENDED);

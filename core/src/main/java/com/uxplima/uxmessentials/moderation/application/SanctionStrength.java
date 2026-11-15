@@ -12,11 +12,18 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
  */
 final class SanctionStrength {
 
+    /**
+     * The audit reason of a rung that changed nothing because a stronger sanction already ran. Without it the
+     * line would read exactly like a refused sanction, and a reviewer could not tell a held rung from a failure.
+     */
+    static final Optional<String> HELD = Optional.of("held_by_stronger");
+
     private SanctionStrength() {}
 
     /**
-     * True when a sanction ending at {@code proposed} lasts past one ending at {@code current}. A tie is not
-     * stronger: replacing a sanction with an equal one would only rewrite who issued it.
+     * True when a sanction ending at {@code proposed} lasts past one ending at {@code current}. Strength is the
+     * end instant, not the span: a short rung fired late can end after a long sanction that is nearly over. Only
+     * the same end instant is a tie, and a tie is not stronger: replacing it would only rewrite who issued it.
      */
     static boolean outlasts(Optional<Instant> proposed, Optional<Instant> current) {
         Objects.requireNonNull(proposed, "proposed");

@@ -94,11 +94,11 @@ public final class TempBan {
     /**
      * Leave {@code target} banned for at least the parsed span: the warn escalation's way in. A ban already in
      * force that ends sooner is replaced by this one as a fresh tempban (stored, recorded, announced and synced
-     * like any tempban); one that lasts as long or longer, a permanent ban above all, is kept and the rung is
-     * audited as not applied, so a rung can never shorten a ban. Only the caller is told the outcome, since the
+     * like any tempban); one that ends at the same instant or later, a permanent ban above all, is kept and the
+     * rung is audited as held, so a rung can never shorten a ban. Only the caller is told the outcome, since the
      * actor here is the server rule, not a person.
      */
-    public Result<EscalationOutcome, ModerationError> escalate(
+    Result<EscalationOutcome, ModerationError> escalate(
             PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -115,7 +115,7 @@ public final class TempBan {
         Duration span = limit.cap(actor, "ban", requested.get());
         if (repository.loadTempban(target) instanceof TempbanState.Active running && running.isActiveAt(now)) {
             if (!SanctionStrength.outlasts(Optional.of(now.plus(span)), SanctionStrength.endOf(running))) {
-                audit.tempbanned(actor, target, SanctionDuration.format(span), false, reason);
+                audit.tempbanned(actor, target, SanctionDuration.format(span), false, SanctionStrength.HELD);
                 return Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
             return apply(actor, target, requested.get(), reason, silent, now).map(ban -> EscalationOutcome.EXTENDED);

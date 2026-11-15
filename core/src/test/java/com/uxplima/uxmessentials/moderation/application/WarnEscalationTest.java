@@ -15,6 +15,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -60,7 +61,7 @@ class WarnEscalationTest {
     private final SanctionHistoryRecorder history = new SanctionHistoryRecorder(new DiscardedHistory(), clock);
     private final SanctionDurationLimit limit = new SanctionDurationLimit(permissions);
     private final List<MessageKey> broadcasts = new ArrayList<>();
-    private final SilentAudit audit = new SilentAudit();
+    private final RecordingAudit audit = new RecordingAudit();
 
     private final RecordingSync sync = new RecordingSync();
     private final Backends backends = new Backends();
@@ -351,6 +352,68 @@ class WarnEscalationTest {
                         ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
         assertThat(sync.mutesChanged).isEqualTo(1);
         assertThat(broadcasts).containsOnlyOnce(ModerationMessageKey.MOD_BROADCAST_MUTE);
+        assertThat(audit.lines)
+                .containsExactly(
+                        new AuditLine("mute", Optional.of("1d"), true, Optional.empty()),
+                        new AuditLine("mute", Optional.of("10m"), false, Optional.of("held_by_stronger")));
+    }
+
+    @Test
+    void aHeldRungIsAuditedApartFromARefusedMute() {
+        mute.mute(ALEX, SAM, "", Optional.empty(), false);
+        mute.mute(ALEX, SAM, "", Optional.empty(), false);
+
+        warnTimes(3, false);
+
+        assertThat(audit.lines)
+                .containsExactly(
+                        new AuditLine("mute", Optional.empty(), true, Optional.empty()),
+                        new AuditLine("mute", Optional.empty(), false, Optional.empty()),
+                        new AuditLine("mute", Optional.of("1h"), false, Optional.of("held_by_stronger")));
+    }
+
+    @Test
+    void aShortRungOutlastsALongMuteThatIsNearlyOver() {
+        mute.mute(ALEX, SAM, "1d", Optional.of("spam"), false);
+        clock.advance(Duration.ofDays(1).minusMinutes(5));
+        IssueWarn late = warnUnder(ladder(rung(3, EscalationAction.TEMPMUTE, Duration.ofMinutes(10))));
+
+        warnTimes(late, 3);
+
+        assertThat(records.loadMute(SAM).expiry()).contains(clock.instant().plus(Duration.ofMinutes(10)));
+        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATED_EXTENDED.key());
+    }
+
+    @Test
+    void theSameSpanFiredLaterEndsLaterAndExtends() {
+        IssueWarn even = warnUnder(ladder(
+                rung(2, EscalationAction.TEMPMUTE, Duration.ofHours(1)),
+                rung(3, EscalationAction.TEMPMUTE, Duration.ofHours(1))));
+        warnTimes(even, 2);
+        clock.advance(Duration.ofMinutes(10));
+
+        warnTimes(even, 1);
+
+        assertThat(records.loadMute(SAM).expiry()).contains(clock.instant().plus(Duration.ofHours(1)));
+        assertThat(toldAlex())
+                .containsExactly(
+                        ModerationMessageKey.MOD_WARN_ESCALATED.key(),
+                        ModerationMessageKey.MOD_WARN_ESCALATED_EXTENDED.key());
+    }
+
+    @Test
+    void theSameSpanFiredAtTheSameInstantIsATieAndHolds() {
+        IssueWarn even = warnUnder(ladder(
+                rung(2, EscalationAction.TEMPMUTE, Duration.ofHours(1)),
+                rung(3, EscalationAction.TEMPMUTE, Duration.ofHours(1))));
+
+        warnTimes(even, 3);
+
+        assertThat(records.loadMute(SAM).expiry()).contains(NOW.plus(Duration.ofHours(1)));
+        assertThat(toldAlex())
+                .containsExactly(
+                        ModerationMessageKey.MOD_WARN_ESCALATED.key(),
+                        ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
     }
 
     @Test
@@ -437,6 +500,10 @@ class WarnEscalationTest {
                         ModerationMessageKey.MOD_WARN_ESCALATED.key(),
                         ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
         assertThat(sync.bansChanged).isEqualTo(1);
+        assertThat(audit.lines)
+                .containsExactly(
+                        new AuditLine("tempban", Optional.of("1d"), true, Optional.empty()),
+                        new AuditLine("tempban", Optional.of("1h"), false, Optional.of("held_by_stronger")));
     }
 
     @Test
@@ -450,6 +517,11 @@ class WarnEscalationTest {
             assertThat(active.until()).isEqualTo(NOW.plus(Ban.PERMANENT_SPAN));
             assertThat(active.issuer().name()).isEqualTo("Alex");
         });
+        assertThat(audit.lines)
+                .filteredOn(line -> line.kind().equals("tempban"))
+                .containsExactly(
+                        new AuditLine("tempban", Optional.of("permanent"), true, Optional.of("cheating")),
+                        new AuditLine("tempban", Optional.of("1d"), false, Optional.of("held_by_stronger")));
         assertThat(toldAlex())
                 .containsExactly(
                         ModerationMessageKey.MOD_WARN_ESCALATED.key(),
@@ -486,6 +558,84 @@ class WarnEscalationTest {
 
         assertThat(online.kicked()).isEmpty();
         assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATION_FAILED.key());
+    }
+
+    /** One mute or ban line the audit log was given: its kind, the span label, whether it landed, and why. */
+    private record AuditLine(String kind, Optional<String> duration, boolean ok, Optional<String> reason) {}
+
+    /** Keeps the mute and ban audit lines in order; every other audit line is not what these tests look at. */
+    private static final class RecordingAudit implements ModerationAudit {
+
+        private final List<AuditLine> lines = new ArrayList<>();
+
+        @Override
+        public void muted(
+                PlayerRef actor, PlayerRef target, Optional<String> duration, boolean ok, Optional<String> reason) {
+            lines.add(new AuditLine("mute", duration, ok, reason));
+        }
+
+        @Override
+        public void tempbanned(
+                PlayerRef actor, PlayerRef target, String duration, boolean ok, Optional<String> reason) {
+            lines.add(new AuditLine("tempban", Optional.of(duration), ok, reason));
+        }
+
+        @Override
+        public void unmuted(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {}
+
+        @Override
+        public void jailed(
+                PlayerRef actor,
+                PlayerRef target,
+                String jail,
+                Optional<String> duration,
+                boolean ok,
+                Optional<String> reason) {}
+
+        @Override
+        public void unjailed(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {}
+
+        @Override
+        public void unbanned(PlayerRef actor, PlayerRef target, boolean ok) {}
+
+        @Override
+        public void warned(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {}
+
+        @Override
+        public void clearedWarns(PlayerRef actor, PlayerRef target, boolean ok, int count) {}
+
+        @Override
+        public void kicked(PlayerRef actor, PlayerRef target, boolean ok, Optional<String> reason) {}
+
+        @Override
+        public void kickedAll(PlayerRef actor, int affected, Optional<String> reason) {}
+
+        @Override
+        public void froze(PlayerRef actor, PlayerRef target, boolean frozen, boolean ok) {}
+
+        @Override
+        public void ipBanned(
+                PlayerRef actor,
+                String targetIp,
+                Optional<UUID> target,
+                Optional<String> duration,
+                boolean ok,
+                Optional<String> reason) {}
+
+        @Override
+        public void ipUnbanned(PlayerRef actor, String targetIp, boolean ok) {}
+
+        @Override
+        public void altDetected(UUID uuid, String ip, List<UUID> matchedAlts, boolean kicked) {}
+
+        @Override
+        public void jailLocationDefined(PlayerRef actor, String jail) {}
+
+        @Override
+        public void jailLocationRemoved(PlayerRef actor, String jail) {}
+
+        @Override
+        public void lockdown(UUID actor, boolean enabled) {}
     }
 
     /** Counts the cross-server frames a sanction sends, so a test can tell a replaced sanction from a kept one. */
