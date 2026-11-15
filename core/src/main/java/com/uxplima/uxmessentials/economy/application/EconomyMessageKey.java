@@ -77,6 +77,8 @@ public enum EconomyMessageKey implements MessageKey {
     SELL_NOTHING_TO_SELL("wallet.sell-nothing"),
     SELL_NOT_SELLABLE("wallet.sell-not-sellable"),
     SELL_NO_ITEM_IN_HAND("wallet.sell-no-item-in-hand"),
+    SELL_FAILED("wallet.sell-failed"),
+    SELL_RETURNED("wallet.sell-returned"),
     // /sellall
     SELLALL_SUMMARY("wallet.sellall-summary"),
 

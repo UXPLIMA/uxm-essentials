@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -34,18 +35,21 @@ public final class SellAll {
     private final EconomyNotifier notifier;
     private final Currency defaultCurrency;
     private final java.util.Collection<Currency> currencies;
+    private final Logger log;
 
     public SellAll(
             EconomyProvider economy,
             WorthSource worth,
             EconomyNotifier notifier,
             Currency defaultCurrency,
-            java.util.Collection<Currency> currencies) {
+            java.util.Collection<Currency> currencies,
+            Logger log) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.worth = Objects.requireNonNull(worth, "worth");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.currencies = java.util.List.copyOf(currencies);
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Sell every priced material in {@code materials} (id → count) for {@code seller}, crediting the total per currency. */
@@ -106,7 +110,19 @@ public final class SellAll {
             total = total.add(unit.amount().multiply(BigDecimal.valueOf(stack.getValue())));
         }
         Money credit = Money.of(currency, total);
-        Result<Unit, TransferError> credited = economy.credit(seller, credit);
+        Result<Unit, TransferError> credited;
+        try {
+            credited = economy.credit(seller, credit);
+        } catch (RuntimeException failure) {
+            // A currency that fails here must not undo one that already paid: its own stacks stay unsold and go back,
+            // while the stacks an earlier credit paid for stay sold.
+            log.error(
+                    "event=sellall_credit_failed seller=" + seller.uuid() + " currency="
+                            + currency.id().value(),
+                    failure);
+            notifier.send(seller, EconomyMessageKey.SELL_FAILED);
+            return;
+        }
         if (credited.isErr()) {
             notifier.send(seller, credited.errorOrThrow().messageKey());
             return;

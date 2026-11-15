@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.application;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -23,6 +24,7 @@ final class InMemoryBank implements EconomyProvider {
 
     private final Set<Currency> currencies;
     private final Map<String, Money> balances = new HashMap<>();
+    private final Set<Currency> broken = new HashSet<>();
 
     InMemoryBank(Currency... currencies) {
         this.currencies = Set.of(currencies);
@@ -30,6 +32,11 @@ final class InMemoryBank implements EconomyProvider {
 
     void set(PlayerRef owner, Money amount) {
         balances.put(owner.uuid() + amount.currency().id().value(), amount);
+    }
+
+    /** Make every credit in {@code currency} throw, the way a provider whose storage is down does. */
+    void breakCredits(Currency currency) {
+        broken.add(currency);
     }
 
     @Override
@@ -47,6 +54,10 @@ final class InMemoryBank implements EconomyProvider {
 
     @Override
     public Result<Unit, TransferError> credit(PlayerRef owner, Money amount) {
+        if (broken.contains(amount.currency())) {
+            throw new IllegalStateException(
+                    "storage down for " + amount.currency().id().value());
+        }
         set(owner, balance(owner, amount.currency()).plus(amount));
         return Result.ok();
     }

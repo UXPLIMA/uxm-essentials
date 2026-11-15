@@ -1,0 +1,53 @@
+package com.uxplima.uxmessentials.persistence.economy;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.nio.file.Path;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import com.uxplima.uxmessentials.economy.application.port.ItemReturnStore;
+import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
+import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
+import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.sqlite.SQLiteDataSource;
+
+/** Kept give-backs through the real migrations on a SQLite file. */
+class JooqItemReturnStoreTest {
+
+    private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
+    private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
+
+    @TempDir
+    Path folder;
+
+    private ItemReturnStore store;
+
+    @BeforeEach
+    void open() {
+        SQLiteDataSource data = new SQLiteDataSource();
+        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
+        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
+        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+        store = new JooqItemReturnStore(dsl, Clock.fixed(Instant.parse("2030-01-01T00:00:00Z"), ZoneOffset.UTC));
+    }
+
+    @Test
+    void keptItemsAreSummedPerItemAndTakenOnlyOnce() {
+        store.keep(ALEX, Map.of("diamond", 5, "coal", 64));
+        store.keep(ALEX, Map.of("diamond", 3));
+        store.keep(SAM, Map.of("coal", 1));
+
+        assertThat(store.takeAll(ALEX)).isEqualTo(Map.of("diamond", 8, "coal", 64));
+        assertThat(store.takeAll(ALEX)).isEmpty();
+        assertThat(store.takeAll(SAM)).isEqualTo(Map.of("coal", 1));
+    }
+}

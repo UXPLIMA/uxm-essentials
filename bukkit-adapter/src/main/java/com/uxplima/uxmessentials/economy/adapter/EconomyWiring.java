@@ -20,8 +20,10 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.TransactionsHistory
 import com.uxplima.uxmessentials.economy.adapter.inbound.gui.WalletPanelMenu;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.BanknoteListener;
 import com.uxplima.uxmessentials.economy.adapter.inbound.listener.CommandCostListener;
+import com.uxplima.uxmessentials.economy.adapter.inbound.listener.ItemReturnListener;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BaltopSnapshots;
 import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitInventoryCalculations;
+import com.uxplima.uxmessentials.economy.adapter.outbound.BukkitSellerInventory;
 import com.uxplima.uxmessentials.economy.adapter.outbound.EconomyProviderRegistrar;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoanRepaymentTask;
 import com.uxplima.uxmessentials.economy.adapter.outbound.LoggingEconomyAudit;
@@ -52,6 +54,7 @@ import com.uxplima.uxmessentials.economy.application.PayAll;
 import com.uxplima.uxmessentials.economy.application.PayTaxation;
 import com.uxplima.uxmessentials.economy.application.PayToggle;
 import com.uxplima.uxmessentials.economy.application.PublishingEconomyProvider;
+import com.uxplima.uxmessentials.economy.application.ReturnUnsoldItems;
 import com.uxplima.uxmessentials.economy.application.RoutingEconomyProvider;
 import com.uxplima.uxmessentials.economy.application.SellAll;
 import com.uxplima.uxmessentials.economy.application.SellItem;
@@ -367,6 +370,9 @@ public final class EconomyWiring {
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
                 resolved, pendingRepo, services.notifier(), kernel.scheduler()));
+        // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
+        // operator turned selling off.
+        listenersList.add(new ItemReturnListener(services.returnUnsoldItems(), kernel.scheduler()));
 
         if (settings.commandCostsEnabled()) {
             listenersList.add(new CommandCostListener(
@@ -701,7 +707,13 @@ public final class EconomyWiring {
                 new BalTop(baltopProvider, notifier, settings.baltopPageSize()),
                 new LookupWorth(worth, notifier, defaultCurrency, currencies.all()),
                 new SellItem(resolved, worth, notifier, defaultCurrency, currencies.all()),
-                new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all()),
+                new SellAll(resolved, worth, notifier, defaultCurrency, currencies.all(), kernel.log()),
+                new ReturnUnsoldItems(
+                        kernel.scheduler(),
+                        new BukkitSellerInventory(kernel.log()),
+                        WalletRepositories.itemReturnStore(persistence, clock),
+                        notifier,
+                        kernel.log()),
                 new SetWorth(worthOverrides, notifier, audit, defaultCurrency, currencies.all()),
                 // An admin change is neither earned nor spent, so the money boards leave it off.
                 new EcoAdmin(
