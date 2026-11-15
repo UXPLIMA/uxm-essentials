@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -217,6 +218,62 @@ class PurgeArchivedRentWarpsTest {
     }
 
     @Test
+    void earningsThatCannotReachAnOfflineOwnerAreLeftAloneQuietly() {
+        PurgeArchivedRentWarps purge = purge(DELAY);
+        warps.put(archivedForRent(1, SAM, "market", LONG_AGO));
+        warps.bank.put(PlayerWarpId.of(1), new BigDecimal("40"));
+        purse.onlineOnly.add(PlayerWarpId.of(1));
+
+        assertThat(purge.purgeDue(500)).isZero();
+
+        assertThat(purse.withdrawals).isZero();
+        assertThat(warps.bank.get(PlayerWarpId.of(1))).isEqualByComparingTo("40");
+        assertThat(warps.findById(PlayerWarpId.of(1))).isPresent();
+        assertThat(log.errors()).isEmpty();
+    }
+
+    @Test
+    void anEmptyBankNeedsNoPayoutWhateverTheCurrency() {
+        PurgeArchivedRentWarps purge = purge(DELAY);
+        warps.put(archivedForRent(1, SAM, "market", LONG_AGO));
+        purse.onlineOnly.add(PlayerWarpId.of(1));
+
+        assertThat(purge.purgeDue(500)).isEqualTo(1);
+    }
+
+    @Test
+    void warpsThatMustBeKeptDoNotBlockTheOnesBehindThem() {
+        PurgeArchivedRentWarps purge = purge(DELAY);
+        for (long id = 1; id <= 2; id++) {
+            warps.put(archivedForRent(id, SAM, "stuck" + id, LONG_AGO.minus(Duration.ofDays(3 - id))));
+            warps.bank.put(PlayerWarpId.of(id), new BigDecimal("40"));
+            purse.onlineOnly.add(PlayerWarpId.of(id));
+        }
+        warps.put(archivedForRent(3, SAM, "market", LONG_AGO));
+
+        assertThat(purge.purgeDue(2)).isZero();
+        assertThat(purge.purgeDue(2)).isEqualTo(1);
+
+        assertThat(warps.ids()).containsExactlyInAnyOrder(1L, 2L);
+    }
+
+    @Test
+    void aWarpTransferredAfterThePageWasReadPaysItsNewOwner() {
+        PurgeArchivedRentWarps purge = purge(DELAY);
+        PlayerRef kim = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000000c"), "Kim");
+        warps.put(archivedForRent(1, SAM, "market", LONG_AGO));
+        warps.bank.put(PlayerWarpId.of(1), new BigDecimal("40"));
+        PlayerWarp read = purge.due(500).getFirst();
+
+        warps.save(read.transferredTo(kim, "Kim", LONG_AGO));
+
+        assertThat(purge.purge(read)).isTrue();
+        assertThat(purse.wallet(kim)).isEqualByComparingTo("40");
+        assertThat(purse.wallet(SAM)).isEqualByComparingTo("0");
+        assertThat(events.published()).containsExactly(new PlayerWarpDeleted(kim, PlayerWarpName.of("market")));
+    }
+
+    @Test
     void oneWarpFailingIsLoggedAndTheRestOfThePassStillRuns() {
         PurgeArchivedRentWarps purge = purge(DELAY);
         warps.put(archivedForRent(1, SAM, "market", LONG_AGO.minusSeconds(1)));
@@ -269,16 +326,26 @@ class PurgeArchivedRentWarpsTest {
         }
 
         @Override
-        public List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
+        public List<PlayerWarp> archivedForRent(Instant cutoff, Optional<RentArchiveCursor> after, int limit) {
             if (queryFails) {
                 throw new IllegalStateException("database unavailable");
             }
+            Comparator<PlayerWarp> order = Comparator.comparing((PlayerWarp w) ->
+                            w.rent().flatMap(RentState::archiveAfter).orElseThrow())
+                    .thenComparingLong(w -> w.id().orElseThrow().value());
             return byId.values().stream()
                     .filter(w -> archivedForRentSince(w, cutoff))
-                    .sorted(Comparator.comparing((PlayerWarp w) ->
-                            w.rent().flatMap(RentState::archiveAfter).orElseThrow()))
+                    .filter(w -> after.map(cursor -> isAfter(w, cursor)).orElse(true))
+                    .sorted(order)
                     .limit(limit)
                     .toList();
+        }
+
+        private static boolean isAfter(PlayerWarp w, RentArchiveCursor cursor) {
+            Instant deadline = w.rent().flatMap(RentState::archiveAfter).orElseThrow();
+            return deadline.isAfter(cursor.archiveAfter())
+                    || (deadline.equals(cursor.archiveAfter())
+                            && w.id().orElseThrow().value() > cursor.id().value());
         }
 
         @Override
@@ -354,6 +421,8 @@ class PurgeArchivedRentWarpsTest {
         private final Warps warps;
         private final Map<PlayerRef, BigDecimal> wallets = new HashMap<>();
         boolean refuse;
+        final Set<PlayerWarpId> onlineOnly = new HashSet<>();
+        int withdrawals;
 
         Purse(Warps warps) {
             this.warps = warps;
@@ -364,7 +433,13 @@ class PurgeArchivedRentWarpsTest {
         }
 
         @Override
+        public boolean canPayOutOffline(PlayerWarpId warp) {
+            return warps.bank.getOrDefault(warp, BigDecimal.ZERO).signum() <= 0 || !onlineOnly.contains(warp);
+        }
+
+        @Override
         public Result<Unit, ChargeError> withdraw(PlayerWarpId warp, PlayerRef to) {
+            withdrawals++;
             BigDecimal held = warps.bank.getOrDefault(warp, BigDecimal.ZERO);
             if (held.signum() <= 0) {
                 return Result.ok();

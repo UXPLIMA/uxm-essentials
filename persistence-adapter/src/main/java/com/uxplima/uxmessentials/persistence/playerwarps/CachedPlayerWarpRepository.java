@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -159,8 +160,8 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
-    public List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
-        return delegate.archivedForRent(cutoff, limit);
+    public List<PlayerWarp> archivedForRent(Instant cutoff, Optional<RentArchiveCursor> after, int limit) {
+        return delegate.archivedForRent(cutoff, after, limit);
     }
 
     @Override

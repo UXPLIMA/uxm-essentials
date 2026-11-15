@@ -9,6 +9,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -33,8 +34,12 @@ import org.jspecify.annotations.NullMarked;
  * rest of the rent sweep leaves it.
  *
  * <p>A warp can still hold earnings when it is archived (a bank in another currency than the rent, or less than one
- * term), so the bank is paid to the owner first and a warp whose payout fails is kept for the next pass. The delete
- * itself goes through {@link PlayerWarpRepository#deleteIfArchivedForRent}, which checks the same condition and an
+ * term), so the bank is paid to the owner first. The owner is read from the warp as it is stored right before the
+ * payout, so a transfer after the page was read pays the new owner. Nobody is watching this payout and the owner is
+ * usually offline, so it is only made when the currency can be credited to an offline player; otherwise the warp is
+ * kept quietly with its bank, and a warp whose payout fails is kept too. The pages move on through the archive in
+ * (deadline, id) order across passes and start over at the end, so warps that must be kept never block the ones
+ * behind them. The delete itself goes through {@link PlayerWarpRepository#deleteIfArchivedForRent}, which checks the same condition and an
  * empty bank inside the delete: the page read earlier can be stale by then (a restore, a payment, another backend
  * running the same sweep), and only a delete that happened is published and counted.
  *
@@ -51,6 +56,8 @@ public final class PurgeArchivedRentWarps {
     private final RentConfig config;
     private final Clock clock;
     private final Logger log;
+    // Passes run one after another on the async lane, possibly on different threads.
+    private volatile Optional<RentArchiveCursor> cursor = Optional.empty();
 
     public PurgeArchivedRentWarps(
             PlayerWarpRepository repository,
@@ -101,12 +108,17 @@ public final class PurgeArchivedRentWarps {
         return deleted.size();
     }
 
-    /** Up to {@code limit} warps whose hard delete is due now; empty when hard delete is off. */
+    /**
+     * The next page of up to {@code limit} warps whose hard delete is due now, after the page the previous call
+     * returned; a short page means the end was reached and the next call starts over. Empty when hard delete is off.
+     */
     public List<PlayerWarp> due(int limit) {
         if (!config.hardDeletes()) {
             return List.of();
         }
-        return repository.archivedForRent(cutoff(), limit);
+        List<PlayerWarp> page = repository.archivedForRent(cutoff(), cursor, limit);
+        cursor = page.size() < limit ? Optional.empty() : cursorAfter(page.getLast());
+        return page;
     }
 
     /**
@@ -123,15 +135,33 @@ public final class PurgeArchivedRentWarps {
         if (id.isEmpty()) {
             return false;
         }
-        Result<Unit, ChargeError> paid = economy.withdraw(id.get(), warp.owner());
+        // The page can be stale: re-read the warp so a restore, a transfer or a new exemption since then is seen and
+        // the bank goes to whoever owns the warp now.
+        Optional<PlayerWarp> stored = repository.findById(id.get());
+        if (stored.isEmpty()) {
+            return false;
+        }
+        PlayerWarp fresh = stored.get();
+        if (config.isExempt(fresh) || !qualifies(fresh, cutoff) || !economy.canPayOutOffline(id.get())) {
+            return false;
+        }
+        Result<Unit, ChargeError> paid = economy.withdraw(id.get(), fresh.owner());
         if (paid.isErr()) {
             return false;
         }
         if (!repository.deleteIfArchivedForRent(id.get(), cutoff)) {
             return false;
         }
-        events.publish(new PlayerWarpDeleted(warp.owner(), warp.name()));
+        events.publish(new PlayerWarpDeleted(fresh.owner(), fresh.name()));
         return true;
+    }
+
+    private static Optional<RentArchiveCursor> cursorAfter(PlayerWarp last) {
+        Optional<Instant> deadline = last.rent().flatMap(RentState::archiveAfter);
+        if (deadline.isEmpty() || last.id().isEmpty()) {
+            return Optional.empty();
+        }
+        return Optional.of(new RentArchiveCursor(deadline.get(), last.id().get()));
     }
 
     private static String token(PlayerWarp warp) {

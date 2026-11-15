@@ -123,11 +123,11 @@ public interface PlayerWarpRepository {
      * were retired for unpaid rent ({@code rent_archive_after} set) and have stayed untouched since {@code cutoff}:
      * both the archive deadline and {@code updated_at} are at or before it, oldest deadline first, for the rent
      * sweep's hard-delete pass. A warp the owner archived while paid up carries no archive deadline and never
-     * matches, and a warp that was restored and archived again counts from its latest change. Capped at
-     * {@code limit}. The default returns an empty list so an undecorated store deletes nothing; the jOOQ adapter
-     * overrides it.
+     * matches, and a warp that was restored and archived again counts from its latest change. The page starts after
+     * {@code after} when given, in the same (deadline, id) order, and is capped at {@code limit}. The default returns
+     * an empty list so an undecorated store deletes nothing; the jOOQ adapter overrides it.
      */
-    default List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
+    default List<PlayerWarp> archivedForRent(Instant cutoff, Optional<RentArchiveCursor> after, int limit) {
         return List.of();
     }
 

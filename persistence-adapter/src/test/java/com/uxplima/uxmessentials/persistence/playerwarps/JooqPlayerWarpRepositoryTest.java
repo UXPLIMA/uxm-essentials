@@ -15,6 +15,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
@@ -76,12 +77,19 @@ class JooqPlayerWarpRepositoryTest {
         repository.save(archivedForRent("restored", old, old).withStatus(WarpStatus.ACTIVE, old));
         repository.save(warp("owner-archived").withStatus(WarpStatus.ARCHIVED, old));
 
-        List<String> due = repository.archivedForRent(CUTOFF, 10).stream()
+        List<String> due = repository.archivedForRent(CUTOFF, Optional.empty(), 10).stream()
                 .map(w -> w.name().value())
                 .toList();
 
         assertThat(due).containsExactly("older", "late");
-        assertThat(repository.archivedForRent(CUTOFF, 1)).hasSize(1);
+        List<PlayerWarp> first = repository.archivedForRent(CUTOFF, Optional.empty(), 1);
+        assertThat(first).extracting(w -> w.name().value()).containsExactly("older");
+        RentArchiveCursor after = new RentArchiveCursor(
+                first.getFirst().rent().flatMap(RentState::archiveAfter).orElseThrow(),
+                first.getFirst().id().orElseThrow());
+        assertThat(repository.archivedForRent(CUTOFF, Optional.of(after), 10))
+                .extracting(w -> w.name().value())
+                .containsExactly("late");
     }
 
     private void favourite(PlayerWarpId warp) {
