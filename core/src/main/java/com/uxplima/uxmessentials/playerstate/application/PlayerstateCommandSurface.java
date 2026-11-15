@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The playerstate inbound adapter realises the Brigadier
  * node from the started module's context on the next {@code COMMANDS} fire. Collected here so
- * {@code PlayerstateModule} stays small and the command/permission pairing is one greppable table the
- * permissions guard checks against {@code paper-plugin.yml}.
+ * {@code PlayerstateModule} stays small and the command/permission pairing is one greppable table.
  *
  * <p>The {@code .others} target form of each self/other command is gated by the single shared
  * {@code uxmessentials.playerstate.others} node, checked per-invocation in the adapter rather than declared

@@ -37,6 +37,13 @@ public final class BukkitServerConnector implements ServerConnector {
         plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, CHANNEL);
     }
 
+    /**
+     * True once the channel is registered, which the constructor does, so in practice this only catches a failed
+     * registration. It cannot say whether a proxy is listening: the {@code BungeeCord} channel is never announced
+     * by the proxy, the proxy settings in the server's configuration do not prove the proxy knows the target name,
+     * and a {@code Connect} frame gets no reply. A caller that charges before connecting needs its own timeout
+     * instead, as the player-warps watchdog does.
+     */
     @Override
     public boolean isAvailable() {
         return plugin.getServer().getMessenger().isOutgoingChannelRegistered(plugin, CHANNEL);

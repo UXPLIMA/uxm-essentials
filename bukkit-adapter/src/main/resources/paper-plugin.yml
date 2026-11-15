@@ -240,7 +240,6 @@ dependencies:
 
 # Permissions are not declared here. Every node the plugin publishes lives in one Java catalogue
 # (core .../shared/application/permission/PermissionCatalog), and the plugin registers the whole
-# surface with the server on enable. Declaring them twice is what let them drift: nodes checked in
-# code that this file never listed, and nodes listed here that no code ever read. The catalogue is
-# also what the reference page and the in-game /uxmess permissions listing are built from, so a node
-# cannot exist without being visible to an operator.
+# surface with the server on enable, so a node is written down once. /uxmess permissions lists the
+# catalogue in game and /uxmess permissions export writes it to a file; the permission pages under
+# docs/user/ follow it by hand.

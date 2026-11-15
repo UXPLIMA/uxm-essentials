@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.velocity;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.network.BusChannel;
-import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.ProxyServer;
@@ -16,7 +15,7 @@ import org.slf4j.Logger;
 /**
  * The fan-out core of the proxy broker, separated from the Velocity-lifecycle shell so the relay decision is
  * plain Java. It takes a {@link PluginMessageEvent} that already matched the bus channel, decodes the frame
- * to read its origin server id, then sends the same bytes to every backend <em>except</em> the origin.
+ * header to read its origin server id, then sends the same bytes to every backend <em>except</em> the origin.
  *
  * <p>Two things make the relay safe against replication loops:
  *
@@ -24,7 +23,7 @@ import org.slf4j.Logger;
  *   <li>It only relays frames whose source is a {@link ServerConnection}, a backend → proxy message. A
  *       frame the proxy itself sent to a backend arrives with a different source type and is never
  *       re-relayed, so the broker cannot bounce its own output.
- *   <li>It skips the origin backend in the fan-out (origin read from the decoded frame), and additionally
+ *   <li>It skips the origin backend in the fan-out (origin read from the frame header), and additionally
  *       skips the connection's own server. The receiving backend's bus client also drops any frame whose
  *       origin equals its own id, belt and suspenders, so a mutation reaches each peer exactly once.
  * </ol>
@@ -79,8 +78,8 @@ final class BusBroker {
 
     private @org.jspecify.annotations.Nullable String decodeOrigin(byte[] frame) {
         try {
-            NetworkMessage message = NetworkMessageCodec.decode(frame);
-            return message.originServer();
+            // The header alone: a frame type this proxy does not know yet is still relayed to the backends.
+            return NetworkMessageCodec.readOrigin(frame);
         } catch (IllegalArgumentException malformed) {
             logger.warn("dropping malformed bus frame ({} bytes): {}", frame.length, malformed.getMessage());
             return null;

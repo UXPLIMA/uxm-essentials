@@ -4,66 +4,78 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
+import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
 import com.uxplima.uxmessentials.ranks.domain.event.PlayerRankedUp;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * {@code /rankup}: advance a player one rung up the ladder when they meet the next rank's requirements and can
- * pay its cost. The current standing is resolved through {@link CurrentRank} (defaulting to the first rank for a
- * player with no stored pointer), the next rank through {@link com.uxplima.uxmessentials.ranks.domain.RankLadder#next},
- * and the outcome is returned as a typed {@link RankupResult} the command boundary renders. This use case sends
- * no message and touches no Bukkit type.
+ * pay its cost. The current standing is resolved from memory through {@link CurrentRank}, the next rank through
+ * {@link RankLadder#next}, and the outcome is returned as a typed {@link RankupResult} the caller renders. This use
+ * case sends no message and touches no Bukkit type.
  *
- * <h2>Ordering and rollback stance</h2>
- * The steps run in a deliberate order so a refused rankup leaves no trace: <b>requirements → charge → advance →
- * actions</b>.
+ * <h2>Ordering and threads</h2>
  * <ol>
- *   <li><b>Requirements.</b> Every parsed requirement of the next rank is evaluated first; a single failure
- *       returns {@link RankupResult#requirementsNotMet()} with nothing charged and the pointer unmoved.</li>
- *   <li><b>Charge.</b> Only once the requirements pass is the cost charged through the {@link RankEconomy} seam.
- *       A refused debit (insufficient funds) returns {@link RankupResult#cannotAfford()}: the withdraw reported
- *       {@code false}, so no money moved and there is nothing to compensate; the pointer does not advance. With
- *       no economy provider wired, or a zero cost, the charge is skipped and rankup is free.</li>
- *   <li><b>Advance.</b> The rank pointer is saved (the prestige level is carried over unchanged: prestige is a
- *       separate mechanic).</li>
- *   <li><b>Actions.</b> The rank's configured actions run last, only after the advance is durable.</li>
+ *   <li><b>Check</b>, on the caller's thread, which must own the player: the standing and the next rank's live
+ *       requirements (inventory, placeholder, permission, previous rank), which only that thread may read. A
+ *       failure here returns with nothing charged and nothing written.</li>
+ *   <li><b>Commit</b>, on the async lane: the requirements that read storage (playtime, balance) are checked, then
+ *       the cost is charged, then the pointer is saved. A failed requirement or a refused debit ends the attempt
+ *       with nothing moved. A save that throws refunds the charge, so a player never pays for a rank they did not
+ *       get.</li>
+ *   <li><b>Finish</b>, back on the player's thread: the rank's actions run and the {@link PlayerRankedUp} event is
+ *       published, both only after the advance is durable.</li>
  * </ol>
- * Charging strictly before advancing is what guarantees a failed charge never advances. The one residual gap is
- * the exceptional case where the guarded debit succeeds but the subsequent {@code save} throws a genuine
- * database fault: Phase 2 does not auto-refund there. {@code save} is a single-row idempotent upsert, so a fault
- * is exceptional and surfaces to the command boundary rather than being silently swallowed. A compensating
- * refund is deferred rather than papered over.
+ * The returned future completes on the player's thread, or on the caller's thread when the check refuses, so a
+ * caller may message the player from it. The one exception is a player who left while the commit ran: the future
+ * then completes on whatever thread the scheduler runs its retired branch on, which may be off the tick, so a
+ * callback checks the player is still online before it touches them. It never completes exceptionally: a storage
+ * fault is {@link RankupResult#failed()}.
+ *
+ * <p>Only one rankup per player is in flight at a time. Without that guard two quick clicks would both pass the
+ * check against the same standing and both pay for the same rung.
  */
 public final class Rankup {
 
-    /** Rank costs are charged in the economy's default currency; a per-rank currency is out of Phase-2 scope. */
+    /** Rank costs are charged in the economy's default currency. */
     private static final String DEFAULT_CURRENCY = "default";
 
     private final CurrentRank currentRank;
     private final PlayerRankRepository repository;
-    private final com.uxplima.uxmessentials.ranks.domain.RankLadder ladder;
+    private final RankLadder ladder;
     private final RankRequirementEvaluator requirements;
     private final RankActionRunner actions;
     private final Optional<RankEconomy> economy;
     private final DomainEventPublisher events;
+    private final Scheduler scheduler;
+    private final Logger log;
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     public Rankup(
             CurrentRank currentRank,
             PlayerRankRepository repository,
-            com.uxplima.uxmessentials.ranks.domain.RankLadder ladder,
+            RankLadder ladder,
             RankRequirementEvaluator requirements,
             RankActionRunner actions,
             Optional<RankEconomy> economy,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            Scheduler scheduler,
+            Logger log) {
         this.currentRank = Objects.requireNonNull(currentRank, "currentRank");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
@@ -71,62 +83,167 @@ public final class Rankup {
         this.actions = Objects.requireNonNull(actions, "actions");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.events = Objects.requireNonNull(events, "events");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
-    /** Attempt to advance {@code who} one rank up the ladder, charging the next rank's cost, returning the outcome. */
-    public RankupResult rankUp(PlayerRef who) {
+    /** Attempt to advance {@code who} one rank up the ladder, charging the next rank's cost. */
+    public CompletableFuture<RankupResult> rankUp(PlayerRef who) {
         return rankUp(who, true);
     }
 
     /**
-     * Attempt to advance {@code who} one rank up the ladder, returning the typed outcome. This is the seam the
-     * autorank scan reuses so it does not duplicate the requirement / advance / action logic: when {@code charge}
-     * is {@code false} the cost step is skipped entirely and a met rank-up promotes for free, so an operator who
-     * turns autorank's {@code charge-cost} off lets an eligible player climb without their balance moving. With
-     * {@code charge} {@code true} the behaviour is identical to {@code /rankup}. The cost is charged before the
-     * pointer advances, so a short balance refuses without promoting.
+     * Attempt to advance {@code who} one rank up the ladder. This is the seam the autorank scan reuses: with
+     * {@code charge} {@code false} the cost step is skipped and a met rankup promotes for free. With {@code charge}
+     * {@code true} the behaviour is identical to {@code /rankup}. Call it on the thread that owns {@code who}.
      */
-    public RankupResult rankUp(PlayerRef who, boolean charge) {
+    public CompletableFuture<RankupResult> rankUp(PlayerRef who, boolean charge) {
         Objects.requireNonNull(who, "who");
+        UUID id = who.uuid();
+        if (!inFlight.add(id)) {
+            return CompletableFuture.completedFuture(RankupResult.busy());
+        }
+        CompletableFuture<RankupResult> answer = new CompletableFuture<>();
+        // The caller chains on the released future, so a follow-up rankup from its callback is not refused as busy.
+        CompletableFuture<RankupResult> released = answer.whenComplete((result, failure) -> inFlight.remove(id));
+        try {
+            check(who, charge, answer);
+        } catch (RuntimeException failure) {
+            log.error("rankup check failed for player " + id, failure);
+            answer.complete(RankupResult.failed());
+        }
+        return released;
+    }
+
+    private void check(PlayerRef who, boolean charge, CompletableFuture<RankupResult> answer) {
         Optional<RankStanding> standing = currentRank.of(who.uuid());
         if (standing.isEmpty()) {
-            return RankupResult.alreadyMax();
+            // With a non-empty ladder an empty standing only means the pointer has not loaded yet.
+            answer.complete(ladder.isEmpty() ? RankupResult.alreadyMax() : RankupResult.busy());
+            return;
         }
         Optional<Rank> next = ladder.next(standing.get().rank().id());
         if (next.isEmpty()) {
-            return RankupResult.alreadyMax();
+            answer.complete(RankupResult.alreadyMax());
+            return;
         }
-        return advance(who, standing.get(), next.get(), charge);
+        Rank target = next.get();
+        List<RankRequirement> needs = parseRequirements(target);
+        if (!requirements.passesLive(who, needs)) {
+            answer.complete(RankupResult.requirementsNotMet());
+            return;
+        }
+        Advance advance = new Advance(who, standing.get(), target, needs, charge ? price(target) : BigDecimal.ZERO);
+        scheduler.async(() -> commit(advance, answer));
     }
 
-    private RankupResult advance(PlayerRef who, RankStanding standing, Rank target, boolean charge) {
-        if (!requirements.passesAll(who, parseRequirements(target))) {
-            return RankupResult.requirementsNotMet();
-        }
-        if (charge && !charge(who, target)) {
-            return RankupResult.cannotAfford();
-        }
-        repository.save(who.uuid(), target.id(), standing.prestige());
-        actions.run(who, target.actions());
-        // Raised last, once the new pointer is durable and the rank's own actions have run, so a consumer that
-        // reads the player's rank in its handler reads the rank they were just given.
-        events.publish(new PlayerRankedUp(who, standing.rank().id(), target.id()));
-        return RankupResult.rankedUp(target);
+    /** Check stored requirements, charge and save on the async lane, then hop back to the player's thread. */
+    private void commit(Advance advance, CompletableFuture<RankupResult> answer) {
+        RankupResult result = chargeAndSave(advance);
+        scheduler.onEntity(
+                advance.who(),
+                () -> finish(advance, result, true, answer),
+                () -> finish(advance, result, false, answer));
     }
 
-    /** Charge the rank's cost, or pass through free when the cost is zero or no economy provider is wired. */
-    private boolean charge(PlayerRef who, Rank target) {
+    private RankupResult chargeAndSave(Advance advance) {
+        PlayerRef who = advance.who();
+        boolean charged = false;
+        try {
+            if (!requirements.passesStored(who, advance.needs())) {
+                return RankupResult.requirementsNotMet();
+            }
+            if (advance.isPriced()) {
+                if (!economy.orElseThrow().withdraw(who, advance.cost(), DEFAULT_CURRENCY)) {
+                    return RankupResult.cannotAfford();
+                }
+                charged = true;
+            }
+            repository.save(who.uuid(), advance.target().id(), advance.from().prestige());
+            return RankupResult.rankedUp(advance.target());
+        } catch (RuntimeException failure) {
+            log.error("rankup could not be stored for player " + who.uuid(), failure);
+            if (charged) {
+                refund(advance);
+            }
+            return RankupResult.failed();
+        }
+    }
+
+    private void refund(Advance advance) {
+        PlayerRef who = advance.who();
+        try {
+            if (economy.orElseThrow().deposit(who, advance.cost(), DEFAULT_CURRENCY)) {
+                return;
+            }
+            log.warn(
+                    "event=rankup_refund_refused player={} amount={} currency={}",
+                    who.uuid(),
+                    advance.cost(),
+                    DEFAULT_CURRENCY);
+        } catch (RuntimeException failure) {
+            log.error(
+                    "rankup refund of " + advance.cost() + " failed for player " + who.uuid()
+                            + "; the player is owed that amount",
+                    failure);
+        }
+    }
+
+    /**
+     * On the player's thread: run the actions and raise the event when the rank was saved, then answer. When the
+     * player left before the hop there is nobody to run actions on, but the event is still raised because the new
+     * rank is durable.
+     */
+    private void finish(Advance advance, RankupResult result, boolean present, CompletableFuture<RankupResult> answer) {
+        try {
+            if (result.status() == RankupResult.Status.RANKED_UP) {
+                if (present) {
+                    runActions(advance);
+                }
+                events.publish(new PlayerRankedUp(
+                        advance.who(),
+                        advance.from().rank().id(),
+                        advance.target().id()));
+            }
+        } catch (RuntimeException failure) {
+            log.error("rankup event failed for player " + advance.who().uuid(), failure);
+        } finally {
+            // Always answered, or the in-flight guard would refuse this player's every later rankup.
+            answer.complete(result);
+        }
+    }
+
+    private void runActions(Advance advance) {
+        try {
+            actions.run(advance.who(), advance.target().actions());
+        } catch (RuntimeException failure) {
+            // The rank is already paid for and saved; a broken action line must not hide that from the player.
+            log.error("rank actions failed for player " + advance.who().uuid(), failure);
+        }
+    }
+
+    /** The rank's cost, or zero when it is free or no economy provider is wired. */
+    private BigDecimal price(Rank target) {
         if (target.cost() <= 0L || economy.isEmpty()) {
-            return true;
+            return BigDecimal.ZERO;
         }
-        return economy.get().withdraw(who, BigDecimal.valueOf(target.cost()), DEFAULT_CURRENCY);
+        return BigDecimal.valueOf(target.cost());
     }
 
     /** Parse the rank's raw requirement lines, dropping any the codec cannot recognise (not enforced). */
-    private List<RankRequirement> parseRequirements(Rank target) {
+    private static List<RankRequirement> parseRequirements(Rank target) {
         return target.requirements().stream()
                 .map(RankRequirement::parse)
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /** One checked rankup on its way to storage: who, from where, to where, what it asks for and what it costs. */
+    private record Advance(
+            PlayerRef who, RankStanding from, Rank target, List<RankRequirement> needs, BigDecimal cost) {
+
+        boolean isPriced() {
+            return cost.signum() > 0;
+        }
     }
 }

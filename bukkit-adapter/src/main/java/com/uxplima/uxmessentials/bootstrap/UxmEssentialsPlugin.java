@@ -178,7 +178,7 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             getLogger()
                     .warning("World '" + worldName + "' asked for our generator, but the worlds module is off,"
                             + " so it will generate as normal terrain. Enable the worlds module in"
-                            + " modules.conf, or drop the generator line for this world.");
+                            + " modules/worlds/config.conf, or drop the generator line for this world.");
             return null;
         }
         ChunkGenerator generator = resolveGenerator(resolver, id);

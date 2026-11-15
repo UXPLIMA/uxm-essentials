@@ -6,11 +6,14 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * The money side of a priced command. The adapter resolves the configured currency lazily, so a backend that
  * arrives after the module started is still picked up.
  *
- * <p>When the economy module is off, the adapter supplies a free implementation: every command can be afforded,
- * charging is a no-op, and a definition that declares a cost simply runs. An operator who wants the price enforced
- * enables the economy module, which is a clearer contract than silently refusing every priced command.
+ * <p>Whether a priced command runs while the backend does not answer is policy, decided by the use case from
+ * {@link #available()}; this port only reports the backend's state, so {@link #canAfford} and {@link #charge} answer
+ * false rather than waving a price through.
  */
 public interface CommandFee {
+
+    /** Whether the currency backend answers right now; it can come and go while the server runs. */
+    boolean available();
 
     /** Whether {@code who} holds at least {@code amount}. */
     boolean canAfford(PlayerRef who, double amount);

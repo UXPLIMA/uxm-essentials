@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@code uxmessentials.vote.use} (shows the configured vote links; its {@code testreward} subcommand,
  * gated by {@code uxmessentials.vote.testreward}, simulates a vote for the sender) and {@code /voteparty}
  * guarded by {@code uxmessentials.voteparty.use} (shows the party progress). The literals and nodes are
- * fixed and greppable so the surface guard checks them against {@code paper-plugin.yml}; the realised
+ * fixed and greppable; the realised
  * Brigadier handlers are built in the adapter.
  *
  * <p>The {@code testreward} action is a subcommand of {@code /vote} gated by its own node, not a separate

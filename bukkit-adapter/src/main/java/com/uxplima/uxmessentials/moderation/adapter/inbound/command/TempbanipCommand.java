@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.regex.Pattern;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -35,7 +34,6 @@ import org.jspecify.annotations.NullMarked;
 public final class TempbanipCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = "uxmessentials.moderation.banip";
-    private static final Pattern IP_LITERAL = Pattern.compile("^[0-9.:a-fA-F]+$");
 
     public TempbanipCommand(ModerationServices services, Messages messages, MessageSink sink) {
         super(services, messages, sink);
@@ -68,10 +66,12 @@ public final class TempbanipCommand extends ModerationCommandSupport implements 
     }
 
     private Optional<BanIp.Target> resolveTarget(CommandContext<CommandSourceStack> ctx, String argument) {
-        if (argument.contains(".") || argument.contains(":")) {
-            return IP_LITERAL.matcher(argument).matches()
-                    ? Optional.of(new BanIp.Target(argument, Optional.empty()))
-                    : Optional.empty();
+        if (IpLiteral.looksLikeAddress(argument)) {
+            Optional<String> ip = IpLiteral.canonical(argument);
+            if (ip.isEmpty()) {
+                notify(ctx, ModerationMessageKey.BANIP_INVALID_IP, Map.of());
+            }
+            return ip.map(address -> new BanIp.Target(address, Optional.empty()));
         }
         return targetByName(ctx, argument).flatMap(player -> byPlayer(ctx, player));
     }

@@ -29,8 +29,10 @@ import org.jspecify.annotations.NullMarked;
  * <p><b>Threading (Folia).</b> The repeating task runs on the global region thread, where the online roster is
  * coherent; {@link #tick} does nothing there but snapshot each online player to a {@link PlayerRef} and hop the
  * promotion to that player's own entity thread through {@link Scheduler#onEntity}. It never reads or mutates a
- * foreign entity inline, the {@link Rankup} pipeline (a placeholder or inventory requirement check, the action
- * runner) runs on the owning region thread, exactly as the {@code /rankup} command thread would. This mirrors the
+ * foreign entity inline: the {@link Rankup} pipeline checks requirements on the owning region thread, charges and
+ * saves on the async lane, and runs the action runner back on the owning region thread, exactly as for the
+ * {@code /rankup} command. A player whose previous promotion is still saving is skipped until the next pass. This
+ * mirrors the
  * {@code WorldAutoUnloadSweep} / {@code StaffFollowService} enumerate-on-global-then-hop-per-entity idiom.
  *
  * <p><b>Opt-in.</b> {@link #start()} schedules nothing and hands back a no-op closeable when autorank is disabled,
@@ -75,11 +77,12 @@ public final class AutorankScan {
         }
     }
 
-    // One promotion step for one player, on that player's own region thread. Guarded so a single failing attempt
-    // is logged with the player's id and skipped rather than aborting the rest of the scan.
+    // One promotion step for one player, started on that player's own region thread. The outcome is not read: a
+    // refusal just waits for the next pass and Rankup logs its own storage faults. Guarded so a single failing
+    // attempt is logged with the player's id and skipped rather than aborting the rest of the scan.
     private void promote(PlayerRef who) {
         try {
-            rankup.rankUp(who, settings.chargeCost());
+            var unused = rankup.rankUp(who, settings.chargeCost());
         } catch (RuntimeException failure) {
             log.error("autorank promotion failed for player " + who.uuid(), failure);
         }

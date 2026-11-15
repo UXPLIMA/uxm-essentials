@@ -24,7 +24,9 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -60,6 +62,8 @@ public final class RanksCommand implements CommandRegistration {
     private final SetRankExecutor setRank;
     private final Optional<RanksPanelMenu> panel;
     private final CurrentRank currentRank;
+    private final Scheduler scheduler;
+    private final Logger log;
     private final Messages messages;
     private final CommandFeedback feedback;
 
@@ -68,11 +72,19 @@ public final class RanksCommand implements CommandRegistration {
             RankLadder ladder,
             Optional<RanksPanelMenu> panel,
             CurrentRank currentRank,
+            Scheduler scheduler,
+            Logger log,
             Messages messages) {
         this.setRank = new SetRankExecutor(
-                Objects.requireNonNull(setRank, "setRank"), Objects.requireNonNull(ladder, "ladder"), messages);
+                Objects.requireNonNull(setRank, "setRank"),
+                Objects.requireNonNull(ladder, "ladder"),
+                Objects.requireNonNull(scheduler, "scheduler"),
+                Objects.requireNonNull(log, "log"),
+                messages);
         this.panel = Objects.requireNonNull(panel, "panel");
         this.currentRank = Objects.requireNonNull(currentRank, "currentRank");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.feedback = new CommandFeedback(messages);
     }
@@ -120,6 +132,24 @@ public final class RanksCommand implements CommandRegistration {
     private void tellStanding(Player player) {
         PlayerRef viewer = BukkitRefs.toRef(player);
         Optional<RankStanding> standing = currentRank.of(player.getUniqueId());
+        if (standing.isPresent()) {
+            sendStanding(player, viewer, standing);
+            return;
+        }
+        // A miss is either an empty ladder or a pointer not loaded yet; the read that tells them apart may reach the
+        // database, so it runs on the async lane and the line is sent back on the player's thread.
+        scheduler.async(() -> {
+            try {
+                Optional<RankStanding> loaded = currentRank.load(viewer.uuid());
+                scheduler.onEntity(viewer, () -> sendStanding(player, viewer, loaded));
+            } catch (RuntimeException failure) {
+                log.error("failed to read the rank of player " + viewer.uuid(), failure);
+                scheduler.onEntity(viewer, () -> feedback.send(player, SharedMessageKey.COMMAND_ERROR));
+            }
+        });
+    }
+
+    private void sendStanding(Player player, PlayerRef viewer, Optional<RankStanding> standing) {
         String rank = standing.map(held -> held.rank().displayName())
                 .orElseGet(() -> messages.resolve(viewer, RanksMessageKey.RANKS_GUI_MAX, Map.of()));
         String prestige =

@@ -6,8 +6,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * The narrow economy seam the ranks context owns so a rank's rankup cost can be charged <em>without</em> a hard
- * dependency on the economy context. This is the entire economy surface ranks needs, a balance check and a
- * guarded withdrawal. Expressed in ranks' own terms; the economy context supplies an adapter that bridges this
+ * dependency on the economy context. This is the entire economy surface ranks needs: a balance check, a
+ * guarded withdrawal and the deposit that refunds a withdrawal whose rankup was not saved. Expressed in ranks' own
+ * terms; the economy context supplies an adapter that bridges this
  * to its {@code EconomyProvider}/{@code Wallet}, and the ranks context never imports an economy type (mirrors the
  * kits {@code KitEconomy} seam).
  *
@@ -28,4 +29,10 @@ public interface RankEconomy {
      * successful debit and {@code false} when the balance was insufficient.
      */
     boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
+
+    /**
+     * Give {@code amount} of {@code currencyId} back to {@code who}: the refund of a charge whose rankup could not be
+     * saved. Returns {@code false} when the credit was refused, so the caller can report money it still owes.
+     */
+    boolean deposit(PlayerRef who, BigDecimal amount, String currencyId);
 }

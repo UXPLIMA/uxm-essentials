@@ -7,7 +7,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 
 /**
  * The permission table for the contexts that police a server. Data, not logic: one row per node, read by {@link
- * PermissionCatalog} and through it by the server registration, the reference page and the in-game listing.
+ * PermissionCatalog} and through it by the server registration, the in-game listing and its export.
  */
 final class EnforcementPermissions {
 

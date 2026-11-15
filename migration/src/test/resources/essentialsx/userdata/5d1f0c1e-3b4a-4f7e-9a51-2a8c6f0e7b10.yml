@@ -1,0 +1,45 @@
+lastAccountName: Steve
+money: '1250.5'
+homes:
+  base:
+    world: world
+    x: 10.5
+    y: 64.0
+    z: -20.5
+    yaw: 90.0
+    pitch: 0.0
+mail:
+- legacy: false
+  read: true
+  sender-name: Alex
+  sender-uuid: 8b0c7a52-6f1e-4d3a-9c2b-0e4f5a6b7c8d
+  timestamp: 1700000000000
+  expire: 0
+  message: "§cMeet me at <spawn> \\o/"
+- legacy: false
+  read: false
+  sender-name: Console
+  sender-uuid: 'null'
+  timestamp: 1700000600000
+  expire: 0
+  message: Server restarts tonight
+- legacy: true
+  read: false
+  sender-name: Ignored
+  message: "§6[§rNotch§6] §rold style mail"
+- "§6[§rJeb_§6] §rplain string mail"
+- just words without a sender
+- legacy: false
+  read: false
+  sender-name: Alex
+  sender-uuid: 8b0c7a52-6f1e-4d3a-9c2b-0e4f5a6b7c8d
+  timestamp: 1600000000000
+  expire: 1600000060000
+  message: long gone
+- legacy: false
+  read: false
+  sender-name: Alex
+  sender-uuid: 8b0c7a52-6f1e-4d3a-9c2b-0e4f5a6b7c8d
+  timestamp: 1700000900000
+  expire: 0
+  message: "§a"

@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 
 import org.bukkit.Material;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.ServicePriority;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -203,6 +204,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActi
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
@@ -217,6 +219,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkPresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -281,6 +284,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
@@ -518,6 +522,20 @@ public final class PluginModule {
         // no-op bus and registers no channel, so the single-server path is unchanged.
         BusWiring.Wired bus = BusWiring.wire(plugin, config, kernel.scheduler(), kernel.log());
         resources.onClose(bus::stop);
+        // Which backend each online player is on, built over the bus before the modules so a context that names a
+        // player can ask it. The players already online are seeded here, on the enable thread, so a plugin reload
+        // does not forget them; their join frames are dropped by the stopped transport, and the first roster
+        // announcement after the bus starts carries them instead.
+        NetworkPresenceWiring.Wired networkPresence = NetworkPresenceWiring.wire(
+                bus.bus(), NetworkConfig.from(config), nameIndex, kernel.scheduler(), kernel.log());
+        resources.onClose(networkPresence::stop);
+        resources.addListener(new NetworkPresenceListener(networkPresence.track()));
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            networkPresence
+                    .track()
+                    .joined(new com.uxplima.uxmessentials.shared.domain.PlayerRef(
+                            online.getUniqueId(), online.getName()));
+        }
 
         // The optional-plugin hook façade: resolved once here (plugin presence is stable for the run) over the
         // registered hooks, each binding to its real impl when its soft-depend is installed or to a no-op default
@@ -861,8 +879,10 @@ public final class PluginModule {
                 menuCurrencyBackends,
                 menuTextInputRef,
                 wiredKernel.resolver()::resolve,
+                networkPresence.presence(),
                 wiredKernel.networkClaims());
         bus.start();
+        networkPresence.start();
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
         // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
         AtomicBoolean placeholdersPublished = new AtomicBoolean();
@@ -886,7 +906,7 @@ public final class PluginModule {
         resources.onClose(pauseLinks.stop());
         resources.addReloadTask(ReloadTask.kernel(
                 "server links", pauseLinks.reload(), "pause-menu links re-read and sent to every player"));
-        MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence, auditChannel);
+        MigrationImportNode importNode = wireMigration(plugin, registry, config, kernel, persistence, auditChannel);
         List<HealthCheck> healthChecks =
                 healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
@@ -1017,6 +1037,7 @@ public final class PluginModule {
 
     private static MigrationImportNode wireMigration(
             JavaPlugin plugin,
+            ModuleRegistry registry,
             ConfigStore config,
             KernelPorts kernel,
             Persistence persistence,
@@ -1034,7 +1055,10 @@ public final class PluginModule {
                 kernel.scheduler(),
                 kernel.log(),
                 auditChannel,
-                module.enabled(config));
+                module.enabled(config),
+                moduleEnabled(registry, config, "messaging")
+                        ? Optional.of(config.scoped(ModuleId.of("messaging").configRoot()))
+                        : Optional.empty());
         return new MigrationImportNode(service, kernel.messages());
     }
 
@@ -1154,10 +1178,11 @@ public final class PluginModule {
             AtomicReference<EconomyBackends> menuCurrencyBackends,
             AtomicReference<TextInput> menuTextInputRef,
             Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages,
+            NetworkPresence presence,
             Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks(auditChannel, queries, actions);
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
@@ -1567,7 +1592,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("survival"))) {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
-            wireRanks(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
+            wireRanks(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("security"))) {
@@ -1951,6 +1976,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -1965,8 +1991,12 @@ public final class PluginModule {
         Optional<RankEconomy> economy = provider != null && currency != null
                 ? Optional.of(new ProviderRankEconomy(provider, currency, receipts(ctx)))
                 : Optional.empty();
-        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, guiRegistry, menus, menuBindings);
+        RanksWiring.Wired wired =
+                RanksWiring.wire(plugin, ctx, persistence, economy, bus, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
+        // Registered before the online players are loaded, so a quit in between cannot leave a stale entry behind.
+        resources.addListener(wired.cacheListener());
+        wired.cacheListener().loadOnline(plugin.getServer().getOnlinePlayers());
         // The prestige board ranks the stored prestige levels, read whole at each refresh; a prestige moves the
         // player's own score at once rather than at the next read.
         var prestigeLevels = com.uxplima.uxmessentials.persistence.ranks.PlayerRankRepositories.jooq(persistence);
@@ -1986,8 +2016,8 @@ public final class PluginModule {
         });
         // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
         resources.onClose(wired.stop());
-        // The rank / next-rank / prestige placeholders read the DB-backed pointer through the CurrentRank use case and
-        // the parsed ladder, so they answer for an offline player too.
+        // The rank / next-rank / prestige placeholders read the cached pointer of online players through the
+        // CurrentRank use case and the parsed ladder, so a scoreboard refresh never reaches the database.
         links.placeholders.ranks(new StoreRanksPlaceholders(wired.currentRank(), wired.ladder()));
         links.queries.register(
                 UxmRanksQuery.class,
@@ -2745,7 +2775,8 @@ public final class PluginModule {
                 menuBindings,
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
-                ipCapture.tokens());
+                ipCapture.tokens(),
+                links.presence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3474,7 +3505,8 @@ public final class PluginModule {
         // reward dispatcher on the global region thread, and the online audience for the party rewards and
         // thank-you broadcast. It syncs the server-wide party counter through the bus handle, a counter
         // mutation here announces a VoteCounterChanged, a remote one drops the cached counter, and a remote
-        // VotePartyFired echoes the party announcement (never the reward), but carries no cross-context bridge.
+        // VotePartyFired echoes the party announcement and pays the players online here, but carries no
+        // cross-context bridge.
         // The reflective Votifier listener self-registers behind a plugin-present guard on start and is dropped
         // on disable, so the module runs unchanged whether or not Votifier is installed. The repository and
         // threshold are surfaced for the PAPI vote placeholder seam registered after all contexts have wired.
@@ -3639,14 +3671,18 @@ public final class PluginModule {
         private final com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions;
         // The one audit channel, so every module that writes a line writes it where the Discord bridge hears it.
         private final AuditChannel auditChannel;
+        // Which backend each online player is on; a context that names a player asks it before offline data.
+        private final NetworkPresence presence;
 
         private ContextLinks(
                 AuditChannel auditChannel,
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries,
-                com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions) {
+                com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions,
+                NetworkPresence presence) {
             this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
+            this.presence = presence;
         }
         // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.
         private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();

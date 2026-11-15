@@ -46,7 +46,7 @@ The top level commands each module registers, with the permission that gates the
 | `/rtoggle` | messaging | Toggle whether you receive replies | `uxmessentials.msg.toggle` |
 | `/socialspy` | messaging | Observe private messages, globally or for one player | `uxmessentials.msg.socialspy` |
 | `/unignore` | messaging | Stop ignoring a player | `uxmessentials.msg.ignore` |
-| `/mute` | moderation | Run a command as another player | `uxmessentials.moderation.mute` |
+| `/mute` | moderation | Mute a player | `uxmessentials.moderation.mute` |
 | `/npc` | npc | Create and manage fake-player NPCs | `uxmessentials.npc.admin` |
 | `/air` | playerstate | Set remaining air | `uxmessentials.air.use` |
 | `/biome` | playerstate | Show the biome you are standing in | `uxmessentials.biome.use` |
@@ -93,21 +93,21 @@ The top level commands each module registers, with the permission that gates the
 | `/realname` | presence | Look up a player's real name | `uxmessentials.realname.use` |
 | `/staff` | presence | List online staff | `uxmessentials.staff.use` |
 | `/whois` | presence | Show information about an online player | `uxmessentials.whois.use` |
-| `/staffchat` | staff | sc | `uxmessentials.staff.chat` |
+| `/staffchat` | staff | Send a message on the staff channel | `uxmessentials.staff.chat` |
 | `/stafflist` | staff | List who is currently in staff mode | `uxmessentials.staff.list` |
 | `/staffmode` | staff | Toggle staff mode | `uxmessentials.staff.mode` |
 | `/ascend` | teleport | Teleport up to the next open space | `uxmessentials.tp.vertical` |
 | `/back` | teleport | Return to your last location | `uxmessentials.back.use` |
 | `/bottom` | teleport | Teleport to the lowest safe block | `uxmessentials.tp.vertical` |
 | `/bring` | teleport | Pull a player to you | `uxmessentials.tp.use` |
-| `/deathback` | teleport | dback | `uxmessentials.back.use` |
+| `/deathback` | teleport | Return to your last death location | `uxmessentials.back.use` |
 | `/descend` | teleport | Teleport down to the next open space | `uxmessentials.tp.vertical` |
 | `/down` | teleport | Teleport down to the first block below | `uxmessentials.tp.vertical` |
 | `/goto` | teleport | Teleport to a player | `uxmessentials.tp.use` |
 | `/jump` | teleport | Teleport to the block you look at | `uxmessentials.tp.vertical` |
 | `/mirrorspawn` | teleport | Redirect this world's spawn to another world | `uxmessentials.spawn.set` |
 | `/removespawn` | teleport | Clear this world's own spawn | `uxmessentials.spawn.set` |
-| `/rtp` | teleport | wild | `uxmessentials.rtp.use` |
+| `/rtp` | teleport | Random teleport | `uxmessentials.rtp.use` |
 | `/setmainspawn` | teleport | Set the main spawn for worlds without their own | `uxmessentials.spawn.set` |
 | `/setspawn` | teleport | Set this world's spawn | `uxmessentials.spawn.set` |
 | `/settpr` | teleport | Set the random-teleport zone for /rtp | `uxmessentials.teleport.settpr` |
@@ -117,14 +117,14 @@ The top level commands each module registers, with the permission that gates the
 | `/tp` | teleport | Teleport to a player or coordinates | `uxmessentials.tp.use` |
 | `/tpa` | teleport | Request to teleport to a player | `uxmessentials.tpa.use` |
 | `/tpaall` | teleport | Request every player to teleport to you | `uxmessentials.tpa.all` |
-| `/tpaccept` | teleport | tpyes | `uxmessentials.tpa.use` |
+| `/tpaccept` | teleport | Accept a teleport request | `uxmessentials.tpa.use` |
 | `/tpahere` | teleport | Ask a player to teleport to you | `uxmessentials.tpahere.use` |
-| `/tpalist` | teleport | tprequests | `uxmessentials.tpa.use` |
+| `/tpalist` | teleport | List players waiting on your teleport reply | `uxmessentials.tpa.use` |
 | `/tpall` | teleport | Pull every player to you | `uxmessentials.tp.all` |
 | `/tpauto` | teleport | Auto-accept incoming teleport requests | `uxmessentials.tpa.auto` |
 | `/tpblock` | teleport | Block a player's requests | `uxmessentials.tpa.block` |
-| `/tpcancel` | teleport | tpacancel | `uxmessentials.tpa.cancel` |
-| `/tpdeny` | teleport | tpno | `uxmessentials.tpa.use` |
+| `/tpcancel` | teleport | Withdraw your outgoing request | `uxmessentials.tpa.cancel` |
+| `/tpdeny` | teleport | Deny a teleport request | `uxmessentials.tpa.use` |
 | `/tphere` | teleport | Pull a player to you | `uxmessentials.tp.use` |
 | `/tpo` | teleport | Teleport overriding no-tp flags | `uxmessentials.tp.others` |
 | `/tpoff` | teleport | Refuse incoming teleport requests | `uxmessentials.tpa.toggle` |
@@ -133,8 +133,8 @@ The top level commands each module registers, with the permission that gates the
 | `/tpohere` | teleport | Pull a player overriding flags | `uxmessentials.tp.others` |
 | `/tpon` | teleport | Accept incoming teleport requests | `uxmessentials.tpa.toggle` |
 | `/tppos` | teleport | Teleport to raw coordinates | `uxmessentials.tp.position` |
-| `/tprandomplayer` | teleport | tprp | `uxmessentials.tp.use` |
-| `/tptoggle` | teleport | toggletp | `uxmessentials.tpa.toggle` |
+| `/tprandomplayer` | teleport | Teleport to a random online player | `uxmessentials.tp.use` |
+| `/tptoggle` | teleport | Refuse all incoming requests | `uxmessentials.tpa.toggle` |
 | `/tpunblock` | teleport | Unblock a player's requests | `uxmessentials.tpa.block` |
 | `/up` | teleport | Teleport up onto a placed block | `uxmessentials.tp.vertical` |
 | `/vault` | vaults | Open one of your vaults | `uxmessentials.vault.use` |
@@ -365,13 +365,13 @@ The boards answer the grammar every UXM plugin shares, so a hologram written for
 
 | `<board>` | Module | Ranks | Periods |
 |---|---|---|---|
-| `playtime` | playerstate | Active time, AFK left out. All time reads the playtime record, corrections included; the other periods count from the version that added them. | all four |
+| `playtime` | playerstate | Active time, AFK left out. All time reads the playtime record, corrections included; the other periods count from the board's first start. | all four |
 | `trades` | trade | Trades finished; both sides count one. | all four |
 | `prestige` | ranks | The prestige level. | `alltime` only |
-| `earned` | economy | Money that came into a wallet in the default currency: sales, salaries, rewards, money another plugin pays through Vault. An admin give, a `/pay` from another player, a cashed banknote and a refund are left out. Counted from the version that added it. | all four |
-| `spent` | economy | Money that left a wallet in the default currency: purchases, fees, money another plugin takes through Vault. An admin take, a `/pay` to another player and a written banknote are left out. Counted from the version that added it. | all four |
+| `earned` | economy | Money that came into a wallet in the default currency: sales, salaries, rewards, money another plugin pays through Vault. An admin give, a `/pay` from another player, a cashed banknote and a refund are left out. Counted from the board's first start. | all four |
+| `spent` | economy | Money that left a wallet in the default currency: purchases, fees, money another plugin takes through Vault. An admin take, a `/pay` to another player and a written banknote are left out. Counted from the board's first start. | all four |
 | `balance` | economy | The default currency's balance, from `/baltop`. | `alltime` only |
-| `votes` | vote | Votes, online or offline. All time reads the vote totals, so a `/vote` reset shows; the other periods count each vote, and on the first start of the version that added them begin from the totals of the windows open then. | all four |
+| `votes` | vote | Votes, online or offline. All time reads the vote totals, so a `/vote` reset shows; the other periods count each vote, starting from the totals of the windows open when the board first starts. | all four |
 
 The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`, `prestige`, `earned`, `spent` and `votes` run on uxmLib's shared board module and follow the `leaderboard` block of `config.conf` (size, refresh, periods, time zone, first day of the week); `balance` answers from `/baltop`.
 
@@ -384,8 +384,16 @@ The periods are `alltime`, `monthly`, `weekly` and `daily`. `playtime`, `trades`
 | `value_<board>_<period>` | The reader's own value. |
 | `resets_<period>` | The time until a period starts again, in the reader's words (`4d 1h`, `1h 30m`, `12m`), or the word for none for `alltime`. |
 
-The words come from the `board.*` lines of the messages files. The older `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys keep answering as before.
+The words come from the `board.*` lines of the messages files. The `economy_baltop_*`, `baltop_position`, `votes_top_*` and `votes_position_*` keys in the table above answer as well.
 
 ## Files
 
-On first start the plugin writes `config.conf`, `messages/messages_<tag>.conf` for every shipped language, and for each module a `modules/<module>/config.conf` with its menus under `modules/<module>/gui/`. `config.conf` lists every module and switches each one on or off. `/uxmess reload` reads the files again.
+Everything sits under `plugins/uxmEssentials/`. A file is written on first start and keeps every edit made to it; an update brings the lines nobody changed to the new wording and adds new settings at the end. `/uxmess reload` reads the files again; turning a module on or off with `enabled` takes a restart.
+
+- `config.conf`: the plugin-wide blocks, such as storage, language, network, leaderboards and claims.
+- `modules/<module>/config.conf`: one per module, with the module's `enabled` switch; its menus are under `modules/<module>/gui/`. Beside it: `teleport/rtp.conf`, `economy/currencies.conf`, `ranks/ranks.conf`, and for communication `chat.conf`, `announcer.conf`, `join-quit.conf`, `advancements.conf` and `info-pages.conf`.
+- `commands.conf`: the name, aliases and switch of every command, written from the commands the plugin registers.
+- `messages/messages_<tag>.conf`: every line a player reads, one file per shipped language.
+- `menus/` holds custom menus and `commands/custom/` custom commands, one file each, both starting with an `example.conf`.
+- `text-input.conf`: how each menu prompt takes a typed line: anvil, chat, sign or dialog.
+- `data/uxmessentials.db`: the database while `storage.type` is `sqlite`.

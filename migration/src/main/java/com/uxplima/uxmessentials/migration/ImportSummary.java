@@ -30,6 +30,7 @@ public final class ImportSummary {
     private final LongAdder holograms = new LongAdder();
     private final LongAdder worlds = new LongAdder();
     private final LongAdder skipped = new LongAdder();
+    private final LongAdder partial = new LongAdder();
     private final LongAdder failed = new LongAdder();
 
     public ImportSummary(SourceId source, ImportMode mode) {
@@ -44,6 +45,8 @@ public final class ImportSummary {
             skipped.increment();
         } else if (outcome == RecordOutcome.FAILED) {
             failed.increment();
+        } else if (outcome == RecordOutcome.PARTIAL) {
+            partial.increment();
         }
     }
 
@@ -129,6 +132,11 @@ public final class ImportSummary {
         return skipped.sum();
     }
 
+    /** Records of which only some parts were written; each line names what was held back. */
+    public long partial() {
+        return partial.sum();
+    }
+
     public long failed() {
         return failed.sum();
     }
@@ -162,7 +170,8 @@ public final class ImportSummary {
         return "source=" + source + " dry_run=" + dryRun() + " users=" + users() + " warps=" + warps()
                 + " player_warps=" + playerWarps() + " kits=" + kits() + " jails=" + jails() + " mutes=" + mutes()
                 + " bans=" + bans() + " ip_bans=" + ipBans() + " warns=" + warns() + " holograms=" + holograms()
-                + " worlds=" + worlds() + " skipped=" + skipped() + " failed=" + failed() + " duration_ms="
+                + " worlds=" + worlds() + " skipped=" + skipped() + " partial=" + partial() + " failed=" + failed()
+                + " duration_ms="
                 + elapsed.toMillis();
     }
 }

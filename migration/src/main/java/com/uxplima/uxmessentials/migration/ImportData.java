@@ -90,19 +90,19 @@ public final class ImportData {
 
     private void writeBatch(List<ImportRecord> batch, Run run) {
         for (ImportRecord rec : batch) {
-            RecordOutcome outcome = writeOne(rec, run);
-            audit.record(run.source(), rec, outcome);
-            run.summary().record(rec, outcome);
+            RecordResult result = writeOne(rec, run);
+            audit.record(run.source(), rec, result);
+            run.summary().record(rec, result.outcome());
         }
     }
 
-    private RecordOutcome writeOne(ImportRecord rec, Run run) {
+    private RecordResult writeOne(ImportRecord rec, Run run) {
         try {
             return run.writer().write(rec, run.options());
         } catch (RuntimeException badRecord) {
             // One record's failure is counted and the run continues.
             log.warn("migration record failed kind={} cause={}", rec.kind(), badRecord.toString());
-            return RecordOutcome.FAILED;
+            return RecordResult.of(RecordOutcome.FAILED);
         }
     }
 

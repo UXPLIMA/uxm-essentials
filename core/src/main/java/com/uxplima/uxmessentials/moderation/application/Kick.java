@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -23,6 +24,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * moderation broadcast node; a silent kick suppresses only that announcement, leaving the actor confirmation
  * and the target's kick screen intact. A successful kick is recorded in the append-only sanction history so it
  * surfaces in {@code /history} and {@code /staffhistory}: a kick carries no expiry.
+ *
+ * <p>A target connected to another backend is refused with that backend's name before anything is written: this
+ * backend cannot disconnect them, and a kick recorded and announced without happening would mislead staff.
  */
 public final class Kick {
 
@@ -32,6 +36,7 @@ public final class Kick {
     private final ModerationAudit audit;
     private final SanctionHistoryRecorder history;
     private final SanctionBroadcast broadcast;
+    private final LiveTargetCheck live;
 
     public Kick(
             Sanctions sanctions,
@@ -39,13 +44,15 @@ public final class Kick {
             Notifier notifier,
             ModerationAudit audit,
             SanctionHistoryRecorder history,
-            SanctionBroadcast broadcast) {
+            SanctionBroadcast broadcast,
+            NetworkPresence presence) {
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.history = Objects.requireNonNull(history, "history");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.live = new LiveTargetCheck(presence, this.notifier);
     }
 
     /** Kick {@code target} with an optional reason, or refuse an exempt target. */
@@ -54,6 +61,9 @@ public final class Kick {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
+        if (live.refusedElsewhere(actor, target)) {
+            return Result.err(ModerationError.TARGET_ELSEWHERE);
+        }
         if (guard.isExempt(target)) {
             audit.kicked(actor, target, false, reason);
             notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());

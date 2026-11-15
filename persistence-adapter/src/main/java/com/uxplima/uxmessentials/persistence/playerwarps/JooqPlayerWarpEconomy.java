@@ -52,6 +52,11 @@ import org.jspecify.annotations.Nullable;
  * secret): the honest outcome, never swallowed. There is no check-then-charge: the debit either takes in full
  * or reports {@link ChargeError#INSUFFICIENT_FUNDS}, so no affordability probe opens a double-spend window.
  *
+ * <h2>A cross-server use is paid in two steps</h2>
+ * {@link #charge} only debits the visitor on the origin, and {@link #accrue} banks the owner's share once the
+ * target has moved them. A cross-server use can still be refunded after the charge (the proxy never moved the
+ * player), and a refund after an immediate accrual would leave the owner paid with money nobody lost.
+ *
  * <h2>Withdraw is a guarded read-then-zero</h2>
  * {@link #withdraw} reads the bank, zeroes it with a guard ({@code SET earned_amount = 0 WHERE id = ? AND
  * earned_amount = <read>}), and only then credits the owner. The guard makes the read-then-zero safe under
@@ -97,6 +102,36 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
             return Result.err(chargeErrorFor(debited.errorOrThrow()));
         }
         return accrueThenPayout(payer, warp, currency, charge);
+    }
+
+    @Override
+    public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
+        Objects.requireNonNull(payer, "payer");
+        Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(currencyId, "currencyId");
+        return economy.debit(payer, Money.of(resolve(currencyId), price)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
+    }
+
+    @Override
+    public Result<Unit, ChargeError> accrue(PlayerWarpId warp, BigDecimal price, String currencyId) {
+        Objects.requireNonNull(warp, "warp");
+        Objects.requireNonNull(price, "price");
+        Objects.requireNonNull(currencyId, "currencyId");
+        Currency currency = resolve(currencyId);
+        BigDecimal net = netOf(currency, Money.of(currency, price).amount());
+        try {
+            if (bumpBank(warp, net, currency.id().value()) == 0) {
+                return Result.err(ChargeError.ACCRUAL_FAILED);
+            }
+        } catch (RuntimeException accrualFailure) {
+            log.error(
+                    "event=playerwarp_accrue_failed warp=" + warp.value() + " currency="
+                            + currency.id().value() + " amount=" + net,
+                    accrualFailure);
+            return Result.err(ChargeError.ACCRUAL_FAILED);
+        }
+        autoPayout(warp, currency);
+        return Result.ok();
     }
 
     /**

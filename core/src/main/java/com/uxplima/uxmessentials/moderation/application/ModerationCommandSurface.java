@@ -8,11 +8,10 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The moderation context's command surface as platform-neutral {@link CommandSpec}s: each pairs a literal with its permission node and a
- * factory that produces the kernel-side {@link BrigadierCommand} description. The inbound adapter realises the
- * Brigadier node from the started module's context on the next {@code COMMANDS} fire. Collected here so the
- * command/permission pairing is one greppable table that matches {@code paper-plugin.yml} and the permissions
- * reference.
+ * The moderation context's command surface as platform-neutral {@link CommandSpec}s: each pairs a literal with its
+ * permission node and a factory that produces the kernel-side {@link BrigadierCommand} description. The inbound adapter
+ * realises the Brigadier node from the started module's context on the next {@code COMMANDS} fire. Collected here so
+ * the command/permission pairing is one greppable table.
  *
  * <p>Every command is permission-gated and every state-mutating one is audit-logged in its use case;
  * {@code /tempmute} is the explicit-duration alias of {@code /mute}, {@code /kickall} shares the kick node,

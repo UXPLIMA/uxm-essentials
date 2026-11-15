@@ -115,6 +115,9 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_CROSS_SERVER_UNAVAILABLE("pwarp.cross-server.unavailable"),
     PWARP_CROSS_SERVER_ARRIVED("pwarp.cross-server.arrived"),
     PWARP_CROSS_SERVER_FAILED("pwarp.cross-server.failed"),
+    PWARP_CROSS_SERVER_TIMED_OUT("pwarp.cross-server.timed-out"),
+    PWARP_CROSS_SERVER_MISROUTED("pwarp.cross-server.misrouted"),
+    PWARP_CROSS_SERVER_REFUNDED("pwarp.cross-server.refunded"),
 
     // admin group. Operator verbs that act on any warp by its surrogate id, gated by the admin node
     PWARP_ADMIN_RESTORED("pwarp.admin.restored"),

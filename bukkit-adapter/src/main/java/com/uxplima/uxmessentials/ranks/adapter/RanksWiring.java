@@ -17,10 +17,12 @@ import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RanksCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.RankupCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.command.SetRankCommand;
 import com.uxplima.uxmessentials.ranks.adapter.inbound.gui.RanksPanelMenu;
+import com.uxplima.uxmessentials.ranks.adapter.inbound.listener.RankCacheListener;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.AutorankScan;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankActionRunner;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.BukkitRankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksApiWrites;
+import com.uxplima.uxmessentials.ranks.application.CachedPlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
 import com.uxplima.uxmessentials.ranks.application.Prestige;
 import com.uxplima.uxmessentials.ranks.application.RankLadders;
@@ -43,6 +45,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.RankSync;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -79,6 +83,7 @@ public final class RanksWiring {
             ModuleContext ctx,
             Persistence persistence,
             Optional<RankEconomy> economy,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -86,17 +91,32 @@ public final class RanksWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
         RanksConfig config = RanksConfig.from(ctx.config());
         RankLadder ladder = RankLadders.from(ctx.config());
-        PlayerRankRepository repository = PlayerRankRepositories.jooq(persistence);
-        CurrentRank currentRank = new CurrentRank(repository, ladder);
+        // Decorator chain: jOOQ -> in-memory cache of online players -> bus broadcaster. Reads on a tick thread go
+        // to the cache; every save goes through the broadcaster so a peer holding the player reloads them.
+        CachedPlayerRankRepository cache = new CachedPlayerRankRepository(
+                PlayerRankRepositories.jooq(persistence), kernel.scheduler(), kernel.log());
+        bus.registry().register(RankSync.listener(cache));
+        PlayerRankRepository repository = RankSync.repository(cache, bus.publisher(), kernel.log());
+        CurrentRank currentRank = new CurrentRank(cache, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);
         RankActionRunner actions = actionRunner(plugin, kernel);
-        Rankup rankup = new Rankup(currentRank, repository, ladder, requirements, actions, economy, kernel.events());
+        Rankup rankup = new Rankup(
+                currentRank,
+                repository,
+                ladder,
+                requirements,
+                actions,
+                economy,
+                kernel.events(),
+                kernel.scheduler(),
+                kernel.log());
         SetRank setRank = new SetRank(repository, ladder, kernel.events());
         // The ladder GUI is config-gated: when gui.enabled is off, no spec is registered, no binding wired, and the
         // /ranks command publishes only its admin setrank surface (the panel Optional stays empty).
@@ -108,10 +128,11 @@ public final class RanksWiring {
                 "ranks", RanksMessageKey.RANKS_GUI_TITLE, Material.DIAMOND, RANKS_GUI_PERMISSION, menu::open)));
         List<CommandRegistration> commands = new ArrayList<>(List.of(
                 new RankupCommand(rankup, kernel.messages()),
-                new RanksCommand(setRank, ladder, panel, currentRank, kernel.messages()),
+                new RanksCommand(
+                        setRank, ladder, panel, currentRank, kernel.scheduler(), kernel.log(), kernel.messages()),
                 // The standalone /setrank publishes the same admin direct-set as /ranks setrank, under its own command
                 // id so it renames/disables independently through commands.conf.
-                new SetRankCommand(setRank, ladder, kernel.messages())));
+                new SetRankCommand(setRank, ladder, kernel.scheduler(), kernel.log(), kernel.messages())));
         Optional<Prestige> prestige = Optional.empty();
         if (config.prestige().enabled()) {
             // Prestige is config-gated: when off, the /prestige verb is not published at all. It reuses the same
@@ -135,6 +156,7 @@ public final class RanksWiring {
         Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
         return new Wired(
                 List.copyOf(commands),
+                new RankCacheListener(cache, plugin.getServer()),
                 config,
                 currentRank,
                 ladder,
@@ -211,6 +233,8 @@ public final class RanksWiring {
      * cancels the autorank scan on module disable.
      *
      * @param commands the Brigadier command registrations to publish
+     * @param cacheListener the login, join and quit listener that keeps the rank pointer cache on the online set;
+     *     register it, then load the players already online through it
      * @param config the typed ranks config snapshot
      * @param currentRank the read use case resolving a player's rank standing against the ladder
      * @param ladder the parsed ladder, exposed for the {@code %uxmessentials_rank_next%} placeholder seam
@@ -220,6 +244,7 @@ public final class RanksWiring {
      */
     public record Wired(
             List<CommandRegistration> commands,
+            RankCacheListener cacheListener,
             RanksConfig config,
             CurrentRank currentRank,
             RankLadder ladder,
@@ -229,6 +254,7 @@ public final class RanksWiring {
 
         public Wired {
             commands = List.copyOf(commands);
+            Objects.requireNonNull(cacheListener, "cacheListener");
             Objects.requireNonNull(config, "config");
             Objects.requireNonNull(currentRank, "currentRank");
             Objects.requireNonNull(ladder, "ladder");

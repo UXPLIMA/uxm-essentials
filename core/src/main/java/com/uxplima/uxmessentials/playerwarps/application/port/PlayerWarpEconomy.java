@@ -39,6 +39,23 @@ public interface PlayerWarpEconomy {
     Result<Unit, ChargeError> chargeAndAccrue(PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId);
 
     /**
+     * Guarded debit of {@code payer} by {@code price} in {@code currencyId} with nothing accrued yet, for a use of a
+     * warp on another backend. The owner's share is written later by {@link #accrue}, only once the target backend
+     * has actually moved the visitor, so a cross-server use that is refunded never leaves the owner paid for it.
+     * Same guard as {@link #chargeAndAccrue}: it either takes in full or reports
+     * {@link ChargeError#INSUFFICIENT_FUNDS}.
+     */
+    Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId);
+
+    /**
+     * Bank the owner's share of {@code price} (the price minus the configured cut) on {@code warp}, for a
+     * cross-server use whose visitor {@link #charge} debited on the origin and the target has now moved. Reports
+     * {@link ChargeError#ACCRUAL_FAILED} when nothing was banked (the warp row is gone or the write failed), and the
+     * caller then gives the visitor's charge back.
+     */
+    Result<Unit, ChargeError> accrue(PlayerWarpId warp, BigDecimal price, String currencyId);
+
+    /**
      * True when {@code who} could currently afford {@code amount} of {@code currencyId}. For UI preview only
      * the gate never calls this, because an affordability probe followed by a separate charge is exactly the
      * double-spend window {@link #chargeAndAccrue} closes.

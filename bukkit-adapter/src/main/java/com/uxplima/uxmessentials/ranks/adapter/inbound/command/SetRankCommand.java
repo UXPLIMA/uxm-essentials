@@ -7,7 +7,9 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.ranks.application.SetRank;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -27,8 +29,8 @@ public final class SetRankCommand implements CommandRegistration {
 
     private final SetRankExecutor setRank;
 
-    public SetRankCommand(SetRank setRank, RankLadder ladder, Messages messages) {
-        this.setRank = new SetRankExecutor(setRank, ladder, messages);
+    public SetRankCommand(SetRank setRank, RankLadder ladder, Scheduler scheduler, Logger log, Messages messages) {
+        this.setRank = new SetRankExecutor(setRank, ladder, scheduler, log, messages);
     }
 
     @Override

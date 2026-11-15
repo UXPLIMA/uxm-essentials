@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,9 +18,9 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.messaging.adapter.MessagingSettings;
+import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
-import com.uxplima.uxmessentials.migration.BalancePolicy;
-import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportData;
 import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
@@ -27,6 +28,7 @@ import com.uxplima.uxmessentials.migration.MigrationAudit;
 import com.uxplima.uxmessentials.migration.MigrationModule;
 import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordWriter;
+import com.uxplima.uxmessentials.migration.UserRecordWriter;
 import com.uxplima.uxmessentials.migration.convert.Convert;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.SourceRegistry;
@@ -47,12 +49,14 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
+import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -81,11 +85,13 @@ public final class MigrationWiring {
      *
      * @param plugin the plugin (for the server world list, data folder, and plugins directory)
      * @param persistence the shared persistence DSL the writers upsert through
-     * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict policy)
+     * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict and balance policies)
      * @param economyConfig the {@code modules.economy} config subtree (the default currency)
      * @param scheduler the off-tick dispatch port
      * @param log operator diagnostics
      * @param enabled the {@link MigrationModule} enable gate (ships disabled)
+     * @param messagingConfig the {@code modules.messaging} config subtree (the mail retention), empty when the
+     *     messaging module is off; then imported mail is skipped and audited
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -95,7 +101,8 @@ public final class MigrationWiring {
             Scheduler scheduler,
             Logger log,
             AuditChannel auditChannel,
-            boolean enabled) {
+            boolean enabled,
+            Optional<ConfigStore> messagingConfig) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
@@ -104,8 +111,8 @@ public final class MigrationWiring {
         Objects.requireNonNull(log, "log");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
-        Writers writers = writers(plugin, persistence, economyConfig, log);
-        ImportOptions options = options(plugin, migrationConfig);
+        Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig);
+        ImportOptions options = options(plugin, migrationConfig, log);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
     }
@@ -199,7 +206,12 @@ public final class MigrationWiring {
                 Optional.of(jdbcUrl), username, password, tablePrefix, Optional.ofNullable(pluginsDir));
     }
 
-    private static Writers writers(Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log) {
+    private static Writers writers(
+            Plugin plugin,
+            Persistence persistence,
+            ConfigStore economyConfig,
+            Logger log,
+            Optional<ConfigStore> messagingConfig) {
         HomeRepository homes = HomeRepositories.cached(persistence);
         WarpRepository warps = WarpRepositories.cached(persistence);
         ModerationRepository moderation = ModerationStores.repository(persistence);
@@ -211,10 +223,18 @@ public final class MigrationWiring {
         Clock clock = Clock.systemUTC();
         WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
         PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
+        // The mail table ships with every install, but a disabled messaging module means the operator does not want
+        // mail, so the import leaves it out rather than filling a mailbox nobody can open.
+        Optional<MailRepository> mail = messagingConfig.map(ignored -> MessagingStores.mail(persistence));
+        Duration mailRetention = messagingConfig
+                .map(config -> new MessagingSettings(config).mailRetention())
+                .orElse(Duration.ZERO);
+        UserRecordWriter users =
+                new UserRecordWriter(homes, wallets, mail, mailRetention, StyledText::escape, defaultCurrency, clock);
         RecordWriter live = new RepositoryRecordWriter(
-                homes, warps, wallets, moderation, kits, holograms, worldRegistry, playerWarps, defaultCurrency, clock);
+                users, warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
         RecordWriter dryRun =
-                new DryRunRecordWriter(warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
+                new DryRunRecordWriter(users, warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
         return new Writers(live, dryRun);
     }
 
@@ -256,13 +276,12 @@ public final class MigrationWiring {
         return new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), log);
     }
 
-    private static ImportOptions options(Plugin plugin, ConfigStore config) {
+    private static ImportOptions options(Plugin plugin, ConfigStore config, Logger log) {
         Path pluginsDir = plugin.getDataFolder().toPath().getParent();
         String configured = config.getString("source-path", DEFAULT_SOURCE_PATH);
         Path sourcePath = pluginsDir == null ? Path.of(configured) : pluginsDir.resolve(configured);
-        ConflictPolicy onConflict = ConflictPolicy.parse(config.getString("on-conflict", "skip"));
-        BalancePolicy balancePolicy = BalancePolicy.parse(config.getString("balance-policy", "skip-if-present"));
-        return new ImportOptions(sourcePath, ImportMode.LIVE, onConflict, balancePolicy);
+        ImportPolicies policies = ImportPolicies.read(config, log);
+        return new ImportOptions(sourcePath, ImportMode.LIVE, policies.onConflict(), policies.balancePolicy());
     }
 
     /** Bundles the live and dry-run writers built over the persistence repositories. */

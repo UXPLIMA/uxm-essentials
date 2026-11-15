@@ -12,8 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  * {@link CommandSpec}s: each pairs a literal with its base permission node and a factory that produces the
  * kernel-side {@link BrigadierCommand} description. The kits inbound adapter realises the Brigadier node from
  * the started module's context on the next {@code COMMANDS} fire. Collected here so {@code KitsModule} stays
- * small and the command/permission pairing is one greppable table the permissions guard checks against
- * {@code paper-plugin.yml}.
+ * small and the command/permission pairing is one greppable table.
  *
  * <p>There is a single command literal, {@code /kit}, gated by {@code uxmessentials.kit.use}. Everything a
  * player or operator does with kits hangs off it: {@code <name>} claims a kit, while {@code list},

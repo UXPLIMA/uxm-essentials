@@ -49,7 +49,26 @@ public final class RanksActions implements UxmRanksActions {
 
     @Override
     public CompletableFuture<UxmOutcome> rankUp(UUID playerId) {
-        return onPlayer(playerId, subject -> outcome(writes.rankup().rankUp(subject)));
+        Objects.requireNonNull(playerId, "playerId");
+        if (!players.isOnline(playerId)) {
+            return CompletableFuture.completedFuture(offline());
+        }
+        PlayerRef subject = ApiValues.subject(players, playerId);
+        // The rankup starts on the player's thread and answers once its save on the async lane is back there. It
+        // never completes exceptionally, so only the left-before-the-hop case needs a branch of its own.
+        CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();
+        scheduler.onEntity(
+                subject,
+                () -> {
+                    try {
+                        var unused =
+                                writes.rankup().rankUp(subject).thenAccept(result -> answer.complete(outcome(result)));
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                () -> answer.complete(gone()));
+        return answer;
     }
 
     @Override
@@ -82,6 +101,10 @@ public final class RanksActions implements UxmRanksActions {
             case REQUIREMENTS_NOT_MET ->
                 UxmOutcome.failed(UxmFailure.REFUSED, "the next rank's requirements are not met");
             case CANNOT_AFFORD -> UxmOutcome.failed(UxmFailure.INSUFFICIENT_FUNDS, "the next rank's cost was refused");
+            case BUSY ->
+                UxmOutcome.failed(UxmFailure.REFUSED, "the player's rank is still loading or another rankup is saving");
+            case FAILED ->
+                UxmOutcome.failed(UxmFailure.FAILED, "the rankup could not be stored; any charge was refunded");
         };
     }
 
@@ -93,6 +116,7 @@ public final class RanksActions implements UxmRanksActions {
             case MAX_LEVEL -> UxmOutcome.failed(UxmFailure.ALREADY_IN_STATE, "already at the prestige cap");
             case REQUIREMENTS_NOT_MET -> UxmOutcome.failed(UxmFailure.REFUSED, "the prestige requirements are not met");
             case CANNOT_AFFORD -> UxmOutcome.failed(UxmFailure.INSUFFICIENT_FUNDS, "the prestige cost was refused");
+            case BUSY -> UxmOutcome.failed(UxmFailure.REFUSED, "the player's rank is still loading");
         };
     }
 
@@ -100,16 +124,19 @@ public final class RanksActions implements UxmRanksActions {
     private CompletableFuture<UxmOutcome> onPlayer(UUID playerId, Write write) {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
-            return CompletableFuture.completedFuture(
-                    UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to check the rank against"));
+            return CompletableFuture.completedFuture(offline());
         }
         PlayerRef subject = ApiValues.subject(players, playerId);
         Supplier<UxmOutcome> work = () -> write.apply(subject);
-        return AsyncActions.onPlayer(
-                scheduler,
-                subject,
-                work,
-                UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player left before the rank could be applied"));
+        return AsyncActions.onPlayer(scheduler, subject, work, gone());
+    }
+
+    private static UxmOutcome offline() {
+        return UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online to check the rank against");
+    }
+
+    private static UxmOutcome gone() {
+        return UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player left before the rank could be applied");
     }
 
     @FunctionalInterface

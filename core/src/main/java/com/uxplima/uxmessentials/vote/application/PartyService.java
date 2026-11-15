@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vote.application;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -15,6 +16,7 @@ import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import com.uxplima.uxmessentials.vote.domain.reward.RewardGrant;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The shared party-fire logic: determine eligible recipients, apply the party reward to each, announce the
@@ -71,7 +73,7 @@ final class PartyService {
         broadcaster.broadcast(
                 VoteMessageKey.VOTEPARTY_REACHED, Map.of("threshold", Integer.toString(effectiveThreshold)), channels);
 
-        events.publish(new VotePartyTriggered(effectiveThreshold));
+        events.publish(new VotePartyTriggered(effectiveThreshold, participants != null, absent(participants, online)));
         repository.clearPartyParticipants();
         // Counter reset is the caller's responsibility: HandleVote uses claimPartyFire (atomic),
         // ForceParty calls setPartyCount(0) before entering here. The reset must not happen here
@@ -84,6 +86,18 @@ final class PartyService {
             // party reverts to the base threshold rather than keeping a ratcheted value.
             repository.setThresholdOverride(0);
         }
+    }
+
+    /** The voters this backend could not reward because they are not online here; other backends may. */
+    private static Set<UUID> absent(@Nullable Set<UUID> participants, Collection<PlayerRef> online) {
+        if (participants == null) {
+            return Set.of();
+        }
+        Set<UUID> absent = new HashSet<>(participants);
+        for (PlayerRef player : online) {
+            absent.remove(player.uuid());
+        }
+        return absent;
     }
 
     /**

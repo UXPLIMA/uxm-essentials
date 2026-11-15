@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.customcommands.application;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.customcommands.application.port.ActionRunner;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
@@ -32,6 +33,10 @@ import org.jspecify.annotations.Nullable;
  * command that calls itself through a {@code command:} action inside the same dispatch is refused at the configured
  * depth. A step scheduled behind a {@code delay:} runs later at depth zero: that is a fresh execution rather than a
  * re-entry, and treating it as one would make a delayed self-call impossible for no benefit.
+ *
+ * <p>A priced command whose currency backend does not answer follows {@link FeeBackendPolicy}: it runs unpaid or is
+ * refused. Either way the operator is told once when the backend goes missing and once when it answers again, not on
+ * every run, because a busy server would otherwise bury the log in the same line.
  */
 public final class RunCustomCommand {
 
@@ -50,9 +55,11 @@ public final class RunCustomCommand {
     private final ActionRunner actions;
     private final RequirementCheck requirements;
     private final CommandFee fee;
+    private final FeeBackendPolicy onBackendMissing;
     private final RunFeedback feedback;
     private final ChainDepth depth;
     private final Logger log;
+    private final AtomicBoolean backendMissing = new AtomicBoolean();
 
     public RunCustomCommand(
             Permissions permissions,
@@ -61,6 +68,7 @@ public final class RunCustomCommand {
             ActionRunner actions,
             RequirementCheck requirements,
             CommandFee fee,
+            FeeBackendPolicy onBackendMissing,
             RunFeedback feedback,
             ChainDepth depth,
             Logger log) {
@@ -70,6 +78,7 @@ public final class RunCustomCommand {
         this.actions = Objects.requireNonNull(actions, "actions");
         this.requirements = Objects.requireNonNull(requirements, "requirements");
         this.fee = Objects.requireNonNull(fee, "fee");
+        this.onBackendMissing = Objects.requireNonNull(onBackendMissing, "onBackendMissing");
         this.feedback = Objects.requireNonNull(feedback, "feedback");
         this.depth = Objects.requireNonNull(depth, "depth");
         this.log = Objects.requireNonNull(log, "log");
@@ -133,10 +142,13 @@ public final class RunCustomCommand {
         if (blocked != null) {
             return blocked;
         }
-        if (charged(command, actor) && !fee.canAfford(actor, command.cost())) {
-            return new RunOutcome.CannotAfford(command.cost());
+        if (!charged(command, actor)) {
+            return new RunOutcome.Ok();
         }
-        return new RunOutcome.Ok();
+        if (!fee.available()) {
+            return onBackendMissing == FeeBackendPolicy.DENY ? new RunOutcome.FeeBackendMissing() : new RunOutcome.Ok();
+        }
+        return fee.canAfford(actor, command.cost()) ? new RunOutcome.Ok() : new RunOutcome.CannotAfford(command.cost());
     }
 
     /** The gates that only look at who is asking: the console policy and the declared permission node. */
@@ -198,14 +210,47 @@ public final class RunCustomCommand {
 
     /** Charge the cost, stamp the cooldown and run the chain, in that order; a failed charge runs nothing. */
     private RunOutcome finish(CustomCommand command, PlayerRef actor, Map<String, String> arguments) {
-        if (charged(command, actor) && (!fee.canAfford(actor, command.cost()) || !fee.charge(actor, command.cost()))) {
-            return new RunOutcome.CannotAfford(command.cost());
+        RunOutcome unpaid = charged(command, actor) ? pay(command, actor) : null;
+        if (unpaid != null) {
+            return unpaid;
         }
         if (!command.cooldown().isZero() && !permissions.has(actor, COOLDOWN_BYPASS)) {
             cooldowns.stampLabel(actor, cooldownLabel(command.id()), command.cooldown());
         }
         actions.run(actor, command.actions(), arguments);
         return new RunOutcome.Ok();
+    }
+
+    /**
+     * Take the price, or answer why the run stops. A missing backend is settled by the policy before any money is
+     * touched, so an allowed run is simply not charged and a denied one never reaches the provider.
+     */
+    private @Nullable RunOutcome pay(CustomCommand command, PlayerRef actor) {
+        if (!backendAnswers()) {
+            return onBackendMissing == FeeBackendPolicy.DENY ? new RunOutcome.FeeBackendMissing() : null;
+        }
+        if (!fee.canAfford(actor, command.cost()) || !fee.charge(actor, command.cost())) {
+            return new RunOutcome.CannotAfford(command.cost());
+        }
+        return null;
+    }
+
+    /** Read the backend's state and log only its transitions, so a long outage costs one warning, not one per run. */
+    private boolean backendAnswers() {
+        boolean available = fee.available();
+        if (!available && backendMissing.compareAndSet(false, true)) {
+            if (onBackendMissing == FeeBackendPolicy.DENY) {
+                log.warn("the currency backend for custom command costs is missing; priced custom commands are"
+                        + " refused until it returns (on-backend-missing = deny)");
+            } else {
+                log.warn("the currency backend for custom command costs is missing; priced custom commands run for"
+                        + " free until it returns (on-backend-missing = allow)");
+            }
+        } else if (available && backendMissing.compareAndSet(true, false)) {
+            log.info("the currency backend for custom command costs is available again; priced custom commands"
+                    + " charge their cost again");
+        }
+        return available;
     }
 
     /** Whether this run has to pay: the definition carries a price and the actor holds no bypass node. */

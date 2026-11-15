@@ -25,7 +25,7 @@ public interface FeatureModule {
     /** Stable identifier: {@code homes}, {@code economy}, … Equals the context's package name. */
     ModuleId id();
 
-    /** HOCON path this module owns: {@code modules.<id>} in {@code modules.conf}. */
+    /** HOCON path this module owns: {@code modules.<id>}, read from {@code modules/<id>/config.conf}. */
     String configRoot();
 
     /** Brigadier command specs; registered only when enabled. Empty when none. */
@@ -37,7 +37,7 @@ public interface FeatureModule {
     /** Flyway migration locations; run only when enabled. Empty when none. */
     List<MigrationSet> migrations();
 
-    /** The enable gate, read from {@code modules.conf} via the config port. Default is {@code true}. */
+    /** The enable gate, {@code enabled} in {@code modules/<id>/config.conf}, read via the config port. */
     boolean enabled(ConfigStore config);
 
     /**

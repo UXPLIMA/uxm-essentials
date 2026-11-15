@@ -18,8 +18,11 @@ public interface MigrationAudit {
     /** {@code event=migration_import_start}, actor, source, dry-run, source path, pre-import backup name. */
     void start(String actor, SourceId source, ImportMode mode, String sourcePath, String backup);
 
-    /** {@code event=migration_import_<kind>}: one line per record, carrying the conflict branch and ok flag. */
-    void record(SourceId source, ImportRecord rec, RecordOutcome outcome);
+    /**
+     * {@code event=migration_import_<kind>}: one line per record, carrying the conflict branch, the ok flag and the
+     * writer's notes on what it held back.
+     */
+    void record(SourceId source, ImportRecord rec, RecordResult result);
 
     /** {@code event=migration_import_finish}, the summary tally plus the run duration. */
     void finish(String actor, ImportSummary summary, Duration elapsed);

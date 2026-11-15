@@ -1,0 +1,347 @@
+package com.uxplima.uxmessentials.shared.application.hop;
+
+import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
+import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
+import static com.uxplima.uxmessentials.testing.Fixtures.at;
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.math.BigDecimal;
+import java.time.Duration;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
+import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
+import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.testing.MemoryHopStore;
+import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
+import com.uxplima.uxmessentials.testing.RecordingNotifier;
+import com.uxplima.uxmessentials.testing.SteppedScheduler;
+import org.junit.jupiter.api.Test;
+
+/**
+ * The shared cross-server hop with a kind other than player warps: a paid hop to a home whose fee is paid on to the
+ * home's keeper once the player lands. Money is followed in the player's wallet and the keeper's account, so a
+ * refund that leaves the keeper paid shows up as money created.
+ */
+class CrossServerHopTest {
+
+    private static final String LOBBY = "lobby";
+    private static final String SURVIVAL = "survival";
+    private static final String BASE = "base";
+    private static final Duration TTL = Duration.ofSeconds(30);
+    private static final Duration SETTLE = Duration.ofSeconds(1);
+    private static final HopCharge FEE = new HopCharge(new BigDecimal("10"), "coins");
+    private static final BigDecimal START = new BigDecimal("100");
+
+    private final MutableClock clock = new MutableClock(NOW);
+    private final SteppedScheduler scheduler = new SteppedScheduler(clock);
+    private final MemoryHopStore store = new MemoryHopStore();
+    private final RecordingLogger log = new RecordingLogger();
+    private final RecordingNotifier notifier = new RecordingNotifier();
+    private final Ledger ledger = new Ledger();
+    private final List<String> moved = new ArrayList<>();
+    private final List<String> connects = new ArrayList<>();
+    private final HopCharges charges = new HopCharges(notifier.notifier(), log);
+    private final HopResolvers lobbyResolvers = homesOn(LOBBY);
+    private final HopWatchdog watchdog = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL);
+    private final HopArrival survival = arrivalOn(SURVIVAL, homesOn(SURVIVAL));
+    private Landing landing = Landing.LAND;
+    private boolean gateRefuses;
+    private boolean proxyAvailable = true;
+
+    private final HopDepartures lobby = new HopDepartures(
+            (who, departure) -> !gateRefuses,
+            new HopConnector() {
+                @Override
+                public boolean isAvailable() {
+                    return proxyAvailable;
+                }
+
+                @Override
+                public void connect(PlayerRef player, String server) {
+                    connects.add(player.name() + "->" + server);
+                }
+            },
+            watchdog,
+            charges,
+            lobbyResolvers,
+            scheduler,
+            LOBBY,
+            clock);
+
+    CrossServerHopTest() {
+        scheduler.online(ALEX);
+        ledger.wallet = START;
+    }
+
+    private HopResolvers homesOn(String server) {
+        HopResolvers resolvers = new HopResolvers();
+        resolvers.register(new Homes(server));
+        return resolvers;
+    }
+
+    private HopArrival arrivalOn(String server, HopResolvers resolvers) {
+        return new HopArrival(store, resolvers, charges, scheduler, log, server, SETTLE, TTL, clock);
+    }
+
+    /** What a homes use case does with a home on another backend: ask the gate, charge, then send. */
+    private boolean goHome() {
+        HopDeparture departure = new HopDeparture(HopKind.HOME, BASE, SURVIVAL, BASE, at(0, 64, 0), Optional.empty());
+        if (!lobby.admit(ALEX, departure)) {
+            return false;
+        }
+        ledger.wallet = ledger.wallet.subtract(FEE.amount());
+        lobby.send(ALEX, departure, Optional.of(FEE), Optional.of(new HopSettlement("keeper")));
+        return true;
+    }
+
+    private void join(HopArrival arrival) {
+        arrival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+    }
+
+    @Test
+    void aHopThatLandsMovesThePlayerOnceAndSettlesTheFeeOnce() {
+        assertThat(goHome()).isTrue();
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+
+        // Two joins that both read the row before either claims it.
+        store.afterNextFind(() -> survival.onArrival(ALEX));
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
+
+        assertThat(moved).containsExactly("Alex->base");
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+        assertThat(ledger.keeper).isEqualByComparingTo("10");
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.arrived");
+        assertThat(store.rows()).isEmpty();
+    }
+
+    @Test
+    void aHopThatMissesIsRefundedOnceAndSettlesNothing() {
+        landing = Landing.MISS_THEN_THROW;
+        goHome();
+
+        join(survival);
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(ledger.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.failed", "home.hop.refunded");
+    }
+
+    @Test
+    void aHopTheGateRefusesChargesNothingRecordsNothingAndConnectsNobody() {
+        gateRefuses = true;
+
+        assertThat(goHome()).isFalse();
+
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(store.rows()).isEmpty();
+        assertThat(connects).isEmpty();
+    }
+
+    @Test
+    void aHopNoBackendTookIsRefundedByTheWatchdogAtTheTtl() {
+        goHome();
+
+        scheduler.advance(TTL.minusSeconds(1));
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+
+        scheduler.advance(Duration.ofSeconds(1));
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(store.rows()).isEmpty();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.timed-out", "home.hop.refunded");
+    }
+
+    @Test
+    void aHopThatCannotLeaveIsRefundedAndNeverRecorded() {
+        proxyAvailable = false;
+
+        goHome();
+
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(store.rows()).isEmpty();
+        assertThat(notifier.sent().getFirst().placeholders()).containsEntry("server", SURVIVAL);
+        assertThat(notifier.keys()).containsExactly("home.hop.unavailable", "home.hop.refunded");
+    }
+
+    @Test
+    void aPlayerTheProxyPutOnTheWrongBackendIsRefundedThereAndTheWatchdogFindsNothing() {
+        goHome();
+
+        arrivalOn("creative", homesOn("creative")).onArrival(ALEX);
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.misrouted", "home.hop.refunded");
+    }
+
+    @Test
+    void aHomeThatIsGoneWhenThePlayerArrivesIsRefunded() {
+        goHome();
+        ledger.homes.remove(BASE);
+
+        join(survival);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.failed", "home.hop.refunded");
+    }
+
+    @Test
+    void aBackendThatDoesNotKnowTheKindLeavesTheRowForTheOriginToRefund() {
+        goHome();
+
+        join(arrivalOn(SURVIVAL, new HopResolvers()));
+        assertThat(store.rows()).containsKey(ALEX.uuid());
+
+        scheduler.advance(TTL);
+        assertThat(moved).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isOne();
+    }
+
+    @Test
+    void aSettlementTheAsyncLaneRefusesIsMadeInPlace() {
+        goHome();
+        survival.onArrival(ALEX);
+        scheduler.rejectAsync(true);
+
+        scheduler.advance(SETTLE);
+
+        assertThat(moved).containsExactly("Alex->base");
+        assertThat(ledger.keeper).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void aRefundTheAsyncLaneRefusesWhileThePlayerLeavesIsMadeInPlace() {
+        goHome();
+        survival.onArrival(ALEX);
+        scheduler.offline(ALEX);
+        scheduler.rejectAsync(true);
+
+        scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isOne();
+    }
+
+    @Test
+    void aSettlementThatBanksNothingGivesThePlayerTheFeeBack() {
+        ledger.settles = false;
+        goHome();
+
+        join(survival);
+
+        assertThat(moved).containsExactly("Alex->base");
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void aNewHopRefundsTheUnclaimedOneItReplaces() {
+        goHome();
+        scheduler.advance(Duration.ofSeconds(5));
+
+        goHome();
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+
+        scheduler.advance(TTL);
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isEqualTo(2);
+    }
+
+    /** How the fake move ends. */
+    private enum Landing {
+        LAND,
+        // Reports the miss and then throws as well, the worst case for refunding exactly once.
+        MISS_THEN_THROW
+    }
+
+    /** The player's wallet, the keeper's account and the homes that exist, with where each lives. */
+    private static final class Ledger {
+
+        private final Map<String, String> homes = new HashMap<>(Map.of(BASE, SURVIVAL));
+        private BigDecimal wallet = BigDecimal.ZERO;
+        private BigDecimal keeper = BigDecimal.ZERO;
+        private int refunds;
+        private boolean settles = true;
+    }
+
+    /** A test kind: a home resolved by name, moved to by the fake landing, paid through the ledger. */
+    private final class Homes implements HopResolver {
+
+        private final String server;
+
+        Homes(String server) {
+            this.server = server;
+        }
+
+        @Override
+        public HopKind kind() {
+            return HopKind.HOME;
+        }
+
+        @Override
+        public HopNotices notices() {
+            Map<HopNotice, MessageKey> keys = new HashMap<>();
+            for (HopNotice notice : HopNotice.values()) {
+                String key = "home.hop."
+                        + notice.name().toLowerCase(java.util.Locale.ROOT).replace('_', '-');
+                keys.put(notice, () -> key);
+            }
+            return new HopNotices("home", keys);
+        }
+
+        @Override
+        public String label(PendingHop hop) {
+            return hop.target();
+        }
+
+        @Override
+        public HopResolution resolve(PendingHop hop) {
+            if (!server.equals(ledger.homes.get(hop.target()))) {
+                return HopResolution.unreachable(hop.target());
+            }
+            return HopResolution.landsAt(hop.target(), (who, onLanded, onMissed) -> {
+                if (landing == Landing.MISS_THEN_THROW) {
+                    onMissed.run();
+                    throw new IllegalStateException("the move broke after reporting its miss");
+                }
+                moved.add(who.name() + "->" + hop.target());
+                onLanded.run();
+            });
+        }
+
+        @Override
+        public boolean refund(PlayerRef who, HopCharge charge) {
+            ledger.wallet = ledger.wallet.add(charge.amount());
+            ledger.refunds++;
+            return true;
+        }
+
+        @Override
+        public boolean settle(PlayerRef who, HopSettlement settlement, HopCharge charge) {
+            if (!ledger.settles) {
+                return false;
+            }
+            ledger.keeper = ledger.keeper.add(charge.amount());
+            return true;
+        }
+    }
+}

@@ -8,10 +8,9 @@ import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 
 /**
- * The scoreboard context's command surface as a single platform-neutral {@link CommandSpec}: {@code /scoreboard}
- * (alias {@code /sb}), guarded by {@code uxmessentials.scoreboard.use}, which toggles whether the invoking player
- * sees the display. The literal and node are greppable and fixed so the surface guard checks them against
- * {@code paper-plugin.yml}; the realised Brigadier handler is built in the adapter.
+ * The scoreboard context's command surface as a single platform-neutral {@link CommandSpec}: {@code /scoreboard} (alias
+ * {@code /sb}), guarded by {@code uxmessentials.scoreboard.use}, which toggles whether the invoking player sees the
+ * display. The literal and node are greppable and fixed; the realised Brigadier handler is built in the adapter.
  */
 final class ScoreboardCommandSurface {
 

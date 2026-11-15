@@ -76,7 +76,8 @@ public final class StaffModule implements FeatureModule {
     public boolean enabled(ConfigStore config) {
         // The module ships ENABLED with a sensible default gadget hotbar. Every command and gadget is
         // permission-gated, so a regular player sees nothing change; an operator grants the staff nodes to use it.
-        // The default here is true (the steady-state contexts default on); an operator opts out via modules.conf.
+        // The default here is true (the steady-state contexts default on); an operator opts out via
+        // modules/staff/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

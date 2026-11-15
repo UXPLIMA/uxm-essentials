@@ -74,7 +74,7 @@ public final class CustomMenusModule implements FeatureModule {
     @Override
     public boolean enabled(ConfigStore config) {
         // A steady-state context that ships enabled but inert (no menu opens until a player runs /menu open). The
-        // default here is true; an operator opts out via modules.conf.
+        // default here is true; an operator opts out via modules/custommenus/config.conf.
         return config.getBoolean(configRoot() + ".enabled", true);
     }
 

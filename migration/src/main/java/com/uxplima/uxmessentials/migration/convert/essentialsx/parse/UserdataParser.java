@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.migration.convert.essentialsx.parse;
 import java.io.IOException;
 import java.io.Reader;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -11,6 +12,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurationNode;
 
 /**
@@ -75,15 +77,56 @@ public final class UserdataParser {
         }
     }
 
-    private List<String> mail(ConfigurationNode mailNode) {
-        List<String> lines = new ArrayList<>();
-        for (ConfigurationNode line : mailNode.childrenList()) {
-            String text = line.getString();
-            if (text != null && !text.isBlank()) {
-                lines.add(text.strip());
-            }
+    private List<EssXMail> mail(ConfigurationNode mailNode) {
+        List<EssXMail> entries = new ArrayList<>();
+        for (ConfigurationNode entry : mailNode.childrenList()) {
+            mailEntry(entry).ifPresent(entries::add);
         }
-        return lines;
+        return entries;
+    }
+
+    private Optional<EssXMail> mailEntry(ConfigurationNode entry) {
+        if (!entry.isMap()) {
+            return nonBlank(entry.getString()).map(text -> EssXMail.legacy(text, false));
+        }
+        Optional<String> message = nonBlank(entry.node("message").getString());
+        if (message.isEmpty()) {
+            return Optional.empty();
+        }
+        boolean read = entry.node("read").getBoolean(false);
+        // EssentialsX reads an entry without the flag as legacy and then ignores its sender and times, so the
+        // same entry imports the same way here.
+        if (entry.node("legacy").getBoolean(true)) {
+            return Optional.of(EssXMail.legacy(message.get(), read));
+        }
+        return Optional.of(new EssXMail(
+                message.get(),
+                nonBlank(entry.node("sender-name").getString()),
+                uuid(entry.node("sender-uuid").getString()),
+                epochMillis(entry.node("timestamp").getLong(0L)),
+                epochMillis(entry.node("expire").getLong(0L)),
+                read));
+    }
+
+    private static Optional<String> nonBlank(@Nullable String raw) {
+        return raw == null || raw.isBlank() ? Optional.empty() : Optional.of(raw.strip());
+    }
+
+    private static Optional<UUID> uuid(@Nullable String raw) {
+        // EssentialsX writes the text "null" for a console sender.
+        if (raw == null || raw.isBlank() || "null".equals(raw.strip())) {
+            return Optional.empty();
+        }
+        try {
+            return Optional.of(UUID.fromString(raw.strip()));
+        } catch (IllegalArgumentException malformed) {
+            return Optional.empty();
+        }
+    }
+
+    private static Optional<Instant> epochMillis(long raw) {
+        // EssentialsX writes 0 for a time it does not know or an expiry that never comes.
+        return raw > 0L ? Optional.of(Instant.ofEpochMilli(raw)) : Optional.empty();
     }
 
     private static UUID uuidFromFileName(String fileName) {

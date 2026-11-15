@@ -12,7 +12,9 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
+import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.RecordWriter;
+import com.uxplima.uxmessentials.migration.UserRecordWriter;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -38,6 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class DryRunRecordWriter implements RecordWriter {
 
+    private final UserRecordWriter users;
     private final WarpRepository warps;
     private final ModerationRepository moderation;
     private final KitRepository kits;
@@ -47,6 +50,7 @@ public final class DryRunRecordWriter implements RecordWriter {
     private final Clock clock;
 
     public DryRunRecordWriter(
+            UserRecordWriter users,
             WarpRepository warps,
             ModerationRepository moderation,
             KitRepository kits,
@@ -54,6 +58,7 @@ public final class DryRunRecordWriter implements RecordWriter {
             WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
             Clock clock) {
+        this.users = Objects.requireNonNull(users, "users");
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
@@ -64,22 +69,24 @@ public final class DryRunRecordWriter implements RecordWriter {
     }
 
     @Override
-    public RecordOutcome write(ImportRecord record, ImportOptions options) {
+    public RecordResult write(ImportRecord record, ImportOptions options) {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(options, "options");
         return switch (record) {
-            case ImportRecord.UserRecord ignored -> RecordOutcome.WRITTEN;
-            case ImportRecord.WarpRecord warp -> warpOutcome(warp.warp().warp().name(), options);
-            case ImportRecord.PlayerWarpRecord warp -> playerWarps.preview(warp.warp());
-            case ImportRecord.KitRecord kit -> kitOutcome(kit.kit().definition().id(), options);
-            case ImportRecord.ModerationRecord rec -> moderationOutcome(rec.moderation(), options);
-            case ImportRecord.BanRecord ban -> banOutcome(ban.target(), options);
-            case ImportRecord.IpBanRecord ban -> ipBanOutcome(ban.ban(), options);
-            case ImportRecord.WarnRecord warn -> warnOutcome(warn.target(), warn.warn());
+            case ImportRecord.UserRecord user -> users.preview(user.user(), options);
+            case ImportRecord.WarpRecord warp ->
+                RecordResult.of(warpOutcome(warp.warp().warp().name(), options));
+            case ImportRecord.PlayerWarpRecord warp -> RecordResult.of(playerWarps.preview(warp.warp()));
+            case ImportRecord.KitRecord kit ->
+                RecordResult.of(kitOutcome(kit.kit().definition().id(), options));
+            case ImportRecord.ModerationRecord rec -> RecordResult.of(moderationOutcome(rec.moderation(), options));
+            case ImportRecord.BanRecord ban -> RecordResult.of(banOutcome(ban.target(), options));
+            case ImportRecord.IpBanRecord ban -> RecordResult.of(ipBanOutcome(ban.ban(), options));
+            case ImportRecord.WarnRecord warn -> RecordResult.of(warnOutcome(warn.target(), warn.warn()));
             case ImportRecord.HologramRecord hologram ->
-                hologramOutcome(hologram.hologram().hologram().name(), options);
+                RecordResult.of(hologramOutcome(hologram.hologram().hologram().name(), options));
             case ImportRecord.WorldRecord world ->
-                worldOutcome(world.world().world().name(), options);
+                RecordResult.of(worldOutcome(world.world().world().name(), options));
         };
     }
 

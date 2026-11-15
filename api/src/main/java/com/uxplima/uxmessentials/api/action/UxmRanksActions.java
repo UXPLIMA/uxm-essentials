@@ -26,7 +26,10 @@ public interface UxmRanksActions {
      * Advance this player one rung, charging the cost and running the rank's actions.
      *
      * <p>{@code not-found} when the ladder is empty, {@code already-in-state} at the top of the ladder,
-     * {@code insufficient-funds} when they cannot pay, {@code refused} when a requirement is not met.
+     * {@code insufficient-funds} when they cannot pay, {@code refused} when a requirement is not met, when their rank
+     * has not finished loading after they joined, or when another rankup for them is still being saved (the last two
+     * clear within moments, so a retry works). {@code failed} when storage failed while charging or saving: the rank
+     * did not move and any cost taken was refunded. The future completes once the new rank is saved.
      */
     CompletableFuture<UxmOutcome> rankUp(UUID playerId);
 
@@ -40,8 +43,9 @@ public interface UxmRanksActions {
     /**
      * Prestige this player: reset them to the first rung one prestige level higher, charging the prestige cost.
      *
-     * <p>{@code refused} when prestige is switched off or a requirement is not met, {@code already-in-state} when
-     * they are not at the top or are already at the prestige cap, {@code insufficient-funds} when they cannot pay.
+     * <p>{@code refused} when prestige is switched off, when a requirement is not met or when their rank has not
+     * finished loading after they joined (a retry a moment later works), {@code already-in-state} when they are not
+     * at the top or are already at the prestige cap, {@code insufficient-funds} when they cannot pay.
      */
     CompletableFuture<UxmOutcome> prestige(UUID playerId);
 }

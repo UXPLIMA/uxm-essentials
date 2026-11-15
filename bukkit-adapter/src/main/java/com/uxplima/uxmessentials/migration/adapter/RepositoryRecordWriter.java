@@ -1,35 +1,28 @@
 package com.uxplima.uxmessentials.migration.adapter;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
-import com.uxplima.uxmessentials.economy.domain.Currency;
-import com.uxplima.uxmessentials.economy.domain.Money;
-import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
-import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
-import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.kits.adapter.outbound.KitItemCodec;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
-import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.PlayerWarpRecordWriter;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
+import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.RecordWriter;
+import com.uxplima.uxmessentials.migration.UserRecordWriter;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
-import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
@@ -47,7 +40,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The live {@link RecordWriter}: applies each mapped record to the target contexts' durable repositories,
- * honouring the conflict and balance policies. Every write is an idempotent upsert
+ * honouring the conflict and balance policies. A player's homes, balance and mail go through
+ * {@link UserRecordWriter}, which reports what it held back. Every other write is an idempotent upsert
  * keyed by stable identity, a home by {@code (owner, slot)}, a warp by {@code name}, a wallet balance by
  * {@code (uuid, currency)}, so a re-run never duplicates a record, and the wallet balance is always
  * <em>set</em>, never added, so a re-run can never double-credit. It writes through the same repository
@@ -57,56 +51,52 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RepositoryRecordWriter implements RecordWriter {
 
-    private final HomeRepository homes;
+    private final UserRecordWriter users;
     private final WarpRepository warps;
-    private final WalletRepository wallets;
     private final ModerationRepository moderation;
     private final KitRepository kits;
     private final HologramRepository holograms;
     private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
-    private final Currency defaultCurrency;
     private final Clock clock;
 
     public RepositoryRecordWriter(
-            HomeRepository homes,
+            UserRecordWriter users,
             WarpRepository warps,
-            WalletRepository wallets,
             ModerationRepository moderation,
             KitRepository kits,
             HologramRepository holograms,
             WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
-            Currency defaultCurrency,
             Clock clock) {
-        this.homes = Objects.requireNonNull(homes, "homes");
+        this.users = Objects.requireNonNull(users, "users");
         this.warps = Objects.requireNonNull(warps, "warps");
-        this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
         this.kits = Objects.requireNonNull(kits, "kits");
         this.holograms = Objects.requireNonNull(holograms, "holograms");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
-        this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
-    public RecordOutcome write(ImportRecord record, ImportOptions options) {
+    public RecordResult write(ImportRecord record, ImportOptions options) {
         Objects.requireNonNull(record, "record");
         Objects.requireNonNull(options, "options");
         return switch (record) {
-            case ImportRecord.UserRecord user -> writeUser(user.user(), options);
-            case ImportRecord.WarpRecord warp -> writeWarp(warp.warp().warp(), options);
-            case ImportRecord.PlayerWarpRecord warp -> playerWarps.write(warp.warp());
-            case ImportRecord.KitRecord kit -> writeKit(kit.kit(), options);
-            case ImportRecord.ModerationRecord rec -> writeModeration(rec.moderation(), options);
-            case ImportRecord.BanRecord ban -> writeBan(ban, options);
-            case ImportRecord.IpBanRecord ban -> writeIpBan(ban.ban(), options);
-            case ImportRecord.WarnRecord warn -> writeWarn(warn);
+            case ImportRecord.UserRecord user -> users.write(user.user(), options);
+            case ImportRecord.WarpRecord warp ->
+                RecordResult.of(writeWarp(warp.warp().warp(), options));
+            case ImportRecord.PlayerWarpRecord warp -> RecordResult.of(playerWarps.write(warp.warp()));
+            case ImportRecord.KitRecord kit -> RecordResult.of(writeKit(kit.kit(), options));
+            case ImportRecord.ModerationRecord rec -> RecordResult.of(writeModeration(rec.moderation(), options));
+            case ImportRecord.BanRecord ban -> RecordResult.of(writeBan(ban, options));
+            case ImportRecord.IpBanRecord ban -> RecordResult.of(writeIpBan(ban.ban(), options));
+            case ImportRecord.WarnRecord warn -> RecordResult.of(writeWarn(warn));
             case ImportRecord.HologramRecord hologram ->
-                writeHologram(hologram.hologram().hologram(), options);
-            case ImportRecord.WorldRecord world -> writeWorld(world.world().world(), options);
+                RecordResult.of(writeHologram(hologram.hologram().hologram(), options));
+            case ImportRecord.WorldRecord world ->
+                RecordResult.of(writeWorld(world.world().world(), options));
         };
     }
 
@@ -127,47 +117,6 @@ public final class RepositoryRecordWriter implements RecordWriter {
         }
         holograms.save(hologram);
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
-    }
-
-    private RecordOutcome writeUser(ImportedUser user, ImportOptions options) {
-        writeHomes(user, options);
-        user.balance().ifPresent(balance -> writeBalance(user.owner(), balance, options.balancePolicy()));
-        return RecordOutcome.WRITTEN;
-    }
-
-    private void writeHomes(ImportedUser user, ImportOptions options) {
-        for (Home home : user.homes()) {
-            if (shouldWriteHome(home, options.onConflict())) {
-                homes.save(home);
-            }
-        }
-    }
-
-    private boolean shouldWriteHome(Home home, ConflictPolicy policy) {
-        if (policy != ConflictPolicy.SKIP) {
-            return true; // overwrite and merge both upsert the home into its slot (same call)
-        }
-        return homes.load(home.owner()).find(home.slot()).isEmpty();
-    }
-
-    private void writeBalance(PlayerRef owner, BigDecimal raw, BalancePolicy policy) {
-        if (policy == BalancePolicy.SKIP_IF_PRESENT && hasBalance(owner)) {
-            return;
-        }
-        wallets.ensureOwner(owner);
-        // Money.of normalises to the currency's precision; the upsert sets (never adds) the balance, so a
-        // re-run can never double-credit.
-        wallets.upsertBalance(owner, Money.of(defaultCurrency, raw));
-    }
-
-    private boolean hasBalance(PlayerRef owner) {
-        return wallets.findByOwner(owner)
-                .map(wallet -> existingAmount(wallet).signum() != 0)
-                .orElse(false);
-    }
-
-    private BigDecimal existingAmount(Wallet wallet) {
-        return wallet.balanceOf(defaultCurrency).amount();
     }
 
     private RecordOutcome writeWarp(Warp warp, ImportOptions options) {

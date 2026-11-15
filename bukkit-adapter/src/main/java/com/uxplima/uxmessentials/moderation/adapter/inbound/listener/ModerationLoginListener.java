@@ -8,6 +8,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerLoginEvent;
 
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
+import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -16,10 +17,12 @@ import org.jspecify.annotations.NullMarked;
  * The ban-on-login enforcement at {@code PlayerLoginEvent} priority HIGHEST: for the
  * connecting player it asks {@link LoginEnforcement} whether a server lockdown, an active tempban or an IP ban
  * bars the login, and disallows the connection <em>before</em> player data loads (kick-before-data-load) when
- * it does. The connecting IP is read from the event's real address, so the IP ban and the alt-detection check
- * are real lookups, not a UUID-only gate. The lockdown bypass is a live permission read off the connecting
- * {@code Player} (the one place that permission can be resolved before data load) passed into the pure use
- * case so it stays free of the Bukkit permission API.
+ * it does. The connecting IP is the event's {@code getAddress()}: behind a proxy with player info forwarding
+ * that is the forwarded player address, the one the join listener, the IP history and the live IP ban kick
+ * read, while {@code getRealAddress()} is the proxy's own socket and would match no IP ban. The lockdown bypass
+ * and the exempt node are live permission reads off the connecting {@code Player} (the one place a permission
+ * can be resolved before data load) passed into the pure use case so it stays free of the Bukkit permission
+ * API.
  *
  * <p>HIGHEST runs after lower-priority listeners but before MONITOR, so a plugin observing the final decision
  * still sees our disallow; we never override an already-denied login (a kick set by another plugin stays).
@@ -46,9 +49,10 @@ public final class ModerationLoginListener implements Listener {
         }
         PlayerRef who =
                 new PlayerRef(event.getPlayer().getUniqueId(), event.getPlayer().getName());
-        String ip = event.getRealAddress().getHostAddress();
+        String ip = event.getAddress().getHostAddress();
         boolean hasBypass = event.getPlayer().hasPermission(LOCKDOWN_BYPASS);
-        LoginEnforcement.Decision decision = enforcement.evaluate(who, ip, hasBypass);
+        boolean exempt = event.getPlayer().hasPermission(ModerationGuard.EXEMPT_NODE);
+        LoginEnforcement.Decision decision = enforcement.evaluate(who, ip, hasBypass, exempt);
         if (!decision.allowed()) {
             event.disallow(
                     PlayerLoginEvent.Result.KICK_BANNED,
