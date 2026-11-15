@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import org.bukkit.Material;
 
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
@@ -52,7 +53,7 @@ public final class StaffSettings {
             "<accent>Freeze</accent>",
             "<accent>Navigator</accent>",
             "<accent>Follow</accent>");
-    private static final String DEFAULT_STAFF_CHAT_NODE = "uxmessentials.staff.chat";
+    private static final String DEFAULT_STAFF_CHAT_NODE = EnforcementPermissions.STAFF_CHAT;
 
     private final boolean vanishOnEnter;
     private final boolean flightOnEnter;

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -42,7 +43,7 @@ import org.jspecify.annotations.Nullable;
 public final class UseWarp {
 
     /** Lets a player use a warp whose destination fails the safety check, here and on a landing elsewhere. */
-    static final String BYPASS_SAFETY = "uxmessentials.warp.bypass.safety";
+    static final String BYPASS_SAFETY = DestinationPermissions.WARP_BYPASS_SAFETY;
 
     private final WarpRepository repository;
     private final WarpAccess access;
@@ -215,11 +216,11 @@ public final class UseWarp {
         if (!access.permits(recipient, warp)) {
             return WarpError.NO_PERMISSION;
         }
-        if (warp.isLocked() && !permissions.has(recipient, "uxmessentials.warp.bypass.lock")) {
+        if (warp.isLocked() && !permissions.has(recipient, DestinationPermissions.WARP_BYPASS_LOCK)) {
             return WarpError.LOCKED;
         }
         if (warp.password().isPresent()
-                && !permissions.has(recipient, "uxmessentials.warp.bypass.password")
+                && !permissions.has(recipient, DestinationPermissions.WARP_BYPASS_PASSWORD)
                 && !enteredPassword.equals(warp.password())) {
             return WarpError.WRONG_PASSWORD;
         }

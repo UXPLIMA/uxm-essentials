@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class HatCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.hat.use";
+    private static final String PERMISSION = ItemworldPermissions.HAT_USE;
 
     public HatCommand(ItemworldServices services) {
         super(services, "hat", SubFeatureGroup.ITEM_UTILS, "Wear the held item as a hat.");

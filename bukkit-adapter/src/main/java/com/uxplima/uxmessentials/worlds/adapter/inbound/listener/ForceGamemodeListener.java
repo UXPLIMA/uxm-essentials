@@ -12,6 +12,7 @@ import org.bukkit.event.player.PlayerChangedWorldEvent;
 import org.bukkit.event.player.PlayerJoinEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
@@ -24,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ForceGamemodeListener implements Listener {
 
-    public static final String BYPASS_NODE = "uxmessentials.world.gamemode.bypass";
+    public static final String BYPASS_NODE = DestinationPermissions.WORLD_GAMEMODE_BYPASS;
 
     private final WorldRepository repository;
     private final Scheduler scheduler;

@@ -21,6 +21,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -44,7 +45,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SudoCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.sudo";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_SUDO;
     private static final String PLAYER_ARG = "player";
     private static final String COMMAND_ARG = "command";
 

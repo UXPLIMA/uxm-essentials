@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.HealthLevel;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class HealthCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.health.use";
+    private static final String PERMISSION = PlayerstatePermissions.HEALTH_USE;
     private static final int MAX_HEALTH_INPUT = 2048;
 
     public HealthCommand(PlayerStateServices services, Messages messages) {
@@ -41,7 +42,7 @@ public final class HealthCommand extends PlayerstateCommandSupport implements Co
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.health.others";
+        return PlayerstatePermissions.HEALTH_OTHERS;
     }
 
     @Override

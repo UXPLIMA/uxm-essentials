@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.itemworld.domain.TimeSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -42,13 +43,14 @@ public final class TimeAliasCommand extends ItemworldCommandSupport implements C
 
     /** {@code /day}, set the world to daytime. */
     public static TimeAliasCommand day(ItemworldServices services) {
-        return new TimeAliasCommand(services, "day", "uxmessentials.time.alias", "Set the time to day.", TimeSpec::day);
+        return new TimeAliasCommand(
+                services, "day", ItemworldPermissions.TIME_ALIAS, "Set the time to day.", TimeSpec::day);
     }
 
     /** {@code /night}, set the world to nighttime. */
     public static TimeAliasCommand night(ItemworldServices services) {
         return new TimeAliasCommand(
-                services, "night", "uxmessentials.time.alias", "Set the time to night.", TimeSpec::night);
+                services, "night", ItemworldPermissions.TIME_ALIAS, "Set the time to night.", TimeSpec::night);
     }
 
     @Override

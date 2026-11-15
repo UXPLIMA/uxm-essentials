@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.OptionalLong;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
@@ -63,7 +64,7 @@ public final class NetworkCooldowns implements Cooldowns {
     public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(label, "label");
-        if (permissions.has(who, "uxmessentials.cooldown.bypass." + label)) {
+        if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return Result.ok();
         }
         return gate(who, LABEL_SCOPE_PREFIX + label);
@@ -79,10 +80,10 @@ public final class NetworkCooldowns implements Cooldowns {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(configDefault, "configDefault");
-        if (permissions.has(who, "uxmessentials.cooldown.bypass." + label)) {
+        if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return;
         }
-        long seconds = resolveSeconds(who, "uxmessentials.cooldown." + label, configDefault.toSeconds());
+        long seconds = resolveSeconds(who, SharedPermissions.cooldown(label), configDefault.toSeconds());
         write(who, LABEL_SCOPE_PREFIX + label, seconds);
     }
 

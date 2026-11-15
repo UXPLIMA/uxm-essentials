@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,9 +43,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PosesCommand implements CommandRegistration {
 
-    private static final String TOGGLE_PERMISSION = "uxmessentials.poses.toggle";
-    private static final String GUI_PERMISSION = "uxmessentials.poses.gui";
-    private static final String REVEAL_PERMISSION = "uxmessentials.poses.reveal";
+    private static final String TOGGLE_PERMISSION = SocialPermissions.POSES_TOGGLE;
+    private static final String GUI_PERMISSION = SocialPermissions.POSES_GUI;
+    private static final String REVEAL_PERMISSION = SocialPermissions.POSES_REVEAL;
     private static final String TARGET = "player";
 
     private final TogglePlayerSit togglePlayerSit;

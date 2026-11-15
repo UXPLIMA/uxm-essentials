@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishActionBar;
@@ -64,10 +65,10 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VanishCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.vanish.use";
-    private static final String OTHERS_PERMISSION = "uxmessentials.vanish.others";
-    private static final String LIST_PERMISSION = "uxmessentials.vanish.list";
-    private static final String SILENT_PERMISSION = "uxmessentials.vanish.silent";
+    private static final String PERMISSION = EnforcementPermissions.VANISH_USE;
+    private static final String OTHERS_PERMISSION = EnforcementPermissions.VANISH_OTHERS;
+    private static final String LIST_PERMISSION = EnforcementPermissions.VANISH_LIST;
+    private static final String SILENT_PERMISSION = EnforcementPermissions.VANISH_SILENT;
     private static final String SILENT_FLAG = "-s";
     private static final String TARGET_ARG = "target";
 

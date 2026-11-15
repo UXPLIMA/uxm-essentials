@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.scoreboard.application.ToggleScoreboard;
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -43,8 +44,8 @@ import org.jspecify.annotations.Nullable;
 public final class ScoreboardCommand
         implements com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.scoreboard.use";
-    private static final String GUI_PERMISSION = "uxmessentials.scoreboard.gui";
+    private static final String PERMISSION = ContentPermissions.SCOREBOARD_USE;
+    private static final String GUI_PERMISSION = ContentPermissions.SCOREBOARD_GUI;
 
     private final ToggleScoreboard toggle;
     private final ScoreboardRenderer renderer;

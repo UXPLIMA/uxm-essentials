@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.messaging.adapter.inbound.gui.MessagingGuiViews;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class IgnoreListCommand extends MessagingCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.msg.ignore";
+    private static final String PERMISSION = SocialPermissions.MSG_IGNORE;
 
     private final MessagingGuiViews views;
 

@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.communication.application.ShowInfoPage;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -47,8 +48,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class InfoPageCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION_PREFIX = "uxmessentials.communication.info.";
-
     private final String command;
     private final InfoRegistry registry;
     private final BukkitInfoSender infoSender;
@@ -65,7 +64,7 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
-        String permission = PERMISSION_PREFIX + command;
+        String permission = SocialPermissions.infoPage(command);
         return Commands.literal(command)
                 .requires(Gate.permission(permission))
                 .executes(ctx -> show(ctx, 1))

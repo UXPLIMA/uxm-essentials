@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -54,17 +55,17 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class NpcCommand extends NpcCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.npc.admin";
-    private static final String GUI_PERMISSION = "uxmessentials.npc.gui";
+    private static final String PERMISSION = ContentPermissions.NPC_ADMIN;
+    private static final String GUI_PERMISSION = ContentPermissions.NPC_GUI;
 
-    private static final String CREATE = "uxmessentials.npc.create";
-    private static final String DELETE = "uxmessentials.npc.delete";
-    private static final String MOVE = "uxmessentials.npc.move";
-    private static final String APPEARANCE = "uxmessentials.npc.appearance";
-    private static final String ACTION = "uxmessentials.npc.action";
-    private static final String VIEW = "uxmessentials.npc.view";
-    private static final String EDIT = "uxmessentials.npc.edit";
-    private static final String SCOPE = "uxmessentials.npc.scope";
+    private static final String CREATE = ContentPermissions.NPC_CREATE;
+    private static final String DELETE = ContentPermissions.NPC_DELETE;
+    private static final String MOVE = ContentPermissions.NPC_MOVE;
+    private static final String APPEARANCE = ContentPermissions.NPC_APPEARANCE;
+    private static final String ACTION = ContentPermissions.NPC_ACTION;
+    private static final String VIEW = ContentPermissions.NPC_VIEW;
+    private static final String EDIT = ContentPermissions.NPC_EDIT;
+    private static final String SCOPE = ContentPermissions.NPC_SCOPE;
 
     /**
      * Which capability each verb belongs to, so the many verbs of {@code /npc} are grantable in the shapes an

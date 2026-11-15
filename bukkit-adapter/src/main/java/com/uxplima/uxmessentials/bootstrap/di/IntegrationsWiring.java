@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -56,7 +57,7 @@ final class IntegrationsWiring {
 
     // The node a player must hold to see the on-join update notice. An admin/op-style node, not isOp(), so a
     // server owner controls exactly who is told (the uxmLib notifier gates on the permission, not on op status).
-    private static final String UPDATE_NOTIFY_PERMISSION = "uxmessentials.update.notify";
+    private static final String UPDATE_NOTIFY_PERMISSION = SharedPermissions.UPDATE_NOTIFY;
 
     // What the notice says. uxmLib used to write this line itself and it stopped: a library that words a message
     // decides how a plugin sounds, and that is the plugin's to decide. The library hands over one notice for every

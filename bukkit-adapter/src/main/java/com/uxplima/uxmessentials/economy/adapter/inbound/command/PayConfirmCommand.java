@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -24,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PayConfirmCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.pay";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_PAY;
 
     public PayConfirmCommand(EconomyServices services, Messages messages) {
         super(services, messages);

@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
@@ -23,7 +24,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class MailClearCommand extends MessagingCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.mail.use";
+    private static final String PERMISSION = SocialPermissions.MAIL_USE;
 
     public MailClearCommand(MessagingServices services, Messages messages, MessageSink sink) {
         super(services, messages, sink);

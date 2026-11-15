@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
@@ -63,10 +64,10 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VoteCommand implements CommandRegistration {
 
-    private static final String USE_PERMISSION = "uxmessentials.vote.use";
-    private static final String TEST_PERMISSION = "uxmessentials.vote.testreward";
-    private static final String TOP_PERMISSION = "uxmessentials.vote.top";
-    private static final String ADMIN_PERMISSION = "uxmessentials.vote.admin";
+    private static final String USE_PERMISSION = EconomyPermissions.VOTE_USE;
+    private static final String TEST_PERMISSION = EconomyPermissions.VOTE_TESTREWARD;
+    private static final String TOP_PERMISSION = EconomyPermissions.VOTE_TOP;
+    private static final String ADMIN_PERMISSION = EconomyPermissions.VOTE_ADMIN;
 
     private final VoteServices services;
     private final CommandFeedback feedback;

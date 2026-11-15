@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.pipeline.ChannelResolver;
 import com.uxplima.uxmlib.pipeline.PacketListenerRegistry;
@@ -57,16 +58,16 @@ import org.jspecify.annotations.NullMarked;
 public final class CommandControlWiring {
 
     /** The node that exempts a holder from the command gate: always allowed through, mirroring the other bypasses. */
-    public static final String BYPASS_PERMISSION = "uxmessentials.commandcontrol.bypass";
+    public static final String BYPASS_PERMISSION = EnforcementPermissions.COMMANDCONTROL_BYPASS;
 
     /** The node that reveals the plugin-listing / help commands the plugin-hide otherwise removes and blocks. */
-    public static final String VIEW_PERMISSION = "uxmessentials.commandcontrol.viewplugins";
+    public static final String VIEW_PERMISSION = EnforcementPermissions.COMMANDCONTROL_VIEWPLUGINS;
 
     /** The node that exempts a holder from the command-spam rate limiter (never counted, never actioned). */
-    public static final String SPAM_BYPASS_PERMISSION = "uxmessentials.commandcontrol.spam.bypass";
+    public static final String SPAM_BYPASS_PERMISSION = EnforcementPermissions.COMMANDCONTROL_SPAM_BYPASS;
 
     /** The node that exempts a holder from the plugin-channel hider (their channel list is never stripped). */
-    public static final String CHANNELHIDE_BYPASS_PERMISSION = "uxmessentials.commandcontrol.channelhide.bypass";
+    public static final String CHANNELHIDE_BYPASS_PERMISSION = EnforcementPermissions.COMMANDCONTROL_CHANNELHIDE_BYPASS;
 
     private CommandControlWiring() {}
 

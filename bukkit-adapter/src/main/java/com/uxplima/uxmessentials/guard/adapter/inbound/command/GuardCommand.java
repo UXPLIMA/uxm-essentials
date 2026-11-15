@@ -69,6 +69,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmlib.command.Gate;
@@ -81,7 +82,6 @@ import org.jspecify.annotations.Nullable;
  */
 public final class GuardCommand implements CommandRegistration {
 
-    private static final String BASE = "uxmessentials.guard.";
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
@@ -178,10 +178,10 @@ public final class GuardCommand implements CommandRegistration {
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("guard")
-                .requires(Gate.permission(BASE + "use"))
+                .requires(Gate.permission(ContentPermissions.GUARD_USE))
                 .executes(ctx -> {
                     if (ctx.getSource().getSender() instanceof Player player
-                            && (player.hasPermission(BASE + "menu") || managesHere(player))) {
+                            && (player.hasPermission(ContentPermissions.GUARD_MENU) || managesHere(player))) {
                         openMenu.accept(player);
                     } else {
                         help(ctx.getSource().getSender());
@@ -237,64 +237,71 @@ public final class GuardCommand implements CommandRegistration {
             all.add("clear");
             return all;
         };
-        add(subs, "help", "use", (s, a) -> help(s));
-        add(subs, "define", "define", this::define, s -> List.of(), shapes);
-        add(subs, "redefine", "define", this::redefine, regions, shapes);
-        add(subs, "remove", "remove", this::remove, regions);
-        add(subs, "restore", "remove", this::restore);
-        add(subs, "info", "info", this::info, regions);
-        add(subs, "list", "list", this::list, s -> worldNames());
-        add(subs, "wand", "define", this::wand);
-        add(subs, "pos1", "define", (s, a) -> corner(s, true));
-        add(subs, "pos2", "define", (s, a) -> corner(s, false));
-        add(subs, "point", "define", this::point);
-        add(subs, "clear", "define", this::clearSelection);
+        add(subs, "help", ContentPermissions.GUARD_USE, (s, a) -> help(s));
+        add(subs, "define", ContentPermissions.GUARD_DEFINE, this::define, s -> List.of(), shapes);
+        add(subs, "redefine", ContentPermissions.GUARD_DEFINE, this::redefine, regions, shapes);
+        add(subs, "remove", ContentPermissions.GUARD_REMOVE, this::remove, regions);
+        add(subs, "restore", ContentPermissions.GUARD_REMOVE, this::restore);
+        add(subs, "info", ContentPermissions.GUARD_INFO, this::info, regions);
+        add(subs, "list", ContentPermissions.GUARD_LIST, this::list, s -> worldNames());
+        add(subs, "wand", ContentPermissions.GUARD_DEFINE, this::wand);
+        add(subs, "pos1", ContentPermissions.GUARD_DEFINE, (s, a) -> corner(s, true));
+        add(subs, "pos2", ContentPermissions.GUARD_DEFINE, (s, a) -> corner(s, false));
+        add(subs, "point", ContentPermissions.GUARD_DEFINE, this::point);
+        add(subs, "clear", ContentPermissions.GUARD_DEFINE, this::clearSelection);
         add(
                 subs,
                 "expand",
-                "define",
+                ContentPermissions.GUARD_DEFINE,
                 this::expand,
                 s -> List.of("1", "5", "10", "vert"),
                 s -> List.of("up", "down", "north", "south", "east", "west", "all"));
-        add(subs, "rule", "rule", this::rule, regions, actions, targets, effects);
-        add(subs, "role", "role", this::role, regions, players, roles);
-        add(subs, "member", "member", this::member, regions, players, s -> List.of("member", "guest", "clear"));
-        add(subs, "set", "set", this::set, regions, keys);
-        add(subs, "priority", "priority", this::priority, regions);
-        add(subs, "parent", "parent", this::parent, regions, regions);
-        add(subs, "family", "family", this::family, regions);
-        add(subs, "tag", "tag", this::tag, regions, s -> List.of("add", "remove", "bulk"));
-        add(subs, "template", "template", this::template, regions, templates);
-        add(subs, "scope", "scope", this::scope, regions, s -> scopeNames());
-        add(subs, "lock", "lock", (s, a) -> lock(s, a, true), regions);
-        add(subs, "unlock", "lock", (s, a) -> lock(s, a, false), regions);
-        add(subs, "bypass", "bypass", (s, a) -> bypass(s));
-        add(subs, "show", "show", this::show, regions);
-        add(subs, "hide", "show", (s, a) -> hide(s));
-        add(subs, "here", "here", (s, a) -> here(s));
-        add(subs, "near", "near", this::near, s -> List.of("16", "32", "64", "128"));
-        add(subs, "why", "why", this::why, actions);
-        add(subs, "test", "test", this::test, players, actions, regions);
-        add(subs, "inspect", "inspect", (s, a) -> inspect(s));
-        add(subs, "history", "history", this::history, regions);
-        add(subs, "undo", "undo", this::undo);
-        add(subs, "log", "log", this::log, players);
-        add(subs, "status", "status", (s, a) -> status(s));
-        add(subs, "actions", "use", this::actions, actions);
+        add(subs, "rule", ContentPermissions.GUARD_RULE, this::rule, regions, actions, targets, effects);
+        add(subs, "role", ContentPermissions.GUARD_ROLE, this::role, regions, players, roles);
+        add(
+                subs,
+                "member",
+                ContentPermissions.GUARD_MEMBER,
+                this::member,
+                regions,
+                players,
+                s -> List.of("member", "guest", "clear"));
+        add(subs, "set", ContentPermissions.GUARD_SET, this::set, regions, keys);
+        add(subs, "priority", ContentPermissions.GUARD_PRIORITY, this::priority, regions);
+        add(subs, "parent", ContentPermissions.GUARD_PARENT, this::parent, regions, regions);
+        add(subs, "family", ContentPermissions.GUARD_FAMILY, this::family, regions);
+        add(subs, "tag", ContentPermissions.GUARD_TAG, this::tag, regions, s -> List.of("add", "remove", "bulk"));
+        add(subs, "template", ContentPermissions.GUARD_TEMPLATE, this::template, regions, templates);
+        add(subs, "scope", ContentPermissions.GUARD_SCOPE, this::scope, regions, s -> scopeNames());
+        add(subs, "lock", ContentPermissions.GUARD_LOCK, (s, a) -> lock(s, a, true), regions);
+        add(subs, "unlock", ContentPermissions.GUARD_LOCK, (s, a) -> lock(s, a, false), regions);
+        add(subs, "bypass", ContentPermissions.GUARD_BYPASS, (s, a) -> bypass(s));
+        add(subs, "show", ContentPermissions.GUARD_SHOW, this::show, regions);
+        add(subs, "hide", ContentPermissions.GUARD_SHOW, (s, a) -> hide(s));
+        add(subs, "here", ContentPermissions.GUARD_HERE, (s, a) -> here(s));
+        add(subs, "near", ContentPermissions.GUARD_NEAR, this::near, s -> List.of("16", "32", "64", "128"));
+        add(subs, "why", ContentPermissions.GUARD_WHY, this::why, actions);
+        add(subs, "test", ContentPermissions.GUARD_TEST, this::test, players, actions, regions);
+        add(subs, "inspect", ContentPermissions.GUARD_INSPECT, (s, a) -> inspect(s));
+        add(subs, "history", ContentPermissions.GUARD_HISTORY, this::history, regions);
+        add(subs, "undo", ContentPermissions.GUARD_UNDO, this::undo);
+        add(subs, "log", ContentPermissions.GUARD_LOG, this::log, players);
+        add(subs, "status", ContentPermissions.GUARD_STATUS, (s, a) -> status(s));
+        add(subs, "actions", ContentPermissions.GUARD_USE, this::actions, actions);
         add(
                 subs,
                 "import",
-                "import",
+                ContentPermissions.GUARD_IMPORT,
                 this::importCommand,
                 s -> List.of("worldguard"),
                 s -> List.of("dry-run", "run", "undo"),
                 s -> List.of("yaml", "sql"));
-        add(subs, "backups", "backups", this::backups, s -> List.of("restore"));
-        add(subs, "reload", "reload", (s, a) -> {
+        add(subs, "backups", ContentPermissions.GUARD_BACKUPS, this::backups, s -> List.of("restore"));
+        add(subs, "reload", ContentPermissions.GUARD_RELOAD, (s, a) -> {
             reload.run();
             feedback.send(s, GuardMessageKey.RELOADED);
         });
-        add(subs, "menu", "use", (s, a) -> withPlayer(s, openMenu));
+        add(subs, "menu", ContentPermissions.GUARD_USE, (s, a) -> withPlayer(s, openMenu));
         return subs;
     }
 
@@ -309,7 +316,7 @@ public final class GuardCommand implements CommandRegistration {
         for (Function<CommandSender, List<String>> suggestion : suggestions) {
             list.add(suggestion);
         }
-        subs.add(new Sub(name, BASE + node, handler, List.copyOf(list)));
+        subs.add(new Sub(name, node, handler, List.copyOf(list)));
     }
 
     private int run(CommandContext<CommandSourceStack> ctx, Sub sub, String raw) {
@@ -662,7 +669,7 @@ public final class GuardCommand implements CommandRegistration {
             boolean targetManaged = region.flatMap(r -> r.roleOf(target.getUniqueId()))
                     .map(r -> !r.manages())
                     .orElse(true);
-            if (!(sender.hasPermission(BASE + "role") || (manages && allowedRole && targetManaged))) {
+            if (!(sender.hasPermission(ContentPermissions.GUARD_ROLE) || (manages && allowedRole && targetManaged))) {
                 feedback.send(sender, GuardMessageKey.ERROR_NOT_MANAGER);
                 return;
             }

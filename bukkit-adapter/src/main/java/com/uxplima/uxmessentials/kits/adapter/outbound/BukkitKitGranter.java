@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.event.KitPreClaimEvent;
 import com.uxplima.uxmessentials.kits.application.port.KitGranter;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -114,7 +115,7 @@ public final class BukkitKitGranter implements KitGranter {
 
         int maxStackSize = stack.getMaxStackSize();
         int amount = stack.getAmount();
-        boolean hasOversizedPermission = player.hasPermission("uxmessentials.oversizedstacks");
+        boolean hasOversizedPermission = player.hasPermission(ContentPermissions.OVERSIZEDSTACKS);
 
         if (item.slot().isPresent()) {
             int targetSlot = item.slot().get();

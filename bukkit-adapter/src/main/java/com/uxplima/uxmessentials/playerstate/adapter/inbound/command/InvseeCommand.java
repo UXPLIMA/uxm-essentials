@@ -12,6 +12,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class InvseeCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.invsee.use";
+    private static final String PERMISSION = PlayerstatePermissions.INVSEE_USE;
 
     public InvseeCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -36,7 +37,7 @@ public final class InvseeCommand extends PlayerstateCommandSupport implements Co
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.invsee.others";
+        return PlayerstatePermissions.INVSEE_OTHERS;
     }
 
     @Override

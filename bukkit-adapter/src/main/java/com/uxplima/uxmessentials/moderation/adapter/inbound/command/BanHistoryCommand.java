@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -45,7 +46,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class BanHistoryCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.ban";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_BAN;
 
     private final Scheduler scheduler;
     private final @Nullable PlayerPickerView picker;

@@ -18,6 +18,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WorthCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.worth";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_WORTH;
 
     public WorthCommand(EconomyServices services, Messages messages) {
         super(services, messages);

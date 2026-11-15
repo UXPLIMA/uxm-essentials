@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -39,16 +40,16 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String ADMIN = "uxmessentials.economy.admin";
-    private static final String GIVE = "uxmessentials.economy.admin.give";
-    private static final String TAKE = "uxmessentials.economy.admin.take";
-    private static final String SET = "uxmessentials.economy.admin.set";
-    private static final String BULK = "uxmessentials.economy.admin.bulk";
-    private static final String HISTORY = "uxmessentials.economy.admin.history";
-    private static final String LOGS = "uxmessentials.economy.admin.logs";
-    private static final String NOTE = "uxmessentials.economy.admin.note";
-    private static final String BACKUP = "uxmessentials.economy.admin.backup";
-    private static final String RESTORE = "uxmessentials.economy.admin.restore";
+    private static final String ADMIN = EconomyPermissions.ECONOMY_ADMIN;
+    private static final String GIVE = EconomyPermissions.ECONOMY_ADMIN_GIVE;
+    private static final String TAKE = EconomyPermissions.ECONOMY_ADMIN_TAKE;
+    private static final String SET = EconomyPermissions.ECONOMY_ADMIN_SET;
+    private static final String BULK = EconomyPermissions.ECONOMY_ADMIN_BULK;
+    private static final String HISTORY = EconomyPermissions.ECONOMY_ADMIN_HISTORY;
+    private static final String LOGS = EconomyPermissions.ECONOMY_ADMIN_LOGS;
+    private static final String NOTE = EconomyPermissions.ECONOMY_ADMIN_NOTE;
+    private static final String BACKUP = EconomyPermissions.ECONOMY_ADMIN_BACKUP;
+    private static final String RESTORE = EconomyPermissions.ECONOMY_ADMIN_RESTORE;
 
     private final BanknoteMinter minter;
     private final @Nullable EconomyAdminGuiViews adminGui;

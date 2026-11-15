@@ -16,6 +16,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
@@ -48,8 +49,8 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VotePartyCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.voteparty.use";
-    private static final String ADMIN_PERMISSION = "uxmessentials.voteparty.admin";
+    private static final String PERMISSION = EconomyPermissions.VOTEPARTY_USE;
+    private static final String ADMIN_PERMISSION = EconomyPermissions.VOTEPARTY_ADMIN;
 
     private final VoteServices services;
     private final CommandFeedback feedback;

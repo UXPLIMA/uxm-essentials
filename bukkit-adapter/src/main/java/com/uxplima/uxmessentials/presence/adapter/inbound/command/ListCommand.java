@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -49,7 +50,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class ListCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.list.use";
+    private static final String PERMISSION = SocialPermissions.LIST_USE;
     private static final MessageKey LIST_PLAYERS = PresenceMessageKey.LIST_PLAYERS;
 
     private final Messages messages;

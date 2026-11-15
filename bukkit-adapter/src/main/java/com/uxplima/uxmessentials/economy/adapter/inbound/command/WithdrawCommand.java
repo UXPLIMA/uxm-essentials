@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WithdrawCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.withdraw";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_WITHDRAW;
 
     private final BanknoteMinter minter;
 

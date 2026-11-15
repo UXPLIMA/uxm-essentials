@@ -283,6 +283,12 @@ import com.uxplima.uxmessentials.shared.application.module.LoadCondition;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -1777,7 +1783,7 @@ public final class PluginModule {
                 "guard",
                 com.uxplima.uxmessentials.guard.application.GuardMessageKey.GUI_HUB_TILE,
                 Material.BRICKS,
-                "uxmessentials.guard.menu",
+                ContentPermissions.GUARD_MENU,
                 (player, viewer) -> wired.openMenu().accept(player)));
         GuardQueries queries = new GuardQueries(wired.service());
         links.queries.register(UxmRegionsQuery.class, queries);
@@ -2376,7 +2382,7 @@ public final class PluginModule {
                 "worlds",
                 com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey.LIST_TITLE,
                 Material.GRASS_BLOCK,
-                "uxmessentials.world.gui",
+                DestinationPermissions.WORLD_GUI,
                 (player, viewer) -> wired.openWorldList().accept(player, viewer)));
     }
 
@@ -2441,7 +2447,7 @@ public final class PluginModule {
                 "homes",
                 com.uxplima.uxmessentials.homes.application.HomesMessageKey.HOME_MENU_TITLE,
                 Material.RED_BED,
-                "uxmessentials.home.use",
+                DestinationPermissions.HOME_USE,
                 (player, viewer) -> wired.listView().open(player)));
     }
 
@@ -2497,7 +2503,7 @@ public final class PluginModule {
                 "economy",
                 com.uxplima.uxmessentials.economy.application.EconomyMessageKey.WALLET_GUI_TITLE,
                 Material.GOLD_INGOT,
-                "uxmessentials.economy.wallet",
+                EconomyPermissions.ECONOMY_WALLET,
                 (player, viewer) -> wired.walletView().open(player, wired.defaultCurrency())));
         // Captured for warps, kits, homes, and vaults, which land after economy and charge a recorded cost
         // through it.
@@ -2602,7 +2608,7 @@ public final class PluginModule {
                 "warps",
                 com.uxplima.uxmessentials.warps.application.WarpsMessageKey.WARP_MENU_TITLE,
                 Material.ENDER_PEARL,
-                "uxmessentials.warp.use",
+                DestinationPermissions.WARP_USE,
                 (player, viewer) ->
                         wired.warpMenu().open(player, viewer, wired.listWarps().available(viewer))));
     }
@@ -2656,7 +2662,7 @@ public final class PluginModule {
                 "kits",
                 com.uxplima.uxmessentials.kits.application.KitsMessageKey.KIT_MENU_TITLE,
                 Material.CHEST,
-                "uxmessentials.kit.use",
+                ContentPermissions.KIT_USE,
                 (player, viewer) ->
                         wired.kitMenu().open(player, viewer, wired.listKits().available(viewer))));
     }
@@ -2806,13 +2812,13 @@ public final class PluginModule {
                 "messaging-settings",
                 com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_SETTINGS_TITLE,
                 Material.WRITABLE_BOOK,
-                "uxmessentials.messaging.gui",
+                SocialPermissions.MESSAGING_GUI,
                 (player, viewer) -> wired.guiViews().openSettings(player, viewer)));
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "messaging-mailbox",
                 com.uxplima.uxmessentials.messaging.application.MessagingMessageKey.GUI_MAIL_TITLE,
                 Material.PAPER,
-                "uxmessentials.messaging.gui",
+                SocialPermissions.MESSAGING_GUI,
                 (player, viewer) -> wired.guiViews().openMailbox(player, viewer)));
         // Captured for staff (wired last), which binds its staff chat to the messaging staff-audience resolver.
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
@@ -2905,7 +2911,7 @@ public final class PluginModule {
                 "moderation",
                 com.uxplima.uxmessentials.moderation.application.ModerationMessageKey.MOD_GUI_LIST_TITLE,
                 org.bukkit.Material.IRON_BARS,
-                "uxmessentials.moderation.gui",
+                EnforcementPermissions.MODERATION_GUI,
                 (player, viewer) -> wired.guiViews().open(player, viewer)));
         // Captured for staff (wired last), which binds its FREEZE gadget to the audited freeze use case and the
         // live freeze-state read (BukkitSanctions is the Sanctions adapter).
@@ -2943,7 +2949,7 @@ public final class PluginModule {
                 "itemworld",
                 com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey.GUI_HUB_TITLE,
                 Material.CRAFTING_TABLE,
-                "uxmessentials.itemworld.gui",
+                ItemworldPermissions.ITEMWORLD_GUI,
                 (player, viewer) -> wired.hubView().open(player)));
         // The one readable corner of an otherwise stateless module: the command bindings a player stamped onto
         // their own items, read from the same item PDC /powertoollist reads.
@@ -3014,7 +3020,7 @@ public final class PluginModule {
                 "vaults",
                 com.uxplima.uxmessentials.vaults.application.VaultsMessageKey.VAULT_SELECTOR_TITLE,
                 Material.ENDER_CHEST,
-                "uxmessentials.vault.use",
+                DestinationPermissions.VAULT_USE,
                 (player, viewer) -> wired.selector().open(player)));
     }
 
@@ -3190,7 +3196,7 @@ public final class PluginModule {
                 "communication",
                 com.uxplima.uxmessentials.communication.application.CommunicationMessageKey.GUI_PANEL_TITLE,
                 Material.WRITABLE_BOOK,
-                "uxmessentials.communication.gui",
+                SocialPermissions.COMMUNICATION_GUI,
                 (player, viewer) -> wired.adminMenu().open(player)));
     }
 
@@ -3253,7 +3259,7 @@ public final class PluginModule {
                 "holograms",
                 com.uxplima.uxmessentials.holograms.application.HologramsMessageKey.HOLOGRAM_GUI_LIST_TITLE,
                 org.bukkit.Material.ARMOR_STAND,
-                "uxmessentials.holograms.gui",
+                ContentPermissions.HOLOGRAMS_GUI,
                 (player, viewer) -> wired.listMenu().open(player)));
         links.queries.register(
                 com.uxplima.uxmessentials.api.query.UxmHologramsQuery.class,
@@ -3380,7 +3386,7 @@ public final class PluginModule {
                 "scoreboard",
                 com.uxplima.uxmessentials.scoreboard.application.ScoreboardMessageKey.GUI_TITLE,
                 Material.PAINTING,
-                "uxmessentials.scoreboard.gui",
+                ContentPermissions.SCOREBOARD_GUI,
                 (player, viewer) -> wired.settingsView().open(player, viewer)));
         // The published sidebar surface: the same preference /scoreboard flips, and the same renderer, so a
         // consumer that brings a redraw forward or puts the board away is doing what the command does.

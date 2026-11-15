@@ -19,6 +19,7 @@ import com.mojang.brigadier.suggestion.SuggestionsBuilder;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -51,10 +52,10 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RtpCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.rtp.use";
-    static final String BIOME_PERMISSION = "uxmessentials.rtp.biome";
-    static final String OTHERS_PERMISSION = "uxmessentials.rtp.others";
-    static final String GUI_PERMISSION = "uxmessentials.rtp.gui";
+    private static final String PERMISSION = TeleportPermissions.RTP_USE;
+    static final String BIOME_PERMISSION = TeleportPermissions.RTP_BIOME;
+    static final String OTHERS_PERMISSION = TeleportPermissions.RTP_OTHERS;
+    static final String GUI_PERMISSION = TeleportPermissions.RTP_GUI;
 
     private final RtpMenu menu;
 

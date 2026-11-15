@@ -6,6 +6,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -23,7 +24,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  */
 public final class HomeCharge {
 
-    private static final String BYPASS_NODE = "uxmessentials.home.bypass.cost";
+    private static final String BYPASS_NODE = DestinationPermissions.HOME_BYPASS_COST;
 
     private final Permissions permissions;
     private final Optional<HomeEconomy> economy;

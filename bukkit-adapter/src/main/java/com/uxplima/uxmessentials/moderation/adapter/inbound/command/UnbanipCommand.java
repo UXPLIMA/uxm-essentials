@@ -8,6 +8,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
@@ -21,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class UnbanipCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.banip";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_BANIP;
 
     public UnbanipCommand(ModerationServices services, Messages messages, MessageSink sink) {
         super(services, messages, sink);

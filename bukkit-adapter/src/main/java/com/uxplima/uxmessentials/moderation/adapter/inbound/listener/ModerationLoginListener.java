@@ -10,6 +10,7 @@ import org.bukkit.event.player.PlayerLoginEvent;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ModerationLoginListener implements Listener {
 
-    private static final String LOCKDOWN_BYPASS = "uxmessentials.moderation.lockdown.bypass";
+    private static final String LOCKDOWN_BYPASS = EnforcementPermissions.MODERATION_LOCKDOWN_BYPASS;
 
     private final LoginEnforcement enforcement;
 

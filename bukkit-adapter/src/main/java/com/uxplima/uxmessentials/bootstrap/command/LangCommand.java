@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.LocaleResolver;
 import com.uxplima.uxmessentials.shared.application.message.LocaleScope;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -61,8 +62,8 @@ import org.jspecify.annotations.NullMarked;
 public final class LangCommand implements CommandRegistration {
 
     private static final String LITERAL = "lang";
-    private static final String PERMISSION = "uxmessentials.lang.use";
-    private static final String OTHERS = "uxmessentials.lang.others";
+    private static final String PERMISSION = SharedPermissions.LANG_USE;
+    private static final String OTHERS = SharedPermissions.LANG_OTHERS;
     private static final String RESET_LITERAL = "reset";
     private static final String SET_LITERAL = "set";
 

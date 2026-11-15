@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.menu.Menus;
@@ -74,7 +75,6 @@ public final class GuardMenus {
 
     private static final List<String> SPECS =
             List.of(LIST, CHILDREN, HUB, RULES, ROLES, BEHAVIOURS, TEMPLATES, HISTORY);
-    private static final String BASE = "uxmessentials.guard.";
     private static final int HISTORY_ROWS = 45;
     private static final DateTimeFormatter TIME =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
@@ -233,23 +233,23 @@ public final class GuardMenus {
         bindings.placeholder("guard_hub_locked", ctx -> hubValue(ctx, r -> r.locked() ? "IRON_BARS" : "OAK_FENCE"));
 
         bindings.action("guard:hub-rules", ctx -> {
-            if (allowed(ctx, "rule")) {
+            if (allowed(ctx, ContentPermissions.GUARD_RULE)) {
                 open(ctx.player(), RULES, new RulesView(hubKey(ctx), null, everyone()));
             }
         });
         bindings.action("guard:hub-roles", ctx -> openRoles(ctx.player(), hubKey(ctx)));
         bindings.action("guard:hub-behaviours", ctx -> {
-            if (allowed(ctx, "set")) {
+            if (allowed(ctx, ContentPermissions.GUARD_SET)) {
                 open(ctx.player(), BEHAVIOURS, new BehavioursView(hubKey(ctx)));
             }
         });
         bindings.action("guard:hub-templates", ctx -> {
-            if (allowed(ctx, "template")) {
+            if (allowed(ctx, ContentPermissions.GUARD_TEMPLATE)) {
                 open(ctx.player(), TEMPLATES, new TemplatesView(hubKey(ctx)));
             }
         });
         bindings.action("guard:hub-history", ctx -> {
-            if (allowed(ctx, "history")) {
+            if (allowed(ctx, ContentPermissions.GUARD_HISTORY)) {
                 openHistory(ctx.player(), hubKey(ctx));
             }
         });
@@ -264,7 +264,7 @@ public final class GuardMenus {
                     .performCommand("guard show " + key.world() + ":" + key.id().value());
         });
         bindings.action("guard:hub-lock", ctx -> {
-            if (!allowed(ctx, "lock")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_LOCK)) {
                 return;
             }
             RegionKey key = hubKey(ctx);
@@ -279,7 +279,7 @@ public final class GuardMenus {
                     () -> openHub(ctx.player(), key));
         });
         bindings.action("guard:hub-remove", ctx -> {
-            if (!allowed(ctx, "remove")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_REMOVE)) {
                 return;
             }
             Player player = ctx.player();
@@ -300,7 +300,7 @@ public final class GuardMenus {
                     () -> openHub(player, key));
         });
         bindings.action("guard-hub-priority", ctx -> {
-            if (!allowed(ctx, "priority")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_PRIORITY)) {
                 return;
             }
             RegionKey key = hubKey(ctx);
@@ -328,7 +328,7 @@ public final class GuardMenus {
     }
 
     private void tag(MenuActionContext ctx, boolean add) {
-        if (!allowed(ctx, "tag")) {
+        if (!allowed(ctx, ContentPermissions.GUARD_TAG)) {
             return;
         }
         RegionKey key = hubKey(ctx);
@@ -383,7 +383,7 @@ public final class GuardMenus {
                 ctx -> ctx.subject(RulesView.class).key().id().value());
 
         bindings.action("guard:rule-cycle", ctx -> {
-            if (!allowed(ctx, "rule")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_RULE)) {
                 return;
             }
             RulesView view = ctx.subject(RulesView.class);
@@ -510,7 +510,7 @@ public final class GuardMenus {
         });
         bindings.action("guard:roles-back", ctx -> {
             RegionKey key = ctx.subject(RolesView.class).key();
-            if (ctx.player().hasPermission(BASE + "menu")) {
+            if (ctx.player().hasPermission(ContentPermissions.GUARD_MENU)) {
                 openHub(ctx.player(), key);
             } else {
                 ctx.player().closeInventory();
@@ -542,7 +542,7 @@ public final class GuardMenus {
                 "guard_behaviours_region",
                 ctx -> ctx.subject(BehavioursView.class).key().id().value());
         bindings.action("guard-behaviour-set", ctx -> {
-            if (!allowed(ctx, "set")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_SET)) {
                 return;
             }
             RegionKey key = ctx.subject(BehavioursView.class).key();
@@ -564,7 +564,7 @@ public final class GuardMenus {
                     () -> open(ctx.player(), BEHAVIOURS, new BehavioursView(key), ctx.page()));
         });
         bindings.action("guard:behaviour-clear", ctx -> {
-            if (!allowed(ctx, "set")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_SET)) {
                 return;
             }
             RegionKey key = ctx.subject(BehavioursView.class).key();
@@ -616,7 +616,7 @@ public final class GuardMenus {
                 "guard_templates_region",
                 ctx -> ctx.subject(TemplatesView.class).key().id().value());
         bindings.action("guard:template-apply", ctx -> {
-            if (!allowed(ctx, "template")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_TEMPLATE)) {
                 return;
             }
             RegionKey key = ctx.subject(TemplatesView.class).key();
@@ -631,7 +631,7 @@ public final class GuardMenus {
                     () -> open(ctx.player(), TEMPLATES, new TemplatesView(key)));
         });
         bindings.action("guard:template-clear", ctx -> {
-            if (!allowed(ctx, "template")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_TEMPLATE)) {
                 return;
             }
             RegionKey key = ctx.subject(TemplatesView.class).key();
@@ -667,7 +667,7 @@ public final class GuardMenus {
                 "guard_history_region",
                 ctx -> ctx.subject(HistoryView.class).key().id().value());
         bindings.action("guard:history-undo", ctx -> {
-            if (!allowed(ctx, "undo")) {
+            if (!allowed(ctx, ContentPermissions.GUARD_UNDO)) {
                 return;
             }
             HistoryEntry entry = ctx.entry(HistoryEntry.class);
@@ -691,7 +691,7 @@ public final class GuardMenus {
      * the player stands in for its owner or manager.
      */
     public void openFor(Player player) {
-        if (player.hasPermission(BASE + "menu")) {
+        if (player.hasPermission(ContentPermissions.GUARD_MENU)) {
             open(player, LIST, new RegionsView(player.getWorld().getName(), null));
             return;
         }
@@ -836,7 +836,7 @@ public final class GuardMenus {
 
     /** The roles {@code player} may hand out in the region: all for staff, member and guest for its managers. */
     private List<RoleName> roleCycle(Player player, RegionKey key) {
-        if (player.hasPermission(BASE + "role")) {
+        if (player.hasPermission(ContentPermissions.GUARD_ROLE)) {
             List<RoleName> all = new ArrayList<>(RoleName.BUILT_IN);
             all.addAll(service.config().extraRoles());
             return all;
@@ -849,7 +849,7 @@ public final class GuardMenus {
     }
 
     private boolean mayChange(Player player, RegionKey key, UUID target, List<RoleName> cycle) {
-        if (player.hasPermission(BASE + "role")) {
+        if (player.hasPermission(ContentPermissions.GUARD_ROLE)) {
             return true;
         }
         RoleName current = service.region(key).flatMap(r -> r.roleOf(target)).orElse(null);
@@ -888,7 +888,7 @@ public final class GuardMenus {
     }
 
     private boolean allowed(MenuActionContext ctx, String node) {
-        if (ctx.player().hasPermission(BASE + node)) {
+        if (ctx.player().hasPermission(node)) {
             return true;
         }
         feedback.send(ctx.player(), SharedMessageKey.COMMAND_NO_PERMISSION);

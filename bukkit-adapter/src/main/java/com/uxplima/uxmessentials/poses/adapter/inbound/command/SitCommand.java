@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -48,7 +49,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SitCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.sit.use";
+    private static final String PERMISSION = SocialPermissions.SIT_USE;
 
     private final StartSit startSit;
     private final StopPose stopPose;

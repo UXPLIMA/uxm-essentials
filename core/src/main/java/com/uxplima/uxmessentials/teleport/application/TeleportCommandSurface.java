@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 
 /**
  * The teleport context's full command surface as platform-neutral
@@ -23,132 +24,150 @@ final class TeleportCommandSurface {
     static List<CommandSpec> all() {
         return List.of(
                 // tpa lifecycle
-                spec("tpa", "uxmessentials.tpa.use", DescribedCommand.of("tpa", "Request to teleport to a player")),
+                spec("tpa", TeleportPermissions.TPA_USE, DescribedCommand.of("tpa", "Request to teleport to a player")),
                 spec(
                         "tpahere",
-                        "uxmessentials.tpahere.use",
+                        TeleportPermissions.TPAHERE_USE,
                         DescribedCommand.of("tpahere", "Ask a player to teleport to you")),
                 spec(
                         "tpaccept",
-                        "uxmessentials.tpa.use",
+                        TeleportPermissions.TPA_USE,
                         DescribedCommand.of("tpaccept", "Accept a teleport request", "tpyes")),
                 spec(
                         "tpdeny",
-                        "uxmessentials.tpa.use",
+                        TeleportPermissions.TPA_USE,
                         DescribedCommand.of("tpdeny", "Deny a teleport request", "tpno")),
                 spec(
                         "tpcancel",
-                        "uxmessentials.tpa.cancel",
+                        TeleportPermissions.TPA_CANCEL,
                         DescribedCommand.of("tpcancel", "Withdraw your outgoing request", "tpacancel")),
                 spec(
                         "tpalist",
-                        "uxmessentials.tpa.use",
+                        TeleportPermissions.TPA_USE,
                         DescribedCommand.of("tpalist", "List players waiting on your teleport reply", "tprequests")),
                 spec(
                         "tptoggle",
-                        "uxmessentials.tpa.toggle",
+                        TeleportPermissions.TPA_TOGGLE,
                         DescribedCommand.of("tptoggle", "Refuse all incoming requests", "toggletp")),
                 spec(
                         "tpon",
-                        "uxmessentials.tpa.toggle",
+                        TeleportPermissions.TPA_TOGGLE,
                         DescribedCommand.of("tpon", "Accept incoming teleport requests")),
                 spec(
                         "tpoff",
-                        "uxmessentials.tpa.toggle",
+                        TeleportPermissions.TPA_TOGGLE,
                         DescribedCommand.of("tpoff", "Refuse incoming teleport requests")),
                 spec(
                         "tpauto",
-                        "uxmessentials.tpa.auto",
+                        TeleportPermissions.TPA_AUTO,
                         DescribedCommand.of("tpauto", "Auto-accept incoming teleport requests")),
-                spec("tpblock", "uxmessentials.tpa.block", DescribedCommand.of("tpblock", "Block a player's requests")),
+                spec(
+                        "tpblock",
+                        TeleportPermissions.TPA_BLOCK,
+                        DescribedCommand.of("tpblock", "Block a player's requests")),
                 spec(
                         "tpunblock",
-                        "uxmessentials.tpa.block",
+                        TeleportPermissions.TPA_BLOCK,
                         DescribedCommand.of("tpunblock", "Unblock a player's requests")),
                 spec(
                         "tpaall",
-                        "uxmessentials.tpa.all",
+                        TeleportPermissions.TPA_ALL,
                         DescribedCommand.of("tpaall", "Request every player to teleport to you")),
                 // back
-                spec("back", "uxmessentials.back.use", DescribedCommand.of("back", "Return to your last location")),
+                spec("back", TeleportPermissions.BACK_USE, DescribedCommand.of("back", "Return to your last location")),
                 spec(
                         "deathback",
-                        "uxmessentials.back.use",
+                        TeleportPermissions.BACK_USE,
                         DescribedCommand.of("deathback", "Return to your last death location", "dback")),
                 // rtp
-                spec("rtp", "uxmessentials.rtp.use", DescribedCommand.of("rtp", "Random teleport", "wild")),
+                spec("rtp", TeleportPermissions.RTP_USE, DescribedCommand.of("rtp", "Random teleport", "wild")),
                 spec(
                         "settpr",
-                        "uxmessentials.teleport.settpr",
+                        TeleportPermissions.TELEPORT_SETTPR,
                         DescribedCommand.of("settpr", "Set the random-teleport zone for /rtp")),
                 // spawn
-                spec("spawn", "uxmessentials.spawn.use", DescribedCommand.of("spawn", "Teleport to spawn")),
-                spec("setspawn", "uxmessentials.spawn.set", DescribedCommand.of("setspawn", "Set this world's spawn")),
+                spec("spawn", TeleportPermissions.SPAWN_USE, DescribedCommand.of("spawn", "Teleport to spawn")),
+                spec(
+                        "setspawn",
+                        TeleportPermissions.SPAWN_SET,
+                        DescribedCommand.of("setspawn", "Set this world's spawn")),
                 spec(
                         "setmainspawn",
-                        "uxmessentials.spawn.set",
+                        TeleportPermissions.SPAWN_SET,
                         DescribedCommand.of("setmainspawn", "Set the main spawn for worlds without their own")),
                 spec(
                         "removespawn",
-                        "uxmessentials.spawn.set",
+                        TeleportPermissions.SPAWN_SET,
                         DescribedCommand.of("removespawn", "Clear this world's own spawn")),
                 spec(
                         "mirrorspawn",
-                        "uxmessentials.spawn.set",
+                        TeleportPermissions.SPAWN_SET,
                         DescribedCommand.of("mirrorspawn", "Redirect this world's spawn to another world")),
                 // admin direct tp
-                spec("tp", "uxmessentials.tp.use", DescribedCommand.of("tp", "Teleport to a player or coordinates")),
-                spec("tphere", "uxmessentials.tp.use", DescribedCommand.of("tphere", "Pull a player to you")),
-                spec("goto", "uxmessentials.tp.use", DescribedCommand.of("goto", "Teleport to a player")),
-                spec("bring", "uxmessentials.tp.use", DescribedCommand.of("bring", "Pull a player to you")),
+                spec(
+                        "tp",
+                        TeleportPermissions.TP_USE,
+                        DescribedCommand.of("tp", "Teleport to a player or coordinates")),
+                spec("tphere", TeleportPermissions.TP_USE, DescribedCommand.of("tphere", "Pull a player to you")),
+                spec("goto", TeleportPermissions.TP_USE, DescribedCommand.of("goto", "Teleport to a player")),
+                spec("bring", TeleportPermissions.TP_USE, DescribedCommand.of("bring", "Pull a player to you")),
                 spec(
                         "tprandomplayer",
-                        "uxmessentials.tp.use",
+                        TeleportPermissions.TP_USE,
                         DescribedCommand.of("tprandomplayer", "Teleport to a random online player", "tprp")),
-                spec("tpo", "uxmessentials.tp.others", DescribedCommand.of("tpo", "Teleport overriding no-tp flags")),
+                spec(
+                        "tpo",
+                        TeleportPermissions.TP_OTHERS,
+                        DescribedCommand.of("tpo", "Teleport overriding no-tp flags")),
                 spec(
                         "tpohere",
-                        "uxmessentials.tp.others",
+                        TeleportPermissions.TP_OTHERS,
                         DescribedCommand.of("tpohere", "Pull a player overriding flags")),
-                spec("tppos", "uxmessentials.tp.position", DescribedCommand.of("tppos", "Teleport to raw coordinates")),
-                spec("tpall", "uxmessentials.tp.all", DescribedCommand.of("tpall", "Pull every player to you")),
+                spec(
+                        "tppos",
+                        TeleportPermissions.TP_POSITION,
+                        DescribedCommand.of("tppos", "Teleport to raw coordinates")),
+                spec("tpall", TeleportPermissions.TP_ALL, DescribedCommand.of("tpall", "Pull every player to you")),
                 spec(
                         "tpoffline",
-                        "uxmessentials.tp.offline",
+                        TeleportPermissions.TP_OFFLINE,
                         DescribedCommand.of("tpoffline", "Teleport to a player's logout point")),
                 spec(
                         "tpofflinehere",
-                        "uxmessentials.tp.offline",
+                        TeleportPermissions.TP_OFFLINE,
                         DescribedCommand.of("tpofflinehere", "Bring a player from their logout point")),
                 // vertical / positional
                 spec(
                         "top",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("top", "Teleport to the highest block above")),
                 spec(
                         "bottom",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("bottom", "Teleport to the lowest safe block")),
                 spec(
                         "jump",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("jump", "Teleport to the block you look at")),
-                spec("up", "uxmessentials.tp.vertical", DescribedCommand.of("up", "Teleport up onto a placed block")),
+                spec(
+                        "up",
+                        TeleportPermissions.TP_VERTICAL,
+                        DescribedCommand.of("up", "Teleport up onto a placed block")),
                 spec(
                         "down",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("down", "Teleport down to the first block below")),
                 spec(
                         "ascend",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("ascend", "Teleport up to the next open space")),
                 spec(
                         "descend",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("descend", "Teleport down to the next open space")),
                 spec(
                         "thru",
-                        "uxmessentials.tp.vertical",
+                        TeleportPermissions.TP_VERTICAL,
                         DescribedCommand.of("thru", "Teleport through the wall you are facing")));
     }
 

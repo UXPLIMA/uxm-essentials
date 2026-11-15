@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -61,9 +62,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class InvrestoreCommand implements CommandRegistration {
 
-    private static final String RESTORE_PERMISSION = "uxmessentials.invrollback.restore";
-    private static final String EXPORT_PERMISSION = "uxmessentials.invrollback.export";
-    private static final String TELEPORT_PERMISSION = "uxmessentials.invrollback.teleport";
+    private static final String RESTORE_PERMISSION = EnforcementPermissions.INVROLLBACK_RESTORE;
+    private static final String EXPORT_PERMISSION = EnforcementPermissions.INVROLLBACK_EXPORT;
+    private static final String TELEPORT_PERMISSION = EnforcementPermissions.INVROLLBACK_TELEPORT;
 
     private final SnapshotListView listView;
     private final SnapshotExporter exporter;

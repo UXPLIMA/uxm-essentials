@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -64,7 +65,7 @@ public final class HomeActionMenu {
     public static final String SPEC_ID = "home-action";
 
     private static final String SPEC_RESOURCE = "modules/homes/gui/home-action.conf";
-    private static final String BYPASS_UNSAFE_PERMISSION = "uxmessentials.home.bypass.unsafe";
+    private static final String BYPASS_UNSAFE_PERMISSION = DestinationPermissions.HOME_BYPASS_UNSAFE;
     private static final String HOME_RENAME_INPUT_KEY = "home.rename";
 
     private final Menus menus;

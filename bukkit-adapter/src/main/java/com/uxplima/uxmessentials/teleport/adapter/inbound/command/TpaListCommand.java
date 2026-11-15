@@ -11,6 +11,7 @@ import com.mojang.brigadier.Command;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmlib.command.Gate;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
 public final class TpaListCommand extends TeleportCommandSupport implements CommandRegistration {
 
     private static final String LITERAL = "tpalist";
-    private static final String PERMISSION = "uxmessentials.tpa.use";
+    private static final String PERMISSION = TeleportPermissions.TPA_USE;
 
     public TpaListCommand(TeleportServices services, Messages messages) {
         super(services, messages);

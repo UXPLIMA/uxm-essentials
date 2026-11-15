@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 
 /**
  * The worlds context's command surface as platform-neutral {@link CommandSpec}s. The {@code /worlds}
@@ -20,8 +21,8 @@ final class WorldCommandSurface {
     private WorldCommandSurface() {}
 
     static List<CommandSpec> all() {
-        return List.of(
-                spec("worlds", "uxmessentials.world.use", WorldsCommandDescriptor.of("worlds", "Manage worlds")));
+        return List.of(spec(
+                "worlds", PlayerstatePermissions.WORLD_USE, WorldsCommandDescriptor.of("worlds", "Manage worlds")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

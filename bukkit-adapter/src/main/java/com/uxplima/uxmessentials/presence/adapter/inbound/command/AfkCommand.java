@@ -13,6 +13,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.command.Gate;
@@ -27,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AfkCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.afk.use";
+    private static final String PERMISSION = SocialPermissions.AFK_USE;
 
     public AfkCommand(PresenceServices services, Messages messages, Scheduler scheduler) {
         super(services, messages, scheduler);

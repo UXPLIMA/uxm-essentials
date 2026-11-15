@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -41,7 +42,7 @@ import org.jspecify.annotations.NullMarked;
 public final class WorkstationCommand extends ItemworldCommandSupport implements CommandRegistration {
 
     /** The cross-cutting node that lets a workstation command target a player other than the sender. */
-    private static final String OTHERS_PERMISSION = "uxmessentials.workstation.others";
+    private static final String OTHERS_PERMISSION = ItemworldPermissions.WORKSTATION_OTHERS;
 
     private final Workstation station;
 

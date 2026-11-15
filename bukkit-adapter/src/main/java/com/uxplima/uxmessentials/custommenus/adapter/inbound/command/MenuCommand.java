@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.binding.MenuExecutor;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -73,10 +74,10 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class MenuCommand implements CommandRegistration {
 
-    private static final String USE = "uxmessentials.menu.use";
-    private static final String ADMIN = "uxmessentials.menu.admin";
-    private static final String EDITOR = "uxmessentials.menu.editor";
-    private static final String OPEN_OTHERS = "uxmessentials.menu.open.others";
+    private static final String USE = ContentPermissions.MENU_USE;
+    private static final String ADMIN = ContentPermissions.MENU_ADMIN;
+    private static final String EDITOR = ContentPermissions.MENU_EDITOR;
+    private static final String OPEN_OTHERS = ContentPermissions.MENU_OPEN_OTHERS;
 
     private final Menus menus;
     private final Supplier<List<String>> menuNames;

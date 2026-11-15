@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 
 /**
  * The vote context's command surface as platform-neutral {@link CommandSpec}s: {@code /vote} guarded by
@@ -24,10 +25,10 @@ final class VoteCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("vote", "uxmessentials.vote.use", command("vote", "Show the server's vote links")),
+                spec("vote", EconomyPermissions.VOTE_USE, command("vote", "Show the server's vote links")),
                 spec(
                         "voteparty",
-                        "uxmessentials.voteparty.use",
+                        EconomyPermissions.VOTEPARTY_USE,
                         command("voteparty", "Show progress towards the next vote party")));
     }
 

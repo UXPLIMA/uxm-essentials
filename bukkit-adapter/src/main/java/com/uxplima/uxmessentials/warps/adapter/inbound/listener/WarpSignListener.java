@@ -19,6 +19,7 @@ import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -65,7 +66,7 @@ public final class WarpSignListener implements Listener {
         }
 
         // Check create permission
-        if (!permissions.has(ref, "uxmessentials.warp.sign.create")) {
+        if (!permissions.has(ref, DestinationPermissions.WARP_SIGN_CREATE)) {
             feedback.send(player, WarpsMessageKey.WARP_SIGN_NO_PERMISSION_CREATE);
             event.setCancelled(true);
             return;
@@ -128,7 +129,7 @@ public final class WarpSignListener implements Listener {
         PlayerRef ref = BukkitRefs.toRef(player);
 
         // Check use permission
-        if (!permissions.has(ref, "uxmessentials.warp.sign.use")) {
+        if (!permissions.has(ref, DestinationPermissions.WARP_SIGN_USE)) {
             feedback.send(player, WarpsMessageKey.WARP_SIGN_NO_PERMISSION_USE);
             event.setCancelled(true);
             return;

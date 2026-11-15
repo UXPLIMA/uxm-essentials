@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RestCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.rest.use";
+    private static final String PERMISSION = PlayerstatePermissions.REST_USE;
 
     public RestCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -37,7 +38,7 @@ public final class RestCommand extends PlayerstateCommandSupport implements Comm
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.rest.others";
+        return PlayerstatePermissions.REST_OTHERS;
     }
 
     @Override

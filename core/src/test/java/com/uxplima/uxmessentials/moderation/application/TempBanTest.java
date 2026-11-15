@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
@@ -32,7 +33,7 @@ import org.junit.jupiter.api.Test;
 class TempBanTest {
 
     private static final String ADDRESS = "198.51.100.9";
-    private static final String CAP_NODE = "uxmessentials.moderation.ban.maxduration";
+    private static final String CAP_NODE = EnforcementPermissions.maxDuration("ban");
 
     private final MutableClock clock = new MutableClock(NOW);
     private final SanctionRecords records = new SanctionRecords();

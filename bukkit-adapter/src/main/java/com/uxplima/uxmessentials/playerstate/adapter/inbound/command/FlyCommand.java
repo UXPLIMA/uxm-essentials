@@ -20,6 +20,8 @@ import com.uxplima.uxmessentials.playerstate.application.NoFlyWorldPolicy;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -41,8 +43,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class FlyCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.fly.use";
-    private static final String GUARD_BYPASS = "uxmessentials.guard.bypass";
+    private static final String PERMISSION = PlayerstatePermissions.FLY_USE;
+    private static final String GUARD_BYPASS = ContentPermissions.GUARD_BYPASS;
 
     private final NoFlyWorldPolicy noFlyWorlds;
     private final RegionBehaviourGate regions;
@@ -60,7 +62,7 @@ public final class FlyCommand extends PlayerstateCommandSupport implements Comma
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.fly.others";
+        return PlayerstatePermissions.FLY_OTHERS;
     }
 
     @Override

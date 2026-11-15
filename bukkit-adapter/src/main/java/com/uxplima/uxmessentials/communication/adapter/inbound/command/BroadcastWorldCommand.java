@@ -14,6 +14,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.adapter.outbound.BukkitAnnouncerBroadcaster;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BroadcastWorldCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.communication.broadcastworld";
+    private static final String PERMISSION = SocialPermissions.COMMUNICATION_BROADCASTWORLD;
     private static final String MESSAGE_ARG = "message";
 
     private final BukkitAnnouncerBroadcaster broadcaster;

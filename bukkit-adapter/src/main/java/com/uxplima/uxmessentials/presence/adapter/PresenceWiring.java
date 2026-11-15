@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
@@ -120,7 +121,7 @@ public final class PresenceWiring {
                 "presence",
                 com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,
                 org.bukkit.Material.CLOCK,
-                "uxmessentials.presence.gui",
+                SocialPermissions.PRESENCE_GUI,
                 settingsView::open));
         // The bare /list head grid (gui-on) reuses the shared paginated list over the data-folder layout loader; the
         // command snapshots the vanish-aware roster on the global thread and the view only renders it.

@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
 import com.uxplima.uxmessentials.economy.domain.Denomination;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRate;
 import com.uxplima.uxmessentials.economy.domain.ExchangeRegistry;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -270,7 +271,7 @@ public final class EconomyConfig {
 
     /** The permission node whose holders are excluded from every leaderboard. */
     public String baltopExemptNode() {
-        return config.getString("baltop.exempt-permission", "uxmessentials.economy.baltop.exempt");
+        return config.getString("baltop.exempt-permission", EconomyPermissions.ECONOMY_BALTOP_EXEMPT);
     }
 
     /** Whether banned players are dropped from every {@code /baltop} (default off). */
@@ -384,7 +385,7 @@ public final class EconomyConfig {
 
     /** The permission node whose holders pay no {@code /pay} tax. */
     public String taxBypassNode() {
-        return config.getString("pay.tax.bypass-permission", "uxmessentials.economy.tax.bypass");
+        return config.getString("pay.tax.bypass-permission", EconomyPermissions.ECONOMY_TAX_BYPASS);
     }
 
     /**
