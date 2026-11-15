@@ -75,15 +75,24 @@ public final class CachedVaultRepository implements VaultRepository {
     @Override
     public VaultStamp save(Vault vault) {
         Objects.requireNonNull(vault, "vault");
-        VaultStamp written = delegate.save(vault);
-        cache.invalidate(vault.id());
-        return written;
+        try {
+            return delegate.save(vault);
+        } finally {
+            cache.invalidate(vault.id());
+        }
     }
 
     @Override
     public Optional<VaultStamp> writeContents(Vault vault) {
         Objects.requireNonNull(vault, "vault");
-        Optional<VaultStamp> written = delegate.writeContents(vault);
+        Optional<VaultStamp> written;
+        try {
+            written = delegate.writeContents(vault);
+        } catch (RuntimeException failure) {
+            // The write may have applied without an answer, so the cached copy can no longer be trusted.
+            cache.invalidate(vault.id());
+            throw failure;
+        }
         if (written.isPresent()) {
             // The cached copy takes exactly what was written and the row's new stamp, so the next open sees the items
             // the window closed with. The name and icon stay as cached, since the write left them as they were.

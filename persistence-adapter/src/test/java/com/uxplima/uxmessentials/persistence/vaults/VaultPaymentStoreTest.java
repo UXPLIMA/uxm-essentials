@@ -358,4 +358,21 @@ class VaultPaymentStoreTest {
         assertThat(inserted.lineage()).isNotNull();
         assertThat(inserted.version()).isEqualTo(1L);
     }
+
+    @Test
+    void aStaffUpsertThatBringsBackADeletedVaultStartsANewLineage() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault old = stored(1);
+        vaults.writeContents(
+                old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result());
+        vaults.delete(vault(1), old.paid());
+
+        VaultStamp back = vaults.save(
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result());
+
+        assertThat(back.lineage()).isNotEqualTo(old.stamp().lineage());
+        assertThat(old.stamp().sameRow(back)).isFalse();
+        assertThat(stored(1).stamp()).isEqualTo(back);
+    }
 }

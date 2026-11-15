@@ -209,17 +209,33 @@ public final class VaultView {
     }
 
     /**
-     * Close and save every still-open vault, then wait at most {@code timeout} for the writes, warning when they did
-     * not all finish in time.
+     * Close and save every still-open vault, then wait at most {@code timeout} for the writes, naming the vaults whose
+     * items are still at risk when they did not all finish, and logging the items of any write that never landed.
+     *
+     * <p>The wait blocks the stopping thread only when it is the global thread: the main thread on Paper (whose windows
+     * the flush has already closed, leaving only async writes to wait for) or Folia's global region, which runs no
+     * player's tasks. On any other thread, a Folia region thread among them, blocking would stall the players it owns,
+     * so the wait moves to the async lane and the stop returns; the next instance of the module is then guarded by the
+     * row versions, and by these writes still landing.
      */
     public void stop(Duration timeout) {
         flushAll();
+        if (scheduler.onGlobalThread() || !running.getAsBoolean()) {
+            awaitWrites(timeout);
+        } else {
+            scheduler.async(() -> awaitWrites(timeout));
+        }
+    }
+
+    private void awaitWrites(Duration timeout) {
         if (!windows.awaitIdle(timeout)) {
             log.warn(
-                    "event=vault_stop_writes_pending open-guis={} (still being written after {})",
-                    windows.count(),
-                    timeout);
+                    "event=vault_stop_writes_pending after={} vaults={}"
+                            + " (their items may be lost if the server stops now)",
+                    timeout,
+                    windows.unsettled());
         }
+        windows.logUnwritten();
     }
 
     /**

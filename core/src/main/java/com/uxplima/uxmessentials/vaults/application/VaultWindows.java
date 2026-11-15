@@ -4,16 +4,20 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultItemHandBack;
+import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
@@ -42,8 +46,15 @@ import org.jspecify.annotations.Nullable;
  * <p>Writes of one vault never overlap and a write that a later close has superseded is skipped, so an older snapshot
  * can never land after a newer one. They are serialised by a fixed set of locks picked by the vault's id, held across
  * the write: a write only waits for another write of a vault that shares its lock, and a per-vault queue would need its
- * own executor and its own shutdown, for no difference a player could notice. A write that throws hands its items back
- * rather than leaving them only in memory.
+ * own executor and its own shutdown, for no difference a player could notice.
+ *
+ * <p>A write that throws is never answered by handing the items back: the row usually still holds what the window was
+ * opened with, so handing the window's items back as well would duplicate everything the two have in common, and a
+ * write that was applied but not acknowledged would be given twice. The snapshot stays pending instead (a reopen still
+ * takes it over), the row is read to learn what happened, and the write is retried with a growing delay: no row means
+ * the vault is gone and the items go back to the owner; a row of the same lineage at a higher version than this server
+ * last knew means the write landed. When the retries run out the snapshot stays pending in memory and its items are
+ * written to the log for an operator.
  *
  * <p>The window handle {@code W} is the adapter's GUI; this class never looks inside it, it only asks the caller for
  * its live items when it is taken over.
@@ -57,18 +68,40 @@ public final class VaultWindows<W> {
 
     private static final int WRITE_LOCKS = 64;
 
+    /** How many times a write that threw is tried again before its items are left to an operator. */
+    private static final int RETRIES = 5;
+
+    /** The delay before the first retry; each further retry waits twice as long. */
+    private static final Duration FIRST_RETRY = Duration.ofMillis(500);
+
     private final SaveVault saveVault;
+    private final VaultRepository repository;
     private final VaultItemHandBack handBack;
+    private final Scheduler scheduler;
+    private final BooleanSupplier running;
     private final Clock clock;
     private final Logger log;
     private final Map<VaultId, Window<W>> open = new HashMap<>();
     private final Map<VaultId, Closed<W>> closed = new HashMap<>();
+    /** The stamp of each vault's last write that landed from this server, the base a failed write is judged against. */
+    private final Map<VaultId, VaultStamp> landedHere = new HashMap<>();
+
     private final Object[] writeLocks = new Object[WRITE_LOCKS];
     private int writesUnderWay;
 
-    public VaultWindows(SaveVault saveVault, VaultItemHandBack handBack, Clock clock, Logger log) {
+    public VaultWindows(
+            SaveVault saveVault,
+            VaultRepository repository,
+            VaultItemHandBack handBack,
+            Scheduler scheduler,
+            BooleanSupplier running,
+            Clock clock,
+            Logger log) {
         this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
+        this.repository = Objects.requireNonNull(repository, "repository");
         this.handBack = Objects.requireNonNull(handBack, "handBack");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.running = Objects.requireNonNull(running, "running");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.log = Objects.requireNonNull(log, "log");
         for (int lock = 0; lock < WRITE_LOCKS; lock++) {
@@ -152,6 +185,33 @@ public final class VaultWindows<W> {
     }
 
     /**
+     * The vaults whose items are not yet safe in the store: open windows and snapshots whose write has not landed, as
+     * {@code owner#index}. For the stop to name what is at risk when it cannot wait.
+     */
+    public synchronized List<String> unsettled() {
+        List<String> names = new ArrayList<>();
+        open.keySet().forEach(id -> names.add(id.owner() + "#" + id.index() + " (open)"));
+        closed.forEach((id, last) -> {
+            if (last.state == State.PENDING) {
+                names.add(id.owner() + "#" + id.index() + " (not written)");
+            }
+        });
+        return names;
+    }
+
+    /**
+     * Write the items of every snapshot that never reached the store to the log, for an operator to give back by hand.
+     * Called when the module stops, after which nothing will retry them.
+     */
+    public void logUnwritten() {
+        List<Closed<W>> unwritten = new ArrayList<>();
+        synchronized (this) {
+            closed.values().stream().filter(last -> last.state == State.PENDING).forEach(unwritten::add);
+        }
+        unwritten.forEach(last -> logForOperator(last, "the module stopped before they were written"));
+    }
+
+    /**
      * Wait until every window is closed and every write has finished, at most {@code timeout}. Returns whether that
      * happened in time. The module stop calls this so the next instance of the module does not read a vault whose
      * write this instance still has on its way.
@@ -229,43 +289,135 @@ public final class VaultWindows<W> {
     }
 
     private void write(VaultId id, Closed<W> written) {
+        boolean finished = true;
         try {
             synchronized (writeLocks[Math.floorMod(id.hashCode(), WRITE_LOCKS)]) {
+                VaultStamp base;
                 synchronized (this) {
                     if (closed.get(id) != written) {
                         return; // a later snapshot of this vault holds these items and writes them
                     }
+                    base = latest(written.window.vault().stamp(), landedHere.get(id));
                 }
                 Optional<VaultStamp> landed;
                 try {
                     landed = store(written);
                 } catch (RuntimeException failure) {
-                    failed(id, written, failure);
-                    return;
-                }
-                boolean giveBack = false;
-                synchronized (this) {
-                    written.settledAt = clock.instant();
-                    if (landed.isPresent()) {
-                        written.landed = landed.get();
-                        if (written.state == State.PENDING) {
-                            written.state = State.LANDED;
-                        }
-                    } else if (written.state == State.PENDING) {
-                        written.state = State.GONE;
-                        giveBack = true;
+                    Optional<Optional<VaultStamp>> learned = learn(id, written, base);
+                    if (learned.isEmpty()) {
+                        finished = !retryLater(id, written, failure);
+                        return;
                     }
+                    log.warn(
+                            "event=vault_write_failed owner={} index={} (the store shows {})",
+                            id.owner(),
+                            id.index(),
+                            learned.get().isPresent() ? "it landed" : "the vault is gone");
+                    landed = learned.get();
                 }
-                if (giveBack && !written.contents.isEmpty()) {
-                    handBack.handBack(written.window.owner(), written.contents);
-                }
+                settle(id, written, landed);
             }
         } finally {
-            synchronized (this) {
-                writesUnderWay--;
-                notifyAll();
+            if (finished) {
+                synchronized (this) {
+                    writesUnderWay--;
+                    notifyAll();
+                }
             }
         }
+    }
+
+    /** Record where a written snapshot's items are now, and hand them back when its vault was found deleted. */
+    private void settle(VaultId id, Closed<W> written, Optional<VaultStamp> landed) {
+        boolean giveBack = false;
+        synchronized (this) {
+            written.settledAt = clock.instant();
+            if (landed.isPresent()) {
+                written.landed = landed.get();
+                landedHere.put(id, landed.get());
+                if (written.state == State.PENDING) {
+                    written.state = State.LANDED;
+                }
+            } else if (written.state == State.PENDING) {
+                written.state = State.GONE;
+                giveBack = true;
+            }
+        }
+        if (giveBack && !written.contents.isEmpty()) {
+            handBack.handBack(written.window.owner(), written.contents);
+        }
+    }
+
+    /**
+     * After a write threw, read the row to learn what happened: empty when that cannot be told (try again), else the
+     * outcome to settle with, the row's stamp when the write landed or nothing when the vault is gone. Only the owner's
+     * own window can find its vault gone; a staff upsert would have recreated it, so a missing row means it did not
+     * apply.
+     */
+    private Optional<Optional<VaultStamp>> learn(VaultId id, Closed<W> written, VaultStamp base) {
+        Optional<Vault> row;
+        try {
+            row = repository.find(id);
+        } catch (RuntimeException unreadable) {
+            return Optional.empty();
+        }
+        if (row.isEmpty()) {
+            return written.window.staffView() ? Optional.empty() : Optional.of(Optional.empty());
+        }
+        VaultStamp now = row.get().stamp();
+        if (now.sameRow(base) && now.version() > base.version()) {
+            return Optional.of(Optional.of(now));
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Try a failed write again after a growing delay. Returns false when no retry is left, or none can run because the
+     * plugin has stopped; the snapshot then stays pending in memory, so a reopen still takes it over, and its items go
+     * to the log.
+     */
+    private boolean retryLater(VaultId id, Closed<W> written, RuntimeException failure) {
+        if (running.getAsBoolean() && written.retries < RETRIES) {
+            Duration delay = FIRST_RETRY.multipliedBy(1L << written.retries);
+            written.retries++;
+            log.warn(
+                    "event=vault_write_retry owner={} index={} attempt={} in={} cause={}",
+                    id.owner(),
+                    id.index(),
+                    written.retries,
+                    delay,
+                    String.valueOf(failure.getMessage()));
+            scheduler.asyncAfter(delay, () -> write(id, written));
+            return true;
+        }
+        log.error(
+                "event=vault_write_gave_up owner=" + id.owner() + " index=" + id.index() + " after " + written.retries
+                        + " retries",
+                failure);
+        logForOperator(written, "every write of them failed");
+        return false;
+    }
+
+    private void logForOperator(Closed<W> written, String why) {
+        VaultId id = written.window.vault().id();
+        log.warn(
+                "event=vault_items_unwritten owner={} index={} items={} ({}; they stay in memory and a reopen"
+                        + " takes them over, but they are lost if the server stops: give them back by hand)",
+                id.owner(),
+                id.index(),
+                written.contents
+                        .payload()
+                        .map(Base64.getEncoder()::encodeToString)
+                        .orElse(""),
+                why);
+    }
+
+    /** The later of two stamps of the same row; the first when they name different rows. */
+    private static VaultStamp latest(VaultStamp read, @Nullable VaultStamp landed) {
+        if (landed != null && read.before(landed)) {
+            return landed;
+        }
+        return read;
     }
 
     /** Write a snapshot, returning the row's stamp after the write, or empty when the vault was gone. */
@@ -275,28 +427,6 @@ public final class VaultWindows<W> {
             return Optional.of(saveVault.keep(window.owner(), window.vault(), written.contents, written.at));
         }
         return saveVault.save(window.owner(), window.vault(), written.contents, written.at);
-    }
-
-    /**
-     * A write that threw: whether it reached the database is unknown, and the items must not live only in memory. A
-     * snapshot nobody took over goes back to the owner (their inventory, or kept for their next join); one a reopened
-     * window holds stays with that window. Either way it is forgotten, so the next reopen reads the store.
-     */
-    private void failed(VaultId id, Closed<W> written, RuntimeException failure) {
-        boolean giveBack;
-        synchronized (this) {
-            giveBack = written.state == State.PENDING;
-            if (closed.get(id) == written) {
-                closed.remove(id);
-            }
-        }
-        log.error(
-                "event=vault_write_failed owner=" + written.window.owner().uuid() + " index=" + id.index()
-                        + (giveBack ? " (the items are handed back)" : " (a reopened window holds the items)"),
-                failure);
-        if (giveBack && !written.contents.isEmpty()) {
-            handBack.handBack(written.window.owner(), written.contents);
-        }
     }
 
     /**
@@ -312,7 +442,10 @@ public final class VaultWindows<W> {
                 settled.add(id);
             }
         });
-        settled.forEach(closed::remove);
+        settled.forEach(id -> {
+            closed.remove(id);
+            landedHere.remove(id);
+        });
     }
 
     /** Where a snapshot's items are. */
@@ -335,6 +468,7 @@ public final class VaultWindows<W> {
         private State state;
         private @Nullable VaultStamp landed;
         private @Nullable Instant settledAt;
+        private int retries;
 
         Closed(Window<W> window, VaultContents contents, Instant at, State state) {
             this.window = window;

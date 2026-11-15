@@ -66,10 +66,8 @@ final class InMemoryVaults implements VaultRepository {
         saves++;
         Vault stored = rows.get(vault.id());
         if (stored == null) {
-            String lineage = vault.stamp().lineage() != null
-                    ? vault.stamp().lineage()
-                    : UUID.randomUUID().toString();
-            VaultStamp stamp = new VaultStamp(lineage, 1L);
+            // An inserted row is always a new lineage, as the real store does it.
+            VaultStamp stamp = new VaultStamp(UUID.randomUUID().toString(), 1L);
             rows.put(
                     vault.id(),
                     Vault.of(

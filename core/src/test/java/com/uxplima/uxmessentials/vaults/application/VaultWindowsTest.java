@@ -14,6 +14,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.QuietLog;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
@@ -45,8 +46,15 @@ class VaultWindowsTest {
     private final SaveVault saveVault = new SaveVault(store, new RecordingEvents(), clock);
     private final QuietLog log = new QuietLog();
     private final List<String> handedBack = new ArrayList<>();
+    private final QueuedScheduler retries = new QueuedScheduler();
     private final VaultWindows<Chest> windows = new VaultWindows<>(
-            saveVault, (owner, items) -> handedBack.add(owner.name() + ":" + bytes(items)), clock, log);
+            saveVault,
+            store,
+            (owner, items) -> handedBack.add(owner.name() + ":" + bytes(items)),
+            retries,
+            () -> true,
+            clock,
+            log);
     private final OpenVault openVault = new OpenVault(
             vaults, new VaultAmountQuota(permissions, 10), new VaultSizeQuota(permissions, 1), charge, clock);
     private final DeleteVault deleteVault = new DeleteVault(vaults, charge, new NoAudit(), notifier);
@@ -251,7 +259,13 @@ class VaultWindowsTest {
         // The survival server's clock is five seconds behind this one, and it shares the same store.
         MutableClock behind = new MutableClock(clock.instant().minusSeconds(5));
         VaultWindows<Chest> survival = new VaultWindows<>(
-                new SaveVault(vaults, new RecordingEvents(), behind), (owner, items) -> {}, behind, log);
+                new SaveVault(vaults, new RecordingEvents(), behind),
+                vaults,
+                (owner, items) -> {},
+                retries,
+                () -> true,
+                behind,
+                log);
         OpenVault survivalOpen = new OpenVault(
                 vaults, new VaultAmountQuota(permissions, 10), new VaultSizeQuota(permissions, 1), charge, behind);
 
@@ -276,7 +290,7 @@ class VaultWindowsTest {
     }
 
     @Test
-    void aWriteThatThrowsHandsTheItemsBackAndTheNextOpenReadsTheStore() {
+    void aWriteThatFailsOnceIsRetriedAndLandsWithoutHandingAnythingBack() {
         vaultHolding(X);
         Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
         a.items = Y;
@@ -284,11 +298,83 @@ class VaultWindowsTest {
 
         close(SECOND, a);
         runWrites();
-        Chest b = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        assertThat(stored(SECOND).contents()).isEqualTo(X);
+        Chest meanwhile = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        close(SECOND, meanwhile);
+        retries.runAll();
+        runWrites();
+
+        assertThat(meanwhile.items).isEqualTo(Y);
+        assertThat(handedBack).isEmpty();
+        assertThat(stored(SECOND).contents()).isEqualTo(Y);
+    }
+
+    @Test
+    void aFailedWriteIsRetriedUntilItLands() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        store.failWrites(2);
+
+        close(SECOND, a);
+        runWrites();
+        retries.runAll();
+
+        assertThat(handedBack).isEmpty();
+        assertThat(stored(SECOND).contents()).isEqualTo(Y);
+        assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isTrue();
+    }
+
+    @Test
+    void aWriteAppliedWithoutAnAnswerIsRecognisedByTheRowsVersion() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        long before = stored(SECOND).stamp().version();
+        store.failNextWriteAfterCommit();
+
+        close(SECOND, a);
+        runWrites();
+        retries.runAll();
+
+        assertThat(stored(SECOND).stamp().version()).isEqualTo(before + 1);
+        assertThat(stored(SECOND).contents()).isEqualTo(Y);
+        assertThat(handedBack).isEmpty();
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+    }
+
+    @Test
+    void aWriteThatFailsWhileTheVaultIsGoneHandsTheItemsBackOnce() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        deleteVault.delete(ALEX, 2);
+        store.failNextWrite();
+
+        close(SECOND, a);
+        runWrites();
+        retries.runAll();
 
         assertThat(handedBack).containsExactly("Alex:7");
-        assertThat(log.errors()).hasSize(1);
-        assertThat(b.items).isEqualTo(X);
+        assertThat(vaults.find(SECOND)).isEmpty();
+    }
+
+    @Test
+    void whenEveryRetryFailsTheItemsStayForAReopenAndGoToTheLog() {
+        vaultHolding(X);
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        a.items = Y;
+        store.failWrites(100);
+
+        close(SECOND, a);
+        runWrites();
+        retries.runAll();
+
+        assertThat(handedBack).isEmpty();
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
+        assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
+        assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isTrue();
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
     }
 
     @Test

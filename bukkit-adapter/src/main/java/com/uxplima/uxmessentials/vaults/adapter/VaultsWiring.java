@@ -140,8 +140,14 @@ public final class VaultsWiring {
                 plugin::isEnabled);
         // The windows keep a closed vault's items until their write lands; a peer's change to a vault also drops what
         // they remember about it, on top of the version check that already tells a stale copy from a fresh one.
-        VaultWindows<StorageGui> windows =
-                new VaultWindows<>(new SaveVault(repository, kernel.events(), clock), returns, clock, kernel.log());
+        VaultWindows<StorageGui> windows = new VaultWindows<>(
+                new SaveVault(repository, kernel.events(), clock),
+                repository,
+                returns,
+                kernel.scheduler(),
+                plugin::isEnabled,
+                clock,
+                kernel.log());
         bus.registry().register(VaultSync.listener(cached, windows::forget));
         VaultServices services = assemble(
                 plugin,

@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.VaultsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -175,7 +176,9 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     private static void upsert(DSLContext dsl, Vault vault) {
         VaultsRecord record = dsl.newRecord(VAULTS);
         VaultRows.apply(record, vault);
-        record.setLineage(VaultRows.lineageOf(vault)).setVersion(1L);
+        // An inserted row is always a new lineage: reusing the copy's would make every old copy of a deleted row look
+        // like a copy of this one, and the version restarting at one would let them pass as fresh.
+        record.setLineage(UUID.randomUUID().toString()).setVersion(1L);
         dsl.insertInto(VAULTS)
                 .set(record)
                 .onConflict(VAULTS.OWNER, VAULTS.IDX)

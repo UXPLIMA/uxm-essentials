@@ -25,7 +25,8 @@ final class InterleavedVaults implements VaultRepository {
     private @Nullable Runnable beforeUpdate;
     private boolean createFails;
     private boolean createFailsAfterWriting;
-    private boolean writeFails;
+    private int writeFailures;
+    private boolean writeFailsAfterCommit;
 
     InterleavedVaults(InMemoryVaults rows) {
         this.rows = rows;
@@ -53,7 +54,17 @@ final class InterleavedVaults implements VaultRepository {
 
     /** Make the next item write throw, as a lost database connection does. */
     void failNextWrite() {
-        writeFails = true;
+        failWrites(1);
+    }
+
+    /** Make the next {@code count} item writes throw before they reach the rows. */
+    void failWrites(int count) {
+        writeFailures = count;
+    }
+
+    /** Make the next item write reach the rows and then throw, as a commit whose answer was lost does. */
+    void failNextWriteAfterCommit() {
+        writeFailsAfterCommit = true;
     }
 
     /** Make the next create store its row and then throw, as a connection lost while the commit was answered does. */
@@ -90,12 +101,17 @@ final class InterleavedVaults implements VaultRepository {
     @Override
     public Optional<VaultStamp> writeContents(Vault vault) {
         failWriteIfArmed();
-        return rows.writeContents(vault);
+        Optional<VaultStamp> written = rows.writeContents(vault);
+        if (writeFailsAfterCommit) {
+            writeFailsAfterCommit = false;
+            throw new IllegalStateException("the answer to the commit was lost");
+        }
+        return written;
     }
 
     private void failWriteIfArmed() {
-        if (writeFails) {
-            writeFails = false;
+        if (writeFailures > 0) {
+            writeFailures--;
             throw new IllegalStateException("the database went away");
         }
     }
