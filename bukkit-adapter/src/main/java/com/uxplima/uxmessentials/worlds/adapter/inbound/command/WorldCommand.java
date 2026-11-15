@@ -297,9 +297,17 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         }
         // A key the operator typed is kept, so the world loads from that namespace on every start.
         Optional<DimensionKey> dimension = DimensionNames.parse(folder);
-        // Left out, the environment is read from the dimension: the_nether and the_end, any other normal.
-        Optional<WorldEnvironment> env = optionalString(ctx, "environment")
-                .map(raw -> arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL));
+        // Left out, the environment is read from the dimension: the_nether and the_end, any other normal. A typo is
+        // refused rather than read as normal, which would load a nether or end dimension as the wrong kind of world.
+        Optional<String> rawEnvironment = optionalString(ctx, "environment");
+        Optional<WorldEnvironment> env = rawEnvironment.flatMap(WorldEnvironment::parse);
+        if (rawEnvironment.isPresent() && env.isEmpty()) {
+            return refuseToken(
+                    sender,
+                    WorldsMessageKey.WORLD_CREATE_INVALID_ENVIRONMENT,
+                    rawEnvironment.get(),
+                    WorldEnvironment.values());
+        }
         Optional<GeneratorRef> gen = optionalString(ctx, "generator").map(GeneratorRef::of);
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_IMPORTING, Map.of("world", name.value()));
@@ -702,15 +710,6 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     @FunctionalInterface
     private interface Mutation {
         void run(PlayerRef who, WorldName name);
-    }
-
-    private static <E extends Enum<E>> E arg(
-            CommandContext<CommandSourceStack> ctx, String key, Class<E> type, E fallback) {
-        try {
-            return Enum.valueOf(type, ctx.getArgument(key, String.class).toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException missingOrInvalid) {
-            return fallback;
-        }
     }
 
     private int refuseToken(CommandSender sender, WorldsMessageKey key, String typed, Enum<?>[] accepted) {
