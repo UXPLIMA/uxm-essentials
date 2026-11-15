@@ -27,7 +27,7 @@ import com.velocitypowered.api.proxy.Player;
  * <ul>
  *   <li>{@link PlayerAvailableCommandsEvent} - prunes the client command tree through the
  *       {@link ProxyCommandTreeFilter}, so a non-permitted player never sees hidden / denied proxy
- *       commands in tab-completion or the client command list (a {@code .bypass} holder keeps everything).
+ *       commands in tab-completion or the client command list (a bypass holder keeps everything).
  *   <li>{@link CommandExecuteEvent} - runs the command-spam guard first (KICK / BLOCK / WARN), then the
  *       whitelist / blacklist gate and the hidden-command deny-execution, denying the command result and
  *       delivering the configured message on a block.

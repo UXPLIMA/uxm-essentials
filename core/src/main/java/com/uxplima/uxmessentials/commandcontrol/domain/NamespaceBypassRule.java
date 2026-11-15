@@ -12,7 +12,7 @@ import java.util.Optional;
  * re-asks the {@link RuleSet} about the bare form, so {@code /minecraft:gamemode} is denied exactly when {@code gamemode}
  * is denied.
  *
- * <p>It is a thin, config-built wrapper over the same {@link RuleSet} the gate already holds; the {@code .bypass}
+ * <p>It is a thin, config-built wrapper over the same {@link RuleSet} the gate already holds; the bypass
  * escape is not modelled here because the wrapped {@link RuleSet} short-circuits a bypass holder to
  * {@link RuleSet.Decision#ALLOW} before any list read, so a bypass holder may still use a namespaced form. When the
  * block is switched off ({@code block-namespace-bypass = false}) it denies nothing. The plugin-hide half of the

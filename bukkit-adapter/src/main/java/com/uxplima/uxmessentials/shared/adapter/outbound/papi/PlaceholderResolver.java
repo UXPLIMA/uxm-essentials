@@ -29,7 +29,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The placeholder resolution logic, behind a thin seam so it is testable without a live PlaceholderAPI.
- * The {@code UxmEssentialsExpansion} shell strips the {@code uxmessentials_} prefix, builds a {@link
+ * The {@code UxmEssentialsExpansion} shell strips the {@code uxm_essentials_} prefix, builds a {@link
  * PlayerRef} from the requesting {@code OfflinePlayer}, and asks this resolver for the value; the resolver
  * never touches a PlaceholderAPI type.
  *
@@ -59,7 +59,7 @@ public final class PlaceholderResolver {
     private static final String ALLOW = "allow";
 
     private static final String REFUSE = "refuse";
-    /** The {@code %uxmessentials_rank_next%} value shown when the player is already at the highest rank. */
+    /** The {@code %uxm_essentials_rank_next%} value shown when the player is already at the highest rank. */
     private static final String MAX_RANK = "max";
 
     /** What a quota with no ceiling reads as, the same word the vault and home quotas already use. */
@@ -130,7 +130,7 @@ public final class PlaceholderResolver {
     private static final String ITEMWORLD_PREFIX = "itemworld_";
     private static final String NPC_PREFIX = "npc_";
     private static final String REGIONS_PREFIX = "regions_";
-    // The guard module's own spelling of the same placeholders: %uxmessentials_guard_here% reads like the command.
+    // The guard module's own spelling of the same placeholders: %uxm_essentials_guard_here% reads like the command.
     private static final String GUARD_PREFIX = "guard_";
     private static final String SECURITY_PREFIX = "security_";
     private static final String MODULE_PREFIX = "module_";
@@ -151,7 +151,7 @@ public final class PlaceholderResolver {
     }
 
     /**
-     * Resolve the {@code uxmessentials_}-stripped {@code key} for {@code who}. {@code online} reflects
+     * Resolve the {@code uxm_essentials_}-stripped {@code key} for {@code who}. {@code online} reflects
      * whether the requesting player is currently connected. Session-only placeholders (presence) read
      * empty for an offline player. An unknown key returns {@link Optional#empty()}.
      */
@@ -663,7 +663,7 @@ public final class PlaceholderResolver {
     }
 
     /**
-     * Resolve a {@code %rel_uxmessentials_<key>%} key, which reads the relation between two players rather than
+     * Resolve a {@code %rel_uxm_essentials_<key>%} key, which reads the relation between two players rather than
      * one player's own state: {@code viewer} is the player the line is being rendered for and {@code target} the
      * player it is about. PlaceholderAPI only supplies both sides where a surface renders per viewer (a chat
      * format, a tab or nametag line), so these keys are typed apart from the rest rather than folded into

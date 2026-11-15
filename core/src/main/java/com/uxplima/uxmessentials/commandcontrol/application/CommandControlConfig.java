@@ -213,7 +213,7 @@ public record CommandControlConfig(
         return expanded;
     }
 
-    /** Build the pure {@link RuleSet} the base config describes, gating {@code .bypass} on {@code bypassPermission}. */
+    /** Build the pure {@link RuleSet} the base config describes, gating the bypass on {@code bypassPermission}. */
     public RuleSet toRuleSet(String bypassPermission) {
         return RuleSet.of(mode, defaultCommands, groupCommands, bypassPermission);
     }

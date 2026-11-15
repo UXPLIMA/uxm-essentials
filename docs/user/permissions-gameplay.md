@@ -21,13 +21,13 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.economy.balance` | /balance [currency] to see your own balance. | true |
 | `uxmessentials.economy.balance.others` | /balance <player> [currency] to view another player's balance. | op |
 | `uxmessentials.economy.baltop` | /baltop [currency] [page] to view the top balances. | true |
-| `uxmessentials.economy.baltop.exempt` | Marks the holder as hidden from every /baltop leaderboard. | false |
+| `uxmessentials.bypass.baltop` | Marks the holder as hidden from every /baltop leaderboard. | false |
 | `uxmessentials.economy.bank` | /bank: open the bank panel to move money between your wallet and your bank balance. | true |
 | `uxmessentials.economy.bank.create` | /bank create <name>: open a new shared bank account. Held by default alongside the bank node. | true |
 | `uxmessentials.economy.bank.deposit` | /bank deposit: pay into a shared bank account. Held by default alongside the bank node. | true |
 | `uxmessentials.economy.bank.withdraw` | /bank withdraw: take money out of a shared bank account; the capability worth withholding from junior members. | true |
 | `uxmessentials.economy.bank.members` | /bank addmember and removemember: change who may use a shared bank account. | true |
-| `uxmessentials.economy.bypasscmdcost` | Skip the configured per-command economy charge (command-costs in economy.conf). | op |
+| `uxmessentials.bypass.cost.command` | Skip the configured per-command economy charge (command-costs in economy.conf). | op |
 | `uxmessentials.economy.currency.<currency>` | Use one currency that is configured to require a permission. | op |
 | `uxmessentials.economy.deposit` | /deposit <amount> [currency]: move money from your wallet into your bank balance. | true |
 | `uxmessentials.economy.exchange` | /exchange <amount> <from> <to>: convert between two currencies at the configured rate. | true |
@@ -39,7 +39,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.economy.salary.amount.<amount>` | The periodic salary you are paid; the largest tier held wins. | false |
 | `uxmessentials.economy.sell` | /sell [amount] to sell held items at their configured worth. | true |
 | `uxmessentials.economy.setworth` | /setworth [item] <price>\|clear to set or clear an item's sell worth override. | op |
-| `uxmessentials.economy.tax.bypass` | Send a /pay without the configured transfer tax being deducted. | op |
+| `uxmessentials.bypass.tax` | Send a /pay without the configured transfer tax being deducted. | op |
 | `uxmessentials.economy.wallet` | /wallet: open your own wallet panel listing every currency you hold. | true |
 | `uxmessentials.economy.withdraw` | /withdraw <amount> [currency]: move money from your bank balance back into your wallet. | true |
 | `uxmessentials.economy.worth` | /worth [item] to report an item's configured sell value. | true |
@@ -50,8 +50,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.home.admin` | /home admin <player> to list, teleport to, set, delete, clear and inspect another player's homes. | op |
-| `uxmessentials.home.bypass.cost` | Skip the per-action economy cost for home create, relocate, and teleport actions. | op |
-| `uxmessentials.home.bypass.unsafe` | Skip the unsafe-destination confirm when teleporting to a home via the GUI, and land at an unsafe home on another server. | op |
+| `uxmessentials.bypass.cost.home` | Skip the per-action economy cost for home create, relocate, and teleport actions. | op |
+| `uxmessentials.bypass.safety.home` | Skip the unsafe-destination confirm when teleporting to a home via the GUI, and land at an unsafe home on another server. | op |
 | `uxmessentials.home.icon` | Pick a custom GUI icon for one of your homes from the grid. | true |
 | `uxmessentials.home.invite` | /home invite and /home uninvite to grant or revoke another player's access to one of your homes. | true |
 | `uxmessentials.home.limit.<n>` | How many homes you may keep; the largest tier held wins. | true |
@@ -66,7 +66,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 |---|---|---|
 | `uxmessentials.kit.<kit>` | Claim a kit whose file sets permission = true. | true |
 | `uxmessentials.kit.cooldown.<group>` | Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins. | false |
-| `uxmessentials.kit.cooldown.bypass` | Skip kit cooldowns and re-claim one-time kits. | op |
+| `uxmessentials.bypass.cooldown.kit` | Skip kit cooldowns and re-claim one-time kits. | op |
 | `uxmessentials.kit.edit` | /kit create, /kit del, /kit editor to define, remove and edit kit contents. | op |
 | `uxmessentials.kit.others` | /kit <name> <player> to give a kit to another player. | op |
 | `uxmessentials.kit.preview` | /kit show <name> to preview a kit's contents without claiming it. | true |
@@ -114,7 +114,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.playtime.set` | /playtime set\|add\|take <player> <time> to correct a player's all-time playtime (naming another player also needs uxmessentials.playerstate.others). | op |
 | `uxmessentials.playtime.use` | /playtime [player] to show a player's playtime breakdown (active/afk, today/week/month/all-time). | op |
 | `uxmessentials.seed.use` | /seed to show the seed of the world you are standing in. | true |
-| `uxmessentials.world.command-bypass` | Run commands a world blocks through its per-world command list. | op |
+| `uxmessentials.bypass.blocked-commands.world` | Run commands a world blocks through its per-world command list. | op |
 | `uxmessentials.world.use` | /world to show the world you are standing in, and /worlds to reach the world manager. | true |
 | `uxmessentials.clearinventory.confirmtoggle` | /clearinventoryconfirmtoggle (/citoggle) to require a confirmation before /clearinventory clears your own inventory. | true |
 | `uxmessentials.clearinventory.use` | /clearinventory (/ci /clear) [player] to empty a player's inventory. | op |
@@ -149,9 +149,9 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.pwarp.ban` | /pwarp ban\|unban <name> <player> to bar a player from one of your warps or lift that bar. | true |
-| `uxmessentials.pwarp.bypass.ban` | Enter a player warp you are banned from (skips the ban check on /pwarp). | op |
-| `uxmessentials.pwarp.bypass.password` | Enter a password-protected player warp without the password (skips the check on /pwarp). | op |
-| `uxmessentials.pwarp.bypass.whitelist` | Enter a whitelist-only player warp without being on the whitelist (skips the check on /pwarp). | op |
+| `uxmessentials.bypass.ban.pwarp` | Enter a player warp you are banned from (skips the ban check on /pwarp). | op |
+| `uxmessentials.bypass.password.pwarp` | Enter a password-protected player warp without the password (skips the check on /pwarp). | op |
+| `uxmessentials.bypass.whitelist.pwarp` | Enter a whitelist-only player warp without being on the whitelist (skips the check on /pwarp). | op |
 | `uxmessentials.pwarp.category` | /pwarp category <name> [categoryId] to file a player warp under a browse category. | true |
 | `uxmessentials.pwarp.delete` | /pwarp del <name> to remove one of your player warps. | true |
 | `uxmessentials.pwarp.description` | /pwarp description <name> [text] to set or clear a player warp's description. | true |
@@ -172,8 +172,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.module.playerwarps` | Hot-reload / inspect the playerwarps module (player-owned warps behind /pwarp). | op |
 | `uxmessentials.pwarp.access` | /pwarp access <name> <PUBLIC\|PASSWORD\|WHITELIST\|PRIVATE> to set a player warp's access axis. | true |
 | `uxmessentials.pwarp.admin` | /pwarp admin restore\|purge\|setowner\|reload to manage any player's warp by its id. | op |
-| `uxmessentials.pwarp.bypass.cost` | Use a priced player warp without paying its entry cost (skips the charge on /pwarp). | op |
-| `uxmessentials.pwarp.bypass.safety` | Use a player warp whose destination is unsafe (skips the safe-landing check on /pwarp). | op |
+| `uxmessentials.bypass.cost.pwarp` | Use a priced player warp without paying its entry cost (skips the charge on /pwarp). | op |
+| `uxmessentials.bypass.safety.pwarp` | Use a player warp whose destination is unsafe (skips the safe-landing check on /pwarp). | op |
 | `uxmessentials.pwarp.favourite` | /pwarp favourite\|unfavourite <name> to star or un-star a player warp. | true |
 | `uxmessentials.pwarp.edit` | /pwarp edit <name> to open one warp's property editor, the click-driven form of the typed verbs. Held by default alongside the use node. | true |
 | `uxmessentials.pwarp.gui` | Manage every player's warps in the /pwarp GUI (a player without it edits only their own). | op |
@@ -239,7 +239,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.rtp.others` | /rtp <player> to force another online player to random teleport (staff). | op |
 | `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp may drop you; the largest tier held wins. | true |
 | `uxmessentials.rtp.use` | /rtp random teleport from the pre-warmed safe-location queue. | true |
-| `uxmessentials.spawn.join.exempt` | Exempt the player from automatic first-join/every-join spawn movement. | false |
+| `uxmessentials.bypass.join-spawn` | Exempt the player from automatic first-join/every-join spawn movement. | false |
 | `uxmessentials.spawn.named` | /spawn <name> to teleport to a named spawn. | true |
 | `uxmessentials.spawn.set` | /setspawn, /setmainspawn, /removespawn and /mirrorspawn to define and manage spawns. | op |
 | `uxmessentials.spawn.use` | /spawn to teleport to the resolved server spawn. | true |
@@ -252,7 +252,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.tp.use` | /tp, /tphere, /goto, /bring and /tprandomplayer (/tprp) direct staff teleport. | op |
 | `uxmessentials.tp.vertical` | /top, /bottom, /jump, /up, /down, /ascend, /descend, /thru vertical teleports. | op |
 | `uxmessentials.tp.warmup.<seconds>` | The stand-still countdown before a teleport runs, in seconds; the shortest tier held wins and 0 removes it. | true |
-| `uxmessentials.tp.warmup.bypass` | Start teleports with no warmup, immune to move-cancel. | op |
+| `uxmessentials.bypass.warmup.tp` | Start teleports with no warmup, immune to move-cancel. | op |
 
 ## trade
 
@@ -268,8 +268,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.module.vaults` | Hot-reload / inspect the vaults module (DB-persisted player vault storage). | op |
 | `uxmessentials.vault.admin.delete` | /vault delete <player> <n>: delete another player's vault (audit-logged, no refund). | op |
 | `uxmessentials.vault.amount.<n>` | How many vaults you may open; the largest tier held wins. | true |
-| `uxmessentials.vault.bypass-blacklist` | Store any item in a vault, ignoring the blacklist-materials list (items are not returned). | op |
-| `uxmessentials.vault.free` | Bypass every vault economy fee (create/open); no refund is paid on delete. | false |
+| `uxmessentials.bypass.blacklist.vault` | Store any item in a vault, ignoring the blacklist-materials list (items are not returned). | op |
+| `uxmessentials.bypass.cost.vault` | Bypass every vault economy fee (create/open); no refund is paid on delete. | false |
 | `uxmessentials.vault.icon` | /vault icon <n> [material]: set or clear the icon of your own vault (held item if omitted). | true |
 | `uxmessentials.vault.others` | /vault <player> [n]: open and audit another player's vault (audit-logged). | op |
 | `uxmessentials.vault.rename` | /vault rename <n> [name]: set or clear the display name of your own vault. | true |
@@ -294,9 +294,9 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.module.warps` | Hot-reload / inspect the warps module (server warps and their access rules). | op |
-| `uxmessentials.warp.bypass.lock` | Use a locked warp regardless of its lock state. | op |
-| `uxmessentials.warp.bypass.password` | Use a password-protected warp without entering its password. | op |
-| `uxmessentials.warp.bypass.safety` | Use a warp whose destination fails the safety check. | op |
+| `uxmessentials.bypass.lock.warp` | Use a locked warp regardless of its lock state. | op |
+| `uxmessentials.bypass.password.warp` | Use a password-protected warp without entering its password. | op |
+| `uxmessentials.bypass.safety.warp` | Use a warp whose destination fails the safety check. | op |
 | `uxmessentials.warp.delete` | /delwarp <name> to remove a warp. | op |
 | `uxmessentials.warp.edit` | /warp editor <name> to open the warp editor (cost, gates, effects, welcome message, icon). | op |
 | `uxmessentials.warp.info` | /warpinfo <name> to show a warp's owner, creation time and cost. | true |
@@ -318,13 +318,13 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 |---|---|---|
 | `uxmessentials.module.worlds` | Hot-reload / inspect the worlds module (world creation, properties and access). | op |
 | `uxmessentials.world.<world>` | Enter one world that is configured as restricted. | op |
-| `uxmessentials.world.access.bypass` | Enter a restricted world without holding that world's own entry node. | op |
+| `uxmessentials.bypass.access.world` | Enter a restricted world without holding that world's own entry node. | op |
 | `uxmessentials.world.backup` | /worlds backup <name>: snapshot a world's folder. | op |
-| `uxmessentials.world.bypass.safety` | Land on the spawn of a world on another server even when the safe-landing check refuses it. | op |
+| `uxmessentials.bypass.safety.world` | Land on the spawn of a world on another server even when the safe-landing check refuses it. | op |
 | `uxmessentials.world.claim` | /worlds claim <name>: take a world no server has claimed onto this server. | op |
 | `uxmessentials.world.create` | /worlds create <name>: generate and register a new world. | op |
 | `uxmessentials.world.delete` | /worlds delete <name>: unregister a world and delete its folder from disk. | op |
-| `uxmessentials.world.gamemode.bypass` | Keep your own game mode in a world that forces one on entry. | op |
+| `uxmessentials.bypass.gamemode.world` | Keep your own game mode in a world that forces one on entry. | op |
 | `uxmessentials.world.gamerule` | /worlds gamerule <name> <rule> <value>: change one gamerule on a world. | op |
 | `uxmessentials.world.gui` | /worlds gui: open the world management GUI. | op |
 | `uxmessentials.world.import` | /worlds import <folder>: adopt an existing world folder into the registry. | op |
@@ -341,4 +341,4 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.world.tp.others` | /worlds tp <name> <player>: teleport somebody else to a world's spawn. | op |
 | `uxmessentials.world.unload` | /worlds unload <name>: unload a loaded world, moving anybody inside to spawn. | op |
 | `uxmessentials.world.unregister` | /worlds unregister <name>: drop a world from the registry, leaving its folder on disk. | op |
-| `uxmessentials.world.voidrescue.exempt` | Keep falling in a world that catches players out of the void. | false |
+| `uxmessentials.bypass.void-rescue` | Keep falling in a world that catches players out of the void. | false |
