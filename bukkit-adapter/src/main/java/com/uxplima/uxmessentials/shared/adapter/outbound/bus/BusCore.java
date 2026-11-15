@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.shared.network.BusTransport;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
+import com.uxplima.uxmessentials.shared.network.UnknownMessageTypeException;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -87,6 +88,10 @@ final class BusCore implements BusPublisher {
         NetworkMessage message;
         try {
             message = NetworkMessageCodec.decode(frame);
+        } catch (UnknownMessageTypeException newer) {
+            // A newer peer's frame during a rolling upgrade: expected, and it would repeat with every heartbeat.
+            log.debug("dropping bus frame of unknown type {}", String.valueOf(newer.wireTag()));
+            return;
         } catch (IllegalArgumentException malformed) {
             log.warn("dropping malformed inbound bus frame: {}", String.valueOf(malformed.getMessage()));
             return;

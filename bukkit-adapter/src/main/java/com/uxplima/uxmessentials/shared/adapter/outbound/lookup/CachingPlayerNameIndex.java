@@ -107,6 +107,17 @@ public final class CachingPlayerNameIndex implements PlayerNameIndex {
         scheduler.async(() -> store.upsert(row));
     }
 
+    @Override
+    public void learn(UUID uuid, String name) {
+        Objects.requireNonNull(uuid, "uuid");
+        Objects.requireNonNull(name, "name");
+        String trimmed = name.strip();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+        remember(trimmed.toLowerCase(Locale.ROOT), new PlayerName(uuid, trimmed, System.currentTimeMillis()));
+    }
+
     /** Put a name last in the order seen, and let the least recently seen go past the limit. */
     private void remember(String key, PlayerName row) {
         synchronized (lock) {
