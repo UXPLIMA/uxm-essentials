@@ -41,13 +41,21 @@ public final class HomeCharge {
      * {@link HomeError#CANNOT_AFFORD} when the player's balance was insufficient.
      */
     public Result<Unit, HomeError> charge(PlayerRef who, HomeChargeKind kind) {
+        return chargeExactly(who, kind).map(taken -> Unit.INSTANCE);
+    }
+
+    /**
+     * Charge {@code who} for {@code kind} as {@link #charge} does, answering exactly what was taken: empty when the
+     * action was free for them. A cross-server hop carries the answer, so a miss refunds that and nothing else.
+     */
+    public Result<Optional<HomeCost>, HomeError> chargeExactly(PlayerRef who, HomeChargeKind kind) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
         HomeCost cost = settings.forKind(kind);
         if (cost.isFree() || economy.isEmpty() || permissions.has(who, BYPASS_NODE)) {
-            return Result.ok();
+            return Result.ok(Optional.empty());
         }
         boolean withdrawn = economy.get().withdraw(who, cost.amount(), cost.currencyId());
-        return withdrawn ? Result.ok() : Result.err(HomeError.CANNOT_AFFORD);
+        return withdrawn ? Result.ok(Optional.of(cost)) : Result.err(HomeError.CANNOT_AFFORD);
     }
 }

@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.homes.application.port.HomeServers;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import org.jspecify.annotations.NullMarked;
 
@@ -45,5 +46,11 @@ public final class HomeRepositories {
     public static HomeInviteRepository homeInviteRepository(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqHomeInviteRepository(persistence.dsl());
+    }
+
+    /** The jOOQ {@link HomeServers} that rewrites the server of every owner's homes at once. */
+    public static HomeServers servers(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqHomeServers(persistence.dsl());
     }
 }
