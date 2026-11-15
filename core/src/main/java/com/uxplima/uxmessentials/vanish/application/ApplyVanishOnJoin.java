@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vanish.application;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -80,15 +81,18 @@ public final class ApplyVanishOnJoin {
     }
 
     /**
-     * Settle {@code joiner}'s vanish from the state the login read ({@code stored}, empty when they have none).
-     * {@code persist} says whether they may keep their vanish across leaving the network, and {@code joinVanished}
-     * whether they rejoin vanished every time. Returns whether they ended up vanished.
+     * Settle {@code joiner}'s vanish from the state the login read at {@code readAt} ({@code stored}, empty when they
+     * have none). The origin's sighting is judged at {@code readAt}, when the player was still on it, so a slow join
+     * cannot age a switch out. {@code persist} says whether they may keep their vanish across leaving the network, and
+     * {@code joinVanished} whether they rejoin vanished every time. Returns whether they ended up vanished.
      */
-    public boolean join(PlayerRef joiner, Optional<StoredVanish> stored, boolean persist, boolean joinVanished) {
+    public boolean join(
+            PlayerRef joiner, Optional<StoredVanish> stored, Instant readAt, boolean persist, boolean joinVanished) {
         Objects.requireNonNull(joiner, "joiner");
         Objects.requireNonNull(stored, "stored");
+        Objects.requireNonNull(readAt, "readAt");
         provisional.remove(joiner.uuid());
-        reconciler.reconcile(joiner.uuid(), carried(joiner.uuid(), stored, persist));
+        reconciler.reconcile(joiner.uuid(), carried(joiner.uuid(), stored, readAt, persist));
         settle(joiner, joinVanished);
         boolean vanished = store.isVanished(joiner.uuid());
         afterDecision(joiner, stored, vanished);
@@ -128,7 +132,7 @@ public final class ApplyVanishOnJoin {
         if (remember.changedHere(joiner.uuid()) || (store.isVanished(joiner.uuid()) && !wasProvisional)) {
             return store.isVanished(joiner.uuid());
         }
-        Optional<StoredVanish> carried = carried(joiner.uuid(), stored, persist);
+        Optional<StoredVanish> carried = carried(joiner.uuid(), stored, clock.instant(), persist);
         if (carried.isPresent()) {
             reconciler.reconcile(joiner.uuid(), carried);
             setVanishLevel.reapply(joiner);
@@ -161,12 +165,14 @@ public final class ApplyVanishOnJoin {
         }
     }
 
-    private Optional<StoredVanish> carried(UUID player, Optional<StoredVanish> stored, boolean persist) {
-        return stored.filter(state -> state.restores(persist, switching(player, state), clock.instant(), hopWindow));
+    private Optional<StoredVanish> carried(
+            UUID player, Optional<StoredVanish> stored, Instant readAt, boolean persist) {
+        return stored.filter(
+                state -> state.restores(persist, switching(player, state, readAt), clock.instant(), hopWindow));
     }
 
-    /** Whether the player is still on their way from another backend, as far as this backend can see. */
-    private boolean switching(UUID player, StoredVanish state) {
+    /** Whether the player was still on their way from another backend when the row was read at {@code readAt}. */
+    private boolean switching(UUID player, StoredVanish state, Instant readAt) {
         String here = presence.localServer();
         Optional<OnlinePlayer> where = presence.find(player);
         if (where.isPresent() && !where.get().server().equals(here)) {
@@ -174,7 +180,7 @@ public final class ApplyVanishOnJoin {
         }
         boolean fromElsewhere =
                 state.server().filter(server -> !server.equals(here)).isPresent();
-        return fromElsewhere && state.seenWithin(clock.instant(), hopWindow);
+        return fromElsewhere && state.seenWithin(readAt, hopWindow);
     }
 
     private void afterDecision(PlayerRef joiner, Optional<StoredVanish> stored, boolean vanished) {

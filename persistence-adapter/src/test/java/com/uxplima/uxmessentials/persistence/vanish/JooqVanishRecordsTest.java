@@ -91,13 +91,26 @@ class JooqVanishRecordsTest {
     }
 
     @Test
-    void aReleaseRecordsADepartureForEveryHeldPlayerNotStillHere() {
+    void aReleaseOnStopRecordsADepartureForEveryPlayerTheServerHolds() {
         records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
-        records.save(SAM, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
+        records.save(SAM, StoredVanish.vanished(VanishLevel.DEFAULT, "lobby", EARLY));
 
-        records.releaseHeld("survival", List.of(SAM), LATE);
+        records.releaseHeld("survival", LATE);
 
         assertThat(records.find(ALEX).flatMap(StoredVanish::departedAt)).contains(LATE);
+        assertThat(records.find(SAM).flatMap(StoredVanish::departedAt)).isEmpty();
+    }
+
+    @Test
+    void aReleaseOnStartSparesAPlayerWhoArrivedSinceTheServerStarted() {
+        Instant started = EARLY.plusSeconds(2);
+        records.save(ALEX, StoredVanish.vanished(VanishLevel.DEFAULT, "survival", EARLY));
+        records.save(SAM, StoredVanish.vanished(VanishLevel.DEFAULT, "lobby", EARLY));
+        records.markArrived(SAM, "survival", LATE);
+
+        records.releaseStale("survival", started);
+
+        assertThat(records.find(ALEX).flatMap(StoredVanish::departedAt)).contains(started);
         assertThat(records.find(SAM).flatMap(StoredVanish::departedAt)).isEmpty();
     }
 

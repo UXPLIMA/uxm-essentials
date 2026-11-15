@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vanish.adapter.inbound.listener;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,11 +36,15 @@ public final class VanishLoginListener implements Listener {
     /** Far longer than any login takes from pre-login to join, so only abandoned answers reach it. */
     private static final Duration HELD_FOR = Duration.ofMinutes(1);
 
-    /** What the login read for one player: their kept state, empty when they have none. */
-    public record Read(Optional<StoredVanish> stored) {
+    /**
+     * What the login read for one player: their kept state, empty when they have none, and when it was read. The join
+     * judges the evidence at that instant, since a slow join (a forced resource pack) can outlast the hop window.
+     */
+    public record Read(Optional<StoredVanish> stored, Instant readAt) {
 
         public Read {
             Objects.requireNonNull(stored, "stored");
+            Objects.requireNonNull(readAt, "readAt");
         }
     }
 
@@ -71,6 +76,7 @@ public final class VanishLoginListener implements Listener {
             return;
         }
         CompletableFuture<Optional<StoredVanish>> answer = new CompletableFuture<>();
+        Instant readAt = Instant.now();
         scheduler.async(() -> {
             try {
                 answer.complete(remember.load(player));
@@ -79,7 +85,7 @@ public final class VanishLoginListener implements Listener {
             }
         });
         try {
-            hold(player, answer.get(timeout.toMillis(), TimeUnit.MILLISECONDS));
+            hold(player, answer.get(timeout.toMillis(), TimeUnit.MILLISECONDS), readAt);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
         } catch (Exception failure) {
@@ -100,9 +106,9 @@ public final class VanishLoginListener implements Listener {
         held.clear();
     }
 
-    private void hold(UUID player, Optional<StoredVanish> stored) {
+    private void hold(UUID player, Optional<StoredVanish> stored, Instant readAt) {
         long now = System.currentTimeMillis();
         held.values().removeIf(answer -> now - answer.at() > HELD_FOR.toMillis());
-        held.put(player, new Held(new Read(stored), now));
+        held.put(player, new Held(new Read(stored, readAt), now));
     }
 }

@@ -3,13 +3,10 @@ package com.uxplima.uxmessentials.persistence.vanish;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerVanish.PLAYER_VANISH;
 
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -125,26 +122,27 @@ public final class JooqVanishRecords extends JooqRepository implements VanishRec
     }
 
     @Override
-    public void releaseHeld(String server, Collection<UUID> stillHere, Instant at) {
+    public void releaseHeld(String server, Instant at) {
         Objects.requireNonNull(server, "server");
-        Objects.requireNonNull(stillHere, "stillHere");
         Objects.requireNonNull(at, "at");
-        Set<String> keep = new HashSet<>();
-        stillHere.forEach(player -> keep.add(player.toString()));
-        List<String> held = new ArrayList<>(read(dsl -> dsl.select(PLAYER_VANISH.PLAYER_UUID)
-                .from(PLAYER_VANISH)
+        write(dsl -> dsl.update(PLAYER_VANISH)
+                .set(PLAYER_VANISH.DEPARTED_AT, at.toEpochMilli())
                 .where(heldBy(server))
                 .and(PLAYER_VANISH.DEPARTED_AT.isNull())
-                .fetch(PLAYER_VANISH.PLAYER_UUID)));
-        held.removeAll(keep);
-        for (String player : held) {
-            write(dsl -> dsl.update(PLAYER_VANISH)
-                    .set(PLAYER_VANISH.DEPARTED_AT, at.toEpochMilli())
-                    .where(PLAYER_VANISH.PLAYER_UUID.eq(player))
-                    .and(heldBy(server))
-                    .and(PLAYER_VANISH.DEPARTED_AT.isNull())
-                    .execute());
-        }
+                .execute());
+    }
+
+    @Override
+    public void releaseStale(String server, Instant startedAt) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(startedAt, "startedAt");
+        long started = startedAt.toEpochMilli();
+        write(dsl -> dsl.update(PLAYER_VANISH)
+                .set(PLAYER_VANISH.DEPARTED_AT, started)
+                .where(heldBy(server))
+                .and(PLAYER_VANISH.DEPARTED_AT.isNull())
+                .and(PLAYER_VANISH.SEEN_AT.isNull().or(PLAYER_VANISH.SEEN_AT.lt(started)))
+                .execute());
     }
 
     private static Condition heldBy(String server) {

@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
+import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus.PeerRun;
@@ -111,12 +112,62 @@ class VanishAcrossBackendsTest {
         survival.join(ALEX);
         survival.toggle(ALEX);
 
-        Optional<StoredVanish> read = lobby.preLogin(ALEX);
+        LoginRead read = lobby.preLogin(ALEX);
         lobby.join(ALEX, read);
         survival.quit(ALEX);
 
         assertThat(lobby.isHidden(ALEX)).isTrue();
         assertThat(creative.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aJoinSlowerThanTheHopWindowAfterTheLoginReadKeepsTheSwitchingPlayerHidden() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        // A forced resource pack holds the player between the login read and the join.
+        LoginRead read = lobby.preLogin(ALEX);
+        survival.quit(ALEX);
+        clock.advance(HOP_WINDOW.plusSeconds(15));
+        lobby.join(ALEX, read);
+
+        assertThat(lobby.isHidden(ALEX)).isTrue();
+    }
+
+    @Test
+    void aPeerThatNamesNoRunOnItsFramesIsStillHeardAfterItRestarts() {
+        network.namesNoRun("survival");
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.joinHoldingPersist(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        Backend restarted = network.start("survival");
+        network.beat();
+        restarted.joinHoldingPersist(ALEX);
+
+        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aPeerThatNamesNoRunOnItsFramesStillLosesItsOldEntriesWhenItRestarts() {
+        network.namesNoRun("survival");
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.crash("survival");
+        network.start("survival");
+        network.beat();
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
     }
 
     @Test
@@ -458,6 +509,7 @@ class VanishAcrossBackendsTest {
         private final Map<String, Map<String, Integer>> runSeen = new HashMap<>();
         private final Map<String, Set<String>> heard = new HashMap<>();
         private final Set<String> deaf = new HashSet<>();
+        private final Set<String> namesNoRun = new HashSet<>();
 
         Backend start(String name) {
             runs.merge(name, 1, Integer::sum);
@@ -465,7 +517,7 @@ class VanishAcrossBackendsTest {
             runSeen.remove(name);
             Backend started = new Backend(name, this);
             running.put(name, started);
-            started.remember.releaseOrphans(Set.of());
+            started.remember.releaseOrphans();
             return started;
         }
 
@@ -516,13 +568,19 @@ class VanishAcrossBackendsTest {
 
         /** The proxy's order: the target's login read, then the origin's quit and departure, then the target's join. */
         void switchServer(PlayerRef who, Backend from, Backend to) {
-            Optional<StoredVanish> read = to.preLogin(who);
+            LoginRead read = to.preLogin(who);
             from.quit(who);
             to.join(who, read);
         }
 
+        /** The backend's vanish frames carry no run, as a peer on an older release sends them. */
+        void namesNoRun(String name) {
+            namesNoRun.add(name);
+        }
+
         void changed(String origin, VanishSync change) {
-            others(origin).forEach(peer -> peer.sync.changed(origin, runOf(origin), change));
+            long run = namesNoRun.contains(origin) ? NetworkVanishStore.UNKNOWN_RUN : runOf(origin);
+            others(origin).forEach(peer -> peer.sync.changed(origin, run, change));
         }
 
         void departed(String origin, UUID player) {
@@ -632,23 +690,23 @@ class VanishAcrossBackendsTest {
             sync = new VanishNetworkSync(roster, store, view, bus, new OnlinePlayers(players), scheduler);
         }
 
-        Optional<StoredVanish> preLogin(PlayerRef who) {
-            return remember.load(who.uuid());
+        LoginRead preLogin(PlayerRef who) {
+            return new LoginRead(remember.load(who.uuid()), clock.instant());
         }
 
         void join(PlayerRef who) {
             join(who, preLogin(who));
         }
 
-        void join(PlayerRef who, Optional<StoredVanish> read) {
+        void join(PlayerRef who, LoginRead read) {
             players.put(who.uuid(), who);
-            applyOnJoin.join(who, read, false, false);
+            applyOnJoin.join(who, read.stored(), read.at(), false, false);
         }
 
         void joinHoldingPersist(PlayerRef who) {
-            Optional<StoredVanish> read = preLogin(who);
+            LoginRead read = preLogin(who);
             players.put(who.uuid(), who);
-            applyOnJoin.join(who, read, true, false);
+            applyOnJoin.join(who, read.stored(), read.at(), true, false);
         }
 
         void joinUnread(PlayerRef who, boolean canVanish) {
@@ -691,6 +749,9 @@ class VanishAcrossBackendsTest {
             return listVanished.visibleTo(caller);
         }
     }
+
+    /** What a backend's login read returned, and when. */
+    private record LoginRead(Optional<StoredVanish> stored, Instant at) {}
 
     /** What one backend's network presence knows: the players of the backends it has heard from. */
     private record SeenPresence(String localServer, Network network) implements NetworkPresence {
@@ -789,8 +850,18 @@ class VanishAcrossBackendsTest {
         }
 
         @Override
-        public void releaseHeld(String server, Collection<UUID> stillHere, Instant at) {
-            rows.replaceAll((id, kept) -> heldBy(kept, server) && !stillHere.contains(id) ? kept.departed(at) : kept);
+        public void releaseHeld(String server, Instant at) {
+            rows.replaceAll((id, kept) -> heldBy(kept, server) ? kept.departed(at) : kept);
+        }
+
+        @Override
+        public void releaseStale(String server, Instant startedAt) {
+            rows.replaceAll((id, kept) -> heldBy(kept, server)
+                            && kept.seenAt()
+                                    .map(seen -> seen.isBefore(startedAt))
+                                    .orElse(true)
+                    ? kept.departed(startedAt)
+                    : kept);
         }
 
         private static boolean heldBy(StoredVanish kept, String server) {

@@ -184,7 +184,7 @@ public final class VanishWiring {
                 : null;
         Foreign foreign = foreign(config, store, plugin.getServer(), kernel);
         // Rows this backend held when it last went down still say the player is here; nobody is, yet.
-        remember.releaseOrphans(store.vanished());
+        remember.releaseOrphans();
         // A third of the hop window keeps a vanished player's sighting fresh across two missed refreshes.
         Duration sighting = config.hopWindow().dividedBy(3);
         AutoCloseable sightingTask =

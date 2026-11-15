@@ -90,22 +90,23 @@ public final class RememberVanish {
     }
 
     /**
-     * Record a departure for every vanished player this backend holds a row for but does not have online
-     * ({@code stillHere}): what a backend that went down without writing departures left behind. Called on start.
+     * Record a departure for every vanished player this backend holds a row for from before now: what a run of it that
+     * went down without writing departures left behind. Called on start; a player who arrives while it runs was seen
+     * after this instant and keeps their row.
      */
-    public void releaseOrphans(Collection<UUID> stillHere) {
-        Objects.requireNonNull(stillHere, "stillHere");
-        Set<UUID> keep = Set.copyOf(stillHere);
-        Instant at = clock.instant();
-        scheduler.async(() -> release(keep, at));
+    public void releaseOrphans() {
+        Instant startedAt = clock.instant();
+        scheduler.async(() -> release("start", () -> records.releaseStale(server, startedAt)));
     }
 
     /**
-     * Record a departure for every vanished player this backend holds, on the calling thread. Called on stop, when the
-     * async lane no longer runs and the server disables plugins before it lets the players go, so no quit is seen.
+     * Record a departure for every vanished player this backend holds, on the calling thread, in one statement. Called on
+     * stop, when the async lane no longer runs and the server disables plugins before it lets the players go, so no quit
+     * is seen.
      */
     public void releaseAllNow() {
-        release(Set.of(), clock.instant());
+        Instant at = clock.instant();
+        release("stop", () -> records.releaseHeld(server, at));
     }
 
     /**
@@ -136,12 +137,16 @@ public final class RememberVanish {
         changedHere.remove(who);
     }
 
-    private void release(Set<UUID> keep, Instant at) {
+    private void release(String when, Runnable write) {
         try {
-            records.releaseHeld(server, keep, at);
+            write.run();
         } catch (RuntimeException failed) {
             // The rows keep a sighting that ages out within the hop window, so no player stays hidden for long.
-            log.warn("event=vanish_write_failed kind=release server={} reason={}", server, failed.toString());
+            log.warn(
+                    "event=vanish_write_failed kind=release when={} server={} reason={}",
+                    when,
+                    server,
+                    failed.toString());
         }
     }
 

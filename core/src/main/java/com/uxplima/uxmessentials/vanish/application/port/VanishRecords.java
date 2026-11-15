@@ -39,9 +39,13 @@ public interface VanishRecords {
     /** Confirm that the vanished {@code players} are still on {@code server} at {@code at}, for rows it holds. */
     void touch(Collection<UUID> players, String server, Instant at);
 
+    /** Record a departure at {@code at} for every vanished player whose row {@code server} holds without one. */
+    void releaseHeld(String server, Instant at);
+
     /**
-     * Record a departure at {@code at} for every vanished player whose row {@code server} holds without a departure,
-     * except {@code stillHere}: they cannot be on a backend that is starting or stopping.
+     * Record a departure at {@code startedAt} for every vanished player whose row {@code server} holds without one and
+     * that was last seen before {@code startedAt}: what a run of that backend that went down left behind. A player who
+     * arrived since was seen at or after it, so they keep their row.
      */
-    void releaseHeld(String server, Collection<UUID> stillHere, Instant at);
+    void releaseStale(String server, Instant startedAt);
 }

@@ -103,7 +103,7 @@ public final class VanishLifecycleListener implements Listener {
         boolean joinVanished = config.joinVanished() && persist;
         VanishLoginListener.@Nullable Read read = login.take(joiner.getUniqueId());
         if (read != null) {
-            applyOnJoin.join(ref, read.stored(), persist, joinVanished);
+            applyOnJoin.join(ref, read.stored(), read.readAt(), persist, joinVanished);
         } else {
             applyOnJoin.joinUnread(ref, joinVanished, joiner.hasPermission(USE_PERMISSION));
             readLate(ref, persist, 0);

@@ -27,7 +27,9 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *   <li>A departure turns the entry into a tombstone that hides an arriving player for one hop window and is never
  *       listed.
  *   <li>The first heartbeat of a backend's new run drops every entry another run of it sent, whenever that arrived, and
- *       a late frame from an ended run is ignored; what the new run reported before its first heartbeat is kept.
+ *       a late frame from an ended run is ignored; what the new run reported before its first heartbeat is kept. A peer
+ *       that names no run on its frames ({@link #UNKNOWN_RUN}) still loses its old entries on a restart, but its frames
+ *       are never ignored.
  * </ul>
  *
  * <p>Reads and writes are lock-free map operations, so the bus dispatch thread and a command thread see a coherent
@@ -94,12 +96,15 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
             return;
         }
         Set<Long> ended = endedRuns.computeIfAbsent(origin, key -> ConcurrentHashMap.newKeySet());
-        if (before != null && before != run) {
+        if (before != null && before != run && before != UNKNOWN_RUN) {
             ended.add(before);
         }
         entries.forEach((id, entry) -> {
             if (entry.origin().equals(origin) && entry.run() != run) {
-                ended.add(entry.run());
+                // A peer that names no run on its frames still loses what it reported before it restarted.
+                if (entry.run() != UNKNOWN_RUN) {
+                    ended.add(entry.run());
+                }
                 entries.remove(id, entry);
             }
         });
@@ -136,6 +141,9 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
     }
 
     private boolean ended(String origin, long run) {
+        if (run == UNKNOWN_RUN) {
+            return false;
+        }
         Set<Long> runs = endedRuns.get(origin);
         return runs != null && runs.contains(run);
     }

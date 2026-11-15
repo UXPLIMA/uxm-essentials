@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import com.uxplima.uxmessentials.shared.network.VanishStateChanged;
 import com.uxplima.uxmessentials.vanish.application.VanishSync;
+import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus.PeerRun;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
@@ -77,6 +78,11 @@ public final class BusVanishBus implements VanishBus {
         return enabled;
     }
 
+    /** The run a nonce names; the bus's no-nonce marker is the vanish context's unknown run. */
+    private static long runOf(long nonce) {
+        return nonce == ServerPing.NO_NONCE ? NetworkVanishStore.UNKNOWN_RUN : nonce;
+    }
+
     /** Register this with the bus registry: translate a vanish frame or a heartbeat for the subscribed listener. */
     public void onFrame(NetworkMessage message) {
         Listener target = listener;
@@ -89,7 +95,7 @@ public final class BusVanishBus implements VanishBus {
             case VanishStateChanged frame ->
                 target.changed(
                         frame.originServer(),
-                        frame.run(),
+                        runOf(frame.run()),
                         new VanishSync(
                                 frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
             case ServerPing ping -> {
@@ -102,7 +108,7 @@ public final class BusVanishBus implements VanishBus {
                 } else {
                     run = PeerRun.NEW_RUN;
                 }
-                target.pinged(ping.originServer(), ping.bootNonce(), run);
+                target.pinged(ping.originServer(), runOf(ping.bootNonce()), run);
             }
             default -> {
                 // Every other frame belongs to another context.

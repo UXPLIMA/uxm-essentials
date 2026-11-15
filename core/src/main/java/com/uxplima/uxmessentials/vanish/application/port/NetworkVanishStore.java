@@ -24,6 +24,12 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 public interface NetworkVanishStore {
 
     /**
+     * The run of a peer that does not name its runs on vanish frames, the bus's no-nonce marker. It never counts as an
+     * ended run: such a peer's frames all carry it, before and after a restart.
+     */
+    long UNKNOWN_RUN = 0L;
+
+    /**
      * Apply a change reported by run {@code run} of peer {@code origin}: record the player vanished, or drop them on a
      * reveal. A change from a run that already ended is ignored.
      */
