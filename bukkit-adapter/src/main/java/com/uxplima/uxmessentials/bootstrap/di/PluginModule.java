@@ -2244,7 +2244,9 @@ public final class PluginModule {
                 menuBindings,
                 fee,
                 claimProviders,
-                guardRegions);
+                guardRegions,
+                links.hops,
+                links.presence);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         wired.startBackgroundWork();
@@ -2281,6 +2283,9 @@ public final class PluginModule {
                 wired.services().engine());
         // Captured for moderation, which lands later and rebinds this jail gate to the real jail policy.
         links.jailGate = wired.jailGate();
+        // Captured for vanish, which lands later and rebinds this seam so a cross-server request to a vanished
+        // player reads as offline to a requester who may not see them.
+        links.requestVisibility = wired.requestVisibility();
         // Captured for homes, which lands later and rebinds this seam so the respawn chain's HOME step resolves.
         links.homeRespawnLocator = wired.homeRespawnLocator();
         links.warpRespawnLocator = wired.warpRespawnLocator();
@@ -3066,6 +3071,13 @@ public final class PluginModule {
         links.vanishStore = wired.vanishStore();
         links.vanishToggle = wired.toggleVanish();
         links.vanishLevelResolver = wired.levels();
+        com.uxplima.uxmessentials.teleport.adapter.MutableRequestVisibility requestVisibility = links.requestVisibility;
+        if (requestVisibility != null) {
+            requestVisibility.bind(new com.uxplima.uxmessentials.teleport.adapter.outbound.VanishRequestVisibility(
+                    wired.vanishStore(),
+                    com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence),
+                    wired.levels()));
+        }
         links.vanishNetwork = wired.network();
         links.queries.register(
                 UxmVanishQuery.class,
@@ -3727,6 +3739,9 @@ public final class PluginModule {
         private com.uxplima.uxmessentials.playerstate.adapter.outbound.@org.jspecify.annotations.Nullable MutablePlaytimeAfkStatus
                 playtimeAfkStatus;
         private @org.jspecify.annotations.Nullable MutableJailGate jailGate;
+        // The vanish seam cross-server teleport requests are judged with, rebound when vanish wires after teleport.
+        private com.uxplima.uxmessentials.teleport.adapter.@org.jspecify.annotations.Nullable MutableRequestVisibility
+                requestVisibility;
         private @org.jspecify.annotations.Nullable MutableHomeRespawnLocator homeRespawnLocator;
         private @org.jspecify.annotations.Nullable MutableWarpRespawnLocator warpRespawnLocator;
         private java.util.function.@org.jspecify.annotations.Nullable Function<

@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport.Named;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
@@ -115,6 +116,19 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
         if (sender == null) {
             return 0;
         }
+        if (services.crossServerStaff().enabled() && resolveHere(ctx, "player").isEmpty()) {
+            Optional<String> elsewhere = typedName(ctx, "player");
+            if (elsewhere.isPresent()) {
+                // Nobody here by that name: the backend the player is on takes part in the teleport, if any.
+                if (pull == Pull.GO) {
+                    services.crossServerStaff().goTo(ref(sender), elsewhere.get());
+                } else {
+                    services.crossServerStaff()
+                            .move(ref(sender), Named.elsewhere(elsewhere.get()), Named.here(sender.getName()));
+                }
+                return Command.SINGLE_SUCCESS;
+            }
+        }
         Optional<Player> target = resolveTarget(ctx);
         if (target.isEmpty()) {
             return 0;
@@ -149,6 +163,16 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
 
     /** {@code /tp <player> <destination>}: move an explicit subject, so console does not need a body. */
     private int runBetweenPlayers(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
+        if (services.crossServerStaff().enabled()) {
+            Optional<Named> subjectName = nameHereOrTyped(ctx, "player");
+            Optional<Named> destinationName = nameHereOrTyped(ctx, "destination");
+            boolean bothHere = resolveHere(ctx, "player").isPresent()
+                    && resolveHere(ctx, "destination").isPresent();
+            if (!bothHere && subjectName.isPresent() && destinationName.isPresent()) {
+                services.crossServerStaff().move(actor(ctx), subjectName.get(), destinationName.get());
+                return Command.SINGLE_SUCCESS;
+            }
+        }
         Optional<Player> subject = resolveTarget(ctx, "player");
         Optional<Player> destination = resolveTarget(ctx, "destination");
         if (subject.isEmpty() || destination.isEmpty()) {
@@ -165,6 +189,14 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
             }
         });
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** The player the argument matches here, or the plain name typed for one who is not here. */
+    private static Optional<Named> nameHereOrTyped(CommandContext<CommandSourceStack> ctx, String argument) {
+        Optional<Player> here = resolveHere(ctx, argument);
+        return here.isPresent()
+                ? Optional.of(Named.here(here.get().getName()))
+                : typedName(ctx, argument).map(Named::elsewhere);
     }
 
     /** {@code /tp at <player> <world> <x> <y> <z> [yaw pitch]} for deterministic console automation. */

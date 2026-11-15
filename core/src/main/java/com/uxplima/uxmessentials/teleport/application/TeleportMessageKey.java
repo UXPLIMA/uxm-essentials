@@ -30,6 +30,17 @@ public enum TeleportMessageKey implements MessageKey {
     TPA_LIST_ENTRY("teleport.tpa.list-entry"),
     TPA_TOGGLE_ON("teleport.tpa.toggle-on"),
     TPA_TOGGLE_OFF("teleport.tpa.toggle-off"),
+    // a target on another backend denied the request; the requester is told, since they cannot see it happen
+    TPA_DENIED_REMOTE("teleport.tpa.denied-remote"),
+
+    // a teleport to a player on another backend: the hop notices, shared by accepted requests and staff teleports
+    CROSS_SERVER_SENDING("teleport.cross-server.sending"),
+    CROSS_SERVER_ARRIVED("teleport.cross-server.arrived"),
+    CROSS_SERVER_TIMED_OUT("teleport.cross-server.timed-out"),
+    CROSS_SERVER_MISROUTED("teleport.cross-server.misrouted"),
+    CROSS_SERVER_FAILED("teleport.cross-server.failed"),
+    CROSS_SERVER_UNAVAILABLE("teleport.cross-server.unavailable"),
+    CROSS_SERVER_REFUNDED("teleport.cross-server.refunded"),
 
     // /tpauto: auto-accept incoming requests
     TPAUTO_ON("teleport.tpauto-on"),
@@ -86,6 +97,10 @@ public enum TeleportMessageKey implements MessageKey {
 
     // admin / positional
     TP_DONE("teleport.tp.done"),
+    // staff /tp of a player on another backend, as the staff member reads it
+    TP_CROSS_SERVER_SENT("teleport.tp.cross-server.sent"),
+    TP_CROSS_SERVER_REFUSED("teleport.tp.cross-server.refused"),
+    TP_CROSS_SERVER_NO_ANSWER("teleport.tp.cross-server.no-answer"),
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),
     TPRANDOM_NONE("teleport.tprandom.none"),
 

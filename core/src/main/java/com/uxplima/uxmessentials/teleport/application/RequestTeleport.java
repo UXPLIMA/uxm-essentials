@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.teleport.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -15,6 +16,7 @@ import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
+import com.uxplima.uxmessentials.teleport.domain.RequestId;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest.Transition;
@@ -89,6 +91,24 @@ public final class RequestTeleport {
     }
 
     private Optional<TeleportError> gate(PlayerRef requester, PlayerRef target) {
+        Optional<TeleportError> refused = refuseRequester(requester, target);
+        if (refused.isPresent()) {
+            return refused;
+        }
+        Optional<TeleportError> declined = targetRefusal(requester, target);
+        if (declined.isPresent()) {
+            return reject(requester, declined.get());
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * The checks the requester's own backend runs before a request leaves it, local or not: the requester is not
+     * jailed, not combat-tagged and not asking themselves. A refusal is told to the requester and returned.
+     */
+    public Optional<TeleportError> refuseRequester(PlayerRef requester, PlayerRef target) {
+        Objects.requireNonNull(requester, "requester");
+        Objects.requireNonNull(target, "target");
         if (jail.isJailed(requester)) {
             return reject(requester, TeleportError.JAILED);
         }
@@ -100,13 +120,44 @@ public final class RequestTeleport {
         if (requester.equals(target)) {
             return reject(requester, TeleportError.SELF_REQUEST);
         }
+        return Optional.empty();
+    }
+
+    /**
+     * Whether {@code target}, a player on this backend, refuses requests from {@code requester}: their toggle is
+     * off, or they blocked the requester. Nobody is told here, since a requester on another backend hears it from
+     * there.
+     */
+    public Optional<TeleportError> targetRefusal(PlayerRef requester, PlayerRef target) {
+        Objects.requireNonNull(requester, "requester");
+        Objects.requireNonNull(target, "target");
         if (!flags.acceptsRequests(target)) {
-            return reject(requester, TeleportError.TARGET_TOGGLED_OFF);
+            return Optional.of(TeleportError.TARGET_TOGGLED_OFF);
         }
         if (flags.hasBlocked(target, requester)) {
-            return reject(requester, TeleportError.REQUESTER_BLOCKED);
+            return Optional.of(TeleportError.REQUESTER_BLOCKED);
         }
         return Optional.empty();
+    }
+
+    /**
+     * Hold a request a player on another backend sent to {@code target} on this one, after its checks passed: store
+     * it under the id both backends know, so the target resolves it like any other, and show it to the target. The
+     * requester's own line comes from their backend.
+     */
+    public TeleportRequest receive(
+            RequestId id, PlayerRef requester, PlayerRef target, RequestDirection direction, Duration ttl) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(requester, "requester");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(direction, "direction");
+        Objects.requireNonNull(ttl, "ttl");
+        Transition opened = TeleportRequest.open(
+                id, requester, target, direction, clock.instant().plus(ttl));
+        requests.store(opened.request());
+        events.publish(opened.event());
+        notifier.send(target, receivedKey(direction), Map.of("player", requester.name()));
+        return opened.request();
     }
 
     // Every gate rejection tells the requester why with the error's own catalog key, so a silent
@@ -119,10 +170,15 @@ public final class RequestTeleport {
     private void announce(TeleportRequest request, RequestDirection direction) {
         Map<String, String> requesterPh = Map.of("player", request.target().name());
         notifier.send(request.requester(), TeleportMessageKey.TPA_SENT, requesterPh);
-        TeleportMessageKey key = direction == RequestDirection.TO_TARGET
+        notifier.send(
+                request.target(),
+                receivedKey(direction),
+                Map.of("player", request.requester().name()));
+    }
+
+    private static TeleportMessageKey receivedKey(RequestDirection direction) {
+        return direction == RequestDirection.TO_TARGET
                 ? TeleportMessageKey.TPA_RECEIVED
                 : TeleportMessageKey.TPA_HERE_RECEIVED;
-        notifier.send(
-                request.target(), key, Map.of("player", request.requester().name()));
     }
 }

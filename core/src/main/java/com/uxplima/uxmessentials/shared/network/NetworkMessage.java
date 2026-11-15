@@ -45,6 +45,9 @@ public sealed interface NetworkMessage
                 StaffChatFrame,
                 JailChanged,
                 JailHopFailed,
+                TeleportRequestFrame,
+                TeleportAnswerFrame,
+                StaffTeleportFrame,
                 WorldChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
@@ -83,6 +86,9 @@ public sealed interface NetworkMessage
         PRIVATE_MESSAGE_ANSWER(22),
         HELP_OP(23),
         STAFF_CHAT(24),
+        TELEPORT_REQUEST(25),
+        TELEPORT_ANSWER(26),
+        STAFF_TELEPORT(27),
         JAIL_CHANGED(28),
         JAIL_HOP_FAILED(29),
         WORLD_CHANGED(30);
