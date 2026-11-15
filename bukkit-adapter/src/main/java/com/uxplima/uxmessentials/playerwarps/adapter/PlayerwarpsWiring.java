@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarp
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.CrossServerArrival;
+import com.uxplima.uxmessentials.playerwarps.application.CrossServerCharges;
 import com.uxplima.uxmessentials.playerwarps.application.CrossServerWatchdog;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
@@ -208,8 +209,9 @@ public final class PlayerwarpsWiring {
         // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop. localServerId is
         // this backend's network.server-name, the same source the P3 server-id claim used.
         String localServerId = bus.publisher().serverId();
+        CrossServerCharges crossServerCharges = new CrossServerCharges(economy, notifier, kernel.log());
         CrossServerParts crossServer = buildCrossServer(
-                ctx, plugin, kernel, persistence, repository, teleporter, notifier, economy, localServerId);
+                ctx, plugin, kernel, persistence, repository, teleporter, notifier, crossServerCharges, localServerId);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -224,6 +226,7 @@ public final class PlayerwarpsWiring {
                 economy,
                 localServerId,
                 crossServer.seam(),
+                crossServerCharges,
                 Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
@@ -558,7 +561,7 @@ public final class PlayerwarpsWiring {
             PlayerWarpRepository repository,
             PlayerWarpTeleporter teleporter,
             Notifier notifier,
-            Optional<PlayerWarpEconomy> economy,
+            CrossServerCharges charges,
             String localServerId) {
         if (!ctx.config().getBoolean("cross-server.enabled", false)) {
             return new CrossServerParts(Optional.empty(), Optional.empty());
@@ -571,16 +574,17 @@ public final class PlayerwarpsWiring {
         Duration requestTtl =
                 Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
         CrossServerWatchdog watchdog =
-                new CrossServerWatchdog(store, repository, economy, notifier, kernel.scheduler(), requestTtl);
+                new CrossServerWatchdog(store, repository, charges, kernel.scheduler(), requestTtl);
         CrossServerTeleport seam = new BukkitCrossServerTeleport(
-                connector, watchdog, kernel.scheduler(), economy, notifier, localServerId, clock);
+                connector, watchdog, charges, kernel.scheduler(), notifier, kernel.log(), localServerId, clock);
         CrossServerArrival arrival = new CrossServerArrival(
                 store,
                 repository,
                 teleporter,
-                economy,
+                charges,
                 notifier,
                 kernel.scheduler(),
+                kernel.log(),
                 localServerId,
                 arrivalDelay,
                 requestTtl,

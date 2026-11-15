@@ -60,6 +60,17 @@ class JooqPendingTeleportStoreTest {
     }
 
     @Test
+    void theRowReadBackClearsTheRequestItWasRecordedFrom() {
+        store.record(request(ASKED));
+
+        PendingTeleport found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.requestedAt()).isEqualTo(Instant.ofEpochMilli(ASKED.toEpochMilli()));
+        assertThat(store.clear(found)).isEqualTo(1);
+        assertThat(store.find(ALEX)).isEmpty();
+    }
+
+    @Test
     void aClearForAnOlderRequestLeavesTheNewerOneInPlace() {
         store.record(request(ASKED));
         PendingTeleport newer = request(ASKED.plusSeconds(5));
