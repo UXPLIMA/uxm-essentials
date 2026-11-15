@@ -222,7 +222,10 @@ commands a permission plugin that shares its storage.
 
 Vault contents are shared and each save tells the other servers to reload that vault. One window per vault is
 enforced on each server only: the owner on one server and a staff member auditing the same vault on another can both
-open it, and the window closed last is what is saved.
+open it. The first window to close is saved. The later one is not written over it: the log shows
+`event=vault_write_conflict` and `event=vault_items_unwritten` with that window's items, which stay in that server's
+memory (a reopen there takes them over) and are lost when it stops. Compare them with the vault and give back what is
+missing by hand.
 
 ### Holograms, NPCs and spawns
 
