@@ -64,10 +64,7 @@ public final class ProxyCommandControl {
         if (!config.enabled()) {
             return;
         }
-        ProxyCatalog catalog = loadCatalog(logger, dataDirectory);
-        if (catalog == null) {
-            return;
-        }
+        ProxyCatalog catalog = ProxyCatalog.load(dataDirectory, logger::warn);
         proxy.getEventManager().register(plugin, buildListener(config, store, catalog, proxy, logger));
         warnIfChannelHideConfigured(config, logger);
         logger.info(
@@ -86,23 +83,13 @@ public final class ProxyCommandControl {
         }
     }
 
-    /** Read the proxy's message files, writing out any that are missing; a file that does not parse is logged. */
-    private static @Nullable ProxyCatalog loadCatalog(Logger logger, Path dataDirectory) {
-        try {
-            return ProxyCatalog.load(dataDirectory);
-        } catch (RuntimeException | org.spongepowered.configurate.ConfigurateException failure) {
-            logger.error("failed to load the proxy message files; command-control stays off", failure);
-            return null;
-        }
-    }
-
     private static CommandControlListener buildListener(
             CommandControlConfig config, ConfigStore store, ProxyCatalog catalog, ProxyServer proxy, Logger logger) {
         RuleSet rules = config.toRuleSet(BYPASS);
         HidePolicy hide = config.toHidePolicy(VIEW);
         CommandRateLimiter limiter = config.toRateLimiter();
         ProxyGroupSource groups = ProxyGroupSources.create(proxy, logger);
-        ProxyCommandMessages messages = ProxyCommandMessages.from(store, catalog);
+        ProxyCommandMessages messages = ProxyCommandMessages.from(store, catalog, logger::info);
         ProxyCommandTreeFilter filter =
                 new ProxyCommandTreeFilter(rules, hide, config.tabCompletionEnabled(), config.blockNamespaceBypass());
         return new CommandControlListener(

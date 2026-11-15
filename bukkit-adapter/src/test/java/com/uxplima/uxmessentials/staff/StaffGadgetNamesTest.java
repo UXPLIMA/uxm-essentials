@@ -2,7 +2,9 @@ package com.uxplima.uxmessentials.staff;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -14,9 +16,13 @@ import org.junit.jupiter.api.Test;
 /** A gadget's name reads from the catalogue unless an operator renamed it. */
 class StaffGadgetNamesTest {
 
-    private static final Logger QUIET = new Logger() {
+    private final List<String> notices = new ArrayList<>();
+
+    private final Logger log = new Logger() {
         @Override
-        public void info(String message, Object... args) {}
+        public void info(String message, Object... args) {
+            notices.add(message);
+        }
 
         @Override
         public void warn(String message, Object... args) {}
@@ -42,6 +48,7 @@ class StaffGadgetNamesTest {
 
         assertThat(nameOf(StaffGadget.VANISH, config)).isEqualTo("@staff.gadget.vanish");
         assertThat(nameOf(StaffGadget.FOLLOW, config)).isEqualTo("@staff.gadget.follow");
+        assertThat(notices).hasSize(2);
     }
 
     @Test
@@ -49,10 +56,11 @@ class StaffGadgetNamesTest {
         Written config = new Written().set("gadgets.freeze.name", "<aqua>Ice Wand");
 
         assertThat(nameOf(StaffGadget.FREEZE, config)).isEqualTo("<aqua>Ice Wand");
+        assertThat(notices).isEmpty();
     }
 
-    private static String nameOf(StaffGadget gadget, ConfigStore config) {
-        return new StaffSettings(config, QUIET)
+    private String nameOf(StaffGadget gadget, ConfigStore config) {
+        return new StaffSettings(config, log)
                 .gadgets().stream()
                         .filter(spec -> spec.gadget() == gadget)
                         .findFirst()

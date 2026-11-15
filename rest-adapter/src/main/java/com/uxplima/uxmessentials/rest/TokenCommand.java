@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 import org.bukkit.command.CommandSender;
 
@@ -38,7 +39,7 @@ import com.uxplima.uxmessentials.rest.auth.TokenStore;
  *
  * <p>The replies are lines of the host's message catalogue, asked for through the developer API. The add-on cannot
  * read the catalogue itself, and shipping a second set of language files for one operator command would leave an
- * operator translating the same plugin in two places.
+ * operator translating the same plugin in two places. A host too old to answer gets the English lines instead.
  */
 public final class TokenCommand {
 
@@ -68,16 +69,20 @@ public final class TokenCommand {
     private final Supplier<Listening> status;
     private final UxmEssentialsApi api;
     private final String configPath;
+    private final Replies replies;
 
     /**
      * @param api the host's developer API, which reads the replies in the sender's language
      * @param configPath where the add-on's config lives, named in the reply when it is not listening
+     * @param log where the switch to English replies on an older host is reported
      */
-    public TokenCommand(TokenStore tokens, Supplier<Listening> status, UxmEssentialsApi api, String configPath) {
+    public TokenCommand(
+            TokenStore tokens, Supplier<Listening> status, UxmEssentialsApi api, String configPath, Logger log) {
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.status = Objects.requireNonNull(status, "status");
         this.api = Objects.requireNonNull(api, "api");
         this.configPath = Objects.requireNonNull(configPath, "configPath");
+        this.replies = new Replies(log);
     }
 
     /** The command tree, ready to register. */
@@ -175,7 +180,7 @@ public final class TokenCommand {
     }
 
     private void reply(CommandSender sender, String key, Map<String, String> placeholders) {
-        sender.sendMessage(api.message(sender, key, placeholders));
+        sender.sendMessage(replies.line((line, values) -> api.message(sender, line, values), key, placeholders));
     }
 
     private static List<String> sorted(Set<String> scopes) {

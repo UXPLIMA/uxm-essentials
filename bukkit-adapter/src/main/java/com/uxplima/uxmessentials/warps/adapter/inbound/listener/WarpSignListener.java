@@ -90,11 +90,7 @@ public final class WarpSignListener implements Listener {
             return;
         }
 
-        // The colour marks an active warp sign. Only the colour comes from the catalogue: the header's words stay the
-        // configured ones, because a sign is matched by its plain text.
-        event.line(
-                0,
-                feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", StyledText.escape(header))));
+        event.line(0, activeHeader(player, header));
         feedback.send(player, WarpsMessageKey.WARP_SIGN_CREATED);
     }
 
@@ -138,6 +134,16 @@ public final class WarpSignListener implements Listener {
         // Execute teleport
         useWarp.use(ref, WarpName.of(warpName));
         event.setCancelled(true);
+    }
+
+    /**
+     * The header drawn on an active warp sign. Only the colour comes from the catalogue: a sign is matched by its plain
+     * text, so a line that would add or change a word (a translator's extra word) is passed over for the bare header.
+     */
+    private Component activeHeader(Player player, String header) {
+        Component drawn =
+                feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", StyledText.escape(header)));
+        return plain(drawn).equals(header) ? drawn : Component.text(header);
     }
 
     private static String plain(@org.jspecify.annotations.Nullable Component line) {

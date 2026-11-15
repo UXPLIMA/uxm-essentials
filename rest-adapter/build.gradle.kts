@@ -14,6 +14,8 @@ dependencies {
     compileOnly(project(":api"))
     compileOnly(libs.gson)
     compileOnly(uxm.configurate.hocon)
+    // The server supplies Adventure at run time; the tests render the English fallback replies without one.
+    testImplementation(libs.bundles.adventure)
 }
 
 tasks.shadowJar {

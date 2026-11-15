@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
@@ -23,9 +24,10 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  * two staff variants let a different line (or nothing, when left blank) go to viewers who <em>can</em> see them. A
  * template that is an {@code @key} reference is read from the message catalogue in each viewer's language, which is
  * what the shipped {@code @vanish.fake-quit} and {@code @vanish.fake-join} do; any other template is operator
- * MiniMessage sent as written. Either way {@code {player}} is substituted. {@code action-bar} drives the persistent
- * "you are vanished" indicator (its text is the {@code vanish.actionbar} catalog key), and {@code join-vanished} lets a
- * player who holds {@code uxmessentials.vanish.persist} rejoin already hidden.
+ * MiniMessage sent as written. Either way {@code <display_name>} is the player's name as the game draws it and
+ * {@code {player}} the bare name. {@code action-bar} drives the persistent "you are vanished" indicator (its text is
+ * the {@code vanish.actionbar} catalog key), and {@code join-vanished} lets a player who holds
+ * {@code uxmessentials.vanish.persist} rejoin already hidden.
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param silentChests suppress the open animation/sound when a vanished player opens a chest, shulker box, ender
@@ -108,9 +110,21 @@ public record VanishConfig(
         Objects.requireNonNull(loadTimeout, "loadTimeout");
     }
 
-    /** Resolve the vanish config from the module's scoped {@link ConfigStore} ({@code modules.vanish}). */
-    public static VanishConfig from(ConfigStore config) {
+    /**
+     * Resolve the vanish config from the module's scoped {@link ConfigStore} ({@code modules.vanish}). A fake line
+     * still holding the English an earlier version shipped is read as its catalogue line instead, and {@code log} is
+     * told so once, since the operator sees different words from that point on.
+     */
+    public static VanishConfig from(ConfigStore config, Logger log) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
+        String quit = config.getString("fake-quit-message", DEFAULT_FAKE_QUIT);
+        String join = config.getString("fake-join-message", DEFAULT_FAKE_JOIN);
+        if (quit.equals(SHIPPED_FAKE_QUIT) || join.equals(SHIPPED_FAKE_JOIN)) {
+            log.info("modules/vanish/config.conf still holds the shipped English fake join or quit line; reading"
+                    + " @vanish.fake-quit and @vanish.fake-join from the message files instead, in each viewer's"
+                    + " language. Write your own line there to keep one of your own.");
+        }
         return new VanishConfig(
                 config.getBoolean("enabled", true),
                 config.getBoolean("silent-chests", true),
@@ -123,8 +137,8 @@ public record VanishConfig(
                 config.getBoolean("fake-join-quit", true),
                 config.getBoolean("action-bar", true),
                 config.getBoolean("join-vanished", true),
-                current(config.getString("fake-quit-message", DEFAULT_FAKE_QUIT), SHIPPED_FAKE_QUIT, DEFAULT_FAKE_QUIT),
-                current(config.getString("fake-join-message", DEFAULT_FAKE_JOIN), SHIPPED_FAKE_JOIN, DEFAULT_FAKE_JOIN),
+                current(quit, SHIPPED_FAKE_QUIT, DEFAULT_FAKE_QUIT),
+                current(join, SHIPPED_FAKE_JOIN, DEFAULT_FAKE_JOIN),
                 config.getString("fake-quit-message-staff", ""),
                 config.getString("fake-join-message-staff", ""),
                 config.getBoolean("cross-server", false),

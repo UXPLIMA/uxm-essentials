@@ -1,10 +1,14 @@
 package com.uxplima.uxmessentials.velocity.commandcontrol;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
+import java.util.function.Consumer;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
@@ -14,6 +18,7 @@ import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
 import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.display.ShippedColours;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -50,28 +55,24 @@ public record ProxyCommandMessages(
     static final String SPAM_BLOCKED = "@proxy.command.spam-blocked";
     static final String SPAM_WARN = "@proxy.command.spam-warn";
 
-    // The English lines earlier versions shipped, in the config file and as the fallback here. A value still holding
-    // one was never edited, so it reads the catalogue line that replaced it rather than English for everybody.
-    private static final Map<String, Set<String>> SHIPPED = Map.of(
-            UNKNOWN_COMMAND,
-                    Set.of("<red>Unknown command.", "<red>Unknown command. Type /help for a list of commands."),
-            NO_PERMISSION, Set.of("<red>You do not have permission to use that command."),
-            PLUGIN_HIDDEN, Set.of("<red>Unknown command.", "<red>Unknown command. Type /help for a list of commands."),
-            SPAM_KICK, Set.of("<red>You are sending commands too quickly."),
-            SPAM_BLOCKED, Set.of("<red>You are sending commands too quickly. Please slow down."),
-            SPAM_WARN, Set.of("<yellow>You are sending commands quickly, please slow down."));
+    // The English lines earlier versions wrote into config.conf. A value still holding one was never edited, so it
+    // reads the catalogue line that replaced it rather than English for everybody.
+    private static final Map<String, String> SHIPPED = Map.of(
+            UNKNOWN_COMMAND, "<red>Unknown command. Type /help for a list of commands.",
+            NO_PERMISSION, "<red>You do not have permission to use that command.",
+            PLUGIN_HIDDEN, "<red>Unknown command. Type /help for a list of commands.",
+            SPAM_KICK, "<red>You are sending commands too quickly.",
+            SPAM_BLOCKED, "<red>You are sending commands too quickly. Please slow down.",
+            SPAM_WARN, "<yellow>You are sending commands quickly, please slow down.");
 
-    // The backend's shipped role colours. The proxy runs on its own machine and cannot read the backend's theme file,
-    // so a line written for both reads the same by default.
-    private static final TagResolver ROLES = TagResolver.resolver(
-            role("accent", 0x38b6ff),
-            role("value", 0x8fd9ff),
-            role("body", 0xffffff),
-            role("muted", 0x93a4b3),
-            role("dim", 0x6b7886),
-            role("good", 0x5be38c),
-            role("bad", 0xff6b6b),
-            role("warn", 0xffc93c));
+    /** A {@code {token}} in a catalogue line, filled in one pass so one value cannot rewrite another. */
+    private static final Pattern ARGUMENT = Pattern.compile("\\{([A-Za-z0-9_.-]+)\\}");
+
+    // The theme's role tags in the colours the backend ships, from the one table both read.
+    private static final TagResolver ROLES = TagResolver.resolver(ShippedColours.roles().entrySet().stream()
+            .map(role -> Placeholder.styling(
+                    role.getKey(), Objects.requireNonNull(TextColor.fromHexString(role.getValue()))))
+            .toList());
 
     public ProxyCommandMessages {
         Objects.requireNonNull(unknownCommand, "unknownCommand");
@@ -83,17 +84,29 @@ public record ProxyCommandMessages(
         Objects.requireNonNull(catalog, "catalog");
     }
 
-    /** Read the {@code messages} block from {@code config}, each key falling back to its catalogue reference. */
-    public static ProxyCommandMessages from(ConfigStore config, ProxyCatalog catalog) {
+    /**
+     * Read the {@code messages} block from {@code config}, each key falling back to its catalogue reference. A value
+     * still holding the English an earlier version wrote reads its catalogue line instead, and {@code notice} is told
+     * so once, since the operator sees different words from that point on.
+     */
+    public static ProxyCommandMessages from(ConfigStore config, ProxyCatalog catalog, Consumer<String> notice) {
         Objects.requireNonNull(config, "config");
-        return new ProxyCommandMessages(
-                read(config, "messages.unknown-command", UNKNOWN_COMMAND),
-                read(config, "messages.no-permission", NO_PERMISSION),
-                read(config, "messages.plugin-hidden", PLUGIN_HIDDEN),
-                read(config, "messages.spam-kick", SPAM_KICK),
-                read(config, "messages.spam-blocked", SPAM_BLOCKED),
-                read(config, "messages.spam-warn", SPAM_WARN),
+        Objects.requireNonNull(notice, "notice");
+        List<String> retired = new ArrayList<>();
+        ProxyCommandMessages messages = new ProxyCommandMessages(
+                read(config, "messages.unknown-command", UNKNOWN_COMMAND, retired),
+                read(config, "messages.no-permission", NO_PERMISSION, retired),
+                read(config, "messages.plugin-hidden", PLUGIN_HIDDEN, retired),
+                read(config, "messages.spam-kick", SPAM_KICK, retired),
+                read(config, "messages.spam-blocked", SPAM_BLOCKED, retired),
+                read(config, "messages.spam-warn", SPAM_WARN, retired),
                 catalog);
+        if (!retired.isEmpty()) {
+            notice.accept("config.conf still holds the shipped English command-control lines " + retired
+                    + "; reading them from messages/messages_<lang>.conf instead, in each player's language. Write your"
+                    + " own line there to keep one of your own.");
+        }
+        return messages;
     }
 
     /** The deny line to show on a blocked command, per {@code use-unknown-command-message}. */
@@ -130,19 +143,16 @@ public record ProxyCommandMessages(
     }
 
     private static String fill(String template, Map<String, String> arguments) {
-        String filled = template;
-        for (Map.Entry<String, String> argument : arguments.entrySet()) {
-            filled = filled.replace("{" + argument.getKey() + "}", argument.getValue());
-        }
-        return filled;
+        return ARGUMENT.matcher(template)
+                .replaceAll(token -> Matcher.quoteReplacement(arguments.getOrDefault(token.group(1), token.group())));
     }
 
-    private static String read(ConfigStore config, String path, String shipped) {
+    private static String read(ConfigStore config, String path, String shipped, List<String> retired) {
         String value = config.getString(path, shipped);
-        return SHIPPED.getOrDefault(shipped, Set.of()).contains(value) ? shipped : value;
-    }
-
-    private static TagResolver role(String name, int rgb) {
-        return Placeholder.styling(name, TextColor.color(rgb));
+        if (value.equals(SHIPPED.get(shipped))) {
+            retired.add(path);
+            return shipped;
+        }
+        return value;
     }
 }

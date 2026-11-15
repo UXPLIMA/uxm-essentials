@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -336,7 +337,13 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         for (LeaderboardEntry entry : entries) {
             rows.add(catalogLine(
                     HologramsMessageKey.HOLOGRAM_LEADERBOARD_ROW,
-                    Map.of("rank", String.valueOf(rank), "name", entry.name(), "score", entry.score())));
+                    Map.of(
+                            "rank",
+                            String.valueOf(rank),
+                            "name",
+                            StyledText.escape(entry.name()),
+                            "score",
+                            StyledText.escape(entry.score()))));
             rank++;
         }
         return rows;

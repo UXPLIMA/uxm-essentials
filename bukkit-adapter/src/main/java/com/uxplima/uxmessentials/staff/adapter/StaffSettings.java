@@ -53,6 +53,12 @@ public final class StaffSettings {
             "<accent>Freeze</accent>",
             "<accent>Navigator</accent>",
             "<accent>Follow</accent>");
+    private static final List<String> GADGET_NODES = List.of(
+            "gadgets.vanish.name",
+            "gadgets.examine.name",
+            "gadgets.freeze.name",
+            "gadgets.compass.name",
+            "gadgets.follow.name");
     private static final String DEFAULT_STAFF_CHAT_NODE = EnforcementPermissions.STAFF_CHAT;
 
     private final boolean vanishOnEnter;
@@ -115,6 +121,11 @@ public final class StaffSettings {
                 .ifPresent(specs::add);
         parseGadget(config, log, StaffGadget.FOLLOW, "follow", 4, DEFAULT_FOLLOW_MATERIAL, DEFAULT_FOLLOW_NAME)
                 .ifPresent(specs::add);
+        if (GADGET_NODES.stream().anyMatch(node -> SHIPPED_NAMES.contains(config.getString(node, "")))) {
+            log.info("modules/staff/config.conf still holds the shipped English gadget names; reading the"
+                    + " @staff.gadget.* lines from the message files instead, in each staff member's language. Write"
+                    + " your own name there to keep one of your own.");
+        }
         return specs;
     }
 

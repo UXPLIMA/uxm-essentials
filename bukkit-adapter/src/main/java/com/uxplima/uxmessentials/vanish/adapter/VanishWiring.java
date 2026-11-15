@@ -101,7 +101,7 @@ public final class VanishWiring {
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(presence, "presence");
         KernelPorts kernel = ctx.kernel();
-        VanishConfig config = VanishConfig.from(ctx.config());
+        VanishConfig config = VanishConfig.from(ctx.config(), kernel.log());
 
         InMemoryVanishStore store = new InMemoryVanishStore();
         BukkitVanishLevelResolver levels = new BukkitVanishLevelResolver();
@@ -148,8 +148,7 @@ public final class VanishWiring {
         VanishLoginListener login =
                 new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());
         Function<UUID, Optional<String>> networkName = network::nameOf;
-        VanishConnectionMessenger messenger =
-                new VanishConnectionMessenger(kernel.scheduler(), kernel.messageSink(), levels, config);
+        VanishConnectionMessenger messenger = new VanishConnectionMessenger(kernel.scheduler(), levels, config);
         VanishActionBar actionBar =
                 new VanishActionBar(plugin.getServer(), kernel.scheduler(), kernel.messages(), store, config);
 
