@@ -136,7 +136,7 @@ public final class MigrationWiring {
         WorldNameResolver worlds = new BukkitWorldNameResolver(plugin.getServer());
         Currency defaultCurrency = new EconomyConfig(economyConfig).currencies().defaultCurrency();
         List<Convert> built = new ArrayList<>();
-        built.add(new EssentialsXConvert(worlds));
+        built.add(new EssentialsXConvert(worlds, log));
         built.add(new LiveBalanceConvert(
                 SourceId.of("vault"),
                 "Vault",

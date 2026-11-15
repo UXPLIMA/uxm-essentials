@@ -15,6 +15,14 @@ homes:
     z: 3.0
     yaw: 0.0
     pitch: 0.0
+  mine:
+    world: 00000000-0000-0000-0000-00000000a001
+    world-name: world
+    x: -50.0
+    y: 12.0
+    z: 75.5
+    yaw: 45.0
+    pitch: 0.0
   broken:
     x: 5.0
     y: 6.0

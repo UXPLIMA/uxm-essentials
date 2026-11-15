@@ -15,12 +15,14 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.migration.Fixtures;
 import com.uxplima.uxmessentials.migration.ImportRecord;
+import com.uxplima.uxmessentials.migration.RecordingLogger;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -39,37 +41,48 @@ import org.junit.jupiter.api.io.TempDir;
  */
 class EssentialsXImportTest {
 
-    private static final UUID NOTCH = UUID.fromString("3c9d2e41-7a6b-4c5d-8e9f-0a1b2c3d4e5f");
+    private static final UUID BRAMBLEWICK = UUID.fromString("3c9d2e41-7a6b-4c5d-8e9f-0a1b2c3d4e5f");
     private static final Issuer ESSENTIALSX = Issuer.console("EssentialsX");
 
-    private final EssentialsXConvert source = new EssentialsXConvert(Fixtures.ONLY_WORLD);
+    private final RecordingLogger log = new RecordingLogger();
+    private final EssentialsXConvert source = new EssentialsXConvert(Fixtures.ONLY_WORLD, log);
     private final List<ImportRecord> records = Fixtures.records(source, Fixtures.path("/essentialsx"));
 
     @Test
     void everyReadablePlayerFileBecomesOneUserAndTheUnreadableOnesAreLeftOut() {
-        assertThat(users()).extracting(user -> user.owner().uuid()).containsExactlyInAnyOrder(STEVE, ALEX, NOTCH);
+        assertThat(users()).extracting(user -> user.owner().uuid()).containsExactlyInAnyOrder(STEVE, ALEX, BRAMBLEWICK);
     }
 
     @Test
     void aHomeInAWorldTheServerDoesNotKnowIsDroppedAndTheRestKeepTheirPlaceAndLabel() {
-        assertThat(user(ALEX).homes()).singleElement().satisfies(home -> {
-            assertThat(home.label()).contains(HomeLabel.of("farm"));
-            assertThat(home.location()).isEqualTo(new Position(WORLD, 100, 70, 100, 0f, 0f));
-            assertThat(home.slot().index()).isZero();
-        });
+        assertThat(user(ALEX).homes())
+                .extracting(
+                        home -> home.label().orElseThrow(), home -> home.slot().index(), Home::location)
+                .containsExactly(
+                        tuple(HomeLabel.of("farm"), 0, new Position(WORLD, 100, 70, 100, 0f, 0f)),
+                        tuple(HomeLabel.of("mine"), 1, new Position(WORLD, -50, 12, 75.5, 45f, 0f)));
+    }
+
+    @Test
+    void aModernFileWithTheWorldUuidUnderWorldIsPlacedByTheNameUnderWorldName() {
+        assertThat(user(ALEX).homes())
+                .filteredOn(home -> home.label().equals(Optional.of(HomeLabel.of("mine"))))
+                .extracting(Home::location)
+                .containsExactly(new Position(WORLD, -50, 12, 75.5, 45f, 0f));
+        assertThat(warp("gate").location()).isEqualTo(new Position(WORLD, 200, 70, -200, 270f, 0f));
     }
 
     @Test
     void aBalanceIsCarriedExactlyAndOneThatIsNotANumberIsLeftOutWithoutLosingThePlayer() {
         assertThat(user(STEVE).balance()).contains(new BigDecimal("1250.5"));
-        assertThat(user(NOTCH).balance()).contains(new BigDecimal("-25.00"));
+        assertThat(user(BRAMBLEWICK).balance()).contains(new BigDecimal("-25.00"));
         assertThat(user(ALEX).balance()).isEmpty();
         assertThat(user(ALEX).homes()).isNotEmpty();
     }
 
     @Test
     void aPlayerWithNoLastAccountNameIsNamedByTheirNickname() {
-        assertThat(user(NOTCH).owner()).isEqualTo(new PlayerRef(NOTCH, "Notch"));
+        assertThat(user(BRAMBLEWICK).owner()).isEqualTo(new PlayerRef(BRAMBLEWICK, "Bramblewick"));
     }
 
     @Test
@@ -88,21 +101,21 @@ class EssentialsXImportTest {
 
     @Test
     void anOldMuteTimeoutStillReadsAndAJailWithNoJailNameIsLeftOut() {
-        ImportedModeration notch = moderation(NOTCH);
+        ImportedModeration bramblewick = moderation(BRAMBLEWICK);
 
-        assertThat(notch.hasMute()).isTrue();
-        assertThat(notch.hasJail()).isFalse();
-        assertThat(notch.profile().mute())
+        assertThat(bramblewick.hasMute()).isTrue();
+        assertThat(bramblewick.hasJail()).isFalse();
+        assertThat(bramblewick.profile().mute())
                 .isEqualTo(MuteState.timed(
                         Instant.ofEpochMilli(1_950_000_000_000L), ESSENTIALSX, Optional.empty(), Instant.EPOCH));
-        assertThat(notch.profile().jail()).isEqualTo(JailState.none());
+        assertThat(bramblewick.profile().jail()).isEqualTo(JailState.none());
     }
 
     @Test
     void aPlayerWithoutSanctionsBringsNoModerationRecord() {
         assertThat(only(records, ImportRecord.ModerationRecord.class))
                 .extracting(rec -> rec.moderation().profile().target().uuid())
-                .containsExactlyInAnyOrder(ALEX, NOTCH);
+                .containsExactlyInAnyOrder(ALEX, BRAMBLEWICK);
     }
 
     @Test
@@ -112,7 +125,19 @@ class EssentialsXImportTest {
                 .extracting(Warp::name, Warp::location)
                 .containsExactlyInAnyOrder(
                         tuple(WarpName.of("spawn"), new Position(WORLD, 0.5, 65, 0.5, 180f, 10f)),
-                        tuple(WarpName.of("market"), new Position(WORLD, 40, 64, -12, 0f, 0f)));
+                        tuple(WarpName.of("market"), new Position(WORLD, 40, 64, -12, 0f, 0f)),
+                        tuple(WarpName.of("gate"), new Position(WORLD, 200, 70, -200, 270f, 0f)));
+    }
+
+    @Test
+    void everyFileWarpAndKitTheImportLeavesOutIsNamedToTheOperator() {
+        assertThat(log.warnings())
+                .anySatisfy(line -> assertThat(line).contains("userdata", "0f0e0d0c-0b0a-4908-8706-050403020100.yml"))
+                .anySatisfy(line -> assertThat(line).contains("userdata", "notes.yml"))
+                .anySatisfy(line -> assertThat(line).contains("warp", "lost", "old_world"))
+                .anySatisfy(line -> assertThat(line).contains("warp file", "nowhere.yml", "no world"))
+                .anySatisfy(line -> assertThat(line)
+                        .contains("kit", "thisisakitnamethatislongerthanthesixtyfourcharactersakitidmayholdx"));
     }
 
     @Test
@@ -167,6 +192,14 @@ class EssentialsXImportTest {
         return only(records, ImportRecord.ModerationRecord.class).stream()
                 .map(ImportRecord.ModerationRecord::moderation)
                 .filter(mod -> mod.profile().target().uuid().equals(uuid))
+                .findFirst()
+                .orElseThrow();
+    }
+
+    private Warp warp(String name) {
+        return only(records, ImportRecord.WarpRecord.class).stream()
+                .map(rec -> rec.warp().warp())
+                .filter(warp -> warp.name().equals(WarpName.of(name)))
                 .findFirst()
                 .orElseThrow();
     }

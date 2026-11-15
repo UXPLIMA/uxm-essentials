@@ -3,10 +3,15 @@ package com.uxplima.uxmessentials.migration.convert.olzie;
 import static com.uxplima.uxmessentials.migration.Fixtures.WORLD;
 import static com.uxplima.uxmessentials.migration.Fixtures.only;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
+import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +21,7 @@ import com.uxplima.uxmessentials.migration.FixtureDatabases;
 import com.uxplima.uxmessentials.migration.Fixtures;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordingLogger;
+import com.uxplima.uxmessentials.migration.convert.jdbc.JdbcConnection;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
@@ -48,11 +54,14 @@ class OlziePlayerWarpsImportTest {
     }
 
     private List<ImportedPlayerWarp> runImport() {
-        OlziePlayerWarpsConvert source = new OlziePlayerWarpsConvert(
-                new OlziePlayerWarpsConfig(Optional.empty(), "", "", Optional.of(plugins)), Fixtures.ONLY_WORLD, log);
+        OlziePlayerWarpsConvert source = new OlziePlayerWarpsConvert(config(), Fixtures.ONLY_WORLD, log);
         return only(Fixtures.records(source, plugins), ImportRecord.PlayerWarpRecord.class).stream()
                 .map(ImportRecord.PlayerWarpRecord::warp)
                 .toList();
+    }
+
+    private OlziePlayerWarpsConfig config() {
+        return new OlziePlayerWarpsConfig(Optional.empty(), "", "", Optional.of(plugins));
     }
 
     private ImportedPlayerWarp warp(String name) {
@@ -122,11 +131,17 @@ class OlziePlayerWarpsImportTest {
     }
 
     @Test
-    void theOperatorsDatabaseIsOpenedReadOnlyAndLeftAsItWas() throws Exception {
+    void theConnectionTheImportOpensRefusesEveryWriteSoTheOperatorsFileIsLeftAsItWas() throws Exception {
         byte[] before = Files.readAllBytes(database);
+        JdbcConnection connection = config().connection().orElseThrow();
 
         List<ImportedPlayerWarp> again = runImport();
 
+        try (Connection opened = DriverManager.getConnection(connection.url());
+                Statement statement = opened.createStatement()) {
+            assertThatThrownBy(() -> statement.execute("DELETE FROM playerwarps_warps"))
+                    .isInstanceOf(SQLException.class);
+        }
         assertThat(again).hasSameSizeAs(warps);
         assertThat(Files.readAllBytes(database)).isEqualTo(before);
         assertThat(log.warnings()).isEmpty();

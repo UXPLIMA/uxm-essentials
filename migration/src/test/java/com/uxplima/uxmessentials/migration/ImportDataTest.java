@@ -39,7 +39,7 @@ class ImportDataTest {
                 return "backup-1";
             },
             new RecordingLogger());
-    private final EssentialsXConvert essentialsx = new EssentialsXConvert(Fixtures.ONLY_WORLD);
+    private final EssentialsXConvert essentialsx = new EssentialsXConvert(Fixtures.ONLY_WORLD, new RecordingLogger());
 
     @Test
     void aDryRunTakesNoBackupWritesNothingAndCountsWhatALiveRunWould() {
@@ -107,20 +107,20 @@ class ImportDataTest {
             return RecordResult.of(RecordOutcome.WRITTEN);
         });
 
-        assertThat(summary.failed()).isEqualTo(2);
-        assertThat(written).hasSize((int) summary.total() - 2);
-        assertThat(audit.records).filteredOn(line -> line.endsWith("failed")).hasSize(2);
+        assertThat(summary.failed()).isEqualTo(summary.warps());
+        assertThat(written).hasSize((int) (summary.total() - summary.warps()));
+        assertThat(audit.records).filteredOn(line -> line.endsWith("failed")).hasSize((int) summary.warps());
     }
 
-    /** Three readable players (two with sanctions), two warps in a known world and three importable kits. */
+    /** Three readable players (two with sanctions), three warps in a known world and three importable kits. */
     private static void assertSummaryOfTheFixture(ImportSummary summary) {
         assertThat(summary.source()).isEqualTo(SourceId.of("essentialsx"));
         assertThat(summary.users()).isEqualTo(3);
         assertThat(summary.mutes()).isEqualTo(2);
         assertThat(summary.jails()).isEqualTo(1);
-        assertThat(summary.warps()).isEqualTo(2);
+        assertThat(summary.warps()).isEqualTo(3);
         assertThat(summary.kits()).isEqualTo(3);
-        assertThat(summary.total()).isEqualTo(10);
+        assertThat(summary.total()).isEqualTo(11);
     }
 
     private static final class RecordingAudit implements MigrationAudit {
