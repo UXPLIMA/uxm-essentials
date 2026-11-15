@@ -28,9 +28,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /rankup}: advance the invoking player one rung up the ladder. The handler resolves nothing but the
- * player's own identity and hands it to {@link Rankup}, which owns the requirement / cost / action pipeline and
- * returns a typed {@link RankupResult}; this class only maps that outcome to the matching catalog line, the
- * success line carrying the new rank's display name as its {@code {rank}} placeholder. Gated on
+ * player's own identity and hands it to {@link Rankup}, which owns the requirement / cost / action pipeline, saves
+ * on the async lane and answers with a typed {@link RankupResult} on the player's thread; this class only maps that
+ * outcome to the matching catalog line, the success line carrying the new rank's display name as its {@code {rank}}
+ * placeholder. Gated on
  * {@code uxmessentials.ranks.rankup}, which ships {@code true} so every player may try to progress.
  */
 @NullMarked
@@ -67,7 +68,12 @@ public final class RankupCommand implements CommandRegistration {
             return 0;
         }
         PlayerRef who = BukkitRefs.toRef(player);
-        render(player, rankup.rankUp(who));
+        var unused = rankup.rankUp(who).thenAccept(result -> {
+            // A player who left mid-save is answered off their thread; there is nobody to tell.
+            if (player.isOnline()) {
+                render(player, result);
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -78,6 +84,8 @@ public final class RankupCommand implements CommandRegistration {
             case ALREADY_MAX -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_MAX);
             case REQUIREMENTS_NOT_MET -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_REQUIREMENTS);
             case CANNOT_AFFORD -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_COST);
+            case BUSY -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_BUSY);
+            case FAILED -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_FAILED);
         }
     }
 

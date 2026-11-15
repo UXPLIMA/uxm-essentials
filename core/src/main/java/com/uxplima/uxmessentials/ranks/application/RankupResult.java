@@ -6,7 +6,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 
 /**
- * The typed outcome of a {@link Rankup} attempt: which of the four terminal states it reached and, on a
+ * The typed outcome of a {@link Rankup} attempt: which of its terminal states it reached and, on a
  * successful advance, the {@link Rank} the player moved up to. Modelling the outcome as a value the command
  * boundary renders, rather than sending a message from the use case, keeps the decision logic pure and free
  * of any {@code Messages} dependency, mirroring how the poses context returns an outcome the command maps to a
@@ -30,7 +30,16 @@ public record RankupResult(Status status, Optional<Rank> newRank) {
         REQUIREMENTS_NOT_MET,
 
         /** The next rank's cost could not be charged; nothing was charged and the pointer did not move. */
-        CANNOT_AFFORD
+        CANNOT_AFFORD,
+
+        /**
+         * The player's pointer is not loaded yet, or another rankup for them is still saving; nothing happened and
+         * trying again a moment later will work.
+         */
+        BUSY,
+
+        /** Storage failed while charging or saving; the pointer did not move and any charge was refunded. */
+        FAILED
     }
 
     public RankupResult {
@@ -59,5 +68,15 @@ public record RankupResult(Status status, Optional<Rank> newRank) {
     /** The next rank's cost could not be paid. */
     public static RankupResult cannotAfford() {
         return new RankupResult(Status.CANNOT_AFFORD, Optional.empty());
+    }
+
+    /** The pointer is still loading or another rankup for the player is in flight. */
+    public static RankupResult busy() {
+        return new RankupResult(Status.BUSY, Optional.empty());
+    }
+
+    /** Storage failed; the pointer did not move and any charge was refunded. */
+    public static RankupResult failed() {
+        return new RankupResult(Status.FAILED, Optional.empty());
     }
 }

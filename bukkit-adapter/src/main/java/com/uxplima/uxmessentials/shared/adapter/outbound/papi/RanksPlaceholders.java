@@ -12,16 +12,18 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * read and the parsed ladder, wired during ranks wiring; when the ranks module is disabled the seam is absent
  * and each placeholder degrades to the dash.
  *
- * <p>The pointer is DB-backed, so a player's standing resolves for an offline requester too: there is no
- * offline guard on these keys. The single {@link #standing(PlayerRef)} read carries the current rank display
+ * <p>The standing is read from the in-memory pointer cache, which holds online players only, so the keys answer the
+ * dash for an offline player and for the moment between a join and the pointer's load. The single {@link
+ * #standing(PlayerRef)} read carries the current rank display
  * name, the next rank's display name (empty at the top of the ladder, which the resolver renders as its
  * max-rank marker), and the prestige level, so one lookup answers all three placeholders.
  */
 public interface RanksPlaceholders {
 
     /**
-     * {@code who}'s resolved standing, or empty only when the ladder holds no ranks (an operator cleared
-     * {@code ranks.conf}), in which case every ranks placeholder degrades to the dash.
+     * {@code who}'s resolved standing, or empty when the ladder holds no ranks (an operator cleared
+     * {@code ranks.conf}) or the player's pointer is not in memory, in which case every ranks placeholder degrades
+     * to the dash.
      */
     Optional<Standing> standing(PlayerRef who);
 

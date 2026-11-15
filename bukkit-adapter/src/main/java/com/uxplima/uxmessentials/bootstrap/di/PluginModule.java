@@ -1546,7 +1546,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("survival"))) {
             wireSurvival(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("ranks"))) {
-            wireRanks(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
+            wireRanks(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
             wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("security"))) {
@@ -1930,6 +1930,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -1944,8 +1945,12 @@ public final class PluginModule {
         Optional<RankEconomy> economy = provider != null && currency != null
                 ? Optional.of(new ProviderRankEconomy(provider, currency, receipts(ctx)))
                 : Optional.empty();
-        RanksWiring.Wired wired = RanksWiring.wire(plugin, ctx, persistence, economy, guiRegistry, menus, menuBindings);
+        RanksWiring.Wired wired =
+                RanksWiring.wire(plugin, ctx, persistence, economy, bus, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
+        // Registered before the online players are loaded, so a quit in between cannot leave a stale entry behind.
+        resources.addListener(wired.cacheListener());
+        wired.cacheListener().loadOnline(plugin.getServer().getOnlinePlayers());
         // The prestige board ranks the stored prestige levels, read whole at each refresh; a prestige moves the
         // player's own score at once rather than at the next read.
         var prestigeLevels = com.uxplima.uxmessentials.persistence.ranks.PlayerRankRepositories.jooq(persistence);
@@ -1965,8 +1970,8 @@ public final class PluginModule {
         });
         // The autorank scan's repeating task is cancelled on module stop so a disable strands no scheduled work.
         resources.onClose(wired.stop());
-        // The rank / next-rank / prestige placeholders read the DB-backed pointer through the CurrentRank use case and
-        // the parsed ladder, so they answer for an offline player too.
+        // The rank / next-rank / prestige placeholders read the cached pointer of online players through the
+        // CurrentRank use case and the parsed ladder, so a scoreboard refresh never reaches the database.
         links.placeholders.ranks(new StoreRanksPlaceholders(wired.currentRank(), wired.ladder()));
         links.queries.register(
                 UxmRanksQuery.class,

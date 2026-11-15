@@ -32,8 +32,9 @@ import org.jspecify.annotations.NullMarked;
  * the shared {@link Permissions} port, a placeholder comparison the shared display-condition model (the same one
  * the scoreboard/tablist filters use) resolved through the PlaceholderAPI bridge, and an item check the live
  * player's inventory. Two kinds the shared systems do not cover are added here: <b>playtime</b> (and
- * <b>playtime-active</b>, which leaves AFK time out) against the DB-backed {@link PlaytimeRepository}, and <b>previous-rank</b> against the player's stored rank resolved by
- * {@link CurrentRank}.
+ * <b>playtime-active</b>, which leaves AFK time out) against the DB-backed {@link PlaytimeRepository}, and
+ * <b>previous-rank</b> against the player's cached rank resolved by
+ * {@link CurrentRank}, which fails closed while the pointer is still loading.
  *
  * <p>Every unresolvable condition fails closed, an offline player for an inventory or placeholder check, a
  * malformed amount, an unknown material, or a money requirement on a server with no economy, so a rankup never
@@ -76,6 +77,19 @@ public final class BukkitRankRequirementEvaluator implements RankRequirementEval
             case PREVIOUS_RANK -> isOnRank(who, requirement.value());
             case PLACEHOLDER -> placeholderPasses(who, requirement.value());
             case ITEM -> hasItem(who, requirement.value());
+        };
+    }
+
+    /**
+     * Playtime is a database summary and a balance read can miss the wallet cache, so both run on the async lane.
+     * The rest answer from the live player or from memory.
+     */
+    @Override
+    public boolean readsStorage(RankRequirement requirement) {
+        Objects.requireNonNull(requirement, "requirement");
+        return switch (requirement.type()) {
+            case MONEY, PLAYTIME, PLAYTIME_ACTIVE -> true;
+            case PERMISSION, PREVIOUS_RANK, PLACEHOLDER, ITEM -> false;
         };
     }
 

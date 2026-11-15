@@ -64,7 +64,7 @@ public final class RanksQueries implements UxmRanksQuery {
     @Override
     public CompletableFuture<Optional<UxmRankStanding>> standingOf(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        return AsyncQueries.supply(scheduler, () -> currentRank.of(playerId).map(this::view));
+        return AsyncQueries.supply(scheduler, () -> currentRank.load(playerId).map(this::view));
     }
 
     @Override
@@ -74,28 +74,34 @@ public final class RanksQueries implements UxmRanksQuery {
             return CompletableFuture.completedFuture(false);
         }
         PlayerRef subject = ApiValues.subject(players, playerId);
-        // The stored pointer is a database read, so it happens on a worker; only the requirement check, which may
-        // touch the live player, hops to their thread afterwards.
-        return AsyncQueries.supply(scheduler, () -> nextRankOf(playerId))
-                .thenCompose(next -> next.map(rank -> meets(subject, rank))
+        // The pointer and the storage-backed requirements (playtime, balance) are read on a worker; only the live
+        // requirements, which may touch the player's inventory or a placeholder, hop to their thread afterwards.
+        return AsyncQueries.supply(
+                        scheduler,
+                        () -> nextRankOf(playerId).filter(rank -> requirements.passesStored(subject, parsed(rank))))
+                .thenCompose(next -> next.map(rank -> meetsLive(subject, rank))
                         .orElseGet(() -> CompletableFuture.completedFuture(false)));
     }
 
     private Optional<Rank> nextRankOf(UUID playerId) {
         return currentRank
-                .of(playerId)
+                .load(playerId)
                 .flatMap(standing -> ladder.next(standing.rank().id()));
     }
 
-    private CompletableFuture<Boolean> meets(PlayerRef subject, Rank rank) {
+    private CompletableFuture<Boolean> meetsLive(PlayerRef subject, Rank rank) {
         CompletableFuture<Boolean> answer = new CompletableFuture<>();
-        scheduler.onEntity(subject, () -> {
-            try {
-                answer.complete(requirements.passesAll(subject, parsed(rank)));
-            } catch (RuntimeException failure) {
-                answer.completeExceptionally(failure);
-            }
-        });
+        scheduler.onEntity(
+                subject,
+                () -> {
+                    try {
+                        answer.complete(requirements.passesLive(subject, parsed(rank)));
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                // A player who left cannot rank up, and the future must not hang waiting for them.
+                () -> answer.complete(false));
         return answer;
     }
 

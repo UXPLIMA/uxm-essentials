@@ -13,7 +13,8 @@ package com.uxplima.uxmessentials.shared.network;
  * sentinel. A mutation made on {@code survival-1} reaches the other
  * backends once and never echoes back to bounce around the cluster.
  *
- * <p>A frame is a <strong>notification, not the source of truth</strong>. The shared database holds the authoritative state; a frame tells a peer "owner X's homes/balance/etc.
+ * <p>A frame is a <strong>notification, not the source of truth</strong>. The shared database holds the authoritative
+ * state; a frame tells a peer "owner X's homes/balance/etc.
  * changed on me, drop your cached copy" so the peer re-reads the fresh row on its next access. It never
  * carries a full aggregate to be written blindly: that would race the DB and risk a lost update.
  */
@@ -34,7 +35,8 @@ public sealed interface NetworkMessage
                 TradeSignalFrame,
                 VanishStateChanged,
                 GuardChanged,
-                IpBanChanged {
+                IpBanChanged,
+                RankChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -64,6 +66,7 @@ public sealed interface NetworkMessage
         TRADE_SIGNAL(14),
         VANISH_STATE_CHANGED(15),
         GUARD_CHANGED(16),
+        RANK_CHANGED(17),
         IP_BAN_CHANGED(18);
 
         private final byte wireTag;

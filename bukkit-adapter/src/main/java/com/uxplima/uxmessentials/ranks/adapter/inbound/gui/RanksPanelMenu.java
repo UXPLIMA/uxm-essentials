@@ -32,15 +32,17 @@ import org.jspecify.annotations.NullMarked;
  * The {@code /ranks} ladder panel (config-gated on {@code gui.enabled}), registered with the menu engine and
  * opened from the command. A three-row window: the player's current rank and prestige, the next rank with its
  * cost and requirements, a rank-up button that runs the {@link Rankup} pipeline, and a close button. It holds no
- * new domain logic. It resolves the viewer's {@link RankStanding} through {@link CurrentRank} off the tick thread
- * when the panel opens, precomputes the display strings into the {@link RanksSubject} the display items read
+ * new domain logic. It reads the viewer's {@link RankStanding} from memory through {@link CurrentRank} when the
+ * panel opens (a pointer still loading draws dashes until the next open), precomputes the display strings into the
+ * {@link RanksSubject} the display items read
  * through the {@code ranks_*} placeholders, then opens the panel through {@link Menus} (which hops to the viewer's
  * entity thread to touch the live inventory). Every visible string resolves from the ranks catalog.
  *
- * <p>The rank-up button routes through the very same {@link Rankup} use case {@code /rankup} runs, on the click's
- * own entity thread (requirement and cost evaluation are owning-region-thread operations, exactly the thread the
- * click dispatches on), reports the typed outcome through the catalog, then reopens the panel so the standing
- * redraws. So the panel and the command always agree, and a refused rankup leaves the standing unmoved.
+ * <p>The rank-up button routes through the very same {@link Rankup} use case {@code /rankup} runs, started on the
+ * click's own entity thread (requirement evaluation is an owning-region-thread operation, exactly the thread the
+ * click dispatches on). Once the save on the async lane answers back on that thread, the outcome is reported
+ * through the catalog and the panel reopens so the standing redraws. So the panel and the command always agree, and a
+ * refused rankup leaves the standing unmoved.
  */
 @NullMarked
 public final class RanksPanelMenu {
@@ -106,6 +108,11 @@ public final class RanksPanelMenu {
     /** Resolve the viewer's standing and precompute every display string the panel renders. */
     private RanksSubject subjectFor(PlayerRef viewer) {
         Optional<RankStanding> standing = currentRank.of(viewer.uuid());
+        if (standing.isEmpty() && !ladder.isEmpty()) {
+            // The pointer is still loading; dashes rather than a guess, and the next open has it.
+            return new RanksSubject(
+                    NO_REQUIREMENTS, NO_REQUIREMENTS, NO_REQUIREMENTS, NO_REQUIREMENTS, NO_REQUIREMENTS);
+        }
         if (standing.isEmpty()) {
             String max = messages.resolve(viewer, RanksMessageKey.RANKS_GUI_MAX, Map.of());
             return new RanksSubject(max, "0", max, NO_REQUIREMENTS, NO_REQUIREMENTS);
@@ -129,15 +136,21 @@ public final class RanksPanelMenu {
     }
 
     /**
-     * Run the rankup pipeline for the clicker on their own entity thread, report the outcome through the catalog
-     * (the same lines {@code /rankup} shows), then reopen the panel so the standing redraws. Charging strictly
-     * before advancing lives in {@link Rankup}, so a refused rankup here neither charges nor moves the pointer.
+     * Start the rankup pipeline for the clicker on their own entity thread; when it answers back there, report the
+     * outcome through the catalog (the same lines {@code /rankup} shows) and reopen the panel so the standing
+     * redraws. Charging strictly before advancing lives in {@link Rankup}, so a refused rankup here neither charges
+     * nor moves the pointer.
      */
     private void onRankup(MenuActionContext ctx) {
         Player player = ctx.player();
         PlayerRef who = BukkitRefs.toRef(player);
-        render(player, rankup.rankUp(who));
-        open(player, who);
+        var unused = rankup.rankUp(who).thenAccept(result -> {
+            // A player who left mid-save is answered off their thread; there is nobody to tell.
+            if (player.isOnline()) {
+                render(player, result);
+                open(player, who);
+            }
+        });
     }
 
     private void render(Player player, RankupResult result) {
@@ -147,6 +160,8 @@ public final class RanksPanelMenu {
             case ALREADY_MAX -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_MAX);
             case REQUIREMENTS_NOT_MET -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_REQUIREMENTS);
             case CANNOT_AFFORD -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_COST);
+            case BUSY -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_BUSY);
+            case FAILED -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_FAILED);
         }
     }
 

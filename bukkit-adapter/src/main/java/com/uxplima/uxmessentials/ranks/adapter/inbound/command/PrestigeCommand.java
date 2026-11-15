@@ -86,6 +86,8 @@ public final class PrestigeCommand implements CommandRegistration {
             case MAX_LEVEL -> feedback.send(player, RanksMessageKey.RANKS_PRESTIGE_MAX);
             case REQUIREMENTS_NOT_MET -> feedback.send(player, RanksMessageKey.RANKS_PRESTIGE_REQUIREMENTS);
             case CANNOT_AFFORD -> feedback.send(player, RanksMessageKey.RANKS_PRESTIGE_COST);
+            // The rankup line already says "your rank is still being updated", which is what this is.
+            case BUSY -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_BUSY);
         }
     }
 
