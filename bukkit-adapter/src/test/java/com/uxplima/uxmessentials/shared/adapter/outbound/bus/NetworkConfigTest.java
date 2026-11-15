@@ -51,6 +51,16 @@ class NetworkConfigTest {
     }
 
     @Test
+    void aServerIsRecordedOnlyOnANetworkUnderARealName() throws IOException {
+        assertThat(read("server-name = \"survival-1\"").recordedServer()).isEmpty();
+        assertThat(read("enabled = true").recordedServer()).isEmpty();
+        assertThat(read("enabled = true\nserver-name = \"server-1\"").recordedServer())
+                .isEmpty();
+        assertThat(read("enabled = true\nserver-name = \"survival-1\"").recordedServer())
+                .contains("survival-1");
+    }
+
+    @Test
     void anOldFileThatSaysServerIdIsReadTheSameWay() throws IOException {
         assertThat(read("server-id = \"survival-2\"").serverId()).isEqualTo("survival-2");
     }

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.playerwarps.adapter.outbound;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 import org.bukkit.plugin.Plugin;
@@ -16,6 +17,10 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Copies the shipped player-warp data out of the V70 {@code _v1_legacy} tables into the surrogate-id schema, then
  * claims this backend's {@code server_id} onto the rows that still have none.
+ *
+ * <p>The claim runs only on a network under a real server name ({@code serverId} present). A standalone server's
+ * name is not the one it may later join a network with, so claiming under it would leave every warp pointing at a
+ * server that does not exist; the rows stay NULL until a networked start claims them.
  *
  * <p>The routine self-disables: it drops the legacy tables after a successful copy, so running it on every enable
  * is safe, because after the first run there is nothing left to migrate and it returns immediately. A name that
@@ -42,9 +47,10 @@ public final class PlayerWarpLegacyMigration {
     private final Plugin plugin;
     private final Persistence persistence;
     private final KernelPorts kernel;
-    private final String serverId;
+    private final Optional<String> serverId;
 
-    public PlayerWarpLegacyMigration(Plugin plugin, Persistence persistence, KernelPorts kernel, String serverId) {
+    public PlayerWarpLegacyMigration(
+            Plugin plugin, Persistence persistence, KernelPorts kernel, Optional<String> serverId) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.persistence = Objects.requireNonNull(persistence, "persistence");
         this.kernel = Objects.requireNonNull(kernel, "kernel");
@@ -71,17 +77,17 @@ public final class PlayerWarpLegacyMigration {
     }
 
     /**
-     * Stamp this backend's {@code network.server-id} onto the freshly-migrated (and any other) NULL-{@code
-     * server_id} rows living in this backend's worlds, logging the affected-row count. A blank server-id is a
-     * misconfiguration that must not crash startup, so the claim is skipped with a debug line and the rows are
-     * left for the next pass.
+     * Stamp this backend's {@code network.server-name} onto the freshly-migrated (and any other) NULL-{@code
+     * server_id} rows living in this backend's worlds, logging how many were claimed when there are any.
      */
     private void claimServerId(List<String> localWorldUids) {
-        if (serverId.isBlank()) {
-            kernel.log().debug("event=playerwarp_server_claim_skipped reason=blank_server_id");
+        if (serverId.isEmpty()) {
             return;
         }
-        int claimed = PlayerWarpServerClaimer.claim(persistence, serverId, localWorldUids);
-        kernel.log().info("event=playerwarp_server_claim server={} claimed={}", serverId, claimed);
+        String server = serverId.get();
+        int claimed = PlayerWarpServerClaimer.claim(persistence, server, localWorldUids);
+        if (claimed > 0) {
+            kernel.log().info("event=playerwarp_server_claim server={} claimed={}", server, claimed);
+        }
     }
 }

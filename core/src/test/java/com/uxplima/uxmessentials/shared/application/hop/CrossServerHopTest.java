@@ -268,6 +268,21 @@ class CrossServerHopTest {
     }
 
     @Test
+    void twoHopsTrackedAtOnceRefundEachChargeExactlyOnce() {
+        // The second hop starts while the first has read no earlier row and not yet written its own.
+        store.afterNextFind(this::goHome);
+        goHome();
+
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(ledger.wallet).isEqualByComparingTo("90");
+
+        scheduler.advance(TTL);
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isEqualTo(2);
+        assertThat(store.rows()).isEmpty();
+    }
+
+    @Test
     void aStaleRowOfAKindNoResolverHereServesIsClaimedOnJoinAndLoggedWithItsCharge() {
         store.record(jailHop(clock.instant()));
         clock.advance(TTL.multipliedBy(2).plusSeconds(1));

@@ -29,7 +29,10 @@ import com.uxplima.uxmessentials.warps.domain.event.WarpCreating;
  *
  * <p>The optional per-warp cost and required permission are passed through from the command so an operator
  * can set a gated or priced warp; with neither, a plain free warp is created. Both a new warp and a re-anchored
- * one are recorded on {@code localServer}, the backend whose world the position is in.
+ * one are recorded on {@code recordedServer}, the backend whose world the position is in. It is empty off a network
+ * or under the shipped default server name: a name every standalone backend shares would send each warp to a server
+ * that does not exist once the backend joins a network under its own name. A new warp then records no server and a
+ * re-anchored one records {@value Warp#UNSCOPED}, so the backend holding the world claims both later.
  */
 public final class SetWarp {
 
@@ -39,7 +42,7 @@ public final class SetWarp {
     private final DomainGate gate;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
-    private final String localServer;
+    private final Optional<String> recordedServer;
 
     /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
     public SetWarp(
@@ -48,8 +51,8 @@ public final class SetWarp {
             DomainEventPublisher events,
             Clock clock,
             java.util.List<String> worldBlacklist,
-            String localServer) {
-        this(repository, notifier, events, DomainGate.allowAll(), clock, worldBlacklist, localServer);
+            Optional<String> recordedServer) {
+        this(repository, notifier, events, DomainGate.allowAll(), clock, worldBlacklist, recordedServer);
     }
 
     public SetWarp(
@@ -59,14 +62,14 @@ public final class SetWarp {
             DomainGate gate,
             Clock clock,
             java.util.List<String> worldBlacklist,
-            String localServer) {
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Create or move the warp {@code name} to {@code at}, free and ungated. */
@@ -105,8 +108,8 @@ public final class SetWarp {
             notifier.send(owner, WarpError.VETOED.messageKey(), Map.of("warp", name.value()));
             return Result.err(WarpError.VETOED);
         }
-        Warp warp = Warp.create(name, at, owner, clock.instant(), cost, requiredPermission)
-                .onServer(localServer);
+        Warp created = Warp.create(name, at, owner, clock.instant(), cost, requiredPermission);
+        Warp warp = recordedServer.map(created::onServer).orElse(created);
         repository.save(warp);
         events.publish(new WarpCreated(name, owner, at));
         notifier.send(owner, WarpsMessageKey.WARP_SET, Map.of("warp", name.value()));
@@ -114,7 +117,7 @@ public final class SetWarp {
     }
 
     private Result<Unit, WarpError> reanchor(PlayerRef owner, Warp existing, Position at) {
-        repository.save(existing.movedTo(at, localServer));
+        repository.save(existing.movedTo(at, recordedServer));
         notifier.send(
                 owner,
                 WarpsMessageKey.WARP_MOVED,

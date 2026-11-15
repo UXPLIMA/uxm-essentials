@@ -35,6 +35,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@code uxmessentials.pwarp.limit.<world>.<n>} node folds in. {@code ownerName} is the player's display name,
  * captured onto the new warp so a browse can render its author without a lookup; the edit timestamp comes from
  * the injected {@link Clock}, never from the domain.
+ *
+ * <p>A new or re-anchored warp records {@code recordedServer}, the backend whose world it is in. It is empty off a
+ * network or under the shipped default server name: a name every standalone backend shares would send the warp to a
+ * server that does not exist once the backend joins a network under its own name. The warp then records no server,
+ * and the backend holding its world claims it at its next start.
  */
 public final class SetPlayerWarp {
 
@@ -45,6 +50,7 @@ public final class SetPlayerWarp {
     private final DomainGate gate;
     private final Clock clock;
     private final java.util.List<String> worldBlacklist;
+    private final Optional<String> recordedServer;
 
     /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
     public SetPlayerWarp(
@@ -53,8 +59,9 @@ public final class SetPlayerWarp {
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
-            java.util.List<String> worldBlacklist) {
-        this(repository, quota, notifier, events, DomainGate.allowAll(), clock, worldBlacklist);
+            java.util.List<String> worldBlacklist,
+            Optional<String> recordedServer) {
+        this(repository, quota, notifier, events, DomainGate.allowAll(), clock, worldBlacklist, recordedServer);
     }
 
     public SetPlayerWarp(
@@ -64,7 +71,8 @@ public final class SetPlayerWarp {
             DomainEventPublisher events,
             DomainGate gate,
             Clock clock,
-            java.util.List<String> worldBlacklist) {
+            java.util.List<String> worldBlacklist,
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.quota = Objects.requireNonNull(quota, "quota");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -72,6 +80,7 @@ public final class SetPlayerWarp {
         this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Create {@code owner}'s warp {@code name} at {@code at}, or re-anchor it when the owner already holds it. */
@@ -109,7 +118,7 @@ public final class SetPlayerWarp {
                     Map.of("warp", existing.name().value()));
             return Result.err(PlayerWarpError.NAME_TAKEN);
         }
-        repository.save(existing.movedTo(at, clock.instant()));
+        repository.save(existing.movedTo(at, recordedServer, clock.instant()));
         notifier.send(
                 owner,
                 PlayerwarpsMessageKey.PWARP_MOVED,
@@ -130,7 +139,8 @@ public final class SetPlayerWarp {
             notifier.send(owner, PlayerWarpError.VETOED.messageKey(), Map.of("warp", name.value()));
             return Result.err(PlayerWarpError.VETOED);
         }
-        repository.save(PlayerWarp.create(owner, ownerName, name, at, clock.instant()));
+        repository.save(
+                PlayerWarp.create(owner, ownerName, name, at, clock.instant()).onServer(recordedServer));
         events.publish(new PlayerWarpCreated(owner, name, at));
         notifier.send(owner, PlayerwarpsMessageKey.PWARP_SET, Map.of("warp", name.value()));
         return Result.ok();

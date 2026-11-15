@@ -6,11 +6,13 @@ import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
@@ -27,9 +29,10 @@ class SetWarpServerTest {
 
     private final WarpFakes.Warps warps = new WarpFakes.Warps();
     private final RecordingNotifier notifier = new RecordingNotifier();
+    private final Audit audit = new Audit();
     private int announcements;
-    private final SetWarpServer setServer =
-            new SetWarpServer(warps, notifier.notifier(), new Live(Set.of("lobby", "survival")), () -> announcements++);
+    private final SetWarpServer setServer = new SetWarpServer(
+            warps, notifier.notifier(), new Live(Set.of("lobby", "survival")), () -> announcements++, audit);
 
     SetWarpServerTest() {
         warps.put(Warp.create(MARKET, at(0, 64, 0), SAM, NOW).onServer("lobby"));
@@ -48,6 +51,9 @@ class SetWarpServerTest {
         assertThat(serverOf(PLOTS)).contains("lobby");
         assertThat(announcements).isOne();
         assertThat(notifier.keys()).containsExactly("warp.server-set");
+        assertThat(audit.lines)
+                .containsExactly("event=warp_server_rename actor=" + ALEX.uuid()
+                        + " warp=market from=lobby to=survival moved=1");
     }
 
     @Test
@@ -57,6 +63,8 @@ class SetWarpServerTest {
         assertThat(serverOf(MARKET)).contains("survival");
         assertThat(serverOf(PLOTS)).contains("survival");
         assertThat(announcements).isOne();
+        assertThat(audit.lines)
+                .containsExactly("event=warp_server_rename actor=" + ALEX.uuid() + " warp=* to=survival moved=2");
     }
 
     @Test
@@ -67,6 +75,7 @@ class SetWarpServerTest {
         assertThat(serverOf(MARKET)).contains("lobby");
         assertThat(announcements).isZero();
         assertThat(notifier.keys()).containsExactly("warp.server-invalid", "warp.server-invalid");
+        assertThat(audit.lines).isEmpty();
     }
 
     @Test
@@ -84,6 +93,30 @@ class SetWarpServerTest {
         assertThat(serverOf(MARKET)).isEmpty();
         assertThat(warps.find(MARKET).orElseThrow().livesElsewhere("survival")).isFalse();
         assertThat(notifier.keys()).containsExactly("warp.server-set");
+    }
+
+    /** The info lines the use case logs, with their placeholders filled in. */
+    private static final class Audit implements Logger {
+
+        final List<String> lines = new ArrayList<>();
+
+        @Override
+        public void info(String message, Object... args) {
+            String line = message;
+            for (Object arg : args) {
+                line = line.replaceFirst("\\{\\}", String.valueOf(arg));
+            }
+            lines.add(line);
+        }
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 
     /** A network whose running backends are the given names. */

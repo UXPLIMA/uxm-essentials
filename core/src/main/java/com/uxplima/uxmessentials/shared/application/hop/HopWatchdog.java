@@ -5,6 +5,9 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
@@ -30,6 +33,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * that row is past twice the TTL: then it is claimed and logged (see {@link AbandonedHops}) and the new hop goes
  * ahead.
  *
+ * <p>Two tracks for the same player at once would both read no earlier row, the second write would replace the
+ * first unseen, and the first hop's timer would then find nothing to claim and keep its charge. So while one track
+ * is between its read and its write, a second one for that player on this backend is refused and refunded there;
+ * the first goes ahead. Once a row is written, a later track reads it and replaces it as above.
+ *
  * <p>The claim and the refund are IO, so {@link #track} is called off the tick thread and the TTL check runs on the
  * {@link Scheduler}'s async lane.
  */
@@ -42,6 +50,8 @@ public final class HopWatchdog {
     private final Logger log;
     private final Duration requestTtl;
     private final AbandonedHops abandoned;
+    /** The players whose track is between reading the earlier row and writing the new one. */
+    private final Set<UUID> recording = ConcurrentHashMap.newKeySet();
 
     public HopWatchdog(
             PendingHopStore store,
@@ -72,6 +82,12 @@ public final class HopWatchdog {
         HopResolver resolver = resolvers
                 .find(pending.kind())
                 .orElseThrow(() -> new IllegalStateException("no hop resolver for " + pending.kind()));
+        if (!recording.add(who.uuid())) {
+            // Nothing of this hop was written, so this refund is the only one its charge can get.
+            log.debug("event=cross_server_hop_refused player={} reason=concurrent_hop", who.uuid());
+            charges.refund(resolver, who, pending.charge(), label);
+            return false;
+        }
         try {
             if (!replaceEarlier(who)) {
                 unreachable(resolver, who, pending, label);
@@ -86,6 +102,8 @@ public final class HopWatchdog {
             clearQuietly(pending);
             unreachable(resolver, who, pending, label);
             return false;
+        } finally {
+            recording.remove(who.uuid());
         }
         try {
             scheduler.asyncAfter(requestTtl, () -> expire(resolver, who, pending, label));

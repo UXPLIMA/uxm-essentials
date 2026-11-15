@@ -72,6 +72,9 @@ public final class WarpsWiring {
      * <p>The {@code menus}/{@code menuBindings} pair is the data-driven menu engine: warps registers the sound
      * selector's list source, placeholders, and actions through the bindings and opens it through the façade. This
      * is the engine pilot and the pattern the remaining feature menus follow when they migrate.
+     *
+     * <p>{@code recordedServer} is the network name a warp set, moved or claimed here records, and empty off a
+     * network or under the shipped default server name, where nothing is recorded or claimed.
      */
     public static Wired wire(
             ModuleContext ctx,
@@ -80,6 +83,7 @@ public final class WarpsWiring {
             Optional<WarpEconomy> economy,
             Bus bus,
             CrossServerHops hops,
+            Optional<String> recordedServer,
             NetworkPresence presence,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -91,6 +95,7 @@ public final class WarpsWiring {
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(recordedServer, "recordedServer");
         Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -228,7 +233,7 @@ public final class WarpsWiring {
                 kernel.gate(),
                 Clock.systemUTC(),
                 ctx.config().getStringList("world-blacklist", List.of()),
-                localServer);
+                recordedServer);
         // The admin warp manager renders through the always-on menu engine. The create flow that opens a fresh warp's
         // editor is pulled out so the engine-rendered manager can drive it. A one-element holder breaks the cycle: the
         // manager's create button reopens the manager on cancel, and the category manager's back button reopens it,
@@ -258,7 +263,11 @@ public final class WarpsWiring {
 
         // Writes through the cache under the broadcasting repository, so a bulk change reaches peers as one frame.
         SetWarpServer setWarpServer = new SetWarpServer(
-                cached, notifier, presence, () -> bus.publisher().publish(new WarpChanged(localServer, "*")));
+                cached,
+                notifier,
+                presence,
+                () -> bus.publisher().publish(new WarpChanged(localServer, "*")),
+                kernel.log());
         WarpServices services = assemble(
                 kernel,
                 repository,
@@ -269,7 +278,8 @@ public final class WarpsWiring {
                 useWarp,
                 managerView,
                 setWarpServer,
-                localServer);
+                localServer,
+                recordedServer);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         // The editor and its welcome / sound / particle / category sub-screens all render through the always-on menu
         // engine now, routed and torn down by the one shared menu listener, so the warps context registers no editor
@@ -293,7 +303,7 @@ public final class WarpsWiring {
                 services.setWarp(),
                 services.moveWarp(),
                 services.delWarp(),
-                new WarpServerAdoption(persistence, kernel, localServer, cached, bus.publisher()),
+                new WarpServerAdoption(persistence, kernel, recordedServer, cached, bus.publisher()),
                 cached);
     }
 
@@ -307,7 +317,8 @@ public final class WarpsWiring {
             UseWarp useWarp,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView,
             SetWarpServer setWarpServer,
-            String localServer) {
+            String localServer,
+            Optional<String> recordedServer) {
         Clock clock = Clock.systemUTC();
         return new WarpServices(
                 useWarp,
@@ -318,11 +329,11 @@ public final class WarpsWiring {
                         kernel.gate(),
                         clock,
                         ctx.config().getStringList("world-blacklist", List.of()),
-                        localServer),
+                        recordedServer),
                 new DelWarp(repository, notifier, kernel.events(), kernel.gate()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
-                new MoveWarp(repository, notifier, localServer),
+                new MoveWarp(repository, notifier, recordedServer),
                 browseMenu,
                 kernel.playerLookup(),
                 repository,
