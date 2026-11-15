@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.teleport.application;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -70,12 +69,15 @@ public final class AcceptTeleport {
     public Result<Unit, TeleportError> accept(PlayerRef target, Position anchorPosition) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(anchorPosition, "anchorPosition");
-        Optional<TeleportRequest> pending = oldestPending(target);
+        // One reading of the clock for the expiry check and the accept, so a request cannot pass the first and
+        // expire before the second.
+        Instant now = clock.instant();
+        Optional<TeleportRequest> pending = oldestPending(target, now);
         if (pending.isEmpty()) {
             return noPending(target);
         }
         TeleportRequest request = pending.get();
-        Transition accepted = request.accept(clock.instant());
+        Transition accepted = request.accept(now);
         finish(accepted);
         if (remote.isRemote(request.id())) {
             // The requester's backend tells them and, for /tpa, runs their warmup; the mover is not here.
@@ -90,7 +92,7 @@ public final class AcceptTeleport {
     /** Deny the oldest request aimed at {@code target}; the requester's cooldown is untouched. */
     public Result<Unit, TeleportError> deny(PlayerRef target) {
         Objects.requireNonNull(target, "target");
-        Optional<TeleportRequest> pending = oldestPending(target);
+        Optional<TeleportRequest> pending = oldestPending(target, clock.instant());
         if (pending.isEmpty()) {
             return noPending(target);
         }
@@ -126,7 +128,10 @@ public final class AcceptTeleport {
     /** Expire a request whose TTL elapsed, notifying both parties. Driven by the adapter's sweep. */
     public void expireIfDue(TeleportRequest request) {
         Objects.requireNonNull(request, "request");
-        Instant now = clock.instant();
+        expireIfDue(request, clock.instant());
+    }
+
+    private void expireIfDue(TeleportRequest request, Instant now) {
         if (!request.hasExpired(now)
                 || request.phase() != com.uxplima.uxmessentials.teleport.domain.RequestState.Phase.PENDING) {
             return;
@@ -170,8 +175,17 @@ public final class AcceptTeleport {
         events.publish(transition.event());
     }
 
-    private Optional<TeleportRequest> oldestPending(PlayerRef target) {
-        List<TeleportRequest> pending = requests.pendingFor(target);
-        return pending.isEmpty() ? Optional.empty() : Optional.of(pending.get(0));
+    /**
+     * The oldest request aimed at {@code target} that is still within its TTL. The sweep runs only once a second, so
+     * a request past its TTL can still be held here; it is expired now rather than accepted, which would throw.
+     */
+    private Optional<TeleportRequest> oldestPending(PlayerRef target, Instant now) {
+        for (TeleportRequest request : requests.pendingFor(target)) {
+            if (!request.hasExpired(now)) {
+                return Optional.of(request);
+            }
+            expireIfDue(request, now);
+        }
+        return Optional.empty();
     }
 }
