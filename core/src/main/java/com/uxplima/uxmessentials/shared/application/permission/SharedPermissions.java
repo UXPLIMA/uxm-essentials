@@ -38,7 +38,7 @@ public final class SharedPermissions {
     private static final String WARMUP_BYPASS_PREFIX = "uxmessentials.bypass.warmup.";
     private static final String MODULE_PREFIX = "uxmessentials.module.";
 
-    /** The head of the cooldown tiers for one labelled feature; the seconds held are appended to it. */
+    /** The head of the cooldown tiers for one label a menu or custom command names; the seconds are appended. */
     public static String cooldown(String label) {
         return COOLDOWN_PREFIX + label;
     }
@@ -106,8 +106,8 @@ public final class SharedPermissions {
                         "/uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows.",
                         PermissionDefault.OP),
                 PermissionSpec.sharedFamily(
-                        cooldown("<feature>") + ".<seconds>",
-                        "The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait.",
+                        cooldown("<label>") + ".<seconds>",
+                        "The wait between uses of one label a menu or custom command names, in seconds; the shortest tier held wins and 0 removes the wait. A built-in feature's wait is its own <feature>.cooldown.<seconds> node.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER),
                 PermissionSpec.sharedFamily(

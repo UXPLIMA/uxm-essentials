@@ -460,7 +460,7 @@ public final class DestinationPermissions {
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.family(
-                        WORLD_PREFIX + "<world>",
+                        worldEnter("<world>"),
                         "Enter one world that is configured as restricted.",
                         PermissionDefault.OP,
                         PermissionShape.LABEL,

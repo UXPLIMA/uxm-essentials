@@ -358,6 +358,12 @@ public final class SocialPermissions {
                         "/poses reveal <player>: give back a body a pose left unseen.",
                         PermissionDefault.OP,
                         POSES),
+                PermissionSpec.family(
+                        SharedPermissions.featureCooldown("poses") + ".<seconds>",
+                        "The wait between starting poses, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
+                        POSES),
                 PermissionSpec.of(
                         SIT_USE,
                         "/sit and right-click-to-sit: sit down where you stand or on a sittable block.",
