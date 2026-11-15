@@ -864,7 +864,7 @@ public final class PluginModule {
         resources.onClose(pauseLinks.stop());
         resources.addReloadTask(ReloadTask.kernel(
                 "server links", pauseLinks.reload(), "pause-menu links re-read and sent to every player"));
-        MigrationImportNode importNode = wireMigration(plugin, config, kernel, persistence, auditChannel);
+        MigrationImportNode importNode = wireMigration(plugin, registry, config, kernel, persistence, auditChannel);
         List<HealthCheck> healthChecks =
                 healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
@@ -995,6 +995,7 @@ public final class PluginModule {
 
     private static MigrationImportNode wireMigration(
             JavaPlugin plugin,
+            ModuleRegistry registry,
             ConfigStore config,
             KernelPorts kernel,
             Persistence persistence,
@@ -1012,7 +1013,8 @@ public final class PluginModule {
                 kernel.scheduler(),
                 kernel.log(),
                 auditChannel,
-                module.enabled(config));
+                module.enabled(config),
+                moduleEnabled(registry, config, "messaging"));
         return new MigrationImportNode(service, kernel.messages());
     }
 

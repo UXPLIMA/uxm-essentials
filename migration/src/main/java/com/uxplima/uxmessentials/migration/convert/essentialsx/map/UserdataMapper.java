@@ -11,7 +11,9 @@ import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXLocation;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXMail;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedMail;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -21,13 +23,14 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Translates a parsed EssentialsX userdata record into domain aggregates. Pure
  * ACL: no Bukkit, no YAML, no I/O: those stay in {@code parse/}. It maps homes whose world the server
- * knows into {@link Home} value objects (a home in an unknown world is dropped, not fatal), and carries
- * the raw balance and mail forward for the writer to seed a wallet and mailbox with.
+ * knows into {@link Home} value objects (a home in an unknown world is dropped, not fatal), carries the raw
+ * balance forward for the writer to seed a wallet with, and turns each mail entry into an {@link ImportedMail}.
  */
 @NullMarked
 public final class UserdataMapper {
 
     private final WorldNameResolver worlds;
+    private final MailMapper mailMapper = new MailMapper();
 
     public UserdataMapper(WorldNameResolver worlds) {
         this.worlds = Objects.requireNonNull(worlds, "worlds");
@@ -36,7 +39,15 @@ public final class UserdataMapper {
     public ImportedUser map(EssXUserdata src) {
         Objects.requireNonNull(src, "src");
         PlayerRef owner = new PlayerRef(src.uuid(), src.name());
-        return new ImportedUser(owner, mapHomes(owner, src.homes()), src.balance(), src.mail());
+        return new ImportedUser(owner, mapHomes(owner, src.homes()), src.balance(), mapMail(src.mail()));
+    }
+
+    private List<ImportedMail> mapMail(List<EssXMail> rawMail) {
+        List<ImportedMail> mail = new ArrayList<>(rawMail.size());
+        for (EssXMail entry : rawMail) {
+            mailMapper.map(entry).ifPresent(mail::add);
+        }
+        return mail;
     }
 
     private List<Home> mapHomes(PlayerRef owner, Map<String, EssXLocation> rawHomes) {

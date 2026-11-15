@@ -20,6 +20,12 @@ public enum RecordOutcome {
     /** The source contributed only the parts the target lacked. */
     MERGED,
 
+    /**
+     * Some parts of a record that carries several (a player's homes, balance and mail) were written and others
+     * were held back, because the target already had them or the context that owns them is off.
+     */
+    PARTIAL,
+
     /** The record could not be written; it is counted in {@code failed} and the run continues. */
     FAILED;
 
