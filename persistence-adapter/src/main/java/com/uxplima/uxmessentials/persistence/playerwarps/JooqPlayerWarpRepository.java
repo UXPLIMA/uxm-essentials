@@ -11,6 +11,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpVisits
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpWhitelist.PLAYER_WARP_WHITELIST;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,6 +26,7 @@ import java.util.function.LongSupplier;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.PlayerWarpsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -33,6 +35,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Query;
 import org.jooq.impl.DSL;
@@ -217,6 +220,58 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
                 .limit(limit)
                 .fetch()
                 .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
+    public List<PlayerWarp> archivedForRent(Instant cutoff, Optional<RentArchiveCursor> after, int limit) {
+        Objects.requireNonNull(cutoff, "cutoff");
+        Objects.requireNonNull(after, "after");
+        long millis = cutoff.toEpochMilli();
+        // Keyset paging on (rent_archive_after, id), the sort order, so a page starts exactly after the last one.
+        Condition past = after.map(cursor -> PLAYER_WARPS
+                        .RENT_ARCHIVE_AFTER
+                        .gt(cursor.archiveAfter().toEpochMilli())
+                        .or(PLAYER_WARPS
+                                .RENT_ARCHIVE_AFTER
+                                .eq(cursor.archiveAfter().toEpochMilli())
+                                .and(PLAYER_WARPS.ID.gt(cursor.id().value()))))
+                .orElse(DSL.noCondition());
+        // updated_at guards a warp restored and archived again: its old deadline is stale, its last change is not.
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .where(PLAYER_WARPS.STATUS.eq(WarpStatus.ARCHIVED.name()))
+                .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.isNotNull())
+                .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.le(millis))
+                .and(PLAYER_WARPS.UPDATED_AT.le(millis))
+                .and(past)
+                .orderBy(PLAYER_WARPS.RENT_ARCHIVE_AFTER.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
+    public boolean deleteIfArchivedForRent(PlayerWarpId id, Instant cutoff) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(cutoff, "cutoff");
+        long key = id.value();
+        long millis = cutoff.toEpochMilli();
+        // The parent row goes first under the full condition: a warp restored, edited or paid into since the sweep
+        // read it, or already deleted by another backend, matches no row and keeps its side rows.
+        return write(dsl -> {
+            int deleted = dsl.deleteFrom(PLAYER_WARPS)
+                    .where(PLAYER_WARPS.ID.eq(key))
+                    .and(PLAYER_WARPS.STATUS.eq(WarpStatus.ARCHIVED.name()))
+                    .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.isNotNull())
+                    .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.le(millis))
+                    .and(PLAYER_WARPS.UPDATED_AT.le(millis))
+                    .and(PLAYER_WARPS.EARNED_AMOUNT.le(BigDecimal.ZERO))
+                    .execute();
+            if (deleted != 1) {
+                return false;
+            }
+            deleteSideRows(dsl, key);
+            return true;
+        });
     }
 
     @Override
