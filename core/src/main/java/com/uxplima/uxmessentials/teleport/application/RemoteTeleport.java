@@ -66,9 +66,16 @@ public sealed interface RemoteTeleport {
      * A staff teleport of a player on {@code subjectServer} to {@code destination}, wherever that player is.
      *
      * @param actor the staff member, or the console, who reads the outcome
+     * @param seeLevel the actor's vanish see level, by which a vanished subject or destination reads as offline
      */
     record StaffMove(
-            String fromServer, UUID id, PlayerRef actor, PlayerRef subject, PlayerRef destination, String subjectServer)
+            String fromServer,
+            UUID id,
+            PlayerRef actor,
+            PlayerRef subject,
+            PlayerRef destination,
+            String subjectServer,
+            int seeLevel)
             implements RemoteTeleport {
 
         public StaffMove {

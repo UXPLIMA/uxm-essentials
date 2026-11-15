@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.RemoteTeleport.Step;
+import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportNetwork;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -32,6 +33,11 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
  * whose landing reads the destination's live position there. A subject on another backend is reached with a staff
  * move message; that backend reports back, and the staff member reads one line for the outcome, or a no-answer line
  * when nothing came back in {@link CrossServerRequests#ANSWER_GRACE}.
+ *
+ * <p>Vanish holds across servers as it does here: a subject or destination vanished above the staff member's see level
+ * reads as offline to them, and nobody is moved. The backend a player is on judges them by its own vanish state; a
+ * destination on a third backend is judged by its shared vanish row before anyone is sent, so a hidden player's
+ * server is never revealed by the move, and again by its own backend at landing.
  *
  * <p>A repeated move message is acted on once, and an answer is read once, whichever copy arrives first.
  */
@@ -72,6 +78,7 @@ public final class CrossServerStaffTeleport {
     private final NetworkPresence presence;
     private final PlayerLookup players;
     private final PlayerLocator locator;
+    private final RequestVisibility visibility;
     private final PlayerHops hops;
     private final TeleportExecutor executor;
     private final Notifier notifier;
@@ -87,6 +94,7 @@ public final class CrossServerStaffTeleport {
             NetworkPresence presence,
             PlayerLookup players,
             PlayerLocator locator,
+            RequestVisibility visibility,
             PlayerHops hops,
             TeleportExecutor executor,
             Notifier notifier,
@@ -96,6 +104,7 @@ public final class CrossServerStaffTeleport {
         this.presence = Objects.requireNonNull(presence, "presence");
         this.players = Objects.requireNonNull(players, "players");
         this.locator = Objects.requireNonNull(locator, "locator");
+        this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.hops = Objects.requireNonNull(hops, "hops");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -135,9 +144,12 @@ public final class CrossServerStaffTeleport {
         }
         PlayerRef mover = subject.get().player();
         PlayerRef anchor = destination.get().player();
+        int seeLevel = visibility.seeLevel(actor);
         if (isHere(subject.get())) {
             boolean self = mover.equals(actor);
             moveFromHere(
+                    actor,
+                    seeLevel,
                     mover,
                     destination.get(),
                     () -> notifier.send(actor, TeleportMessageKey.TP_DONE),
@@ -154,13 +166,14 @@ public final class CrossServerStaffTeleport {
                                     actor, TeleportMessageKey.TP_CROSS_SERVER_REFUSED, Map.of("player", mover.name()));
                         }
                     },
-                    () -> offline(actor, mover.name()));
+                    () -> offline(actor, mover.name()),
+                    () -> offline(actor, anchor.name()));
             return;
         }
         UUID id = UUID.randomUUID();
         pending.put(id, new Pending(actor, mover, anchor));
         network.send(new RemoteTeleport.StaffMove(
-                network.localServer(), id, actor, mover, anchor, subject.get().server()));
+                network.localServer(), id, actor, mover, anchor, subject.get().server(), seeLevel));
         later(CrossServerRequests.ANSWER_GRACE, () -> {
             Pending waited = pending.remove(id);
             if (waited != null) {
@@ -193,7 +206,8 @@ public final class CrossServerStaffTeleport {
         }
         later(REMEMBERED, () -> actedOn.remove(move.id()));
         PlayerRef subject = move.subject();
-        if (!players.isOnline(subject.uuid())) {
+        // A subject hidden from the staff member reads exactly like one who is not here.
+        if (!players.isOnline(subject.uuid()) || visibility.hides(subject, move.actor(), move.seeLevel())) {
             answer(move, Step.SUBJECT_OFFLINE, subject, "");
             return;
         }
@@ -204,12 +218,15 @@ public final class CrossServerStaffTeleport {
             return;
         }
         moveFromHere(
+                move.actor(),
+                move.seeLevel(),
                 subject,
                 destination.get(),
                 () -> answer(move, Step.MOVED, subject, ""),
                 server -> answer(move, Step.SENT, subject, server),
                 () -> answer(move, Step.REFUSED, subject, ""),
-                () -> answer(move, Step.SUBJECT_OFFLINE, subject, ""));
+                () -> answer(move, Step.SUBJECT_OFFLINE, subject, ""),
+                () -> answer(move, Step.DESTINATION_OFFLINE, move.destination(), ""));
     }
 
     private void onAnswer(RemoteTeleport.Answer answer) {
@@ -245,18 +262,27 @@ public final class CrossServerStaffTeleport {
     }
 
     /**
-     * Move {@code mover}, a player on this backend, to {@code destination}: in place when the destination is here
-     * too, through the hop otherwise. Exactly one of the outcomes runs.
+     * Move {@code mover}, a player on this backend, to {@code destination} for {@code actor}: in place when the
+     * destination is here too, through the hop otherwise. A destination hidden from the actor at {@code seeLevel} moves
+     * nobody: here by this backend's vanish state, elsewhere by its shared vanish row, read before any connect. Exactly
+     * one of the outcomes runs.
      */
     private void moveFromHere(
+            PlayerRef actor,
+            int seeLevel,
             PlayerRef mover,
             OnlinePlayer destination,
             Runnable moved,
             java.util.function.Consumer<String> sent,
             Runnable refused,
-            Runnable gone) {
+            Runnable gone,
+            Runnable destinationHidden) {
         PlayerRef anchor = destination.player();
         if (isHere(destination)) {
+            if (visibility.hides(anchor, actor, seeLevel)) {
+                destinationHidden.run();
+                return;
+            }
             moveLocally(mover, anchor, moved, refused);
             return;
         }
@@ -266,11 +292,15 @@ public final class CrossServerStaffTeleport {
                 gone.run();
                 return;
             }
-            if (!hops.admit(mover, HopKind.PLAYER_STAFF, anchor, server)) {
+            if (visibility.hiddenElsewhere(anchor, seeLevel)) {
+                destinationHidden.run();
+                return;
+            }
+            if (!hops.admit(mover, HopKind.PLAYER_STAFF, anchor, server, seeLevel)) {
                 refused.run();
                 return;
             }
-            hops.send(mover, HopKind.PLAYER_STAFF, anchor, server);
+            hops.send(mover, HopKind.PLAYER_STAFF, anchor, server, seeLevel);
             sent.accept(server);
         });
     }

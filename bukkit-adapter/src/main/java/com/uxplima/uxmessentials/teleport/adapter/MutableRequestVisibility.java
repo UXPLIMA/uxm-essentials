@@ -27,6 +27,11 @@ public final class MutableRequestVisibility implements RequestVisibility {
         return Objects.requireNonNull(delegate.get(), "delegate").hides(target, viewer, viewerSeeLevel);
     }
 
+    @Override
+    public boolean hiddenElsewhere(PlayerRef target, int viewerSeeLevel) {
+        return Objects.requireNonNull(delegate.get(), "delegate").hiddenElsewhere(target, viewerSeeLevel);
+    }
+
     /** Rebind to the vanish authority; called once when the vanish context wires. */
     public void bind(RequestVisibility real) {
         delegate.set(Objects.requireNonNull(real, "real"));

@@ -10,13 +10,16 @@ import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 
 /**
  * How a teleport to a player on another backend is handed to the shared cross-server hop: an accepted request as
  * {@link HopKind#PLAYER_REQUEST}, a staff teleport as {@link HopKind#PLAYER_STAFF}. {@code departures} is empty while
  * the teleport {@code cross-server} block is off, and then no player is ever sent to another backend.
  *
- * <p>The hop's target is the anchor player's id and name. The anchor's position is not known here and would be stale
+ * <p>The hop's target is the anchor player's id and name, and for a staff teleport the staff member's vanish see
+ * level, so the landing can refuse an anchor who vanished from them since. The anchor's position is not known here and
+ * would be stale
  * by the time the mover arrives, so the target backend reads it at landing time; the departure carries a stand-in
  * position, which the origin's gate never reads (it judges the kind, the mover and the cooldown).
  */
@@ -45,35 +48,68 @@ public final class PlayerHops {
      * {@code kind}; on false they have already been told why. Called before anything is spent on the hop.
      */
     public boolean admit(PlayerRef mover, HopKind kind, PlayerRef anchor, String server) {
+        return admit(mover, kind, anchor, server, RequestVisibility.SEES_EVERYONE);
+    }
+
+    /** {@link #admit(PlayerRef, HopKind, PlayerRef, String)} for a hop that lands only while {@code seeLevel} sees the anchor. */
+    public boolean admit(PlayerRef mover, HopKind kind, PlayerRef anchor, String server, int seeLevel) {
         Objects.requireNonNull(mover, "mover");
-        return departures.orElseThrow().admit(mover, departureOf(kind, anchor, server));
+        return departures.orElseThrow().admit(mover, departureOf(kind, anchor, server, seeLevel));
     }
 
     /** Send {@code mover} to {@code anchor} on {@code server}. Nothing is charged for a hop to a player. */
     public void send(PlayerRef mover, HopKind kind, PlayerRef anchor, String server) {
-        Objects.requireNonNull(mover, "mover");
-        departures.orElseThrow().send(mover, departureOf(kind, anchor, server), Optional.empty(), Optional.empty());
+        send(mover, kind, anchor, server, RequestVisibility.SEES_EVERYONE);
     }
 
-    /** The hop's target reference for {@code anchor}: the id the landing resolves and the name its lines show. */
-    static String targetOf(PlayerRef anchor) {
-        return anchor.uuid().toString() + SEPARATOR + anchor.name();
+    /**
+     * Send {@code mover} to {@code anchor} on {@code server}; the landing refuses an anchor vanished above
+     * {@code seeLevel}, the see level of whoever ordered the move.
+     */
+    public void send(PlayerRef mover, HopKind kind, PlayerRef anchor, String server, int seeLevel) {
+        Objects.requireNonNull(mover, "mover");
+        departures
+                .orElseThrow()
+                .send(mover, departureOf(kind, anchor, server, seeLevel), Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * The hop's target reference for {@code anchor}: the id the landing resolves, the name its lines show, and the see
+     * level the anchor must be visible at when one applies. A player name never holds the separator.
+     */
+    static String targetOf(PlayerRef anchor, int seeLevel) {
+        String target = anchor.uuid().toString() + SEPARATOR + anchor.name();
+        return seeLevel == RequestVisibility.SEES_EVERYONE ? target : target + SEPARATOR + seeLevel;
     }
 
     /** The anchor a hop's target names, or empty for a reference this release did not write. */
     static Optional<PlayerRef> anchorOf(String target) {
-        int split = target.indexOf(SEPARATOR);
-        if (split <= 0 || split == target.length() - 1) {
+        String[] parts = target.split(String.valueOf(SEPARATOR), -1);
+        if (parts.length < 2 || parts.length > 3 || parts[0].isEmpty() || parts[1].isEmpty()) {
             return Optional.empty();
         }
         try {
-            return Optional.of(new PlayerRef(UUID.fromString(target.substring(0, split)), target.substring(split + 1)));
+            return Optional.of(new PlayerRef(UUID.fromString(parts[0]), parts[1]));
         } catch (IllegalArgumentException malformed) {
             return Optional.empty();
         }
     }
 
-    static HopDeparture departureOf(HopKind kind, PlayerRef anchor, String server) {
+    /** The see level a hop's target says its anchor must be visible at; everyone sees them when it says none. */
+    static int seeLevelOf(String target) {
+        String[] parts = target.split(String.valueOf(SEPARATOR), -1);
+        if (parts.length != 3) {
+            return RequestVisibility.SEES_EVERYONE;
+        }
+        try {
+            return Integer.parseInt(parts[2]);
+        } catch (NumberFormatException malformed) {
+            // A reference this release did not write: nothing is revealed by refusing the landing.
+            return 0;
+        }
+    }
+
+    static HopDeparture departureOf(HopKind kind, PlayerRef anchor, String server, int seeLevel) {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(anchor, "anchor");
         Objects.requireNonNull(server, "server");
@@ -81,6 +117,6 @@ public final class PlayerHops {
             throw new IllegalArgumentException("not a hop to a player: " + kind);
         }
         Position standIn = Position.of(new WorldRef(new UUID(0L, 0L), server), 0, 0, 0);
-        return new HopDeparture(kind, targetOf(anchor), server, anchor.name(), standIn, Optional.empty());
+        return new HopDeparture(kind, targetOf(anchor, seeLevel), server, anchor.name(), standIn, Optional.empty());
     }
 }

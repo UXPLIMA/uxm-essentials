@@ -73,7 +73,8 @@ public final class BusTeleportNetwork implements TeleportNetwork {
                                 new PlayerRef(staff.actorUuid(), staff.actorName()),
                                 new PlayerRef(staff.subjectUuid(), staff.subjectName()),
                                 new PlayerRef(staff.destinationUuid(), staff.destinationName()),
-                                staff.subjectServer());
+                                staff.subjectServer(),
+                                staff.seeLevel());
                     default -> null;
                 };
         if (message != null) {
@@ -155,7 +156,8 @@ public final class BusTeleportNetwork implements TeleportNetwork {
                         staff.subject().name(),
                         staff.destination().uuid(),
                         staff.destination().name(),
-                        staff.subjectServer());
+                        staff.subjectServer(),
+                        staff.seeLevel());
         };
     }
 }

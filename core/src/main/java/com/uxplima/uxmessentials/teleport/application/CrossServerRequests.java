@@ -503,9 +503,21 @@ public final class CrossServerRequests implements RemoteRequests {
                             missed.run();
                             return;
                         }
-                        // The same arrival a hop's landing uses; a refusal tells the mover why on its own.
-                        engine.arriveImmediately(
-                                mover, Destination.at(standing.get()), TeleportKind.REQUEST, () -> {}, missed);
+                        // The mover's checks and move belong to the mover's thread, as in a hop's landing; a refusal
+                        // tells the mover why on its own.
+                        try {
+                            scheduler.onEntity(
+                                    mover,
+                                    () -> engine.arriveImmediately(
+                                            mover,
+                                            Destination.at(standing.get()),
+                                            TeleportKind.REQUEST,
+                                            () -> {},
+                                            missed),
+                                    missed);
+                        } catch (RuntimeException unscheduled) {
+                            missed.run();
+                        }
                     },
                     missed);
         } catch (RuntimeException unscheduled) {

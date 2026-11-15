@@ -262,6 +262,7 @@ public final class NetworkMessageCodec {
                 writeUuid(out, staff.destinationUuid());
                 out.writeUTF(staff.destinationName());
                 out.writeUTF(staff.subjectServer());
+                out.writeInt(staff.seeLevel());
             }
         }
     }
@@ -353,7 +354,8 @@ public final class NetworkMessageCodec {
                         in.readUTF(),
                         readUuid(in),
                         in.readUTF(),
-                        in.readUTF());
+                        in.readUTF(),
+                        in.readInt());
         };
     }
 

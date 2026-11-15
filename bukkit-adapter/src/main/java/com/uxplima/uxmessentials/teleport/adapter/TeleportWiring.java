@@ -346,6 +346,7 @@ public final class TeleportWiring {
                                 kind,
                                 engine,
                                 executor,
+                                crossServer.visibility(),
                                 kernel.playerLookup(),
                                 kernel.playerLocator(),
                                 kernel.scheduler()));
@@ -381,6 +382,7 @@ public final class TeleportWiring {
                 crossServer.presence(),
                 kernel.playerLookup(),
                 kernel.playerLocator(),
+                crossServer.visibility(),
                 playerHops,
                 executor,
                 notifier,

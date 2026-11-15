@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
@@ -31,7 +32,9 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
  * they stood when the hop was sent. An accepted request lands through the teleport engine's immediate arrival, which
  * applies the jail, combat and veto checks and stamps the request cooldown, as a local accepted request does. A staff
  * teleport lands through the executor as {@link TeleportKind#ADMIN}, exactly as a local staff {@code /tp} moves a
- * player: no check, no cooldown.
+ * player: no check, no cooldown. A staff hop also lands only while the anchor is still visible at the see level of
+ * the staff member who ordered it, judged by this backend's vanish state; an anchor who vanished from them since reads
+ * as unreachable.
  *
  * <p>A hop to a player carries no charge, so there is nothing to refund or settle; every way the landing can fail
  * (the anchor left, the mover left, a refusal, a shutdown) is a miss, which tells the mover once.
@@ -52,6 +55,7 @@ public final class PlayerHopResolver implements HopResolver {
     private final HopKind kind;
     private final TeleportEngine engine;
     private final TeleportExecutor executor;
+    private final RequestVisibility visibility;
     private final PlayerLookup players;
     private final PlayerLocator locator;
     private final Scheduler scheduler;
@@ -60,6 +64,7 @@ public final class PlayerHopResolver implements HopResolver {
             HopKind kind,
             TeleportEngine engine,
             TeleportExecutor executor,
+            RequestVisibility visibility,
             PlayerLookup players,
             PlayerLocator locator,
             Scheduler scheduler) {
@@ -69,6 +74,7 @@ public final class PlayerHopResolver implements HopResolver {
         }
         this.engine = Objects.requireNonNull(engine, "engine");
         this.executor = Objects.requireNonNull(executor, "executor");
+        this.visibility = Objects.requireNonNull(visibility, "visibility");
         this.players = Objects.requireNonNull(players, "players");
         this.locator = Objects.requireNonNull(locator, "locator");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -93,7 +99,7 @@ public final class PlayerHopResolver implements HopResolver {
     public HopResolution resolve(PendingHop hop) {
         Optional<PlayerRef> anchor = PlayerHops.anchorOf(hop.target());
         String label = label(hop);
-        if (anchor.isEmpty() || !players.isOnline(anchor.get().uuid())) {
+        if (anchor.isEmpty() || !players.isOnline(anchor.get().uuid()) || hidden(hop, anchor.get())) {
             return HopResolution.unreachable(label);
         }
         PlayerRef found = anchor.get();
@@ -120,6 +126,13 @@ public final class PlayerHopResolver implements HopResolver {
                     }
                 },
                 onMissed);
+    }
+
+    /** Whether the staff member who ordered {@code hop} may no longer see its anchor here. */
+    private boolean hidden(PendingHop hop, PlayerRef anchor) {
+        int seeLevel = PlayerHops.seeLevelOf(hop.target());
+        return seeLevel != RequestVisibility.SEES_EVERYONE
+                && visibility.hides(anchor, new PlayerRef(hop.player(), anchor.name()), seeLevel);
     }
 
     private void arrive(PlayerRef who, Position standing, Runnable onLanded, Runnable onMissed) {

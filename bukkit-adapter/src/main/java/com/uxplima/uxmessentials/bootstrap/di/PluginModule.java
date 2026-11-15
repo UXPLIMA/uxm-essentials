@@ -3068,7 +3068,9 @@ public final class PluginModule {
         com.uxplima.uxmessentials.teleport.adapter.MutableRequestVisibility requestVisibility = links.requestVisibility;
         if (requestVisibility != null) {
             requestVisibility.bind(new com.uxplima.uxmessentials.teleport.adapter.outbound.VanishRequestVisibility(
-                    wired.vanishStore(), wired.levels()));
+                    wired.vanishStore(),
+                    com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence),
+                    wired.levels()));
         }
         links.vanishNetwork = wired.network();
         links.queries.register(

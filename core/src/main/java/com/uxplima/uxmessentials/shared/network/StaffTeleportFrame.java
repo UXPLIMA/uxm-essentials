@@ -17,6 +17,7 @@ import java.util.UUID;
  * @param destinationUuid the player to move them to
  * @param destinationName the destination player's name
  * @param subjectServer the backend the subject is on
+ * @param seeLevel the staff member's vanish see level, so the backends involved can hide a vanished player from them
  */
 public record StaffTeleportFrame(
         String originServer,
@@ -27,7 +28,8 @@ public record StaffTeleportFrame(
         String subjectName,
         UUID destinationUuid,
         String destinationName,
-        String subjectServer)
+        String subjectServer,
+        int seeLevel)
         implements NetworkMessage {
 
     public StaffTeleportFrame {

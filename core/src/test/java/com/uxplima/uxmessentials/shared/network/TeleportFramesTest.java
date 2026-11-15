@@ -36,8 +36,8 @@ class TeleportFramesTest {
 
     @Test
     void aStaffTeleportCrossesTheWireUnchanged() {
-        StaffTeleportFrame sent =
-                new StaffTeleportFrame("creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1");
+        StaffTeleportFrame sent = new StaffTeleportFrame(
+                "creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1", 2);
 
         assertThat(roundTrip(sent)).isEqualTo(sent);
     }
@@ -48,16 +48,16 @@ class TeleportFramesTest {
                 "lobby-1", REQUEST, STEVE, "Steve", ALEX, "Alex", "survival-1", "TO_TARGET", 0, 1L));
         byte[] answer = NetworkMessageCodec.encode(
                 new TeleportAnswerFrame("survival-1", REQUEST, "DELIVERED", "lobby-1", ALEX, "Alex", ""));
-        byte[] staff = NetworkMessageCodec.encode(
-                new StaffTeleportFrame("creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1"));
+        byte[] staff = NetworkMessageCodec.encode(new StaffTeleportFrame(
+                "creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1", 2));
 
         assertThat(new byte[] {request[1], answer[1], staff[1]}).containsExactly(25, 26, 27);
     }
 
     @Test
     void aTeleportFrameAnOlderPeerDoesNotKnowIsRefusedButItsOriginStillReads() {
-        byte[] frame = NetworkMessageCodec.encode(
-                new StaffTeleportFrame("creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1"));
+        byte[] frame = NetworkMessageCodec.encode(new StaffTeleportFrame(
+                "creative-1", REQUEST, MOD, "Mod", STEVE, "Steve", ALEX, "Alex", "survival-1", 2));
         // What an older peer sees: a tag it has no type for.
         frame[1] = 120;
 

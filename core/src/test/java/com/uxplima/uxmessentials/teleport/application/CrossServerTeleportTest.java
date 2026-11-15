@@ -87,6 +87,9 @@ class CrossServerTeleportTest {
     private final List<TeleportKind> vetoAsked = new ArrayList<>();
     private final Bus bus = new Bus();
     private final Set<UUID> jailed = new HashSet<>();
+    /** The vanish rows every backend shares in the database, by player, at their use level. */
+    private final Map<UUID, Integer> vanishRows = new HashMap<>();
+
     private boolean proxyCarries = true;
     private boolean holdWarmups;
     private final List<Runnable[]> heldWarmups = new ArrayList<>();
@@ -562,7 +565,90 @@ class CrossServerTeleportTest {
         assertThat(keys(MOD)).containsExactly("teleport.tp.cross-server.no-answer", "teleport.tp.cross-server.sent");
     }
 
+    // Vanish holds for staff teleports across servers.
+
+    @Test
+    void staffGoingToAVanishedPlayerElsewhereReadsOfflineAndNobodyIsSent() {
+        vanish(survival, SAM);
+
+        creative.staff.goTo(MOD, "Sam");
+
+        assertThat(keys(MOD)).containsExactly("teleport.tpa.target-offline");
+        assertThat(hopTable.rows()).isEmpty();
+        assertThat(moves).isEmpty();
+    }
+
+    @Test
+    void staffWhoMaySeeTheVanishedPlayerReachThem() {
+        vanish(survival, SAM);
+        creative.seeLevels.put(MOD.uuid(), 1);
+
+        creative.staff.goTo(MOD, "Sam");
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).containsExactly("Mod@survival->10,64,10 ADMIN");
+    }
+
+    @Test
+    void aVanishedSubjectOnAnotherServerReadsOfflineAndIsNotMoved() {
+        vanish(survival, SAM);
+
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
+        bus.deliver();
+        scheduler.advance(SETTLE);
+
+        assertThat(keys(MOD)).containsExactly("teleport.tpa.target-offline");
+        assertThat(notifier.sent().get(0).placeholders()).containsEntry("player", "Sam");
+        assertThat(moves).isEmpty();
+    }
+
+    @Test
+    void aVanishedDestinationOnTheSubjectsServerReadsOfflineAndNobodyIsMoved() {
+        join(survival, ALEX, at(7, 7, 7));
+        vanish(survival, ALEX);
+
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
+        bus.deliver();
+
+        assertThat(keys(MOD)).containsExactly("teleport.tpa.target-offline");
+        assertThat(notifier.sent().get(0).placeholders()).containsEntry("player", "Alex");
+        assertThat(moves).isEmpty();
+    }
+
+    @Test
+    void aVanishedDestinationOnAThirdServerReadsOfflineAndTheSubjectIsNotSent() {
+        vanish(lobby, ALEX);
+
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
+        bus.deliver();
+        scheduler.advance(SETTLE);
+
+        assertThat(keys(MOD)).containsExactly("teleport.tpa.target-offline");
+        assertThat(keys(SAM)).isEmpty();
+        assertThat(hopTable.rows()).isEmpty();
+        assertThat(moves).isEmpty();
+    }
+
+    @Test
+    void aDestinationWhoVanishedBeforeTheirRowSaidSoIsRefusedAtTheLanding() {
+        // The destination's own backend already hides them; the shared row has not caught up.
+        survival.vanished.put(SAM.uuid(), 1);
+
+        creative.staff.goTo(MOD, "Sam");
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).isEmpty();
+        assertThat(keys(MOD)).containsExactly("teleport.cross-server.sending", "teleport.cross-server.failed");
+        assertThat(hopTable.rows()).isEmpty();
+    }
+
     // The scaffolding.
+
+    /** {@code player} vanishes at level 1 on {@code backend}, which writes the shared row too. */
+    private void vanish(Backend backend, PlayerRef player) {
+        backend.vanished.put(player.uuid(), 1);
+        vanishRows.put(player.uuid(), 1);
+    }
 
     private void acceptAlexToSam() {
         lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
@@ -639,9 +725,11 @@ class CrossServerTeleportTest {
                         return true;
                     },
                     log);
+            Visibility visibility = new Visibility();
             HopResolvers resolvers = new HopResolvers();
             for (HopKind kind : List.of(HopKind.PLAYER_REQUEST, HopKind.PLAYER_STAFF)) {
-                resolvers.register(new PlayerHopResolver(kind, engine, executor, players, this::locate, scheduler));
+                resolvers.register(
+                        new PlayerHopResolver(kind, engine, executor, visibility, players, this::locate, scheduler));
             }
             HopCharges charges = new HopCharges(notifier.notifier(), log);
             HopWatchdog watchdog = new HopWatchdog(hopTable, resolvers, charges, scheduler, log, HOP_TTL, clock);
@@ -657,7 +745,6 @@ class CrossServerTeleportTest {
                     who -> jailed.contains(who.uuid()),
                     who -> false,
                     clock);
-            Visibility visibility = new Visibility();
             Net network = new Net(name);
             AcceptTeleport[] holder = new AcceptTeleport[1];
             requests = new CrossServerRequests(
@@ -687,6 +774,7 @@ class CrossServerTeleportTest {
                     new Presence(name),
                     players,
                     this::locate,
+                    visibility,
                     hops,
                     executor,
                     notifier.notifier(),
@@ -711,12 +799,18 @@ class CrossServerTeleportTest {
 
             @Override
             public int seeLevel(PlayerRef viewer) {
-                return seeLevels.getOrDefault(viewer.uuid(), 0);
+                return viewer.isSystem() ? SEES_EVERYONE : seeLevels.getOrDefault(viewer.uuid(), 0);
             }
 
             @Override
             public boolean hides(PlayerRef target, PlayerRef viewer, int viewerSeeLevel) {
                 Integer level = vanished.get(target.uuid());
+                return level != null && viewerSeeLevel < level;
+            }
+
+            @Override
+            public boolean hiddenElsewhere(PlayerRef target, int viewerSeeLevel) {
+                Integer level = vanishRows.get(target.uuid());
                 return level != null && viewerSeeLevel < level;
             }
         }
