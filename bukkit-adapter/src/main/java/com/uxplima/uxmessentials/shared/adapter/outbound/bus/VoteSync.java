@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vote.CachedVoteRepository;
+import com.uxplima.uxmessentials.shared.application.RecentIds;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
@@ -36,7 +38,8 @@ import org.jspecify.annotations.NullMarked;
  *       counter, and on a remote {@link VotePartyFired}, drops the cached counter, re-broadcasts the party
  *       announcement on the configured channels and rewards the players online here whom the frame makes
  *       eligible. The origin paid only its own players, and a player is online on one backend at a time, so
- *       nobody is paid twice.
+ *       nobody is paid twice. With {@code network.transport = both} each frame arrives once per transport, so a
+ *       party id already celebrated here is dropped.
  * </ul>
  *
  * <p>The decorator wraps the <em>same</em> cache the vote commands read, so the loop closes: a write here emits
@@ -78,10 +81,11 @@ public final class VoteSync {
         Objects.requireNonNull(channels, "channels");
         Objects.requireNonNull(rewards, "rewards");
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
+        RecentIds celebrated = new RecentIds();
         return message -> {
             if (message instanceof VoteCounterChanged) {
                 dropCachedCounter.run();
-            } else if (message instanceof VotePartyFired fired) {
+            } else if (message instanceof VotePartyFired fired && firstCopy(fired, celebrated)) {
                 dropCachedCounter.run();
                 broadcaster.broadcast(
                         VoteMessageKey.VOTEPARTY_REACHED,
@@ -99,6 +103,14 @@ public final class VoteSync {
     }
 
     /**
+     * Whether {@code fired} is a party not yet celebrated here. A frame without an id cannot be told apart from a new
+     * party, so it is always run, as it was before frames carried one.
+     */
+    private static boolean firstCopy(VotePartyFired fired, RecentIds celebrated) {
+        return !fired.identified() || celebrated.firstTime(fired.partyId());
+    }
+
+    /**
      * A domain-event consumer that publishes a {@link VotePartyFired} when a {@link VotePartyTriggered} fires
      * locally, so peers celebrate the same party. Any other event is ignored.
      */
@@ -112,13 +124,15 @@ public final class VoteSync {
     }
 
     private static VotePartyFired fired(String origin, VotePartyTriggered triggered) {
+        UUID party = UUID.randomUUID();
+        int threshold = triggered.threshold();
         if (!triggered.onlyVoters()) {
-            return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.EVERYONE, Set.of());
+            return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.EVERYONE, Set.of());
         }
         if (triggered.absentVoters().size() > MAX_VOTERS_ON_WIRE) {
-            return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.NONE, Set.of());
+            return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.NONE, Set.of());
         }
-        return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.VOTERS, triggered.absentVoters());
+        return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.VOTERS, triggered.absentVoters());
     }
 
     /** Forwards every call to the cached delegate, then announces each counter mutation on the bus. */

@@ -103,9 +103,8 @@ Velocity proxy in front to connect the player.
 
 Every frame goes out on both carriers, for a network where some backends are reached only through the proxy and
 others only through Redis. A backend reached over both receives each frame twice. Frames that act carry an id or a
-sequence and act once (jail, private message, staff chat, helpop, teleport requests, presence), and a second cache
-reload is harmless. A vote party frame carries no id, so with `both` a backend reached over both carriers pays the
-network party reward twice. Use `both` only while moving from one carrier to the other.
+sequence and act once (jail, private message, staff chat, helpop, teleport requests, presence, vote party), and a
+second cache reload is harmless. Use `both` only while moving from one carrier to the other.
 
 ## The proxy plugin
 

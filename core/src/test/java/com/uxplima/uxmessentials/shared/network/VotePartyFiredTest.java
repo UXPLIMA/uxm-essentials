@@ -10,16 +10,21 @@ import java.util.UUID;
 
 import org.junit.jupiter.api.Test;
 
-/** A vote party tells the other servers whom they may reward, and a party from an older server rewards nobody. */
+/**
+ * A vote party tells the other servers whom they may reward and which party it is, and a party from an older server
+ * still decodes.
+ */
 class VotePartyFiredTest {
+
+    private static final UUID PARTY = UUID.fromString("00000000-0000-0000-0000-0000000000f1");
+    private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-000000000a1e");
+
+    private final ByteArrayOutputStream bytes = new ByteArrayOutputStream();
 
     @Test
     void theVotersOfAPartyCrossTheWireUnchanged() {
         VotePartyFired sent = new VotePartyFired(
-                "survival-1",
-                25,
-                VotePartyFired.Reach.VOTERS,
-                Set.of(UUID.fromString("00000000-0000-0000-0000-000000000a1e"), new UUID(7L, 9L)));
+                "survival-1", PARTY, 25, VotePartyFired.Reach.VOTERS, Set.of(ALEX, new UUID(7L, 9L)));
 
         NetworkMessage received = NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
 
@@ -28,7 +33,7 @@ class VotePartyFiredTest {
 
     @Test
     void aPartyForEveryoneCrossesTheWireUnchanged() {
-        VotePartyFired sent = new VotePartyFired("survival-1", 25, VotePartyFired.Reach.EVERYONE, Set.of());
+        VotePartyFired sent = new VotePartyFired("survival-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of());
 
         NetworkMessage received = NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
 
@@ -37,16 +42,53 @@ class VotePartyFiredTest {
 
     @Test
     void aPartyFromAServerThatSendsOnlyTheThresholdRewardsNobody() throws IOException {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (DataOutputStream out = new DataOutputStream(bytes)) {
-            out.writeByte(NetworkMessageCodec.VERSION);
-            out.writeByte(NetworkMessage.MessageType.VOTE_PARTY_FIRED.wireTag());
-            out.writeUTF("survival-1");
+        try (DataOutputStream out = header()) {
             out.writeInt(25);
         }
 
         NetworkMessage received = NetworkMessageCodec.decode(bytes.toByteArray());
 
-        assertThat(received).isEqualTo(new VotePartyFired("survival-1", 25, VotePartyFired.Reach.NONE, Set.of()));
+        assertThat(received)
+                .isEqualTo(new VotePartyFired(
+                        "survival-1", VotePartyFired.NO_ID, 25, VotePartyFired.Reach.NONE, Set.of()));
+    }
+
+    @Test
+    void aPartyFromAServerThatSendsNoPartyIdStillRewardsItsVoters() throws IOException {
+        try (DataOutputStream out = header()) {
+            out.writeInt(25);
+            out.writeByte(VotePartyFired.Reach.VOTERS.wireTag());
+            out.writeInt(1);
+            out.writeLong(ALEX.getMostSignificantBits());
+            out.writeLong(ALEX.getLeastSignificantBits());
+        }
+
+        NetworkMessage received = NetworkMessageCodec.decode(bytes.toByteArray());
+
+        assertThat(received)
+                .isEqualTo(new VotePartyFired(
+                        "survival-1", VotePartyFired.NO_ID, 25, VotePartyFired.Reach.VOTERS, Set.of(ALEX)));
+    }
+
+    @Test
+    void aPartyFromAServerThatSendsNoPartyIdStillRewardsEveryone() throws IOException {
+        try (DataOutputStream out = header()) {
+            out.writeInt(25);
+            out.writeByte(VotePartyFired.Reach.EVERYONE.wireTag());
+        }
+
+        NetworkMessage received = NetworkMessageCodec.decode(bytes.toByteArray());
+
+        assertThat(received)
+                .isEqualTo(new VotePartyFired(
+                        "survival-1", VotePartyFired.NO_ID, 25, VotePartyFired.Reach.EVERYONE, Set.of()));
+    }
+
+    private DataOutputStream header() throws IOException {
+        DataOutputStream out = new DataOutputStream(bytes);
+        out.writeByte(NetworkMessageCodec.VERSION);
+        out.writeByte(NetworkMessage.MessageType.VOTE_PARTY_FIRED.wireTag());
+        out.writeUTF("survival-1");
+        return out;
     }
 }
