@@ -6,7 +6,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -92,7 +94,7 @@ public final class NetworkMessageCodec {
                 // Written last: a peer on the older layout stops reading after the timestamp and never sees it.
                 out.writeLong(ping.bootNonce());
             }
-            case VotePartyFired party -> out.writeInt(party.threshold());
+            case VotePartyFired party -> writeParty(out, party);
             case VoteCounterChanged counter -> {
                 // origin already written above; the counter frame carries no further body.
             }
@@ -115,6 +117,7 @@ public final class NetworkMessageCodec {
                 out.writeUTF(guard.world());
                 out.writeUTF(guard.region());
             }
+            case IpBanChanged ipBan -> out.writeUTF(ipBan.ip());
         }
     }
 
@@ -132,7 +135,7 @@ public final class NetworkMessageCodec {
             case NPC_CHANGED -> new NpcChanged(origin, in.readUTF());
             case IGNORE_CHANGED -> new IgnoreChanged(origin, readUuid(in));
             case SERVER_PING -> new ServerPing(origin, in.readLong(), readOptionalLong(in, ServerPing.NO_NONCE));
-            case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
+            case VOTE_PARTY_FIRED -> readParty(in, origin);
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);
             case TRADE_SIGNAL ->
                 new TradeSignalFrame(
@@ -140,6 +143,7 @@ public final class NetworkMessageCodec {
             case VANISH_STATE_CHANGED ->
                 new VanishStateChanged(origin, readUuid(in), in.readUTF(), in.readBoolean(), in.readInt());
             case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
+            case IP_BAN_CHANGED -> new IpBanChanged(origin, in.readUTF());
         };
     }
 
@@ -150,6 +154,42 @@ public final class NetworkMessageCodec {
      */
     private static long readOptionalLong(DataInputStream in, long absent) throws IOException {
         return in.available() >= Long.BYTES ? in.readLong() : absent;
+    }
+
+    /**
+     * The reach and voters follow the threshold so an older decoder, which stops after the threshold, still reads
+     * the frame it knew.
+     */
+    private static void writeParty(DataOutputStream out, VotePartyFired party) throws IOException {
+        out.writeInt(party.threshold());
+        out.writeByte(party.reach().wireTag());
+        if (party.reach() == VotePartyFired.Reach.VOTERS) {
+            out.writeInt(party.voters().size());
+            for (UUID voter : party.voters()) {
+                writeUuid(out, voter);
+            }
+        }
+    }
+
+    private static VotePartyFired readParty(DataInputStream in, String origin) throws IOException {
+        int threshold = in.readInt();
+        if (in.available() == 0) {
+            // A frame without the reach byte names nobody for a peer to reward.
+            return new VotePartyFired(origin, threshold, VotePartyFired.Reach.NONE, Set.of());
+        }
+        VotePartyFired.Reach reach = VotePartyFired.Reach.fromWireTag(in.readByte());
+        if (reach != VotePartyFired.Reach.VOTERS) {
+            return new VotePartyFired(origin, threshold, reach, Set.of());
+        }
+        int count = in.readInt();
+        if (count < 0) {
+            throw new IOException("negative voter count: " + count);
+        }
+        Set<UUID> voters = new HashSet<>();
+        for (int i = 0; i < count; i++) {
+            voters.add(readUuid(in));
+        }
+        return new VotePartyFired(origin, threshold, reach, voters);
     }
 
     private static void writeUuid(DataOutputStream out, UUID uuid) throws IOException {

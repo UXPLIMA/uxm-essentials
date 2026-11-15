@@ -7,6 +7,7 @@ import java.util.function.Consumer;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.BanChanged;
+import com.uxplima.uxmessentials.shared.network.IpBanChanged;
 import com.uxplima.uxmessentials.shared.network.MuteChanged;
 import org.jspecify.annotations.NullMarked;
 
@@ -18,11 +19,13 @@ import org.jspecify.annotations.NullMarked;
  * <ul>
  *   <li><b>Outbound</b>: {@link #publisher(BusPublisher)} binds the bus-agnostic {@link SanctionSync} port to
  *       the bus, so a successful {@code /ban}/{@code /tempban} publishes a {@link BanChanged} and a successful
- *       {@code /mute} publishes a {@link MuteChanged}, each stamped with this backend's origin.
- *   <li><b>Inbound</b>: {@link #listener(Consumer)} returns a {@link RemoteSyncListener} that, on a remote
- *       {@code BanChanged}, hands the target UUID to the wired re-enforcement action (the
+ *       {@code /mute} publishes a {@link MuteChanged}, and a successful {@code /banip}/{@code /tempbanip} an
+ *       {@link IpBanChanged}, each stamped with this backend's origin.
+ *   <li><b>Inbound</b>: {@link #listener(Consumer, Consumer)} returns a {@link RemoteSyncListener} that, on a
+ *       remote {@code BanChanged}, hands the target UUID to the wired re-enforcement action (the
  *       {@code EnforceRemoteBan} use case) which re-evaluates that target's ban here and kicks them if it is in
- *       effect and they are online. A {@code MuteChanged} is a no-op: the messaging mute gate re-reads the
+ *       effect and they are online, and on a remote {@code IpBanChanged} hands the address to
+ *       {@code EnforceRemoteIpBan}, which kicks everyone here on it. A {@code MuteChanged} is a no-op: the messaging mute gate re-reads the
  *       shared DB on the next chat attempt, so there is no in-memory mute state to refresh.
  * </ul>
  *
@@ -44,15 +47,19 @@ public final class ModerationSync {
 
     /**
      * A listener that hands a remote {@link BanChanged}'s target to {@code onRemoteBan} (the re-enforcement
-     * action that kicks an online, still-banned target); a {@link MuteChanged} is a no-op. The action is a
+     * action that kicks an online, still-banned target) and a remote {@link IpBanChanged}'s address to
+     * {@code onRemoteIpBan} (which kicks everyone here on that address); a {@link MuteChanged} is a no-op. The action is a
      * {@code Consumer<UUID>} so the wiring passes {@code enforce::onRemoteBan} and this seam stays trivially
      * testable without the use case's port graph.
      */
-    public static RemoteSyncListener listener(Consumer<UUID> onRemoteBan) {
+    public static RemoteSyncListener listener(Consumer<UUID> onRemoteBan, Consumer<String> onRemoteIpBan) {
         Objects.requireNonNull(onRemoteBan, "onRemoteBan");
+        Objects.requireNonNull(onRemoteIpBan, "onRemoteIpBan");
         return message -> {
             if (message instanceof BanChanged changed) {
                 onRemoteBan.accept(changed.target());
+            } else if (message instanceof IpBanChanged ipBan) {
+                onRemoteIpBan.accept(ipBan.ip());
             }
             // MuteChanged: no in-memory mute cache to refresh: the mute gate re-reads the shared DB on next chat.
         };
@@ -69,6 +76,11 @@ public final class ModerationSync {
         @Override
         public void muteChanged(PlayerRef target) {
             bus.publish(new MuteChanged(bus.serverId(), target.uuid()));
+        }
+
+        @Override
+        public void ipBanChanged(String ip) {
+            bus.publish(new IpBanChanged(bus.serverId(), ip));
         }
     }
 }

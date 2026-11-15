@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
+import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
 import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.port.ForwardingVoteRepository;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
@@ -30,11 +31,12 @@ import org.jspecify.annotations.NullMarked;
  *   <li><b>Outbound (party fire)</b>: {@link #partyPublisher(BusPublisher)} returns a domain-event consumer
  *       that, on a local {@link VotePartyTriggered}, publishes a {@link VotePartyFired} frame so peers run
  *       their own party celebration once, in lockstep, rather than each racing to detect the crossing.
- *   <li><b>Inbound</b>: {@link #listener(CachedVoteRepository, VoteBroadcaster, Set)} returns a
- *       {@link RemoteSyncListener} that, on a remote {@link VoteCounterChanged}, drops the cached counter, and
- *       on a remote {@link VotePartyFired}, drops the cached counter <em>and</em> re-broadcasts the party
- *       announcement on the configured channels. It never applies any reward, the origin backend already paid
- *       its players out, and the shared DB holds the authoritative reset; a peer only echoes the announcement.
+ *   <li><b>Inbound</b>: {@link #listener(CachedVoteRepository, VoteBroadcaster, Set, RewardNetworkParty)}
+ *       returns a {@link RemoteSyncListener} that, on a remote {@link VoteCounterChanged}, drops the cached
+ *       counter, and on a remote {@link VotePartyFired}, drops the cached counter, re-broadcasts the party
+ *       announcement on the configured channels and rewards the players online here whom the frame makes
+ *       eligible. The origin paid only its own players, and a player is online on one backend at a time, so
+ *       nobody is paid twice.
  * </ul>
  *
  * <p>The decorator wraps the <em>same</em> cache the vote commands read, so the loop closes: a write here emits
@@ -43,6 +45,12 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class VoteSync {
+
+    /**
+     * The proxy relays a frame to a backend as a plugin message the server refuses above 32767 bytes, which
+     * disconnects the player carrying it. At 16 bytes a voter this keeps the frame near half of that.
+     */
+    static final int MAX_VOTERS_ON_WIRE = 1000;
 
     private VoteSync() {}
 
@@ -55,14 +63,19 @@ public final class VoteSync {
 
     /**
      * A listener that drops the cached counter on a remote {@link VoteCounterChanged}, and on a remote
-     * {@link VotePartyFired} drops the counter and re-broadcasts {@link VoteMessageKey#VOTEPARTY_REACHED} on
-     * {@code channels}. It applies no reward; the origin already paid its players out.
+     * {@link VotePartyFired} drops the counter, re-broadcasts {@link VoteMessageKey#VOTEPARTY_REACHED} on
+     * {@code channels} and hands the frame's eligible players to {@code rewards}, which pays the ones online
+     * here.
      */
     public static RemoteSyncListener listener(
-            CachedVoteRepository cache, VoteBroadcaster broadcaster, Set<BroadcastChannel> channels) {
+            CachedVoteRepository cache,
+            VoteBroadcaster broadcaster,
+            Set<BroadcastChannel> channels,
+            RewardNetworkParty rewards) {
         Objects.requireNonNull(cache, "cache");
         Objects.requireNonNull(broadcaster, "broadcaster");
         Objects.requireNonNull(channels, "channels");
+        Objects.requireNonNull(rewards, "rewards");
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
         return message -> {
             if (message instanceof VoteCounterChanged) {
@@ -73,6 +86,13 @@ public final class VoteSync {
                         VoteMessageKey.VOTEPARTY_REACHED,
                         Map.of("threshold", Integer.toString(fired.threshold())),
                         safeChannels);
+                switch (fired.reach()) {
+                    case EVERYONE -> rewards.rewardEveryone();
+                    case VOTERS -> rewards.rewardVoters(fired.voters());
+                    case NONE -> {
+                        // The origin predates network rewards or its voter list was too long to send.
+                    }
+                }
             }
         };
     }
@@ -85,9 +105,19 @@ public final class VoteSync {
         Objects.requireNonNull(bus, "bus");
         return event -> {
             if (event instanceof VotePartyTriggered triggered) {
-                bus.publish(new VotePartyFired(bus.serverId(), triggered.threshold()));
+                bus.publish(fired(bus.serverId(), triggered));
             }
         };
+    }
+
+    private static VotePartyFired fired(String origin, VotePartyTriggered triggered) {
+        if (!triggered.onlyVoters()) {
+            return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.EVERYONE, Set.of());
+        }
+        if (triggered.absentVoters().size() > MAX_VOTERS_ON_WIRE) {
+            return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.NONE, Set.of());
+        }
+        return new VotePartyFired(origin, triggered.threshold(), VotePartyFired.Reach.VOTERS, triggered.absentVoters());
     }
 
     /** Forwards every call to the cached delegate, then announces each counter mutation on the bus. */

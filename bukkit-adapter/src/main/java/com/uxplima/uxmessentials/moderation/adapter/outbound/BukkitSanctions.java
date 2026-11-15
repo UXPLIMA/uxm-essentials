@@ -1,11 +1,14 @@
 package com.uxplima.uxmessentials.moderation.adapter.outbound;
 
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.Collection;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import org.bukkit.Location;
 import org.bukkit.Server;
@@ -15,6 +18,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationSettings;
+import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
@@ -25,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link Sanctions} adapter: the live-player side of a sanction on top of the Paper {@link Server} and the
@@ -61,6 +66,33 @@ public final class BukkitSanctions implements Sanctions {
         Objects.requireNonNull(reasonText, "reasonText");
         Component reason = StyledText.render(reasonText);
         scheduler.onEntity(target, () -> withPlayer(target, player -> player.kick(reason)));
+    }
+
+    @Override
+    public void kickAddress(String ip, Function<PlayerRef, String> reasonFor) {
+        Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(reasonFor, "reasonFor");
+        // Callers reach this from a command thread or the async bus thread, and the roster is only consistently
+        // readable on the global region thread on Folia, so the scan hops there; each kick then hops to the
+        // player's own entity thread like kick() does.
+        scheduler.onGlobal(() -> {
+            for (Player player : server.getOnlinePlayers()) {
+                if (ip.equals(addressOf(player))) {
+                    PlayerRef ref = BukkitRefs.toRef(player);
+                    kick(ref, ModerationMessageKey.BANIP_KICK, reasonFor.apply(ref));
+                }
+            }
+        });
+    }
+
+    /** The address the join listener records for the player, which is what {@code /banip <player>} bans. */
+    private static @Nullable String addressOf(Player player) {
+        InetSocketAddress socket = player.getAddress();
+        if (socket == null) {
+            return null;
+        }
+        InetAddress address = socket.getAddress();
+        return address == null ? null : address.getHostAddress();
     }
 
     @Override

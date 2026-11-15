@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.moderation.application.ClearWarns;
 import com.uxplima.uxmessentials.moderation.application.CommandSpy;
 import com.uxplima.uxmessentials.moderation.application.DelJail;
 import com.uxplima.uxmessentials.moderation.application.EnforceRemoteBan;
+import com.uxplima.uxmessentials.moderation.application.EnforceRemoteIpBan;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
@@ -207,7 +208,9 @@ public final class ModerationWiring {
         // already kicked) never double-kicks; with the bus disabled this listener is never invoked.
         EnforceRemoteBan enforce = new EnforceRemoteBan(
                 repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
-        bus.registry().register(ModerationSync.listener(enforce::onRemoteBan));
+        EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
+                repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
+        bus.registry().register(ModerationSync.listener(enforce::onRemoteBan, enforceIp::onRemoteIpBan));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
@@ -423,8 +426,10 @@ public final class ModerationWiring {
                         new ReviewPunishmentStats(sanctionHistory, new PunishmentStats(), notifier, clock))
                 .checkBan(new CheckBan(repository, notifier, clock))
                 .checkMute(new CheckMute(repository, notifier, clock))
-                .banIp(new BanIp(repository, ipAlts, notifier, audit, kernel.events(), history, clock))
-                .tempBanIp(new TempBanIp(repository, ipAlts, notifier, audit, kernel.events(), history, clock))
+                .banIp(new BanIp(
+                        repository, sanctionPort, sync, ipAlts, notifier, audit, kernel.events(), history, clock))
+                .tempBanIp(new TempBanIp(
+                        repository, sanctionPort, sync, ipAlts, notifier, audit, kernel.events(), history, clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
                 .seen(new Seen(

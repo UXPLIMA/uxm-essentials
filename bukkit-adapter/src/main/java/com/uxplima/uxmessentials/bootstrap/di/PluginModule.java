@@ -3441,7 +3441,8 @@ public final class PluginModule {
         // reward dispatcher on the global region thread, and the online audience for the party rewards and
         // thank-you broadcast. It syncs the server-wide party counter through the bus handle, a counter
         // mutation here announces a VoteCounterChanged, a remote one drops the cached counter, and a remote
-        // VotePartyFired echoes the party announcement (never the reward), but carries no cross-context bridge.
+        // VotePartyFired echoes the party announcement and pays the players online here, but carries no
+        // cross-context bridge.
         // The reflective Votifier listener self-registers behind a plugin-present guard on start and is dropped
         // on disable, so the module runs unchanged whether or not Votifier is installed. The repository and
         // threshold are surfaced for the PAPI vote placeholder seam registered after all contexts have wired.
