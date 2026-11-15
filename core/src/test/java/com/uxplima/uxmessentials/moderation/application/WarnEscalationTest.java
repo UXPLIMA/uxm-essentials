@@ -216,6 +216,19 @@ class WarnEscalationTest {
     }
 
     @Test
+    void aWarningThatIsNotSilentAnnouncesTheWarningsAndTheEscalatedMute() {
+        warnTimes(3, false);
+
+        assertThat(escalations()).isEqualTo(1);
+        assertThat(broadcasts)
+                .containsExactly(
+                        ModerationMessageKey.MOD_BROADCAST_WARN,
+                        ModerationMessageKey.MOD_BROADCAST_WARN,
+                        ModerationMessageKey.MOD_BROADCAST_WARN,
+                        ModerationMessageKey.MOD_BROADCAST_MUTE);
+    }
+
+    @Test
     void anExemptPlayerIsNeitherWarnedNorEscalated() {
         permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
 

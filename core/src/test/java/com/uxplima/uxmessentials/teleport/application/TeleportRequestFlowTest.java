@@ -128,7 +128,11 @@ class TeleportRequestFlowTest {
         assertThat(warmups.pending()).isZero();
         assertThat(requests.all()).isEmpty();
         assertThat(alexIsOnCooldown()).isFalse();
-        assertThat(notifier.keys()).contains("teleport.tpa.expired");
+        assertThat(notifier.sent())
+                .filteredOn(line -> line.key().equals("teleport.tpa.expired"))
+                .containsExactly(
+                        new RecordingNotifier.Sent(ALEX, "teleport.tpa.expired", Map.of("player", "Sam")),
+                        new RecordingNotifier.Sent(SAM, "teleport.tpa.expired", Map.of("player", "Alex")));
     }
 
     @Test

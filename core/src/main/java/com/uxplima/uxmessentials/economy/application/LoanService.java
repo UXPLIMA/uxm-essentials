@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.economy.application.port.LoanRepository;
 import com.uxplima.uxmessentials.economy.domain.Loan;
@@ -81,11 +82,29 @@ public final class LoanService {
         return Result.ok(loan);
     }
 
-    /** Pays an installment of a loan. Increases credit score on successful payment. */
+    /**
+     * Pays {@code amount} towards a loan. Increases credit score on successful payment. A zero or negative amount
+     * is refused with {@link LoanError#INVALID_TERMS}: it is not a payment, and the domain would throw on it.
+     */
     public Result<Unit, LoanError> payInstallment(PlayerRef debtor, String loanId, Money amount) {
+        Objects.requireNonNull(amount, "amount");
+        if (amount.isNegative() || amount.isZero()) {
+            return Result.err(LoanError.INVALID_TERMS);
+        }
+        return pay(debtor, loanId, loan -> amount).map(settled -> Unit.INSTANCE);
+    }
+
+    /**
+     * Pays the loan's next installment, the figure automatic repayment would collect, and returns what was settled.
+     * Increases credit score on successful payment.
+     */
+    public Result<Money, LoanError> payInstallment(PlayerRef debtor, String loanId) {
+        return pay(debtor, loanId, LoanService::dueInstallment);
+    }
+
+    private Result<Money, LoanError> pay(PlayerRef debtor, String loanId, Function<Loan, Money> offer) {
         Objects.requireNonNull(debtor, "debtor");
         Objects.requireNonNull(loanId, "loanId");
-        Objects.requireNonNull(amount, "amount");
         if (!nativeLedger) {
             return Result.err(LoanError.PROVIDER_UNSUPPORTED);
         }
@@ -101,7 +120,7 @@ public final class LoanService {
 
         // The settlement never exceeds the residual. The final installment clears the exact remainder, and an
         // over-offer is trimmed here so the debtor is never debited more than they owe.
-        Money settlement = loan.settlementFor(amount);
+        Money settlement = loan.settlementFor(offer.apply(loan));
         Loan updated = loan.afterPayment(settlement).withNextPayment(nextCycle());
         Result<Unit, TransferError> applied =
                 loanRepository.applyRepayment(debtor, settlement, updated, updated.isFullyPaid());
@@ -110,7 +129,15 @@ public final class LoanService {
         }
         bumpScore(debtor, policy.onTimeManualDelta());
         events.publish(new LoanRepaid(loan.id(), debtor, settlement, updated.remainingAmount()));
-        return Result.ok();
+        return Result.ok(settlement);
+    }
+
+    /**
+     * What one installment of {@code loan} collects. A stored installment that rounds to nothing is not a payment,
+     * so the remainder is collected instead: it closes the loan, where a zero settlement would throw.
+     */
+    private static Money dueInstallment(Loan loan) {
+        return loan.installmentAmount().isZero() ? loan.remainingAmount() : loan.installmentAmount();
     }
 
     /** Background scheduler routine to automatically repay due loans. Reduces credit score on failure. */
@@ -126,10 +153,8 @@ public final class LoanService {
 
     private void attemptAutoRepayment(Loan loan) {
         PlayerRef debtor = loan.debtor();
-        // A stored installment that rounds to nothing is not a payment; collecting the remainder still closes the
-        // loan, where a zero settlement would throw and stop every loan after it in this run.
-        Money due = loan.installmentAmount().isZero() ? loan.remainingAmount() : loan.installmentAmount();
-        Money settlement = loan.settlementFor(due);
+        // dueInstallment never offers zero, which would throw and stop every loan after this one in the run.
+        Money settlement = loan.settlementFor(dueInstallment(loan));
         Loan updated = loan.afterPayment(settlement).withNextPayment(nextCycle());
         Result<Unit, TransferError> applied =
                 loanRepository.applyRepayment(debtor, settlement, updated, updated.isFullyPaid());

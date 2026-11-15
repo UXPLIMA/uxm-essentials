@@ -39,6 +39,17 @@ class LoanServiceTest {
     private static final Currency DOLLARS =
             Currency.builder(CurrencyId.of("dollars")).build();
     private static final Duration CYCLE = Duration.ofHours(24);
+    /** A stored loan whose installment rounds to nothing: 0.49 owed, 0.00 per installment. */
+    private static final Loan STUCK = new Loan(
+            "stuck",
+            SAM,
+            Money.of(DOLLARS, new BigDecimal("0.40")),
+            Money.of(DOLLARS, new BigDecimal("0.49")),
+            new BigDecimal("0.22"),
+            100,
+            Money.zero(DOLLARS),
+            NOW.toEpochMilli(),
+            NOW.toEpochMilli());
 
     private final MutableClock clock = new MutableClock(NOW);
     private final InMemoryBank bank = new InMemoryBank(DOLLARS);
@@ -152,6 +163,43 @@ class LoanServiceTest {
     }
 
     @Test
+    void payingTheNextInstallmentTakesTheInstallmentAndAnswersWhatItSettled() {
+        Loan loan = take("1000", 10);
+
+        Result<Money, LoanError> paid = service.payInstallment(ALEX, loan.id());
+
+        assertThat(paid.orElseThrow().amount()).isEqualByComparingTo("122");
+        assertThat(wallet(ALEX)).isEqualByComparingTo("878");
+        assertThat(stored(loan).remainingAmount().amount()).isEqualByComparingTo("1098");
+    }
+
+    @Test
+    void theNextInstallmentOfAStoredLoanThatRoundsToNothingCollectsTheRemainder() {
+        loans.byId.put(STUCK.id(), STUCK);
+        bank.set(SAM, dollars("1"));
+
+        Result<Money, LoanError> paid = service.payInstallment(SAM, STUCK.id());
+
+        assertThat(paid.orElseThrow().amount()).isEqualByComparingTo("0.49");
+        assertThat(wallet(SAM)).isEqualByComparingTo("0.51");
+        assertThat(loans.byId).isEmpty();
+    }
+
+    @Test
+    void aZeroOrNegativePaymentIsRefusedAndTakesNothing() {
+        Loan loan = take("1000", 10);
+
+        assertThat(service.payInstallment(ALEX, loan.id(), dollars("0")).errorOrThrow())
+                .isEqualTo(LoanError.INVALID_TERMS);
+        assertThat(service.payInstallment(ALEX, loan.id(), dollars("-5")).errorOrThrow())
+                .isEqualTo(LoanError.INVALID_TERMS);
+
+        assertThat(wallet(ALEX)).isEqualByComparingTo("1000");
+        assertThat(stored(loan).remainingAmount().amount()).isEqualByComparingTo("1220");
+        assertThat(loans.scores).doesNotContainKey(ALEX.uuid());
+    }
+
+    @Test
     void anAutomaticInstallmentIsCollectedOnlyOnceItFallsDue() {
         Loan loan = take("1000", 10);
 
@@ -208,17 +256,7 @@ class LoanServiceTest {
 
     @Test
     void aStoredLoanWhoseInstallmentRoundsToNothingDoesNotStopTheOthersBeingCollected() {
-        Loan stuck = new Loan(
-                "stuck",
-                SAM,
-                dollars("0.40"),
-                dollars("0.49"),
-                new BigDecimal("0.22"),
-                100,
-                dollars("0"),
-                NOW.toEpochMilli(),
-                NOW.toEpochMilli());
-        loans.byId.put(stuck.id(), stuck);
+        loans.byId.put(STUCK.id(), STUCK);
         bank.set(SAM, dollars("1"));
         Loan loan = take("1000", 10);
 

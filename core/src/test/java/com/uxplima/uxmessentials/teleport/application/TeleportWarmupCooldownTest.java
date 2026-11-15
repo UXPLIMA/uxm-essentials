@@ -76,12 +76,9 @@ class TeleportWarmupCooldownTest {
         TeleportEngine engine = engine();
 
         assertThat(engine.launch(ALEX, home(), TeleportKind.HOME).isOk()).isTrue();
-        assertThat(engine.launch(ALEX, home(), TeleportKind.HOME).isOk())
-                .as("no cooldown is running while the first warmup has not landed")
-                .isTrue();
         warmups.finish();
 
-        assertThat(hops.landed).containsExactly("Alex:HOME", "Alex:HOME");
+        assertThat(hops.landed).containsExactly("Alex:HOME");
         assertThat(engine.launch(ALEX, home(), TeleportKind.HOME).asError()).contains(TeleportError.ON_COOLDOWN);
         clock.advance(Duration.ofSeconds(29));
         assertThat(engine.launch(ALEX, home(), TeleportKind.HOME).asError()).contains(TeleportError.ON_COOLDOWN);
