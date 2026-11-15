@@ -3,15 +3,18 @@ package com.uxplima.uxmessentials.teleport.application.port;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Outbound port for spawn resolution: the operator-set per-world spawn, the single global main spawn used
- * when a world has no spawn of its own, operator-defined named spawns, and the per-world spawn-mirror rules.
- * The {@link com.uxplima.uxmessentials.teleport.application.ResolveSpawn} use case folds a mirror (when
- * present) through this directory so a mirrored {@code /spawn} reads the live target-world spawn rather than
- * a copied location.
+ * Outbound port for spawn resolution: the operator-set per-world spawn, the main spawns used when a world has
+ * no spawn of its own (one network-wide and one for each server scope an operator set), operator-defined named
+ * spawns, and the per-world spawn-mirror rules. The
+ * {@link com.uxplima.uxmessentials.teleport.application.ResolveSpawn} use case folds a mirror (when present)
+ * through this directory so a mirrored {@code /spawn} reads the live target-world spawn rather than a copied
+ * location.
  *
  * <p>Two read methods address the per-world spawn at different layers. {@link #operatorSpawn} returns only
  * the operator-set row (empty when none) so the use case can fall through to the {@link #mainSpawn} and then
@@ -30,8 +33,12 @@ public interface SpawnDirectory {
     /** Only the operator-set per-world spawn for {@code world}, with no fallback: empty when none is set. */
     Optional<Position> operatorSpawn(WorldRef world);
 
-    /** The global main spawn ({@code /setmainspawn}) used when a world has no spawn of its own, or empty. */
-    Optional<Position> mainSpawn();
+    /**
+     * The main spawn ({@code /setmainspawn}) stored for exactly {@code scope}, or the network-wide one when
+     * {@code scope} is {@code null}; empty when none is stored there. Which of them applies on a server is the
+     * use case's decision.
+     */
+    Optional<Position> mainSpawn(@Nullable ServerScope scope);
 
     /** A named spawn ({@code /spawn <name>}), or empty when no spawn answers to that name. */
     Optional<Position> namedSpawn(String name);
@@ -45,8 +52,8 @@ public interface SpawnDirectory {
     /** Set or replace the named spawn {@code name}. */
     void setNamedSpawn(String name, Position position);
 
-    /** Set or replace the global main spawn. */
-    void setMainSpawn(Position position);
+    /** Set or replace the main spawn of {@code scope}, or the network-wide one when {@code scope} is {@code null}. */
+    void setMainSpawn(@Nullable ServerScope scope, Position position);
 
     /** Remove the operator-set per-world spawn for {@code world}; true when a spawn existed and was removed. */
     boolean removeDefaultSpawn(WorldRef world);

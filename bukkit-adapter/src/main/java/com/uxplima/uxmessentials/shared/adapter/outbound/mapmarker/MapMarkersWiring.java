@@ -9,6 +9,7 @@ import org.bukkit.Server;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.mapmarker.MapMarkerPublisher;
 import com.uxplima.uxmessentials.shared.application.mapmarker.MapMarkerService;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -59,7 +61,8 @@ public final class MapMarkersWiring {
         if (!settings.enabled() || !MapMarkerPublishers.anyPresent(server)) {
             return Stopped.inert();
         }
-        return start(server, persistence, scheduler, events, log, settings);
+        LocalServer local = NetworkConfig.from(config).localServer();
+        return start(server, persistence, scheduler, events, log, settings, local);
     }
 
     private static Stopped start(
@@ -68,9 +71,11 @@ public final class MapMarkersWiring {
             Scheduler scheduler,
             InProcessDomainEventPublisher events,
             Logger log,
-            MapMarkerSettings settings) {
+            MapMarkerSettings settings,
+            LocalServer local) {
         MapMarkerPublisher publisher = MapMarkerPublishers.discover(server, settings, log);
-        MapMarkerService service = new MapMarkerService(publisher, settings, sources(server, persistence, settings));
+        MapMarkerService service =
+                new MapMarkerService(publisher, settings, sources(server, persistence, settings, local));
         Consumer<DomainEvent> subscriber = event -> scheduler.async(() -> service.onEvent(event));
         events.subscribe(subscriber);
         scheduler.async(service::refreshAll);
@@ -81,13 +86,14 @@ public final class MapMarkersWiring {
         });
     }
 
-    private static List<MapMarkerSource> sources(Server server, Persistence persistence, MapMarkerSettings settings) {
+    private static List<MapMarkerSource> sources(
+            Server server, Persistence persistence, MapMarkerSettings settings, LocalServer local) {
         // Only warps and spawns have an enumerable source for the on-enable refresh. Homes have no
         // all-owners list (and are private), so they populate only via the opt-in HomeCreated/HomeDeleted
         // events the service handles directly: never bulk-rendered.
         return List.of(
                 new WarpMarkerSource(WarpRepositories.cached(persistence), settings),
-                new SpawnMarkerSource(server, SpawnDirectories.jooq(persistence), settings));
+                new SpawnMarkerSource(server, SpawnDirectories.jooq(persistence), settings, local));
     }
 
     /** The integration's disable hook: unsubscribe from the bus and clear the rendered layer. */

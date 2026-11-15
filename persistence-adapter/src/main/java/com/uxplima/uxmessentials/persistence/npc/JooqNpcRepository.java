@@ -222,6 +222,7 @@ public final class JooqNpcRepository extends JooqRepository implements NpcReposi
                 .set(NPC.SILENT, record.getSilent())
                 .set(NPC.VIEW_DISTANCE, record.getViewDistance())
                 .set(NPC.TURN_DISTANCE, record.getTurnDistance())
+                .set(NPC.SCOPE, record.getScope())
                 .set(NPC.CREATED_AT, record.getCreatedAt())
                 .execute();
     }

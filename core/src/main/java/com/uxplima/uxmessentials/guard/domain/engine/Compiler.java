@@ -15,7 +15,6 @@ import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
@@ -24,6 +23,7 @@ import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -190,7 +190,7 @@ public final class Compiler {
     private static Region defaultsRegion(Input input) {
         return Region.create(
                         new RegionKey(input.world(), RegionId.WORLD_DEFAULTS),
-                        GuardScope.server("defaults"),
+                        ServerScope.server("defaults"),
                         new Shape.Global())
                 .withPriority(Integer.MIN_VALUE)
                 .withRules(input.defaultRules())

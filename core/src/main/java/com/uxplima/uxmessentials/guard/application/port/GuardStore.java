@@ -5,10 +5,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -19,10 +19,10 @@ import org.jspecify.annotations.Nullable;
 public interface GuardStore {
 
     /** Every region in the given scopes; throws {@link GuardStoreException} when they cannot be read. */
-    List<Region> load(Set<GuardScope> scopes);
+    List<Region> load(Set<ServerScope> scopes);
 
     /** One region, or empty. */
-    Optional<Region> find(GuardScope scope, RegionKey key);
+    Optional<Region> find(ServerScope scope, RegionKey key);
 
     /**
      * Store a change: {@code after} replaces {@code before} (a create when {@code before} is null, a removal when
@@ -37,7 +37,7 @@ public interface GuardStore {
     Optional<HistoryEntry> historyEntry(long id);
 
     /** A number that changes whenever a region in the scopes changes, for polling peers without Redis. */
-    long stamp(Set<GuardScope> scopes);
+    long stamp(Set<ServerScope> scopes);
 
     /** Append denials to the log. */
     void logDenials(List<Denial> denials);

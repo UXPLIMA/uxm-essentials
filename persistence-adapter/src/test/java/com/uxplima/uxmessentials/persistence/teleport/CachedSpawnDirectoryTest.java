@@ -11,9 +11,11 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -71,7 +73,7 @@ class CachedSpawnDirectoryTest {
     }
 
     private static Optional<SpawnDirectorySnapshot> snapshot(Map<String, Position> named) {
-        return Optional.of(new SpawnDirectorySnapshot(Map.of(), named, Map.of(), Optional.empty()));
+        return Optional.of(new SpawnDirectorySnapshot(Map.of(), named, Map.of(), Map.of()));
     }
 
     private static Position at(double x) {
@@ -91,7 +93,7 @@ class CachedSpawnDirectoryTest {
         }
 
         @Override
-        public Optional<Position> mainSpawn() {
+        public Optional<Position> mainSpawn(@Nullable ServerScope scope) {
             return Optional.empty();
         }
 
@@ -112,7 +114,7 @@ class CachedSpawnDirectoryTest {
         public void setNamedSpawn(String name, Position position) {}
 
         @Override
-        public void setMainSpawn(Position position) {}
+        public void setMainSpawn(@Nullable ServerScope scope, Position position) {}
 
         @Override
         public boolean removeDefaultSpawn(WorldRef world) {
