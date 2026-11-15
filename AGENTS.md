@@ -30,7 +30,7 @@ The all-in-one essentials suite for Paper 26.2: 37 modules, from homes, warps an
 
 ## Testing
 
-Tests are few so far, under `core/src/test`. New tests follow the repository standard: behavior through the
+Tests live in `core`, `persistence-adapter` and `bukkit-adapter`. New tests follow the repository standard: behavior through the
 public API, fakes for ports, no assertion on structure. In-game behavior is checked with Craftwire on a development server.
 
 ## Pull requests

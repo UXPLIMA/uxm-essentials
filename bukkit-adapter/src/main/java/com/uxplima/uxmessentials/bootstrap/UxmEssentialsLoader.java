@@ -37,7 +37,7 @@ public final class UxmEssentialsLoader implements PluginLoader {
         resolver.addDependency(
                 new Dependency(new DefaultArtifact("org.flywaydb:flyway-database-postgresql:10.19.0"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact("org.flywaydb:flyway-mysql:10.19.0"), null));
-        resolver.addDependency(new Dependency(new DefaultArtifact("org.jooq:jooq:3.19.16"), null));
+        resolver.addDependency(new Dependency(new DefaultArtifact("org.jooq:jooq:3.20.20"), null));
         resolver.addDependency(
                 new Dependency(new DefaultArtifact("com.github.ben-manes.caffeine:caffeine:3.1.8"), null));
         resolver.addDependency(new Dependency(new DefaultArtifact(LoaderDependencies.configurateHocon()), null));

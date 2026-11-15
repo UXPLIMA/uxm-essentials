@@ -128,3 +128,9 @@ spotless {
         targetExclude("build/generated-src/**")
     }
 }
+
+// sqlite-jdbc loads its native library through System::load, which JDK 24 and later report as a restricted
+// method call unless the test JVM grants native access.
+tasks.named<Test>("test") {
+    jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
