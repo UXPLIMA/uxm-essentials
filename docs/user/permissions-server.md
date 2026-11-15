@@ -275,7 +275,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.skin.drop` | /skin drop <player>: delete a stored skin, so their next join derives one afresh. | op |
 | `uxmessentials.skin.info` | /skin info <player>: which skin somebody wears, from where, and when it was set. | op |
 | `uxmessentials.skin.purge` | /skin purge <name>: forget a cached texture so the next lookup goes back to the source. | op |
-| `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | true |
+| `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | op |
 | `uxmessentials.skin.cooldown.<seconds>` | The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it. | true |
 
 ## staff

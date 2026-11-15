@@ -64,7 +64,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 
 | Permission | What it allows | Default |
 |---|---|---|
-| `uxmessentials.kit.<kit>` | Claim a kit whose file sets permission = true. | true |
+| `uxmessentials.kit.<kit>` | Claim a kit whose file sets permission = true. | op |
 | `uxmessentials.kit.cooldown.<group>` | Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins. | false |
 | `uxmessentials.kit.cooldown.<seconds>` | The wait before a kit can be claimed again, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.bypass.cooldown.kit` | Skip kit cooldowns and re-claim one-time kits. | op |
