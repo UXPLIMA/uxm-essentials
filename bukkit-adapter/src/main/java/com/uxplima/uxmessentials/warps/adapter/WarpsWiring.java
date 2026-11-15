@@ -267,7 +267,8 @@ public final class WarpsWiring {
                 notifier,
                 presence,
                 () -> bus.publisher().publish(new WarpChanged(localServer, "*")),
-                kernel.log());
+                kernel.log(),
+                recordedServer);
         WarpServices services = assemble(
                 kernel,
                 repository,
@@ -278,7 +279,6 @@ public final class WarpsWiring {
                 useWarp,
                 managerView,
                 setWarpServer,
-                localServer,
                 recordedServer);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         // The editor and its welcome / sound / particle / category sub-screens all render through the always-on menu
@@ -317,7 +317,6 @@ public final class WarpsWiring {
             UseWarp useWarp,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView,
             SetWarpServer setWarpServer,
-            String localServer,
             Optional<String> recordedServer) {
         Clock clock = Clock.systemUTC();
         return new WarpServices(
@@ -340,8 +339,7 @@ public final class WarpsWiring {
                 editorView,
                 managerView,
                 kernel.scheduler(),
-                setWarpServer,
-                localServer);
+                setWarpServer);
     }
 
     /**

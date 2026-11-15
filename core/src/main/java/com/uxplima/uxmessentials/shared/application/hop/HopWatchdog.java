@@ -83,8 +83,10 @@ public final class HopWatchdog {
                 .find(pending.kind())
                 .orElseThrow(() -> new IllegalStateException("no hop resolver for " + pending.kind()));
         if (!recording.add(who.uuid())) {
-            // Nothing of this hop was written, so this refund is the only one its charge can get.
+            // Nothing of this hop was written, so this refund is the only one its charge can get. The kind's failure
+            // hook is not told: the hop never started, and the first one is still on its way.
             log.debug("event=cross_server_hop_refused player={} reason=concurrent_hop", who.uuid());
+            charges.tell(resolver, who, HopNotice.UNAVAILABLE, Map.of("server", pending.targetServer()), label);
             charges.refund(resolver, who, pending.charge(), label);
             return false;
         }

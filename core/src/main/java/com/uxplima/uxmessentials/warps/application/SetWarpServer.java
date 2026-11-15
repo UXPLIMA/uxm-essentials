@@ -24,6 +24,9 @@ import com.uxplima.uxmessentials.warps.domain.WarpName;
  * the backend holding the warp's world claims it again at its next start. The command gate checks the operator
  * permission; this use case validates, writes, reports and logs an audit line.
  *
+ * <p>With no server named, the command means this backend: {@code recordedServer}. It is empty off a network or
+ * under the shipped default server name, which no warp may record, so the operator is asked to name the server.
+ *
  * <p>The writes go to a repository that does not announce them one by one, and peers are told once at the end
  * through {@code announce}: a bulk change of every warp is one cross-server frame, not one per warp.
  */
@@ -37,14 +40,42 @@ public final class SetWarpServer {
     private final NetworkPresence presence;
     private final Runnable announce;
     private final Logger log;
+    private final Optional<String> recordedServer;
 
     public SetWarpServer(
-            WarpRepository repository, Notifier notifier, NetworkPresence presence, Runnable announce, Logger log) {
+            WarpRepository repository,
+            Notifier notifier,
+            NetworkPresence presence,
+            Runnable announce,
+            Logger log,
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.announce = Objects.requireNonNull(announce, "announce");
         this.log = Objects.requireNonNull(log, "log");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
+    }
+
+    /** Record this backend as the server of the warp {@code name}, or refuse when this backend records none. */
+    public Result<Unit, WarpError> setHere(PlayerRef actor, WarpName name) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(name, "name");
+        if (recordedServer.isEmpty()) {
+            notifier.send(actor, WarpsMessageKey.WARP_SERVER_UNRECORDED, Map.of());
+            return Result.err(WarpError.INVALID_SERVER);
+        }
+        return set(actor, name, recordedServer.get());
+    }
+
+    /** Record this backend as the server of every warp, or refuse when this backend records none. */
+    public Result<Integer, WarpError> setAllHere(PlayerRef actor) {
+        Objects.requireNonNull(actor, "actor");
+        if (recordedServer.isEmpty()) {
+            notifier.send(actor, WarpsMessageKey.WARP_SERVER_UNRECORDED, Map.of());
+            return Result.err(WarpError.INVALID_SERVER);
+        }
+        return setAll(actor, recordedServer.get());
     }
 
     /** Record {@code server} as the backend of the warp {@code name}, or reject an unknown warp or a bad name. */

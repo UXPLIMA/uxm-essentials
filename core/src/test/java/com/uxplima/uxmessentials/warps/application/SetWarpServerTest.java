@@ -31,12 +31,21 @@ class SetWarpServerTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final Audit audit = new Audit();
     private int announcements;
-    private final SetWarpServer setServer = new SetWarpServer(
-            warps, notifier.notifier(), new Live(Set.of("lobby", "survival")), () -> announcements++, audit);
+    private final SetWarpServer setServer = recording(Optional.of("survival"));
 
     SetWarpServerTest() {
         warps.put(Warp.create(MARKET, at(0, 64, 0), SAM, NOW).onServer("lobby"));
         warps.put(Warp.create(PLOTS, at(9, 64, 9), SAM, NOW).onServer("lobby"));
+    }
+
+    private SetWarpServer recording(Optional<String> recordedServer) {
+        return new SetWarpServer(
+                warps,
+                notifier.notifier(),
+                new Live(Set.of("lobby", "survival")),
+                () -> announcements++,
+                audit,
+                recordedServer);
     }
 
     private Optional<String> serverOf(WarpName name) {
@@ -93,6 +102,29 @@ class SetWarpServerTest {
         assertThat(serverOf(MARKET)).isEmpty();
         assertThat(warps.find(MARKET).orElseThrow().livesElsewhere("survival")).isFalse();
         assertThat(notifier.keys()).containsExactly("warp.server-set");
+    }
+
+    @Test
+    void withNoServerNamedTheWarpsMoveToTheServerThisBackendRecords() {
+        assertThat(setServer.setHere(ALEX, MARKET).isOk()).isTrue();
+        assertThat(setServer.setAllHere(ALEX).asValue()).contains(2);
+
+        assertThat(serverOf(MARKET)).contains("survival");
+        assertThat(serverOf(PLOTS)).contains("survival");
+    }
+
+    @Test
+    void withNoServerNamedABackendThatRecordsNoneAsksForOneAndWritesNothing() {
+        SetWarpServer standalone = recording(Optional.empty());
+
+        assertThat(standalone.setHere(ALEX, MARKET).asError()).contains(WarpError.INVALID_SERVER);
+        assertThat(standalone.setAllHere(ALEX).asError()).contains(WarpError.INVALID_SERVER);
+
+        assertThat(serverOf(MARKET)).contains("lobby");
+        assertThat(serverOf(PLOTS)).contains("lobby");
+        assertThat(announcements).isZero();
+        assertThat(audit.lines).isEmpty();
+        assertThat(notifier.keys()).containsExactly("warp.server-unrecorded", "warp.server-unrecorded");
     }
 
     /** The info lines the use case logs, with their placeholders filled in. */

@@ -2397,7 +2397,7 @@ public final class PluginModule {
                 bus,
                 links.hops,
                 // Off a network, or under the shipped default name, a backend records no server on its homes.
-                links.network.enabled() && !NetworkConfig.isDefaultServerName(links.network.serverId()),
+                links.network.recordedServer().isPresent(),
                 links.presence,
                 guiLayouts,
                 resources,
