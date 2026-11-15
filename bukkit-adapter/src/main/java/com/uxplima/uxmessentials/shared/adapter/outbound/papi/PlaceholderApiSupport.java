@@ -4,16 +4,22 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiFunction;
 import java.util.function.UnaryOperator;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.HandlerList;
+import org.bukkit.event.Listener;
+import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import me.clip.placeholderapi.PlaceholderAPI;
 import me.clip.placeholderapi.PlaceholderAPIPlugin;
+import me.clip.placeholderapi.events.ExpansionUnregisterEvent;
 import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.jspecify.annotations.NullMarked;
 
@@ -46,7 +52,9 @@ public final class PlaceholderApiSupport {
      * contributed a seam. Returns empty (registering nothing) when PlaceholderAPI is absent, no context is enabled,
      * or neither identifier could be taken, so the caller has nothing to close.
      */
-    public static Optional<Registration> registerExpansion(PlaceholderContexts contexts, String version, Logger log) {
+    public static Optional<Registration> registerExpansion(
+            Plugin plugin, PlaceholderContexts contexts, String version, Logger log) {
+        Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(contexts, "contexts");
         Objects.requireNonNull(version, "version");
         Objects.requireNonNull(log, "log");
@@ -72,15 +80,24 @@ public final class PlaceholderApiSupport {
                 log.warn("event=papi_expansion_register_failed identifier={}", identifier);
             }
         }
-        return registered.isEmpty() ? Optional.empty() : Optional.of(new Registration(registered, log));
+        if (registered.isEmpty()) {
+            return Optional.empty();
+        }
+        Registration registration = new Registration(registered, log);
+        registration.listen(plugin);
+        return Optional.of(registration);
     }
 
     /** The author of an expansion that is not ours and already holds {@code identifier}, or empty when none does. */
     private static Optional<String> foreignHolder(String identifier) {
-        Optional<PlaceholderExpansion> held =
-                PlaceholderAPIPlugin.getInstance().getLocalExpansionManager().findExpansionByIdentifier(identifier);
-        return held.filter(expansion -> !(expansion instanceof UxmEssentialsExpansion))
+        return holder(identifier)
+                .filter(expansion -> !(expansion instanceof UxmEssentialsExpansion))
                 .map(expansion -> expansion.getName() + " by " + expansion.getAuthor());
+    }
+
+    /** The expansion PlaceholderAPI asks for {@code identifier} right now, whoever registered it. */
+    private static Optional<PlaceholderExpansion> holder(String identifier) {
+        return PlaceholderAPIPlugin.getInstance().getLocalExpansionManager().findExpansionByIdentifier(identifier);
     }
 
     /**
@@ -163,23 +180,85 @@ public final class PlaceholderApiSupport {
         return open >= 0 && source.indexOf('%', open + 1) > open;
     }
 
-    /** The registered expansions; {@link #close()} unregisters them on plugin disable. */
+    /**
+     * The registered expansions; {@link #close()} unregisters them on plugin disable.
+     *
+     * <p>PlaceholderAPI removes an expansion by its identifier, not by the object, so an expansion of ours that another
+     * plugin has since replaced is left alone on close: unregistering it would take that plugin's expansion down.
+     * While open it also watches for one of ours being dropped by someone else, which would otherwise only show as
+     * placeholders that suddenly read as written.
+     */
     public static final class Registration implements AutoCloseable {
 
         private final List<UxmEssentialsExpansion> expansions;
         private final Logger log;
+        private final AtomicBoolean closing = new AtomicBoolean();
+        private final Listener evictions = new Evictions(this);
 
         private Registration(List<UxmEssentialsExpansion> expansions, Logger log) {
             this.expansions = List.copyOf(expansions);
             this.log = log;
         }
 
+        private void listen(Plugin plugin) {
+            Bukkit.getPluginManager().registerEvents(evictions, plugin);
+        }
+
+        /** Whether {@code %uxm_essentials_<key>%} answers right now, rather than only the older form. */
+        public boolean answersCurrentForm() {
+            String identifier = PlaceholderRoute.current().identifier();
+            return expansions.stream()
+                    .anyMatch(expansion -> expansion.getIdentifier().equals(identifier) && held(expansion));
+        }
+
+        /** Whether any expansion of ours still answers. */
+        public boolean answersAny() {
+            return expansions.stream().anyMatch(Registration::held);
+        }
+
+        private static boolean held(UxmEssentialsExpansion expansion) {
+            return holder(expansion.getIdentifier())
+                    .filter(current -> current == expansion)
+                    .isPresent();
+        }
+
+        private void dropped(PlaceholderExpansion expansion) {
+            if (closing.get() || expansions.stream().noneMatch(ours -> ours == expansion)) {
+                return;
+            }
+            log.warn(
+                    "event=papi_expansion_evicted identifier={} note=another plugin or PlaceholderAPI dropped it, so"
+                            + " these placeholders read as written until the plugin is enabled again",
+                    expansion.getIdentifier());
+        }
+
         @Override
         public void close() {
+            closing.set(true);
+            HandlerList.unregisterAll(evictions);
             for (UxmEssentialsExpansion expansion : expansions) {
+                if (!held(expansion)) {
+                    log.info("event=papi_expansion_not_ours identifier={}", expansion.getIdentifier());
+                    continue;
+                }
                 expansion.unregister();
                 log.info("event=papi_expansion_unregistered identifier={}", expansion.getIdentifier());
             }
+        }
+    }
+
+    /** Hears every expansion PlaceholderAPI drops and hands it to the registration that may own it. */
+    static final class Evictions implements Listener {
+
+        private final Registration registration;
+
+        private Evictions(Registration registration) {
+            this.registration = registration;
+        }
+
+        @EventHandler
+        public void onUnregister(ExpansionUnregisterEvent event) {
+            registration.dropped(event.getExpansion());
         }
     }
 }

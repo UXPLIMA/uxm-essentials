@@ -34,6 +34,7 @@ public final class SharedPermissions {
 
     private static final String COOLDOWN_PREFIX = "uxmessentials.cooldown.";
     private static final String COOLDOWN_BYPASS_PREFIX = "uxmessentials.bypass.cooldown.";
+    private static final String LABEL_COOLDOWN_BYPASS_PREFIX = "uxmessentials.bypass.cooldown.label.";
     private static final String WARMUP_BYPASS_PREFIX = "uxmessentials.bypass.warmup.";
     private static final String MODULE_PREFIX = "uxmessentials.module.";
 
@@ -43,11 +44,12 @@ public final class SharedPermissions {
     }
 
     /**
-     * The node that skips the cooldown of one labelled feature. Labels and features share this space, so an operator
-     * finds every cooldown exemption under one head whichever way the feature resolves its wait.
+     * The node that skips the cooldown of one label a menu or custom command names. Labels are chosen by operators,
+     * so they sit in their own {@code label.} branch: a menu label called {@code kit} must never also lift the kit
+     * cooldown.
      */
     public static String cooldownBypass(String label) {
-        return COOLDOWN_BYPASS_PREFIX + label;
+        return LABEL_COOLDOWN_BYPASS_PREFIX + label;
     }
 
     /** The head of the cooldown tiers a feature resolves through its own segment, as {@code tp} does. */
@@ -57,7 +59,7 @@ public final class SharedPermissions {
 
     /** The node that skips the cooldown a feature resolves through its own segment. */
     public static String featureCooldownBypass(String feature) {
-        return cooldownBypass(feature);
+        return COOLDOWN_BYPASS_PREFIX + feature;
     }
 
     /** The head of the warmup tiers a feature resolves through its own segment, as {@code tp} does. */
@@ -65,7 +67,7 @@ public final class SharedPermissions {
         return NAMESPACE + feature + ".warmup";
     }
 
-    /** The node that starts a feature's teleport with no warmup. */
+    /** The node that starts a feature's warmup-gated action at once. */
     public static String featureWarmupBypass(String feature) {
         return WARMUP_BYPASS_PREFIX + feature;
     }
@@ -109,8 +111,18 @@ public final class SharedPermissions {
                         PermissionDefault.TRUE,
                         PermissionShape.TIER),
                 PermissionSpec.sharedFamily(
-                        cooldownBypass("<feature>"),
-                        "Skip the cooldown on one rate-limited feature entirely: tp, rtp, kit, poses, skin, customcommand.<id> or a cooldown label a menu names.",
+                        featureCooldownBypass("<feature>"),
+                        "Skip the cooldown on one rate-limited feature entirely: tp, rtp, kit, poses or skin.",
+                        PermissionDefault.OP,
+                        PermissionShape.LABEL),
+                PermissionSpec.sharedFamily(
+                        cooldownBypass("<label>"),
+                        "Skip the cooldown of one label a menu or custom command names, such as customcommand.<id>.",
+                        PermissionDefault.OP,
+                        PermissionShape.LABEL),
+                PermissionSpec.sharedFamily(
+                        featureWarmupBypass("<feature>"),
+                        "Start one warmup-gated feature at once, immune to move-cancel: tp or customcommand.",
                         PermissionDefault.OP,
                         PermissionShape.LABEL),
                 PermissionSpec.shared(GUI, "/uxmess gui to open the module management hub.", PermissionDefault.OP),

@@ -67,11 +67,9 @@ public final class UxmEssentialsExpansion extends PlaceholderExpansion implement
     @Override
     public @Nullable String onRequest(@Nullable OfflinePlayer player, String params) {
         Objects.requireNonNull(params, "params");
-        if (player == null) {
-            return null;
-        }
+        // The key is read first so an old placeholder on a player-less surface is still named in the log.
         Optional<String> key = route.key(params);
-        if (key.isEmpty()) {
+        if (player == null || key.isEmpty()) {
             return null;
         }
         PlayerRef who = refOf(player);
@@ -87,11 +85,11 @@ public final class UxmEssentialsExpansion extends PlaceholderExpansion implement
     @Override
     public @Nullable String onPlaceholderRequest(@Nullable Player viewer, @Nullable Player target, String params) {
         Objects.requireNonNull(params, "params");
+        Optional<String> key = route.key(params);
         if (viewer == null || target == null) {
             return null;
         }
-        return route.key(params)
-                .flatMap(key -> resolver.resolveRelational(refOf(viewer), refOf(target), key))
+        return key.flatMap(k -> resolver.resolveRelational(refOf(viewer), refOf(target), k))
                 .orElse(null);
     }
 

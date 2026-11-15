@@ -36,7 +36,7 @@ class PlaceholderRouteTest {
     }
 
     @Test
-    void anotherPluginsUxmPlaceholderIsLeftAlone() {
+    void aUxmPlaceholderThatIsNotOursGetsNoAnswer() {
         PlaceholderRoute route = PlaceholderRoute.current();
 
         assertThat(route.key("chat_nick")).isEmpty();
@@ -45,17 +45,32 @@ class PlaceholderRouteTest {
     }
 
     @Test
-    void theOlderFormStillAnswersAndWarnsOnceNamingWhatToWriteInstead() {
+    void theOlderFormStillAnswersAndNamesEachKeyOnceWithWhatToWriteInstead() {
         PlaceholderRoute route = PlaceholderRoute.legacy(log);
 
         Optional<String> first = route.key("homes_count");
         Optional<String> second = route.key("balance");
+        route.key("homes_count");
+        route.key("HOMES_COUNT");
 
         assertThat(route.identifier()).isEqualTo("uxmessentials");
         assertThat(first).contains("homes_count");
         assertThat(second).contains("balance");
-        assertThat(log.warnings).hasSize(1);
-        assertThat(log.warnings.getFirst()).contains("uxmessentials", "homes_count", "uxm_essentials_");
+        assertThat(log.warnings).hasSize(2);
+        assertThat(log.warnings.get(0)).contains("%uxmessentials_homes_count%", "%uxm_essentials_homes_count%");
+        assertThat(log.warnings.get(1)).contains("%uxmessentials_balance%", "%uxm_essentials_balance%");
+    }
+
+    @Test
+    void pastTheCapOneLineSaysThereAreMore() {
+        PlaceholderRoute route = PlaceholderRoute.legacy(log);
+
+        for (int i = 0; i < PlaceholderRoute.WARNED_KEYS + 50; i++) {
+            route.key("p_player" + i + "_balance");
+        }
+
+        assertThat(log.warnings).hasSize(PlaceholderRoute.WARNED_KEYS + 1);
+        assertThat(log.warnings.getLast()).contains("papi_placeholder_deprecated_more");
     }
 
     @Test

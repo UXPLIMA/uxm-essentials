@@ -21,6 +21,7 @@ public final class RenamedPermissions {
     private static final Map<String, String> RENAMED = Map.ofEntries(
             Map.entry("uxmessentials.customcommand.cooldown.bypass", "uxmessentials.bypass.cooldown.customcommand"),
             Map.entry("uxmessentials.customcommand.cost.bypass", "uxmessentials.bypass.cost.customcommand"),
+            Map.entry("uxmessentials.customcommand.warmup.bypass", "uxmessentials.bypass.warmup.customcommand"),
             Map.entry("uxmessentials.guard.bypass.gamemode", "uxmessentials.bypass.gamemode.guard"),
             Map.entry("uxmessentials.guard.bypass", "uxmessentials.bypass.guard"),
             Map.entry("uxmessentials.kit.cooldown.bypass", "uxmessentials.bypass.cooldown.kit"),
@@ -71,7 +72,10 @@ public final class RenamedPermissions {
         return RENAMED.getOrDefault(node, node);
     }
 
-    /** Every renamed fixed node, earlier spelling to current; the per-label cooldown exemptions are a pattern. */
+    /**
+     * Every renamed fixed node, earlier spelling to current. The per-label cooldown exemptions are a pattern instead:
+     * {@code uxmessentials.cooldown.bypass.<label>} reads as {@code uxmessentials.bypass.cooldown.label.<label>}.
+     */
     public static Map<String, String> all() {
         return RENAMED;
     }

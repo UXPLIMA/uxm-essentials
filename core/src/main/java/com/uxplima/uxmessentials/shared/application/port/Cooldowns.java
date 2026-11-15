@@ -22,7 +22,7 @@ import org.jspecify.annotations.Nullable;
  * {@link CooldownStartPhase} that decides when the clock starts. The {@link #checkLabel}/
  * {@link #stampLabel} pair keys the generic per-command cooldown by an operator-chosen command label
  * or rule id, sized by {@code uxmessentials.cooldown.<label>.<seconds>} with the same min-reducer
- * semantics and skipped by {@code uxmessentials.bypass.cooldown.<label>}.
+ * semantics and skipped by {@code uxmessentials.bypass.cooldown.label.<label>}.
  */
 public interface Cooldowns {
 

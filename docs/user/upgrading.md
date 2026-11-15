@@ -15,27 +15,44 @@ the names every UXM plugin uses.
 2. Replace `%uxmessentials_` with `%uxm_essentials_`, and `%rel_uxmessentials_` with `%rel_uxm_essentials_`, wherever
    a placeholder of this plugin is written: this plugin's own files under `plugins/uxmEssentials/` and the files of
    every other plugin that shows one (tab list, scoreboard, hologram, chat, menu or Discord plugins).
-3. Nothing to do for `pay.tax.bypass-permission`, `baltop.exempt-permission` and `spawn.exempt-permission`: a file
+3. Edit by hand any old node written as a requirement: a menu's `permission:` condition, a custom command's
+   `requirements` or `permission`, or a node another plugin checks on our behalf. Those strings are passed to the
+   permission check as written and are not translated.
+4. Nothing to do for `pay.tax.bypass-permission`, `baltop.exempt-permission` and `spawn.exempt-permission`: a file
    that still names an old node there is read as the new one. A node of your own in those settings is kept as written.
+
+### What the new names change for wildcards
+
+- A feature wildcard no longer reaches its exemptions. `uxmessentials.home.*` used to include
+  `uxmessentials.home.bypass.cost`; it does not include `uxmessentials.bypass.cost.home`. Grant the exemption on its
+  own, or a `uxmessentials.bypass.` wildcard.
+- The other way round, one wildcard now spans features. `uxmessentials.bypass.cost.*` waives the vault, home, player
+  warp, custom command and per-command charges together; `uxmessentials.bypass.safety.*` lands at every unsafe
+  destination; `uxmessentials.bypass.*` lifts every rule. Check who holds such a wildcard before you grant it.
 
 ### The old placeholders keep answering for now
 
 `%uxmessentials_<key>%` and `%rel_uxmessentials_<key>%` still answer in this release, so nothing goes blank on the
-first start. The first time one is read, the log says which key it was and what to write instead:
+first start. The first time each key is read, the log names it and what to write instead, which gives you the list
+of what to edit:
 
 ```text
 event=papi_placeholder_deprecated read=%uxmessentials_homes_count% use=%uxm_essentials_homes_count% ...
 ```
 
-The plugin does not rewrite any file for you: most of these placeholders live in other plugins' files, which are
-not ours to edit, and a rewrite of your own files would race with an editor or a reload. A later release removes the
-old form, so search every plugin folder for `uxmessentials_` before then.
+After 256 distinct keys one `papi_placeholder_deprecated_more` line says there are more. The plugin does not rewrite
+any file for you: most of these placeholders live in other plugins' files, which are not ours to edit, and a rewrite
+of your own files would race with an editor or a reload. A later release removes the old form, so search every plugin
+folder for `uxmessentials_` before then.
 
 PlaceholderAPI finds an expansion by the text before the first underscore, so the new form registers the identifier
-`uxm`. If another plugin already holds `uxm`, the log shows `event=papi_expansion_identifier_taken` and only the old
-form answers; tell us which plugin it is.
+`uxm`, and PlaceholderAPI keeps one expansion per identifier. If another plugin already holds `uxm`, the log shows
+`event=papi_expansion_identifier_taken`, `/uxmess doctor` warns on its placeholders line, and only the old form
+answers. If another plugin takes `uxm` later, the log shows `event=papi_expansion_evicted`. Tell us which plugin it is.
 
 ### Node names
+
+40 fixed nodes moved:
 
 | Old node | New node |
 |---|---|
@@ -76,12 +93,13 @@ form answers; tell us which plugin it is.
 | `uxmessentials.security.bypass` | `uxmessentials.bypass.security` |
 | `uxmessentials.economy.tax.bypass` | `uxmessentials.bypass.tax` |
 | `uxmessentials.world.voidrescue.exempt` | `uxmessentials.bypass.void-rescue` |
+| `uxmessentials.customcommand.warmup.bypass` | `uxmessentials.bypass.warmup.customcommand` |
 | `uxmessentials.tp.warmup.bypass` | `uxmessentials.bypass.warmup.tp` |
 | `uxmessentials.pwarp.bypass.whitelist` | `uxmessentials.bypass.whitelist.pwarp` |
 
-A cooldown label keeps its name and moves under the same head: `uxmessentials.cooldown.bypass.<label>` is now
-`uxmessentials.bypass.cooldown.<label>`, for example `uxmessentials.bypass.cooldown.customcommand.example` for the
-custom command `example`.
+A cooldown label an operator chose keeps its name and moves to its own branch, so a label can never lift a feature's
+cooldown: `uxmessentials.cooldown.bypass.<label>` is now `uxmessentials.bypass.cooldown.label.<label>`, for example
+`uxmessentials.bypass.cooldown.label.customcommand.example` for the custom command `example`.
 
 ### Moving the grants with LuckPerms
 
@@ -126,6 +144,7 @@ custom command `example`.
 /lp bulkupdate all update permission uxmessentials.bypass.security "permission == uxmessentials.security.bypass"
 /lp bulkupdate all update permission uxmessentials.bypass.tax "permission == uxmessentials.economy.tax.bypass"
 /lp bulkupdate all update permission uxmessentials.bypass.void-rescue "permission == uxmessentials.world.voidrescue.exempt"
+/lp bulkupdate all update permission uxmessentials.bypass.warmup.customcommand "permission == uxmessentials.customcommand.warmup.bypass"
 /lp bulkupdate all update permission uxmessentials.bypass.warmup.tp "permission == uxmessentials.tp.warmup.bypass"
 /lp bulkupdate all update permission uxmessentials.bypass.whitelist.pwarp "permission == uxmessentials.pwarp.bypass.whitelist"
 ```
@@ -133,7 +152,7 @@ custom command `example`.
 A cooldown label you granted on its own needs its own line, for example:
 
 ```text
-/lp bulkupdate all update permission uxmessentials.bypass.cooldown.daily "permission == uxmessentials.cooldown.bypass.daily"
+/lp bulkupdate all update permission uxmessentials.bypass.cooldown.label.daily "permission == uxmessentials.cooldown.bypass.daily"
 ```
 
 To move one group by hand instead:
@@ -142,5 +161,9 @@ To move one group by hand instead:
 /lp group staff permission unset uxmessentials.economy.tax.bypass
 /lp group staff permission set uxmessentials.bypass.tax true
 ```
+
+On a network, run the commands against every LuckPerms storage your servers use: once per database that backends
+share, and on each server that keeps its own. The proxy checks `uxmessentials.bypass.commandcontrol` and
+`uxmessentials.bypass.command-spam` itself, so the proxy's LuckPerms needs those two moved as well.
 
 `/uxmess permissions` lists every node the running build checks.

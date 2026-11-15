@@ -16,7 +16,8 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
 | `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
 | `uxmessentials.cooldown.<feature>.<seconds>` | The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait. | true |
-| `uxmessentials.bypass.cooldown.<feature>` | Skip the cooldown on one rate-limited feature entirely: tp, rtp, kit, poses, skin, customcommand.<id> or a cooldown label a menu names. | op |
+| `uxmessentials.bypass.cooldown.<feature>` and `uxmessentials.bypass.cooldown.label.<label>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses or skin), or on one label a menu or custom command names, such as customcommand.<id>. | op |
+| `uxmessentials.bypass.warmup.<feature>` | Start one warmup-gated feature at once, immune to move-cancel: tp or customcommand. | op |
 | `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
 | `uxmessentials.help` | /help to list the commands you can use. | true |
 | `uxmessentials.lang.use` | /lang to set or clear your personal language override. | true |

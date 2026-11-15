@@ -23,10 +23,11 @@ import org.jspecify.annotations.NullMarked;
 public final class PlaceholderExpansionHealthCheck implements HealthCheck {
 
     private final BooleanSupplier published;
+    private final BooleanSupplier currentForm;
     private final BooleanSupplier placeholderApiPresent;
 
     public PlaceholderExpansionHealthCheck(boolean published, BooleanSupplier placeholderApiPresent) {
-        this(() -> published, placeholderApiPresent);
+        this(() -> published, () -> published, placeholderApiPresent);
     }
 
     /**
@@ -34,7 +35,17 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
      * {@code ServerLoadEvent}, after this check is built, because this plugin enables before PlaceholderAPI does.
      */
     public PlaceholderExpansionHealthCheck(BooleanSupplier published, BooleanSupplier placeholderApiPresent) {
+        this(published, published, placeholderApiPresent);
+    }
+
+    /**
+     * As above, also told whether the {@code %uxm_essentials_<key>%} form answers. Only the older form answers when
+     * another plugin holds the {@code uxm} identifier, and every placeholder written the current way reads as empty.
+     */
+    public PlaceholderExpansionHealthCheck(
+            BooleanSupplier published, BooleanSupplier currentForm, BooleanSupplier placeholderApiPresent) {
         this.published = Objects.requireNonNull(published, "published");
+        this.currentForm = Objects.requireNonNull(currentForm, "currentForm");
         this.placeholderApiPresent = Objects.requireNonNull(placeholderApiPresent, "placeholderApiPresent");
     }
 
@@ -46,6 +57,10 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
     @Override
     public HealthResult check() {
         if (published.getAsBoolean()) {
+            if (!currentForm.getAsBoolean()) {
+                return HealthResult.warn("only the older %uxmessentials_<key>% form answers: another plugin holds the"
+                        + " uxm identifier, so %uxm_essentials_<key>% reads as written; the log names the holder");
+            }
             return HealthResult.ok("published");
         }
         if (!placeholderApiPresent.getAsBoolean()) {

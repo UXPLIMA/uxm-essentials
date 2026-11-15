@@ -13,7 +13,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
@@ -918,13 +917,22 @@ public final class PluginModule {
         resources.onClose(cacheRefresh::stop);
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
         // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
-        AtomicBoolean placeholdersPublished = new AtomicBoolean();
+        AtomicReference<PlaceholderApiSupport.@Nullable Registration> placeholderRegistration = new AtomicReference<>();
         resources
                 .worldPhase()
                 .run(
                         "placeholder expansion",
-                        () -> placeholdersPublished.set(
-                                registerPlaceholders(plugin, placeholders, resources, kernel.log())));
+                        () -> placeholderRegistration.set(
+                                registerPlaceholders(plugin, placeholders, resources, kernel.log())
+                                        .orElse(null)));
+        BooleanSupplier placeholdersPublished = () -> {
+            PlaceholderApiSupport.Registration open = placeholderRegistration.get();
+            return open != null && open.answersAny();
+        };
+        BooleanSupplier placeholdersCurrentForm = () -> {
+            PlaceholderApiSupport.Registration open = placeholderRegistration.get();
+            return open != null && open.answersCurrentForm();
+        };
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
         // integration). These belong to no feature context: the update checker
         // off by default, built on the uxmLib update toolkit. Self-registers its permission-gated join notice and
@@ -941,8 +949,8 @@ public final class PluginModule {
                 "server links", pauseLinks.reload(), "pause-menu links re-read and sent to every player"));
         MigrationImportNode importNode =
                 wireMigration(plugin, registry, config, kernel, persistence, auditChannel, importTargets, bus.bus());
-        List<HealthCheck> healthChecks =
-                healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
+        List<HealthCheck> healthChecks = healthChecks(
+                plugin, registry, config, persistence, bus, resources, placeholdersPublished, placeholdersCurrentForm);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
         // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
@@ -1054,8 +1062,8 @@ public final class PluginModule {
         }
     }
 
-    /** @return whether the expansion published, which the doctor's placeholders line reports. */
-    private static boolean registerPlaceholders(
+    /** @return the published expansions, whose state the doctor's placeholders line reports. */
+    private static Optional<PlaceholderApiSupport.Registration> registerPlaceholders(
             JavaPlugin plugin,
             PlaceholderContexts placeholders,
             CloseableResources resources,
@@ -1064,9 +1072,9 @@ public final class PluginModule {
         // contributed a read seam; otherwise this is a no-op and nothing is closed on disable. The registration
         // happens after every context is wired so every enabled placeholder group is reachable.
         Optional<PlaceholderApiSupport.Registration> registration = PlaceholderApiSupport.registerExpansion(
-                placeholders, plugin.getPluginMeta().getVersion(), log);
+                plugin, placeholders, plugin.getPluginMeta().getVersion(), log);
         registration.ifPresent(open -> resources.onClose(open::close));
-        return registration.isPresent();
+        return registration;
     }
 
     private static MigrationImportNode wireMigration(
@@ -1109,7 +1117,8 @@ public final class PluginModule {
             Persistence persistence,
             BusWiring.Wired bus,
             CloseableResources resources,
-            BooleanSupplier placeholdersPublished) {
+            BooleanSupplier placeholdersPublished,
+            BooleanSupplier placeholdersCurrentForm) {
         // Assembled after the modules are wired so the set reflects what is actually present: the database and
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
@@ -1145,7 +1154,8 @@ public final class PluginModule {
         }));
         // Presence is asked of the class that owns the soft depend and never of the plugin manager here.
         // A getPlugin check of our own would call a plugin that failed its own startup live.
-        checks.add(new PlaceholderExpansionHealthCheck(placeholdersPublished, PlaceholderApiSupport::isPresent));
+        checks.add(new PlaceholderExpansionHealthCheck(
+                placeholdersPublished, placeholdersCurrentForm, PlaceholderApiSupport::isPresent));
         return List.copyOf(checks);
     }
 

@@ -24,8 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * duration is resolved from the player's numbered {@code uxmessentials.cooldown.<feature>.<seconds>}
  * nodes via {@link Permissions} (the {@code min}-reducer: the shortest tier wins), and
  * {@code uxmessentials.bypass.cooldown.<feature>} skips the gate entirely. The generic per-command
- * layer ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label
- * in the same space.
+ * layer ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label,
+ * skipped by {@code uxmessentials.bypass.cooldown.label.<label>} so a label can never lift a feature.
  *
  * <p>Stamps are transient per-holder state that may safely die with a world rollback, which is why
  * a single server keeps them in PDC rather than the database. A network keeps them in the database instead
