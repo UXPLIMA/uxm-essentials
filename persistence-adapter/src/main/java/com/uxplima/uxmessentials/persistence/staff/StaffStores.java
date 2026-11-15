@@ -34,4 +34,14 @@ public final class StaffStores {
         Objects.requireNonNull(serverId, "serverId");
         return new JooqStaffLoadoutRepository(persistence.dsl(), clock, serverId);
     }
+
+    /**
+     * Move the unscoped loadout rows onto {@code serverId}. A player who already holds a row under {@code serverId}
+     * keeps it, and their unscoped row is reported as left behind.
+     */
+    public static StaffLoadoutAdoption adoptLoadouts(Persistence persistence, String serverId) {
+        Objects.requireNonNull(persistence, "persistence");
+        // The clock only stamps a save, which a move never performs.
+        return new JooqStaffLoadoutRepository(persistence.dsl(), Clock.systemUTC(), serverId).adopt();
+    }
 }

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.staff;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.StaffLoadout.STAFF_LOADOUT;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.StaffLoadoutRec
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 
 /**
@@ -29,6 +31,12 @@ import org.jooq.DSLContext;
  */
 public final class JooqStaffLoadoutRepository extends JooqRepository implements StaffLoadoutRepository {
 
+    /**
+     * The server id of a row whose backend is unknown. Each backend adopts these rows on start, and none saves
+     * under it, so an adopted row is never one a running backend still holds.
+     */
+    public static final String UNSCOPED_SERVER_ID = "unscoped";
+
     private final Clock clock;
     private final String serverId;
 
@@ -38,6 +46,10 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
         this.serverId = Objects.requireNonNull(serverId, "serverId");
         if (serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank");
+        }
+        if (serverId.equals(UNSCOPED_SERVER_ID)) {
+            // Saving under the sentinel would hand this backend's live rows to whichever backend starts next.
+            throw new IllegalArgumentException("server id '" + UNSCOPED_SERVER_ID + "' is reserved");
         }
     }
 
@@ -71,6 +83,42 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
                     .and(STAFF_LOADOUT.SERVER_ID.eq(serverId))
                     .execute();
             return null;
+        });
+    }
+
+    /**
+     * Move every unscoped row to this repository's server id. A player who already holds a row under this server
+     * id keeps it, and their unscoped row stays where it is and is reported, since overwriting would drop a
+     * loadout captured on this backend.
+     *
+     * @return how many rows moved and which players' unscoped rows were left behind
+     */
+    public StaffLoadoutAdoption adopt() {
+        return write(dsl -> {
+            // Read first rather than a NOT EXISTS subquery: MySQL refuses an UPDATE whose subquery reads the
+            // table being updated.
+            List<String> held = dsl.select(STAFF_LOADOUT.PLAYER)
+                    .from(STAFF_LOADOUT)
+                    .where(STAFF_LOADOUT.SERVER_ID.eq(serverId))
+                    .fetch(STAFF_LOADOUT.PLAYER);
+            Condition unscoped = STAFF_LOADOUT.SERVER_ID.eq(UNSCOPED_SERVER_ID);
+            List<UUID> leftBehind = held.isEmpty()
+                    ? List.of()
+                    : dsl
+                            .select(STAFF_LOADOUT.PLAYER)
+                            .from(STAFF_LOADOUT)
+                            .where(unscoped)
+                            .and(STAFF_LOADOUT.PLAYER.in(held))
+                            .fetch(STAFF_LOADOUT.PLAYER)
+                            .stream()
+                            .map(UUID::fromString)
+                            .toList();
+            Condition movable = held.isEmpty() ? unscoped : unscoped.and(STAFF_LOADOUT.PLAYER.notIn(held));
+            int moved = dsl.update(STAFF_LOADOUT)
+                    .set(STAFF_LOADOUT.SERVER_ID, serverId)
+                    .where(movable)
+                    .execute();
+            return new StaffLoadoutAdoption(moved, leftBehind);
         });
     }
 

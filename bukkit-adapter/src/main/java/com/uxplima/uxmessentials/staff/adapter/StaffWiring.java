@@ -18,12 +18,13 @@ import com.uxplima.uxmessentials.messaging.application.port.StaffAudience;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.persistence.staff.StaffLoadoutAdoption;
 import com.uxplima.uxmessentials.persistence.staff.StaffStores;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
-import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -87,12 +88,15 @@ public final class StaffWiring {
      * Build the staff adapters from {@code plugin}, {@code ctx}, the {@code persistence} DSL, the {@code seams},
      * and the in-process event bus. The bus is the concrete {@link InProcessDomainEventPublisher} so the
      * enter/exit roster-alert subscriber can be registered here and unsubscribed on stop, the kernel port
-     * exposes only {@code publish}.
+     * exposes only {@code publish}. The {@code serverId} is this backend's id from the root {@code network}
+     * block, the one the bus stamps on its frames; the module's own config is scoped under {@code modules.staff}
+     * and never holds it.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
+            String serverId,
             StaffSeams seams,
             InProcessDomainEventPublisher events,
             ManagementGuiRegistry guiRegistry,
@@ -101,6 +105,7 @@ public final class StaffWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(seams, "seams");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
@@ -115,8 +120,11 @@ public final class StaffWiring {
         // The loadout is per-server state, so it is keyed per (player, server_id): the repository scopes every
         // save/load/delete to THIS backend's network.server-name, so two backends sharing one DB never clobber
         // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
-        String serverId = NetworkConfig.from(ctx.config()).serverId();
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);
+        // /staffmode stays shut until the move lands, so enter sees a moved row and recovers it instead of
+        // capturing over it. A join inside that window recovers on the player's next join or /staffmode.
+        AtomicBoolean adopted = new AtomicBoolean(false);
+        adoptUnscopedLoadouts(persistence, serverId, kernel, adopted);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
 
         // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
@@ -182,7 +190,11 @@ public final class StaffWiring {
                 "staff", StaffMessageKey.STAFF_LIST_TITLE, Material.SHIELD, STAFF_LIST_PERMISSION, staffList::open));
         List<CommandRegistration> commands = List.of(
                 new StaffModeCommand(
-                        services, kernel.messages(), kernel.scheduler(), kernel.playerLookup(), running::get),
+                        services,
+                        kernel.messages(),
+                        kernel.scheduler(),
+                        kernel.playerLookup(),
+                        () -> running.get() && adopted.get()),
                 new StaffChatCommand(services, kernel.messages()),
                 staffList);
         List<Listener> listeners = List.of(
@@ -194,6 +206,36 @@ public final class StaffWiring {
         @Nullable Consumer<DomainEvent> alertSubscriber = StaffAlertWiring.subscribe(seams, settings, kernel, events);
         return new Wired(
                 commands, listeners, services, followService, kernel.scheduler(), running, events, alertSubscriber);
+    }
+
+    /**
+     * Move the unscoped loadouts onto {@code serverId} off the tick, then set {@code adopted}. A row the move
+     * leaves behind belongs to a player who already holds one here, so it is named for the operator to restore.
+     * A failed move leaves the rows unscoped for the next start; {@code adopted} is set either way so staff mode
+     * is not held shut by a database fault.
+     */
+    private static void adoptUnscopedLoadouts(
+            Persistence persistence, String serverId, KernelPorts kernel, AtomicBoolean adopted) {
+        kernel.scheduler().async(() -> {
+            try {
+                StaffLoadoutAdoption adoption = StaffStores.adoptLoadouts(persistence, serverId);
+                if (adoption.moved() > 0) {
+                    kernel.log().info("event=staff_loadout_adopted to={} rows={}", serverId, adoption.moved());
+                }
+                if (!adoption.leftBehind().isEmpty()) {
+                    kernel.log()
+                            .warn(
+                                    "event=staff_loadout_left_unscoped server={} rows={} players={}",
+                                    serverId,
+                                    adoption.leftBehind().size(),
+                                    adoption.leftBehind());
+                }
+            } catch (PersistenceException failure) {
+                kernel.log().error("event=staff_loadout_adopt_failed server=" + serverId, failure);
+            } finally {
+                adopted.set(true);
+            }
+        });
     }
 
     private static void bindSeams(

@@ -1516,7 +1516,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("nametags"))) {
             wireNametags(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("staff"))) {
-            wireStaff(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
+            wireStaff(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("npc"))) {
             wireNpc(
                     plugin,
@@ -3386,6 +3386,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
@@ -3406,8 +3407,8 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired =
-                StaffWiring.wire(plugin, ctx, persistence, seams, events, guiRegistry, menus, menuBindings);
+        StaffWiring.Wired wired = StaffWiring.wire(
+                plugin, ctx, persistence, bus.publisher().serverId(), seams, events, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
