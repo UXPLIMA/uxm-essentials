@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
+import com.uxplima.uxmessentials.warps.application.SetWarpServer;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpInfo;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -35,6 +36,8 @@ import org.jspecify.annotations.NullMarked;
  *     disabled
  * @param scheduler the kernel scheduler the rating commands run their uncached database read/write through off
  *     the tick thread, bridging the confirmation back to the player's region thread
+ * @param setWarpServer {@code /warp setserver}
+ * @param localServer this backend's network name, the server {@code /warp setserver} names when none is given
  */
 @NullMarked
 public record WarpServices(
@@ -49,7 +52,9 @@ public record WarpServices(
         WarpRepository repository,
         @org.jspecify.annotations.Nullable WarpEditorView editorView,
         @org.jspecify.annotations.Nullable WarpManagerMenu managerView,
-        Scheduler scheduler) {
+        Scheduler scheduler,
+        SetWarpServer setWarpServer,
+        String localServer) {
 
     public WarpServices {
         Objects.requireNonNull(useWarp, "useWarp");
@@ -62,5 +67,7 @@ public record WarpServices(
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(setWarpServer, "setWarpServer");
+        Objects.requireNonNull(localServer, "localServer");
     }
 }

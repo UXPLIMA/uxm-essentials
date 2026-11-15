@@ -233,6 +233,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.HeadDatabaseHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.PermissionQuery;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultEconomyHook;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hooks.VaultPermissionHook;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.SystemLoggerBridge;
@@ -1213,7 +1214,13 @@ public final class PluginModule {
             Optional<com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims> networkClaims) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, importTargets);
+        // The cross-server hop every teleport kind shares, built before any of them wires so each registers its
+        // resolver into the one registry the single join listener reads. A kind whose cross-server switch is off
+        // registers nothing, and with none registered a join does no hop work.
+        CrossServerHops hops = HopWiring.wire(
+                plugin, config, kernel, persistence, bus.publisher().serverId());
+        resources.addListener(hops.arrivalListener());
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.livePeers = livePeers;
@@ -2529,6 +2536,8 @@ public final class PluginModule {
                 engine,
                 Optional.ofNullable(links.warpEconomy),
                 bus,
+                links.hops,
+                links.presence,
                 guiLayouts,
                 textInput,
                 menus,
@@ -2540,6 +2549,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        resources.worldPhase().run("warp server claim", wired.serverAdoption());
         bindWarpRespawn(links, new RepositoryWarpRespawnLocator(wired.repository()));
         resources.onClose(links.importTargets.warps(wired.cache()));
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
@@ -3236,6 +3246,7 @@ public final class PluginModule {
                 persistence,
                 engine,
                 bus,
+                links.hops,
                 links.warpEditorView,
                 links.warpPlayerWarpHandle,
                 links.warpPlayerWarpGoTo,
@@ -3728,6 +3739,8 @@ public final class PluginModule {
         private final AuditChannel auditChannel;
         // Which backend each online player is on; a context that names a player asks it before offline data.
         private final NetworkPresence presence;
+        // The cross-server hop every kind that sends players across the proxy registers into.
+        private final CrossServerHops hops;
         // The caches the importer writes through, each set by its module as it wires and withdrawn through the
         // module's resources, so a module that fails part way leaves its slot empty and the importer falls back
         // to the database for that kind.
@@ -3738,11 +3751,13 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries,
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions,
                 NetworkPresence presence,
+                CrossServerHops hops,
                 ImportTargets importTargets) {
             this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
             this.presence = presence;
+            this.hops = hops;
             this.importTargets = importTargets;
         }
         // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.

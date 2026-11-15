@@ -38,6 +38,16 @@ public enum WarpError {
 
     /** The warp cannot be created in this world because it is blacklisted. */
     WORLD_BLACKLISTED(WarpsMessageKey.WARP_WORLD_BLACKLISTED),
+
+    /**
+     * The teleport rules (jail, combat tag, cooldown) refused a use of a warp on another backend. The player has
+     * already been told why by those rules, so this value is returned without a line of its own.
+     */
+    TELEPORT_REFUSED(SharedMessageKey.COMMON_ACTION_VETOED),
+
+    /** A server name {@code /warp setserver} cannot record: empty, too long, or with a character no backend name has. */
+    INVALID_SERVER(WarpsMessageKey.WARP_SERVER_INVALID),
+
     /** Another plugin refused the action through the developer API. Nothing was written. */
     VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 

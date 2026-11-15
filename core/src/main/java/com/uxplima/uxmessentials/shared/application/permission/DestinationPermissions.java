@@ -140,6 +140,11 @@ final class DestinationPermissions {
                         PermissionDefault.OP,
                         WARPS),
                 PermissionSpec.of(
+                        "uxmessentials.warp.setserver",
+                        "/warp setserver <name|all> [server] to record which server a warp lives on without moving it.",
+                        PermissionDefault.OP,
+                        WARPS),
+                PermissionSpec.of(
                         "uxmessentials.warp.sign.create",
                         "Create a [warp] sign that teleports players to a warp on click.",
                         PermissionDefault.OP,

@@ -13,19 +13,27 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.network.WarpChanged;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.warps.adapter.inbound.command.WarpCommands;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpBrowseMenu;
 import com.uxplima.uxmessentials.warps.adapter.outbound.TeleportWarpAdapter;
+import com.uxplima.uxmessentials.warps.adapter.outbound.WarpServerAdoption;
 import com.uxplima.uxmessentials.warps.application.DelWarp;
 import com.uxplima.uxmessentials.warps.application.ListWarps;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
+import com.uxplima.uxmessentials.warps.application.SetWarpServer;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.WarpAccess;
+import com.uxplima.uxmessentials.warps.application.WarpHopResolver;
+import com.uxplima.uxmessentials.warps.application.WarpHops;
 import com.uxplima.uxmessentials.warps.application.WarpInfo;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -71,6 +79,8 @@ public final class WarpsWiring {
             TeleportEngine teleportEngine,
             Optional<WarpEconomy> economy,
             Bus bus,
+            CrossServerHops hops,
+            NetworkPresence presence,
             GuiLayouts guiLayouts,
             TextInput textInput,
             com.uxplima.uxmlib.menu.Menus menus,
@@ -80,6 +90,8 @@ public final class WarpsWiring {
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -115,6 +127,24 @@ public final class WarpsWiring {
         WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
         var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
+        // A warp records the backend it was set on. With cross-server.enabled on, a warp of another backend is used
+        // by sending the player there through the hop the bootstrap shares between every kind: the jail, combat and
+        // cooldown checks run here before the charge, and the charge comes back on every miss. Off, the resolver is
+        // not registered and every warp is used on this backend, as it always was.
+        String localServer = hops.server();
+        WarpHops warpHops = WarpHops.local(localServer);
+        if (ctx.config().getBoolean("cross-server.enabled", false)) {
+            hops.register(new WarpHopResolver(
+                    repository,
+                    teleporter,
+                    economy,
+                    new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                    kernel.permissions(),
+                    notifier,
+                    kernel.scheduler(),
+                    localServer));
+            warpHops = new WarpHops(Optional.of(hops.departures(new TeleportHopGate(teleportEngine))), localServer);
+        }
         // UseWarp is built once here so the editor's "go to" button and the /warp command share the exact same
         // teleport path, then handed to assemble() rather than rebuilt there.
         UseWarp useWarp = new UseWarp(
@@ -124,7 +154,9 @@ public final class WarpsWiring {
                 notifier,
                 new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
                 kernel.permissions(),
-                kernel.scheduler());
+                kernel.scheduler(),
+                kernel.playerLookup(),
+                warpHops);
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
         // sub-screen back buttons reopen it. Its category/welcome/sound/particle sub-screens are all engine now and
@@ -195,7 +227,8 @@ public final class WarpsWiring {
                 kernel.events(),
                 kernel.gate(),
                 Clock.systemUTC(),
-                ctx.config().getStringList("world-blacklist", List.of()));
+                ctx.config().getStringList("world-blacklist", List.of()),
+                localServer);
         // The admin warp manager renders through the always-on menu engine. The create flow that opens a fresh warp's
         // editor is pulled out so the engine-rendered manager can drive it. A one-element holder breaks the cycle: the
         // manager's create button reopens the manager on cancel, and the category manager's back button reopens it,
@@ -223,8 +256,20 @@ public final class WarpsWiring {
         var browseMenu = new WarpBrowseMenu(menus, kernel.scheduler(), useWarp, kernel.messages(), categoryRepository);
         browseMenu.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
 
-        WarpServices services =
-                assemble(kernel, repository, notifier, browseMenu, editorView, ctx, useWarp, managerView);
+        // Writes through the cache under the broadcasting repository, so a bulk change reaches peers as one frame.
+        SetWarpServer setWarpServer = new SetWarpServer(
+                cached, notifier, presence, () -> bus.publisher().publish(new WarpChanged(localServer, "*")));
+        WarpServices services = assemble(
+                kernel,
+                repository,
+                notifier,
+                browseMenu,
+                editorView,
+                ctx,
+                useWarp,
+                managerView,
+                setWarpServer,
+                localServer);
         var commands = WarpCommands.all(services, kernel.messages(), () -> ListDisplayMode.from(ctx.config()));
         // The editor and its welcome / sound / particle / category sub-screens all render through the always-on menu
         // engine now, routed and torn down by the one shared menu listener, so the warps context registers no editor
@@ -248,6 +293,7 @@ public final class WarpsWiring {
                 services.setWarp(),
                 services.moveWarp(),
                 services.delWarp(),
+                new WarpServerAdoption(persistence, kernel, localServer, cached, bus.publisher()),
                 cached);
     }
 
@@ -259,7 +305,9 @@ public final class WarpsWiring {
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpEditorView editorView,
             com.uxplima.uxmessentials.shared.application.module.ModuleContext ctx,
             UseWarp useWarp,
-            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView) {
+            com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpManagerMenu managerView,
+            SetWarpServer setWarpServer,
+            String localServer) {
         Clock clock = Clock.systemUTC();
         return new WarpServices(
                 useWarp,
@@ -269,17 +317,20 @@ public final class WarpsWiring {
                         kernel.events(),
                         kernel.gate(),
                         clock,
-                        ctx.config().getStringList("world-blacklist", List.of())),
+                        ctx.config().getStringList("world-blacklist", List.of()),
+                        localServer),
                 new DelWarp(repository, notifier, kernel.events(), kernel.gate()),
                 new ListWarps(repository, kernel.permissions(), notifier),
                 new WarpInfo(repository, notifier),
-                new MoveWarp(repository, notifier),
+                new MoveWarp(repository, notifier, localServer),
                 browseMenu,
                 kernel.playerLookup(),
                 repository,
                 editorView,
                 managerView,
-                kernel.scheduler());
+                kernel.scheduler(),
+                setWarpServer,
+                localServer);
     }
 
     /**
@@ -294,6 +345,8 @@ public final class WarpsWiring {
      * @param playerWarpGoTo the late-bound handle player-warps binds its go-to teleport into for the editor button
      * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
      * @param stopAction cleanup action on shutdown
+     * @param serverAdoption records this backend as the server of the warps of unknown server in its worlds; run
+     *     once the worlds are up
      * @param cache the cache under the broadcasting repository, which the importer writes through so a large
      *     import updates this server without one cross-server frame per row
      */
@@ -312,6 +365,7 @@ public final class WarpsWiring {
             SetWarp setWarp,
             MoveWarp moveWarp,
             DelWarp delWarp,
+            Runnable serverAdoption,
             CachedWarpRepository cache) {
 
         public Wired {
@@ -327,6 +381,7 @@ public final class WarpsWiring {
             Objects.requireNonNull(delWarp, "delWarp");
             Objects.requireNonNull(teleportRegistry, "teleportRegistry");
             Objects.requireNonNull(stopAction, "stopAction");
+            Objects.requireNonNull(serverAdoption, "serverAdoption");
         }
 
         public void stop() {

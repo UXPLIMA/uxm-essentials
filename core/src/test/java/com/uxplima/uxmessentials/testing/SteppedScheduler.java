@@ -13,6 +13,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 
 /**
  * Runs async work at once and delayed work when the test moves the clock past it. Entity work runs only for a
@@ -26,6 +27,7 @@ public final class SteppedScheduler implements Scheduler {
     private final MutableClock clock;
     private final List<Timed> waiting = new ArrayList<>();
     private final Set<UUID> online = new HashSet<>();
+    private final Set<UUID> unloadedWorlds = new HashSet<>();
     private long scheduled;
     private boolean rejectsAsync;
     private boolean rejectsDelayed;
@@ -40,6 +42,11 @@ public final class SteppedScheduler implements Scheduler {
 
     public void offline(PlayerRef player) {
         online.remove(player.uuid());
+    }
+
+    /** A world this backend does not have loaded: region work there never runs, as on Folia. */
+    public void unload(WorldRef world) {
+        unloadedWorlds.add(world.uid());
     }
 
     public void rejectAsync(boolean rejects) {
@@ -79,7 +86,18 @@ public final class SteppedScheduler implements Scheduler {
 
     @Override
     public void onRegion(Position position, Runnable task) {
-        task.run();
+        if (!unloadedWorlds.contains(position.world().uid())) {
+            task.run();
+        }
+    }
+
+    @Override
+    public void onRegion(Position position, Runnable task, Runnable retired) {
+        if (unloadedWorlds.contains(position.world().uid())) {
+            retired.run();
+        } else {
+            task.run();
+        }
     }
 
     @Override

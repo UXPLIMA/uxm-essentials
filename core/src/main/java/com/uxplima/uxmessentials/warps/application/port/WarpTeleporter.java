@@ -13,6 +13,21 @@ import com.uxplima.uxmessentials.warps.domain.Warp;
  */
 public interface WarpTeleporter {
 
+    /**
+     * Whether the teleport rules (jail, combat tag, the warp cooldown) let {@code who} start a teleport to
+     * {@code warp} now. Asked before the use is charged, so a use those rules refuse costs nothing; on false the
+     * player has already been told why.
+     */
+    boolean admits(PlayerRef who, Warp warp);
+
     /** Send {@code who} to {@code warp}, routing the hop through the teleport context's gated flow. */
     void teleportTo(PlayerRef who, Warp warp);
+
+    /**
+     * On {@code who}'s region thread: move them to {@code warp} at once, the landing of a cross-server hop. The
+     * origin already ran the jail, combat and cooldown checks before it charged, so there is no warmup and no
+     * cooldown check here; the landing stamps the warp cooldown under the key the origin checked. Exactly one of
+     * {@code onLanded} and {@code onMissed} runs, {@code onLanded} only once the player stands at the warp.
+     */
+    void arrive(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed);
 }

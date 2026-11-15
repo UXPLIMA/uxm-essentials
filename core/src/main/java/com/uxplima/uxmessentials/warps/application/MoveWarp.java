@@ -24,10 +24,13 @@ public final class MoveWarp {
 
     private final WarpRepository repository;
     private final Notifier notifier;
+    private final String localServer;
 
-    public MoveWarp(WarpRepository repository, Notifier notifier) {
+    /** {@code localServer} is the backend a moved warp is recorded on, the one whose world it now points into. */
+    public MoveWarp(WarpRepository repository, Notifier notifier, String localServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
     /** Move the warp {@code name} to {@code at}, or reject when no such warp exists. */
@@ -40,7 +43,7 @@ public final class MoveWarp {
             notifier.send(actor, WarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
             return Result.err(WarpError.NOT_FOUND);
         }
-        repository.save(existing.get().movedTo(at));
+        repository.save(existing.get().movedTo(at, localServer));
         notifier.send(actor, WarpsMessageKey.WARP_MOVED, Map.of("warp", name.value()));
         return Result.ok();
     }

@@ -28,4 +28,10 @@ public interface WarpEconomy {
      * {@code false} when the balance was insufficient.
      */
     boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
+
+    /**
+     * Give {@code amount} of {@code currencyId} back to {@code who}, for a cross-server warp use that was charged
+     * and never moved the player. Returns {@code true} once the credit has landed.
+     */
+    boolean refund(PlayerRef who, BigDecimal amount, String currencyId);
 }
