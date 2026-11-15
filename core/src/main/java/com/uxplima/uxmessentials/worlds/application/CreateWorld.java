@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -14,17 +15,19 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.WorldCreateOptions;
+import com.uxplima.uxmessentials.worlds.domain.WorldDefaults;
 import com.uxplima.uxmessentials.worlds.domain.WorldError;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
-import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldCreated;
 
 /**
- * Creates a new world: rejects a name already in the registry or already present on disk, asks the
- * engine to build the world (the Bukkit handle op, on the calling global thread), then persists the
- * aggregate and publishes {@link WorldCreated} on the {@code Scheduler}'s async executor, hopping back
- * to the creator only to notify. The synchronous {@link Result} carries the gate/engine outcome; the
- * persistence write is off-tick.
+ * Creates a new world: rejects a name already in the registry or already present on disk, fills every
+ * option the operator left open from the configured {@link WorldDefaults}, asks the engine to build the
+ * world (the Bukkit handle op, on the calling global thread), then persists the aggregate, with the
+ * default per-world settings, and publishes {@link WorldCreated} on the {@code Scheduler}'s async
+ * executor, hopping back to the creator only to notify. The synchronous {@link Result} carries the
+ * gate/engine outcome; the persistence write is off-tick.
  */
 public final class CreateWorld {
 
@@ -34,6 +37,7 @@ public final class CreateWorld {
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
     private final Clock clock;
+    private final Supplier<WorldDefaults> defaults;
 
     public CreateWorld(
             WorldRepository repository,
@@ -41,24 +45,31 @@ public final class CreateWorld {
             Notifier notifier,
             DomainEventPublisher events,
             Scheduler scheduler,
-            Clock clock) {
+            Clock clock,
+            Supplier<WorldDefaults> defaults) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
     }
 
-    public Result<Unit, WorldError> create(PlayerRef creator, WorldName name, WorldSpec spec, boolean autoLoad) {
+    public Result<Unit, WorldError> create(
+            PlayerRef creator, WorldName name, WorldCreateOptions options, boolean autoLoad) {
         Objects.requireNonNull(creator, "creator");
         Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(spec, "spec");
+        Objects.requireNonNull(options, "options");
         if (repository.exists(name) || engine.exists(name)) {
             notifier.send(creator, WorldError.ALREADY_EXISTS.messageKey(), Map.of("world", name.value()));
             return Result.err(WorldError.ALREADY_EXISTS);
         }
-        ManagedWorld world = ManagedWorld.created(name, spec, autoLoad, Optional.of(creator.uuid()), clock.instant());
+        // One read, so a reload landing mid-create cannot mix the old spec defaults with the new settings.
+        WorldDefaults current = defaults.get();
+        ManagedWorld world = ManagedWorld.created(
+                        name, current.specFor(options), autoLoad, Optional.of(creator.uuid()), clock.instant())
+                .withSettings(current.settings());
         Result<Unit, WorldError> created = engine.create(world);
         if (created.isErr()) {
             notifier.send(creator, created.errorOrThrow().messageKey(), Map.of("world", name.value()));

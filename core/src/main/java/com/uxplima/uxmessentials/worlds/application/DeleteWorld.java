@@ -1,10 +1,12 @@
 package com.uxplima.uxmessentials.worlds.application;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
@@ -22,8 +24,9 @@ import com.uxplima.uxmessentials.worlds.domain.event.WorldDeleted;
 
 /**
  * Two-phase world deletion. {@code request} validates and stages a confirmation (no destruction);
- * {@code confirm} consumes the staged deletion, re-validates from scratch (never trusting the staged
- * value), unloads the world if loaded, deletes its files, drops the metadata row, and publishes
+ * {@code confirm} consumes the staged deletion, refuses it once it is older than the configured timeout,
+ * re-validates from scratch (never trusting the staged value), unloads the world if loaded, deletes its
+ * files, drops the metadata row, and publishes
  * {@link WorldDeleted}. The default world is protected; the recursive file delete and the metadata
  * drop run off-tick on the {@code Scheduler}'s async executor, hopping back to the requester only to
  * notify: the synchronous gate (unload + protect-default check) stays on the calling global thread.
@@ -38,6 +41,7 @@ public final class DeleteWorld {
     private final Scheduler scheduler;
     private final Clock clock;
     private final BooleanSupplier protectDefault;
+    private final Supplier<Duration> confirmTimeout;
 
     public DeleteWorld(
             WorldRepository repository,
@@ -47,7 +51,8 @@ public final class DeleteWorld {
             DomainEventPublisher events,
             Scheduler scheduler,
             Clock clock,
-            BooleanSupplier protectDefault) {
+            BooleanSupplier protectDefault,
+            Supplier<Duration> confirmTimeout) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.pending = Objects.requireNonNull(pending, "pending");
@@ -56,6 +61,7 @@ public final class DeleteWorld {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.protectDefault = Objects.requireNonNull(protectDefault, "protectDefault");
+        this.confirmTimeout = Objects.requireNonNull(confirmTimeout, "confirmTimeout");
     }
 
     public Result<Unit, WorldError> request(PlayerRef who, WorldName name) {
@@ -74,9 +80,15 @@ public final class DeleteWorld {
     public Result<Unit, WorldError> confirm(PlayerRef who, WorldName name) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(name, "name");
-        if (pending.take(name, who.uuid()).isEmpty()) {
+        // Taking the entry drops it whether or not it is still valid, so an expired request is gone for good.
+        Optional<PendingDeletion> staged = pending.take(name, who.uuid());
+        if (staged.isEmpty()) {
             notifier.send(who, WorldsMessageKey.WORLD_DELETE_NONE, Map.of("world", name.value()));
             return Result.err(WorldError.NOT_FOUND);
+        }
+        if (staged.get().expiredAt(clock.instant(), confirmTimeout.get())) {
+            notifier.send(who, WorldsMessageKey.WORLD_DELETE_EXPIRED, Map.of("world", name.value()));
+            return Result.err(WorldError.DELETE_EXPIRED);
         }
         Optional<WorldError> gate = validate(name);
         if (gate.isPresent()) {

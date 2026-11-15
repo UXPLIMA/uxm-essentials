@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -41,10 +42,10 @@ import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
 import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.WorldCreateOptions;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
-import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -248,16 +249,27 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (name == null) {
             return 0;
         }
-        WorldSpec spec = new WorldSpec(
-                arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL),
-                arg(ctx, "type", WorldGenType.class, WorldGenType.NORMAL),
-                Optional.empty(),
-                parseGenerator(ctx),
-                true,
-                Optional.empty());
+        // Left out, the environment and type come from the configured defaults. A typo is refused rather than read as
+        // the default, because the environment a world is made with can never be changed afterwards.
+        Optional<String> rawEnvironment = optionalString(ctx, "environment");
+        Optional<WorldEnvironment> environment = rawEnvironment.flatMap(WorldEnvironment::parse);
+        if (rawEnvironment.isPresent() && environment.isEmpty()) {
+            return refuseToken(
+                    sender,
+                    WorldsMessageKey.WORLD_CREATE_INVALID_ENVIRONMENT,
+                    rawEnvironment.get(),
+                    WorldEnvironment.values());
+        }
+        Optional<String> rawType = optionalString(ctx, "type");
+        Optional<WorldGenType> type = rawType.flatMap(WorldGenType::parse);
+        if (rawType.isPresent() && type.isEmpty()) {
+            return refuseToken(
+                    sender, WorldsMessageKey.WORLD_CREATE_INVALID_TYPE, rawType.get(), WorldGenType.values());
+        }
+        WorldCreateOptions options = new WorldCreateOptions(environment, type, Optional.empty(), parseGenerator(ctx));
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
-        onGlobal(() -> services.createWorld().create(who, name, spec, true));
+        onGlobal(() -> services.createWorld().create(who, name, options, true));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -285,9 +297,17 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         }
         // A key the operator typed is kept, so the world loads from that namespace on every start.
         Optional<DimensionKey> dimension = DimensionNames.parse(folder);
-        // Left out, the environment is read from the dimension: the_nether and the_end, any other normal.
-        Optional<WorldEnvironment> env = optionalString(ctx, "environment")
-                .map(raw -> arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL));
+        // Left out, the environment is read from the dimension: the_nether and the_end, any other normal. A typo is
+        // refused rather than read as normal, which would load a nether or end dimension as the wrong kind of world.
+        Optional<String> rawEnvironment = optionalString(ctx, "environment");
+        Optional<WorldEnvironment> env = rawEnvironment.flatMap(WorldEnvironment::parse);
+        if (rawEnvironment.isPresent() && env.isEmpty()) {
+            return refuseToken(
+                    sender,
+                    WorldsMessageKey.WORLD_CREATE_INVALID_ENVIRONMENT,
+                    rawEnvironment.get(),
+                    WorldEnvironment.values());
+        }
         Optional<GeneratorRef> gen = optionalString(ctx, "generator").map(GeneratorRef::of);
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_IMPORTING, Map.of("world", name.value()));
@@ -692,13 +712,10 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         void run(PlayerRef who, WorldName name);
     }
 
-    private static <E extends Enum<E>> E arg(
-            CommandContext<CommandSourceStack> ctx, String key, Class<E> type, E fallback) {
-        try {
-            return Enum.valueOf(type, ctx.getArgument(key, String.class).toUpperCase(Locale.ROOT));
-        } catch (IllegalArgumentException missingOrInvalid) {
-            return fallback;
-        }
+    private int refuseToken(CommandSender sender, WorldsMessageKey key, String typed, Enum<?>[] accepted) {
+        String values = Arrays.stream(accepted).map(Enum::name).collect(Collectors.joining(", "));
+        feedback.send(sender, key, Map.of("value", typed, "values", values));
+        return 0;
     }
 
     private static Optional<String> optionalString(CommandContext<CommandSourceStack> ctx, String key) {

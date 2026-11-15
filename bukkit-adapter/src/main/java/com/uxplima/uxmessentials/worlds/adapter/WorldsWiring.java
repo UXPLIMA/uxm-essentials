@@ -83,6 +83,7 @@ import com.uxplima.uxmessentials.worlds.application.port.RescueTargets;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
+import com.uxplima.uxmessentials.worlds.domain.event.WorldCreated;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -243,8 +244,8 @@ public final class WorldsWiring {
                 mainMenu::open);
         // The create screen reopens the engine list on cancel/create through the shared reopen seam, runs the started
         // CreateWorld use case, and captures text through the shared input seam.
-        WorldCreateMenu createMenu =
-                new WorldCreateMenu(menus, tracked, services.createWorld(), notifier, textInput, reopenList);
+        WorldCreateMenu createMenu = new WorldCreateMenu(
+                menus, tracked, services.createWorld(), settings::creationDefaults, notifier, textInput, reopenList);
         WorldGenerationMenu generationMenu = new WorldGenerationMenu(menus, tracked, repository);
         WorldGridMenu gridMenu = new WorldGridMenu(menus, tracked, repository, services.setWorldProperty());
         // The hub's toggle button flips the world's loaded state: the load/unload use case reaches Bukkit world
@@ -282,12 +283,15 @@ public final class WorldsWiring {
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
                 repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
 
-        // Re-apply a world's stored settings to the live world on load and after any setting change, on the
-        // global region thread (the applier touches Bukkit world handles). Subscribed for the module's lifetime
-        // and dropped on stop so a reload never leaves a stale listener firing against torn-down state.
+        // Re-apply a world's stored settings to the live world on load and after any setting change, on the global
+        // region thread (the applier touches Bukkit world handles). Creating a world publishes no WorldLoaded, so a
+        // new world gets its stored settings here once its row is saved. Subscribed for the module's lifetime and
+        // dropped on stop so a reload never leaves a stale listener firing against torn-down state.
         Consumer<DomainEvent> applySubscriber = event -> {
             if (event instanceof WorldLoaded loaded) {
                 kernel.scheduler().onGlobal(() -> onLoad.apply(loaded.name()));
+            } else if (event instanceof WorldCreated created) {
+                kernel.scheduler().onGlobal(() -> onLoad.apply(created.name()));
             } else if (event instanceof WorldSettingChanged changed) {
                 kernel.scheduler().onGlobal(() -> onLoad.apply(changed.name()));
             }
@@ -359,7 +363,8 @@ public final class WorldsWiring {
             RestoreWorld restoreWorld,
             BiConsumer<Player, PlayerRef> openWorldList,
             com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener openWorldMain) {
-        CreateWorld createWorld = new CreateWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
+        CreateWorld createWorld = new CreateWorld(
+                repository, engine, notifier, kernel.events(), scheduler, clock, settings::creationDefaults);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
         LoadWorld loadWorld = new LoadWorld(repository, engine, notifier, kernel.events(), scheduler);
         UnloadWorld unloadWorld = new UnloadWorld(engine, notifier, kernel.events(), settings::protectDefaultWorld);
@@ -372,7 +377,8 @@ public final class WorldsWiring {
                 kernel.events(),
                 scheduler,
                 clock,
-                settings::protectDefaultWorld);
+                settings::protectDefaultWorld,
+                settings::deleteConfirmTimeout);
         ListWorlds listWorlds = new ListWorlds(repository, engine);
         WorldInfo worldInfo = new WorldInfo(repository);
         SetWorldProperty setProperty = new SetWorldProperty(repository, notifier, kernel.events(), scheduler);

@@ -18,8 +18,11 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_DELETE_CONFIRM("world.delete-confirm"),
     WORLD_DELETED("world.deleted"),
     WORLD_DELETE_NONE("world.delete-none"),
+    WORLD_DELETE_EXPIRED("world.delete-expired"),
 
     WORLD_NAME_INVALID("world.name-invalid"),
+    WORLD_CREATE_INVALID_ENVIRONMENT("world.create.invalid-environment"),
+    WORLD_CREATE_INVALID_TYPE("world.create.invalid-type"),
     WORLD_ALREADY_EXISTS("world.already-exists"),
     WORLD_NOT_FOUND("world.not-found"),
     WORLD_ALREADY_LOADED("world.already-loaded"),

@@ -1,11 +1,18 @@
 package com.uxplima.uxmessentials.worlds.application;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.worlds.domain.BiomeId;
 import com.uxplima.uxmessentials.worlds.domain.FlatLayerPlan;
+import com.uxplima.uxmessentials.worlds.domain.WorldDefaults;
+import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
+import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
+import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
+import com.uxplima.uxmessentials.worlds.domain.WorldProperty;
+import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
 
 /**
  * A typed read view over the worlds module's config subtree. The use cases consult this rather than
@@ -17,6 +24,9 @@ import com.uxplima.uxmessentials.worlds.domain.FlatLayerPlan;
  * relative to that root, matching the convention {@code TeleportSettings} follows.
  */
 public final class WorldsSettings {
+
+    private static final Duration DEFAULT_DELETE_CONFIRM_TIMEOUT = Duration.ofSeconds(30);
+    private static final String SETTINGS_DEFAULTS = "settings.defaults.";
 
     private final ConfigStore config;
 
@@ -37,6 +47,47 @@ public final class WorldsSettings {
     /** Whether the enable-time reconcile auto-loads registered worlds flagged for it; default true. */
     public boolean autoLoadRegistered() {
         return config.getBoolean("auto-load-registered", true);
+    }
+
+    /**
+     * How long a staged {@code /worlds delete} stays confirmable, {@code delete-confirm-timeout}; default 30s. A value
+     * that is not a length of time, or is zero, falls back to the default rather than making every confirm fail or
+     * none expire.
+     */
+    public Duration deleteConfirmTimeout() {
+        return WorldsDuration.parse(config.getString("delete-confirm-timeout", "30s"))
+                .filter(timeout -> !timeout.isZero())
+                .orElse(DEFAULT_DELETE_CONFIRM_TIMEOUT);
+    }
+
+    /**
+     * What a world created through the plugin starts with where the operator chose nothing: {@code defaults} for the
+     * environment, preset and structures, {@code settings.defaults} for the per-world settings. A missing or unknown
+     * value takes the vanilla default for that one key.
+     */
+    public WorldDefaults creationDefaults() {
+        WorldDefaults vanilla = WorldDefaults.vanilla();
+        WorldSettings settings = WorldSettings.defaults()
+                .with(WorldProperties.PVP, settingFlag(WorldProperties.PVP))
+                .with(WorldProperties.DIFFICULTY, settingValue(WorldProperties.DIFFICULTY))
+                .with(WorldProperties.FORCE_GAMEMODE, settingValue(WorldProperties.FORCE_GAMEMODE))
+                .with(WorldProperties.SPAWN_ANIMALS, settingFlag(WorldProperties.SPAWN_ANIMALS))
+                .with(WorldProperties.SPAWN_MONSTERS, settingFlag(WorldProperties.SPAWN_MONSTERS));
+        return new WorldDefaults(
+                WorldEnvironment.parse(config.getString("defaults.environment", ""))
+                        .orElse(vanilla.environment()),
+                WorldGenType.parse(config.getString("defaults.world-type", "")).orElse(vanilla.worldType()),
+                config.getBoolean("defaults.generate-structures", vanilla.generateStructures()),
+                settings);
+    }
+
+    private boolean settingFlag(WorldProperty<Boolean> property) {
+        return config.getBoolean(SETTINGS_DEFAULTS + property.key(), property.defaultValue());
+    }
+
+    private <T> T settingValue(WorldProperty<T> property) {
+        String raw = config.getString(SETTINGS_DEFAULTS + property.key(), property.encode(property.defaultValue()));
+        return property.decode(raw).orElse(property.defaultValue());
     }
 
     /**
