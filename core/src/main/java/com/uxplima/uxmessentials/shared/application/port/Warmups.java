@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * module drops every pending warmup on {@code stop()}. The duration is resolved from numbered
  * permission nodes via {@link Permissions} with the {@code min}-reducer (lowest matching
  * {@code uxmessentials.<feature>.warmup.<seconds>} wins, {@code 0} removes the warmup); the
- * {@code uxmessentials.<feature>.warmup.bypass} node starts the teleport immediately, immune to
+ * {@code uxmessentials.bypass.warmup.<feature>} node starts the teleport immediately, immune to
  * move-cancel.
  *
  * <p>The move-cancels-warmup invariant itself is owned by the teleport context (its

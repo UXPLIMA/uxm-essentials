@@ -53,10 +53,10 @@ public final class SocialPermissions {
     public static final String COMMUNICATION_BROADCAST = "uxmessentials.communication.broadcast";
     public static final String COMMUNICATION_BROADCASTTOGGLE = "uxmessentials.communication.broadcasttoggle";
     public static final String COMMUNICATION_BROADCASTWORLD = "uxmessentials.communication.broadcastworld";
-    public static final String COMMUNICATION_CHAT_BYPASS = "uxmessentials.communication.chat.bypass";
+    public static final String COMMUNICATION_CHAT_BYPASS = "uxmessentials.bypass.chat-lock";
     public static final String COMMUNICATION_CHAT_FORMAT = "uxmessentials.communication.chat.format";
     public static final String COMMUNICATION_CLEARCHAT = "uxmessentials.communication.clearchat";
-    public static final String COMMUNICATION_CLEARCHAT_EXEMPT = "uxmessentials.communication.clearchat.exempt";
+    public static final String COMMUNICATION_CLEARCHAT_EXEMPT = "uxmessentials.bypass.clear-chat";
     public static final String COMMUNICATION_GUI = "uxmessentials.communication.gui";
     public static final String COMMUNICATION_INFO_INFO = "uxmessentials.communication.info.info";
     public static final String COMMUNICATION_INFO_MOTD = "uxmessentials.communication.info.motd";

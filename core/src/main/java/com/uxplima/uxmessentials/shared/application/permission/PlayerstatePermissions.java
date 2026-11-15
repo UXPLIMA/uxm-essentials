@@ -51,7 +51,7 @@ public final class PlayerstatePermissions {
     public static final String PLAYTIME_SET = "uxmessentials.playtime.set";
     public static final String PLAYTIME_USE = "uxmessentials.playtime.use";
     public static final String SEED_USE = "uxmessentials.seed.use";
-    public static final String WORLD_COMMAND_BYPASS = "uxmessentials.world.command-bypass";
+    public static final String WORLD_COMMAND_BYPASS = "uxmessentials.bypass.blocked-commands.world";
     public static final String WORLD_USE = "uxmessentials.world.use";
     public static final String CLEARINVENTORY_CONFIRMTOGGLE = "uxmessentials.clearinventory.confirmtoggle";
     public static final String CLEARINVENTORY_USE = "uxmessentials.clearinventory.use";

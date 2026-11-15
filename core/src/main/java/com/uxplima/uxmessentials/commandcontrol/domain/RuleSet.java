@@ -13,12 +13,12 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The pure allow/deny decision behind the command whitelist / blacklist. Built once from the module's config, it
- * holds the {@link RuleMode}, a {@code default} command list, a per-group command list map, and the {@code .bypass}
+ * holds the {@link RuleMode}, a {@code default} command list, a per-group command list map, and the bypass
  * permission node; it decides {@link Decision#ALLOW} or {@link Decision#DENY} for one command and one player's
  * {@link PlayerFacts}. Nothing here is Bukkit-aware. The event handling and the group/permission lookups are
  * adapter-side, so the decision is a plain function that unit-tests exactly.
  *
- * <p>Resolution: a {@code .bypass} holder is always allowed. Otherwise the player's group selects its command list
+ * <p>Resolution: a bypass holder is always allowed. Otherwise the player's group selects its command list
  * (falling back to the {@code default} list when the group has none or is absent), and the mode reads that list:
  * {@link RuleMode#WHITELIST} allows only a listed command, {@link RuleMode#BLACKLIST} denies only a listed command.
  * Console is never modelled here: the adapter's listener fires only for player commands, so a console command is never
@@ -87,7 +87,7 @@ public final class RuleSet {
 
     /**
      * Decide whether {@code command} may run for {@code facts}. The command is read with its arguments, with or without
-     * its leading slash. A {@code .bypass} holder is always allowed; otherwise the player's group selects its list (or
+     * its leading slash. A bypass holder is always allowed; otherwise the player's group selects its list (or
      * the default list) and the mode reads it.
      */
     public Decision decide(String command, PlayerFacts facts) {

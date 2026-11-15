@@ -114,11 +114,11 @@ Every `/eco` subcommand also needs `uxmessentials.economy.admin`, which opens `/
 
 | Placeholder | Value |
 |---|---|
-| `%uxmessentials_balance%` | The balance in the default currency, as a plain number. |
-| `%uxmessentials_balance_formatted%` | The same with the symbol and grouping. |
-| `%uxmessentials_economy_balance_compact%` | Shortened, such as `1.2K`. |
-| `%uxmessentials_baltop_position%` | The player's place on the leaderboard. |
-| `%uxmessentials_economy_currency_symbol%` | The symbol of the default currency. |
+| `%uxm_essentials_balance%` | The balance in the default currency, as a plain number. |
+| `%uxm_essentials_balance_formatted%` | The same with the symbol and grouping. |
+| `%uxm_essentials_economy_balance_compact%` | Shortened, such as `1.2K`. |
+| `%uxm_essentials_baltop_position%` | The player's place on the leaderboard. |
+| `%uxm_essentials_economy_currency_symbol%` | The symbol of the default currency. |
 
 ## Examples
 
@@ -130,4 +130,4 @@ exchange-allowed = false, leaderboard-enabled = false }` to `currencies.conf` an
 finishes with `/payconfirm` within 30 seconds.
 
 **A tax on payments.** Set `pay.tax { enabled = true, percent = "5" }`. Staff with
-`uxmessentials.economy.tax.bypass` pay none.
+`uxmessentials.bypass.tax` pay none.

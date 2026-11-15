@@ -58,7 +58,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The {@link VaultItemPolicy} blacklist is enforced on close: an item whose material is blocked is removed
  * from the vault and returned to the closer (added to their inventory, overflow dropped at their feet), so a
- * configured material can never be stored. A player holding {@code uxmessentials.vault.bypass-blacklist} skips
+ * configured material can never be stored. A player holding {@code uxmessentials.bypass.blacklist.vault} skips
  * the filter and keeps every item. The filter runs in the close handler, where the live closer is known, so the
  * return and the {@code VAULT_ITEM_BLOCKED} notice happen on that player's region thread.
  *
@@ -291,7 +291,7 @@ public final class VaultView {
 
     /**
      * Strip blacklisted items from the still-open {@code gui} and hand them back to the {@code closer} before
-     * the contents are encoded. A {@code uxmessentials.vault.bypass-blacklist} holder keeps everything. Each
+     * the contents are encoded. A {@code uxmessentials.bypass.blacklist.vault} holder keeps everything. Each
      * blocked stack is cleared from its slot and returned to the closer's inventory, with any overflow dropped
      * at their feet, so no item is lost or duplicated; a non-zero count produces the {@code VAULT_ITEM_BLOCKED}
      * notice. The closer is the live player behind the close event, so this runs on their region thread.

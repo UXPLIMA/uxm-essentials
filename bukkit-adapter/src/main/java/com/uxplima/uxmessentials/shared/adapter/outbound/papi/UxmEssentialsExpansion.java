@@ -15,36 +15,38 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The {@code %uxmessentials_<key>%} expansion. A thin PlaceholderAPI shell: it strips the implicit {@code
- * uxmessentials_} prefix PlaceholderAPI already removes, builds a {@link PlayerRef} from the requesting
- * {@link OfflinePlayer}, and delegates every key to the {@link PlaceholderResolver}, which carries the
- * resolution logic with no PlaceholderAPI dependency. This is the only class that extends {@code
+ * The {@code %uxm_essentials_<key>%} expansion. A thin PlaceholderAPI shell: its {@link PlaceholderRoute} names
+ * the identifier and takes the key out of the parameters PlaceholderAPI hands over, it builds a {@link PlayerRef}
+ * from the requesting {@link OfflinePlayer}, and it delegates every key to the {@link PlaceholderResolver}, which
+ * carries the resolution logic with no PlaceholderAPI dependency. This is the only class that extends {@code
  * PlaceholderExpansion}; it is constructed and registered solely in bootstrap, and only when PlaceholderAPI
- * is present.
+ * is present. A second instance on the legacy route answers {@code %uxmessentials_<key>%} the same way.
  *
  * <p>It also implements PlaceholderAPI's {@code Relational} contract, which routes the {@code
- * %rel_uxmessentials_<key>%} form: the keys that read the relation between two players (whether one can see,
+ * %rel_uxm_essentials_<key>%} form: the keys that read the relation between two players (whether one can see,
  * ignores or is trading with the other, and how far apart they stand) rather than one player's own state.
  *
  * <p>{@link #persist()} is {@code true} so the expansion survives a PlaceholderAPI internal reload, the
  * plugin owns its lifecycle and unregisters the expansion on its own disable, not when PlaceholderAPI
- * reloads its registry. An unknown key resolves to {@code null}, the PlaceholderAPI signal to leave the raw
- * token in place.
+ * reloads its registry. An unknown key, or parameters another plugin sharing the identifier owns, resolve to
+ * {@code null}, the PlaceholderAPI signal to leave the raw token in place.
  */
 @NullMarked
 public final class UxmEssentialsExpansion extends PlaceholderExpansion implements Relational {
 
     private final PlaceholderResolver resolver;
     private final String version;
+    private final PlaceholderRoute route;
 
-    public UxmEssentialsExpansion(PlaceholderResolver resolver, String version) {
+    UxmEssentialsExpansion(PlaceholderResolver resolver, String version, PlaceholderRoute route) {
         this.resolver = Objects.requireNonNull(resolver, "resolver");
         this.version = Objects.requireNonNull(version, "version");
+        this.route = Objects.requireNonNull(route, "route");
     }
 
     @Override
     public String getIdentifier() {
-        return "uxmessentials";
+        return route.identifier();
     }
 
     @Override
@@ -65,26 +67,30 @@ public final class UxmEssentialsExpansion extends PlaceholderExpansion implement
     @Override
     public @Nullable String onRequest(@Nullable OfflinePlayer player, String params) {
         Objects.requireNonNull(params, "params");
-        if (player == null) {
+        // The key is read first so an old placeholder on a player-less surface is still named in the log.
+        Optional<String> key = route.key(params);
+        if (player == null || key.isEmpty()) {
             return null;
         }
         PlayerRef who = refOf(player);
         boolean online = isOnline(player.getUniqueId());
-        return resolver.resolve(who, online, params).orElse(null);
+        return resolver.resolve(who, online, key.get()).orElse(null);
     }
 
     /**
-     * The {@code %rel_uxmessentials_<key>%} form: {@code viewer} is the player the line is being rendered for and
+     * The {@code %rel_uxm_essentials_<key>%} form: {@code viewer} is the player the line is being rendered for and
      * {@code target} the player it is about. PlaceholderAPI supplies both only where a surface renders per viewer,
      * and passes either as null on a surface that does not, in which case the raw token is left in place.
      */
     @Override
     public @Nullable String onPlaceholderRequest(@Nullable Player viewer, @Nullable Player target, String params) {
         Objects.requireNonNull(params, "params");
+        Optional<String> key = route.key(params);
         if (viewer == null || target == null) {
             return null;
         }
-        return resolver.resolveRelational(refOf(viewer), refOf(target), params).orElse(null);
+        return key.flatMap(k -> resolver.resolveRelational(refOf(viewer), refOf(target), k))
+                .orElse(null);
     }
 
     private static PlayerRef refOf(OfflinePlayer player) {

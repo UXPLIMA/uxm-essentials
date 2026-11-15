@@ -49,7 +49,7 @@ public final class LoginEnforcement {
 
     /**
      * Decide whether {@code who} connecting from {@code ip} may log in, recording seen and alt-detection.
-     * {@code hasBypass} is whether the connecting player holds {@code uxmessentials.moderation.lockdown.bypass};
+     * {@code hasBypass} is whether the connecting player holds {@code uxmessentials.bypass.lockdown};
      * the listener resolves it from the live {@code Player} (a permission cannot be read for a connecting player
      * inside this pure use case) and threads it in so a locked-down server refuses every login but theirs.
      * {@code exempt} is whether they hold {@link ModerationGuard#EXEMPT_NODE}, read the same way: an exempt holder

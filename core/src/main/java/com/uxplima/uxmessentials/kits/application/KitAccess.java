@@ -38,7 +38,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  *
  * <p>The cooldown resolves through the shared {@link Cooldowns} port against the {@code kit} tier node
  * ({@code uxmessentials.kit.cooldown.<seconds>}, lowest wins) while keying its stamp per kit id, so each kit
- * rate-limits independently. The {@code uxmessentials.kit.cooldown.bypass} node both skips the cooldown and,
+ * rate-limits independently. The {@code uxmessentials.bypass.cooldown.kit} node both skips the cooldown and,
  * by convention, lets a holder re-claim a one-time kit: that bypass is checked here for the one-time gate.
  */
 public final class KitAccess {

@@ -61,7 +61,7 @@ import org.jspecify.annotations.Nullable;
  * </ul>
  *
  * <p>Every path resolves the rule set and hide policy of the player's <em>current</em> world, so a per-world override
- * governs the player while they are in that world and the base governs them elsewhere. A {@code .bypass} holder is
+ * governs the player while they are in that world and the base governs them elsewhere. A bypass holder is
  * short-circuited before any work - the bypass sees everything. The listener does nothing when both the tab filter
  * (rule set inert or switched off) and the plugin-hide are inactive for the player's world.
  */

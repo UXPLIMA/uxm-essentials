@@ -7,8 +7,8 @@ import java.util.OptionalLong;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * Read seam the expansion queries for the {@code %uxmessentials_rank%}, {@code %uxmessentials_rank_next%} and
- * {@code %uxmessentials_prestige%} placeholders. It is an adapter over the ranks context's {@code CurrentRank}
+ * Read seam the expansion queries for the {@code %uxm_essentials_rank%}, {@code %uxm_essentials_rank_next%} and
+ * {@code %uxm_essentials_prestige%} placeholders. It is an adapter over the ranks context's {@code CurrentRank}
  * read and the parsed ladder, wired during ranks wiring; when the ranks module is disabled the seam is absent
  * and each placeholder degrades to the dash.
  *

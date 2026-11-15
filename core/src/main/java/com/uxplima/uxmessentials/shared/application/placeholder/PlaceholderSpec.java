@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * against it in both directions, {@code /uxmess placeholders} lists it in game, and the reference page is built
  * from it.
  *
- * @param key the key as an operator types it between the percent signs, without the {@code uxmessentials_} prefix,
+ * @param key the key as an operator types it between the percent signs, without the {@code uxm_essentials_} prefix,
  *     with the open segment written out when the shape is a family ({@code kit_cost_<kit>})
  * @param description what the key renders, in one sentence
  * @param shape whether this is one key or the head of an open family
@@ -23,6 +23,12 @@ import org.jspecify.annotations.Nullable;
  */
 public record PlaceholderSpec(
         String key, String description, PlaceholderShape shape, PlaceholderScope scope, Optional<ModuleId> owner) {
+
+    /**
+     * What an operator types before every key, following the shared {@code %uxm_<plugin>_<path>%} form so the
+     * placeholders of every UXM plugin read alike.
+     */
+    public static final String PREFIX = "uxm_essentials_";
 
     public PlaceholderSpec {
         Objects.requireNonNull(key, "key");
@@ -74,7 +80,7 @@ public record PlaceholderSpec(
      * {@code rel_} prefix PlaceholderAPI routes the two-player form under.
      */
     public String placeholder() {
-        return (scope == PlaceholderScope.RELATIONAL ? "%rel_uxmessentials_" : "%uxmessentials_") + key + "%";
+        return (scope == PlaceholderScope.RELATIONAL ? "%rel_" : "%") + PREFIX + key + "%";
     }
 
     /** Whether this key answers about a pair of players rather than the one it is rendered for. */

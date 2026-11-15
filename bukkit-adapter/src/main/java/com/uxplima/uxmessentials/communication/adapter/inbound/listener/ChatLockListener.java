@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Enforces the global chat lock {@code /togglechat} flips: while the {@link ChatLock} is set, a public chat
- * message from a player who lacks {@code uxmessentials.communication.chat.bypass} is cancelled and the speaker
+ * message from a player who lacks {@code uxmessentials.bypass.chat-lock} is cancelled and the speaker
  * is told chat is locked. Staff with the bypass node (and console, which never raises this event) speak
  * through a frozen chat so they can still coordinate.
  *

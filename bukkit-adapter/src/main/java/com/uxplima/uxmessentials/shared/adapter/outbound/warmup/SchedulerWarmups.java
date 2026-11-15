@@ -15,8 +15,8 @@ import org.jspecify.annotations.NullMarked;
  * with no PDC stamp, so a warmup is purely in-flight runtime state the owning module drops on
  * {@code stop()}. The duration is resolved from the player's numbered
  * {@code uxmessentials.<feature>.warmup.<seconds>} nodes via {@link Permissions} (the {@code min}
- * reducer. The shortest tier wins, {@code 0} removes the warmup), and the {@code .bypass} node starts
- * the teleport immediately, immune to move-cancel.
+ * reducer. The shortest tier wins, {@code 0} removes the warmup), and {@code uxmessentials.bypass.warmup.<feature>}
+ * starts the teleport immediately, immune to move-cancel.
  *
  * <p>The countdown holds no scheduler resource: it sleeps once via {@link Scheduler#asyncAfter} and on
  * wake re-checks the handle's {@code cancelled} flag before hopping to the player's region thread to

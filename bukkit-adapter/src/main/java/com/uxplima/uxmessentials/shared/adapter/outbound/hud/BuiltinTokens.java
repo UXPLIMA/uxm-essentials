@@ -25,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Alongside the per-viewer tokens it also resolves a handful of server-wide metric tokens, {@code {tps}},
  * {@code {tps_colored}}, {@code {uptime}}, {@code {ram_used}}, {@code {ram_max}}, which ignore the viewer. These
- * mirror the {@code %uxmessentials_server_*%} PlaceholderAPI placeholders but work with no PlaceholderAPI installed,
+ * mirror the {@code %uxm_essentials_server_*%} PlaceholderAPI placeholders but work with no PlaceholderAPI installed,
  * which is the point of the built-in pass: a HUD header can show live TPS and memory out of the box.
  *
  * <p>Each token is substituted only when present in the source (a cheap {@code contains} check), so a source carrying
@@ -91,7 +91,7 @@ public final class BuiltinTokens {
 
     /**
      * A tick rate rounded to two decimal places with trailing zeros stripped, so 20.0 reads {@code 20} and
-     * 19.97 reads {@code 19.97}, matching the {@code %uxmessentials_server_tps%} rendering.
+     * 19.97 reads {@code 19.97}, matching the {@code %uxm_essentials_server_tps%} rendering.
      */
     private static String formatTps(double value) {
         return new java.math.BigDecimal(value)
