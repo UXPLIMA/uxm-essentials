@@ -59,10 +59,9 @@ entries of `selector-presets`, up to eighteen of each.
 The checks run in this order, and the first that fails stops the use with its own message:
 
 1. The player holds `uxmessentials.warp.use.<warp>`, and the warp's required permission when it has one. The
-   per-warp node is meant to default to everyone, but the plugin does not register it yet, so today a player who is
-   not an operator is refused until it is granted. This is a known issue. Until it is fixed, grant
-   `uxmessentials.warp.use.*` to the default group, or one `uxmessentials.warp.use.<warp>` per warp; set a node to
-   false for a group to keep that group out of a warp.
+   per-warp node defaults to every player, so nothing needs granting. Set it to false for a group to keep that group
+   out of one warp, or set `uxmessentials.warp.use.*` to false and grant single warps back to close them all by
+   default.
 2. The warp is not locked, unless the player holds `uxmessentials.bypass.lock.warp`.
 3. The right password was given, unless the warp has none or the player holds `uxmessentials.bypass.password.warp`.
 4. The destination is safe: solid ground, and no solid block, lava or fire at the feet or head. A warp in a world
