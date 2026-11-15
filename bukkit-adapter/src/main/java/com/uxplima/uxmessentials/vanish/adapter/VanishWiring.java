@@ -148,7 +148,8 @@ public final class VanishWiring {
         VanishLoginListener login =
                 new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());
         Function<UUID, Optional<String>> networkName = network::nameOf;
-        VanishConnectionMessenger messenger = new VanishConnectionMessenger(kernel.scheduler(), levels, config);
+        VanishConnectionMessenger messenger =
+                new VanishConnectionMessenger(kernel.scheduler(), kernel.messages(), levels, config);
         VanishActionBar actionBar =
                 new VanishActionBar(plugin.getServer(), kernel.scheduler(), kernel.messages(), store, config);
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.UnaryOperator;
 
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.TextComponent;
@@ -15,13 +16,19 @@ import org.junit.jupiter.api.Test;
 /** A fake connection line carries the player the way a real one does. */
 class FakeConnectionLineTest {
 
+    private static final UnaryOperator<String> NO_PLACEHOLDERS = UnaryOperator.identity();
+
     private static final Component DISPLAY =
             Component.text("Steve").hoverEvent(HoverEvent.showText(Component.text("Steve")));
 
     @Test
     void theShippedLineIsTheGamesOwnLineWithThePlayersDisplayName() {
         Component line = VanishConnectionMessenger.render(
-                        "<yellow><lang:multiplayer.player.left:'<display_name>'></yellow>", "Steve", DISPLAY)
+                        "<yellow><lang:multiplayer.player.left:'<display_name>'></yellow>",
+                        "Steve",
+                        DISPLAY,
+                        NO_PLACEHOLDERS,
+                        "")
                 .orElseThrow();
 
         List<TranslatableComponent> translated = translatables(line);
@@ -36,15 +43,30 @@ class FakeConnectionLineTest {
 
     @Test
     void anOperatorsLineFillsTheBareName() {
-        Component line = VanishConnectionMessenger.render("<gray>{player} went home", "Steve", DISPLAY)
+        Component line = VanishConnectionMessenger.render(
+                        "<gray>{player} went home", "Steve", DISPLAY, NO_PLACEHOLDERS, "")
                 .orElseThrow();
 
         assertThat(texts(line)).extracting(TextComponent::content).contains("Steve went home");
     }
 
     @Test
+    void anOperatorsLineReadsTheViewersPlaceholdersAndThePrefix() {
+        UnaryOperator<String> placeholders = source -> source.replace("%luckperms_prefix%", "[VIP] ");
+
+        Component line = VanishConnectionMessenger.render(
+                        "<prefix>%luckperms_prefix%{player} left the game", "Steve", DISPLAY, placeholders, "[server] ")
+                .orElseThrow();
+
+        assertThat(String.join(
+                        "", texts(line).stream().map(TextComponent::content).toList()))
+                .isEqualTo("[server] [VIP] Steve left the game");
+    }
+
+    @Test
     void aBlankLineSendsNothing() {
-        assertThat(VanishConnectionMessenger.render("", "Steve", DISPLAY)).isEmpty();
+        assertThat(VanishConnectionMessenger.render("", "Steve", DISPLAY, NO_PLACEHOLDERS, ""))
+                .isEmpty();
     }
 
     private static List<TranslatableComponent> translatables(Component component) {

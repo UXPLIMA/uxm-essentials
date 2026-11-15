@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.rest;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,34 +20,52 @@ import org.junit.jupiter.api.Test;
 class RepliesTest {
 
     private final List<String> logged = new ArrayList<>();
-    private final Replies replies = new Replies(recording());
 
     @Test
     void aHostThatAnswersIsAsked() {
-        Component line = replies.line(
-                (key, values) -> Component.text("host:" + key + ":" + values.get("label")),
-                "admin.rest.revoked",
-                Map.of("label", "panel"));
+        Component line = new Replies(true, recording())
+                .line(
+                        (key, values) -> Component.text("host:" + key + ":" + values.get("label")),
+                        "admin.rest.revoked",
+                        Map.of("label", "panel"));
 
         assertThat(plain(line)).isEqualTo("host:admin.rest.revoked:panel");
         assertThat(logged).isEmpty();
     }
 
     @Test
-    void aHostWithoutTheCallGetsEnglishAndIsNotAskedAgain() {
+    void aHostWithoutTheCallGetsEnglishAndIsNeverAsked() {
         List<String> asked = new ArrayList<>();
         Replies.Host older = (key, values) -> {
             asked.add(key);
             throw new NoSuchMethodError("message");
         };
+        Replies replies = new Replies(false, recording());
 
         Component first = replies.line(older, "admin.rest.revoked", Map.of("label", "panel"));
         Component second = replies.line(older, "admin.rest.not-found", Map.of("label", "gone"));
 
         assertThat(plain(first)).isEqualTo("Token panel revoked.");
         assertThat(plain(second)).isEqualTo("No token named gone.");
-        assertThat(asked).hasSize(1);
+        assertThat(asked).isEmpty();
         assertThat(logged).hasSize(1);
+    }
+
+    @Test
+    void aFaultInsideAHostThatHasTheCallIsNotTakenForAnOldHost() {
+        Replies.Host failing = (key, values) -> {
+            throw new NoSuchMethodError("something inside the host");
+        };
+        Replies replies = new Replies(true, recording());
+
+        assertThatThrownBy(() -> replies.line(failing, "admin.rest.revoked", Map.of("label", "panel")))
+                .isInstanceOf(NoSuchMethodError.class);
+        assertThat(logged).isEmpty();
+    }
+
+    @Test
+    void theHostThisBuildsAgainstHasTheCall() {
+        assertThat(Replies.hostHasMessages()).isTrue();
     }
 
     @Test
@@ -55,7 +74,8 @@ class RepliesTest {
             throw new AbstractMethodError("message");
         };
 
-        Component secret = replies.line(older, "admin.rest.secret", Map.of("secret", "uxm_abc"));
+        Component secret =
+                new Replies(false, recording()).line(older, "admin.rest.secret", Map.of("secret", "uxm_abc"));
 
         assertThat(plain(secret)).isEqualTo("uxm_abc");
         assertThat(secret.clickEvent()).isEqualTo(ClickEvent.copyToClipboard("uxm_abc"));
@@ -67,7 +87,7 @@ class RepliesTest {
             throw new NoSuchMethodError("message");
         };
 
-        Component line = replies.line(older, "admin.rest.exists", Map.of("label", "<red>x"));
+        Component line = new Replies(false, recording()).line(older, "admin.rest.exists", Map.of("label", "<red>x"));
 
         assertThat(plain(line)).isEqualTo("A token named <red>x already exists.");
     }

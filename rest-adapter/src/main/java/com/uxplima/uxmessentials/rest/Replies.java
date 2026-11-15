@@ -4,6 +4,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Logger;
 
+import org.bukkit.command.CommandSender;
+
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
@@ -12,13 +14,16 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
+
 /**
  * The {@code /uxmapi} replies: lines of the host's catalogue when the host can read them, plain English otherwise.
  *
  * <p>The add-on updates separately from the host, and not every host version has the developer API call that reads
- * the catalogue. On a host without it the method is missing at run time, so the first reply that asks for it switches
- * every later one to the English lines below. Without that switch an operator on an older host
- * could make a token and never see its secret, which is shown only once.
+ * the catalogue. Whether this host has it is looked up once, when the command is built, and a host without it gets
+ * the English lines below; otherwise an operator on that host could make a token and never see its secret, which is
+ * shown only once. The look-up asks for the method by name rather than waiting for a call to fail, so a fault inside a
+ * host that does have it is not mistaken for an old host.
  */
 final class Replies {
 
@@ -48,11 +53,29 @@ final class Replies {
 
     private static final String SECRET = "admin.rest.secret";
 
-    private final Logger log;
-    private volatile boolean hostSpeaks = true;
+    private final boolean hostSpeaks;
 
-    Replies(Logger log) {
-        this.log = Objects.requireNonNull(log, "log");
+    /**
+     * @param hostSpeaks whether the host has the call that reads its catalogue, as {@link #hostHasMessages} answers
+     * @param log where an older host is reported, once
+     */
+    Replies(boolean hostSpeaks, Logger log) {
+        Objects.requireNonNull(log, "log");
+        this.hostSpeaks = hostSpeaks;
+        if (!hostSpeaks) {
+            log.info("uxmEssentials is older than this add-on's message lines, so /uxmapi replies in English."
+                    + " Update uxmEssentials to read them in each operator's language.");
+        }
+    }
+
+    /** Whether the running host's developer API has the call that reads its catalogue. */
+    static boolean hostHasMessages() {
+        try {
+            UxmEssentialsApi.class.getMethod("message", CommandSender.class, String.class, Map.class);
+            return true;
+        } catch (NoSuchMethodException olderHost) {
+            return false;
+        }
     }
 
     /** {@code key} as the host reads it, or in English when the host is too old to. */
@@ -60,16 +83,7 @@ final class Replies {
         Objects.requireNonNull(host, "host");
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(placeholders, "placeholders");
-        if (hostSpeaks) {
-            try {
-                return host.message(key, placeholders);
-            } catch (NoSuchMethodError | AbstractMethodError olderHost) {
-                hostSpeaks = false;
-                log.info("uxmEssentials is older than this add-on's message lines, so /uxmapi replies in English."
-                        + " Update uxmEssentials to read them in each operator's language.");
-            }
-        }
-        return english(key, placeholders);
+        return hostSpeaks ? host.message(key, placeholders) : english(key, placeholders);
     }
 
     private static Component english(String key, Map<String, String> placeholders) {

@@ -82,7 +82,7 @@ public final class TokenCommand {
         this.status = Objects.requireNonNull(status, "status");
         this.api = Objects.requireNonNull(api, "api");
         this.configPath = Objects.requireNonNull(configPath, "configPath");
-        this.replies = new Replies(log);
+        this.replies = new Replies(Replies.hostHasMessages(), log);
     }
 
     /** The command tree, ready to register. */
