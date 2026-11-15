@@ -24,7 +24,7 @@ final class PlayerWarpBuilder {
     private PlayerWarpName name;
     private Optional<DisplayName> displayName;
     private Position location;
-    private final Optional<String> serverId;
+    private Optional<String> serverId;
     private Optional<String> categoryId;
     private Optional<WarpDescription> description;
     private Optional<IconSpec> icon;
@@ -118,6 +118,11 @@ final class PlayerWarpBuilder {
 
     PlayerWarpBuilder location(Position value) {
         this.location = value;
+        return this;
+    }
+
+    PlayerWarpBuilder serverId(Optional<String> value) {
+        this.serverId = value;
         return this;
     }
 

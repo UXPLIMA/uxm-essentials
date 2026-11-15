@@ -24,13 +24,17 @@ public final class MoveWarp {
 
     private final WarpRepository repository;
     private final Notifier notifier;
-    private final String localServer;
+    private final Optional<String> recordedServer;
 
-    /** {@code localServer} is the backend a moved warp is recorded on, the one whose world it now points into. */
-    public MoveWarp(WarpRepository repository, Notifier notifier, String localServer) {
+    /**
+     * {@code recordedServer} is the backend a moved warp is recorded on, the one whose world it now points into. It
+     * is empty off a network or under the shipped default server name, and the warp then records
+     * {@value Warp#UNSCOPED} for the backend holding its world to claim.
+     */
+    public MoveWarp(WarpRepository repository, Notifier notifier, Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Move the warp {@code name} to {@code at}, or reject when no such warp exists. */
@@ -43,7 +47,7 @@ public final class MoveWarp {
             notifier.send(actor, WarpError.NOT_FOUND.messageKey(), Map.of("warp", name.value()));
             return Result.err(WarpError.NOT_FOUND);
         }
-        repository.save(existing.get().movedTo(at, localServer));
+        repository.save(existing.get().movedTo(at, recordedServer));
         notifier.send(actor, WarpsMessageKey.WARP_MOVED, Map.of("warp", name.value()));
         return Result.ok();
     }

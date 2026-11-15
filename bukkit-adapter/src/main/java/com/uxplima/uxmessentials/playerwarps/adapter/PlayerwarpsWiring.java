@@ -133,6 +133,7 @@ public final class PlayerwarpsWiring {
             TeleportEngine teleportEngine,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             CrossServerHops hops,
+            Optional<String> recordedServer,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
@@ -157,6 +158,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(recordedServer, "recordedServer");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -166,8 +168,7 @@ public final class PlayerwarpsWiring {
         KernelPorts kernel = ctx.kernel();
         // Handed back on Wired rather than run here: it needs the world list, and at load: STARTUP the wiring
         // thread has none. Bootstrap releases it through WorldPhase once the worlds are up.
-        Runnable legacyMigration = new PlayerWarpLegacyMigration(
-                plugin, persistence, kernel, bus.publisher().serverId())::run;
+        Runnable legacyMigration = new PlayerWarpLegacyMigration(plugin, persistence, kernel, recordedServer)::run;
         // The concrete cache is what the cross-server listener invalidates per owner; the broadcasting decorator
         // wraps that same cache so a local write announces it to peers (the homes seam, copied for player-warps).
         com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cached =
@@ -247,7 +248,8 @@ public final class PlayerwarpsWiring {
                 kernel.events(),
                 kernel.gate(),
                 Clock.systemUTC(),
-                ctx.config().getStringList("world-blacklist", List.of()));
+                ctx.config().getStringList("world-blacklist", List.of()),
+                recordedServer);
         ArchivePlayerWarp archivePlayerWarp = new ArchivePlayerWarp(
                 repository, warpAuthorization, notifier, kernel.events(), kernel.gate(), Clock.systemUTC());
         SetPlayerWarpVisibility visibility = new SetPlayerWarpVisibility(repository, notifier, Clock.systemUTC());
@@ -278,8 +280,8 @@ public final class PlayerwarpsWiring {
         WithdrawEarnings withdrawEarnings = new WithdrawEarnings(repository, warpAuthorization, notifier, economy);
         // The single-warp edit verbs and the ownership transfer gate through the same shared WarpAuthorization and
         // reuse the repository, notifier, and password store built above: no new persistence, just use cases.
-        EditPlayerWarp editPlayerWarp =
-                new EditPlayerWarp(repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC());
+        EditPlayerWarp editPlayerWarp = new EditPlayerWarp(
+                repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer);
         TransferPlayerWarp transferPlayerWarp =
                 new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
         // The sponsorship sub-group: an owner buys a paid, time-limited pinned browse slot through the same
@@ -300,7 +302,8 @@ public final class PlayerwarpsWiring {
                 guiText,
                 guiLayouts,
                 textInput,
-                menus);
+                menus,
+                recordedServer);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The paged public browse bare /pwarp opens: one card per public warp read a page at a time through the
         // browse read model. The read model is the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so
@@ -663,7 +666,8 @@ public final class PlayerwarpsWiring {
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            Menus menus) {
+            Menus menus,
+            Optional<String> recordedServer) {
         PlayerWarpEditorSubLayouts subLayouts = PlayerWarpEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "playerwarps", "pwarp-editor", kernel.log());
         EntityEditorLayout editorLayout =
@@ -680,7 +684,8 @@ public final class PlayerwarpsWiring {
                 kernel.messages(),
                 editorLayout,
                 subLayouts,
-                (player, viewer) -> listHolder[0].open(player, viewer));
+                (player, viewer) -> listHolder[0].open(player, viewer),
+                recordedServer);
         PlayerWarpListMenu listMenu = new PlayerWarpListMenu(
                 menus,
                 kernel.scheduler(),
