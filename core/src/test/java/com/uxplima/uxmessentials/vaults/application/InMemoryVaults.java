@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 
 /** Vault rows keyed by owner and index, upserted on save, with a count of every write for no-churn checks. */
 final class InMemoryVaults implements VaultRepository {
@@ -54,15 +55,50 @@ final class InMemoryVaults implements VaultRepository {
         return ownedIndices(owner).size();
     }
 
+    /** Like the real store, a save neither writes nor changes a payment: only {@link #create} records one. */
     @Override
     public void save(Vault vault) {
         saves++;
-        rows.put(vault.id(), vault);
+        Vault stored = rows.get(vault.id());
+        rows.put(vault.id(), withPayment(vault, stored == null ? Optional.empty() : stored.paid()));
+    }
+
+    private static Vault withPayment(Vault vault, Optional<VaultPayment> paid) {
+        return Vault.of(
+                vault.id(),
+                vault.size(),
+                vault.contents(),
+                vault.displayName(),
+                vault.iconMaterial(),
+                vault.lastTouched(),
+                paid.orElse(null));
     }
 
     @Override
-    public void delete(VaultId id) {
+    public boolean update(Vault vault) {
+        Vault stored = rows.get(vault.id());
+        if (stored == null) {
+            return false;
+        }
+        saves++;
+        rows.put(vault.id(), withPayment(vault, stored.paid()));
+        return true;
+    }
+
+    @Override
+    public boolean create(Vault vault) {
+        saves++;
+        return rows.putIfAbsent(vault.id(), vault) == null;
+    }
+
+    @Override
+    public boolean delete(VaultId id, Optional<VaultPayment> expected) {
+        Vault stored = rows.get(id);
+        if (stored == null || !stored.paid().equals(expected)) {
+            return false;
+        }
         rows.remove(id);
+        return true;
     }
 
     @Override

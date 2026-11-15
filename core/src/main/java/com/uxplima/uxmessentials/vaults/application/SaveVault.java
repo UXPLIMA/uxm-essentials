@@ -29,8 +29,30 @@ public final class SaveVault {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Write {@code newContents} into {@code vault} as {@code owner}'s save and publish the change. */
-    public void save(PlayerRef owner, Vault vault, VaultContents newContents) {
+    /**
+     * Write {@code newContents} into {@code vault} as {@code owner}'s save and publish the change, returning
+     * whether the vault was still there. A vault deleted while its window was open is not brought back: nothing
+     * is written and the result is {@code false}, so the caller hands the window's items to the player instead.
+     * Bringing it back would give the player a vault they had already been refunded for, or undo a staff delete.
+     */
+    public boolean save(PlayerRef owner, Vault vault, VaultContents newContents) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(newContents, "newContents");
+        Vault.Change change = vault.withContents(owner, newContents, clock.instant());
+        if (!repository.update(change.result())) {
+            return false;
+        }
+        events.publish(change.event());
+        return true;
+    }
+
+    /**
+     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window: the
+     * staff member is not the owner the items belong to, and it is how staff fill a vault the owner has not opened
+     * yet. A vault this brings back records no payment, so deleting it again refunds nothing.
+     */
+    public void keep(PlayerRef owner, Vault vault, VaultContents newContents) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
