@@ -1,7 +1,7 @@
 # Documentation
 
 - [Reference](user/reference.md): commands, placeholders and files.
-- [Permissions: gameplay](user/permissions-gameplay.md) and [staff, server and items](user/permissions-server.md): every node with its default.
+- [Permissions: gameplay](user/permissions-gameplay.md), [staff and server](user/permissions-server.md) and [item and world tools](user/permissions-items.md): every node with its default.
 - [Homes](user/homes.md): the home grid, limits, costs and claims.
 - [Kits](user/kits.md): making kits, cooldowns, costs and schedules.
 - [Playtime](user/playtime.md): the tracked record, corrections, the vanilla import and the rank requirements.

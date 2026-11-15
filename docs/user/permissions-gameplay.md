@@ -1,6 +1,6 @@
 # Permissions: gameplay modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The staff, server and item modules and the plugin-wide nodes are in [permissions-server.md](permissions-server.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The staff and server modules and the plugin-wide nodes are in [permissions-server.md](permissions-server.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
 
 Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstate](#playerstate) · [playerwarps](#playerwarps) · [poses](#poses) · [survival](#survival) · [teleport](#teleport) · [trade](#trade) · [vaults](#vaults) · [villagers](#villagers) · [warps](#warps) · [worlds](#worlds)
 
