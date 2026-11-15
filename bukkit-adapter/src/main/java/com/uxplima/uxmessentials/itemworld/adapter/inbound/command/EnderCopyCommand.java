@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class EnderCopyCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.endercopy.use";
+    private static final String PERMISSION = ItemworldPermissions.ENDERCOPY_USE;
 
     public EnderCopyCommand(ItemworldServices services) {
         super(services, "endercopy", SubFeatureGroup.ITEM_UTILS, "Copy a player's ender chest into yours.");

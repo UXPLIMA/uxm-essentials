@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -54,7 +55,7 @@ public final class CustomMenusModule implements FeatureModule {
     public List<CommandSpec> commands() {
         // The real /menu node is built in the adapter wiring over the menu engine; this descriptor names the literal
         // and its base node so the command catalog and the feature-module drift guard see the context's surface.
-        return List.of(spec("menu", "uxmessentials.menu.use", descriptor("menu", "Open operator custom menus")));
+        return List.of(spec("menu", ContentPermissions.MENU_USE, descriptor("menu", "Open operator custom menus")));
     }
 
     @Override

@@ -19,6 +19,7 @@ import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.itemworld.application.ItemworldConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -39,7 +40,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class ShulkerBoxListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.itemworld.shulker";
+    private static final String PERMISSION = ItemworldPermissions.ITEMWORLD_SHULKER;
 
     private final ShulkerBoxView view;
     private final ItemworldConfig config;

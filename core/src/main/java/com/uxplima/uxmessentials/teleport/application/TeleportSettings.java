@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.domain.ArrivalGraceSettings;
@@ -264,7 +265,7 @@ public final class TeleportSettings {
 
     /** Permission which exempts a player from automatic join-spawn movement. */
     public String joinSpawnExemptPermission() {
-        return config.getString("spawn.exempt-permission", "uxmessentials.spawn.join.exempt")
+        return config.getString("spawn.exempt-permission", TeleportPermissions.SPAWN_JOIN_EXEMPT)
                 .strip();
     }
 

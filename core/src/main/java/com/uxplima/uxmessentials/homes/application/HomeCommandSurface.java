@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 
 /**
  * The homes context's command surface as platform-neutral
@@ -22,7 +23,8 @@ final class HomeCommandSurface {
     private HomeCommandSurface() {}
 
     static List<CommandSpec> all() {
-        return List.of(spec("home", "uxmessentials.home.use", HomeCommand.of("home", "Open and manage your homes")));
+        return List.of(
+                spec("home", DestinationPermissions.HOME_USE, HomeCommand.of("home", "Open and manage your homes")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

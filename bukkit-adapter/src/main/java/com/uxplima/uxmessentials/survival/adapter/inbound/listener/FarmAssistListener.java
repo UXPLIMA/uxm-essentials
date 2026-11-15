@@ -15,6 +15,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class FarmAssistListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.survival.farmassist";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_FARMASSIST;
 
     private final Map<Material, Material> cropToSeed;
 

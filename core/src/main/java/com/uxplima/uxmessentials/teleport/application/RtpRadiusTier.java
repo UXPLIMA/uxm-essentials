@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -23,7 +24,7 @@ import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
 public final class RtpRadiusTier {
 
     /** The quota family for the radius tier: {@code uxmessentials.rtp.radius.<n>}, reduced by the maximum. */
-    public static final QuotaFamily FAMILY = QuotaFamily.quota("uxmessentials.rtp.radius");
+    public static final QuotaFamily FAMILY = QuotaFamily.quota(TeleportPermissions.RTP_RADIUS);
 
     private final Permissions permissions;
 

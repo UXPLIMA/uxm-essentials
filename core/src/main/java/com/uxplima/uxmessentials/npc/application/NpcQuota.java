@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.npc.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.npc.domain.NpcLimit;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -19,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public final class NpcQuota {
 
-    private static final String NODE = "uxmessentials.npc.limit";
+    private static final String NODE = ContentPermissions.NPC_LIMIT;
 
     private final Permissions permissions;
     private final QuotaFamily family;

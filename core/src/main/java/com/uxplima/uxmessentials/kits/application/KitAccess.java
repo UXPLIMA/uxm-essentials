@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitUnlockStore;
 import com.uxplima.uxmessentials.kits.application.port.RequirementEvaluator;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitError;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownStartPhase;
@@ -42,7 +43,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  */
 public final class KitAccess {
 
-    private static final String COOLDOWN_BYPASS_NODE = "uxmessentials.kit.cooldown.bypass";
+    private static final String COOLDOWN_BYPASS_NODE = ContentPermissions.KIT_COOLDOWN_BYPASS;
 
     private final Permissions permissions;
     private final Cooldowns cooldowns;
@@ -339,7 +340,7 @@ public final class KitAccess {
         for (java.util.Map.Entry<String, java.time.Duration> entry :
                 kit.permissionCooldowns().entrySet()) {
             String group = entry.getKey();
-            if (permissions.has(who, "uxmessentials.kit.cooldown." + group)) {
+            if (permissions.has(who, ContentPermissions.kitCooldown(group))) {
                 long durationSecs = entry.getValue().toSeconds();
                 if (durationSecs < shortest) {
                     shortest = durationSecs;

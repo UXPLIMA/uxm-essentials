@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 
 /**
  * The playerstate context's command surface as platform-neutral
@@ -27,52 +28,61 @@ final class PlayerstateCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("god", "uxmessentials.god.use", cmd("god", "Toggle damage immunity")),
-                spec("fly", "uxmessentials.fly.use", cmd("fly", "Toggle flight")),
-                spec("heal", "uxmessentials.heal.use", cmd("heal", "Restore health")),
-                spec("feed", "uxmessentials.feed.use", cmd("feed", "Restore hunger")),
-                spec("foodlevel", "uxmessentials.foodlevel.use", cmd("foodlevel", "Set a player's food level")),
-                spec("health", "uxmessentials.health.use", cmd("health", "Set a player's health")),
-                spec("gamemode", "uxmessentials.gamemode.use", cmd("gamemode", "Set game mode")),
-                spec("speed", "uxmessentials.speed.use", cmd("speed", "Set walk and fly speed")),
-                spec("flyspeed", "uxmessentials.speed.use", cmd("flyspeed", "Set fly speed")),
-                spec("walkspeed", "uxmessentials.speed.use", cmd("walkspeed", "Set walk speed")),
-                spec("ext", "uxmessentials.extinguish.use", cmd("ext", "Put out a burning player")),
+                spec("god", PlayerstatePermissions.GOD_USE, cmd("god", "Toggle damage immunity")),
+                spec("fly", PlayerstatePermissions.FLY_USE, cmd("fly", "Toggle flight")),
+                spec("heal", PlayerstatePermissions.HEAL_USE, cmd("heal", "Restore health")),
+                spec("feed", PlayerstatePermissions.FEED_USE, cmd("feed", "Restore hunger")),
+                spec("foodlevel", PlayerstatePermissions.FOODLEVEL_USE, cmd("foodlevel", "Set a player's food level")),
+                spec("health", PlayerstatePermissions.HEALTH_USE, cmd("health", "Set a player's health")),
+                spec("gamemode", PlayerstatePermissions.GAMEMODE_USE, cmd("gamemode", "Set game mode")),
+                spec("speed", PlayerstatePermissions.SPEED_USE, cmd("speed", "Set walk and fly speed")),
+                spec("flyspeed", PlayerstatePermissions.SPEED_USE, cmd("flyspeed", "Set fly speed")),
+                spec("walkspeed", PlayerstatePermissions.SPEED_USE, cmd("walkspeed", "Set walk speed")),
+                spec("ext", PlayerstatePermissions.EXTINGUISH_USE, cmd("ext", "Put out a burning player")),
                 spec(
                         "clearinventory",
-                        "uxmessentials.clearinventory.use",
+                        PlayerstatePermissions.CLEARINVENTORY_USE,
                         cmd("clearinventory", "Clear a player's inventory")),
                 spec(
                         "clearinventoryconfirmtoggle",
-                        "uxmessentials.clearinventory.confirmtoggle",
+                        PlayerstatePermissions.CLEARINVENTORY_CONFIRMTOGGLE,
                         cmd("clearinventoryconfirmtoggle", "Toggle a confirmation before /clearinventory")),
-                spec("invsee", "uxmessentials.invsee.use", cmd("invsee", "View a player's inventory")),
-                spec("endersee", "uxmessentials.endersee.use", cmd("endersee", "View a player's ender chest")),
-                spec("suicide", "uxmessentials.suicide.use", cmd("suicide", "Kill yourself")),
-                spec("near", "uxmessentials.near.use", cmd("near", "List nearby players")),
-                spec("nightvision", "uxmessentials.nightvision.use", cmd("nightvision", "Toggle night vision")),
-                spec("glow", "uxmessentials.glow.use", cmd("glow", "Toggle a glowing outline")),
-                spec("ptime", "uxmessentials.ptime.use", cmd("ptime", "Set your personal time")),
-                spec("pweather", "uxmessentials.pweather.use", cmd("pweather", "Set your personal weather")),
-                spec("exp", "uxmessentials.exp.use", cmd("exp", "Get or set experience")),
-                spec("air", "uxmessentials.air.use", cmd("air", "Set remaining air")),
-                spec("burn", "uxmessentials.burn.use", cmd("burn", "Set a player on fire")),
-                spec("ice", "uxmessentials.ice.use", cmd("ice", "Freeze a player")),
-                spec("getpos", "uxmessentials.getpos.use", cmd("getpos", "Show a player's coordinates")),
-                spec("ping", "uxmessentials.ping.use", cmd("ping", "Show a player's ping")),
+                spec("invsee", PlayerstatePermissions.INVSEE_USE, cmd("invsee", "View a player's inventory")),
+                spec("endersee", PlayerstatePermissions.ENDERSEE_USE, cmd("endersee", "View a player's ender chest")),
+                spec("suicide", PlayerstatePermissions.SUICIDE_USE, cmd("suicide", "Kill yourself")),
+                spec("near", PlayerstatePermissions.NEAR_USE, cmd("near", "List nearby players")),
+                spec("nightvision", PlayerstatePermissions.NIGHTVISION_USE, cmd("nightvision", "Toggle night vision")),
+                spec("glow", PlayerstatePermissions.GLOW_USE, cmd("glow", "Toggle a glowing outline")),
+                spec("ptime", PlayerstatePermissions.PTIME_USE, cmd("ptime", "Set your personal time")),
+                spec("pweather", PlayerstatePermissions.PWEATHER_USE, cmd("pweather", "Set your personal weather")),
+                spec("exp", PlayerstatePermissions.EXP_USE, cmd("exp", "Get or set experience")),
+                spec("air", PlayerstatePermissions.AIR_USE, cmd("air", "Set remaining air")),
+                spec("burn", PlayerstatePermissions.BURN_USE, cmd("burn", "Set a player on fire")),
+                spec("ice", PlayerstatePermissions.ICE_USE, cmd("ice", "Freeze a player")),
+                spec("getpos", PlayerstatePermissions.GETPOS_USE, cmd("getpos", "Show a player's coordinates")),
+                spec("ping", PlayerstatePermissions.PING_USE, cmd("ping", "Show a player's ping")),
                 spec(
                         "playtime",
-                        "uxmessentials.playtime.use",
+                        PlayerstatePermissions.PLAYTIME_USE,
                         cmd("playtime", "Show, correct or import a player's playtime")),
-                spec("rest", "uxmessentials.rest.use", cmd("rest", "Reset time-since-rest so phantoms stop")),
-                spec("depth", "uxmessentials.depth.use", cmd("depth", "Show how far you are above or below sea level")),
-                spec("biome", "uxmessentials.biome.use", cmd("biome", "Show the biome you are standing in")),
-                spec("seed", "uxmessentials.seed.use", cmd("seed", "Show the seed of the world you are standing in")),
-                spec("compass", "uxmessentials.compass.use", cmd("compass", "Show the direction you are facing")),
-                spec("world", "uxmessentials.world.use", cmd("world", "Show the world you are standing in")),
+                spec("rest", PlayerstatePermissions.REST_USE, cmd("rest", "Reset time-since-rest so phantoms stop")),
+                spec(
+                        "depth",
+                        PlayerstatePermissions.DEPTH_USE,
+                        cmd("depth", "Show how far you are above or below sea level")),
+                spec("biome", PlayerstatePermissions.BIOME_USE, cmd("biome", "Show the biome you are standing in")),
+                spec(
+                        "seed",
+                        PlayerstatePermissions.SEED_USE,
+                        cmd("seed", "Show the seed of the world you are standing in")),
+                spec(
+                        "compass",
+                        PlayerstatePermissions.COMPASS_USE,
+                        cmd("compass", "Show the direction you are facing")),
+                spec("world", PlayerstatePermissions.WORLD_USE, cmd("world", "Show the world you are standing in")),
                 spec(
                         "dimension",
-                        "uxmessentials.dimension.use",
+                        PlayerstatePermissions.DIMENSION_USE,
                         cmd("dimension", "Show the dimension you are standing in")));
     }
 

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -54,10 +55,10 @@ import org.jspecify.annotations.NullMarked;
 public final class RanksCommand implements CommandRegistration {
 
     /** The permission an administrator holds to set a player's rank directly. */
-    public static final String PERMISSION = "uxmessentials.ranks.admin";
+    public static final String PERMISSION = EconomyPermissions.RANKS_ADMIN;
 
     /** The self-service permission a player holds to open the {@code /ranks} ladder panel. */
-    public static final String GUI_PERMISSION = "uxmessentials.ranks.gui";
+    public static final String GUI_PERMISSION = EconomyPermissions.RANKS_GUI;
 
     private final SetRankExecutor setRank;
     private final Optional<RanksPanelMenu> panel;

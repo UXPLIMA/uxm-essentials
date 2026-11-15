@@ -8,6 +8,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class InvseeView {
 
-    private static final String MODIFY_PERMISSION = "uxmessentials.invsee.modify";
+    private static final String MODIFY_PERMISSION = PlayerstatePermissions.INVSEE_MODIFY;
 
     private final Scheduler scheduler;
     private final MirrorWindow window;

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.homes.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.domain.HomeLimit;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
@@ -23,7 +24,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class HomeQuota {
 
-    private static final String NODE = "uxmessentials.home.limit";
+    private static final String NODE = DestinationPermissions.HOME_LIMIT;
 
     private final Permissions permissions;
     private final QuotaFamily family;

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ChatLockListener implements Listener {
 
-    private static final String BYPASS_PERMISSION = "uxmessentials.communication.chat.bypass";
+    private static final String BYPASS_PERMISSION = SocialPermissions.COMMUNICATION_CHAT_BYPASS;
 
     private final ChatLock lock;
     private final Notifier notifier;

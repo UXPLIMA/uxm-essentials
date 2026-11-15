@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.economy.adapter.EconomyServices;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -33,8 +34,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BalanceCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.balance";
-    private static final String OTHERS_PERMISSION = "uxmessentials.economy.balance.others";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_BALANCE;
+    private static final String OTHERS_PERMISSION = EconomyPermissions.ECONOMY_BALANCE_OTHERS;
 
     public BalanceCommand(EconomyServices services, Messages messages) {
         super(services, messages);

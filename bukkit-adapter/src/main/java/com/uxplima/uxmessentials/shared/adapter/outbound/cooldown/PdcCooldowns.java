@@ -10,6 +10,7 @@ import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
@@ -75,7 +76,7 @@ public final class PdcCooldowns implements Cooldowns {
     public Result<Unit, Duration> checkLabel(PlayerRef who, String label) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(label, "label");
-        if (permissions.has(who, "uxmessentials.cooldown.bypass." + label)) {
+        if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return Result.ok();
         }
         return gate(who, keys.forName(LABEL_FEATURE_PREFIX + label));
@@ -91,10 +92,10 @@ public final class PdcCooldowns implements Cooldowns {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(label, "label");
         Objects.requireNonNull(configDefault, "configDefault");
-        if (permissions.has(who, "uxmessentials.cooldown.bypass." + label)) {
+        if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return;
         }
-        long seconds = resolveSeconds(who, "uxmessentials.cooldown." + label, configDefault.toSeconds());
+        long seconds = resolveSeconds(who, SharedPermissions.cooldown(label), configDefault.toSeconds());
         writeStamp(who, keys.forName(LABEL_FEATURE_PREFIX + label), seconds);
     }
 

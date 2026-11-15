@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.FreezeDuration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class IceCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.ice.use";
+    private static final String PERMISSION = PlayerstatePermissions.ICE_USE;
     private static final int DEFAULT_SECONDS = 7;
 
     public IceCommand(PlayerStateServices services, Messages messages) {
@@ -43,7 +44,7 @@ public final class IceCommand extends PlayerstateCommandSupport implements Comma
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.ice.others";
+        return PlayerstatePermissions.ICE_OTHERS;
     }
 
     @Override

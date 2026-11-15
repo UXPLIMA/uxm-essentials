@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.communication.domain.Announcement;
 import com.uxplima.uxmessentials.communication.domain.AnnouncerConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
@@ -63,7 +64,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AnnounceCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.announce.admin";
+    private static final String PERMISSION = SocialPermissions.ANNOUNCE_ADMIN;
 
     /**
      * The per-verb nodes under {@link #PERMISSION}. Authoring an announcement, re-reading the file, and reading the
@@ -72,15 +73,15 @@ public final class AnnounceCommand extends CommunicationCommandSupport implement
      * so an existing {@code uxmessentials.announce.admin} grant is unchanged and an operator narrows by negating
      * one node.
      */
-    private static final String EDITOR = PERMISSION + ".editor";
+    private static final String EDITOR = SocialPermissions.ANNOUNCE_ADMIN_EDITOR;
 
-    private static final String RELOAD = PERMISSION + ".reload";
+    private static final String RELOAD = SocialPermissions.ANNOUNCE_ADMIN_RELOAD;
 
-    private static final String LIST = PERMISSION + ".list";
+    private static final String LIST = SocialPermissions.ANNOUNCE_ADMIN_LIST;
 
-    private static final String PREVIEW = PERMISSION + ".preview";
+    private static final String PREVIEW = SocialPermissions.ANNOUNCE_ADMIN_PREVIEW;
 
-    private static final String TOGGLE = PERMISSION + ".toggle";
+    private static final String TOGGLE = SocialPermissions.ANNOUNCE_ADMIN_TOGGLE;
 
     private final CommunicationSettings settings;
     private final Supplier<AnnouncerConfig> mergedConfig;

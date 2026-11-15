@@ -12,6 +12,7 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.WorldCommandPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 public final class WorldCommandListener implements Listener {
 
     /** The node that exempts a player from every per-world command block. */
-    public static final String BYPASS_NODE = "uxmessentials.world.command-bypass";
+    public static final String BYPASS_NODE = PlayerstatePermissions.WORLD_COMMAND_BYPASS;
 
     private final WorldCommandPolicy policy;
     private final Messages messages;

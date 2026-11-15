@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -18,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class ModerationGuard {
 
     /** The target-side immunity node. */
-    public static final String EXEMPT_NODE = "uxmessentials.moderation.exempt";
+    public static final String EXEMPT_NODE = EnforcementPermissions.MODERATION_EXEMPT;
 
     private final Permissions permissions;
 

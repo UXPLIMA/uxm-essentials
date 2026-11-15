@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.shared.application.module;
 import java.util.Objects;
 import java.util.regex.Pattern;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
+
 /**
  * Stable identifier for a {@link FeatureModule}: {@code "homes"}, {@code "economy"}, and so on.
  *
@@ -36,7 +38,7 @@ public record ModuleId(String value) {
 
     /** The per-module operator permission node: {@code uxmessentials.module.<id>}. */
     public String permissionNode() {
-        return "uxmessentials.module." + value;
+        return SharedPermissions.module(value);
     }
 
     @Override

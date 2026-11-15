@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalog;
 import com.uxplima.uxmessentials.shared.application.permission.PermissionCatalogRenderer;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Args;
@@ -46,7 +47,7 @@ public final class PermissionsSubcommand {
     /** The exported file, written next to the config so it sits with everything else an operator edits. */
     static final String EXPORT_FILE = "permissions.md";
 
-    private static final String PERMISSION = "uxmessentials.admin.permissions";
+    private static final String PERMISSION = SharedPermissions.ADMIN_PERMISSIONS;
 
     /** The arguments the hint shows, which are command syntax and the same in every language. */
     private static final String ARGUMENTS = "<area> [page]";

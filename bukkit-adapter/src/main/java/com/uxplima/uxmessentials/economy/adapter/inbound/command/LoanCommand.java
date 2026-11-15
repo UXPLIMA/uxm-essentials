@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.economy.domain.LoanError;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -35,8 +36,8 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class LoanCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.loan";
-    private static final String TAKE = "uxmessentials.economy.loan.take";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_LOAN;
+    private static final String TAKE = EconomyPermissions.ECONOMY_LOAN_TAKE;
 
     public LoanCommand(Plugin plugin, EconomyServices services, Messages messages) {
         super(services, messages);

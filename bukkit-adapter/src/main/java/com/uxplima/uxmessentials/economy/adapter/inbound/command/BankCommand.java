@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.economy.domain.SharedBank.BankRole;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -36,11 +37,11 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BankCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.bank";
-    private static final String CREATE = "uxmessentials.economy.bank.create";
-    private static final String DEPOSIT = "uxmessentials.economy.bank.deposit";
-    private static final String WITHDRAW = "uxmessentials.economy.bank.withdraw";
-    private static final String MEMBERS = "uxmessentials.economy.bank.members";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_BANK;
+    private static final String CREATE = EconomyPermissions.ECONOMY_BANK_CREATE;
+    private static final String DEPOSIT = EconomyPermissions.ECONOMY_BANK_DEPOSIT;
+    private static final String WITHDRAW = EconomyPermissions.ECONOMY_BANK_WITHDRAW;
+    private static final String MEMBERS = EconomyPermissions.ECONOMY_BANK_MEMBERS;
 
     public BankCommand(Plugin plugin, EconomyServices services, Messages messages) {
         super(services, messages);

@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.api.action.UxmOutcome;
 import com.uxplima.uxmessentials.api.action.UxmTeleportActions;
 import com.uxplima.uxmessentials.api.view.UxmLocation;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -41,7 +42,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class TeleportActions implements UxmTeleportActions {
 
-    private static final String DEATH_BACK_NODE = "uxmessentials.back.ondeath";
+    private static final String DEATH_BACK_NODE = TeleportPermissions.BACK_ONDEATH;
 
     private final TeleportExecutor executor;
     private final CaptureBack captureBack;

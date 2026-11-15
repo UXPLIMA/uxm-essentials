@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
@@ -53,7 +54,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SpawnMobCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.spawnmob.use";
+    private static final String PERMISSION = ItemworldPermissions.SPAWNMOB_USE;
 
     public SpawnMobCommand(ItemworldServices services) {
         super(services, "spawnmob", SubFeatureGroup.MOB_ENTITY, "Spawn mobs.");
@@ -100,7 +101,7 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
         if (!allowsType(
                 ctx,
                 Sender.audience(ctx.getSource()),
-                "spawnmob",
+                ItemworldPermissions::spawnMob,
                 type.get().getKey().getKey())) {
             return Command.SINGLE_SUCCESS;
         }
@@ -153,7 +154,8 @@ public final class SpawnMobCommand extends ItemworldCommandSupport implements Co
             reply(ctx, ItemworldMessageKey.SPAWNMOB_UNKNOWN, Map.of("mob", rawType));
             return Command.SINGLE_SUCCESS;
         }
-        if (!allowsType(ctx, sender, "spawnmob", type.get().getKey().getKey())) {
+        if (!allowsType(
+                ctx, sender, ItemworldPermissions::spawnMob, type.get().getKey().getKey())) {
             return Command.SINGLE_SUCCESS;
         }
         spawn(ctx, actor(ctx), new Position(BukkitRefs.toRef(world), x, y, z, 0f, 0f), spec.get(), type.get());

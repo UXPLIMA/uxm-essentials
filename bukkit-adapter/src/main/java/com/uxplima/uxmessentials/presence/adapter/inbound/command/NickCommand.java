@@ -22,6 +22,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.presence.adapter.PresenceServices;
 import com.uxplima.uxmessentials.presence.application.PresenceMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -47,8 +48,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class NickCommand extends PresenceCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.nick.use";
-    private static final String OTHERS_PERMISSION = "uxmessentials.nick.others";
+    private static final String PERMISSION = SocialPermissions.NICK_USE;
+    private static final String OTHERS_PERMISSION = SocialPermissions.NICK_OTHERS;
     private static final String OFF = "off";
     private static final String CLEAR = "clear";
 

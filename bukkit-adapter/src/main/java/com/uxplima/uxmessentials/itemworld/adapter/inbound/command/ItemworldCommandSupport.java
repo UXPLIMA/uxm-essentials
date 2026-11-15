@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Keyed;
 import org.bukkit.Material;
@@ -135,17 +136,18 @@ abstract class ItemworldCommandSupport {
      * holder is unaffected until an operator negates a specific type, non-breaking, opt-out restriction. On a denied
      * type the sender is told {@link SharedMessageKey#COMMAND_NO_PERMISSION} and the caller must not proceed.
      *
-     * @param command the command segment of the node ({@code spawnmob}, {@code give}, {@code enchant})
+     * @param family the catalogue factory that names the node for one type of this command
      * @param type the resolved registry key path, already namespace-stripped and lower-cased by the caller
      */
-    final boolean allowsType(CommandContext<CommandSourceStack> ctx, Player player, String command, String type) {
-        return allowsType(ctx, (CommandSender) player, command, type);
+    final boolean allowsType(
+            CommandContext<CommandSourceStack> ctx, Player player, UnaryOperator<String> family, String type) {
+        return allowsType(ctx, (CommandSender) player, family, type);
     }
 
     /** Console-capable variant of the common per-type permission gate. */
     final boolean allowsType(
-            CommandContext<CommandSourceStack> ctx, CommandSender sender, String command, String type) {
-        String node = "uxmessentials.itemworld." + command + "." + type.toLowerCase(Locale.ROOT);
+            CommandContext<CommandSourceStack> ctx, CommandSender sender, UnaryOperator<String> family, String type) {
+        String node = family.apply(type.toLowerCase(Locale.ROOT));
         boolean allowed = sender instanceof Player player
                 ? services.kernel().permissions().has(ref(player), node)
                 : sender.hasPermission(node);

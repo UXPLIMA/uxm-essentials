@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -42,7 +43,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GiveCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.give.use";
+    private static final String PERMISSION = ItemworldPermissions.GIVE_USE;
 
     public GiveCommand(ItemworldServices services) {
         super(services, "give", SubFeatureGroup.ITEM_UTILS, "Give an item to a player.");
@@ -112,7 +113,11 @@ public final class GiveCommand extends ItemworldCommandSupport implements Comman
      */
     private boolean allowsItem(CommandContext<CommandSourceStack> ctx, Material material) {
         return !(Sender.audience(ctx.getSource()) instanceof Player sender)
-                || allowsType(ctx, sender, "give", material.getKey().getKey());
+                || allowsType(
+                        ctx,
+                        sender,
+                        ItemworldPermissions::giveItem,
+                        material.getKey().getKey());
     }
 
     private void deliver(CommandContext<CommandSourceStack> ctx, Material material, AmountSpec amount) {

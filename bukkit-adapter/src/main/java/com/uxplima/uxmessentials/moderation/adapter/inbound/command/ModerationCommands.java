@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -62,7 +63,7 @@ public final class ModerationCommands {
                 new TempmuteCommand(services, messages, sink, silentByDefault, guiFlow),
                 target(
                         "unmute",
-                        "uxmessentials.moderation.unmute",
+                        EnforcementPermissions.MODERATION_UNMUTE,
                         "Lift a player's mute",
                         services,
                         messages,
@@ -71,7 +72,7 @@ public final class ModerationCommands {
                 new JailCommand(services, messages, sink, jailGui),
                 target(
                         "unjail",
-                        "uxmessentials.moderation.unjail",
+                        EnforcementPermissions.MODERATION_UNJAIL,
                         "Release a jailed player",
                         services,
                         messages,
@@ -102,7 +103,7 @@ public final class ModerationCommands {
                 new UnwarnCommand(services, messages, sink),
                 target(
                         "warns",
-                        "uxmessentials.moderation.warn",
+                        EnforcementPermissions.MODERATION_WARN,
                         "Review a player's warnings",
                         services,
                         messages,
@@ -114,7 +115,7 @@ public final class ModerationCommands {
                 new UnbanipCommand(services, messages, sink),
                 target(
                         "freeze",
-                        "uxmessentials.moderation.freeze",
+                        EnforcementPermissions.MODERATION_FREEZE,
                         "Freeze a player in place",
                         services,
                         messages,
@@ -122,7 +123,7 @@ public final class ModerationCommands {
                         (a, t) -> services.freeze().freeze(a, t)),
                 target(
                         "unfreeze",
-                        "uxmessentials.moderation.freeze",
+                        EnforcementPermissions.MODERATION_FREEZE,
                         "Release a frozen player",
                         services,
                         messages,
@@ -133,7 +134,7 @@ public final class ModerationCommands {
                 // and what the actor may see ask the server, so they are found here first.
                 target(
                         "seen",
-                        "uxmessentials.moderation.seen",
+                        EnforcementPermissions.MODERATION_SEEN,
                         "Show a player's last-seen",
                         services,
                         messages,
@@ -144,7 +145,7 @@ public final class ModerationCommands {
                         }),
                 target(
                         "seenip",
-                        "uxmessentials.moderation.seen",
+                        EnforcementPermissions.MODERATION_SEEN,
                         "Show a player's last IP and alts",
                         services,
                         messages,

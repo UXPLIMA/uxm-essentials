@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -63,12 +64,12 @@ public interface Warmups {
 
         /** The permission node prefix this kind resolves its tier against. */
         public String warmupNode() {
-            return "uxmessentials." + feature + ".warmup";
+            return SharedPermissions.featureWarmup(feature);
         }
 
         /** The bypass node that starts the teleport immediately, immune to move-cancel. */
         public String bypassNode() {
-            return warmupNode() + ".bypass";
+            return SharedPermissions.featureWarmupBypass(feature);
         }
 
         /** The default duration as a {@link Duration}. */

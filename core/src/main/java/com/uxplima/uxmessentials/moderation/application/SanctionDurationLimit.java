@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.application;
 import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -22,9 +23,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * is the lowercase family segment, {@code "ban"} or {@code "mute"}.
  */
 public final class SanctionDurationLimit {
-
-    private static final String NODE_PREFIX = "uxmessentials.moderation.";
-    private static final String NODE_SUFFIX = ".maxduration";
 
     /**
      * The "no node held" fallback handed to the reducer as its config default. It must be negative (so the
@@ -51,7 +49,7 @@ public final class SanctionDurationLimit {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(requested, "requested");
-        QuotaFamily family = QuotaFamily.quota(NODE_PREFIX + kind + NODE_SUFFIX);
+        QuotaFamily family = QuotaFamily.quota(EnforcementPermissions.maxDuration(kind));
         QuotaResult resolved = permissions.resolveQuota(actor, family, null, NO_NODE_FALLBACK);
         if (resolved.isUnlimited()) {
             return requested;

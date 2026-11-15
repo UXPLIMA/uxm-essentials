@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEv
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.inbound.command.StaffChatCommand;
@@ -82,7 +83,7 @@ import org.jspecify.annotations.Nullable;
 public final class StaffWiring {
 
     /** The node {@code /stafflist} requires, reused for the hub entry that opens the same roster. */
-    private static final String STAFF_LIST_PERMISSION = "uxmessentials.staff.list";
+    private static final String STAFF_LIST_PERMISSION = EnforcementPermissions.STAFF_LIST;
 
     private StaffWiring() {}
 

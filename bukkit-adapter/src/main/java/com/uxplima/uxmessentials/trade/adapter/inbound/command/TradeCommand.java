@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.CrossServerTradeView;
@@ -52,7 +53,7 @@ import org.jspecify.annotations.Nullable;
 public final class TradeCommand implements CommandRegistration {
 
     /** The permission every player holds by default so they can start a trade. */
-    public static final String PERMISSION = "uxmessentials.trade.use";
+    public static final String PERMISSION = EconomyPermissions.TRADE_USE;
 
     private final TradeRequests requests;
     private final TradeCooldown cooldown;

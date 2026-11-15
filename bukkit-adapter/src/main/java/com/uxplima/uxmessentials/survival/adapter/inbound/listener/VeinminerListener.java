@@ -12,6 +12,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.inventory.ItemStack;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalConfig.Veinminer;
 import com.uxplima.uxmessentials.survival.domain.ConnectedBlockSearch;
@@ -43,7 +44,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VeinminerListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.survival.veinminer";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_VEINMINER;
 
     private final Veinminer config;
     private final Set<Material> triggers;

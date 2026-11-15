@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.application;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -18,7 +19,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 public final class VaultAmountQuota {
 
     /** The quota family for vault counts: the {@code MAX}-direction reducer over the numbered nodes. */
-    public static final QuotaFamily FAMILY = QuotaFamily.quota("uxmessentials.vault.amount");
+    public static final QuotaFamily FAMILY = QuotaFamily.quota(DestinationPermissions.VAULT_AMOUNT);
 
     private final Permissions permissions;
     private final int configDefault;

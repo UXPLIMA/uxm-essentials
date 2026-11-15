@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -49,7 +50,7 @@ public final class MessagingSettingsView {
     private static final String LAYOUT = "messaging-settings";
 
     /** The staff node that gates the social-spy command, reused to gate the panel's social-spy toggle. */
-    private static final String SOCIALSPY_PERMISSION = "uxmessentials.msg.socialspy";
+    private static final String SOCIALSPY_PERMISSION = SocialPermissions.MSG_SOCIALSPY;
 
     private final GuiText guiText;
     private final Menus menus;
