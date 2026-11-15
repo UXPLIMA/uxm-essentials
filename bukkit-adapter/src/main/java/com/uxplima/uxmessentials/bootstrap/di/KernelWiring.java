@@ -43,7 +43,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -57,6 +56,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.text.language.FilePlayerLanguages;
 import com.uxplima.uxmlib.text.language.LanguageSettings;
 import com.uxplima.uxmlib.text.language.SharedLanguage;

@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.warps.domain;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
-import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The modelled failures a warp operation can produce. Each value carries the {@link WarpsMessageKey} the

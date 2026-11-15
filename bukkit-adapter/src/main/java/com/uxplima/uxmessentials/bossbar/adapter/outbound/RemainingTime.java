@@ -8,10 +8,10 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.BiFunction;
 
-import com.uxplima.uxmessentials.bossbar.application.BossBarMessageKey;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.bossbar.domain.BossBarMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

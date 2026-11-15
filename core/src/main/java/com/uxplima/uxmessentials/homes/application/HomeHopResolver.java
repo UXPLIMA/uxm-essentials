@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.homes.application.port.HomeSafetyChecker;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.hop.HopNotice;
@@ -19,7 +20,6 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolution;
 import com.uxplima.uxmessentials.shared.application.hop.HopResolver;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * The home side of the shared cross-server hop. A hop's target is the home's owner and slot. On the target the home

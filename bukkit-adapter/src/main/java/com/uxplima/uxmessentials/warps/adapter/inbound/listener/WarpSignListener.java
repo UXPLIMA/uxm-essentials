@@ -25,9 +25,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
-import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 @NullMarked

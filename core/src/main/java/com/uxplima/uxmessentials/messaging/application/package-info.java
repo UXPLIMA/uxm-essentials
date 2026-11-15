@@ -1,7 +1,7 @@
 /**
  * Application layer of the messaging context: the {@code /msg} {@code /reply} {@code /mail} {@code /ignore}
- * {@code /socialspy} {@code /helpop} use cases that orchestrate the pure domain through outbound ports, the
- * {@code MessagingModule} {@code FeatureModule}, and the {@code MessagingMessageKey} catalog. Private
+ * {@code /socialspy} {@code /helpop} use cases that orchestrate the pure domain through outbound ports, and the
+ * {@code MessagingModule} {@code FeatureModule}. Private
  * messages are transient/real-time (a transient reply-target store, the {@code MessageDelivery} port); the
  * mailbox and the ignore list are persistent ({@code MailRepository}, {@code IgnoreStore}). Cross-context
  * gates (mute from moderation, vanish-aware target resolution from vanish) are soft-coupled lookups that

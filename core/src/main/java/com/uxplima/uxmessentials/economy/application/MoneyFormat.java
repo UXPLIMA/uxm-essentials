@@ -8,6 +8,7 @@ import java.util.Locale;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 
 /**

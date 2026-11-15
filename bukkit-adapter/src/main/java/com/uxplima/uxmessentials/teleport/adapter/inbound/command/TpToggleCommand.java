@@ -15,7 +15,7 @@ import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissio
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
-import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 

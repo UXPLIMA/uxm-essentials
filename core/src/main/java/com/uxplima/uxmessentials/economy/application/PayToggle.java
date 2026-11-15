@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.economy.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**

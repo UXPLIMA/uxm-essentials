@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.port.WorldServers;
 import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 
 /**
  * {@code /worlds setserver <from> <to>}: move every world recorded on one server to another, settings included, without

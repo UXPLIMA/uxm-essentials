@@ -49,7 +49,6 @@ import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
-import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatingRewardConfig;
@@ -77,6 +76,7 @@ import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingRewardSt
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
 import com.uxplima.uxmessentials.playerwarps.domain.BayesianRating;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.RewardSpec;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;

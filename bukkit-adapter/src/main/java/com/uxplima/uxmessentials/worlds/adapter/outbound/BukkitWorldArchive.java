@@ -20,15 +20,14 @@ import org.bukkit.World;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
-import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsSettings;
 import com.uxplima.uxmessentials.worlds.application.port.WorldArchive;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
@@ -38,6 +37,7 @@ import com.uxplima.uxmessentials.worlds.domain.BackupRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldError;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

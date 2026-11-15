@@ -11,10 +11,10 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.network.VoteCounterChanged;
 import com.uxplima.uxmessentials.shared.network.VotePartyFired;
 import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
-import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.application.port.ForwardingVoteRepository;
 import com.uxplima.uxmessentials.vote.application.port.VoteBroadcaster;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 import com.uxplima.uxmessentials.vote.domain.event.VotePartyTriggered;
 import org.jspecify.annotations.NullMarked;
 

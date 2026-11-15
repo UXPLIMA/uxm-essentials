@@ -20,13 +20,13 @@ import net.kyori.adventure.text.Component;
 
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuEditSession;
-import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
+import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.item.SerializedItems;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;

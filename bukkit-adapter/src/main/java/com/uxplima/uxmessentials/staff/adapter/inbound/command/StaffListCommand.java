@@ -24,7 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.adapter.StaffServices;
 import com.uxplima.uxmessentials.staff.adapter.inbound.gui.StaffPlayerMenu;
-import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
+import com.uxplima.uxmessentials.staff.domain.StaffMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 

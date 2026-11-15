@@ -33,8 +33,8 @@ import org.bukkit.potion.PotionEffect;
 
 import com.destroystokyo.paper.event.entity.PreCreatureSpawnEvent;
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 
 /**

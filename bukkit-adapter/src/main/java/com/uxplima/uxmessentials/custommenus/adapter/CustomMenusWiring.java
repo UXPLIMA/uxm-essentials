@@ -41,7 +41,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerItem
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.OpenerSpec;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuFileWriter;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
-import com.uxplima.uxmessentials.custommenus.application.CustomMenusMessageKey;
+import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;

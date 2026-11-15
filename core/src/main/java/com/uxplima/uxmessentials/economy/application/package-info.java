@@ -3,8 +3,7 @@
  * (with the per-currency confirm flow and {@code /paytoggle}), {@code BalTop}, and {@code EcoAdmin}
  * (give/take/set/reset plus the bulk giveall/giverandom/resetall) each reach money only through the
  * {@code EconomyProvider} port (or, for the exact-balance admin paths, the native {@code WalletRepository}),
- * never by touching another context's domain. {@code EconomyMessageKey} carries every user-visible string;
- * {@code EconomyModule} is the {@code FeatureModule} that wires them. No Bukkit, Paper, Kyori, logging,
+ * never by touching another context's domain. {@code EconomyModule} is the {@code FeatureModule} that wires them. No Bukkit, Paper, Kyori, logging,
  * Vault, or Treasury type appears here. The ArchUnit fence {@code economyDomainHasNoProviderSdk} keeps the
  * provider SDKs confined to the outbound adapter.
  *

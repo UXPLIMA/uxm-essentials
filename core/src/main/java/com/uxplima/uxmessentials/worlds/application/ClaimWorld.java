@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.port.WorldClaims;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 
 /**
  * {@code /worlds claim <world>}: an operator copies a world no backend has claimed onto this backend, for a world the

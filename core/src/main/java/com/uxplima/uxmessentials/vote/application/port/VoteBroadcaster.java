@@ -3,8 +3,8 @@ package com.uxplima.uxmessentials.vote.application.port;
 import java.util.Map;
 import java.util.Set;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Outbound port for fanning one of the plugin's own {@link MessageKey} strings out to every receiving

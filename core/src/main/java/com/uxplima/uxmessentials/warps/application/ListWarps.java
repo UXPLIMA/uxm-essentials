@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
+import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 
 /**
  * {@code /warps}: list the warps a player may use. The list is filtered to the warps whose per-warp
@@ -63,7 +64,7 @@ public final class ListWarps {
     }
 
     private boolean canUse(PlayerRef viewer, Warp warp) {
-        if (!permissions.has(viewer, warp.name().useNode())) {
+        if (!permissions.has(viewer, WarpAccess.useNode(warp.name()))) {
             return false;
         }
         return warp.requiredPermission()

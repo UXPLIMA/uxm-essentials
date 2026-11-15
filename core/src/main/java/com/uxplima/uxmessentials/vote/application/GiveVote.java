@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.domain.Vote;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 
 /**
  * Admin use case: inject {@code amount} synthetic votes for a target player, running the full

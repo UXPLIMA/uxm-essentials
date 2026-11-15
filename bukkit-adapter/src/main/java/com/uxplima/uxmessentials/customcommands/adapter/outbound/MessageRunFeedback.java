@@ -3,16 +3,16 @@ package com.uxplima.uxmessentials.customcommands.adapter.outbound;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.customcommands.application.RunOutcome;
 import com.uxplima.uxmessentials.customcommands.application.port.CommandFee;
 import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.customcommands.domain.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.DurationText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Turns a run outcome into the line the actor reads. One switch over the sealed outcome keeps the gate order and

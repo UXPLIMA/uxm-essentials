@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.economy.domain;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
-
 /**
  * The modelled failures a shared-bank operation ({@code /bank create|deposit|withdraw|addmember|removemember})
  * can produce. Each value is a distinct outcome the command adapter renders through its own

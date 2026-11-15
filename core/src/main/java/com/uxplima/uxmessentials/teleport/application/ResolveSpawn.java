@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import org.jspecify.annotations.Nullable;
 
 /**

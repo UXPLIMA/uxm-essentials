@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.skin.application;
 
 import java.time.Clock;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownStartPhase;
@@ -110,13 +112,21 @@ public final class SetSkin {
         if (source instanceof SkinSource.ByName name
                 && policy.restricted(name.username())
                 && !actor.isSystem()
-                && !permissions.has(actor, policy.permissionFor(name.username()))) {
+                && !permissions.has(actor, restrictedNode(name.username()))) {
             return Outcome.NO_PERMISSION;
         }
         if (actor.equals(target) && cooldowns.check(actor, kind()).isErr()) {
             return Outcome.ON_COOLDOWN;
         }
         return Outcome.APPLIED;
+    }
+
+    /**
+     * The node a skin sits behind once the operator restricted it, so a skin can be reserved for a rank. Matched
+     * without regard to case, as the policy matches the name.
+     */
+    private static String restrictedNode(String skinName) {
+        return ContentPermissions.skinName(skinName.toLowerCase(Locale.ROOT));
     }
 
     /** Whether the operator left this source switched on. */

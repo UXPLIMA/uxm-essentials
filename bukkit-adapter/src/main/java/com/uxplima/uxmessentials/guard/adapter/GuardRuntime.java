@@ -22,7 +22,6 @@ import org.bukkit.block.Block;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.guard.application.GuardConfig;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.application.GuardService;
 import com.uxplima.uxmessentials.guard.application.GuardStats;
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
@@ -30,6 +29,7 @@ import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
 import com.uxplima.uxmessentials.guard.domain.Explanation;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
@@ -38,10 +38,10 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
 
 /**

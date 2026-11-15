@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.ranks.domain.Prestige;
+import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 
 /**
  * The typed outcome of a {@link Prestige} attempt: which of the five terminal states it reached and, on a

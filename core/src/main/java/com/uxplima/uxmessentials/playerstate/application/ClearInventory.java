@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.playerstate.application.port.ClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerEffects;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 

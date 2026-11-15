@@ -115,7 +115,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                     services.notifier()
                             .send(
                                     senderRef,
-                                    com.uxplima.uxmessentials.economy.application.EconomyMessageKey.LOAN_APPROVED,
+                                    com.uxplima.uxmessentials.economy.domain.EconomyMessageKey.LOAN_APPROVED,
                                     java.util.Map.of(
                                             "amount",
                                             services.notifier().amount(loan.remainingAmount()),
@@ -148,7 +148,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                                 () -> services.notifier()
                                         .send(
                                                 senderRef,
-                                                com.uxplima.uxmessentials.economy.application.EconomyMessageKey
+                                                com.uxplima.uxmessentials.economy.domain.EconomyMessageKey
                                                         .LOAN_NOT_FOUND));
                 return;
             }
@@ -167,7 +167,7 @@ public final class LoanCommand extends EconomyCommandSupport implements CommandR
                             services.notifier()
                                     .send(
                                             senderRef,
-                                            com.uxplima.uxmessentials.economy.application.EconomyMessageKey.LOAN_PAID,
+                                            com.uxplima.uxmessentials.economy.domain.EconomyMessageKey.LOAN_PAID,
                                             java.util.Map.of(
                                                     "remaining",
                                                     services.notifier()

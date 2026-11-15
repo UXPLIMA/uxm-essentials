@@ -8,12 +8,12 @@ import java.util.Optional;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.ranks.application.CurrentRank;
-import com.uxplima.uxmessentials.ranks.application.RanksMessageKey;
 import com.uxplima.uxmessentials.ranks.application.Rankup;
 import com.uxplima.uxmessentials.ranks.application.RankupResult;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
 import com.uxplima.uxmessentials.ranks.domain.RankLadder;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
+import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;

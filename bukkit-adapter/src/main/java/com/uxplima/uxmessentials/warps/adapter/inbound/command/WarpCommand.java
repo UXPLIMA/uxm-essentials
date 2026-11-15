@@ -28,9 +28,9 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.adapter.WarpServices;
-import com.uxplima.uxmessentials.warps.application.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
+import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -473,14 +473,13 @@ public final class WarpCommand extends WarpCommandSupport implements CommandRegi
         if (world == null) {
             feedback.send(
                     sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
+                    com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey.COMMAND_UNKNOWN_WORLD,
                     Map.of("world", ctx.getArgument("world", String.class)));
             return null;
         }
         if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(z)) {
             feedback.send(
-                    sender,
-                    com.uxplima.uxmessentials.shared.application.message.SharedMessageKey.COMMAND_INVALID_POSITION);
+                    sender, com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey.COMMAND_INVALID_POSITION);
             return null;
         }
         return Position.of(BukkitRefs.toRef(world), x, y, z);

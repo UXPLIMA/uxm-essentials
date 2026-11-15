@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
 import com.uxplima.uxmessentials.worlds.domain.WorldProperty;
 import com.uxplima.uxmessentials.worlds.domain.WorldSettings;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
 
 /** Sets a scalar per-world property from the {@link WorldProperties} catalog (DB write off-tick). */

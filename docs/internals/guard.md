@@ -8,9 +8,9 @@ section of the published docs.
 
 | Package | What it holds |
 |---|---|
-| `core/.../guard/domain` | Regions, shapes, rules, targets, behaviours, templates, the action tree. No Bukkit |
+| `core/.../guard/domain` | Regions, shapes, rules, targets, behaviours, templates, the action tree, message keys. No Bukkit |
 | `core/.../guard/domain/engine` | The compiler, the per world index, chunk columns, cells, region sets, the explainer |
-| `core/.../guard/application` | `GuardService` (every edit, history, undo, restore, sync), `GuardConfig`, message keys, ports |
+| `core/.../guard/application` | `GuardService` (every edit, history, undo, restore, sync), `GuardConfig`, ports |
 | `persistence-adapter/.../persistence/guard` | `JooqGuardStore` and the region JSON; tables come from Flyway `V88` |
 | `bukkit-adapter/.../guard/adapter` | `GuardRuntime` (the check and its feedback), `GuardWiring`, listeners, movement, menus, the command, the WorldGuard importer, backups |
 | `rest-adapter/.../RegionsRoutes.java` | The read and check routes under `/api/v1` |

@@ -15,7 +15,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
 import com.uxplima.uxmessentials.guard.adapter.Selections;
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardWand;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**

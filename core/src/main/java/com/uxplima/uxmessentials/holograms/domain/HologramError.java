@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.holograms.domain;
 
-import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
-
 /**
  * The modelled failures a hologram operation can produce. Each value carries the
  * {@link HologramsMessageKey} the command adapter renders, so a use case returns a

@@ -26,8 +26,8 @@ import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.BukkitPlayerFac
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandPermissionView;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.CommandTreePruner;
 import com.uxplima.uxmessentials.commandcontrol.adapter.outbound.PlayerGroupSource;
-import com.uxplima.uxmessentials.commandcontrol.application.CommandControlMessageKey;
 import com.uxplima.uxmessentials.commandcontrol.application.LanguageWords;
+import com.uxplima.uxmessentials.commandcontrol.domain.CommandControlMessageKey;
 import com.uxplima.uxmessentials.commandcontrol.domain.HidePolicy;
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
 import com.uxplima.uxmessentials.commandcontrol.domain.RuleSet;

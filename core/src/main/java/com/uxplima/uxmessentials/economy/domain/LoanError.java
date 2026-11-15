@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.economy.domain;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
-
 /**
  * The modelled failures a loan operation ({@code /loan take}, {@code /loan pay}) can produce. Each value is a
  * distinct outcome the command adapter renders through its own {@link EconomyMessageKey}: never collapsed to

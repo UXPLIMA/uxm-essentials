@@ -119,7 +119,7 @@ public final class PresenceWiring {
                 menus);
         guiRegistry.register(new ManagementGuiEntry(
                 "presence",
-                com.uxplima.uxmessentials.presence.application.PresenceMessageKey.GUI_SETTINGS_TITLE,
+                com.uxplima.uxmessentials.presence.domain.PresenceMessageKey.GUI_SETTINGS_TITLE,
                 org.bukkit.Material.CLOCK,
                 SocialPermissions.PRESENCE_GUI,
                 settingsView::open));

@@ -20,7 +20,7 @@ import com.uxplima.uxmessentials.shared.application.permission.EconomyPermission
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.VoteServices;
-import com.uxplima.uxmessentials.vote.application.VoteMessageKey;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;

@@ -22,10 +22,10 @@ import com.uxplima.uxmessentials.economy.application.port.ItemReturnStore;
 import com.uxplima.uxmessentials.economy.application.port.SellerInventory;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import org.junit.jupiter.api.Test;
 

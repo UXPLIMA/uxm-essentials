@@ -16,8 +16,8 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec.Summary;
-import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.application.port.SnapshotRepository;
+import com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;

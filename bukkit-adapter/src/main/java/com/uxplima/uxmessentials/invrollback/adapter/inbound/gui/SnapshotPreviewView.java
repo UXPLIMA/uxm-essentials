@@ -10,7 +10,7 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec.Summary;
-import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
+import com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;

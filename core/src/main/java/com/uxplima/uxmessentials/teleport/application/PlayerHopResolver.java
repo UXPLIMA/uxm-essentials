@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 
 /**
  * The landing side of a hop to a player: an accepted request ({@link HopKind#PLAYER_REQUEST}) or a staff teleport

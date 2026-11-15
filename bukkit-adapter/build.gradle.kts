@@ -73,6 +73,9 @@ dependencies {
     // drivers or pool: the server's library loader supplies those.
     implementation(uxm.uxmlib.board) { isTransitive = false }
     implementation(uxm.uxmlib.storage) { isTransitive = false }
+
+    // The layer test reads the compiled classes of every module on this test class path, which is why it lives here.
+    testImplementation(uxm.archunit.junit)
 }
 
 // The dev bundle is needed only to compile the offline-inventory adapter against server internals.

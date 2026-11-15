@@ -2,7 +2,7 @@ package com.uxplima.uxmessentials.economy.domain;
 
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * The sealed outcome of an attempted value movement (a {@code /pay} or a {@code WarpCost} charge). Three

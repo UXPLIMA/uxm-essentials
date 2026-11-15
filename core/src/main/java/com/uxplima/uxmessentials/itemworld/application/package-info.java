@@ -1,7 +1,6 @@
 /**
  * The itemworld context's application layer, the {@link
  * com.uxplima.uxmessentials.itemworld.application.ItemworldModule feature module}, the {@link
- * com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey message catalog}, the {@link
  * com.uxplima.uxmessentials.itemworld.application.ItemworldCommandSurface command surface}, the thin
  * per-verb-group policies where domain logic exists, and the itemworld audit port.
  *

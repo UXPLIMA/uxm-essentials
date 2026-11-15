@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistr
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Transaction;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
