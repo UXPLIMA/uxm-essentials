@@ -12,10 +12,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Announces this backend's presence to the cluster on a bounded interval. Each tick publishes a fresh
  * {@link ServerPing} stamped with this backend's {@code server-id}, the current wall-clock time and the nonce
- * this boot drew; peers
- * record it into their {@link ClusterPeers} roster so the cluster-peer line in {@code /uxmess doctor} stays
- * current. A backend that stops heartbeating ages out of every peer's roster once its last ping leaves the
- * liveness window.
+ * this boot drew; peers record it into their {@link ClusterPeers} roster so the cluster-peer line in
+ * {@code /uxmess doctor} stays current. A backend that stops heartbeating ages out of every peer's roster once
+ * its last ping leaves the liveness window.
  *
  * <p>It uses the same self-rescheduling loop as the salary and loan-repayment sweeps, schedule the next tick
  * through {@link Scheduler#asyncAfter} rather than holding a raw repeating handle, so a {@code stop()} simply

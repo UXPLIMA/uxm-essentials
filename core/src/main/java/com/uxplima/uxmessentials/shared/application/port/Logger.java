@@ -19,12 +19,6 @@ public interface Logger {
     /** A failure; the throwable carries the cause for the operator's investigation. */
     void error(String message, Throwable cause);
 
-    /**
-     * A fault with no exception behind it, such as a state only two servers together can produce. A stack trace
-     * would point at the code that noticed it, not at what is wrong.
-     */
-    void error(String message, Object... args);
-
     /** Verbose detail, off by default, enabled for troubleshooting. */
     void debug(String message, Object... args);
 }

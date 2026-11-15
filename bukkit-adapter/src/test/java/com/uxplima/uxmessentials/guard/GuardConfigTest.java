@@ -36,9 +36,6 @@ class GuardConfigTest {
         public void error(String message, Throwable cause) {}
 
         @Override
-        public void error(String message, Object... args) {}
-
-        @Override
         public void debug(String message, Object... args) {}
     };
 

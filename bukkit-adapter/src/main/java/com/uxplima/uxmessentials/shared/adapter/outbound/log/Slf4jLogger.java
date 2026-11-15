@@ -36,11 +36,6 @@ public final class Slf4jLogger implements Logger {
     }
 
     @Override
-    public void error(String message, Object... args) {
-        delegate.error(message, args);
-    }
-
-    @Override
     public void debug(String message, Object... args) {
         delegate.debug(message, args);
     }

@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -21,10 +22,11 @@ class DuplicateServerNamesTest {
     private static final String NAME = "survival-1";
     private static final long OWN_NONCE = 7L;
     private static final Duration WINDOW = Duration.ofSeconds(90);
-    private static final long NOW = 1_700_000_000_000L;
+    private static final long START = 1_700_000_000_000L;
 
+    private long now = START;
     private final RecordingLogger log = new RecordingLogger();
-    private final DuplicateServerNames duplicates = new DuplicateServerNames(NAME, OWN_NONCE, WINDOW, log);
+    private final DuplicateServerNames duplicates = new DuplicateServerNames(NAME, OWN_NONCE, WINDOW, () -> now, log);
     private final List<NetworkMessage> dispatched = new ArrayList<>();
     private final BusCore core = core();
 
@@ -39,58 +41,64 @@ class DuplicateServerNamesTest {
     }
 
     @Test
-    void aHeartbeatWithOurNameAndAnotherBootIsAnErrorAndStillDropped() {
-        arrive(new ServerPing(NAME, NOW, 99L));
+    void aHeartbeatWithOurNameAndAnotherBootIsReportedAndStillDropped() {
+        arrive(new ServerPing(NAME, START, 99L));
 
-        assertThat(log.errors).singleElement().asString().contains("'survival-1'", "network.server-name");
-        assertThat(duplicates.seen(NOW)).isTrue();
+        assertThat(log.warnings).singleElement().asString().contains("'survival-1'", "network.server-name");
+        assertThat(duplicates.seen()).isTrue();
         assertThat(dispatched).isEmpty();
     }
 
     @Test
     void theSameClashingBootIsReportedOnceAndANewBootAgain() {
-        arrive(new ServerPing(NAME, NOW, 99L));
-        arrive(new ServerPing(NAME, NOW + 30_000, 99L));
-        arrive(new ServerPing(NAME, NOW + 60_000, 99L));
-        arrive(new ServerPing(NAME, NOW + 90_000, 100L));
+        arrive(new ServerPing(NAME, START, 99L));
+        now += 30_000;
+        arrive(new ServerPing(NAME, now, 99L));
+        now += 30_000;
+        arrive(new ServerPing(NAME, now, 99L));
+        arrive(new ServerPing(NAME, now, 100L));
 
-        assertThat(log.errors).hasSize(2);
+        assertThat(log.warnings).hasSize(2);
     }
 
     @Test
     void ourOwnEchoAndAPeerWithoutANonceAreNotAClash() {
-        arrive(new ServerPing(NAME, NOW, OWN_NONCE));
-        arrive(new ServerPing(NAME, NOW, ServerPing.NO_NONCE));
-        arrive(new HomeChanged(NAME, new java.util.UUID(1L, 2L)));
+        arrive(new ServerPing(NAME, START, OWN_NONCE));
+        arrive(new ServerPing(NAME, START, ServerPing.NO_NONCE));
+        arrive(new HomeChanged(NAME, new UUID(1L, 2L)));
 
-        assertThat(log.errors).isEmpty();
-        assertThat(duplicates.seen(NOW)).isFalse();
+        assertThat(log.warnings).isEmpty();
+        assertThat(duplicates.seen()).isFalse();
     }
 
     @Test
-    void aClashClearsOnceTheOtherBackendFallsSilent() {
-        arrive(new ServerPing(NAME, NOW, 99L));
+    void aClashClearsOnceTheOtherBackendFallsSilentForTheWindow() {
+        arrive(new ServerPing(NAME, START, 99L));
 
-        assertThat(duplicates.seen(NOW + WINDOW.toMillis())).isTrue();
-        assertThat(duplicates.seen(NOW + WINDOW.toMillis() + 1)).isFalse();
+        now = START + WINDOW.toMillis();
+        assertThat(duplicates.seen()).isTrue();
+        now = START + WINDOW.toMillis() + 1;
+        assertThat(duplicates.seen()).isFalse();
     }
 
     @Test
-    void aLateOlderHeartbeatDoesNotShortenTheClash() {
-        arrive(new ServerPing(NAME, NOW + 60_000, 99L));
-        arrive(new ServerPing(NAME, NOW, 99L));
+    void thePeersOwnClockNeitherHidesNorProlongsTheClash() {
+        arrive(new ServerPing(NAME, START - Duration.ofHours(3).toMillis(), 99L));
+        assertThat(duplicates.seen()).isTrue();
 
-        assertThat(duplicates.seen(NOW + 60_000 + WINDOW.toMillis())).isTrue();
+        arrive(new ServerPing(NAME, START + Duration.ofHours(3).toMillis(), 100L));
+        now = START + WINDOW.toMillis() + 1;
+        assertThat(duplicates.seen()).isFalse();
     }
 
     @Test
     void aPeerWithAnotherNameIsDispatchedAndNotAClash() {
-        ServerPing peer = new ServerPing("lobby-1", NOW, 99L);
+        ServerPing peer = new ServerPing("lobby-1", START, 99L);
 
         arrive(peer);
 
         assertThat(dispatched).containsExactly(peer);
-        assertThat(log.errors).isEmpty();
+        assertThat(log.warnings).isEmpty();
     }
 
     private static final class IdleTransport implements BusTransport {
@@ -110,27 +118,22 @@ class DuplicateServerNamesTest {
     }
 
     private static final class RecordingLogger implements Logger {
-        final List<String> errors = new ArrayList<>();
+        final List<String> warnings = new ArrayList<>();
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
-
-        @Override
-        public void error(String message, Throwable cause) {
-            errors.add(message);
-        }
-
-        @Override
-        public void error(String message, Object... args) {
+        public void warn(String message, Object... args) {
             String line = message;
             for (Object arg : args) {
                 line = line.replaceFirst("\\{}", java.util.regex.Matcher.quoteReplacement(String.valueOf(arg)));
             }
-            errors.add(line);
+            warnings.add(line);
         }
+
+        @Override
+        public void error(String message, Throwable cause) {}
 
         @Override
         public void debug(String message, Object... args) {}

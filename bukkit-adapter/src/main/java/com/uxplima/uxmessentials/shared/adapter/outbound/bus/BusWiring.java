@@ -59,8 +59,8 @@ public final class BusWiring {
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         BusTransport transport = selectTransport(plugin, network, scheduler, log);
         long bootNonce = bootNonce();
-        DuplicateServerNames duplicates =
-                new DuplicateServerNames(network.serverId(), bootNonce, network.peerLivenessWindow(), log);
+        DuplicateServerNames duplicates = new DuplicateServerNames(
+                network.serverId(), bootNonce, network.peerLivenessWindow(), System::currentTimeMillis, log);
         BusCore core = new BusCore(transport, network.serverId(), registry, duplicates, log);
         // The cluster roster and the presence heartbeat are kernel concerns (one per backend), so they are wired
         // here next to the core rather than in any feature context. The roster's listener records inbound pings;

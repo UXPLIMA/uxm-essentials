@@ -170,11 +170,6 @@ public final class AuditChannel implements AuditFeed {
         }
 
         @Override
-        public void error(String message, Object... args) {
-            target.error(message, args);
-        }
-
-        @Override
         public void debug(String message, Object... args) {
             target.debug(message, args);
         }

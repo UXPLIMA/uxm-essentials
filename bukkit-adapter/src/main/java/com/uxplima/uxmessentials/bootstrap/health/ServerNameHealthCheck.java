@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.bootstrap.health;
 
 import java.util.Objects;
-import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.DuplicateServerNames;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
@@ -21,15 +20,9 @@ import org.jspecify.annotations.NullMarked;
 public final class ServerNameHealthCheck implements HealthCheck {
 
     private final DuplicateServerNames duplicates;
-    private final LongSupplier clock;
 
     public ServerNameHealthCheck(DuplicateServerNames duplicates) {
-        this(duplicates, System::currentTimeMillis);
-    }
-
-    ServerNameHealthCheck(DuplicateServerNames duplicates, LongSupplier clock) {
         this.duplicates = Objects.requireNonNull(duplicates, "duplicates");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @Override
@@ -40,7 +33,7 @@ public final class ServerNameHealthCheck implements HealthCheck {
     @Override
     public HealthResult check() {
         String name = duplicates.serverName();
-        if (duplicates.seen(clock.getAsLong())) {
+        if (duplicates.seen()) {
             return HealthResult.fail("another backend also uses the name " + name
                     + ", so neither receives the other's sync. Set a unique network.server-name in config.conf"
                     + " on one of them and restart it");

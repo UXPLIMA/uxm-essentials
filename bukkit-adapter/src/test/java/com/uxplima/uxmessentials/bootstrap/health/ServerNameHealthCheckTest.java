@@ -27,18 +27,15 @@ class ServerNameHealthCheckTest {
         public void error(String message, Throwable cause) {}
 
         @Override
-        public void error(String message, Object... args) {}
-
-        @Override
         public void debug(String message, Object... args) {}
     };
 
     private static DuplicateServerNames watching(String name) {
-        return new DuplicateServerNames(name, 7L, Duration.ofSeconds(90), QUIET);
+        return new DuplicateServerNames(name, 7L, Duration.ofSeconds(90), () -> NOW, QUIET);
     }
 
     private static HealthResult check(DuplicateServerNames duplicates) {
-        return new ServerNameHealthCheck(duplicates, () -> NOW).check();
+        return new ServerNameHealthCheck(duplicates).check();
     }
 
     @Test

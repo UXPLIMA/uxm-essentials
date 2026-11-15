@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
@@ -14,11 +15,16 @@ import org.jspecify.annotations.NullMarked;
  * name drop each other's frames and sync between them stops with nothing to show for it. Each boot draws a
  * random nonce and stamps it into its heartbeats; a ping with our name and a nonce that is not ours can only
  * come from such a second backend. Our own pings echoed back (Redis delivers to the publisher too) carry our
- * nonce and are ignored.
+ * nonce and are ignored. Behind Velocity, when the shared name is also a proxy server's name, the broker never
+ * delivers to that server, so only the other backend reports the clash.
  *
- * <p>The ERROR is logged once per clashing boot, so a running conflict does not flood the log on every beat
- * while a peer that restarts into the same mistake is reported again. The doctor reads {@link #seen} against the
- * liveness window, so the failure clears once the other backend is renamed and its last ping ages out.
+ * <p>A shared name is an operator mistake, so it is a WARN, logged once per clashing boot: a running conflict
+ * does not flood the log on every beat, while a peer that restarts into the same mistake is reported again. The
+ * loud signal is the doctor FAIL, which {@link #seen} drives.
+ *
+ * <p>Times are this backend's receive times, never the peer's own stamp, so a peer with a skewed clock neither
+ * hides the clash nor keeps it reported long after the peer was renamed. An entry older than the window is
+ * pruned, so the failure clears once the other backend's last ping ages out.
  */
 @NullMarked
 public final class DuplicateServerNames {
@@ -26,6 +32,7 @@ public final class DuplicateServerNames {
     private final String serverName;
     private final long ownNonce;
     private final long windowMillis;
+    private final LongSupplier clock;
     private final Logger log;
     private final ConcurrentHashMap<Long, Long> lastSeenByNonce = new ConcurrentHashMap<>();
 
@@ -35,11 +42,13 @@ public final class DuplicateServerNames {
      * @param serverName this backend's {@code network.server-name}
      * @param ownNonce the nonce this boot stamps into its own heartbeats
      * @param window how long a clash stays reported after its last ping
+     * @param clock this backend's wall clock in epoch milliseconds, read when a ping arrives and when asked
      * @param log where the clash is reported
      */
-    public DuplicateServerNames(String serverName, long ownNonce, Duration window, Logger log) {
+    public DuplicateServerNames(String serverName, long ownNonce, Duration window, LongSupplier clock, Logger log) {
         this.serverName = Objects.requireNonNull(serverName, "serverName");
         Objects.requireNonNull(window, "window");
+        this.clock = Objects.requireNonNull(clock, "clock");
         this.log = Objects.requireNonNull(log, "log");
         if (ownNonce == ServerPing.NO_NONCE) {
             throw new IllegalArgumentException("a boot nonce must not be the no-nonce marker");
@@ -66,12 +75,10 @@ public final class DuplicateServerNames {
         if (!serverName.equals(ping.originServer()) || nonce == ServerPing.NO_NONCE || nonce == ownNonce) {
             return;
         }
-        Long previous = lastSeenByNonce.putIfAbsent(nonce, ping.epochMillis());
-        if (previous != null) {
-            // A late older ping must not pull the last-seen time back.
-            lastSeenByNonce.merge(nonce, ping.epochMillis(), Math::max);
-        } else {
-            log.error(
+        long now = clock.getAsLong();
+        prune(now);
+        if (lastSeenByNonce.put(nonce, now) == null) {
+            log.warn(
                     "Two backends share the network name '{}', so each drops the other's sync frames and nothing"
                             + " syncs between them. Set a unique network.server-name in config.conf on one of them"
                             + " and restart it.",
@@ -79,13 +86,13 @@ public final class DuplicateServerNames {
         }
     }
 
-    /** Whether another backend with this name has pinged within the window as of {@code now}. */
-    public boolean seen(long now) {
-        for (long lastSeen : lastSeenByNonce.values()) {
-            if (now - lastSeen <= windowMillis) {
-                return true;
-            }
-        }
-        return false;
+    /** Whether another backend with this name has pinged within the window. */
+    public boolean seen() {
+        prune(clock.getAsLong());
+        return !lastSeenByNonce.isEmpty();
+    }
+
+    private void prune(long now) {
+        lastSeenByNonce.values().removeIf(lastSeen -> now - lastSeen > windowMillis);
     }
 }
