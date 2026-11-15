@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration.adapter;
 
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -17,6 +18,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.messaging.adapter.MessagingSettings;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
@@ -90,7 +92,8 @@ public final class MigrationWiring {
      * @param scheduler the off-tick dispatch port
      * @param log operator diagnostics
      * @param enabled the {@link MigrationModule} enable gate (ships disabled)
-     * @param messagingEnabled whether the messaging module is on; off, imported mail is skipped and audited
+     * @param messagingConfig the {@code modules.messaging} config subtree (the mail retention), empty when the
+     *     messaging module is off; then imported mail is skipped and audited
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -101,7 +104,7 @@ public final class MigrationWiring {
             Logger log,
             AuditChannel auditChannel,
             boolean enabled,
-            boolean messagingEnabled) {
+            Optional<ConfigStore> messagingConfig) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
@@ -110,7 +113,7 @@ public final class MigrationWiring {
         Objects.requireNonNull(log, "log");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
-        Writers writers = writers(plugin, persistence, economyConfig, log, messagingEnabled);
+        Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig);
         ImportOptions options = options(plugin, migrationConfig);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
@@ -206,7 +209,11 @@ public final class MigrationWiring {
     }
 
     private static Writers writers(
-            Plugin plugin, Persistence persistence, ConfigStore economyConfig, Logger log, boolean messagingEnabled) {
+            Plugin plugin,
+            Persistence persistence,
+            ConfigStore economyConfig,
+            Logger log,
+            Optional<ConfigStore> messagingConfig) {
         HomeRepository homes = HomeRepositories.cached(persistence);
         WarpRepository warps = WarpRepositories.cached(persistence);
         ModerationRepository moderation = ModerationStores.repository(persistence);
@@ -220,9 +227,12 @@ public final class MigrationWiring {
         PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
         // The mail table ships with every install, but a disabled messaging module means the operator does not want
         // mail, so the import leaves it out rather than filling a mailbox nobody can open.
-        Optional<MailRepository> mail =
-                messagingEnabled ? Optional.of(MessagingStores.mail(persistence)) : Optional.empty();
-        UserRecordWriter users = new UserRecordWriter(homes, wallets, mail, StyledText::escape, defaultCurrency, clock);
+        Optional<MailRepository> mail = messagingConfig.map(ignored -> MessagingStores.mail(persistence));
+        Duration mailRetention = messagingConfig
+                .map(config -> new MessagingSettings(config).mailRetention())
+                .orElse(Duration.ZERO);
+        UserRecordWriter users =
+                new UserRecordWriter(homes, wallets, mail, mailRetention, StyledText::escape, defaultCurrency, clock);
         RecordWriter live = new RepositoryRecordWriter(
                 users, warps, moderation, kits, holograms, worldRegistry, playerWarps, clock);
         RecordWriter dryRun =

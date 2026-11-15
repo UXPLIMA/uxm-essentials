@@ -1014,7 +1014,9 @@ public final class PluginModule {
                 kernel.log(),
                 auditChannel,
                 module.enabled(config),
-                moduleEnabled(registry, config, "messaging"));
+                moduleEnabled(registry, config, "messaging")
+                        ? Optional.of(config.scoped(ModuleId.of("messaging").configRoot()))
+                        : Optional.empty());
         return new MigrationImportNode(service, kernel.messages());
     }
 

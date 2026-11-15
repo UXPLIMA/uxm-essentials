@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -48,8 +49,18 @@ class UserRecordWriterTest {
     private final InMemoryMail mail = new InMemoryMail();
 
     private UserRecordWriter writer(Optional<MailRepository> mailStore) {
+        return writer(mailStore, Duration.ZERO);
+    }
+
+    private UserRecordWriter writer(Optional<MailRepository> mailStore, Duration retention) {
         return new UserRecordWriter(
-                homes, wallets, mailStore, UserRecordWriterTest::escape, COINS, Clock.fixed(NOW, ZoneOffset.UTC));
+                homes,
+                wallets,
+                mailStore,
+                retention,
+                UserRecordWriterTest::escape,
+                COINS,
+                Clock.fixed(NOW, ZoneOffset.UTC));
     }
 
     private UserRecordWriter writer() {
@@ -166,6 +177,7 @@ class UserRecordWriterTest {
                                 new InMemoryHomes(),
                                 new InMemoryWallets(),
                                 Optional.of(new InMemoryMail()),
+                                Duration.ZERO,
                                 UserRecordWriterTest::escape,
                                 COINS,
                                 Clock.fixed(NOW, ZoneOffset.UTC))
@@ -186,6 +198,47 @@ class UserRecordWriterTest {
                 .singleElement()
                 .extracting(item -> item.body().value())
                 .isEqualTo("\\<".repeat(128));
+    }
+
+    @Test
+    void mailTheSweepWouldDeleteIsHeldBackSoItIsNotImportedAgainOnEveryRun() {
+        ImportedUser steve = EssentialsXFixture.steve();
+
+        RecordResult first = writer(Optional.of(mail), Duration.ofDays(30)).write(steve, SKIP);
+        RecordResult second = writer(Optional.of(mail), Duration.ofDays(30)).write(steve, SKIP);
+
+        assertThat(mail.all()).extracting(item -> item.sender().name()).containsExactly("Notch", "Jeb_", "EssentialsX");
+        assertThat(first.outcome()).isEqualTo(RecordOutcome.PARTIAL);
+        assertThat(first.notes()).contains("mail_written=3", "mail_past_retention=2");
+        assertThat(second.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(second.notes()).contains("mail_kept=3", "mail_past_retention=2");
+    }
+
+    @Test
+    void aSenderNameIsCutBeforeEscapingSoNoEscapeIsLeftHalfDone() {
+        ImportedUser user =
+                new ImportedUser(STEVE_REF, List.of(), Optional.empty(), List.of(mailFrom("abcdefghijklmno<", "hi")));
+
+        writer().write(user, SKIP);
+
+        assertThat(mail.all())
+                .singleElement()
+                .extracting(item -> item.sender().name())
+                .isEqualTo("abcdefghijklmno");
+    }
+
+    @Test
+    void cuttingLongTextToTheColumnNeverSplitsACharacterInTwo() {
+        String emoji = new String(Character.toChars(0x1F600));
+        String text = "a".repeat(MessageBody.MAX_LENGTH - 1) + emoji + "tail";
+        ImportedUser user = new ImportedUser(STEVE_REF, List.of(), Optional.empty(), List.of(mailFrom("Alex", text)));
+
+        writer().write(user, SKIP);
+
+        assertThat(mail.all())
+                .singleElement()
+                .extracting(item -> item.body().value())
+                .isEqualTo("a".repeat(MessageBody.MAX_LENGTH - 1));
     }
 
     private static ImportedMail mailFrom(String sender, String text) {
