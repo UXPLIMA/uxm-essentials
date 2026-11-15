@@ -111,16 +111,49 @@ public final class Ban {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
-            audit.tempbanned(actor, target, PERMANENT_LABEL, false, reason);
-            notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());
-            return Result.err(ModerationError.TARGET_EXEMPT);
+            return refuseExempt(actor, target, reason);
         }
-        return apply(actor, target, reason, silent);
+        return apply(actor, target, reason, silent, clock.instant());
+    }
+
+    /**
+     * Leave {@code target} banned at least as long as a ban by {@code actor} would: the warn escalation's way
+     * in. A timed ban already in force is replaced by this one (stored, recorded, announced and synced like any
+     * ban); a permanent ban already in force, or a timed one that outlasts what {@code actor}'s tier allows, is
+     * kept and the rung is audited as held. Only the caller is told the outcome, since the actor here is the
+     * server rule, not a person.
+     */
+    Result<EscalationOutcome, ModerationError> escalate(
+            PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(reason, "reason");
+        if (guard.isExempt(target)) {
+            return refuseExempt(actor, target, reason);
+        }
+        Instant now = clock.instant();
+        Duration effective = limit.cap(actor, "ban", PERMANENT_SPAN);
+        boolean capped = effective.compareTo(PERMANENT_SPAN) < 0;
+        if (repository.loadTempban(target) instanceof TempbanState.Active running && running.isActiveAt(now)) {
+            Optional<Instant> proposed = capped ? Optional.of(now.plus(effective)) : Optional.empty();
+            if (!SanctionStrength.outlasts(proposed, SanctionStrength.endOf(running))) {
+                String label = capped ? SanctionDuration.format(effective) : PERMANENT_LABEL;
+                audit.tempbanned(actor, target, label, false, SanctionStrength.HELD);
+                return Result.ok(EscalationOutcome.ALREADY_STRONGER);
+            }
+            return apply(actor, target, reason, silent, now).map(ban -> EscalationOutcome.EXTENDED);
+        }
+        return apply(actor, target, reason, silent, now).map(ban -> EscalationOutcome.APPLIED);
+    }
+
+    private <T> Result<T, ModerationError> refuseExempt(PlayerRef actor, PlayerRef target, Optional<String> reason) {
+        audit.tempbanned(actor, target, PERMANENT_LABEL, false, reason);
+        notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());
+        return Result.err(ModerationError.TARGET_EXEMPT);
     }
 
     private Result<TempbanState.Active, ModerationError> apply(
-            PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
-        Instant now = clock.instant();
+            PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent, Instant now) {
         // A permanent ban is the far-future span; an actor whose tier caps it lands a timed ban instead.
         Duration effective = limit.cap(actor, "ban", PERMANENT_SPAN);
         boolean capped = effective.compareTo(PERMANENT_SPAN) < 0;

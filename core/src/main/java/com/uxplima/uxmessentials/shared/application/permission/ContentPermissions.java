@@ -374,6 +374,12 @@ public final class ContentPermissions {
                         "/customcmd run <id> <player>: run an operator-defined command for somebody else.",
                         PermissionDefault.OP,
                         CUSTOMCOMMANDS),
+                PermissionSpec.family(
+                        SharedPermissions.featureWarmup("customcommand") + ".<seconds>",
+                        "The stand-still countdown before an operator-defined command runs, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
+                        CUSTOMCOMMANDS),
                 PermissionSpec.of(
                         CUSTOMCOMMAND_COOLDOWN_BYPASS,
                         "Run an operator-defined command without waiting out its cooldown.",
@@ -692,6 +698,12 @@ public final class ContentPermissions {
                         PermissionDefault.FALSE,
                         PermissionShape.LABEL,
                         KITS),
+                PermissionSpec.family(
+                        SharedPermissions.featureCooldown("kit") + ".<seconds>",
+                        "The wait before a kit can be claimed again, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
+                        KITS),
                 PermissionSpec.of(
                         KIT_COOLDOWN_BYPASS,
                         "Skip kit cooldowns and re-claim one-time kits.",
@@ -853,6 +865,12 @@ public final class ContentPermissions {
                         "Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone.",
                         PermissionDefault.TRUE,
                         PermissionShape.LABEL,
+                        SKIN),
+                PermissionSpec.family(
+                        SharedPermissions.featureCooldown("skin") + ".<seconds>",
+                        "The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
                         SKIN));
     }
 }

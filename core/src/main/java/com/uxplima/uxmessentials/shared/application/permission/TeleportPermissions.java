@@ -132,6 +132,12 @@ public final class TeleportPermissions {
                         PermissionDefault.OP,
                         TELEPORT),
                 PermissionSpec.family(
+                        SharedPermissions.featureCooldown("rtp") + ".<seconds>",
+                        "The wait between random teleports, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
+                        TELEPORT),
+                PermissionSpec.family(
                         RTP_RADIUS + ".<blocks>",
                         "How far from the world centre /rtp may drop you; the largest tier held wins.",
                         PermissionDefault.TRUE,
@@ -191,6 +197,12 @@ public final class TeleportPermissions {
                         TP_VERTICAL,
                         "/top, /bottom, /jump, /up, /down, /ascend, /descend, /thru vertical teleports.",
                         PermissionDefault.OP,
+                        TELEPORT),
+                PermissionSpec.family(
+                        SharedPermissions.featureCooldown("tp") + ".<seconds>",
+                        "The wait between teleports, per verb when a verb has its own clock, in seconds; the shortest tier held wins and 0 removes it.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.TIER,
                         TELEPORT),
                 PermissionSpec.family(
                         SharedPermissions.featureWarmup("tp") + ".<seconds>",

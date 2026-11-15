@@ -145,7 +145,7 @@ The top level commands each module registers, with the permission that gates the
 
 ## Permissions
 
-Listed by module in [permissions-gameplay.md](permissions-gameplay.md) and [permissions-server.md](permissions-server.md).
+Listed by module in [permissions-gameplay.md](permissions-gameplay.md), [permissions-server.md](permissions-server.md) and [permissions-items.md](permissions-items.md).
 
 ## Placeholders
 

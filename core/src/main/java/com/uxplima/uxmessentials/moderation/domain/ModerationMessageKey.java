@@ -193,6 +193,9 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_BROADCAST_WARN("moderation.broadcast.warn"),
     MOD_DURATION_CAPPED("moderation.duration-capped"),
     MOD_WARN_ESCALATED("moderation.warn-escalated"),
+    MOD_WARN_ESCALATED_EXTENDED("moderation.warn-escalated-extended"),
+    MOD_WARN_ESCALATED_HELD("moderation.warn-escalated-held"),
+    MOD_WARN_ESCALATION_FAILED("moderation.warn-escalation-failed"),
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),
