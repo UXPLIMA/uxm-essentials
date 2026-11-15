@@ -12,9 +12,11 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -48,6 +50,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
@@ -68,6 +71,7 @@ import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.testing.SteppedScheduler;
+import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
@@ -102,10 +106,17 @@ class CrossServerTeleportTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
     private final List<String> connects = new ArrayList<>();
+    private final FakePermissions permissions = new FakePermissions();
+    /** Backends whose blocks read unsafe at the warp, as an origin without its world does. */
+    private final Set<String> unsafeOn = new HashSet<>();
+    /** Backends whose safety check throws instead of answering. */
+    private final Set<String> unreadableOn = new HashSet<>();
+
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = resolversOn(LOBBY);
     private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
+
     private HopGate gate = HopGate.OPEN;
     private boolean tagged;
 
@@ -117,8 +128,30 @@ class CrossServerTeleportTest {
 
     private HopResolvers resolversOn(String server) {
         HopResolvers resolvers = new HopResolvers();
-        resolvers.register(new PlayerWarpHopResolver(warps, moves, Optional.of(purse), server));
+        resolvers.register(resolverOn(server));
         return resolvers;
+    }
+
+    private PlayerWarpHopResolver resolverOn(String server) {
+        return new PlayerWarpHopResolver(
+                warps,
+                moves,
+                Optional.of(purse),
+                safetyOn(server),
+                permissions,
+                notifier.notifier(),
+                scheduler,
+                server);
+    }
+
+    /** The safety check as {@code server} answers it, from its own blocks. */
+    private WarpSafetyChecker safetyOn(String server) {
+        return position -> {
+            if (unreadableOn.contains(server)) {
+                throw new IllegalStateException("the chunk could not be read");
+            }
+            return !unsafeOn.contains(server);
+        };
     }
 
     private HopArrival arrivalOn(String server) {
@@ -145,8 +178,8 @@ class CrossServerTeleportTest {
                 warps,
                 moves,
                 notifier.notifier(),
-                position -> true,
-                new FakePermissions(),
+                safetyOn(LOBBY),
+                permissions,
                 new NoBans(),
                 new NoMembers(),
                 new NoWhitelist(),
@@ -154,8 +187,7 @@ class CrossServerTeleportTest {
                 cooldowns,
                 Optional.of(purse),
                 LOBBY,
-                new PlayerWarpHops(
-                        departures, charges, new PlayerWarpHopResolver(warps, moves, Optional.of(purse), LOBBY)),
+                new PlayerWarpHops(departures, charges, resolverOn(LOBBY)),
                 clock,
                 new PaidTeleports(scheduler, log),
                 log);
@@ -521,6 +553,79 @@ class CrossServerTeleportTest {
 
         assertThat(purse.refunds).isOne();
         assertThat(notifier.keys()).containsExactly("pwarp.cross-server.unavailable", "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aCrossServerUseIsNotJudgedByTheOriginWhichHasNoneOfTheWarpsBlocks() {
+        unsafeOn.add(LOBBY);
+
+        assertThat(lobbyGate().useFor(ALEX, MARKET_NAME).isOk()).isTrue();
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        assertThat(moves.made).containsExactly("Alex->market");
+        assertThat(wallet()).isEqualByComparingTo("74.50");
+        assertThat(vault()).isEqualByComparingTo("25.50");
+    }
+
+    @Test
+    void aCrossServerUseOntoAnUnsafeDestinationIsRefusedOnLandingAndRefundedOnce() {
+        unsafeOn.add(SURVIVAL);
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys())
+                .containsExactly(
+                        "pwarp.cross-server.sending",
+                        "pwarp.unsafe",
+                        "pwarp.cross-server.failed",
+                        "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aCrossServerDestinationThatCannotBeJudgedIsRefundedRatherThanLandedOn() {
+        unreadableOn.add(SURVIVAL);
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void aPlayerWhoMayBypassTheSafetyCheckLandsOnAnUnsafeCrossServerDestination() {
+        permissions.grant(ALEX, DestinationPermissions.PWARP_BYPASS_SAFETY);
+        unsafeOn.add(SURVIVAL);
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        assertThat(moves.made).containsExactly("Alex->market");
+        assertThat(vault()).isEqualByComparingTo("25.50");
+        assertThat(purse.refunds).isZero();
+    }
+
+    @Test
+    void aLocalUseOntoAnUnsafeDestinationIsRefusedBeforeAnythingIsCharged() {
+        warps.put(marketOn(LOBBY));
+        unsafeOn.add(LOBBY);
+
+        Result<Unit, PlayerWarpError> used = lobbyGate().useFor(ALEX, MARKET_NAME);
+
+        assertThat(used.asError()).contains(PlayerWarpError.UNSAFE_LOCATION);
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(moves.made).isEmpty();
     }
 
     @Test

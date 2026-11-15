@@ -149,9 +149,10 @@ Fix a wrong claim or follow a renamed `network.server-name` with:
 
 With no server named, the command means this server. `all` moves every warp of the network. `unscoped` clears the
 record, so the server that has the warp's world claims it again at its next start. A name no running server answers
-to is set anyway, with a warning, so you can prepare a server that is not up yet. Two servers that run copies of one
-world folder share its `uid.dat`, and the first to start claims every warp in it; a world loaded after start is
-claimed at the next restart.
+to is set anyway, with a warning, so you can prepare a server that is not up yet. `server-1` is refused: a server
+still under that name records no server, so no server would reach a warp recorded on it. Two servers that run copies
+of one world folder share its `uid.dat`, and the first to start claims every warp in it; a world loaded after start
+is claimed at the next restart.
 
 ## Player warps
 
@@ -244,12 +245,11 @@ A player warp records its server the same way as a server warp, and an unrecorde
 named server that has its world (`event=playerwarp_server_claim`). There is no `setserver` command: the owner moves
 the warp with `/pwarp move` on the right server.
 
-With `cross-server.enabled = true`, a visit to a warp of another server runs the checks above here, takes the fee and
-sends the visitor through the proxy, with no warmup. The warp's server moves them on join, pays the owner then, and
-refunds the visitor if they never arrive or the warp is gone, no longer active or moved. The safety check runs on the
-server the visit starts from, before the visitor leaves, so a warp in a world that server does not have counts as
-unsafe and only a player with `uxmessentials.bypass.safety.pwarp` gets through. This is a known issue: server warps
-check the spot on the server the player lands on.
+With `cross-server.enabled = true`, a visit to a warp of another server runs the checks above here, except the
+safety check, takes the fee and sends the visitor through the proxy, with no warmup. Only the warp's server has its
+world, so it judges the spot when the visitor lands. It moves them on join and pays the owner then. It refunds the
+visitor and pays the owner nothing if they never arrive, if the warp is gone, no longer active or moved, if its world
+is not loaded there, or if the spot is unsafe and the visitor lacks `uxmessentials.bypass.safety.pwarp`.
 
 With the switch off, a visit to a warp of another server is refused as unavailable. The fee is taken first and given
 straight back, and the jail, combat and cooldown checks do not run for it.

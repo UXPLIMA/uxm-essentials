@@ -26,7 +26,8 @@ import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
  * permission; this use case validates, writes, reports and logs an audit line.
  *
  * <p>With no server named, the command means this backend: {@code recordedServer}. It is empty off a network or
- * under the shipped default server name, which no warp may record, so the operator is asked to name the server.
+ * under the shipped default server name, which no warp may record, so the operator is asked to name the server. Named
+ * explicitly, the shipped default is refused for the same reason.
  *
  * <p>The writes go to a repository that does not announce them one by one, and peers are told once at the end
  * through {@code announce}: a bulk change of every warp is one cross-server frame, not one per warp.
@@ -42,20 +43,27 @@ public final class SetWarpServer {
     private final Runnable announce;
     private final Logger log;
     private final Optional<String> recordedServer;
+    private final String defaultServerName;
 
+    /**
+     * @param defaultServerName the shipped {@code network.server-name}: a backend still under it records no server, so
+     *     a warp recorded on that name would be reached by no backend at all
+     */
     public SetWarpServer(
             WarpRepository repository,
             Notifier notifier,
             NetworkPresence presence,
             Runnable announce,
             Logger log,
-            Optional<String> recordedServer) {
+            Optional<String> recordedServer,
+            String defaultServerName) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.announce = Objects.requireNonNull(announce, "announce");
         this.log = Objects.requireNonNull(log, "log");
         this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
+        this.defaultServerName = Objects.requireNonNull(defaultServerName, "defaultServerName");
     }
 
     /** Record this backend as the server of the warp {@code name}, or refuse when this backend records none. */
@@ -123,13 +131,17 @@ public final class SetWarpServer {
     }
 
     /**
-     * Refuse a name that cannot be a backend's, and warn, without refusing, about one no running backend answers to:
-     * the operator may be preparing a server that is not up yet.
+     * Refuse a name that cannot be a backend's or that no backend records, and warn, without refusing, about one no
+     * running backend answers to: the operator may be preparing a server that is not up yet.
      */
     private boolean accepted(PlayerRef actor, String server) {
         Objects.requireNonNull(server, "server");
         if (!SERVER_NAME.matcher(server).matches()) {
             notifier.send(actor, WarpError.INVALID_SERVER.messageKey(), Map.of("server", server));
+            return false;
+        }
+        if (server.equals(defaultServerName)) {
+            notifier.send(actor, WarpsMessageKey.WARP_SERVER_DEFAULT, Map.of("server", server));
             return false;
         }
         if (!server.equals(Warp.UNSCOPED) && !presence.isLive(server)) {

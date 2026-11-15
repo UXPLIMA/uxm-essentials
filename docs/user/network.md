@@ -162,9 +162,8 @@ Both keys are in the root `config.conf` and read on start.
   money back. If the target refuses them on arrival (the warp or home is gone, the world is full or will not load,
   the spot is unsafe), the server they reached gives it back, in the currency it was taken in; keep the economy module
   on wherever a move can land. A player warp's fee goes to its owner only when the visitor arrives.
-- **Safety.** Warps, homes and worlds check the spot on the server the player lands on. A player warp is checked on
-  the origin before the player leaves, against the origin's copy of the world, so a player warp whose world is not
-  loaded on the origin is refused as unsafe.
+- **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
+  that has its world.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with
   no warmup. An accepted teleport request runs the usual warmup on the mover's server first.
 - **Switches.** Turn each module's `cross-server` switch on on every backend. With it off, a warp or home is used on
