@@ -43,4 +43,19 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         var cooldown = warp.timing().cooldownSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
         engine.launch(who, Destination.at(warp.location(), warmup, cooldown), TeleportKind.WARP);
     }
+
+    @Override
+    public void arrive(PlayerRef who, PlayerWarp warp, Runnable onLanded, Runnable onMissed) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(warp, "warp");
+        Objects.requireNonNull(onLanded, "onLanded");
+        Objects.requireNonNull(onMissed, "onMissed");
+        registry.register(who.uuid(), warp);
+        if (engine.arriveImmediately(who, Destination.at(warp.location()), TeleportKind.WARP, onLanded, onMissed)
+                .isErr()) {
+            // No hop was issued, so the landing notice registered above would otherwise greet the next teleport.
+            registry.getAndRemove(who.uuid());
+            onMissed.run();
+        }
+    }
 }

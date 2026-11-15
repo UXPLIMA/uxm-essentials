@@ -25,6 +25,8 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
  * @param originServer the {@code network.server-id} of the backend that recorded the request
  * @param requestedAt when the origin recorded the request, for the request-ttl expiry check
  * @param paid the amount debited on the origin, to refund if arrival fails; empty when nothing was charged
+ * @param accrueOnArrival true when the origin left the owner's share for the arrival to bank; false on a row an
+ *     earlier release wrote, whose origin already banked it at charge time, so the arrival must not pay it again
  */
 public record PendingTeleport(
         UUID player,
@@ -32,7 +34,8 @@ public record PendingTeleport(
         String targetServer,
         String originServer,
         Instant requestedAt,
-        Optional<WarpCost> paid) {
+        Optional<WarpCost> paid,
+        boolean accrueOnArrival) {
 
     public PendingTeleport {
         Objects.requireNonNull(player, "player");

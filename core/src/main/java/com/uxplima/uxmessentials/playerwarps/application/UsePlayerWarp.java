@@ -87,6 +87,7 @@ public final class UsePlayerWarp {
     private final Optional<PlayerWarpEconomy> economy;
     private final String localServerId;
     private final Optional<CrossServerTeleport> crossServer;
+    private final CrossServerCharges charges;
     private final Clock clock;
 
     public UsePlayerWarp(
@@ -103,6 +104,7 @@ public final class UsePlayerWarp {
             Optional<PlayerWarpEconomy> economy,
             String localServerId,
             Optional<CrossServerTeleport> crossServer,
+            CrossServerCharges charges,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
@@ -117,6 +119,7 @@ public final class UsePlayerWarp {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.crossServer = Objects.requireNonNull(crossServer, "crossServer");
+        this.charges = Objects.requireNonNull(charges, "charges");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -197,12 +200,12 @@ public final class UsePlayerWarp {
             crossServer.get().send(actor, warp, charged);
             return;
         }
-        notifier.send(
+        charges.fail(
                 actor,
+                charged,
                 PlayerwarpsMessageKey.PWARP_CROSS_SERVER_UNAVAILABLE,
-                Map.of("warp", warp.name().value(), "server", warp.serverId().orElse("")));
-        charged.ifPresent(
-                cost -> economy.ifPresent(provider -> provider.refund(actor, cost.amount(), cost.currencyId())));
+                Map.of("server", warp.serverId().orElse("")),
+                warp.name().value());
     }
 
     /**
@@ -318,7 +321,8 @@ public final class UsePlayerWarp {
     /**
      * Step 6: the guarded charge, reached only for a non-member. A free warp, the cost bypass, or an absent
      * economy provider all skip the debit and admit for free (the {@code WarpEconomy} soft-coupling precedent).
-     * A priced warp with a provider present charges through {@link PlayerWarpEconomy#chargeAndAccrue}; any
+     * A priced warp with a provider present charges through {@link PlayerWarpEconomy#chargeAndAccrue}, or through
+     * {@link PlayerWarpEconomy#charge} alone for a warp on another backend; any
      * {@link ChargeError} refuses {@link PlayerWarpError#CANNOT_AFFORD} so no visit is recorded and no hop occurs.
      * A successful charge carries the exact price forward so a cross-server route can refund it if arrival fails.
      */
@@ -326,8 +330,12 @@ public final class UsePlayerWarp {
         if (warp.price().amount().signum() <= 0 || permissions.has(actor, BYPASS_COST) || economy.isEmpty()) {
             return Admission.free();
         }
-        Result<Unit, ChargeError> charged = economy.get()
-                .chargeAndAccrue(
+        PlayerWarpEconomy provider = economy.get();
+        // A remote warp can still be refunded after this charge, so its owner is paid only when the target backend
+        // has moved the visitor (CrossServerArrival accrues then).
+        Result<Unit, ChargeError> charged = isRemote(warp)
+                ? provider.charge(actor, warp.price().amount(), warp.price().currencyId())
+                : provider.chargeAndAccrue(
                         actor,
                         warp.id().orElseThrow(),
                         warp.price().amount(),
