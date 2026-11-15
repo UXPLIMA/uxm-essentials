@@ -24,28 +24,27 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
 
     private final BooleanSupplier published;
     private final BooleanSupplier currentForm;
+    private final BooleanSupplier groupsEnabled;
     private final BooleanSupplier placeholderApiPresent;
 
-    public PlaceholderExpansionHealthCheck(boolean published, BooleanSupplier placeholderApiPresent) {
-        this(() -> published, () -> published, placeholderApiPresent);
-    }
-
     /**
-     * As above, with whether the expansion published asked when the doctor runs. The expansion is registered on
-     * {@code ServerLoadEvent}, after this check is built, because this plugin enables before PlaceholderAPI does.
-     */
-    public PlaceholderExpansionHealthCheck(BooleanSupplier published, BooleanSupplier placeholderApiPresent) {
-        this(published, published, placeholderApiPresent);
-    }
-
-    /**
-     * As above, also told whether the {@code %uxm_essentials_<key>%} form answers. Only the older form answers when
-     * another plugin holds the {@code uxm} identifier, and every placeholder written the current way reads as empty.
+     * Every state is asked when the doctor runs: the expansion is registered on {@code ServerLoadEvent}, after this
+     * check is built, because this plugin enables before PlaceholderAPI does, and another plugin can take an
+     * identifier from it at any time after.
+     *
+     * @param published whether any expansion of ours answers right now
+     * @param currentForm whether the {@code %uxm_essentials_<key>%} form answers, rather than only the older one
+     * @param groupsEnabled whether at least one placeholder group is enabled, so there was something to publish
+     * @param placeholderApiPresent whether PlaceholderAPI is on the server
      */
     public PlaceholderExpansionHealthCheck(
-            BooleanSupplier published, BooleanSupplier currentForm, BooleanSupplier placeholderApiPresent) {
+            BooleanSupplier published,
+            BooleanSupplier currentForm,
+            BooleanSupplier groupsEnabled,
+            BooleanSupplier placeholderApiPresent) {
         this.published = Objects.requireNonNull(published, "published");
         this.currentForm = Objects.requireNonNull(currentForm, "currentForm");
+        this.groupsEnabled = Objects.requireNonNull(groupsEnabled, "groupsEnabled");
         this.placeholderApiPresent = Objects.requireNonNull(placeholderApiPresent, "placeholderApiPresent");
     }
 
@@ -67,7 +66,12 @@ public final class PlaceholderExpansionHealthCheck implements HealthCheck {
             return HealthResult.warn("PlaceholderAPI is not on this server, so our placeholders publish nothing:"
                     + " every other part of the plugin works");
         }
-        return HealthResult.warn("PlaceholderAPI is here and no placeholder group is enabled, so nothing was"
-                + " published and every placeholder of ours reads as empty");
+        if (!groupsEnabled.getAsBoolean()) {
+            return HealthResult.warn("PlaceholderAPI is here and no placeholder group is enabled, so nothing was"
+                    + " published and every placeholder of ours reads as empty");
+        }
+        return HealthResult.warn("our placeholders are not held: another plugin took the uxm and uxmessentials"
+                + " identifiers, at start or since, so every placeholder of ours reads as written; the log names the"
+                + " holder (papi_expansion_identifier_taken or papi_expansion_evicted)");
     }
 }

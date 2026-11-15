@@ -101,6 +101,12 @@ A cooldown label an operator chose keeps its name and moves to its own branch, s
 cooldown: `uxmessentials.cooldown.bypass.<label>` is now `uxmessentials.bypass.cooldown.label.<label>`, for example
 `uxmessentials.bypass.cooldown.label.customcommand.example` for the custom command `example`.
 
+Earlier pages suggested `uxmessentials.cooldown.bypass.tp`, `.rtp`, `.kit` or `.poses` for a feature's cooldown. That
+node only ever skipped a menu or custom command label of that name, never the feature, so it maps to
+`uxmessentials.bypass.cooldown.label.<name>` like any other label. To skip a feature's cooldown, grant
+`uxmessentials.bypass.cooldown.<feature>`, such as `uxmessentials.bypass.cooldown.tp`. `uxmessentials.bypass.cooldown.*`
+covers every feature and every label together.
+
 ### Moving the grants with LuckPerms
 
 `bulkupdate` changes every user and group at once. Run each line in the console, then confirm it with the

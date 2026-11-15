@@ -35,8 +35,13 @@ class BypassNodesTest {
 
     /** A warmup or cooldown kind built in the code, with its first argument: the feature, written or named. */
     private static final Pattern KIND =
-            Pattern.compile("(?:new\\s+(?:Warmups\\.)?(WarmupKind)|new\\s+(?:Cooldowns\\.)?(CooldownKind)"
-                    + "|(CooldownKind)\\.(?:scoped|onTeleport))\\(\\s*(\"[^\"]*\"|[A-Za-z_][A-Za-z0-9_]*)");
+            Pattern.compile("(?:new\\s+(?:[\\w.]+\\.)?(WarmupKind)|new\\s+(?:[\\w.]+\\.)?(CooldownKind)"
+                    + "|(?:[\\w.]+\\.)?CooldownKind\\.(?:scoped|onTeleport)|(?<![\\w.])(scoped|onTeleport))"
+                    + "\\(\\s*(\"[^\"]*\"|[A-Za-z_][A-Za-z0-9_]*)");
+
+    /** A file that may call the factories bare, because it imports them statically. */
+    private static final Pattern STATIC_FACTORY =
+            Pattern.compile("import\\s+static\\s+[\\w.]*CooldownKind\\.(?:scoped|onTeleport|\\*)\\s*;");
 
     /** The ports declare the kinds and pass the feature through; every other file names a real feature. */
     private static final Set<String> PORTS = Set.of("Cooldowns.java", "Warmups.java");
@@ -106,7 +111,11 @@ class BypassNodesTest {
         for (Path file : mainSources()) {
             String source = read(file);
             Matcher kind = KIND.matcher(source);
+            boolean staticFactories = STATIC_FACTORY.matcher(source).find();
             while (kind.find()) {
+                if (kind.group(3) != null && !staticFactories) {
+                    continue;
+                }
                 boolean warmup = kind.group(1) != null;
                 Optional<String> feature = featureOf(source, kind.group(4));
                 if (feature.isEmpty()) {

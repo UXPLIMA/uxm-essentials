@@ -933,6 +933,7 @@ public final class PluginModule {
             PlaceholderApiSupport.Registration open = placeholderRegistration.get();
             return open != null && open.answersCurrentForm();
         };
+        BooleanSupplier placeholderGroupsEnabled = () -> !placeholders.isEmpty();
         // Cross-cutting server-integration polish (1.21+ pause-menu links + opt-in update checker + map-marker
         // integration). These belong to no feature context: the update checker
         // off by default, built on the uxmLib update toolkit. Self-registers its permission-gated join notice and
@@ -950,7 +951,15 @@ public final class PluginModule {
         MigrationImportNode importNode =
                 wireMigration(plugin, registry, config, kernel, persistence, auditChannel, importTargets, bus.bus());
         List<HealthCheck> healthChecks = healthChecks(
-                plugin, registry, config, persistence, bus, resources, placeholdersPublished, placeholdersCurrentForm);
+                plugin,
+                registry,
+                config,
+                persistence,
+                bus,
+                resources,
+                placeholdersPublished,
+                placeholdersCurrentForm,
+                placeholderGroupsEnabled);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
         // ManagementGuiRegistry entries the viewer is permitted, each opening that module's own GUI. The
         // registry is constructed here and is threaded to module wiring (SP1+ each registers its opener);
@@ -1118,7 +1127,8 @@ public final class PluginModule {
             BusWiring.Wired bus,
             CloseableResources resources,
             BooleanSupplier placeholdersPublished,
-            BooleanSupplier placeholdersCurrentForm) {
+            BooleanSupplier placeholdersCurrentForm,
+            BooleanSupplier placeholderGroupsEnabled) {
         // Assembled after the modules are wired so the set reflects what is actually present: the database and
         // soft-depend probes always apply, the economy-provider ownership check only when economy is enabled.
         // The /uxmess doctor command runs each one off-tick (each is wrapped in HealthCheck.safe so a probe that
@@ -1155,7 +1165,10 @@ public final class PluginModule {
         // Presence is asked of the class that owns the soft depend and never of the plugin manager here.
         // A getPlugin check of our own would call a plugin that failed its own startup live.
         checks.add(new PlaceholderExpansionHealthCheck(
-                placeholdersPublished, placeholdersCurrentForm, PlaceholderApiSupport::isPresent));
+                placeholdersPublished,
+                placeholdersCurrentForm,
+                placeholderGroupsEnabled,
+                PlaceholderApiSupport::isPresent));
         return List.copyOf(checks);
     }
 
