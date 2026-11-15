@@ -99,6 +99,11 @@ final class InMemoryIpBans implements ModerationRepository {
     }
 
     @Override
+    public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public int appendWarn(PlayerRef target, Warn warn) {
         throw new UnsupportedOperationException();
     }

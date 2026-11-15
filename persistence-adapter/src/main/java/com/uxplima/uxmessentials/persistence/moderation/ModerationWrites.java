@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationTempbansRecord;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
@@ -100,16 +101,46 @@ final class ModerationWrites {
         if (!(tempban instanceof TempbanState.Active active)) {
             return 0;
         }
+        return dsl.insertInto(MODERATION_TEMPBANS).set(tempbanRow(key, active)).execute();
+    }
+
+    /**
+     * Write {@code replacement} only while {@code target}'s row is still {@code expected}. Each branch is one
+     * statement that the database checks and applies atomically: the update names the row by its expiry and issue
+     * instant, which a ban written in between changes, and the insert does nothing when a row appeared since. Both
+     * forms are portable across SQLite, MySQL and PostgreSQL.
+     */
+    static boolean replaceTempban(
+            DSLContext dsl, PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+        String key = target.uuid().toString();
+        ModerationTempbansRecord row = tempbanRow(key, replacement);
+        if (expected instanceof TempbanState.Active seen) {
+            return dsl.update(MODERATION_TEMPBANS)
+                            .set(row)
+                            .where(MODERATION_TEMPBANS.TARGET.eq(key))
+                            .and(MODERATION_TEMPBANS.UNTIL.eq(seen.until().toEpochMilli()))
+                            .and(MODERATION_TEMPBANS.CREATED_AT.eq(
+                                    seen.issuedAt().toEpochMilli()))
+                            .execute()
+                    == 1;
+        }
         return dsl.insertInto(MODERATION_TEMPBANS)
-                .set(MODERATION_TEMPBANS.TARGET, key)
-                .set(MODERATION_TEMPBANS.UNTIL, active.until().toEpochMilli())
-                .set(MODERATION_TEMPBANS.REASON, active.reason().orElse(null))
-                .set(MODERATION_TEMPBANS.BANNED_BY, issuerUuid(active.issuer()))
-                .set(
-                        MODERATION_TEMPBANS.BANNED_BY_NAME,
-                        fit(MODERATION_TEMPBANS.BANNED_BY_NAME, active.issuer().name()))
-                .set(MODERATION_TEMPBANS.CREATED_AT, active.issuedAt().toEpochMilli())
-                .execute();
+                        .set(row)
+                        .onConflict(MODERATION_TEMPBANS.TARGET)
+                        .doNothing()
+                        .execute()
+                == 1;
+    }
+
+    private static ModerationTempbansRecord tempbanRow(String key, TempbanState.Active ban) {
+        ModerationTempbansRecord row = new ModerationTempbansRecord();
+        row.setTarget(key);
+        row.setUntil(ban.until().toEpochMilli());
+        row.setReason(ban.reason().orElse(null));
+        row.setBannedBy(issuerUuid(ban.issuer()));
+        row.setBannedByName(fit(MODERATION_TEMPBANS.BANNED_BY_NAME, ban.issuer().name()));
+        row.setCreatedAt(ban.issuedAt().toEpochMilli());
+        return row;
     }
 
     static int appendWarn(DSLContext dsl, PlayerRef target, Warn warn) {
