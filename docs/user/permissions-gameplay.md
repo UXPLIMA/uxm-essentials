@@ -317,7 +317,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.module.worlds` | Hot-reload / inspect the worlds module (world creation, properties and access). | op |
-| `uxmessentials.world.<world>` | Enter one world that is configured as restricted. | op |
+| `uxmessentials.world.<world>.enter` | Enter one world that is configured as restricted. | op |
 | `uxmessentials.bypass.access.world` | Enter a restricted world without holding that world's own entry node. | op |
 | `uxmessentials.world.backup` | /worlds backup <name>: snapshot a world's folder. | op |
 | `uxmessentials.bypass.safety.world` | Land on the spawn of a world on another server even when the safe-landing check refuses it. | op |
