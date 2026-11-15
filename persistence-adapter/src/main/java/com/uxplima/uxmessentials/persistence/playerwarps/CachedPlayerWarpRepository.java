@@ -159,6 +159,11 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     }
 
     @Override
+    public List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
+        return delegate.archivedForRent(cutoff, limit);
+    }
+
+    @Override
     public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
         return delegate.remindableForRent(now, horizon, maxStage, limit);
     }

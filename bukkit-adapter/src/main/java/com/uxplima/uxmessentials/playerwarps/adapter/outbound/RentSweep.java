@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
 import com.uxplima.uxmessentials.playerwarps.application.RentConfig;
 import com.uxplima.uxmessentials.playerwarps.application.RentOutcome;
 import com.uxplima.uxmessentials.playerwarps.application.RentReminders;
@@ -19,8 +20,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The self-rescheduling rent sweep (the {@code SalaryTask}/{@code BankInterestTask} pattern): on a fixed interval,
- * off the tick thread, it charges the warps whose paid term has lapsed, retries or archives the suspended ones, and
- * mails any owners a heads-up whose term is approaching. Every pass is bounded: each query is capped at
+ * off the tick thread, it charges the warps whose paid term has lapsed, retries or archives the suspended ones,
+ * deletes for good the warps that have stayed archived past the configured delay, and mails any owners a heads-up
+ * whose term is approaching. Every pass is bounded: each query is capped at
  * {@link #BATCH_LIMIT} rows and indexed on {@code rent_paid_until}, never a full-table scan, and each warp is settled
  * in isolation, so one warp's fault (a transient DB error, say) is logged and the sweep carries on.
  *
@@ -33,12 +35,14 @@ public final class RentSweep extends AbstractPeriodicSweep {
     private final PlayerWarpRepository repository;
     private final SettleRent settle;
     private final RentReminders reminders;
+    private final PurgeArchivedRentWarps purge;
     private final RentConfig config;
 
     public RentSweep(
             PlayerWarpRepository repository,
             SettleRent settle,
             RentReminders reminders,
+            PurgeArchivedRentWarps purge,
             RentConfig config,
             Scheduler scheduler,
             Duration interval,
@@ -48,6 +52,7 @@ public final class RentSweep extends AbstractPeriodicSweep {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.settle = Objects.requireNonNull(settle, "settle");
         this.reminders = Objects.requireNonNull(reminders, "reminders");
+        this.purge = Objects.requireNonNull(purge, "purge");
         this.config = Objects.requireNonNull(config, "config");
     }
 
@@ -56,16 +61,41 @@ public final class RentSweep extends AbstractPeriodicSweep {
         return config.enabled();
     }
 
-    /** One bounded pass: charge the due warps, retry/archive the suspended ones, then send any due reminders. */
+    /**
+     * One bounded pass: charge the due warps, retry/archive the suspended ones, hard-delete the long archived ones,
+     * then send any due reminders.
+     */
     @Override
     public void sweepOnce() {
         Instant now = clock.instant();
         int charged = settleBatch(repository.dueForRent(now, BATCH_LIMIT));
         int retried = settleBatch(repository.suspendedForRent(BATCH_LIMIT));
+        int purged = purgeBatch();
         int reminded = remindBatch(now);
         if (charged + retried + reminded > 0) {
             log.info("event=playerwarp_rent_sweep charged={} retried={} reminded={}", charged, retried, reminded);
         }
+        // A hard delete cannot be undone, so the operator always sees how many went, even in an otherwise quiet pass.
+        if (purged > 0) {
+            log.info(
+                    "event=playerwarp_rent_hard_deleted count={} after_days={}",
+                    purged,
+                    config.hardDeleteAfter().toDays());
+        }
+    }
+
+    private int purgeBatch() {
+        int deleted = 0;
+        for (PlayerWarp warp : purge.due(BATCH_LIMIT)) {
+            try {
+                if (purge.purge(warp)) {
+                    deleted++;
+                }
+            } catch (RuntimeException failure) {
+                log.error("event=playerwarp_rent_hard_delete_failed warp=" + warpId(warp), failure);
+            }
+        }
+        return deleted;
     }
 
     private int settleBatch(List<PlayerWarp> warps) {

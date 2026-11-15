@@ -220,6 +220,22 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
     }
 
     @Override
+    public List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
+        Objects.requireNonNull(cutoff, "cutoff");
+        long millis = cutoff.toEpochMilli();
+        // updated_at guards a warp restored and archived again: its old deadline is stale, its last change is not.
+        return read(dsl -> dsl.selectFrom(PLAYER_WARPS)
+                .where(PLAYER_WARPS.STATUS.eq(WarpStatus.ARCHIVED.name()))
+                .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.isNotNull())
+                .and(PLAYER_WARPS.RENT_ARCHIVE_AFTER.le(millis))
+                .and(PLAYER_WARPS.UPDATED_AT.le(millis))
+                .orderBy(PLAYER_WARPS.RENT_ARCHIVE_AFTER.asc(), PLAYER_WARPS.ID.asc())
+                .limit(limit)
+                .fetch()
+                .map(row -> PlayerWarpRows.toPlayerWarp(row, names)));
+    }
+
+    @Override
     public List<RentReminderCandidate> remindableForRent(Instant now, Instant horizon, int maxStage, int limit) {
         Objects.requireNonNull(now, "now");
         Objects.requireNonNull(horizon, "horizon");

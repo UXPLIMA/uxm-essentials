@@ -119,6 +119,19 @@ public interface PlayerWarpRepository {
     }
 
     /**
+     * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ARCHIVED archived} warps that
+     * were retired for unpaid rent ({@code rent_archive_after} set) and have stayed untouched since {@code cutoff}:
+     * both the archive deadline and {@code updated_at} are at or before it, oldest deadline first, for the rent
+     * sweep's hard-delete pass. A warp the owner archived while paid up carries no archive deadline and never
+     * matches, and a warp that was restored and archived again counts from its latest change. Capped at
+     * {@code limit}. The default returns an empty list so an undecorated store deletes nothing; the jOOQ adapter
+     * overrides it.
+     */
+    default List<PlayerWarp> archivedForRent(Instant cutoff, int limit) {
+        return List.of();
+    }
+
+    /**
      * A bounded page of {@link com.uxplima.uxmessentials.playerwarps.domain.WarpStatus#ACTIVE active} warps whose
      * paid term falls within {@code (now, horizon]} and whose {@code rent_reminded_stage} is still below
      * {@code maxStage}, for the reminder pass: the candidates that might still owe a heads-up mail. Capped at
