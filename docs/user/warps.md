@@ -24,7 +24,7 @@ out of the box.
 | `/warp <name>` | `uxmessentials.warp.use` | Teleports you to a warp. |
 | `/warp <name> <password>` | `uxmessentials.warp.use` | Teleports you to a warp that has a password. |
 | `/warp <name> <player>` | `uxmessentials.warp.others` | Sends an online player to the warp instead of you. |
-| `/warp list` | `uxmessentials.warp.list` | Opens the warp menu, or the chat list with `list-display = "chat"`. The console always gets the chat list. Bare `/warp` does the same with only `uxmessentials.warp.use`. |
+| `/warp list` | `uxmessentials.warp.list` | Opens the warp menu, or the chat list with `list-display = "chat"`. The console always gets the chat list and must type `/warp list`. Bare `/warp` opens the same for a player with only `uxmessentials.warp.use`. |
 | `/warp create <name>` | `uxmessentials.warp.set` | Sets a warp at your position. On an existing name it moves that warp. `/warp set <name>` does the same. |
 | `/warp create <name> at <world> <x> <y> <z>` | `uxmessentials.warp.set` | The same at a given position; also `/warp createat <name> <world> <x> <y> <z>`. |
 | `/warp move <name>` | `uxmessentials.warp.move` | Moves a warp to your position; `move <name> at <world> <x> <y> <z>` or `moveat` for a given one. |
@@ -59,7 +59,10 @@ entries of `selector-presets`, up to eighteen of each.
 The checks run in this order, and the first that fails stops the use with its own message:
 
 1. The player holds `uxmessentials.warp.use.<warp>`, and the warp's required permission when it has one. The
-   per-warp node is granted to everyone by default; set it to false for a group to keep that group out.
+   per-warp node is meant to default to everyone, but the plugin does not register it yet, so today a player who is
+   not an operator is refused until it is granted. This is a known issue. Until it is fixed, grant
+   `uxmessentials.warp.use.*` to the default group, or one `uxmessentials.warp.use.<warp>` per warp; set a node to
+   false for a group to keep that group out of a warp.
 2. The warp is not locked, unless the player holds `uxmessentials.bypass.lock.warp`.
 3. The right password was given, unless the warp has none or the player holds `uxmessentials.bypass.password.warp`.
 4. The destination is safe: solid ground, and no solid block, lava or fire at the feet or head. A warp in a world
@@ -211,7 +214,8 @@ paid at once, in a currency that can be paid to an offline player.
 ### Limits and categories
 
 A player owns up to `default-limit` warps (3). `uxmessentials.pwarp.limit.<n>` raises it, the largest node held
-wins, `uxmessentials.pwarp.limit.<world>.<n>` counts for warps in that world, and `-1` removes the limit.
+wins, and `-1` removes the limit. `uxmessentials.pwarp.limit.<world>.<n>` sets the limit used when the new warp is
+in that world, but it is compared with all of the owner's warps, in every world, not only those in that world.
 
 Categories come from the warp categories made in `/warp editor`. While none exist, the browser offers `building`,
 `shop`, `pvp`, `farm`, `redstone` and `misc`. The browser sorts by name, age, visits, unique visitors, rating,
@@ -244,8 +248,11 @@ With `cross-server.enabled = true`, a visit to a warp of another server runs the
 sends the visitor through the proxy, with no warmup. The warp's server moves them on join, pays the owner then, and
 refunds the visitor if they never arrive or the warp is gone, no longer active or moved. The safety check runs on the
 server the visit starts from, before the visitor leaves, so a warp in a world that server does not have counts as
-unsafe and only a player with `uxmessentials.bypass.safety.pwarp` gets through. With the switch off, a visit to a warp
-of another server is refused, and a fee already taken is given back.
+unsafe and only a player with `uxmessentials.bypass.safety.pwarp` gets through. This is a known issue: server warps
+check the spot on the server the player lands on.
+
+With the switch off, a visit to a warp of another server is refused as unavailable. The fee is taken first and given
+straight back, and the jail, combat and cooldown checks do not run for it.
 
 ## Other permissions
 

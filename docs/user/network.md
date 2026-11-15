@@ -48,8 +48,9 @@ matters in three ways:
   server records nothing, so it never ties its rows to a name it will drop when it joins a network. Rows that record
   no server are claimed at a later start by the backend that has their world loaded.
 
-`unscoped` is reserved for rows of no known server and cannot be a server name. A name may use letters, digits,
-`_`, `.` and `-`, at most 64 characters; the enable log names one that cannot be used in a scope.
+`unscoped` is reserved for rows of no known server and should not be a server name: a backend under it starts, but
+the log names it as a problem and it claims no warps, homes or jails (`reason=reserved_server_name`). A name may use
+letters, digits, `_`, `.` and `-`, at most 64 characters; the enable log names one that cannot be used in a scope.
 
 ### Renaming a server, or fixing a wrong claim
 
@@ -84,8 +85,8 @@ Plugin messages ride a player's connection, which sets the limits:
   when its first player joins, and warps, spawns, worlds, NPCs, holograms and the vote counter also reload every
   `network.cache-refresh-seconds` (default 300; `0` turns the timer off). Balances, homes and other per-player data
   expire on their own after a few minutes.
-- Frames waiting for a player are kept in a queue of `network.bus.outbound-queue-size` (default 256). When it is full
-  the oldest frame is dropped.
+- Frames waiting for a player are kept in a queue of 256. When it is full the oldest frame is dropped. The size is
+  `network.bus.outbound-queue-size`, which the shipped file does not list; add it inside `network` to change it.
 - A frame larger than 32767 bytes is never sent; the log reports the drop, at most once a minute.
 - `network.bus-channel` must match the proxy. Leave it as shipped.
 
@@ -117,9 +118,12 @@ Backend commands are gated by the `commandcontrol` module on each backend.
 
 `/uxmess doctor` on a backend shows:
 
-- the bus line: disabled, connected, or `DISCONNECTED` when the carrier cannot deliver;
+- the bus line: disabled, connected, or `DISCONNECTED`. Connected does not prove that frames travel: with Velocity
+  it only means the channel is registered on this backend, so it reads connected even with no proxy jar installed,
+  and with `both` either carrier counts;
 - the peers line: how many other backends sent a heartbeat recently (`network.heartbeat-seconds`, default 30; a peer
-  drops out after three missed beats) and how long ago;
+  drops out after three missed beats) and how long ago. This is the line that shows frames arrive: on a working
+  network it counts every other backend that has players (or every other backend, with Redis);
 - the server name line: a failure when another backend uses this name, a warning while it is still `server-1`.
 
 ## What each module does on a network
@@ -142,9 +146,9 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Ranks | Each player's rank and prestige | none | none |
 | Vaults | Vault contents | none | none |
 | Holograms, NPCs, main spawn | Definitions, with a scope | Edits show on every server in scope | `network.shared-sets` |
-| Guard | Regions, with a scope | Edits apply on every server in scope | `guard` `network` block |
+| Guard | Regions, with a scope | Edits apply on every server in scope | none; shared sets in `modules/guard/config.conf` |
 | Trade | Escrow | Two players on different servers trade | `trade` `cross-server` |
-| Vote | Party counter | A party pays players on every server | `vote` `network-rewards` |
+| Vote | Party counter | A party pays players on every server | `voteparty.network-rewards` in `vote`, default on |
 | Playtime | Daily rows | Time on every server adds up | none |
 
 ### Cross-server moves
@@ -237,12 +241,17 @@ the other servers at once; a main spawn reaches them at their next cache refresh
 world's uid, and named spawns are shared by name but only work on a server that has their world. `/spawn` never
 changes server.
 
+Guard regions are scoped the same way but keep their own list of shared sets, `network.shared-sets` in
+`modules/guard/config.conf`, and `network.new-region-scope` there picks the scope of a new region. Guard has no
+network switch: an edit is announced over the bus, and each server also reads the regions from the database every
+`network.poll-seconds` (10), which is how edits arrive without Redis when a frame was missed. See [guard](guard.md).
+
 ### Economy
 
 Balances live in the shared database, so a player has the same balance on every server. A transfer is one
 transaction on the shared rows, and each change tells the other servers to drop their cached balance. `/pay` finds
 its target among the players on this server, so it cannot pay a player who is on another one. The daily reward
-stamp is shared, so switching servers does not pay it twice. Keep `timezone` in `modules/economy/config.conf` the
+stamp is shared, so switching servers does not pay it twice. Keep `gui.timezone` in `modules/economy/config.conf` the
 same everywhere so transaction times agree.
 
 ## What does not cross servers
@@ -266,9 +275,11 @@ same everywhere so transaction times agree.
    records servers clears warps and player warps recorded under `server-1`, and each backend claims its rows by world
    at its first start under a real name.
 4. Start one backend, read its log, then start the others. Check the claim lines (`event=warp_server_claim`,
-   `event=home_server_claim`, `world_server_claim_conflict`, `world_server_claim_skipped`) and fix a wrong claim with
-   the [setserver commands](#renaming-a-server-or-fixing-a-wrong-claim).
-5. Run `/uxmess doctor` on each backend: bus connected, the expected peer count, no server name failure.
+   `event=playerwarp_server_claim`, `event=home_server_claim`, `event=jail_server_claim`, `event=world_server_claim`,
+   `world_server_claim_conflict`, `world_server_claim_skipped`) and fix a wrong claim with the
+   [setserver commands](#renaming-a-server-or-fixing-a-wrong-claim), or `/setjail` for a jail.
+5. Run `/uxmess doctor` on each backend once players are on: the expected peer count and no server name failure. The
+   bus line alone does not prove frames travel.
 6. Move permission grants and placeholders to the new names as [upgrading](upgrading.md) describes. That release
    renames every exemption node to `uxmessentials.bypass.*` and every placeholder to `%uxm_essentials_<path>%`.
 

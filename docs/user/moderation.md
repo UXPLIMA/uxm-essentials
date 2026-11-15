@@ -53,7 +53,8 @@ Where a duration is optional (`/mute` and `/jail`), `perm` or `permanent` means 
 /jail Alex spawnjail 30m
 ```
 
-`/tempban`, `/tempmute`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`.
+`/tempban`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. `/tempmute <player> perm` is
+accepted and gives a permanent mute, the same as `/mute <player> perm`.
 
 The reason is everything after the last argument, spaces included. It is stored with the sanction, shown to the
 player and written to the history.
@@ -83,6 +84,10 @@ by `muted-blocked-commands` while muted.
 A new ban on a player who is already banned replaces the old one. The player sees the reason, and for a timed ban
 how long is left, on the kick screen.
 
+A permanent ban is stored as a ban that ends very far in the future. The kick at the moment of `/ban` uses the
+`moderation.ban.kick` screen, but every later login refusal, and the kick on another server of a network, use the
+`moderation.tempban.kick` screen, which then shows a time left of about 365000 days. This is a known issue.
+
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
 account. STRICT catches anyone else on those addresses too (a household, a school network), so leave it off unless
@@ -92,7 +97,8 @@ you want that. If the ban was shortened by a duration cap, the IP bans end with 
 
 A muted player cannot chat, and cannot use this plugin's private messages, mail or helpop. The commands in
 `muted-blocked-commands` are also refused while muted, which covers other plugins' and the game's own message
-commands. Write each as the bare command word:
+commands. Write each as the bare command word. A namespaced form such as `/minecraft:msg` or `/essentials:msg` is a
+different word and must be listed on its own:
 
 ```
 muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply"]
@@ -129,6 +135,12 @@ third warning and banned for a day at their fifth, and nothing happens at the fo
 escalates silently. A step with a bad count, an unknown action or a missing duration is skipped with a warning in
 the log. An empty list turns escalation off.
 
+A step never weakens what is already running. A mute or ban step leaves the player under whichever of its own
+sanction and the running one of that kind ends later: a permanent one beats any timed one, and a tie keeps the
+running one. So a `tempmute:10m` step extends a mute that has five minutes left, while a `tempban:1d` step on a
+permanently banned player leaves the permanent ban in place. A step that is held back this way is written to the
+audit log as not applied (`held_by_stronger`).
+
 ## Kicks
 
 `/kick` disconnects a player on this server with an optional reason. On a network, a player connected to another
@@ -156,7 +168,8 @@ jail {
 ```
 
 `/jails` lists both kinds. When both have the same name, the one made with `/setjail` wins. A config jail is removed
-by editing the file. `/togglejail` without a jail name uses the first jail in the `jails` list.
+by editing the file. `/togglejail` without a jail name uses the config jail whose name comes first in alphabetical
+order, and never a jail made with `/setjail`; with no config jail it is refused as an unknown jail.
 
 ### Time
 
@@ -262,7 +275,7 @@ Discord bridge forwards. Without the bridge the line only lands in the audit log
 ## History and lookups
 
 Every ban, tempban, IP ban, unban, mute, unmute, warning and kick is written to a history that is never edited. Jails
-are not in it.
+are not in it, and neither are the kicks of `/kickall` or the IP bans a STRICT `/ban` adds.
 
 | Command | Permission | What it shows |
 |---|---|---|
@@ -273,7 +286,7 @@ are not in it.
 | `/checkban <player>`, `/checkmute <player>` | `uxmessentials.moderation.check` | Whether the player is banned or muted now. |
 | `/banlist`, `/mutelist` | `uxmessentials.moderation.banlist`, `uxmessentials.moderation.mutelist` | Bans and mutes in effect (up to 50). |
 | `/staffhistory <staff>` | `uxmessentials.moderation.staffhistory` | What one staff member has issued. |
-| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given. A sanction since replaced by another staff member's is left alone. |
+| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given, at most 500. A sanction since replaced by another staff member's is left alone. |
 | `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. |
 | `/seen <player>` | `uxmessentials.moderation.seen` | First join and last seen, or the server the player is on now. |
 | `/seenip <player>`, `/alts <player>` | `uxmessentials.moderation.seen` | The last address and the accounts that share it; every account that shared any of the player's addresses. |
@@ -292,7 +305,9 @@ confirmation, `/jail` opens the jail menu, `/jails` the jail manager, `/jailedpl
 
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
-`messages/messages_<language>.conf`. Add your appeal link or Discord invite there.
+`messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
+and `moderation.tempban.kick`: a permanently banned player who logs in again sees the tempban screen (see
+[Bans](#bans)).
 
 ## On a network
 

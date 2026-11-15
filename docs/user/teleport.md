@@ -106,8 +106,8 @@ land claims and guard or WorldGuard regions while `respect-claims` and `respect-
 `persist-pool` the spots survive a restart. The picker offers each loaded world that has a ring to search.
 `fallback-world.<world> = "<other>"` sends `/rtp` from a world without one to another world.
 
-`uxmessentials.rtp.radius.<blocks>` narrows the ring for `/rtp biome`, the largest node held wins; plain `/rtp` draws
-from the shared ready spots and ignores it.
+`uxmessentials.rtp.radius.<blocks>` sets the outer edge of the ring for `/rtp biome`: the largest node held replaces
+`max-radius`, and may reach beyond it. Plain `/rtp` draws from the shared ready spots and ignores it.
 
 `cost` is charged in the default currency. A player who cannot pay is refused before anything is searched. The money
 is taken when the warmup ends, and given back if the hop then fails; a warmup cancelled by moving costs nothing. With
@@ -153,9 +153,13 @@ cooldown checks run before any charge, so a refused teleport costs nothing.
 | `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, kept apart from the others. |
 | `uxmessentials.bypass.cooldown.rtp` | No `/rtp` cooldown. |
 
+The two bypass nodes are listed in the permission pages under the `uxmessentials.bypass.cooldown.<feature>` row.
+
 By default every voluntary teleport shares one clock. `cooldowns.back`, `cooldowns.home`, `cooldowns.warp` and
 `cooldowns.spawn` set to 0 or more give that command its own clock and default; `-1` keeps the shared one. A warp with
-its own cooldown in the editor has its own clock too. `cooldowns.rtp` sets the default of the `/rtp` clock.
+its own cooldown in the editor uses the warp clock, one clock shared by every warp that sets one, with the warp's
+value as the default; a player's `uxmessentials.tp.cooldown.<seconds>` node overrides that value. `cooldowns.rtp`
+sets the default of the `/rtp` clock.
 
 `cooldown-start-phase` decides what starts the clock. With `teleport`, the default, a landing does. With `accept`,
 only an accepted request starts it, for the player who moves, and other teleports start none. With `request`, no
@@ -197,7 +201,7 @@ are the `cross-server` block of the root `config.conf`.
 | `teleport-to-center` | `true` | Lands players in the middle of the block. |
 | `arrival-title`, `arrival-effects` | `true` | Master switches for the arrival messages and effects. |
 | `effects.<verb>` | | The sound and particle on arrival for `home`, `spawn`, `rtp`, `back` and `warp` (off: warps play their own). |
-| `arrival-messages.<verb>` | a title | Lines shown on arrival, each `TITLE`, `SUBTITLE`, `BOSS_BAR`, `CHAT` or `ACTION_BAR` with a message key or MiniMessage text. `[]` shows none. |
+| `arrival-messages.<verb>` | a title; none for `warp` | Lines shown on arrival, each `TITLE`, `SUBTITLE`, `BOSS_BAR`, `CHAT` or `ACTION_BAR` with a message key or MiniMessage text. `[]` shows none. |
 
 Other nodes: `uxmessentials.teleport.gui` (the settings panel on `/uxmess gui`, op) and
 `uxmessentials.module.teleport` (reload and inspect the module, op). The full list is in

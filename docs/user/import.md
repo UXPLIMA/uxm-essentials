@@ -52,7 +52,8 @@ written to the server log, not to chat (see [Reading the result](#reading-the-re
 wait for its `migration_import_finish` line before the next.
 
 A dry run makes the same decisions as a live run against the current data, conflicts included, and writes the same
-log lines with `dry_run=true`, so the two can be compared line by line. It takes no backup.
+log lines, so the two can be compared line by line; its start and finish lines say `dry_run=true`. It takes no
+backup.
 
 | Source | Imports | Reads from |
 |---|---|---|
@@ -76,9 +77,10 @@ Each `userdata/<uuid>.yml` gives one player:
   are imported even when they are more than the player's home limit; see [homes.md](homes.md) for what such a
   player can do.
 - **Balance.** `money`, paid into the default currency of the economy module.
-- **Mail.** Each message with its sender, send time and read flag. Colour codes are removed. Mail EssentialsX had
-  already expired is dropped, and mail older than `mail-retention-days` of the messaging module is not written,
-  because the next sweep would delete it; raise the retention before importing to keep it. With the messaging
+- **Mail.** Each message. The sender, send time and read flag are carried over only for entries EssentialsX wrote in
+  its newer format (`legacy: false`); an older plain-text entry has none of them. Colour codes are removed. Mail
+  EssentialsX had already expired is dropped, and mail older than `mail-retention-days` of the messaging module is not
+  written, because the next sweep would delete it; raise the retention before importing to keep it. With the messaging
   module off, no mail is written.
 - **Mute.** A muted player stays muted, until the same time or for good, with the mute reason. The issuer is
   recorded as `EssentialsX` and the issue time is unknown.
@@ -106,10 +108,11 @@ litebans {
 ```
 
 Only rows LiteBans still marks active are imported. Reasons, issue times, expiry times and the name of the staff
-member are kept. A permanent ban is stored the way `/ban` stores one. An IP ban keeps its address; a wildcard
-(range) IP ban is skipped. A row whose player is not a real UUID (LiteBans writes `#offline#` and similar) is
-skipped. A table that cannot be read is logged and skipped. `table-prefix` must contain only lowercase letters,
-digits and `_`; any other value stops the LiteBans import with an error in the log.
+member are kept. A permanent ban is stored the way `/ban` stores one. An IP ban is imported by its address, whatever
+player it names; a wildcard (range) IP ban is skipped. A ban, mute or warning whose player is not a real UUID
+(LiteBans writes `#offline#` and similar) is skipped. A table that cannot be read is logged and skipped.
+`table-prefix` must contain only lowercase letters, digits and `_`; any other value stops the LiteBans import with an
+error in the log.
 
 ## Player warps
 
@@ -118,11 +121,11 @@ All three sources write through the same path as `/setpwarp`:
 | Source | Carried over |
 |---|---|
 | AxPlayerWarps | owner, location, category, price, access (public, whitelist or private), ratings, whitelist, blacklist as warp bans, favourites, visit counts |
-| AthelionPlayerWarps | owner, location, category, admission price, a password (stored hashed) or closed status, ratings, blocked players as warp bans |
-| OlziePlayerWarps | owner, location, cost, access (password, whitelist, locked or public), ratings, whitelist, managers as warp members, bans with their reason, favourites, visit counts |
+| AthelionPlayerWarps | owner, location, category, admission price, a password (stored hashed) or closed status, ratings, blocked players as warp bans, visit counts |
+| OlziePlayerWarps | owner, location, category, cost, access (password, whitelist, locked or public), ratings, whitelist, managers as warp members, bans with their reason, favourites, visit counts |
 
-Prices are recorded in the default currency. Athelion and Olzie do not store the owner's name, so the warp shows a
-placeholder author until the owner joins. A warp name is turned into a valid player warp name (lowercase letters,
+Prices are recorded in the default currency. Athelion and Olzie do not store the owner's name, so those warps show
+the owner as `Unknown`, and it stays so. A warp name is turned into a valid player warp name (lowercase letters,
 digits, `_` and `-`, 3 to 32 characters); when another player already owns that name, the warp gets `name2`,
 `name3` and so on. A warp whose world is not loaded or whose owner is unknown is left out.
 
@@ -130,16 +133,17 @@ digits, `_` and `-`, 3 to 32 characters); when another player already owns that 
 
 DecentHolograms and FancyHolograms holograms keep their name, position and the text lines of the first page. They
 get the look, visibility and refresh of a hologram made with `/hologram create`. Pages, click actions, view ranges,
-rotation, blank spacer lines and lines too long for a hologram line are dropped. Item and block holograms, and
-holograms in a world that is not loaded, are left out.
+rotation, blank spacer lines and lines too long for a hologram line are dropped. A DecentHolograms icon or item line
+is imported as plain text. FancyHolograms item and block holograms, and holograms in a world that is not loaded, are
+left out.
 
 ## Multiverse worlds
 
 Each world in `worlds.yml` becomes a world of the worlds module, with its environment, seed, generator, alias and
-auto-load, and, where Multiverse had a value other than its default, PvP, difficulty, forced game mode, player limit,
-a money entry fee and the spawn point. Other Multiverse settings are not read. A world whose name the worlds module
-cannot hold is skipped with a warning. The import only registers the world: it loads on the next start when
-`auto-load-registered` is on in `modules/worlds/config.conf` and the world's own auto-load is on. See
+auto-load, and, where Multiverse's value differs from the worlds module's own default, PvP, difficulty, forced game
+mode, player limit, a money entry fee and the spawn point. Other Multiverse settings are not read. A world whose name
+the worlds module cannot hold is skipped with a warning. The import only registers the world: it loads on the next
+start when `auto-load-registered` is on in `modules/worlds/config.conf` and the world's own auto-load is on. See
 [worlds.md](worlds.md) for where Paper keeps world folders.
 
 ## Vault and PlayerPoints balances
@@ -174,7 +178,7 @@ Some records ignore both settings:
 
 - **Player warps** are never replaced. A warp whose name, or a numbered form of it, already belongs to the same
   owner counts as imported and is skipped.
-- **Warnings** are never duplicated: one with the same issuer, reason and issue time is skipped.
+- **Warnings** are never duplicated: one with exactly the same issuer, reason, issue time and expiry is skipped.
 - **Mail** is never duplicated: a message with the same sender, text and, when known, send time is skipped.
 
 ## Running it again
@@ -184,8 +188,10 @@ address), so running the same import again with the default policies adds nothin
 import that stopped part way can simply be run again. Balances are set, never added, so they cannot be counted
 twice.
 
-Homes are matched by slot, not by name. Importing a second EssentialsX folder for the same players, for example
-from a second server, puts its homes into the slots the first left empty and skips the rest.
+Homes are matched by slot, not by name. Each run places a player's homes in alphabetical order from slot 1, and
+with `skip` a home is written only when its slot is empty. Importing a second EssentialsX folder for the same
+players, for example from a second server, therefore writes only the homes that fall on empty slots and skips the
+rest, even when their names differ.
 
 ## Reading the result
 
@@ -198,13 +204,13 @@ server log:
 | `event=migration_import_<kind>` | One per record: `user`, `warp`, `player_warp`, `kit`, `jail`, `mute`, `ban`, `ip_ban`, `warn`, `hologram`, `world`. |
 | `event=migration_import_finish` | At the end, with the counts and `duration_ms`. |
 
-Each record line has `conflict=` (`written`, `skipped`, `overwritten`, `partial` or `failed`) and `ok=`. A `user`
-line also says which parts landed: `homes_written`, `homes_kept`, `balance` (`written`, `kept` or `none`),
-`mail_written`, `mail_kept`, and when they apply `mail_expired`, `mail_past_retention` and
-`mail_skipped=messaging_disabled`. `partial` means some of the player's parts were kept back. The finish line counts
-`users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`, `partial` and `failed`; player
-warps, holograms and worlds appear only on their own record lines. One record that fails is counted and the run goes
-on. A run that cannot continue logs `migration import failed for source <source>`.
+Each record line has `ok=`, and every one but the `jail` and `mute` lines has `conflict=` (`written`, `skipped`,
+`overwritten`, `partial` or `failed`). A `user` line also says which parts landed: `homes_written`, `homes_kept`,
+`balance` (`written`, `kept` or `none`), `mail_written`, `mail_kept`, and when they apply `mail_expired`,
+`mail_past_retention` and `mail_skipped=messaging_disabled`. `partial` means some of the player's parts were kept
+back. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
+`partial` and `failed`; player warps, holograms and worlds appear only on their own record lines. One record that
+fails is counted and the run goes on. A run that cannot continue logs `migration import failed for source <source>`.
 
 Entries a source leaves out never reach these counts. Some are logged as warnings (EssentialsX files, warps and
 kits, LiteBans tables, Multiverse worlds, malformed player warps); others are left out without a line (homes,
@@ -289,4 +295,5 @@ See [network.md](network.md) for the shared database itself.
 | `uxmessentials.guard.import` | `/guard import worldguard`. | op |
 | `uxmessentials.guard.backups` | `/guard backups`, to put the `before-import` backup back. | op |
 
-The full list is in [permissions-server.md](permissions-server.md).
+The `/uxmess` nodes are in [permissions-server.md](permissions-server.md); the guard nodes are in
+[guard.md](guard.md).
