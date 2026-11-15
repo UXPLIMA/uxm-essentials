@@ -24,7 +24,8 @@ import org.jspecify.annotations.Nullable;
  * flight. {@link #record} upserts on that key, so a fresh cross-server request overwrites a stale one in place
  * rather than leaving orphaned rows. The uuid is canonical 36-char text, the warp the surrogate {@code long}, the
  * request time epoch-millis, and the charged amount a {@code DECIMAL(20,4)} paired with its currency id, both
- * NULL when nothing was charged. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * NULL when nothing was charged. {@link #clear} is one conditional {@code DELETE}, so the database decides which
+ * of two racing callers removed the row. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
  */
 @NullMarked
 public final class JooqPendingTeleportStore extends JooqRepository implements PendingTeleportStore {
@@ -73,14 +74,16 @@ public final class JooqPendingTeleportStore extends JooqRepository implements Pe
     }
 
     @Override
-    public void clear(UUID player) {
-        Objects.requireNonNull(player, "player");
-        write(dsl -> {
-            dsl.deleteFrom(PLAYER_WARP_PENDING_TELEPORTS)
-                    .where(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID.eq(player.toString()))
-                    .execute();
-            return null;
-        });
+    public int clear(PendingTeleport pending) {
+        Objects.requireNonNull(pending, "pending");
+        return write(dsl -> dsl.deleteFrom(PLAYER_WARP_PENDING_TELEPORTS)
+                .where(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID.eq(
+                        pending.player().toString()))
+                .and(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID.eq(pending.warp().value()))
+                .and(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER.eq(pending.targetServer()))
+                .and(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT.eq(
+                        pending.requestedAt().toEpochMilli()))
+                .execute());
     }
 
     /** Rebuild the aggregate from a row; the charge is present only when both the amount and currency survived. */

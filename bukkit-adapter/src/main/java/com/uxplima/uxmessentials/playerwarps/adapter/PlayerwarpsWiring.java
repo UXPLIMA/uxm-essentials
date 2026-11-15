@@ -42,6 +42,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarp
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
 import com.uxplima.uxmessentials.playerwarps.application.CrossServerArrival;
+import com.uxplima.uxmessentials.playerwarps.application.CrossServerWatchdog;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
@@ -544,10 +545,10 @@ public final class PlayerwarpsWiring {
      * Build the cross-server sub-group's send seam and arrival handler when {@code cross-server.enabled} is on,
      * else two empty {@link Optional}s. The two share one {@link PendingTeleportStore} over the network-shared
      * {@code player_warp_pending_teleports} table. The send half writes the row and connects the player, the
-     * arrival half reads it on join and completes the local hop (or refunds). The {@link ServerConnector} is built
-     * fresh over the standard proxy channel, exactly as the {@code npc}/{@code holograms} connectors are; when no
-     * proxy is in front its {@code isAvailable()} degrades a send to an unavailable-notice-plus-refund. Disabled,
-     * nothing is instantiated and the gate fails a remote warp closed.
+     * arrival half reads it on join and completes the local hop (or refunds), and the origin's watchdog refunds a
+     * row no backend claimed within the request TTL. The {@link ServerConnector} is built fresh over the standard
+     * proxy channel, exactly as the {@code npc}/{@code holograms} connectors are. Disabled, nothing is instantiated
+     * and the gate fails a remote warp closed.
      */
     private static CrossServerParts buildCrossServer(
             ModuleContext ctx,
@@ -565,12 +566,14 @@ public final class PlayerwarpsWiring {
         Clock clock = Clock.systemUTC();
         PendingTeleportStore store = PlayerWarpRepositories.pendingTeleportStore(persistence);
         ServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
-        CrossServerTeleport seam = new BukkitCrossServerTeleport(
-                store, connector, kernel.scheduler(), economy, notifier, localServerId, clock);
         Duration arrivalDelay =
                 Duration.ofMillis(Math.max(0, ctx.config().getInt("cross-server.arrival-delay-ticks", 20)) * 50L);
         Duration requestTtl =
                 Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
+        CrossServerWatchdog watchdog =
+                new CrossServerWatchdog(store, repository, economy, notifier, kernel.scheduler(), requestTtl);
+        CrossServerTeleport seam = new BukkitCrossServerTeleport(
+                connector, watchdog, kernel.scheduler(), economy, notifier, localServerId, clock);
         CrossServerArrival arrival = new CrossServerArrival(
                 store,
                 repository,

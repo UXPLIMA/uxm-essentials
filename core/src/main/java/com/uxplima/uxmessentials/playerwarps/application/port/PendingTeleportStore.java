@@ -21,6 +21,12 @@ public interface PendingTeleportStore {
     /** The player's in-flight teleport, if one is recorded. A single PK read. */
     Optional<PendingTeleport> find(UUID player);
 
-    /** Drop the player's in-flight teleport row; a no-op when none exists. Called once the hop settles or is abandoned. */
-    void clear(UUID player);
+    /**
+     * Delete {@code pending}'s row in one statement, only while the stored row is still that same request (same
+     * player, warp, target and request time to the millisecond), and return how many rows went: {@code 1} or
+     * {@code 0}. The delete is the claim on the request. A caller moves or refunds the player only when it removed
+     * the row, so two quick joins, or a join racing the origin's watchdog, can never act twice, and a decision
+     * taken on an old read can never wipe a newer request the player made since.
+     */
+    int clear(PendingTeleport pending);
 }
