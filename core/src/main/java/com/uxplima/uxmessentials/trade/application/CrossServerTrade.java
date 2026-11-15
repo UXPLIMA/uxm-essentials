@@ -98,7 +98,7 @@ public final class CrossServerTrade {
         switch (signal.type()) {
             case READY, COMMIT -> progress(signal.tradeId(), me, peer);
             case ABORT -> refund(signal.tradeId(), me, false);
-            case INVITE, ACCEPT, DECLINE -> {
+            case INVITE, ACCEPT, DECLINE, DELIVERED, NOT_FOUND, BUSY -> {
                 // The rendezvous signals are handled by the request flow, not the escrow engine.
             }
         }
