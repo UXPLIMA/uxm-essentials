@@ -67,9 +67,8 @@ public final class SellCommand extends EconomyCommandSupport implements CommandR
      * Sell from the held stack: take the items here, on the seller's own thread, then ask for the sale off the tick,
      * and give back what it does not pay for.
      *
-     * <p>It used to pay first and remove afterwards with a plain {@code removeItem}, which finds only a plain stack
-     * and says so in a return value nobody read. A player holding renamed diamonds was paid for them and kept them.
-     * So only a plain stack is sold, it is taken before anything is paid, and a refused or failed sale puts it back.
+     * <p>Only a plain stack is sold, because {@code removeItem} finds nothing else and a renamed stack would be paid
+     * for and kept. It is taken before anything is paid, and a refused or failed sale puts it back.
      */
     void sell(Player sender, Optional<Integer> requested) {
         ItemStack held = sender.getInventory().getItemInMainHand();
@@ -94,6 +93,10 @@ public final class SellCommand extends EconomyCommandSupport implements CommandR
                 .sell(
                         seller,
                         Map.of(id, taken),
-                        items -> services.sellItem().sell(seller, id, taken).sold() ? items : Map.of());
+                        (items, paid) -> services.sellItem()
+                                        .sell(seller, id, taken, () -> paid.paid(items))
+                                        .sold()
+                                ? items
+                                : Map.of());
     }
 }

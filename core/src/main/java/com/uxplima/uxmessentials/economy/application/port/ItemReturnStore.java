@@ -14,8 +14,8 @@ public interface ItemReturnStore {
     void keep(UUID owner, Map<String, Integer> items);
 
     /**
-     * Take everything kept for {@code owner}, summed per item id, and remove it in the same step, so two servers
-     * sharing the database never hand the same items out twice. Empty when nothing is kept.
+     * Take everything kept for {@code owner}, summed per item id, and remove it. Each kept row goes to exactly one
+     * caller, even when two takes run at once on servers sharing the database. Empty when nothing is kept.
      */
     Map<String, Integer> takeAll(UUID owner);
 }

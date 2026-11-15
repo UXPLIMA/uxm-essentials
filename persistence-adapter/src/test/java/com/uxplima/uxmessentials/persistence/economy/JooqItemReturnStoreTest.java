@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.ItemReturnStore;
+import com.uxplima.uxmessentials.persistence.economy.JooqItemReturnStore.KeptRow;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
@@ -49,5 +50,15 @@ class JooqItemReturnStoreTest {
         assertThat(store.takeAll(ALEX)).isEqualTo(Map.of("diamond", 8, "coal", 64));
         assertThat(store.takeAll(ALEX)).isEmpty();
         assertThat(store.takeAll(SAM)).isEqualTo(Map.of("coal", 1));
+    }
+
+    @Test
+    void aRowAnotherTakeDeletedFirstIsNotHandedOutAgain() {
+        List<KeptRow> read =
+                List.of(new KeptRow("a", "diamond", 5), new KeptRow("b", "diamond", 3), new KeptRow("c", "coal", 64));
+
+        Map<String, Integer> claimed = JooqItemReturnStore.claim(read, id -> id.equals("b") ? 0 : 1);
+
+        assertThat(claimed).isEqualTo(Map.of("diamond", 5, "coal", 64));
     }
 }

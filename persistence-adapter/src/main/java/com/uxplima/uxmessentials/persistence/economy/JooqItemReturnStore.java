@@ -8,20 +8,26 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.ToIntFunction;
 
 import com.uxplima.uxmessentials.economy.application.port.ItemReturnStore;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import org.jooq.DSLContext;
-import org.jooq.Record3;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * jOOQ-backed {@link ItemReturnStore} over the {@code economy_item_returns} table. The take-all reads and deletes in
- * one transaction, and deletes only the rows it read, so a row kept by another server between the two statements is
- * left for the next join instead of being deleted unread.
+ * jOOQ-backed {@link ItemReturnStore} over the {@code economy_item_returns} table.
+ *
+ * <p>The take-all reads first and opens a write only when there are rows. It then deletes the rows one by one and
+ * counts a row only when its own delete removed it. Two takes running at once (a quick rejoin, or two servers on one
+ * database) can both read the same rows, but each row is deleted by exactly one of them, so no item is handed out
+ * twice, on any backend's isolation level.
  */
 @NullMarked
 public final class JooqItemReturnStore extends JooqRepository implements ItemReturnStore {
+
+    /** One kept row as read, before it is claimed. */
+    record KeptRow(String id, String item, int amount) {}
 
     private final Clock clock;
 
@@ -57,23 +63,33 @@ public final class JooqItemReturnStore extends JooqRepository implements ItemRet
     @Override
     public Map<String, Integer> takeAll(UUID owner) {
         Objects.requireNonNull(owner, "owner");
-        return write(dsl -> {
-            List<Record3<String, String, Integer>> rows = dsl.select(
-                            ECONOMY_ITEM_RETURNS.ID, ECONOMY_ITEM_RETURNS.ITEM, ECONOMY_ITEM_RETURNS.AMOUNT)
-                    .from(ECONOMY_ITEM_RETURNS)
-                    .where(ECONOMY_ITEM_RETURNS.OWNER.eq(owner.toString()))
-                    .orderBy(ECONOMY_ITEM_RETURNS.CREATED_AT, ECONOMY_ITEM_RETURNS.ID)
-                    .fetch();
-            Map<String, Integer> items = new LinkedHashMap<>();
-            if (rows.isEmpty()) {
-                return items;
+        List<KeptRow> rows =
+                read(dsl -> dsl.select(ECONOMY_ITEM_RETURNS.ID, ECONOMY_ITEM_RETURNS.ITEM, ECONOMY_ITEM_RETURNS.AMOUNT)
+                        .from(ECONOMY_ITEM_RETURNS)
+                        .where(ECONOMY_ITEM_RETURNS.OWNER.eq(owner.toString()))
+                        .orderBy(ECONOMY_ITEM_RETURNS.CREATED_AT, ECONOMY_ITEM_RETURNS.ID)
+                        .fetch(row -> new KeptRow(row.value1(), row.value2(), row.value3())));
+        if (rows.isEmpty()) {
+            return Map.of();
+        }
+        return write(dsl -> claim(
+                rows,
+                id -> dsl.deleteFrom(ECONOMY_ITEM_RETURNS)
+                        .where(ECONOMY_ITEM_RETURNS.ID.eq(id))
+                        .execute()));
+    }
+
+    /**
+     * Sum the rows whose delete removed exactly one row. A row another take deleted first answers zero and is left out,
+     * because that take is the one handing it over.
+     */
+    static Map<String, Integer> claim(List<KeptRow> rows, ToIntFunction<String> deleteById) {
+        Map<String, Integer> items = new LinkedHashMap<>();
+        for (KeptRow row : rows) {
+            if (deleteById.applyAsInt(row.id()) == 1) {
+                items.merge(row.item(), row.amount(), Integer::sum);
             }
-            rows.forEach(row -> items.merge(row.value2(), row.value3(), Integer::sum));
-            dsl.deleteFrom(ECONOMY_ITEM_RETURNS)
-                    .where(ECONOMY_ITEM_RETURNS.ID.in(
-                            rows.stream().map(Record3::value1).toList()))
-                    .execute();
-            return items;
-        });
+        }
+        return items;
     }
 }

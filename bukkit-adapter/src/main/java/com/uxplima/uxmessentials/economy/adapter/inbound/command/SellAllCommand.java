@@ -62,10 +62,8 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
 
     /**
      * Sell every plain stack the player carries: take them here, on the seller's own thread, ask for the sale off the
-     * tick, and give back every item the sale does not buy.
-     *
-     * <p>It used to count every stack by material, armour and off hand included, pay for the lot and then remove with
-     * a plain {@code removeItem} whose shortfall nobody read, so a renamed stack was paid for and kept.
+     * tick, and give back every item the sale does not buy. Armour, the off hand and renamed stacks are left alone,
+     * since {@code removeItem} would not find them and they would be paid for and kept.
      */
     void sell(Player sender) {
         Map<Material, Integer> taken = new LinkedHashMap<>();
@@ -82,7 +80,9 @@ public final class SellAllCommand extends EconomyCommandSupport implements Comma
                 .sell(
                         seller,
                         byId,
-                        items -> services.sellAll().sellAll(seller, items).sold());
+                        (items, paid) -> services.sellAll()
+                                .sellAll(seller, items, paid::paid)
+                                .sold());
     }
 
     /** The plain stacks of the player's own storage, counted by material: no armour, no off hand, no renamed item. */
