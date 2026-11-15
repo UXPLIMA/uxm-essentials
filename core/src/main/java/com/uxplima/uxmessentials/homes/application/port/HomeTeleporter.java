@@ -15,4 +15,12 @@ public interface HomeTeleporter {
 
     /** Send {@code who} to {@code home}, routing the hop through the teleport context's gated flow. */
     void teleportTo(PlayerRef who, Home home);
+
+    /**
+     * On {@code who}'s region thread: move them to {@code home} at once, the landing of a cross-server hop. The origin
+     * already ran the jail, combat and cooldown checks before it charged, so there is no warmup and no cooldown check
+     * here; the landing stamps the home cooldown under the key the origin checked. Exactly one of {@code onLanded} and
+     * {@code onMissed} runs, {@code onLanded} only once the player stands at the home.
+     */
+    void arrive(PlayerRef who, Home home, Runnable onLanded, Runnable onMissed);
 }

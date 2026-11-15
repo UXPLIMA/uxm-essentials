@@ -49,9 +49,21 @@ public final class HomeSync {
         Objects.requireNonNull(cache, "cache");
         return message -> {
             if (message instanceof HomeChanged changed) {
-                cache.invalidateOwner(changed.owner());
+                if (changed.owner().equals(PlayerRef.SYSTEM_UUID)) {
+                    cache.invalidateAll();
+                } else {
+                    cache.invalidateOwner(changed.owner());
+                }
             }
         };
+    }
+
+    /**
+     * The frame that tells peers every owner's homes changed at once (a server claim or rename). It names the system
+     * actor, which owns no home, so a peer of a release that does not know it drops nothing it needed.
+     */
+    public static NetworkMessage everyOwnerChanged(String originServer) {
+        return new HomeChanged(originServer, PlayerRef.SYSTEM_UUID);
     }
 
     /** Forwards every call to the cached delegate, then announces each mutation on the bus. */

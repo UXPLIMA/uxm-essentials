@@ -20,7 +20,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <ul>
  *   <li><b>{@link #onJoin}</b>, re-apply the jail (the same offline-jail enforcement the login path uses):
- *       a still-active jail re-teleports the player into the jail world so they cannot escape by relogging.
+ *       a still-active jail puts the player back into the jail so they cannot escape by relogging or by
+ *       switching backends: a jail on another backend sends them there through {@link JailTransfer}.
  *       The caller records the join instant as the session start; nothing is decremented yet.
  *   <li><b>{@link #onTick}</b>. Burn the online time elapsed since {@code sessionStart} off an online-only
  *       remainder. If the remainder is exhausted the player is released (row deleted, teleported out,
@@ -35,6 +36,7 @@ public final class JailCountdown {
 
     private final ModerationRepository repository;
     private final Sanctions sanctions;
+    private final JailTransfer transfer;
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final Clock clock;
@@ -42,11 +44,13 @@ public final class JailCountdown {
     public JailCountdown(
             ModerationRepository repository,
             Sanctions sanctions,
+            JailTransfer transfer,
             ModerationAudit audit,
             DomainEventPublisher events,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.transfer = Objects.requireNonNull(transfer, "transfer");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -56,7 +60,7 @@ public final class JailCountdown {
     public boolean onJoin(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         if (repository.loadJail(who) instanceof JailState.Active active && active.isActiveAt(clock.instant())) {
-            sanctions.sendToJail(who, active.jail());
+            transfer.send(who, active.jail());
             return true;
         }
         return false;

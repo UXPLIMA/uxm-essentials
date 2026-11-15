@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.moderation.domain.StoredJail;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationJailLocationsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -19,6 +20,9 @@ import org.jspecify.annotations.NullMarked;
  * primary key, {@code names} reads every name sorted, and a {@code save} upserts on that key, a {@code
  * /setjail} onto an existing name overwrites the same row. Every statement is typed jOOQ DSL; no SQL is ever
  * string-concatenated.
+ *
+ * <p>A save never replaces a known server with an empty one, so a jail written back without its server (by a
+ * backend of the previous release, which does not know the column) keeps the claim it had.
  *
  * <p>The {@code created_at} metadata column is stamped at save time from the wall clock; the {@link StoredJail}
  * value object carries only the name and location, so the column is a write-only audit field the domain does
@@ -91,6 +95,11 @@ public final class JooqJailLocationStore extends JooqRepository implements JailL
                 .set(MODERATION_JAIL_LOCATIONS.YAW, record.getYaw())
                 .set(MODERATION_JAIL_LOCATIONS.PITCH, record.getPitch())
                 .set(MODERATION_JAIL_LOCATIONS.CREATED_AT, record.getCreatedAt())
+                .set(
+                        MODERATION_JAIL_LOCATIONS.SERVER_ID,
+                        DSL.coalesce(
+                                DSL.val(record.getServerId(), MODERATION_JAIL_LOCATIONS.SERVER_ID),
+                                MODERATION_JAIL_LOCATIONS.SERVER_ID))
                 .execute();
     }
 }

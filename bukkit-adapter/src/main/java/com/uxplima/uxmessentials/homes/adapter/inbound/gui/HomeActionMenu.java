@@ -14,6 +14,7 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.homes.application.DeleteHome;
+import com.uxplima.uxmessentials.homes.application.HomeHops;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
@@ -88,6 +89,7 @@ public final class HomeActionMenu {
     private final BiConsumer<Player, Home> openIconPicker;
     private final BiConsumer<Player, Home> openInvitesMenu;
     private final Consumer<Player> openList;
+    private final HomeHops hops;
 
     public HomeActionMenu(Collaborators collaborators) {
         this.menus = collaborators.menus();
@@ -112,6 +114,7 @@ public final class HomeActionMenu {
         this.openIconPicker = collaborators.openIconPicker();
         this.openInvitesMenu = collaborators.openInvitesMenu();
         this.openList = collaborators.openList();
+        this.hops = collaborators.hops();
     }
 
     /** Register the bindings the spec names and the spec itself; called once at homes wiring time. */
@@ -122,6 +125,7 @@ public final class HomeActionMenu {
         Objects.requireNonNull(log, "log");
         bindings.placeholder("home_name", ctx -> label(home(ctx)));
         bindings.placeholder("home_world", ctx -> home(ctx).location().world().name());
+        bindings.placeholder("home_server", ctx -> home(ctx).knownServer().orElse(hops.localServer()));
         bindings.placeholder(
                 "home_x", ctx -> Integer.toString(home(ctx).location().blockX()));
         bindings.placeholder(
@@ -159,12 +163,17 @@ public final class HomeActionMenu {
 
     /**
      * Teleport to the home. The claim-access read runs on the destination region (claim providers read world state
-     * there); when unsafe-tp confirm is on and the viewer lacks the bypass, an unsafe destination warns first.
+     * there); when unsafe-tp confirm is on and the viewer lacks the bypass, an unsafe destination warns first. A home
+     * on another server has no region here to read, so those checks run on that server when the player lands.
      */
     private void handleTeleport(MenuActionContext ctx) {
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         Home home = home(ctx);
+        if (hops.routes(home)) {
+            doTeleport(player, viewer, home);
+            return;
+        }
         scheduler.onRegion(home.location(), () -> {
             ClaimDecision access = claimService.canAccess(viewer, home.location());
             if (!access.allowed()) {
@@ -374,5 +383,6 @@ public final class HomeActionMenu {
             ClaimService claimService,
             BiConsumer<Player, Home> openIconPicker,
             BiConsumer<Player, Home> openInvitesMenu,
-            Consumer<Player> openList) {}
+            Consumer<Player> openList,
+            HomeHops hops) {}
 }

@@ -49,6 +49,20 @@ public final class HopCharges {
         if (credited) {
             tell(resolver, who, HopNotice.REFUNDED, Map.of(), label);
         }
+        report(resolver, who, reason, label);
+    }
+
+    /** Let the kind hear about the failure; a failing report is logged, never thrown, like a failing line. */
+    private void report(HopResolver resolver, PlayerRef who, HopNotice reason, String label) {
+        try {
+            resolver.failed(who, label, reason);
+        } catch (RuntimeException reportFailure) {
+            log.warn(
+                    "event=cross_server_hop_report_failed kind={} player={} reason={}",
+                    resolver.kind(),
+                    who.uuid(),
+                    reportFailure.toString());
+        }
     }
 
     /** Give back what {@code who} paid for a hop that is being replaced or abandoned, with only the refund line. */

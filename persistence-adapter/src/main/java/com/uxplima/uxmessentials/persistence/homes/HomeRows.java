@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.Record;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The anti-corruption mapping between a {@code homes} row and the domain {@link Home}. UUIDs are stored as
@@ -50,7 +51,19 @@ final class HomeRows {
                 icon,
                 row.get(HOMES.PUBLIC) != 0,
                 Instant.ofEpochMilli(row.get(HOMES.CREATED_AT)),
-                Instant.ofEpochMilli(row.get(HOMES.UPDATED_AT)));
+                Instant.ofEpochMilli(row.get(HOMES.UPDATED_AT)),
+                serverOf(row.get(HOMES.SERVER_ID)));
+    }
+
+    /**
+     * The {@code unscoped} sentinel reads as unknown, like NULL, so a home read before its claim and saved again writes
+     * NULL, which the upsert's {@code COALESCE} turns into keeping the claimed server.
+     */
+    private static Optional<String> serverOf(@Nullable String stored) {
+        if (stored == null || stored.isBlank() || stored.equals(Home.UNSCOPED)) {
+            return Optional.empty();
+        }
+        return Optional.of(stored);
     }
 
     /** Populate a {@link HomesRecord} from a domain {@link Home} for an upsert. */
@@ -69,6 +82,7 @@ final class HomeRows {
                 .setPitch(location.pitch())
                 .setPublic(home.isPublic() ? 1 : 0)
                 .setCreatedAt(home.createdAt().toEpochMilli())
-                .setUpdatedAt(home.updatedAt().toEpochMilli());
+                .setUpdatedAt(home.updatedAt().toEpochMilli())
+                .setServerId(home.server().orElse(null));
     }
 }

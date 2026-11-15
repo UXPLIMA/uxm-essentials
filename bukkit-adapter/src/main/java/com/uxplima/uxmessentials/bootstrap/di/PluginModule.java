@@ -1226,6 +1226,7 @@ public final class PluginModule {
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.livePeers = livePeers;
+        links.networked = NetworkConfig.from(config).enabled();
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -2389,6 +2390,10 @@ public final class PluginModule {
                 engine,
                 Optional.ofNullable(links.homeEconomy),
                 bus,
+                links.hops,
+                // Off a network, or under the shipped default name, a backend records no server on its homes.
+                links.network.enabled() && !NetworkConfig.isDefaultServerName(links.network.serverId()),
+                links.presence,
                 guiLayouts,
                 resources,
                 textInput,
@@ -2397,10 +2402,11 @@ public final class PluginModule {
                 claimProviders);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.worldPhase().run("home server claim", wired.serverAdoption());
         // Rebind the teleport context's home-respawn seam (built while it still resolved to empty) to the
         // cache-backed locator, so a HOME step in a configured respawn chain now lands on the player's home.
         // When teleport is disabled its holder is absent and this bind is a no-op.
-        bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
+        bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository(), wired.elsewhere()));
         resources.onClose(links.importTargets.homes(wired.cache()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
         links.queries.register(
@@ -2847,6 +2853,8 @@ public final class PluginModule {
                 persistence,
                 gates,
                 bus,
+                links.hops,
+                links.networked,
                 guiText,
                 guiLayouts,
                 textInput,
@@ -2861,6 +2869,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
         links.placeholders.moderation(new GateModerationPlaceholders(
                 wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
         links.queries.register(
@@ -3673,6 +3682,8 @@ public final class PluginModule {
     private static final class ContextLinks {
         // The peer backends live by their heartbeats; a cross-server trade invite waits for each to answer.
         private java.util.function.Supplier<java.util.Set<String>> livePeers = java.util.Set::of;
+        // Whether this backend is part of a network (network.enabled), which is when a jail can be on another one.
+        private boolean networked;
         // The shared target picker, built and registered at enable before any module wires; moderation and the
         // economy admin GUI open it rather than each building one of their own.
         private com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView

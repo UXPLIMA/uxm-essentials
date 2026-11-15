@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.homes.adapter.HomeServices;
 import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -26,6 +27,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
@@ -43,6 +45,8 @@ import org.jspecify.annotations.NullMarked;
  *       one of your private homes. Both gated by {@code uxmessentials.home.invite}.
  *   <li>{@code /home admin <player> list|info <slot>|set [slot]|del <slot>|tp <slot>|clear} is full staff
  *       management over another player's homes. Gated by {@code uxmessentials.home.admin}.
+ *   <li>{@code /home setserver <from> <to>} moves every home recorded on one server to another, without moving any
+ *       home. Gated by {@code uxmessentials.home.setserver}.
  * </ul>
  *
  * <p>Per-subcommand permissions are enforced by a {@code Gate} on each node, so only
@@ -58,6 +62,7 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
     private static final String VISIT_PERMISSION = "uxmessentials.home.visit";
     private static final String INVITE_PERMISSION = "uxmessentials.home.invite";
     private static final String ADMIN_PERMISSION = "uxmessentials.home.admin";
+    private static final String SETSERVER_PERMISSION = "uxmessentials.home.setserver";
 
     private final Scheduler scheduler;
 
@@ -75,6 +80,10 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
                 .then(targetSlotSub("invite", INVITE_PERMISSION, this::runInvite))
                 .then(targetSlotSub("uninvite", INVITE_PERMISSION, this::runUninvite))
                 .then(adminSubtree())
+                .then(Commands.literal("setserver")
+                        .requires(Gate.permission(SETSERVER_PERMISSION))
+                        .then(Commands.argument("from", Args.token())
+                                .then(Commands.argument("to", Args.token()).executes(this::runSetServer))))
                 .build();
     }
 
@@ -153,6 +162,15 @@ public final class HomeCommand extends HomeCommandSupport implements CommandRegi
         }
         PlayerRef resolved = owner.get();
         scheduler.async(() -> services.visitHome().visit(actor, resolved, slot));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /** Rewrites every owner's rows off the tick; the console may run it too. */
+    private int runSetServer(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = CommandFeedback.refOf(Sender.audience(ctx.getSource()));
+        String from = ctx.getArgument("from", String.class);
+        String to = ctx.getArgument("to", String.class);
+        scheduler.async(() -> services.setHomeServer().rename(actor, from, to));
         return Command.SINGLE_SUCCESS;
     }
 
