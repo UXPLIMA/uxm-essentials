@@ -55,6 +55,7 @@ public enum VaultsMessageKey implements MessageKey {
 
     // a vault deleted while its window was open: the items in the window go back to the player who closed it
     VAULT_DELETED_RETURNED("vaults.deleted-returned"),
+    VAULT_RETURNS_KEPT("vaults.returns-kept"),
 
     // vault-selector GUI (/vault with several owned): one icon per index, owned vs locked
     VAULT_SELECTOR_TITLE("vaults.selector.title"),

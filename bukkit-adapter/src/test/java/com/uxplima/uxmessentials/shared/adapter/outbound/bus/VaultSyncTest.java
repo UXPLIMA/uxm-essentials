@@ -18,9 +18,12 @@ import com.uxplima.uxmessentials.shared.network.VaultChanged;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
+import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -51,13 +54,52 @@ class VaultSyncTest {
 
     @Test
     void createAndUpdateReportWhetherTheyWrote() {
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(1), NOW), "close", null)
+                        .isPresent())
+                .isFalse();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE)))
                 .isTrue();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(2), NOW))).isTrue();
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(2), NOW), "close", null)
+                        .isPresent())
+                .isTrue();
 
         assertThat(frames.published).allSatisfy(frame -> assertThat(frame).isInstanceOf(VaultChanged.class));
+    }
+
+    @Test
+    void theCachedCopyTakesTheItemsAClosingWindowWrote() {
+        store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE));
+        Vault opened = store.find(FIRST).orElseThrow();
+        store.update(opened.renamedTo("loot"), VaultRepository.Columns.PRESENTATION);
+        Vault named = store.find(FIRST).orElseThrow();
+
+        VaultStamp written = store.writeContents(
+                        opened.withContents(ALEX, VaultContents.of(new byte[] {5}), NOW.plusSeconds(1))
+                                .result(),
+                        "close",
+                        null)
+                .orElseThrow();
+        rows.held.clear();
+
+        Vault cached = store.find(FIRST).orElseThrow();
+        assertThat(named.displayName()).isEqualTo("loot");
+        assertThat(cached.contents()).isEqualTo(VaultContents.of(new byte[] {5}));
+        assertThat(cached.displayName()).isEqualTo("loot");
+        assertThat(cached.lastTouched()).isEqualTo(NOW.plusSeconds(1));
+        assertThat(cached.stamp()).isEqualTo(written);
+        assertThat(written.version()).isEqualTo(opened.stamp().version() + 1);
+    }
+
+    @Test
+    void aPeersChangeToAVaultIsPassedOnAfterTheCacheDropsIt() {
+        List<VaultId> forgotten = new ArrayList<>();
+        CachedVaultRepository cache = new CachedVaultRepository(rows);
+        RemoteSyncListener listener = VaultSync.listener(cache, forgotten::add);
+
+        listener.onRemoteChange(new VaultChanged("survival", ALEX.uuid(), 1));
+
+        assertThat(forgotten).containsExactly(FIRST);
     }
 
     /** Rows keyed by vault, with the store's payment rules: only a create records one, a delete must match it. */
@@ -86,13 +128,36 @@ class VaultSyncTest {
         }
 
         @Override
-        public void save(Vault vault) {
+        public VaultStamp save(Vault vault, String writer) {
             held.put(vault.id(), vault);
+            return vault.stamp();
         }
 
         @Override
-        public boolean update(Vault vault) {
-            return held.computeIfPresent(vault.id(), (id, stored) -> vault) != null;
+        public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
+            Vault stored = held.get(vault.id());
+            if (stored == null || (onlyAt != null && !stored.stamp().equals(onlyAt))) {
+                return Optional.empty();
+            }
+            VaultStamp stamp =
+                    new VaultStamp(stored.stamp().lineage(), stored.stamp().version() + 1);
+            held.put(vault.id(), stored.withContentsOf(vault, stamp));
+            return Optional.of(stamp);
+        }
+
+        @Override
+        public Optional<LastWrite> lastWrite(VaultId id) {
+            return find(id).map(stored -> new LastWrite(stored.stamp(), null));
+        }
+
+        @Override
+        public boolean update(Vault vault, Columns columns) {
+            return held.computeIfPresent(vault.id(), (id, stored) -> switch (columns) {
+                        case PRESENTATION ->
+                            stored.renamedTo(vault.displayName()).iconSet(vault.iconMaterial());
+                        case SIZE -> stored.openedAt(vault.size());
+                    })
+                    != null;
         }
 
         @Override

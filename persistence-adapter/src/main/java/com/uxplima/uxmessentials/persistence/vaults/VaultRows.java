@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.jooq.Record;
 import org.jspecify.annotations.Nullable;
 
@@ -50,7 +51,17 @@ final class VaultRows {
                 row.get(vaults.DISPLAY_NAME),
                 row.get(vaults.ICON),
                 lastTouched,
-                payment(row.get(vaults.PAID_AMOUNT), row.get(vaults.PAID_CURRENCY)));
+                payment(row.get(vaults.PAID_AMOUNT), row.get(vaults.PAID_CURRENCY)),
+                new VaultStamp(row.get(vaults.LINEAGE), row.get(vaults.VERSION)));
+    }
+
+    /**
+     * The lineage a new row of {@code vault} is inserted with: the vault's own when it has one, so the copy the caller
+     * holds names the row it creates, or else a fresh one.
+     */
+    static String lineageOf(Vault vault) {
+        String lineage = vault.stamp().lineage();
+        return lineage != null ? lineage : UUID.randomUUID().toString();
     }
 
     /** Populate a {@link VaultsRecord} from a domain {@link Vault} for an upsert. */

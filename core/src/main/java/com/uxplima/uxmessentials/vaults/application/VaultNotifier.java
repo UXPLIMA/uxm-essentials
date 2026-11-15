@@ -137,6 +137,16 @@ public final class VaultNotifier {
         send(sender, VaultsMessageKey.VAULT_PLAYERS_ONLY, Map.of());
     }
 
+    /** Tell {@code owner} {@code count} items of a vault deleted while it was open went into their inventory. */
+    public void itemsReturned(PlayerRef owner, int count) {
+        send(owner, VaultsMessageKey.VAULT_DELETED_RETURNED, Map.of("count", Integer.toString(count)));
+    }
+
+    /** Tell {@code owner} {@code count} returned items did not fit their inventory and wait for their next join. */
+    public void returnsKept(PlayerRef owner, int count) {
+        send(owner, VaultsMessageKey.VAULT_RETURNS_KEPT, Map.of("count", Integer.toString(count)));
+    }
+
     private void send(PlayerRef viewer, MessageKey key, Map<String, String> placeholders) {
         notifier.send(viewer, key, placeholders);
     }
