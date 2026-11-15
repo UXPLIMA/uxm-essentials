@@ -72,6 +72,7 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_CROSS_SERVER_NOT_FOUND("trade.cross-server-not-found"),
     TRADE_CROSS_SERVER_DENIED("trade.cross-server-denied"),
     TRADE_CROSS_SERVER_TIMEOUT("trade.cross-server-timeout"),
+    TRADE_CROSS_SERVER_ACCEPTED_BUSY("trade.cross-server-accepted-busy"),
     TRADE_CROSS_SERVER_ESCROWED("trade.cross-server-escrowed"),
     TRADE_CROSS_SERVER_COMPLETED("trade.cross-server-completed"),
 

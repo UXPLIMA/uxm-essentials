@@ -10,6 +10,8 @@ package com.uxplima.uxmessentials.trade.application;
  *   <li>{@link #DELIVERED} / {@link #NOT_FOUND} / {@link #BUSY}. A peer's answer to an {@code INVITE}: the target saw
  *       it and may accept, the target is not online on that peer, or the target is already in a trade.
  *   <li>{@link #ACCEPT} / {@link #DECLINE}. The target accepted or denied a delivered invite.
+ *   <li>{@link #OPENED}. The inviter's window for an accepted invite is open; only now does the target's open, so the
+ *       target never stakes into a trade with nobody on the other side.
  *   <li>{@link #READY}. The sender escrowed its side (its row is {@code HELD}); the receiver re-checks whether both
  *       sides are now escrowed and, if so, crosses the atomic commit point.
  *   <li>{@link #COMMIT}. The sender crossed the commit point; the receiver delivers the counterpart's goods to its
@@ -30,5 +32,6 @@ public enum TradeSignalType {
     ABORT,
     DELIVERED,
     NOT_FOUND,
-    BUSY
+    BUSY,
+    OPENED
 }

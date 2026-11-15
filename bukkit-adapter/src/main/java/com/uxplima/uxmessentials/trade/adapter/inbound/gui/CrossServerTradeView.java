@@ -25,7 +25,6 @@ import com.uxplima.uxmessentials.trade.application.TradeSignal;
 import com.uxplima.uxmessentials.trade.application.TradeSignalType;
 import com.uxplima.uxmessentials.trade.application.port.TradeBus;
 import com.uxplima.uxmessentials.trade.application.port.TradePresence;
-import com.uxplima.uxmessentials.trade.domain.TradeId;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -33,8 +32,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Drives the player-facing half of a cross-server trade: the invite step over the bus and each side's own solo offer
  * window. A {@code /trade} to a player on another backend sends an {@code INVITE}; the target's backend shows it as a
- * line to accept or deny and answers whether it arrived, and nothing opens until the target accepts. The accept opens
- * the target's window and answers {@code ACCEPT}; the sender's backend then opens its own. The invite bookkeeping on
+ * line to accept or deny and answers whether it arrived, and nothing opens until the target accepts. The accept claims
+ * the target's side and answers {@code ACCEPT}; the sender's backend opens its own window and answers {@code OPENED},
+ * and only then does the target's window open, so neither side can stake into a trade the other never joined. The invite bookkeeping on
  * both ends is {@link CrossServerInvites}; this class turns its outcomes into lines and windows.
  *
  * <p>Each participant stakes items in their own {@link CrossTradeWindow} (items-only in v1) and confirms; confirming
@@ -121,12 +121,13 @@ public final class CrossServerTradeView {
     }
 
     /**
-     * {@code target} accepts a waiting cross-server invite, from {@code inviterName} or the newest. Returns false when
-     * no such invite is waiting, so the caller can report that no request exists at all.
+     * {@code target} accepts a waiting cross-server invite, from {@code inviterName} or the newest. Their side is
+     * claimed before the accept goes out, and their window opens once the inviter's backend reports its own side open.
+     * Returns false when no such invite is waiting, so the caller can report that no request exists at all.
      */
     public boolean accept(Player target, @Nullable String inviterName) {
         Objects.requireNonNull(target, "target");
-        CrossServerInvites.Answer answer = invites.accept(target.getUniqueId(), inviterName);
+        CrossServerInvites.Answer answer = invites.accept(target.getUniqueId(), inviterName, this::claim);
         PlayerRef local = ref(target);
         switch (answer.status()) {
             case NONE -> {
@@ -135,12 +136,11 @@ public final class CrossServerTradeView {
             case TRADING -> notify(local, TradeMessageKey.TRADE_ALREADY_TRADING, Map.of());
             case EXPIRED -> notifyExpired(local, answered(answer));
             case MATCHED -> {
-                CrossServerInvites.Incoming matched = answered(answer);
                 notify(
                         local,
                         TradeMessageKey.TRADE_ACCEPTED,
-                        Map.of("player", matched.inviter().name()));
-                open(matched.tradeId(), local, matched.inviter(), matched.inviterServer());
+                        Map.of("player", answered(answer).inviter().name()));
+                scheduler.asyncAfter(CrossServerInvites.ANSWER_GRACE.plus(SWEEP_MARGIN), this::sweep);
             }
         }
         return true;
@@ -171,18 +171,24 @@ public final class CrossServerTradeView {
         return invites.pendingInviterNames(target);
     }
 
-    /** Route an inbound rendezvous signal; escrow signals are handled by the coordinator, not here. */
+    /**
+     * Route an inbound rendezvous signal; escrow signals are handled by the coordinator, not here. Every rendezvous
+     * signal, the abort included, runs on the global thread: lookups by name belong there, and one queue keeps an
+     * abort from being handled on another thread at the same moment as the accept it cancels. Frames can still
+     * arrive out of order, which the invite book's tombstones and the claim gates below absorb.
+     */
     public void onSignal(TradeSignal signal) {
         Objects.requireNonNull(signal, "signal");
         switch (signal.type()) {
-            // Looking a player up by name and reading who is trading happen on the global thread, not the bus thread.
             case INVITE -> scheduler.onGlobal(() -> invites.onInvite(signal).ifPresent(this::showInvite));
             case DELIVERED, NOT_FOUND, BUSY, DECLINE, ACCEPT ->
                 scheduler.onGlobal(() -> invites.onReply(signal).ifPresent(this::report));
-            case ABORT -> {
-                invites.onAbort(signal);
-                onAbort(signal);
-            }
+            case OPENED -> scheduler.onGlobal(() -> invites.onOpened(signal).ifPresent(this::openAccepted));
+            case ABORT ->
+                scheduler.onGlobal(() -> {
+                    invites.onAbort(signal);
+                    onAbort(signal);
+                });
             case COMMIT -> notify(signal.to(), TradeMessageKey.TRADE_CROSS_SERVER_COMPLETED, Map.of());
             case READY -> {
                 // READY is the coordinator's.
@@ -190,9 +196,10 @@ public final class CrossServerTradeView {
         }
     }
 
-    /** Settle the invites whose wait is over and tell each inviter. */
+    /** Settle the invites whose wait is over and tell each player, and give up accepts the inviter never opened. */
     private void sweep() {
         invites.expire().forEach(this::report);
+        invites.expireAccepts().forEach(this::releaseAbandoned);
     }
 
     private void showInvite(CrossServerInvites.Incoming invite) {
@@ -204,8 +211,8 @@ public final class CrossServerTradeView {
 
     private void report(CrossServerInvites.Reply reply) {
         switch (reply) {
-            case CrossServerInvites.Accepted accepted ->
-                open(accepted.tradeId(), accepted.inviter(), accepted.target(), accepted.targetServer());
+            case CrossServerInvites.Accepted accepted -> openInviter(accepted);
+            case CrossServerInvites.AcceptedWhileBusy busy -> notifyAcceptedBusy(busy.inviter(), busy.target());
             case CrossServerInvites.Denied denied ->
                 notify(
                         denied.inviter(),
@@ -242,20 +249,77 @@ public final class CrossServerTradeView {
         }
     }
 
+    /** Reserve the target's side of an invite they accept; false when they already hold another trade's side. */
+    private boolean claim(CrossServerInvites.Incoming invite) {
+        CrossTradeHolder holder =
+                new CrossTradeHolder(invite.tradeId(), invite.target(), invite.inviter(), invite.inviterServer());
+        return sessions.putIfAbsent(invite.target().uuid(), holder) == null;
+    }
+
     /**
-     * Claim the local player's side and open their window on their own entity thread. The claim comes first so the
-     * busy check sees it at once; if the player is gone before the window can open, the claim is dropped and the peer
-     * is told, so their side does not wait for a partner who never arrives.
+     * The target accepted and their side is free: claim the inviter's side, open their window on their own entity
+     * thread, and only then tell the target's backend to open its window. A player who meanwhile took another trade's
+     * side keeps it; this one is withdrawn and they are told who accepted.
      */
-    private void open(TradeId tradeId, PlayerRef local, PlayerRef remote, String remoteServer) {
-        CrossTradeHolder holder = new CrossTradeHolder(tradeId, local, remote, remoteServer);
-        sessions.put(local.uuid(), holder);
-        scheduler.onEntity(local, () -> window.open(holder), () -> {
-            if (holder.beginEscrow()) {
-                sessions.remove(local.uuid(), holder);
-                bus.send(new TradeSignal(tradeId, TradeSignalType.ABORT, local, remote, bus.localServer()));
-            }
-        });
+    private void openInviter(CrossServerInvites.Accepted accepted) {
+        CrossTradeHolder holder = new CrossTradeHolder(
+                accepted.tradeId(), accepted.inviter(), accepted.target(), accepted.targetServer());
+        if (sessions.putIfAbsent(accepted.inviter().uuid(), holder) != null) {
+            sendAbort(holder);
+            notifyAcceptedBusy(accepted.inviter(), accepted.target());
+            return;
+        }
+        scheduler.onEntity(
+                accepted.inviter(),
+                () -> {
+                    if (!holder.escrowed()) {
+                        window.open(holder);
+                        invites.opened(accepted);
+                    }
+                },
+                () -> abandon(holder));
+    }
+
+    /** The inviter's side is open: open the target's window for the side claimed when they accepted. */
+    private void openAccepted(CrossServerInvites.Incoming invite) {
+        CrossTradeHolder holder = sessions.get(invite.target().uuid());
+        if (holder == null || !holder.tradeId().equals(invite.tradeId())) {
+            return;
+        }
+        scheduler.onEntity(
+                invite.target(),
+                () -> {
+                    if (!holder.escrowed()) {
+                        window.open(holder);
+                    }
+                },
+                () -> abandon(holder));
+    }
+
+    /** The inviter's side never opened in time; the invite book already withdrew it, so only release the target. */
+    private void releaseAbandoned(CrossServerInvites.Incoming invite) {
+        CrossTradeHolder holder = sessions.get(invite.target().uuid());
+        if (holder != null && holder.tradeId().equals(invite.tradeId()) && holder.beginEscrow()) {
+            sessions.remove(invite.target().uuid(), holder);
+            notify(invite.target(), TradeMessageKey.TRADE_CANCELLED, Map.of());
+        }
+    }
+
+    /** The player left before their window could open: drop their side and tell the peer. */
+    private void abandon(CrossTradeHolder holder) {
+        if (holder.beginEscrow()) {
+            sessions.remove(holder.local().uuid(), holder);
+            sendAbort(holder);
+        }
+    }
+
+    private void sendAbort(CrossTradeHolder holder) {
+        bus.send(new TradeSignal(
+                holder.tradeId(), TradeSignalType.ABORT, holder.local(), holder.remote(), bus.localServer()));
+    }
+
+    private void notifyAcceptedBusy(PlayerRef inviter, PlayerRef target) {
+        notify(inviter, TradeMessageKey.TRADE_CROSS_SERVER_ACCEPTED_BUSY, Map.of("player", target.name()));
     }
 
     private static CrossServerInvites.Incoming answered(CrossServerInvites.Answer answer) {
@@ -272,7 +336,7 @@ public final class CrossServerTradeView {
         if (!holder.beginEscrow()) {
             return;
         }
-        sessions.remove(holder.local().uuid());
+        sessions.remove(holder.local().uuid(), holder);
         List<ItemStack> staked = window.live(holder.local())
                 .map(inv -> {
                     List<ItemStack> read = TradeItemCodec.stacks(window.readOffer(inv));
@@ -302,7 +366,7 @@ public final class CrossServerTradeView {
         if (!holder.beginEscrow()) {
             return;
         }
-        sessions.remove(holder.local().uuid());
+        sessions.remove(holder.local().uuid(), holder);
         deliver(holder.local(), TradeItemCodec.stacks(contents.toArray(new ItemStack[0])));
         notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
         bus.send(new TradeSignal(
@@ -318,12 +382,11 @@ public final class CrossServerTradeView {
         if (!holder.beginEscrow()) {
             return;
         }
-        sessions.remove(holder.local().uuid());
+        sessions.remove(holder.local().uuid(), holder);
         returnAndClose(holder);
         notify(holder.local(), TradeMessageKey.TRADE_CANCELLED, Map.of());
         if (tellPeer) {
-            bus.send(new TradeSignal(
-                    holder.tradeId(), TradeSignalType.ABORT, holder.local(), holder.remote(), bus.localServer()));
+            sendAbort(holder);
         }
     }
 
@@ -348,10 +411,14 @@ public final class CrossServerTradeView {
         }
     }
 
-    /** Empty the live window into the player's hands and shut it, on their own region thread. */
+    /**
+     * Empty the live window into the player's hands and shut it, on their own region thread. A side that never got
+     * its window (still waiting for the inviter) leaves whatever the player has open alone.
+     */
     private void returnAndClose(CrossTradeHolder holder) {
         PlayerRef viewer = holder.local();
         scheduler.onEntity(viewer, () -> {
+            boolean windowOpen = window.live(viewer).isPresent();
             List<ItemStack> staked = window.live(viewer)
                     .map(inv -> {
                         List<ItemStack> read = TradeItemCodec.stacks(window.readOffer(inv));
@@ -361,7 +428,7 @@ public final class CrossServerTradeView {
                     .orElse(List.of());
             deliverNow(viewer, staked);
             Player live = Bukkit.getPlayer(viewer.uuid());
-            if (live != null && live.isOnline()) {
+            if (windowOpen && live != null && live.isOnline()) {
                 live.closeInventory();
             }
         });

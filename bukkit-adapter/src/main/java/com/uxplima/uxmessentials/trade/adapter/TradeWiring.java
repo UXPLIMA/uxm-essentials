@@ -6,7 +6,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.function.IntSupplier;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -73,7 +74,7 @@ public final class TradeWiring {
     /**
      * Build the trade adapters from {@code ctx}, ready to register. The {@code economy} seam is present only when the
      * economy provider is wired; when absent the money row is hidden and a trade moves items only. {@code livePeers}
-     * counts the peer backends that answer a cross-server invite.
+     * names the peer backends that answer a cross-server invite.
      */
     public static Wired wire(
             ModuleContext ctx,
@@ -85,7 +86,7 @@ public final class TradeWiring {
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder,
-            IntSupplier livePeers) {
+            Supplier<Set<String>> livePeers) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(bus, "bus");
@@ -223,8 +224,8 @@ public final class TradeWiring {
         crossView.onSignal(signal);
     }
 
-    /** What the cross-server invite step shares with the same-server flow, plus the live peer count. */
-    private record CrossInviteSeams(TradeSessions sessions, TradeCooldown cooldown, IntSupplier livePeers) {}
+    /** What the cross-server invite step shares with the same-server flow, plus the live peer roster. */
+    private record CrossInviteSeams(TradeSessions sessions, TradeCooldown cooldown, Supplier<Set<String>> livePeers) {}
 
     /** A no-op economy for an items-only cross-server install (no economy provider); money is never staked in v1. */
     private static TradeEconomy itemsOnlyEconomy() {
