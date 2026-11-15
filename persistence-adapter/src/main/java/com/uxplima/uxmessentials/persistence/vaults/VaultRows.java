@@ -20,8 +20,8 @@ import org.jspecify.annotations.Nullable;
  * The anti-corruption mapping between a {@code vaults} row and the domain {@link Vault}. The queryable facts
  * owner uuid (canonical 36-char text), the one-based index, the size in rows, and the last-touched epoch
  * millis. Are first-class columns; only the {@code ItemStack[]} contents are opaque payload, stored as the
- * base64 text of the adapter's already-serialized item bytes (the architecture persistence invariant). This class is the single place that translation lives, so the row shape stays
- * identical on every backend.
+ * base64 text of the adapter's already-serialized item bytes (the architecture persistence invariant). This
+ * class is the single place that translation lives, so the row shape stays identical on every backend.
  *
  * <p>A null {@code contents} cell is a freshly allocated, empty vault; it round-trips to
  * {@link VaultContents#empty()} and back to a null cell, so no blob is written for a vault that holds nothing.
@@ -70,16 +70,22 @@ final class VaultRows {
      * fraction more than was taken, and the stored amount is the refund ceiling.
      */
     static void applyPayment(VaultsRecord record, Vault vault) {
-        BigDecimal amount = vault.paid()
-                .map(paid -> paid.amount().setScale(PAID_SCALE, RoundingMode.DOWN))
-                .filter(stored -> stored.signum() > 0)
-                .orElse(null);
+        BigDecimal amount = vault.paid().map(VaultRows::storedAmount).orElse(null);
         record.setPaidAmount(amount)
                 .setPaidCurrency(
                         amount == null ? null : vault.paid().orElseThrow().currencyId());
     }
 
-    /** The payment a row records, or {@code null} when it records none (a free vault, or one from before). */
+    /**
+     * The amount the {@code paid_amount} column holds for {@code paid}, or {@code null} when it rounds to nothing,
+     * the same value a conditional delete compares against.
+     */
+    static @Nullable BigDecimal storedAmount(VaultPayment paid) {
+        BigDecimal stored = paid.amount().setScale(PAID_SCALE, RoundingMode.DOWN);
+        return stored.signum() > 0 ? stored : null;
+    }
+
+    /** The payment a row records, or {@code null} when it records none (a free vault, or payment not recorded). */
     static @Nullable VaultPayment payment(@Nullable BigDecimal amount, @Nullable String currency) {
         if (amount == null || amount.signum() <= 0 || currency == null || currency.isBlank()) {
             return null;

@@ -84,6 +84,12 @@ public final class ProviderVaultEconomy implements VaultEconomy {
         return currency.id().value();
     }
 
+    @Override
+    public BigDecimal denominate(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount");
+        return Money.of(currency, amount).amount();
+    }
+
     private Optional<Currency> currency(String currencyId) {
         if (currency.id().value().equalsIgnoreCase(currencyId)) {
             return Optional.of(currency);

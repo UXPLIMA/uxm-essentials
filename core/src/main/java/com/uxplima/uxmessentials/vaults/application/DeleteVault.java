@@ -20,9 +20,10 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
  *
  * <p>The own path refunds through {@link VaultCharge#refund}, capped by what the vault cost to create (a no-op
  * when no refund is configured, the vault was free, or economy is unwired). The refund is paid only by the call
- * whose delete removed the row, so two deletes racing for one vault cannot both be paid. The admin path is audited through
- * {@link VaultAudit#adminDeleted} and intentionally pays <em>no</em> refund: the actor is not the owner, and
- * the owner is typically offline, so a destructive staff override is recorded rather than reimbursed.
+ * whose delete removed the row with the payment it read, so two deletes racing for one vault cannot both be
+ * paid. The admin path is audited through {@link VaultAudit#adminDeleted} and intentionally pays <em>no</em>
+ * refund: the actor is not the owner, and the owner is typically offline, so a destructive staff override is
+ * recorded rather than reimbursed.
  *
  * <p>This use case is pure: it touches the repository, the charge gate and the audit/notifier ports only,
  * leaving cache invalidation and the cross-server {@code VaultChanged} emit to the repository adapter.
@@ -46,7 +47,9 @@ public final class DeleteVault {
         Objects.requireNonNull(owner, "owner");
         VaultId id = VaultId.of(owner, index);
         Optional<Vault> found = repository.find(id);
-        if (found.isEmpty() || !repository.delete(id)) {
+        // The delete only removes the row if it still records the payment read here, so the refund below is for
+        // the row this call removed and never for one deleted and brought back since the read.
+        if (found.isEmpty() || !repository.delete(id, found.get().paid())) {
             notifier.deleteUnknown(owner, index);
             return Result.err(VaultError.DELETE_UNKNOWN);
         }
@@ -66,7 +69,8 @@ public final class DeleteVault {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(owner, "owner");
         VaultId id = VaultId.of(owner, index);
-        if (repository.find(id).isEmpty() || !repository.delete(id)) {
+        Optional<Vault> found = repository.find(id);
+        if (found.isEmpty() || !repository.delete(id, found.get().paid())) {
             notifier.deleteUnknown(actor, index);
             return Result.err(VaultError.DELETE_UNKNOWN);
         }

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.vaults.application;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -76,6 +77,12 @@ final class VaultPurse implements VaultEconomy {
     @Override
     public String currencyId() {
         return charging;
+    }
+
+    /** Coins and gems both carry two decimals, rounded half up, as a typical currency does. */
+    @Override
+    public BigDecimal denominate(BigDecimal amount) {
+        return amount.setScale(2, RoundingMode.HALF_UP);
     }
 
     private static String plain(BigDecimal amount) {

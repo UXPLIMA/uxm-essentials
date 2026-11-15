@@ -8,6 +8,7 @@ import java.nio.file.Path;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
@@ -115,13 +116,12 @@ class VaultPaymentStoreTest {
     }
 
     @Test
-    void aSaveThatBringsBackADeletedVaultCarriesNoPayment() {
+    void anUpsertThatBringsBackADeletedVaultCarriesNoPayment() {
         upgrade();
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
-        assertThat(vaults.delete(vault(1))).isTrue();
-        assertThat(vaults.delete(vault(1))).isFalse();
+        assertThat(vaults.delete(vault(1), stored(1).paid())).isTrue();
         vaults.save(created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
                 .result());
 
@@ -129,14 +129,70 @@ class VaultPaymentStoreTest {
     }
 
     @Test
-    void creatingOverAnExistingVaultKeepsTheVaultThatWasThere() {
+    void anUpdateNeverBringsBackADeletedVaultAndNeverChangesWhatItCost() {
+        upgrade();
+        Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
+        vaults.create(created);
+
+        assertThat(vaults.update(created.renamedTo("loot"))).isTrue();
+        assertThat(stored(1).displayName()).isEqualTo("loot");
+        assertThat(stored(1).paid().orElseThrow().amount()).isEqualByComparingTo("5");
+
+        vaults.delete(vault(1), stored(1).paid());
+        assertThat(vaults.update(created.renamedTo("again"))).isFalse();
+        assertThat(vaults.find(vault(1))).isEmpty();
+    }
+
+    @Test
+    void aDeleteRemovesTheRowOnlyWhileItStillRecordsTheExpectedPayment() {
         upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS));
-        vaults.save(stored(1)
+        Optional<VaultPayment> read = stored(1).paid();
+
+        assertThat(vaults.delete(vault(1), Optional.empty())).isFalse();
+        assertThat(vaults.delete(vault(1), Optional.of(new VaultPayment(new BigDecimal("5"), "gems"))))
+                .isFalse();
+        assertThat(vaults.delete(vault(1), Optional.of(new VaultPayment(new BigDecimal("4"), "coins"))))
+                .isFalse();
+        assertThat(vaults.find(vault(1))).isPresent();
+
+        assertThat(vaults.delete(vault(1), read)).isTrue();
+        assertThat(vaults.delete(vault(1), read)).isFalse();
+        assertThat(vaults.find(vault(1))).isEmpty();
+    }
+
+    @Test
+    void aDeleteExpectingNoPaymentRemovesAFreeVaultButNotARowBroughtBackWithADifferentOne() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        vaults.create(Vault.allocate(vault(2), new VaultSize(1), NOW, FIVE_COINS));
+
+        assertThat(vaults.delete(vault(1), Optional.empty())).isTrue();
+        assertThat(vaults.delete(vault(2), Optional.empty())).isFalse();
+        assertThat(vaults.find(vault(2))).isPresent();
+    }
+
+    @Test
+    void aDeleteExpectingAFinerPaymentMatchesTheRoundedStoredOne() {
+        upgrade();
+        VaultPayment fine = new VaultPayment(new BigDecimal("1.23459"), "coins");
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, fine));
+
+        assertThat(vaults.delete(vault(1), Optional.of(fine))).isTrue();
+    }
+
+    @Test
+    void creatingOverAnExistingVaultReportsItAndKeepsTheVaultThatWasThere() {
+        upgrade();
+        assertThat(vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS)))
+                .isTrue();
+        vaults.update(stored(1)
                 .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
                 .result());
 
-        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("50"), "coins")));
+        assertThat(vaults.create(Vault.allocate(
+                        vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("50"), "coins"))))
+                .isFalse();
 
         assertThat(stored(1).paid().orElseThrow().amount()).isEqualByComparingTo("5");
         assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {7}));

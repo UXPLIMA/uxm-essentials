@@ -8,6 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 
 /**
  * Outbound port for durable, per-owner vault storage. A vault's queryable facts (owner, index, size,
@@ -36,28 +37,39 @@ public interface VaultRepository {
 
     /**
      * Persist {@code vault}, upserting on the {@code (owner, index)} key: a re-save of an existing vault
-     * overwrites its size, contents and last-touched in place rather than inserting a second row. This is the
-     * write-through every {@code InventoryClose} save and every fresh allocation goes through.
+     * overwrites its size, contents, name, icon and last-touched in place, and a vault with no row is inserted.
+     * Only a staff window and a window still open when the module stops save this way, because for them losing
+     * the items would be worse than keeping the vault. Every other write to an existing vault goes through
+     * {@link #update}, so it cannot bring back a vault that was deleted. The upsert never writes a payment, and
+     * never changes one already stored, so a vault it brings back carries none and cannot be refunded.
      */
     void save(Vault vault);
 
     /**
-     * Insert a freshly allocated {@code vault} together with what its owner paid for it
-     * ({@link Vault#paid()}). This is the only write that stores a payment: {@link #save} never writes one, and
-     * never changes one already stored. A close-save that re-inserts a vault deleted while its window was open
-     * therefore carries no payment, so the same payment can never be refunded twice. When a row already exists
-     * at the vault's id this is a no-op, keeping that row's contents and payment.
+     * Overwrite the size, contents, name, icon and last-touched of the existing row at the vault's id, leaving
+     * its payment as it is, and report whether that row was there. A vault deleted in the meantime stays deleted:
+     * nothing is inserted and the result is {@code false}.
      */
-    void create(Vault vault);
+    boolean update(Vault vault);
 
     /**
-     * Remove the vault row at {@code id}, freeing the owner's quota slot, and report whether a row was removed.
-     * Idempotent: deleting an id with no row is a no-op that returns {@code false}, never an error. Only the
-     * call that removed the row sees {@code true}, so two deletes racing for the same vault refund it once. The
-     * cache invalidation and cross-server {@code VaultChanged} emit are the adapter's concern; the use case
-     * depends only on this contract.
+     * Insert a freshly allocated {@code vault} together with what its owner paid for it ({@link Vault#paid()}),
+     * and report whether it was inserted. This is the only write that stores a payment. When a row already exists
+     * at the vault's id nothing is written and the result is {@code false}, keeping that row's contents and
+     * payment, so the caller can give back what it charged for the vault it could not store.
      */
-    boolean delete(VaultId id);
+    boolean create(Vault vault);
+
+    /**
+     * Remove the vault row at {@code id} only if it still records {@code expected} as its payment (empty matching
+     * a row that records none), and report whether a row was removed. The payment check and the removal are one
+     * statement, so the payment a caller refunds is the payment of the row it removed: a row deleted and brought
+     * back in between, or two deletes racing for the same vault, can never pay out the same payment twice.
+     * Deleting an id with no matching row is a no-op that returns {@code false}, never an error. The cache
+     * invalidation and cross-server {@code VaultChanged} emit are the adapter's concern; the use case depends only
+     * on this contract.
+     */
+    boolean delete(VaultId id, Optional<VaultPayment> expected);
 
     /**
      * Delete every vault row whose last-touched instant is strictly before {@code cutoff}, returning the number

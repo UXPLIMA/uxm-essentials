@@ -53,6 +53,9 @@ public enum VaultsMessageKey implements MessageKey {
     // overflow rescue (items in slots beyond a shrunken size quota, returned to the player on open)
     VAULT_OVERFLOW_RETURNED("vaults.overflow-returned"),
 
+    // a vault deleted while its window was open: the items in the window go back to the player who closed it
+    VAULT_DELETED_RETURNED("vaults.deleted-returned"),
+
     // vault-selector GUI (/vault with several owned): one icon per index, owned vs locked
     VAULT_SELECTOR_TITLE("vaults.selector.title"),
     VAULT_SELECTOR_ENTRY_NAME("vaults.selector.entry.name"),

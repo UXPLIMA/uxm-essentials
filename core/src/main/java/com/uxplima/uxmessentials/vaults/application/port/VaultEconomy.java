@@ -50,6 +50,11 @@ public interface VaultEconomy {
         public String currencyId() {
             return "default";
         }
+
+        @Override
+        public BigDecimal denominate(BigDecimal amount) {
+            return amount;
+        }
     };
 
     /**
@@ -82,4 +87,11 @@ public interface VaultEconomy {
      * refund can go back in that same currency.
      */
     String currencyId();
+
+    /**
+     * {@code amount} as a {@link #withdraw} in {@link #currencyId()} would actually move it, rounded to that
+     * currency's precision. A fee is denominated before it is charged so the amount recorded as paid is the
+     * amount that left the balance, not the raw config value.
+     */
+    BigDecimal denominate(BigDecimal amount);
 }

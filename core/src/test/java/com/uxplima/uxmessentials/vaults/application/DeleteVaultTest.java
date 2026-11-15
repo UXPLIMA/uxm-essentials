@@ -32,6 +32,7 @@ class DeleteVaultTest {
     private static final VaultChargeSettings CREATE_5_REFUND_5 = costs("5", "0", "5");
 
     private final InMemoryVaults vaults = new InMemoryVaults();
+    private final InterleavedVaults store = new InterleavedVaults(vaults);
     private final FakePermissions permissions = new FakePermissions();
     private final VaultPurse purse = new VaultPurse("100");
     private final List<String> lines = new ArrayList<>();
@@ -45,14 +46,21 @@ class DeleteVaultTest {
         return new VaultCharge(permissions, Optional.of(purse), costs);
     }
 
-    private DeleteVault deleteVault(VaultChargeSettings costs) {
-        VaultNotifier notifier = new VaultNotifier(
+    private VaultNotifier notifier() {
+        return new VaultNotifier(
                 (viewer, key, placeholders) -> {
                     lines.add(viewer.name() + ":" + key.key());
                     return key.key();
                 },
                 (viewer, text) -> {});
-        return new DeleteVault(vaults, charge(costs), new Audit(), notifier);
+    }
+
+    private DeleteVault deleteVault(VaultChargeSettings costs) {
+        return new DeleteVault(store, charge(costs), new Audit(), notifier());
+    }
+
+    private SaveVault saveVault() {
+        return new SaveVault(store, new RecordingEvents(), CLOCK);
     }
 
     private DeleteVault deleteVault() {
@@ -62,11 +70,7 @@ class DeleteVaultTest {
     /** Buy vault {@code index} the way a player does, through /vault, paying whatever {@code costs} charges. */
     private Vault buy(int index, VaultChargeSettings costs) {
         OpenVault open = new OpenVault(
-                vaults,
-                new VaultAmountQuota(permissions, 10),
-                new VaultSizeQuota(permissions, 1),
-                charge(costs),
-                CLOCK);
+                store, new VaultAmountQuota(permissions, 10), new VaultSizeQuota(permissions, 1), charge(costs), CLOCK);
         return open.open(ALEX, index).orElseThrow();
     }
 
@@ -183,14 +187,76 @@ class DeleteVaultTest {
     }
 
     @Test
-    void aWindowClosedAfterItsVaultWasDeletedCannotBeRefundedAgain() {
+    void theOwnersWindowClosedAfterTheVaultWasDeletedDoesNotBringItBack() {
         Vault opened = buy(1, CREATE_5_REFUND_5);
         deleteVault().delete(ALEX, 1);
 
-        new SaveVault(vaults, new RecordingEvents(), CLOCK).save(ALEX, opened, VaultContents.of(new byte[] {1}));
+        boolean stored = saveVault().save(ALEX, opened, VaultContents.of(new byte[] {1}));
+
+        assertThat(stored).isFalse();
+        assertThat(vaults.find(VaultId.of(ALEX, 1))).isEmpty();
+        assertThat(purse.moves()).containsExactly("-5", "+5 coins");
+    }
+
+    @Test
+    void aVaultAStaffWindowKeptAfterTheDeleteIsNeverRefundedAgain() {
+        Vault opened = buy(1, CREATE_5_REFUND_5);
+        deleteVault().delete(ALEX, 1);
+
+        saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {1}));
         assertThat(deleteVault().delete(ALEX, 1).isOk()).isTrue();
 
         assertThat(purse.moves()).containsExactly("-5", "+5 coins");
+    }
+
+    @Test
+    void aDeleteThatLostTheRaceRefundsNothingEvenWhenTheRowWasBroughtBack() {
+        Vault opened = buy(1, CREATE_5_REFUND_5);
+        DeleteVault first = deleteVault();
+        // Between this delete's read and its delete, a second delete wins and a staff window that was still open
+        // puts the row back, without a payment.
+        store.beforeNextDelete(() -> {
+            assertThat(deleteVault().delete(ALEX, 1).isOk()).isTrue();
+            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}));
+        });
+
+        assertThat(first.delete(ALEX, 1).errorOrThrow()).isEqualTo(VaultError.DELETE_UNKNOWN);
+
+        assertThat(purse.moves()).containsExactly("-5", "+5 coins");
+        assertThat(vaults.find(VaultId.of(ALEX, 1))).isPresent();
+    }
+
+    @Test
+    void aStaffDeleteThatLostTheRaceRemovesNothing() {
+        Vault opened = buy(2, CREATE_5_REFUND_5);
+        store.beforeNextDelete(() -> {
+            deleteVault().delete(ALEX, 2);
+            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}));
+        });
+
+        assertThat(deleteVault().deleteOther(SAM, ALEX, 2).errorOrThrow()).isEqualTo(VaultError.DELETE_UNKNOWN);
+
+        assertThat(audit).isEmpty();
+        assertThat(vaults.find(VaultId.of(ALEX, 2))).isPresent();
+    }
+
+    @Test
+    void renamingOrSettingTheIconOfAVaultDeletedMeanwhileDoesNotBringItBack() {
+        buy(1, CREATE_5_REFUND_5);
+        store.beforeNextUpdate(() -> deleteVault().delete(ALEX, 1));
+        assertThat(new RenameVault(store, notifier()).rename(ALEX, 1, "loot").errorOrThrow())
+                .isEqualTo(VaultError.VAULT_UNKNOWN);
+        assertThat(vaults.find(VaultId.of(ALEX, 1))).isEmpty();
+
+        buy(1, CREATE_5_REFUND_5);
+        store.beforeNextUpdate(() -> deleteVault().delete(ALEX, 1));
+        assertThat(new SetVaultIcon(store, notifier())
+                        .setIcon(ALEX, 1, "DIAMOND")
+                        .errorOrThrow())
+                .isEqualTo(VaultError.VAULT_UNKNOWN);
+        assertThat(vaults.find(VaultId.of(ALEX, 1))).isEmpty();
+
+        assertThat(purse.moves()).containsExactly("-5", "+5 coins", "-5", "+5 coins");
     }
 
     @Test

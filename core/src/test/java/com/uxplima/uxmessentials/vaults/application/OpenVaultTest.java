@@ -4,6 +4,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -30,12 +31,13 @@ class OpenVaultTest {
             new VaultChargeSettings(new BigDecimal("10"), new BigDecimal("2"), BigDecimal.ZERO);
 
     private final InMemoryVaults vaults = new InMemoryVaults();
+    private final InterleavedVaults store = new InterleavedVaults(vaults);
     private final FakePermissions permissions = new FakePermissions();
     private final VaultPurse purse = new VaultPurse("100");
 
     private OpenVault openVault(VaultChargeSettings costs, Optional<VaultEconomy> economy) {
         return new OpenVault(
-                vaults,
+                store,
                 new VaultAmountQuota(permissions, 1),
                 new VaultSizeQuota(permissions, 3),
                 new VaultCharge(permissions, economy, costs),
@@ -59,8 +61,63 @@ class OpenVaultTest {
     void aFirstOpenRecordsTheCreateFeeAndItsCurrencyAsWhatTheVaultCost() {
         openVault(CREATE_10_OPEN_2).open(ALEX, 1);
 
-        assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid())
-                .contains(new VaultPayment(new BigDecimal("10"), "coins"));
+        VaultPayment paid =
+                vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid().orElseThrow();
+        assertThat(paid.amount()).isEqualByComparingTo("10");
+        assertThat(paid.currencyId()).isEqualTo("coins");
+    }
+
+    @Test
+    void theRecordedCostIsWhatTheCurrencyActuallyTookNotTheRawConfigValue() {
+        openVault(new VaultChargeSettings(new BigDecimal("1.005"), BigDecimal.ZERO, BigDecimal.ZERO))
+                .open(ALEX, 1);
+
+        assertThat(purse.moves()).containsExactly("-1.01");
+        assertThat(vaults.find(VaultId.of(ALEX, 1))
+                        .orElseThrow()
+                        .paid()
+                        .orElseThrow()
+                        .amount())
+                .isEqualByComparingTo("1.01");
+    }
+
+    @Test
+    void anOpenThatLostTheRaceToCreateTheVaultGivesBackEverythingItTookAndShowsTheStoredVault() {
+        VaultContents items = VaultContents.of(new byte[] {9});
+        Vault winner = Vault.allocate(VaultId.of(ALEX, 1), new VaultSize(3), NOW)
+                .withContents(ALEX, items, NOW)
+                .result();
+        store.beforeNextCreate(() -> vaults.put(winner));
+
+        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow();
+
+        assertThat(purse.moves()).containsExactly("-12", "+12 coins");
+        assertThat(purse.balance()).isEqualByComparingTo("100");
+        assertThat(opened.contents()).isEqualTo(items);
+        assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().contents()).isEqualTo(items);
+    }
+
+    @Test
+    void aCreateThatFailsGivesBackEverythingItTookAndLetsTheFailureThrough() {
+        store.failNextCreate();
+        OpenVault open = openVault(CREATE_10_OPEN_2);
+
+        assertThatThrownBy(() -> open.open(ALEX, 1)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(purse.moves()).containsExactly("-12", "+12 coins");
+        assertThat(vaults.size()).isZero();
+    }
+
+    @Test
+    void aResizingOpenOfAVaultDeletedMeanwhileFailsAndGivesTheOpenFeeBack() {
+        vaults.put(Vault.allocate(VaultId.of(ALEX, 1), new VaultSize(1), NOW));
+        store.beforeNextUpdate(() -> store.delete(VaultId.of(ALEX, 1), Optional.empty()));
+
+        Result<Vault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1);
+
+        assertThat(opened.errorOrThrow()).isEqualTo(VaultError.VAULT_UNKNOWN);
+        assertThat(purse.moves()).containsExactly("-2", "+2 coins");
+        assertThat(vaults.size()).isZero();
     }
 
     @Test
