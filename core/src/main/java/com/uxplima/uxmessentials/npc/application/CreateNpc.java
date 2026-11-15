@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.npc.application;
 
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import java.util.Objects;
 
@@ -76,7 +77,9 @@ public final class CreateNpc {
             notifier.send(creator, NpcError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
             return Result.err(NpcError.LIMIT_REACHED);
         }
-        Npc npc = Npc.create(name, at, skin, clock.instant()).withOwner(creator.uuid());
+        // Rows keep epoch millis, so the cached copy matches the stored one and a resync sees no change.
+        Npc npc = Npc.create(name, at, skin, clock.instant().truncatedTo(ChronoUnit.MILLIS))
+                .withOwner(creator.uuid());
         if (entityType != null && !entityType.isBlank()) {
             npc = npc.withEntityType(entityType);
         }

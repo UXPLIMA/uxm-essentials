@@ -103,6 +103,9 @@ public final class RanksWiring {
         CachedPlayerRankRepository cache = new CachedPlayerRankRepository(
                 PlayerRankRepositories.jooq(persistence), kernel.scheduler(), kernel.log());
         bus.registry().register(RankSync.listener(cache));
+        // A rank changed after the joiner's pre-login read but before they could carry frames would be lost on an
+        // otherwise empty backend; on that first join only the joiner is online, so this is one read off the tick.
+        bus.registry().registerPlayerCacheDrop(cache::refreshOnline);
         PlayerRankRepository repository = RankSync.repository(cache, bus.publisher(), kernel.log());
         CurrentRank currentRank = new CurrentRank(cache, ladder);
         RankRequirementEvaluator requirements = requirementEvaluator(plugin, kernel, persistence, currentRank, economy);

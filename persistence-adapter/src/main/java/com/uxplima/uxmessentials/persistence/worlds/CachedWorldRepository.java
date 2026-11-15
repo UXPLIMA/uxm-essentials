@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.persistence.runtime.SnapshotSwap;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
@@ -47,6 +48,15 @@ public final class CachedWorldRepository implements WorldRepository {
     public void delete(WorldName name) {
         delegate.delete(name);
         republish(next -> next.remove(name.value()));
+    }
+
+    /**
+     * Load the whole set again and swap it in, for rows another server wrote. Readers keep the old set until the
+     * swap, so none of them loads on its own thread meanwhile; a local write during the load wins over it. Blocks on
+     * the database, so call it off the tick.
+     */
+    public Optional<SnapshotSwap<ManagedWorld>> reloadAll() {
+        return SnapshotSwap.reload(loaded, this::loadAll);
     }
 
     /** Force a reload on the next read (e.g. after enable-time reconciliation mutated rows directly). */

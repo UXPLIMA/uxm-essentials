@@ -111,6 +111,10 @@ public final class WarpsWiring {
         // the single-server path; the cross-server bus listener drops the set on a peer's change and the next
         // read lazily reloads.
         cached.all();
+        bus.registry().registerResync(() -> {
+            cached.reloadAll();
+            categoryRepository.reloadAll();
+        });
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
@@ -263,7 +267,8 @@ public final class WarpsWiring {
                 services.setWarp(),
                 services.moveWarp(),
                 services.delWarp(),
-                new WarpServerAdoption(persistence, kernel, localServer, cached, bus.publisher()));
+                new WarpServerAdoption(persistence, kernel, localServer, cached, bus.publisher()),
+                cached);
     }
 
     private static WarpServices assemble(
@@ -313,6 +318,8 @@ public final class WarpsWiring {
      * @param stopAction cleanup action on shutdown
      * @param serverAdoption records this backend as the server of the warps of unknown server in its worlds; run
      *     once the worlds are up
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -329,7 +336,8 @@ public final class WarpsWiring {
             SetWarp setWarp,
             MoveWarp moveWarp,
             DelWarp delWarp,
-            Runnable serverAdoption) {
+            Runnable serverAdoption,
+            CachedWarpRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);

@@ -158,6 +158,7 @@ public final class EconomyWiring {
         // change; the broadcasting decorator wraps it so this backend's balance writes notify peers.
         CachedWalletRepository cached = WalletRepositories.cachedConcrete(persistence, currencies, clock);
         bus.registry().register(WalletSync.listener(cached));
+        bus.registry().registerPlayerCacheDrop(cached::invalidateAll);
 
         // Decorator chain: JooqWalletRepository -> CachedWalletRepository -> general-bus WalletSync broadcaster.
         // Cross-server invalidation rides the general bus's WalletSync frame (network.transport selects the
@@ -195,6 +196,7 @@ public final class EconomyWiring {
                 settings,
                 currencies,
                 ledger,
+                cached,
                 resolved.provider(),
                 resolved.backends(),
                 decoratedRepository,
@@ -293,6 +295,7 @@ public final class EconomyWiring {
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletLedger ledger,
+            CachedWalletRepository cached,
             EconomyProvider resolved,
             CurrencyBackendRegistry backends,
             WalletRepository repository,
@@ -470,7 +473,8 @@ public final class EconomyWiring {
                 services.walletView(),
                 services.ecoAdmin(),
                 services.returnUnsoldItems(),
-                settings.allowNonAtomicRecurring());
+                settings.allowNonAtomicRecurring(),
+                cached);
     }
 
     /**
@@ -783,6 +787,8 @@ public final class EconomyWiring {
      * @param returns the sale give-backs, whose items still in flight are kept on stop
      * @param allowNonAtomicRecurring whether a charge on a timer may run on a backend that cannot guard its take,
      *     which the modules that bill on a timer ask before they start
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -808,7 +814,8 @@ public final class EconomyWiring {
             WalletPanelMenu walletView,
             EcoAdmin admin,
             ReturnUnsoldItems returns,
-            boolean allowNonAtomicRecurring) {
+            boolean allowNonAtomicRecurring,
+            CachedWalletRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);
