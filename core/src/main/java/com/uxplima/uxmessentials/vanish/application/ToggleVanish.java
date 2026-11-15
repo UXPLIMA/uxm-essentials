@@ -28,9 +28,12 @@ import com.uxplima.uxmessentials.vanish.domain.event.VanishToggled;
  * staff-mode vanish: grants and clears them uniformly.
  *
  * <p>Every transition is announced to the peer backends through the {@link VanishBus} so a cluster keeps one coherent
- * vanish view: vanishing publishes the new state and level, unvanishing publishes the reveal. A quit does <em>not</em>
- * publish (a server hop must not read as an unvanish), so only a genuine {@code /vanish} flip crosses the bus. With the
- * bus {@link VanishBus#disabled() disabled} the publish is a no-op and cross-server is inert.
+ * vanish view: vanishing publishes the new state and level, unvanishing publishes the reveal. A quit is not a reveal
+ * (a server hop must not read as an unvanish); it is published as a departure by {@link DepartVanished}. With the bus
+ * {@link VanishBus#disabled() disabled} the publish is a no-op and cross-server is inert.
+ *
+ * <p>Every transition is also written through {@link RememberVanish}, so the vanish survives a server switch whether or
+ * not the bus delivered the frame, and a player who may persist it keeps it through a restart.
  *
  * <p>Every transition also raises {@link VanishToggled} on the in-process bus, which is what the published API
  * bridges to a Bukkit event. The bus publish above talks to the other backends; this one talks to the plugins
@@ -45,6 +48,7 @@ public final class ToggleVanish {
     private final VanishBuffs buffs;
     private final VanishBus bus;
     private final DomainEventPublisher events;
+    private final RememberVanish remember;
 
     public ToggleVanish(
             VanishStore store,
@@ -53,7 +57,8 @@ public final class ToggleVanish {
             Notifier notifier,
             VanishBuffs buffs,
             VanishBus bus,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            RememberVanish remember) {
         this.store = Objects.requireNonNull(store, "store");
         this.view = Objects.requireNonNull(view, "view");
         this.levels = Objects.requireNonNull(levels, "levels");
@@ -61,6 +66,7 @@ public final class ToggleVanish {
         this.buffs = Objects.requireNonNull(buffs, "buffs");
         this.bus = Objects.requireNonNull(bus, "bus");
         this.events = Objects.requireNonNull(events, "events");
+        this.remember = Objects.requireNonNull(remember, "remember");
     }
 
     /** Toggle {@code who}'s vanish state; returns the new vanished flag. */
@@ -71,6 +77,7 @@ public final class ToggleVanish {
             // what a consumer mirroring the state needs to undo it.
             VanishLevel was = store.levelOf(who.uuid()).orElse(VanishLevel.DEFAULT);
             store.reveal(who.uuid());
+            remember.revealed(who.uuid());
             view.reveal(who);
             buffs.clear(who);
             notifier.send(who, VanishMessageKey.VANISH_OFF);
@@ -80,6 +87,7 @@ public final class ToggleVanish {
         }
         VanishLevel level = levels.useLevel(who);
         store.vanish(who.uuid(), level);
+        remember.vanished(who.uuid(), level);
         view.hide(who, level);
         buffs.apply(who);
         notifier.send(who, VanishMessageKey.VANISH_ON);

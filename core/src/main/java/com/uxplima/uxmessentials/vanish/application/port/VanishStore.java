@@ -8,11 +8,11 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 import com.uxplima.uxmessentials.vanish.domain.VanishState;
 
 /**
- * The single authority over the vanish state: a transient per-player map of who is vanished and at which
- * {@link VanishLevel}. The adapter backs it with a {@code ConcurrentHashMap<UUID, VanishLevel>} mutated through
- * {@code compute} / {@code remove}, so a reader on any thread. A sync command, the async messaging resolution, the
- * nametag viewer cull, always sees a coherent value. Nothing here is persisted: the state is seeded by {@code
- * /vanish}, read by every consumer (messaging, nametags, staff), and dropped on quit, re-derived on the next join.
+ * The single authority over who this backend is hiding right now: a transient per-player map of who is vanished and at
+ * which {@link VanishLevel}. The adapter backs it with a {@code ConcurrentHashMap<UUID, VanishLevel>}, so a reader on
+ * any thread (a sync command, the async messaging resolution, the nametag viewer cull) always sees a coherent value.
+ * It holds online players only: it is seeded on join from the durable {@link VanishRecords}, changed by {@code
+ * /vanish}, read by every consumer (messaging, nametags, staff), and dropped on quit.
  *
  * <p>This is the one vanish state in the plugin. The presence, messaging, nametags, and staff contexts all read or
  * mutate vanish through this port (or a query backed by it): there is no second vanish flag anywhere.
