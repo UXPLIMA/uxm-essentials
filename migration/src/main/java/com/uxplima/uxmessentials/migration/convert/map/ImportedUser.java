@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * One parsed-and-mapped player, expressed entirely in domain terms: the owner, the homes that mapped to
- * {@link Home} aggregates, the raw balance to seed a wallet with, and the mailbox lines.
+ * {@link Home} aggregates, the raw balance to seed a wallet with, and the mail waiting for them.
  *
  * <p>The balance is carried as a raw {@link BigDecimal} rather than a {@code Money} because the target
  * {@code Currency} is resolved at write time from the live economy config, keeping this mapper output
@@ -21,10 +21,10 @@ import org.jspecify.annotations.NullMarked;
  * @param owner the player this record belongs to
  * @param homes the homes mapped from the source, already clamped to valid names
  * @param balance the source money figure, empty when the source carried none
- * @param mail the mailbox lines, in source order
+ * @param mail the mail waiting for the player, in source order
  */
 @NullMarked
-public record ImportedUser(PlayerRef owner, List<Home> homes, Optional<BigDecimal> balance, List<String> mail) {
+public record ImportedUser(PlayerRef owner, List<Home> homes, Optional<BigDecimal> balance, List<ImportedMail> mail) {
 
     public ImportedUser {
         Objects.requireNonNull(owner, "owner");

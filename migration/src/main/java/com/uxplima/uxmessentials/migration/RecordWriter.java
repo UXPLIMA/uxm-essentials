@@ -5,7 +5,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The write seam: applies one mapped {@link ImportRecord} to the target contexts' application services
  * under the run's {@link ImportOptions}, honouring the conflict and balance policies, and reports the
- * {@link RecordOutcome}. A live run binds the real writer (which calls {@code SetHome}/{@code SetWarp}/
+ * {@link RecordResult}. A live run binds the real writer (which calls {@code SetHome}/{@code SetWarp}/
  * economy services through the same ports a live command uses, so an import can never create a state a
  * normal command could not); a dry-run binds the no-op accumulator, which runs the identical
  * conflict-resolution logic and reports the same outcomes without touching the database.
@@ -20,5 +20,5 @@ import org.jspecify.annotations.NullMarked;
 public interface RecordWriter {
 
     /** Apply one record under {@code options} and report what happened. Never throws for a bad record. */
-    RecordOutcome write(ImportRecord record, ImportOptions options);
+    RecordResult write(ImportRecord record, ImportOptions options);
 }

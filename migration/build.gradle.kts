@@ -10,4 +10,7 @@ dependencies {
     compileOnly(libs.configurate.yaml)
     compileOnly(libs.slf4j.api)
     compileOnly(libs.h2)
+
+    // The tests parse EssentialsX fixtures, so they need the YAML reader the server would otherwise provide.
+    testImplementation(libs.configurate.yaml)
 }

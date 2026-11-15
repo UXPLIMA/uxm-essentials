@@ -10,6 +10,7 @@ import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.ImportSummary;
 import com.uxplima.uxmessentials.migration.MigrationAudit;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
+import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -48,9 +49,10 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
     }
 
     @Override
-    public void record(SourceId source, ImportRecord rec, RecordOutcome outcome) {
+    public void record(SourceId source, ImportRecord rec, RecordResult result) {
+        RecordOutcome outcome = result.outcome();
         switch (rec) {
-            case ImportRecord.UserRecord user -> recordUser(source, user, outcome);
+            case ImportRecord.UserRecord user -> recordUser(source, user, result);
             case ImportRecord.WarpRecord warp -> recordWarp(source, warp, outcome);
             case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, outcome);
             case ImportRecord.KitRecord kit -> recordKit(source, kit, outcome);
@@ -85,16 +87,22 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 outcome.ok());
     }
 
-    private void recordUser(SourceId source, ImportRecord.UserRecord rec, RecordOutcome outcome) {
+    private void recordUser(SourceId source, ImportRecord.UserRecord rec, RecordResult result) {
+        // The counts before conflict= are what the source held; the notes after ok= say which parts landed.
         audit.info(
-                "event=migration_import_user source={} uuid={} homes={} balance_imported={} mailbox={} conflict={} ok={}",
+                "event=migration_import_user source={} uuid={} homes={} balance_imported={} mailbox={} conflict={} ok={}{}",
                 source,
                 rec.user().owner().uuid(),
                 rec.user().homes().size(),
                 rec.user().balance().isPresent(),
                 rec.user().mail().size(),
-                outcome.token(),
-                outcome.ok());
+                result.outcome().token(),
+                result.outcome().ok(),
+                notes(result));
+    }
+
+    private static String notes(RecordResult result) {
+        return result.notes().isEmpty() ? "" : " " + String.join(" ", result.notes());
     }
 
     private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordOutcome outcome) {
@@ -202,7 +210,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
     @Override
     public void finish(String actor, ImportSummary summary, Duration elapsed) {
         audit.info(
-                "event=migration_import_finish actor={} source={} dry_run={} users={} warps={} kits={} jails={} mutes={} bans={} ip_bans={} warns={} skipped={} failed={} duration_ms={}",
+                "event=migration_import_finish actor={} source={} dry_run={} users={} warps={} kits={} jails={} mutes={} bans={} ip_bans={} warns={} skipped={} partial={} failed={} duration_ms={}",
                 actor,
                 summary.source(),
                 summary.dryRun(),
@@ -215,6 +223,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 summary.ipBans(),
                 summary.warns(),
                 summary.skipped(),
+                summary.partial(),
                 summary.failed(),
                 elapsed.toMillis());
     }
