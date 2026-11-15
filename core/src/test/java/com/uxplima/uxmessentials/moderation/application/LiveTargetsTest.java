@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
@@ -140,6 +141,28 @@ class LiveTargetsTest {
         assertThat(notifier.sent())
                 .containsExactly(new RecordingNotifier.Sent(
                         STAFF, "moderation.seen.online-elsewhere", Map.of("player", "Steve", "server", "lobby-1")));
+    }
+
+    @Test
+    void seenReportsAPlayerHereAsOnlineOnThisServer() {
+        InMemoryIpBans repository = new InMemoryIpBans();
+        repository.recordSeen(SeenRecord.firstJoin(LOCAL, Optional.empty(), Instant.parse("2026-01-02T03:04:05Z")));
+        Seen seen = new Seen(
+                repository,
+                new IpAlts(new NoIpHistory(), address -> address),
+                new OnlyOnline(LOCAL),
+                notifier.notifier(),
+                false,
+                CLOCK,
+                presence);
+
+        seen.seen(STAFF, LOCAL);
+
+        assertThat(notifier.sent())
+                .containsExactly(new RecordingNotifier.Sent(
+                        STAFF,
+                        "moderation.seen.online-here",
+                        Map.of("player", "Alex", "first", "2026-01-02T03:04:05Z", "server", "survival-1")));
     }
 
     /** The live side of this backend: who was kicked and who is frozen. */
@@ -330,6 +353,25 @@ class LiveTargetsTest {
         @Override
         public void lockdown(UUID actor, boolean enabled) {
             lines.add("lockdown " + enabled);
+        }
+    }
+
+    /** A server with one player connected. */
+    private record OnlyOnline(PlayerRef player) implements PlayerLookup {
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return player.name().equals(name) ? Optional.of(player) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return player.uuid().equals(uuid) ? Optional.of(player) : Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return player.uuid().equals(uuid);
         }
     }
 

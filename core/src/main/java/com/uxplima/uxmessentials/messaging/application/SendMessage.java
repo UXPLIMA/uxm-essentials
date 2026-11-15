@@ -56,6 +56,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * on (the note waits in the vanished player's box) and renders the {@code TARGET_OFFLINE} rejection when it is
  * off. A hidden target never takes the live delivery branch, so their presence is never leaked and the sender's
  * feedback is byte-identical to that for a real offline target in both config modes.
+ *
+ * <p>A message to a player on another backend is split in two: the target's backend runs {@link #receive} (the
+ * target's switches, the delivery, its spies) and the sender's backend runs {@link #conclude} on the answer (the
+ * echo, the AFK notice, its spies, the reply target, the event). {@link RelayPrivateMessage} carries it between them.
  */
 public final class SendMessage {
 
@@ -181,7 +185,10 @@ public final class SendMessage {
     private void notifyIfAfk(PlayerRef sender, PlayerRef target) {
         // Fired only on a real delivery, never on a silently-dropped ignore: an AFK notice there would reveal
         // that the ignoring target is online, breaking the ignore-is-not-observable contract.
-        Optional<String> reason = afk.afkReasonOf(target);
+        notifyAway(sender, target, afk.afkReasonOf(target));
+    }
+
+    private void notifyAway(PlayerRef sender, PlayerRef target, Optional<String> reason) {
         if (reason.isPresent()) {
             notifier.send(
                     sender,
@@ -204,6 +211,82 @@ public final class SendMessage {
         java.time.Instant now = clock.instant();
         conversations.remember(sender, LastConversation.with(target, now));
         conversations.remember(target, LastConversation.with(sender, now));
+    }
+
+    /** Refuse {@code sender} when they are muted, telling them why; whether they were refused. */
+    boolean refusedMuted(PlayerRef sender) {
+        if (!mute.isMuted(sender)) {
+            return false;
+        }
+        reject(sender, MessagingError.SENDER_MUTED);
+        return true;
+    }
+
+    /**
+     * The target's side of a message sent from another backend, run on the target's thread on the backend they are
+     * on. The sender's backend already refused a muted sender; the target's own gates are checked here because only
+     * this backend holds their switches. The sender's echo, the event and the sender's reply target are left to the
+     * sender's backend, which acts on the returned answer.
+     */
+    RemoteAnswer receive(RemoteMessage message, boolean acceptsReplies) {
+        PlayerRef sender = message.sender();
+        PlayerRef target = message.target();
+        if (message.reply() && !acceptsReplies) {
+            return RemoteAnswer.to(message, RemoteOutcome.REPLIES_OFF);
+        }
+        if (!toggles.acceptsMessages(target)) {
+            return RemoteAnswer.to(message, RemoteOutcome.TOGGLED_OFF);
+        }
+        if (ignores.load(target).blocks(sender, IgnoreChannel.MESSAGE)) {
+            fanOutSpies(sender, target, message.body());
+            return RemoteAnswer.to(message, RemoteOutcome.IGNORED);
+        }
+        delivery.deliverMessage(sender, target, message.body());
+        fanOutSpies(sender, target, message.body());
+        conversations.remember(target, LastConversation.with(sender, clock.instant()));
+        return new RemoteAnswer(
+                message.id(), RemoteOutcome.DELIVERED, sender, target, message.body(), afk.afkReasonOf(target));
+    }
+
+    /**
+     * The sender's side of a message sent to another backend: tell the sender how it went, with the same lines a
+     * message to a player here would have produced. An ignore still reads as sent, and a target who left reads as
+     * offline (or, for a reply, as no one to reply to).
+     */
+    void conclude(RemoteMessage message, RemoteAnswer answer) {
+        PlayerRef sender = message.sender();
+        PlayerRef target = message.target();
+        MessageBody body = message.body();
+        switch (answer.outcome()) {
+            case DELIVERED -> {
+                delivery.echoSent(sender, target, body);
+                notifyAway(sender, target, answer.afkReason());
+                fanOutSpies(sender, target, body);
+                conversations.remember(sender, LastConversation.with(target, clock.instant()));
+                events.publish(new PrivateMessageSent(sender, target, body, clock.instant()));
+            }
+            case IGNORED -> {
+                delivery.echoSent(sender, target, body);
+                fanOutSpies(sender, target, body);
+                conversations.remember(sender, LastConversation.with(target, clock.instant()));
+            }
+            case TOGGLED_OFF -> reject(sender, MessagingError.TARGET_TOGGLED_OFF);
+            case REPLIES_OFF -> reject(sender, MessagingError.NO_REPLY_TARGET);
+            case OFFLINE -> {
+                if (message.reply()) {
+                    reject(sender, MessagingError.NO_REPLY_TARGET);
+                } else {
+                    offline(sender, target, body);
+                }
+            }
+        }
+    }
+
+    /** A message between two other backends: this backend's spies see it as they would a local one. */
+    void observe(RemoteAnswer answer) {
+        if (answer.outcome() == RemoteOutcome.DELIVERED || answer.outcome() == RemoteOutcome.IGNORED) {
+            fanOutSpies(answer.sender(), answer.target(), answer.body());
+        }
     }
 
     private Result<Unit, MessagingError> silentlyDrop(PlayerRef sender, PlayerRef target, MessageBody body) {

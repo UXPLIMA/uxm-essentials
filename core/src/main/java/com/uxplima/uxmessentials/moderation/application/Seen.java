@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * {@code /seen <player>} (last-seen + first-join) and {@code /seenip <player>} (last-seen by IP, surfacing
- * alts). {@code /seen} renders the first-join and last-activity (or "online now" when connected) from the
+ * alts). {@code /seen} renders the first-join and last-activity (or the server they are on when connected) from the
  * DB-backed {@link SeenRecord}; {@code /seenip} renders the last address that record holds and the other accounts
  * that have connected from it. The alt half of {@code /seenip} goes through the shared {@link IpAlts} lookup, so
  * it matches by token against the same rows {@code /alts} and {@code /ipalts} answer from.
@@ -36,6 +36,7 @@ public final class Seen {
     private final boolean censorIp;
     private final Clock clock;
     private final LiveTargetCheck live;
+    private final NetworkPresence presence;
 
     public Seen(
             ModerationRepository repository,
@@ -51,6 +52,7 @@ public final class Seen {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.censorIp = censorIp;
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.presence = Objects.requireNonNull(presence, "presence");
         this.live = new LiveTargetCheck(presence, this.notifier);
     }
 
@@ -67,11 +69,34 @@ public final class Seen {
             return;
         }
         Optional<SeenRecord> record = repository.seen(target);
+        boolean here = players.isOnline(target.uuid());
         if (record.isEmpty()) {
-            notifier.send(actor, ModerationMessageKey.SEEN_NEVER, Map.of("player", target.name()));
+            if (here) {
+                // Connected before their first record was written: still online, just with no first-join to show.
+                notifier.send(
+                        actor,
+                        ModerationMessageKey.SEEN_ONLINE_ELSEWHERE,
+                        Map.of("player", target.name(), "server", presence.localServer()));
+            } else {
+                notifier.send(actor, ModerationMessageKey.SEEN_NEVER, Map.of("player", target.name()));
+            }
             return;
         }
-        notifier.send(actor, ModerationMessageKey.SEEN_REPORT, seenPlaceholders(record.get()));
+        SeenRecord seen = record.get();
+        if (here) {
+            notifier.send(
+                    actor,
+                    ModerationMessageKey.SEEN_ONLINE_HERE,
+                    Map.of(
+                            "player",
+                            seen.player().name(),
+                            "first",
+                            seen.firstSeen().toString(),
+                            "server",
+                            presence.localServer()));
+            return;
+        }
+        notifier.send(actor, ModerationMessageKey.SEEN_REPORT, seenPlaceholders(seen));
     }
 
     /** Report {@code target}'s last IP and the alt accounts sharing it to {@code actor}. */
@@ -121,9 +146,7 @@ public final class Seen {
     }
 
     private Map<String, String> seenPlaceholders(SeenRecord record) {
-        boolean online = players.isOnline(record.player().uuid());
-        String ago =
-                online ? "online now" : SanctionDuration.format(Duration.between(record.lastSeen(), clock.instant()));
+        String ago = SanctionDuration.format(Duration.between(record.lastSeen(), clock.instant()));
         return Map.of(
                 "player", record.player().name(), "first", record.firstSeen().toString(), "ago", ago);
     }
