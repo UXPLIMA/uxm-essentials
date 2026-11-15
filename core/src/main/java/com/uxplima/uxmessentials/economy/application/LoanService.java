@@ -69,6 +69,10 @@ public final class LoanService {
         }
 
         Loan loan = buildLoan(debtor, principal, installments, creditScore.score());
+        if (loan.installmentAmount().isZero()) {
+            // An installment that rounds to nothing at the currency's precision could never be collected.
+            return Result.err(LoanError.INVALID_TERMS);
+        }
         Result<Unit, TransferError> disbursed = loanRepository.disburse(loan);
         if (disbursed.isErr()) {
             return Result.err(toLoanError(disbursed.errorOrThrow()));
@@ -122,7 +126,10 @@ public final class LoanService {
 
     private void attemptAutoRepayment(Loan loan) {
         PlayerRef debtor = loan.debtor();
-        Money settlement = loan.settlementFor(loan.installmentAmount());
+        // A stored installment that rounds to nothing is not a payment; collecting the remainder still closes the
+        // loan, where a zero settlement would throw and stop every loan after it in this run.
+        Money due = loan.installmentAmount().isZero() ? loan.remainingAmount() : loan.installmentAmount();
+        Money settlement = loan.settlementFor(due);
         Loan updated = loan.afterPayment(settlement).withNextPayment(nextCycle());
         Result<Unit, TransferError> applied =
                 loanRepository.applyRepayment(debtor, settlement, updated, updated.isFullyPaid());

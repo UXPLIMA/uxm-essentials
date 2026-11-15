@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.teleport.application;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -170,8 +169,17 @@ public final class AcceptTeleport {
         events.publish(transition.event());
     }
 
+    /**
+     * The oldest request aimed at {@code target} that is still within its TTL. The sweep runs only once a second, so
+     * a request past its TTL can still be held here; it is expired now rather than accepted, which would throw.
+     */
     private Optional<TeleportRequest> oldestPending(PlayerRef target) {
-        List<TeleportRequest> pending = requests.pendingFor(target);
-        return pending.isEmpty() ? Optional.empty() : Optional.of(pending.get(0));
+        for (TeleportRequest request : requests.pendingFor(target)) {
+            if (!request.hasExpired(clock.instant())) {
+                return Optional.of(request);
+            }
+            expireIfDue(request);
+        }
+        return Optional.empty();
     }
 }
