@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
@@ -8,6 +9,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationJailL
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.Record;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The anti-corruption mapping between a {@code moderation_jail_locations} row and the domain
@@ -31,7 +33,15 @@ final class JailLocationRows {
         WorldRef world = new WorldRef(UUID.fromString(row.get(JAILS.WORLD)), row.get(JAILS.WORLD_NAME));
         Position location = new Position(
                 world, row.get(JAILS.X), row.get(JAILS.Y), row.get(JAILS.Z), row.get(JAILS.YAW), row.get(JAILS.PITCH));
-        return new StoredJail(row.get(JAILS.NAME), location);
+        return new StoredJail(row.get(JAILS.NAME), location, serverOf(row.get(JAILS.SERVER_ID)));
+    }
+
+    /** A NULL and the unscoped sentinel both mean the jail's backend is not known yet. */
+    private static Optional<String> serverOf(@Nullable String stored) {
+        if (stored == null || stored.isBlank() || stored.equals(StoredJail.UNSCOPED)) {
+            return Optional.empty();
+        }
+        return Optional.of(stored);
     }
 
     /** Populate a record from a domain {@link StoredJail} for an upsert, stamping the save metadata. */
@@ -45,6 +55,7 @@ final class JailLocationRows {
                 .setZ(location.z())
                 .setYaw(location.yaw())
                 .setPitch(location.pitch())
+                .setServerId(jail.server().orElse(null))
                 .setCreatedAt(savedAtEpochMillis);
     }
 }

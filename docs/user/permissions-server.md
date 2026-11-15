@@ -227,7 +227,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.banip` | /banip <player\|ip> [reason] / /unbanip <ip>: IP ban with stored-IP alt detection. | op |
 | `uxmessentials.moderation.banlist` | /banlist to review the players currently banned. | op |
 | `uxmessentials.moderation.freeze` | /freeze <player> / /unfreeze <player>: pin a player in place pending review. | op |
-| `uxmessentials.moderation.jail` | /jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /jail del <name> removes a defined jail. | op |
+| `uxmessentials.moderation.jail` | /jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /jail del <name> removes a defined jail. On a network the target may be on any server, and a jail defined on another server sends them there. | op |
 | `uxmessentials.moderation.kick` | /kick <player> [reason]; /kickall [reason] to clear non-exempt players. | op |
 | `uxmessentials.moderation.lockdown` | /lockdown [on\|off]: refuse every login except holders of the lockdown bypass; the flag survives restart. | op |
 | `uxmessentials.moderation.lockdown.bypass` | Join the server while it is locked down (/lockdown). Held by staff who must stay reachable during a lockdown. | op |
@@ -241,7 +241,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.unjail` | /unjail <player>. | op |
 | `uxmessentials.moderation.unmute` | /unmute <player>. | op |
 | `uxmessentials.moderation.warn` | /warn <player> [reason], /tempwarn <player> <duration> [reason], /warns <player> and /unwarn <player>: issue (standing or timed), review and clear warning history. | op |
-| `uxmessentials.moderation.broadcast.receive` | Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited). | op |
+| `uxmessentials.moderation.broadcast.receive` | Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits, and the line when a jailed player could not be taken to a jail on another server. The -s flag (or broadcast.silent-by-default) suppresses it. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited). | op |
 | `uxmessentials.moderation.check` | /checkban <player> and /checkmute <player>: report whether a player is currently banned or muted. | op |
 | `uxmessentials.moderation.commandspy` | /commandspy (/cspy) to watch the commands other players run. | op |
 | `uxmessentials.moderation.exempt` | Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff. | op |

@@ -189,6 +189,17 @@ public final class NetworkMessageCodec {
                     out.writeUTF(member.name());
                 }
             }
+            case JailChanged jail -> {
+                writeUuid(out, jail.frameId());
+                writeUuid(out, jail.target());
+                out.writeBoolean(jail.jailed());
+            }
+            case JailHopFailed failed -> {
+                writeUuid(out, failed.frameId());
+                writeUuid(out, failed.target());
+                out.writeUTF(failed.targetName());
+                out.writeUTF(failed.jail());
+            }
         }
     }
 
@@ -226,6 +237,8 @@ public final class NetworkMessageCodec {
             case PRESENCE_CHANGED ->
                 new PresenceChanged(origin, in.readLong(), in.readLong(), readUuid(in), in.readUTF(), in.readBoolean());
             case PRESENCE_SNAPSHOT -> readSnapshot(in, origin);
+            case JAIL_CHANGED -> new JailChanged(origin, readUuid(in), readUuid(in), in.readBoolean());
+            case JAIL_HOP_FAILED -> new JailHopFailed(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
         };
     }
 

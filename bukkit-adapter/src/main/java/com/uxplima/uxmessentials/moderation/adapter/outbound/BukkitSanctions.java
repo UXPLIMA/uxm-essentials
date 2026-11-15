@@ -20,6 +20,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.adapter.ModerationSettings;
 import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
+import com.uxplima.uxmessentials.moderation.application.port.JailCells;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.StoredJail;
@@ -43,9 +44,12 @@ import org.jspecify.annotations.Nullable;
  * an operator fills with {@code /setjail}, falling back to {@link ModerationSettings} (the {@code
  * moderation.conf} jails), so an in-game {@code /setjail} overrides a same-named config entry. An unresolved
  * jail (missing world) is a no-op rather than a crash. Release teleports back to the world spawn.
+ *
+ * <p>As {@link JailCells} it lands a player who arrived from another backend in their cell, reporting a missing
+ * world or a refused teleport as a miss so the hop is not taken for a success.
  */
 @NullMarked
-public final class BukkitSanctions implements Sanctions {
+public final class BukkitSanctions implements Sanctions, JailCells {
 
     private final Server server;
     private final Scheduler scheduler;
@@ -150,6 +154,28 @@ public final class BukkitSanctions implements Sanctions {
     public void releaseFromJail(PlayerRef target) {
         Objects.requireNonNull(target, "target");
         scheduler.onEntity(target, () -> withPlayer(target, this::sendToWorldSpawn));
+    }
+
+    @Override
+    public void move(PlayerRef target, Position cell, Runnable onLanded, Runnable onMissed) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(cell, "cell");
+        Objects.requireNonNull(onLanded, "onLanded");
+        Objects.requireNonNull(onMissed, "onMissed");
+        Player player = server.getPlayer(target.uuid());
+        World world = server.getWorld(cell.world().uid());
+        World resolved = world == null ? server.getWorld(cell.world().name()) : world;
+        if (player == null || resolved == null) {
+            onMissed.run();
+            return;
+        }
+        var unused = player.teleportAsync(BukkitRefs.toLocation(resolved, cell)).whenComplete((moved, failure) -> {
+            if (failure == null && Boolean.TRUE.equals(moved)) {
+                onLanded.run();
+            } else {
+                onMissed.run();
+            }
+        });
     }
 
     private Optional<Location> jailLocation(String jail) {
