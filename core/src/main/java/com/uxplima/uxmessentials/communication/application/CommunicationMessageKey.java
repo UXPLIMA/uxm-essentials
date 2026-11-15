@@ -21,6 +21,8 @@ public enum CommunicationMessageKey implements MessageKey {
     // /broadcasttoggle: the per-player announcer subscription toggle confirmations.
     BROADCAST_TOGGLE_ON("communication.broadcast-toggle.on"),
     BROADCAST_TOGGLE_OFF("communication.broadcast-toggle.off"),
+    // the frame a /broadcast or /broadcastworld body is drawn in, {message}
+    BROADCAST_LINE("communication.broadcast.line"),
 
     // /rules /motd /info: a requested info page that is not configured.
     INFO_PAGE_MISSING("communication.info-page-missing"),

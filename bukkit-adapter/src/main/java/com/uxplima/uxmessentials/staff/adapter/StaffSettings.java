@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Typed view over the {@code modules/staff/config.conf} subtree, read once at wire time from the module's
  * scoped {@link ConfigStore}. It carries the {@code vanish-on-enter} flag, the gadget hotbar layout (one
- * {@link GadgetSpec} per gadget. Its slot, material, and operator-authored MiniMessage display name), and the
+ * {@link GadgetSpec} per gadget. Its slot, material, and display name, a catalogue reference or MiniMessage), and the
  * staff-chat receive permission node. An unknown gadget material or an out-of-range slot is dropped with a
  * single warning rather than failing the wire, so a misconfigured gadget never strands the module.
  *
@@ -34,11 +34,31 @@ public final class StaffSettings {
     private static final Material DEFAULT_FREEZE_MATERIAL = Material.PACKED_ICE;
     private static final Material DEFAULT_COMPASS_MATERIAL = Material.COMPASS;
     private static final Material DEFAULT_FOLLOW_MATERIAL = Material.LEAD;
-    private static final String DEFAULT_VANISH_NAME = "<accent>Vanish</accent>";
-    private static final String DEFAULT_EXAMINE_NAME = "<accent>Examine</accent>";
-    private static final String DEFAULT_FREEZE_NAME = "<accent>Freeze</accent>";
-    private static final String DEFAULT_COMPASS_NAME = "<accent>Navigator</accent>";
-    private static final String DEFAULT_FOLLOW_NAME = "<accent>Follow</accent>";
+    private static final String DEFAULT_VANISH_NAME = "@staff.gadget.vanish";
+    private static final String DEFAULT_EXAMINE_NAME = "@staff.gadget.examine";
+    private static final String DEFAULT_FREEZE_NAME = "@staff.gadget.freeze";
+    private static final String DEFAULT_COMPASS_NAME = "@staff.gadget.compass";
+    private static final String DEFAULT_FOLLOW_NAME = "@staff.gadget.follow";
+
+    // The English names earlier versions shipped, in the config file and as the fallback here. A gadget still named one
+    // was never renamed by its operator, so it reads the catalogue line that replaced it rather than English for all.
+    private static final List<String> SHIPPED_NAMES = List.of(
+            "<accent>ᴠᴀɴɪꜱʜ</accent>",
+            "<accent>ᴇxᴀᴍɪɴᴇ</accent>",
+            "<accent>ꜰʀᴇᴇᴢᴇ</accent>",
+            "<accent>ɴᴀᴠɪɢᴀᴛᴏʀ</accent>",
+            "<accent>ꜰᴏʟʟᴏᴡ</accent>",
+            "<accent>Vanish</accent>",
+            "<accent>Examine</accent>",
+            "<accent>Freeze</accent>",
+            "<accent>Navigator</accent>",
+            "<accent>Follow</accent>");
+    private static final List<String> GADGET_NODES = List.of(
+            "gadgets.vanish.name",
+            "gadgets.examine.name",
+            "gadgets.freeze.name",
+            "gadgets.compass.name",
+            "gadgets.follow.name");
     private static final String DEFAULT_STAFF_CHAT_NODE = EnforcementPermissions.STAFF_CHAT;
 
     private final boolean vanishOnEnter;
@@ -101,6 +121,11 @@ public final class StaffSettings {
                 .ifPresent(specs::add);
         parseGadget(config, log, StaffGadget.FOLLOW, "follow", 4, DEFAULT_FOLLOW_MATERIAL, DEFAULT_FOLLOW_NAME)
                 .ifPresent(specs::add);
+        if (GADGET_NODES.stream().anyMatch(node -> SHIPPED_NAMES.contains(config.getString(node, "")))) {
+            log.info("modules/staff/config.conf still holds the shipped English gadget names; reading the"
+                    + " @staff.gadget.* lines from the message files instead, in each staff member's language. Write"
+                    + " your own name there to keep one of your own.");
+        }
         return specs;
     }
 
@@ -123,6 +148,9 @@ public final class StaffSettings {
         }
         Material material = parseMaterial(config.getString(base + ".material", ""), defaultMaterial, log, node);
         String name = config.getString(base + ".name", defaultName);
+        if (SHIPPED_NAMES.contains(name)) {
+            name = defaultName;
+        }
         return java.util.Optional.of(new GadgetSpec(gadget, slot, material, name));
     }
 
@@ -140,12 +168,12 @@ public final class StaffSettings {
 
     /**
      * One gadget's hotbar placement: the gadget kind, the hotbar slot ({@code 0..8}), the item material, and the
-     * operator-authored MiniMessage display name. A pure value parsed once at wire time.
+     * display name. A pure value parsed once at wire time.
      *
      * @param gadget the gadget kind this slot carries
      * @param slot the hotbar slot, {@code 0..8}
      * @param material the item material
-     * @param name the MiniMessage display name (operator content, not a {@code MessageKey})
+     * @param name the display name: an {@code @key} catalogue reference read in the holder's language, or MiniMessage
      */
     public record GadgetSpec(StaffGadget gadget, int slot, Material material, String name) {
 

@@ -116,7 +116,7 @@ public final class BukkitStaffLoadoutCapture implements StaffLoadoutCapture {
         PlayerInventory inventory = player.getInventory();
         inventory.clear();
         for (StaffSettings.GadgetSpec spec : settings.gadgets()) {
-            inventory.setItem(spec.slot(), gadgetItems.build(spec));
+            inventory.setItem(spec.slot(), gadgetItems.build(spec, player.getUniqueId()));
         }
         applyStaffModePerks(player);
         player.updateInventory();

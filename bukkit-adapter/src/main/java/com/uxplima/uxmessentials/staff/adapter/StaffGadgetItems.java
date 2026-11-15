@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.staff.adapter;
 
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.inventory.ItemStack;
@@ -10,6 +11,7 @@ import org.bukkit.plugin.Plugin;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -22,10 +24,11 @@ import org.jspecify.annotations.Nullable;
  * re-skinnable display name), so the right-click listener resolves the gadget regardless of how the item is
  * styled in config.
  *
- * <p>The display name is operator-authored MiniMessage content from {@code modules/staff/config.conf} (like the
- * nametag formats), parsed here once at build time with the shared {@link StyleTags} palette resolver so the
- * config can use the project tokens ({@code <accent>}, {@code <h:'…'>}, …); it is never resolved through the
- * {@code MessageKey} catalog. {@code ItemBuilder.name} defaults the name to upright (non-italic).
+ * <p>The display name comes from {@code modules/staff/config.conf}. The shipped names are {@code @staff.gadget.*}
+ * references, read in the language of the staff member the hotbar is built for; a name an operator wrote in their own
+ * words is MiniMessage used as written. Either way it is parsed at build time with the shared {@link StyleTags}
+ * palette resolver so it can use the project tokens ({@code <accent>}, {@code <h:'…'>}, …). {@code ItemBuilder.name}
+ * defaults the name to upright (non-italic).
  */
 @NullMarked
 public final class StaffGadgetItems {
@@ -36,10 +39,11 @@ public final class StaffGadgetItems {
         this.key = new NamespacedKey(Objects.requireNonNull(plugin, "plugin"), "staff-gadget");
     }
 
-    /** Build the hotbar item for {@code spec}, tagged with its gadget kind so a right-click resolves it. */
-    public ItemStack build(StaffSettings.GadgetSpec spec) {
+    /** Build {@code holder}'s hotbar item for {@code spec}, tagged with its gadget kind so a right-click resolves it. */
+    public ItemStack build(StaffSettings.GadgetSpec spec, UUID holder) {
         Objects.requireNonNull(spec, "spec");
-        Component name = StyledText.render(spec.name());
+        Objects.requireNonNull(holder, "holder");
+        Component name = StyledText.render(HudText.lineFor(holder, spec.name()));
         return ItemBuilder.of(spec.material())
                 .name(name)
                 .editPersistentData(container -> container.set(

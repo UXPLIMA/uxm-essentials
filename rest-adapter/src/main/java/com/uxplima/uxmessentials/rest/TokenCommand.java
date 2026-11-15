@@ -2,23 +2,23 @@ package com.uxplima.uxmessentials.rest;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Supplier;
+import java.util.logging.Logger;
 
 import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 
-import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.event.ClickEvent;
-import net.kyori.adventure.text.event.HoverEvent;
-import net.kyori.adventure.text.format.NamedTextColor;
-
 import com.mojang.brigadier.Command;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
+import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
 import com.uxplima.uxmessentials.rest.auth.ApiToken;
 import com.uxplima.uxmessentials.rest.auth.Scopes;
 import com.uxplima.uxmessentials.rest.auth.TokenStore;
@@ -37,9 +37,9 @@ import com.uxplima.uxmessentials.rest.auth.TokenStore;
  * file is a secret that ends up in a paste bin, a backup and a support ticket. The one this prints is
  * click-to-copy and is never shown again.
  *
- * <p>The replies here are plain English rather than catalog keys. The message catalog belongs to the host plugin
- * and is not part of the published API, and an add-on inventing its own locale pipeline for one operator command
- * would be a worse trade than three untranslated lines.
+ * <p>The replies are lines of the host's message catalogue, asked for through the developer API. The add-on cannot
+ * read the catalogue itself, and shipping a second set of language files for one operator command would leave an
+ * operator translating the same plugin in two places. A host too old to answer gets the English lines instead.
  */
 public final class TokenCommand {
 
@@ -50,12 +50,39 @@ public final class TokenCommand {
     private static final DateTimeFormatter WHEN =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
 
+    // The host catalogue's keys for these replies. Written out here because the host's key enum is not published.
+    private static final String CREATED = "admin.rest.created";
+    private static final String SECRET = "admin.rest.secret";
+    private static final String EXISTS = "admin.rest.exists";
+    private static final String NO_SCOPE = "admin.rest.no-scope";
+    private static final String BAD_LABEL = "admin.rest.bad-label";
+    private static final String LIST_EMPTY = "admin.rest.list-empty";
+    private static final String LIST_HEADER = "admin.rest.list-header";
+    private static final String LIST_ENTRY = "admin.rest.list-entry";
+    private static final String REVOKED = "admin.rest.revoked";
+    private static final String NOT_FOUND = "admin.rest.not-found";
+    private static final String OFF = "admin.rest.off";
+    private static final String LISTENING = "admin.rest.listening";
+    private static final String CONNECTIONS = "admin.rest.connections";
+
     private final TokenStore tokens;
     private final Supplier<Listening> status;
+    private final UxmEssentialsApi api;
+    private final String configPath;
+    private final Replies replies;
 
-    public TokenCommand(TokenStore tokens, Supplier<Listening> status) {
+    /**
+     * @param api the host's developer API, which reads the replies in the sender's language
+     * @param configPath where the add-on's config lives, named in the reply when it is not listening
+     * @param log where the switch to English replies on an older host is reported
+     */
+    public TokenCommand(
+            TokenStore tokens, Supplier<Listening> status, UxmEssentialsApi api, String configPath, Logger log) {
         this.tokens = Objects.requireNonNull(tokens, "tokens");
         this.status = Objects.requireNonNull(status, "status");
+        this.api = Objects.requireNonNull(api, "api");
+        this.configPath = Objects.requireNonNull(configPath, "configPath");
+        this.replies = new Replies(Replies.hostHasMessages(), log);
     }
 
     /** The command tree, ready to register. */
@@ -80,32 +107,44 @@ public final class TokenCommand {
     private int create(CommandContext<CommandSourceStack> ctx, String rawScopes) {
         CommandSender sender = ctx.getSource().getSender();
         String label = StringArgumentType.getString(ctx, "label");
+        Set<String> scopes;
         try {
-            String secret = tokens.create(label, Scopes.parse(rawScopes));
-            sender.sendMessage(Component.text("Token " + label + " created. It is shown once:", NamedTextColor.GREEN));
-            sender.sendMessage(Component.text(secret, NamedTextColor.YELLOW)
-                    .clickEvent(ClickEvent.copyToClipboard(secret))
-                    .hoverEvent(HoverEvent.showText(Component.text("Click to copy"))));
-        } catch (IllegalArgumentException | IllegalStateException refused) {
-            sender.sendMessage(Component.text(String.valueOf(refused.getMessage()), NamedTextColor.RED));
+            scopes = Scopes.parse(rawScopes);
+        } catch (IllegalArgumentException noScope) {
+            reply(sender, NO_SCOPE, Map.of("scopes", rawScopes, "known", String.join(", ", sorted(Scopes.ALL))));
+            return Command.SINGLE_SUCCESS;
         }
+        String secret;
+        try {
+            secret = tokens.create(label, scopes);
+        } catch (IllegalStateException taken) {
+            reply(sender, EXISTS, Map.of("label", label));
+            return Command.SINGLE_SUCCESS;
+        } catch (IllegalArgumentException blank) {
+            reply(sender, BAD_LABEL, Map.of());
+            return Command.SINGLE_SUCCESS;
+        }
+        reply(sender, CREATED, Map.of("label", label));
+        reply(sender, SECRET, Map.of("secret", secret));
         return Command.SINGLE_SUCCESS;
     }
 
     private int list(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
-        java.util.List<ApiToken> all = tokens.list();
+        List<ApiToken> all = tokens.list();
         if (all.isEmpty()) {
-            sender.sendMessage(Component.text("No API tokens yet. /uxmapi token create <label>", NamedTextColor.GRAY));
+            reply(sender, LIST_EMPTY, Map.of());
             return Command.SINGLE_SUCCESS;
         }
-        sender.sendMessage(Component.text(all.size() + " API token(s):", NamedTextColor.GREEN));
+        reply(sender, LIST_HEADER, Map.of("count", String.valueOf(all.size())));
         for (ApiToken token : all) {
-            sender.sendMessage(Component.text(
-                    "  " + token.label() + "  ["
-                            + String.join(", ", token.scopes().stream().sorted().toList()) + "]  "
-                            + WHEN.format(token.createdAt()),
-                    NamedTextColor.GRAY));
+            reply(
+                    sender,
+                    LIST_ENTRY,
+                    Map.of(
+                            "label", token.label(),
+                            "scopes", String.join(", ", sorted(token.scopes())),
+                            "created", WHEN.format(token.createdAt())));
         }
         return Command.SINGLE_SUCCESS;
     }
@@ -120,29 +159,32 @@ public final class TokenCommand {
         CommandSender sender = ctx.getSource().getSender();
         Listening now = status.get();
         if (!now.up()) {
-            sender.sendMessage(Component.text(
-                    "The REST API is not listening. Turn it on in plugins/uxmEssentials-rest/config/rest.conf"
-                            + " and restart.",
-                    NamedTextColor.RED));
+            reply(sender, OFF, Map.of("file", configPath));
             return Command.SINGLE_SUCCESS;
         }
-        sender.sendMessage(
-                Component.text("REST API listening on " + now.bind() + ":" + now.port(), NamedTextColor.GREEN));
-        sender.sendMessage(Component.text(
-                "  " + tokens.list().size() + " token(s), " + now.subscribers() + " event stream(s) open",
-                NamedTextColor.GRAY));
+        reply(sender, LISTENING, Map.of("bind", now.bind(), "port", String.valueOf(now.port())));
+        reply(
+                sender,
+                CONNECTIONS,
+                Map.of(
+                        "tokens", String.valueOf(tokens.list().size()),
+                        "streams", String.valueOf(now.subscribers())));
         return Command.SINGLE_SUCCESS;
     }
 
     private int revoke(CommandContext<CommandSourceStack> ctx) {
         CommandSender sender = ctx.getSource().getSender();
         String label = StringArgumentType.getString(ctx, "label");
-        boolean revoked = tokens.revoke(label);
-        sender.sendMessage(
-                revoked
-                        ? Component.text("Token " + label + " revoked.", NamedTextColor.GREEN)
-                        : Component.text("No token named " + label + ".", NamedTextColor.RED));
+        reply(sender, tokens.revoke(label) ? REVOKED : NOT_FOUND, Map.of("label", label));
         return Command.SINGLE_SUCCESS;
+    }
+
+    private void reply(CommandSender sender, String key, Map<String, String> placeholders) {
+        sender.sendMessage(replies.line((line, values) -> api.message(sender, line, values), key, placeholders));
+    }
+
+    private static List<String> sorted(Set<String> scopes) {
+        return scopes.stream().sorted().toList();
     }
 
     /**

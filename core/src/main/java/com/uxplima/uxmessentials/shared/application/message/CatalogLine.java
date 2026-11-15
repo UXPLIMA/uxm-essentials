@@ -78,6 +78,21 @@ public record CatalogLine(String key, Map<String, String> arguments) {
         }
     }
 
+    /**
+     * The line as an operator would write it, every argument quoted, so {@link #parse} reads back this same reference
+     * whatever the values hold. A surface the plugin fills itself (a leaderboard's rows) writes its lines this way and
+     * they are then read in each viewer's language like any line an operator wrote.
+     */
+    public String written() {
+        StringBuilder line = new StringBuilder().append(MARK).append(key);
+        arguments.forEach((name, value) -> line.append(' ')
+                .append(name)
+                .append("=\"")
+                .append(value.replace("\\", "\\\\").replace("\"", "\\\""))
+                .append('"'));
+        return line.toString();
+    }
+
     /** Read a quoted value into {@code into}; the index just past the closing quote, or -1 when it never closes. */
     private static int quoted(String text, int from, char quote, StringBuilder into) {
         for (int index = from; index < text.length(); index++) {

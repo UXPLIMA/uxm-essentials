@@ -63,7 +63,9 @@ public final class UxmEssentialsRest extends JavaPlugin {
                         LifecycleEvents.COMMANDS,
                         event -> event.registrar()
                                 .register(
-                                        new TokenCommand(tokens, () -> listening(config)).build(),
+                                        new TokenCommand(
+                                                        tokens, () -> listening(config), api, configPath(), getLogger())
+                                                .build(),
                                         "uxmEssentials REST API tokens"));
         start(config, api, tokens);
     }

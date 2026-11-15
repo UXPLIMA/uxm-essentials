@@ -15,6 +15,9 @@ dependencies {
     compileOnly(libs.bundles.adventure)
     compileOnly(libs.luckperms.api)
     annotationProcessor(libs.velocity.api)
+    // The proxy supplies these at runtime; the tests read the message files and render lines without one.
+    testImplementation(uxm.configurate.hocon)
+    testImplementation(libs.bundles.adventure)
 }
 
 // The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin annotation. The
