@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * The intentionally conservative, separate knob for imported balances, money
@@ -23,9 +24,16 @@ public enum BalancePolicy {
         return SKIP_IF_PRESENT;
     }
 
-    /** Parse a {@code migration.conf > balance-policy} value, defaulting to {@link #SKIP_IF_PRESENT}. */
-    public static BalancePolicy parse(String raw) {
+    /**
+     * Parse a {@code balance-policy} value. Empty when the value is not {@code skip-if-present} or {@code overwrite},
+     * so the caller can tell the operator instead of quietly picking a policy for them.
+     */
+    public static Optional<BalancePolicy> parse(String raw) {
         Objects.requireNonNull(raw, "raw");
-        return "overwrite".equals(raw.strip().toLowerCase(Locale.ROOT)) ? OVERWRITE : SKIP_IF_PRESENT;
+        return switch (raw.strip().toLowerCase(Locale.ROOT)) {
+            case "skip-if-present" -> Optional.of(SKIP_IF_PRESENT);
+            case "overwrite" -> Optional.of(OVERWRITE);
+            default -> Optional.empty();
+        };
     }
 }

@@ -175,6 +175,7 @@ public enum ModerationMessageKey implements MessageKey {
     // /seen, /seenip
     SEEN_REPORT("moderation.seen.report"),
     SEEN_NEVER("moderation.seen.never"),
+    SEEN_ONLINE_ELSEWHERE("moderation.seen.online-elsewhere"),
     SEENIP_REPORT("moderation.seenip.report"),
     SEENIP_ALTS("moderation.seenip.alts"),
     SEENIP_NO_IP("moderation.seenip.no-ip"),
@@ -190,6 +191,7 @@ public enum ModerationMessageKey implements MessageKey {
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),
+    TARGET_ELSEWHERE("moderation.target-elsewhere"),
     BAD_DURATION("moderation.bad-duration"),
     UNKNOWN_TARGET("moderation.unknown-target"),
     MUTED_COMMAND_BLOCKED("moderation.muted-command-blocked"),
