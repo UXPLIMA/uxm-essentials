@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
+import com.uxplima.uxmessentials.persistence.runtime.SnapshotSwap;
 
 /**
  * An in-memory-authoritative decorator over a delegate {@link HologramRepository}. Holograms are server-wide
@@ -146,6 +147,21 @@ public final class CachedHologramRepository implements HologramRepository {
         Objects.requireNonNull(viewer, "viewer");
         delegate.removeFromBlacklist(name, viewer);
         blacklists.invalidate(name.value());
+    }
+
+    /**
+     * Load the whole set again and swap it in, for rows another server wrote. Readers keep the old set until the
+     * swap, so none of them loads on its own thread meanwhile; a local write during the load wins over it. Blocks on
+     * the database, so call it off the tick.
+     */
+    public Optional<SnapshotSwap<Hologram>> reloadAll() {
+        Optional<SnapshotSwap<Hologram>> swap = SnapshotSwap.reload(loaded, this::loadAll);
+        // Only a hologram that changed drops its viewer lists, so a MANUAL hologram that did not is never re-read.
+        swap.ifPresent(done -> done.changedKeys().forEach(name -> {
+            viewers.invalidate(name);
+            blacklists.invalidate(name);
+        }));
+        return swap;
     }
 
     /** Drop the loaded set and the viewer/blacklist caches; call on a module reload. */

@@ -158,6 +158,7 @@ public final class HomesWiring {
         KernelPorts kernel = ctx.kernel();
         CachedHomeRepository cached = HomeRepositories.cachedConcrete(persistence);
         bus.registry().register(HomeSync.listener(cached));
+        bus.registry().registerPlayerCacheDrop(cached::invalidateAll);
         HomeRepository repository = HomeSync.repository(cached, bus.publisher());
         HomeInviteRepository invites = HomeRepositories.homeInviteRepository(persistence);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());

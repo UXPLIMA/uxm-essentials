@@ -168,6 +168,7 @@ import com.uxplima.uxmessentials.servertweaks.adapter.outbound.ConfigServerTweak
 import com.uxplima.uxmessentials.servertweaks.application.ServerTweaksConfig;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.EngineMenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl;
+import com.uxplima.uxmessentials.shared.adapter.inbound.cacherefresh.SharedCacheRefreshListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
@@ -220,6 +221,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkPresenceWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.SharedCacheRefresh;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.CommandCatalogConfig;
@@ -889,6 +891,17 @@ public final class PluginModule {
                 wiredKernel.networkClaims());
         bus.start();
         networkPresence.start();
+        // Every module has registered its resync by now. The proxy cannot relay a frame to an empty backend, so the
+        // caches peers change reload when this backend fills again and on a bounded timer; off the network, never.
+        SharedCacheRefresh cacheRefresh = SharedCacheRefresh.wire(
+                NetworkConfig.from(config),
+                bus.bus().registry(),
+                kernel.scheduler(),
+                kernel.log(),
+                plugin.getServer().getOnlinePlayers().size());
+        resources.addListener(new SharedCacheRefreshListener(cacheRefresh));
+        cacheRefresh.start();
+        resources.onClose(cacheRefresh::stop);
         // PlaceholderAPI is installed but not yet enabled while this STARTUP plugin enables, so the expansion is
         // registered by the world phase, on ServerLoadEvent, and the doctor reads whether it published then.
         AtomicBoolean placeholdersPublished = new AtomicBoolean();
@@ -1442,6 +1455,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
+                    bus,
                     guiLayouts,
                     guiRegistry,
                     menus,
@@ -1454,6 +1468,7 @@ public final class PluginModule {
                     persistence,
                     resources,
                     links,
+                    bus,
                     guiLayouts,
                     guiRegistry,
                     textInput,
@@ -2164,6 +2179,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -2192,6 +2208,7 @@ public final class PluginModule {
                 plugin,
                 ctx,
                 persistence,
+                bus,
                 guiLayouts,
                 guiRegistry,
                 menus,
@@ -2248,6 +2265,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            Bus bus,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             TextInput textInput,
@@ -2282,6 +2300,7 @@ public final class PluginModule {
         WorldsWiring.Wired wired = WorldsWiring.wire(
                 ctx,
                 persistence,
+                bus,
                 plugin.getServer(),
                 events,
                 engine,

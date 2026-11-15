@@ -229,6 +229,7 @@ public final class VoteWiring {
         bus.registry()
                 .register(VoteSync.listener(
                         cachedRepository::invalidate, broadcaster, broadcastChannels, networkRewards));
+        bus.registry().registerResync(cachedRepository::reloadCount);
         Consumer<DomainEvent> partyPublisher = VoteSync.partyPublisher(bus.publisher());
         events.subscribe(partyPublisher);
 

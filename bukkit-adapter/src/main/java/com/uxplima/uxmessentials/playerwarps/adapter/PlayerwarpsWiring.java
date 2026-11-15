@@ -181,6 +181,7 @@ public final class PlayerwarpsWiring {
                         com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(
                                 kernel.playerLookup()));
         bus.registry().register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync.listener(cached));
+        bus.registry().registerPlayerCacheDrop(cached::invalidateAll);
         PlayerWarpRepository repository =
                 com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync.repository(
                         cached, bus.publisher());

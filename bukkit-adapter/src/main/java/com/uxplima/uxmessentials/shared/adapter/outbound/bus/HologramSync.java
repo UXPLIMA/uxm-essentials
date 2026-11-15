@@ -75,6 +75,26 @@ public final class HologramSync {
         };
     }
 
+    /**
+     * A resync for {@link SharedCacheRefresh}: reload the whole set from the shared DB without emptying it, then
+     * render each hologram a missed frame left stale and despawn each one deleted meanwhile. Holograms that did not
+     * change are not redrawn. It runs on the async lane, as the listener's reload does.
+     */
+    public static Runnable resync(CachedHologramRepository cache, HologramView renderer) {
+        Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(renderer, "renderer");
+        return () -> cache.reloadAll().ifPresent(swap -> {
+            for (String key : swap.changedKeys()) {
+                Hologram fresh = swap.after().get(key);
+                if (fresh != null) {
+                    renderer.render(fresh);
+                } else {
+                    renderer.despawn(HologramName.of(key));
+                }
+            }
+        });
+    }
+
     /** Reload the named hologram from the shared DB and render it if present, despawn it if it was deleted. */
     private static void reRender(CachedHologramRepository cache, HologramView renderer, HologramName name) {
         Optional<Hologram> fresh = cache.reload(name);

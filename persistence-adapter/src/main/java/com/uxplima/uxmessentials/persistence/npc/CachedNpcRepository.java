@@ -11,6 +11,7 @@ import java.util.function.Consumer;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.persistence.runtime.SnapshotSwap;
 
 /**
  * An in-memory-authoritative decorator over a delegate {@link NpcRepository}. The full NPC set is small and
@@ -68,6 +69,15 @@ public final class CachedNpcRepository implements NpcRepository {
         Objects.requireNonNull(name, "name");
         delegate.delete(name);
         republish(next -> next.remove(name.value()));
+    }
+
+    /**
+     * Load the whole set again and swap it in, for rows another server wrote. Readers keep the old set until the
+     * swap, so none of them loads on its own thread meanwhile; a local write during the load wins over it. Blocks on
+     * the database, so call it off the tick.
+     */
+    public Optional<SnapshotSwap<Npc>> reloadAll() {
+        return SnapshotSwap.reload(loaded, this::loadAll);
     }
 
     /** Drop the loaded set so the next read rebuilds it from the delegate; call on a module reload. */
