@@ -34,13 +34,6 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CommunicationCommands {
 
-    /**
-     * Prefix prepended to a manual {@code /broadcast} body so it reads like an announcement, not plain chat; this
-     * is operator-facing MiniMessage content, not a parity-checked MessageKey. Public so the admin GUI's broadcast
-     * button sends through the same prefix as the command.
-     */
-    public static final String BROADCAST_PREFIX = "<gray>[</gray><gold>Broadcast</gold><gray>]</gray> <white>";
-
     private CommunicationCommands() {}
 
     /**
@@ -75,8 +68,8 @@ public final class CommunicationCommands {
         Objects.requireNonNull(settings, "settings");
         Objects.requireNonNull(editorView, "editorView");
         List<CommandRegistration> commands = new ArrayList<>();
-        commands.add(new BroadcastCommand(broadcaster, BROADCAST_PREFIX));
-        commands.add(new BroadcastWorldCommand(messages, broadcaster, BROADCAST_PREFIX));
+        commands.add(new BroadcastCommand(broadcaster));
+        commands.add(new BroadcastWorldCommand(messages, broadcaster));
         commands.add(new BroadcastToggleCommand(optOut, messages));
         commands.add(new AnnounceCommand(
                 settings, mergedConfig, broadcaster, optOut, announcer, editorView, scheduler, messages));

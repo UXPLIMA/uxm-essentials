@@ -23,8 +23,8 @@ import org.jspecify.annotations.NullMarked;
  * through the {@link BukkitAnnouncerBroadcaster} (and the {@code MessageSink} beneath it) as a raw source string
  * rather than a {@code MessageKey}, and is never parity-checked. The shared broadcaster reuses the same fan-out the
  * scheduled announcer uses: it skips players who opted out via {@code /broadcasttoggle} and hops to each viewer's
- * region thread inside the sink. The configured prefix is prepended so a manual broadcast reads like an
- * announcement rather than plain chat.
+ * region thread inside the sink. The broadcaster frames the body with the catalogue's broadcast line, so a manual
+ * broadcast reads like an announcement rather than plain chat, in each reader's language.
  */
 @NullMarked
 public final class BroadcastCommand implements CommandRegistration {
@@ -33,11 +33,9 @@ public final class BroadcastCommand implements CommandRegistration {
     private static final String MESSAGE_ARG = "message";
 
     private final BukkitAnnouncerBroadcaster broadcaster;
-    private final String prefix;
 
-    public BroadcastCommand(BukkitAnnouncerBroadcaster broadcaster, String prefix) {
+    public BroadcastCommand(BukkitAnnouncerBroadcaster broadcaster) {
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
-        this.prefix = Objects.requireNonNull(prefix, "prefix");
     }
 
     @Override
@@ -56,7 +54,7 @@ public final class BroadcastCommand implements CommandRegistration {
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         String message = StringArgumentType.getString(ctx, MESSAGE_ARG);
-        broadcaster.broadcast(prefix + message);
+        broadcaster.broadcast(message);
         return Command.SINGLE_SUCCESS;
     }
 }

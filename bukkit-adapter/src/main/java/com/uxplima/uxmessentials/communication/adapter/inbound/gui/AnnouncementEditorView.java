@@ -385,7 +385,7 @@ public final class AnnouncementEditorView {
                 return;
             }
             // A fresh announcement seeds one placeholder line carrying the id; the operator edits the message next.
-            store.save(StoredAnnouncement.fresh(id, "<gray>" + id));
+            store.save(StoredAnnouncement.fresh(id, "<muted>" + id));
             // Land straight in the new announcement's editor.
             store.find(id)
                     .ifPresent(created -> scheduler.entity(player, () -> {

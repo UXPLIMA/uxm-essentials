@@ -1,10 +1,15 @@
 package com.uxplima.uxmessentials.shared.adapter.inbound.api;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.UxmEssentialsApi;
@@ -37,8 +42,10 @@ import com.uxplima.uxmessentials.api.query.UxmVaultsQuery;
 import com.uxplima.uxmessentials.api.query.UxmVoteQuery;
 import com.uxplima.uxmessentials.api.query.UxmWarpsQuery;
 import com.uxplima.uxmessentials.api.query.UxmWorldsQuery;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
@@ -59,19 +66,7 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     private final MenuApi menus;
     private final QueryContexts queries;
     private final ActionContexts actions;
-
-    public UxmEssentialsApiImpl(String version, ModuleRegistry modules, Supplier<ConfigStore> config, MenuApi menus) {
-        this(version, modules, config, menus, QueryContexts.empty(), ActionContexts.empty());
-    }
-
-    public UxmEssentialsApiImpl(
-            String version,
-            ModuleRegistry modules,
-            Supplier<ConfigStore> config,
-            MenuApi menus,
-            QueryContexts queries) {
-        this(version, modules, config, menus, queries, ActionContexts.empty());
-    }
+    private final CommandFeedback lines;
 
     public UxmEssentialsApiImpl(
             String version,
@@ -79,13 +74,15 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
             Supplier<ConfigStore> config,
             MenuApi menus,
             QueryContexts queries,
-            ActionContexts actions) {
+            ActionContexts actions,
+            CommandFeedback lines) {
         this.version = Objects.requireNonNull(version, "version");
         this.modules = Objects.requireNonNull(modules, "modules");
         this.config = Objects.requireNonNull(config, "config");
         this.menus = Objects.requireNonNull(menus, "menus");
         this.queries = Objects.requireNonNull(queries, "queries");
         this.actions = Objects.requireNonNull(actions, "actions");
+        this.lines = Objects.requireNonNull(lines, "lines");
     }
 
     @Override
@@ -105,6 +102,17 @@ public final class UxmEssentialsApiImpl implements UxmEssentialsApi {
     @Override
     public MenuApi menus() {
         return menus;
+    }
+
+    @Override
+    public Component message(CommandSender viewer, String key, Map<String, String> placeholders) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(placeholders, "placeholders");
+        // The promise is plain text, so a value cannot carry a click or a colour into the line.
+        Map<String, String> plain = new LinkedHashMap<>();
+        placeholders.forEach((name, value) -> plain.put(name, StyledText.escape(value)));
+        return lines.render(viewer, () -> key, plain);
     }
 
     @Override

@@ -1,9 +1,13 @@
 package com.uxplima.uxmessentials.api.bukkit;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.Plugin;
+
+import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.api.action.UxmActions;
 import com.uxplima.uxmessentials.api.bukkit.menu.MenuApi;
@@ -89,6 +93,27 @@ public interface UxmEssentialsApi {
 
     /** The menu registration surface: custom actions, requirements, placeholders, list sources and icons. */
     MenuApi menus();
+
+    /**
+     * A line of the uxmEssentials message catalogue as {@code viewer} reads it: in their language, in the theme's
+     * colours, with the shared chat prefix folded in.
+     *
+     * <p>For an add-on whose words live in this plugin's catalogue, so an operator translates and restyles them in the
+     * files they already edit rather than in a second set the add-on ships. Each placeholder value fills the line's
+     * {@code {name}} token as plain text: a tag inside it is shown, not applied.
+     *
+     * <pre>{@code
+     * sender.sendMessage(api.message(sender, "admin.rest.revoked", Map.of("label", label)));
+     * }</pre>
+     *
+     * @param viewer whose language the line is read in; the console reads the server's own
+     * @param key the catalogue key
+     * @param placeholders the values for the line's {@code {name}} tokens
+     * @return the line, or the key itself as plain text from an implementation with no catalogue behind it
+     */
+    default Component message(CommandSender viewer, String key, Map<String, String> placeholders) {
+        return Component.text(key);
+    }
 
     /**
      * What uxmEssentials can be asked to do, attributed to {@code plugin}.

@@ -63,7 +63,11 @@ public final class ProxyCommandControl {
         if (!config.enabled()) {
             return;
         }
-        proxy.getEventManager().register(plugin, buildListener(config, store, proxy, logger));
+        ProxyCatalog catalog = loadCatalog(logger, dataDirectory);
+        if (catalog == null) {
+            return;
+        }
+        proxy.getEventManager().register(plugin, buildListener(config, store, catalog, proxy, logger));
         warnIfChannelHideConfigured(config, logger);
         logger.info(
                 "uxmEssentials command-control active on the proxy (spam-guard {})",
@@ -81,13 +85,23 @@ public final class ProxyCommandControl {
         }
     }
 
+    /** Read the proxy's message files, writing out any that are missing; a file that does not parse is logged. */
+    private static @Nullable ProxyCatalog loadCatalog(Logger logger, Path dataDirectory) {
+        try {
+            return ProxyCatalog.load(dataDirectory);
+        } catch (RuntimeException | org.spongepowered.configurate.ConfigurateException failure) {
+            logger.error("failed to load the proxy message files; command-control stays off", failure);
+            return null;
+        }
+    }
+
     private static CommandControlListener buildListener(
-            CommandControlConfig config, ConfigStore store, ProxyServer proxy, Logger logger) {
+            CommandControlConfig config, ConfigStore store, ProxyCatalog catalog, ProxyServer proxy, Logger logger) {
         RuleSet rules = config.toRuleSet(BYPASS);
         HidePolicy hide = config.toHidePolicy(VIEW);
         CommandRateLimiter limiter = config.toRateLimiter();
         ProxyGroupSource groups = ProxyGroupSources.create(proxy, logger);
-        ProxyCommandMessages messages = ProxyCommandMessages.from(store);
+        ProxyCommandMessages messages = ProxyCommandMessages.from(store, catalog);
         ProxyCommandTreeFilter filter =
                 new ProxyCommandTreeFilter(rules, hide, config.tabCompletionEnabled(), config.blockNamespaceBypass());
         return new CommandControlListener(

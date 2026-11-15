@@ -26,8 +26,8 @@ import org.jspecify.annotations.NullMarked;
  * {@link CommunicationCommandSupport} provides.
  *
  * <p>Like {@code /broadcast} the body is operator-authored MiniMessage content (not a parity-checked
- * {@code MessageKey}) flowing through the {@link BukkitAnnouncerBroadcaster}; the same configured prefix is
- * prepended so it reads like an announcement rather than plain chat, and broadcast opt-outs are still honoured.
+ * {@code MessageKey}) flowing through the {@link BukkitAnnouncerBroadcaster}, which frames it with the catalogue's
+ * broadcast line so it reads like an announcement rather than plain chat, and broadcast opt-outs are still honoured.
  */
 @NullMarked
 public final class BroadcastWorldCommand extends CommunicationCommandSupport implements CommandRegistration {
@@ -36,12 +36,10 @@ public final class BroadcastWorldCommand extends CommunicationCommandSupport imp
     private static final String MESSAGE_ARG = "message";
 
     private final BukkitAnnouncerBroadcaster broadcaster;
-    private final String prefix;
 
-    public BroadcastWorldCommand(Messages messages, BukkitAnnouncerBroadcaster broadcaster, String prefix) {
+    public BroadcastWorldCommand(Messages messages, BukkitAnnouncerBroadcaster broadcaster) {
         super(messages);
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
-        this.prefix = Objects.requireNonNull(prefix, "prefix");
     }
 
     @Override
@@ -69,7 +67,7 @@ public final class BroadcastWorldCommand extends CommunicationCommandSupport imp
             return 0;
         }
         String message = StringArgumentType.getString(ctx, MESSAGE_ARG);
-        broadcaster.broadcastToWorld(prefix + message, sender.getWorld().getUID());
+        broadcaster.broadcastToWorld(message, sender.getWorld().getUID());
         return Command.SINGLE_SUCCESS;
     }
 }

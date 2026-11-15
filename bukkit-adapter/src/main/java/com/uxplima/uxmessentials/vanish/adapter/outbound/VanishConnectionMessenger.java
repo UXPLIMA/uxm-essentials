@@ -6,6 +6,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -22,8 +23,9 @@ import org.jspecify.annotations.NullMarked;
  * lines of a vanished player are suppressed by the {@code VanishLifecycleListener}; this class supplies the fake ones a
  * {@code /vanish} transition emits in their place.
  *
- * <p>The lines are operator MiniMessage content from {@link VanishConfig} ({@code {player}} substituted), never a
- * {@code MessageKey}: the same treatment the connection-message context gives real join/quit templates. Each viewer's
+ * <p>The lines come from {@link VanishConfig}: an {@code @key} reference is read from the catalogue in each viewer's own
+ * language, anything else is operator MiniMessage sent as written, and {@code {player}} is substituted in both. Each
+ * viewer's
  * variant is chosen by whether they can see the vanishing player: a viewer whose see level clears the player's use
  * level (staff) gets the {@code *-staff} template, everyone else gets the public one; a blank template sends that group
  * nothing. The whole broadcast is a no-op when {@code fake-join-quit} is off.
@@ -65,9 +67,6 @@ public final class VanishConnectionMessenger {
             return;
         }
         VanishLevel useLevel = levels.useLevel(who);
-        // A name an account could not have is never filled in; that template then sends nothing, like a blank one.
-        String toOthers = NameFill.into(publicTemplate, who.name()).orElse("");
-        String toStaff = NameFill.into(staffTemplate, who.name()).orElse("");
         scheduler.onGlobal(() -> {
             for (Player online : Bukkit.getOnlinePlayers()) {
                 PlayerRef viewer = BukkitRefs.toRef(online);
@@ -75,11 +74,23 @@ public final class VanishConnectionMessenger {
                     continue;
                 }
                 boolean canSee = VanishLevels.sees(levels.seeLevel(viewer), useLevel);
-                String line = canSee ? toStaff : toOthers;
+                String line = lineFor(viewer, canSee ? staffTemplate : publicTemplate, who);
                 if (!line.isBlank()) {
                     sink.deliver(viewer, line);
                 }
             }
         });
+    }
+
+    /**
+     * {@code template} as {@code viewer} reads it with {@code who}'s name filled in. A name an account could not have
+     * is never filled in; that line then sends nothing, like a blank one.
+     */
+    private static String lineFor(PlayerRef viewer, String template, PlayerRef who) {
+        if (template.isBlank()) {
+            return "";
+        }
+        return NameFill.into(HudText.lineFor(viewer.uuid(), template), who.name())
+                .orElse("");
     }
 }

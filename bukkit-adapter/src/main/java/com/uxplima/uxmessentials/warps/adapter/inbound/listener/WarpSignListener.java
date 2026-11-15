@@ -14,11 +14,11 @@ import org.bukkit.event.block.SignChangeEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -89,8 +89,11 @@ public final class WarpSignListener implements Listener {
             return;
         }
 
-        // Colorize sign header to mark it as an active warp sign.
-        event.line(0, Component.text(header, NamedTextColor.DARK_BLUE));
+        // The colour marks an active warp sign. Only the colour comes from the catalogue: the header's words stay the
+        // configured ones, because a sign is matched by its plain text.
+        event.line(
+                0,
+                feedback.render(player, WarpsMessageKey.WARP_SIGN_HEADER, Map.of("header", StyledText.escape(header))));
         feedback.send(player, WarpsMessageKey.WARP_SIGN_CREATED);
     }
 
@@ -110,7 +113,7 @@ public final class WarpSignListener implements Listener {
         String header = config.getString("warp-sign-header", "[Warp]");
         org.bukkit.block.sign.SignSide front = sign.getSide(org.bukkit.block.sign.Side.FRONT);
         // Plain text strips any colour, so the same comparison matches both a freshly typed header and the
-        // dark-blue header the create handler applies to mark an active warp sign.
+        // coloured header the create handler applies to mark an active warp sign.
         String line0 = plain(front.line(0));
         if (!line0.equalsIgnoreCase(header)) {
             return;

@@ -24,6 +24,7 @@ import org.bukkit.util.Vector;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.holograms.application.HologramsMessageKey;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardEntry;
 import com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.holograms.domain.LeaderboardSpec;
 import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
+import com.uxplima.uxmessentials.shared.application.message.CatalogLine;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -317,23 +319,31 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
         scheduler.onRegion(gone.anchor, drawn::remove);
     }
 
-    /** The top rows of {@code spec}'s provider, one ranked line each; a single line saying so when there are none. */
+    /**
+     * The top rows of {@code spec}'s provider, one ranked line each; a single line saying so when there are none. Each
+     * row is a catalogue line, so a viewer reads it in their own language and the theme's colours.
+     */
     private List<HologramLine> rowsOf(LeaderboardSpec spec) {
         List<LeaderboardEntry> entries = leaderboards
                 .find(spec.providerId())
                 .map(provider -> provider.top(spec.limit()))
                 .orElse(List.of());
         if (entries.isEmpty()) {
-            return List.of(new HologramLine("<gray>(no data)"));
+            return List.of(catalogLine(HologramsMessageKey.HOLOGRAM_LEADERBOARD_EMPTY, Map.of()));
         }
         List<HologramLine> rows = new ArrayList<>(entries.size());
         int rank = 1;
         for (LeaderboardEntry entry : entries) {
-            rows.add(new HologramLine(
-                    "<gray>#" + rank + " <white>" + entry.name() + " <gray>- <green>" + entry.score()));
+            rows.add(catalogLine(
+                    HologramsMessageKey.HOLOGRAM_LEADERBOARD_ROW,
+                    Map.of("rank", String.valueOf(rank), "name", entry.name(), "score", entry.score())));
             rank++;
         }
         return rows;
+    }
+
+    private static HologramLine catalogLine(HologramsMessageKey key, Map<String, String> arguments) {
+        return new HologramLine(new CatalogLine(key.key(), arguments).written());
     }
 
     /**

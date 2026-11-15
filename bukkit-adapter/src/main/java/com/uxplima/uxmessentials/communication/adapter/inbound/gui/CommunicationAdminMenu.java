@@ -70,7 +70,6 @@ public final class CommunicationAdminMenu {
     private final Messages messages;
     private final ChatLock chatLock;
     private final BukkitAnnouncerBroadcaster broadcaster;
-    private final String broadcastPrefix;
     private final Supplier<AnnouncerConfig> announcerConfig;
     private final Notifier notifier;
     private final MessageSink sink;
@@ -83,7 +82,6 @@ public final class CommunicationAdminMenu {
             Messages messages,
             ChatLock chatLock,
             BukkitAnnouncerBroadcaster broadcaster,
-            String broadcastPrefix,
             Supplier<AnnouncerConfig> announcerConfig,
             Notifier notifier,
             MessageSink sink,
@@ -94,7 +92,6 @@ public final class CommunicationAdminMenu {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.chatLock = Objects.requireNonNull(chatLock, "chatLock");
         this.broadcaster = Objects.requireNonNull(broadcaster, "broadcaster");
-        this.broadcastPrefix = Objects.requireNonNull(broadcastPrefix, "broadcastPrefix");
         this.announcerConfig = Objects.requireNonNull(announcerConfig, "announcerConfig");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.sink = Objects.requireNonNull(sink, "sink");
@@ -190,7 +187,7 @@ public final class CommunicationAdminMenu {
     void submitBroadcast(String raw) {
         Objects.requireNonNull(raw, "raw");
         if (!raw.isBlank()) {
-            broadcaster.broadcast(broadcastPrefix + raw.strip());
+            broadcaster.broadcast(raw.strip());
         }
     }
 

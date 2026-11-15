@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.bootstrap.di;
 
 import java.time.Duration;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -15,15 +16,17 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.mapmarker.MapMarkersWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksApplier;
 import com.uxplima.uxmessentials.shared.adapter.outbound.serverlinks.ServerLinksConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.update.UpdateCheckSettings;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.scheduler.PaperScheduler;
 import com.uxplima.uxmlib.scheduler.Scheduler;
 import com.uxplima.uxmlib.scheduler.TaskHandle;
-import com.uxplima.uxmlib.text.Text;
 import com.uxplima.uxmlib.update.JsonUrlReleaseProvider;
 import com.uxplima.uxmlib.update.UpdateAnnouncement;
 import com.uxplima.uxmlib.update.UpdateChecker;
@@ -55,19 +58,22 @@ final class IntegrationsWiring {
     // server owner controls exactly who is told (the uxmLib notifier gates on the permission, not on op status).
     private static final String UPDATE_NOTIFY_PERMISSION = "uxmessentials.update.notify";
 
-    // What the notice says. uxmLib used to write this line itself and it stopped: a library that words a
-    // message decides how a plugin sounds, and that is the plugin's to decide. The wording is the one the
-    // library shipped, kept to the letter, because an operator who has read this line on every start should
-    // not have to read a new one to learn the same thing.
-    private static final UpdateAnnouncement UPDATE_ANNOUNCEMENT = (pluginName, currentVersion, release) -> Text.mini(
-                    "<gray>[<aqua><name></aqua>]</gray> <yellow>A new version is available:</yellow> "
-                            + "<gray><current></gray> <dark_gray>-></dark_gray> <green><latest></green>",
-                    Text.placeholder("name", pluginName),
-                    Text.placeholder("current", currentVersion),
-                    Text.placeholder("latest", release.version()))
-            .appendSpace()
-            .append(Text.mini("<aqua><underlined>[Open release page]</underlined></aqua>")
-                    .clickEvent(ClickEvent.openUrl(release.url())));
+    // What the notice says. uxmLib used to write this line itself and it stopped: a library that words a message
+    // decides how a plugin sounds, and that is the plugin's to decide. The library hands over one notice for every
+    // operator it reaches and the console, so it is read in the server's own language rather than each reader's.
+    private static UpdateAnnouncement updateAnnouncement(Messages messages) {
+        PlayerRef server = PlayerRef.system("update");
+        return (pluginName, currentVersion, release) -> StyledText.render(messages.resolve(
+                        server,
+                        SharedMessageKey.ADMIN_UPDATE_AVAILABLE,
+                        Map.of(
+                                "name", StyledText.escape(pluginName),
+                                "current", StyledText.escape(currentVersion),
+                                "latest", StyledText.escape(release.version()))))
+                .appendSpace()
+                .append(StyledText.render(messages.resolve(server, SharedMessageKey.ADMIN_UPDATE_OPEN, Map.of()))
+                        .clickEvent(ClickEvent.openUrl(release.url())));
+    }
 
     /**
      * Apply server links, start the update checker, and wire the map-marker integration from {@code config},
@@ -153,7 +159,7 @@ final class IntegrationsWiring {
                 new JsonUrlReleaseProvider(settings.sourceUrl()),
                 plugin.getPluginMeta().getVersion());
         Runnable stop = settings.notifyOpsOnJoin()
-                ? startWithJoinNotice(plugin, scheduler, checker, settings)
+                ? startWithJoinNotice(plugin, scheduler, checker, settings, kernel.messages())
                 : startConsoleOnly(scheduler, checker, kernel.log(), settings);
         return new Wired(stop);
     }
@@ -163,9 +169,13 @@ final class IntegrationsWiring {
     // interval (check-once) falls back to the shipped default cadence here. The join listener self-warms its
     // cache anyway, so a player who joins before the first poll still triggers a check.
     private static Runnable startWithJoinNotice(
-            JavaPlugin plugin, Scheduler scheduler, UpdateChecker checker, UpdateCheckSettings settings) {
+            JavaPlugin plugin,
+            Scheduler scheduler,
+            UpdateChecker checker,
+            UpdateCheckSettings settings,
+            Messages messages) {
         UpdateNotifier notifier =
-                new UpdateNotifier(plugin, scheduler, checker, UPDATE_NOTIFY_PERMISSION, UPDATE_ANNOUNCEMENT);
+                new UpdateNotifier(plugin, scheduler, checker, UPDATE_NOTIFY_PERMISSION, updateAnnouncement(messages));
         notifier.start(Duration.ZERO, settings.repeats() ? settings.interval() : DEFAULT_POLL_PERIOD);
         return notifier::stop;
     }
