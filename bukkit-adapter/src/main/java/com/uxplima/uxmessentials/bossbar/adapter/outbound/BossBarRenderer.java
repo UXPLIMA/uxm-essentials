@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.hud.AnimationRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.BuiltinTokens;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
 import org.jspecify.annotations.NullMarked;
 
@@ -204,7 +205,7 @@ public final class BossBarRenderer {
 
     private static ConditionContext conditionContext(Player player) {
         return new ConditionContext(
-                player::hasPermission,
+                node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
                 PlaceholderApiSupport.messageBridge(player.getUniqueId()));

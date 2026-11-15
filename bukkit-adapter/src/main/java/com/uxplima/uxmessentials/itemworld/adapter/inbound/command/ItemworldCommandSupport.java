@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandUsage;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
@@ -150,7 +151,7 @@ abstract class ItemworldCommandSupport {
         String node = family.apply(type.toLowerCase(Locale.ROOT));
         boolean allowed = sender instanceof Player player
                 ? services.kernel().permissions().has(ref(player), node)
-                : sender.hasPermission(node);
+                : CatalogPermissionCheck.has(sender, node);
         if (allowed) {
             return true;
         }
