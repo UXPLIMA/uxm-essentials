@@ -1,13 +1,17 @@
 package com.uxplima.uxmessentials.economy.adapter.outbound;
 
+import java.math.BigDecimal;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
+import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import org.jspecify.annotations.NullMarked;
 
@@ -24,6 +28,13 @@ public final class ProviderWarpEconomy extends AbstractProviderEconomy implement
 
     public ProviderWarpEconomy(EconomyProvider economy, Currency currency, Optional<ChargeReceipts> receipts) {
         super(economy, currency, receipts);
+    }
+
+    @Override
+    public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        return economy().credit(who, Money.of(resolve(currencyId), amount)).isOk();
     }
 
     @Override

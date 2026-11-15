@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.application.hop;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
@@ -25,7 +26,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>A new hop overwrites the player's single row, so an earlier one nobody claimed is refunded as it is replaced;
  * otherwise its timer would find the newer row, claim nothing, and keep that charge. An earlier row of a kind this
- * backend has no resolver for cannot be refunded here, so the new hop is refused instead of overwriting it.
+ * backend has no resolver for cannot be refunded here, so the new hop is refused instead of overwriting it, until
+ * that row is past twice the TTL: then it is claimed and logged (see {@link AbandonedHops}) and the new hop goes
+ * ahead.
  *
  * <p>The claim and the refund are IO, so {@link #track} is called off the tick thread and the TTL check runs on the
  * {@link Scheduler}'s async lane.
@@ -38,6 +41,7 @@ public final class HopWatchdog {
     private final Scheduler scheduler;
     private final Logger log;
     private final Duration requestTtl;
+    private final AbandonedHops abandoned;
 
     public HopWatchdog(
             PendingHopStore store,
@@ -45,13 +49,15 @@ public final class HopWatchdog {
             HopCharges charges,
             Scheduler scheduler,
             Logger log,
-            Duration requestTtl) {
+            Duration requestTtl,
+            Clock clock) {
         this.store = Objects.requireNonNull(store, "store");
         this.resolvers = Objects.requireNonNull(resolvers, "resolvers");
         this.charges = Objects.requireNonNull(charges, "charges");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.requestTtl = Objects.requireNonNull(requestTtl, "requestTtl");
+        this.abandoned = new AbandonedHops(store, log, requestTtl, clock);
     }
 
     /**
@@ -103,6 +109,9 @@ public final class HopWatchdog {
         }
         Optional<HopResolver> resolver = resolvers.find(earlier.get().kind());
         if (resolver.isEmpty()) {
+            if (abandoned.claimUnresolvable(earlier.get())) {
+                return true;
+            }
             log.warn(
                     "event=cross_server_hop_replace_refused player={} earlier_kind={} reason=no_resolver",
                     who.uuid(),

@@ -57,10 +57,14 @@ public final class HopDepartures {
     /**
      * Whether {@code who} may start {@code departure} under the rules a local teleport obeys. Called before the
      * caller charges, so a refused hop costs nothing; on false the player has already been told why.
+     *
+     * @throws IllegalStateException when no resolver serves the departure's kind on this backend, a wiring fault
+     *     raised here so it surfaces before any money moves rather than at {@link #send}, after the charge
      */
     public boolean admit(PlayerRef who, HopDeparture departure) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(departure, "departure");
+        resolverFor(departure.kind());
         return gate.admits(who, departure);
     }
 
@@ -75,9 +79,7 @@ public final class HopDepartures {
         Objects.requireNonNull(departure, "departure");
         Objects.requireNonNull(charge, "charge");
         Objects.requireNonNull(settlement, "settlement");
-        HopResolver resolver = resolvers
-                .find(departure.kind())
-                .orElseThrow(() -> new IllegalStateException("no hop resolver for " + departure.kind()));
+        HopResolver resolver = resolverFor(departure.kind());
         String target = departure.targetServer();
         if (!connector.isAvailable()) {
             charges.fail(resolver, who, charge, HopNotice.UNAVAILABLE, Map.of("server", target), departure.label());
@@ -98,5 +100,9 @@ public final class HopDepartures {
         }
         charges.tell(resolver, who, HopNotice.SENDING, Map.of("server", target), departure.label());
         scheduler.onEntity(who, () -> connector.connect(who, target));
+    }
+
+    private HopResolver resolverFor(HopKind kind) {
+        return resolvers.find(kind).orElseThrow(() -> new IllegalStateException("no hop resolver for " + kind));
     }
 }

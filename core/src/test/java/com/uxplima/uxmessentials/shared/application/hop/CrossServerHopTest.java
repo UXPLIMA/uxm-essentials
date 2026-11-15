@@ -4,6 +4,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -49,7 +50,7 @@ class CrossServerHopTest {
     private final List<String> connects = new ArrayList<>();
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = homesOn(LOBBY);
-    private final HopWatchdog watchdog = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL);
+    private final HopWatchdog watchdog = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL, homesOn(SURVIVAL));
     private Landing landing = Landing.LAND;
     private boolean gateRefuses;
@@ -264,6 +265,66 @@ class CrossServerHopTest {
         scheduler.advance(TTL);
         assertThat(ledger.wallet).isEqualByComparingTo(START);
         assertThat(ledger.refunds).isEqualTo(2);
+    }
+
+    @Test
+    void aStaleRowOfAKindNoResolverHereServesIsClaimedOnJoinAndLoggedWithItsCharge() {
+        store.record(jailHop(clock.instant()));
+        clock.advance(TTL.multipliedBy(2).plusSeconds(1));
+
+        join(arrivalOn(SURVIVAL, new HopResolvers()));
+
+        assertThat(store.rows()).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.refunds).isZero();
+        assertThat(log.warnings())
+                .anySatisfy(line -> assertThat(line)
+                        .contains("cross_server_hop_abandoned")
+                        .contains("JAIL")
+                        .contains("10")
+                        .contains("coins"));
+    }
+
+    @Test
+    void aFreshRowOfAnUnknownKindRefusesANewHopAndRefundsIt() {
+        store.record(jailHop(clock.instant()));
+
+        goHome();
+
+        assertThat(store.find(ALEX.uuid()).map(PendingHop::kind)).contains(HopKind.JAIL);
+        assertThat(connects).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(notifier.keys()).containsExactly("home.hop.unavailable", "home.hop.refunded");
+    }
+
+    @Test
+    void aStaleRowOfAnUnknownKindNoLongerBlocksANewHop() {
+        store.record(jailHop(clock.instant()));
+        clock.advance(TTL.multipliedBy(2).plusSeconds(1));
+
+        goHome();
+
+        assertThat(store.find(ALEX.uuid()).map(PendingHop::kind)).contains(HopKind.HOME);
+        assertThat(connects).containsExactly("Alex->survival");
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("cross_server_hop_abandoned"));
+    }
+
+    @Test
+    void aKindWithNoResolverIsRefusedAtAdmissionBeforeAnythingIsCharged() {
+        HopDeparture toNether =
+                new HopDeparture(HopKind.WORLD, "nether", SURVIVAL, "nether", at(0, 64, 0), Optional.empty());
+
+        assertThatThrownBy(() -> lobby.admit(ALEX, toNether)).isInstanceOf(IllegalStateException.class);
+
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(store.rows()).isEmpty();
+        assertThat(connects).isEmpty();
+    }
+
+    /** A charged hop of a kind neither backend in this test registers. */
+    private static PendingHop jailHop(java.time.Instant at) {
+        return new PendingHop(
+                ALEX.uuid(), HopKind.JAIL, "cell-1", SURVIVAL, "prison", at, Optional.of(FEE), Optional.empty());
     }
 
     /** How the fake move ends. */

@@ -96,7 +96,7 @@ class CrossServerTeleportTest {
     private final List<String> connects = new ArrayList<>();
     private final HopCharges charges = new HopCharges(notifier.notifier(), log);
     private final HopResolvers lobbyResolvers = resolversOn(LOBBY);
-    private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL);
+    private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
     private HopGate gate = HopGate.OPEN;
     private boolean tagged;

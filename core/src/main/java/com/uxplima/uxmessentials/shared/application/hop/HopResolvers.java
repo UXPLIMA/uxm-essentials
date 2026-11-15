@@ -28,4 +28,9 @@ public final class HopResolvers {
         Objects.requireNonNull(kind, "kind");
         return Optional.ofNullable(byKind.get(kind));
     }
+
+    /** True while no kind has registered, so a join has no hop to look for on this backend. */
+    public boolean isEmpty() {
+        return byKind.isEmpty();
+    }
 }

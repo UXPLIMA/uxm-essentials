@@ -1,5 +1,6 @@
-package com.uxplima.uxmessentials.persistence.playerwarps;
+package com.uxplima.uxmessentials.persistence.hop;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarpPendingTeleports.PLAYER_WARP_PENDING_TELEPORTS;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
@@ -18,12 +19,13 @@ import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
+import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.sqlite.SQLiteDataSource;
 
-/** The pending cross-server hop row through the real migrations on a SQLite file. */
+/** The pending cross-server hop row of every kind through the real migrations on a SQLite file. */
 class JooqPendingHopStoreTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-000000000a1e");
@@ -34,13 +36,15 @@ class JooqPendingHopStoreTest {
     Path folder;
 
     private PendingHopStore store;
+    private DSLContext dsl;
 
     @BeforeEach
     void open() {
         SQLiteDataSource data = new SQLiteDataSource();
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
         new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        store = new JooqPendingHopStore(DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), ""));
+        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+        store = new JooqPendingHopStore(dsl);
     }
 
     private static PendingHop request(Instant at) {
@@ -104,13 +108,78 @@ class JooqPendingHopStoreTest {
     }
 
     @Test
-    void aHopOfAKindTheTableCannotHoldIsRefusedAndLeavesThePlayerWarpRow() {
+    void aHopOfAnotherKindSurvivesTheRoundTripAndIsClaimedOnlyAsItself() {
+        PendingHop toMarket = new PendingHop(
+                ALEX,
+                HopKind.WARP,
+                "market",
+                "survival",
+                "lobby",
+                ASKED,
+                Optional.of(new HopCharge(new BigDecimal("3.0000"), "gold")),
+                Optional.of(new HopSettlement("keeper")));
+        store.record(toMarket);
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.WARP);
+        assertThat(found.target()).isEqualTo("market");
+        assertThat(found.settlement()).contains(new HopSettlement("keeper"));
+        assertThat(found.charge().orElseThrow().amount()).isEqualByComparingTo("3");
+        assertThat(store.clear(hop(HopKind.HOME, ASKED, Optional.empty()))).isZero();
+        assertThat(store.clear(request(ASKED))).isZero();
+        assertThat(store.clear(found)).isEqualTo(1);
+    }
+
+    @Test
+    void aHopOfAnotherKindKeepsAWarpIdNoPlayerWarpHasSoAnOlderBackendCannotTakeIt() {
+        store.record(new PendingHop(
+                ALEX, HopKind.WARP, "market", "survival", "lobby", ASKED, Optional.empty(), Optional.empty()));
+
+        var row = dsl.selectFrom(PLAYER_WARP_PENDING_TELEPORTS).fetchSingle();
+
+        assertThat(row.getWarpId()).isZero();
+        assertThat(row.getKind()).isEqualTo("WARP");
+    }
+
+    @Test
+    void aPlayerWarpHopIsWrittenInTheShapeAnOlderBackendReads() {
         store.record(request(ASKED));
 
-        assertThatThrownBy(() -> store.record(hop(HopKind.HOME, ASKED.plusSeconds(1), Optional.empty())))
+        var row = dsl.selectFrom(PLAYER_WARP_PENDING_TELEPORTS).fetchSingle();
+
+        assertThat(row.getKind()).isNull();
+        assertThat(row.getTargetRef()).isNull();
+        assertThat(row.getWarpId()).isEqualTo(7L);
+        assertThat(row.getAccrueOnArrival()).isEqualTo((short) 1);
+    }
+
+    @Test
+    void aRowAnOlderReleaseWroteStillResolvesAsAPlayerWarpHop() {
+        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
+                .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "survival")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
+                .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
+                .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
+                .execute();
+
+        PendingHop found = store.find(ALEX).orElseThrow();
+
+        assertThat(found.kind()).isEqualTo(HopKind.PLAYER_WARP);
+        assertThat(found.target()).isEqualTo("7");
+        assertThat(found.settlement()).isEmpty();
+        assertThat(found.charge().orElseThrow().amount()).isEqualByComparingTo("25.5");
+        assertThat(store.clear(found)).isEqualTo(1);
+    }
+
+    @Test
+    void aPlayerWarpHopThatSettlesToAnotherWarpIsRefused() {
+        assertThatThrownBy(() -> store.record(hop(HopKind.PLAYER_WARP, ASKED, Optional.of(new HopSettlement("8")))))
                 .isInstanceOf(IllegalArgumentException.class);
 
-        assertThat(store.clear(hop(HopKind.HOME, ASKED, TO_THE_WARP))).isZero();
-        assertThat(store.find(ALEX).map(PendingHop::kind)).contains(HopKind.PLAYER_WARP);
+        assertThat(store.find(ALEX)).isEmpty();
     }
 }

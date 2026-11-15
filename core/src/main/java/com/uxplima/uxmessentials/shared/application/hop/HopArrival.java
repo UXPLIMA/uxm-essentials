@@ -19,7 +19,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * {@link HopResolver} finds the destination and the player is moved after a short settling delay. The charge is
  * settled only once the player has landed. A row past its expiry, or one aimed at another backend, is refunded
  * instead, and so is a destination that is gone or has moved off this backend, and a hop that is refused or
- * misses. A row of a kind with no resolver here is left alone: the origin's {@link HopWatchdog} refunds it.
+ * misses. A row of a kind with no resolver here is left alone while it is fresh, since the origin's
+ * {@link HopWatchdog} refunds it; once it is past the expiry it is claimed and logged instead, so it neither stays
+ * forever nor blocks the player's next hop.
  *
  * <p>Nothing is acted on before the row is claimed: the store's conditional delete must remove it, or this join
  * does nothing. Of two quick joins, or a join racing the origin's watchdog, only one caller can win that delete,
@@ -41,8 +43,7 @@ public final class HopArrival {
     private final Logger log;
     private final String localServerId;
     private final Duration arrivalDelay;
-    private final Duration expiry;
-    private final Clock clock;
+    private final AbandonedHops abandoned;
 
     public HopArrival(
             PendingHopStore store,
@@ -61,11 +62,7 @@ public final class HopArrival {
         this.log = Objects.requireNonNull(log, "log");
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.arrivalDelay = Objects.requireNonNull(arrivalDelay, "arrivalDelay");
-        // The request time is stamped by the origin's clock and read against this backend's, so a skew between
-        // the two would expire a fresh hop. Twice the TTL absorbs that; the live case, a player the proxy never
-        // moved, is already settled at one TTL by the origin's watchdog, which compares only its own clock.
-        this.expiry = Objects.requireNonNull(requestTtl, "requestTtl").multipliedBy(2);
-        this.clock = Objects.requireNonNull(clock, "clock");
+        this.abandoned = new AbandonedHops(store, log, requestTtl, clock);
     }
 
     /** Read the joining player's pending hop off-tick and either schedule the move or refund the row. */
@@ -83,14 +80,16 @@ public final class HopArrival {
         PendingHop pending = found.get();
         Optional<HopResolver> known = resolvers.find(pending.kind());
         if (known.isEmpty()) {
-            log.warn(
-                    "event=cross_server_hop_unknown_kind player={} kind={} outcome=left_for_origin",
-                    who.uuid(),
-                    pending.kind());
+            if (!abandoned.claimUnresolvable(pending)) {
+                log.warn(
+                        "event=cross_server_hop_unknown_kind player={} kind={} outcome=left_for_origin",
+                        who.uuid(),
+                        pending.kind());
+            }
             return;
         }
         HopResolver resolver = known.get();
-        boolean expired = isExpired(pending);
+        boolean expired = abandoned.expired(pending);
         // A row aimed at another backend means the proxy put the player somewhere other than the destination's
         // backend, so the hop they paid for never happened and no other backend will see this row again.
         boolean misrouted = !pending.targetServer().equals(localServerId);
@@ -170,10 +169,5 @@ public final class HopArrival {
             log.warn("event=cross_server_hop_async_rejected reason={}", rejected.toString());
             work.run();
         }
-    }
-
-    /** True once the hop has aged past the expiry, so a long-abandoned row is refunded not honoured. */
-    private boolean isExpired(PendingHop pending) {
-        return pending.requestedAt().plus(expiry).isBefore(clock.instant());
     }
 }
