@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import org.bukkit.plugin.Plugin;
 
@@ -55,6 +56,13 @@ import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.PlayerWarpSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WalletSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
@@ -92,6 +100,8 @@ public final class MigrationWiring {
      * @param enabled the {@link MigrationModule} enable gate (ships disabled)
      * @param messagingConfig the {@code modules.messaging} config subtree (the mail retention), empty when the
      *     messaging module is off; then imported mail is skipped and audited
+     * @param targets the running modules' own repositories, which the import writes through so their caches see it
+     * @param publisher the cross-server bus, which the fallback stores announce imported rows on
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -102,16 +112,20 @@ public final class MigrationWiring {
             Logger log,
             AuditChannel auditChannel,
             boolean enabled,
-            Optional<ConfigStore> messagingConfig) {
+            Optional<ConfigStore> messagingConfig,
+            ImportTargets targets,
+            BusPublisher publisher) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
         Objects.requireNonNull(economyConfig, "economyConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(publisher, "publisher");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
-        Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig);
+        Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig, targets, publisher);
         ImportOptions options = options(plugin, migrationConfig, log);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
@@ -211,18 +225,32 @@ public final class MigrationWiring {
             Persistence persistence,
             ConfigStore economyConfig,
             Logger log,
-            Optional<ConfigStore> messagingConfig) {
-        HomeRepository homes = HomeRepositories.cached(persistence);
-        WarpRepository warps = WarpRepositories.cached(persistence);
-        ModerationRepository moderation = ModerationStores.repository(persistence);
-        KitRepository kits = kitRepository(plugin, log);
-        HologramRepository holograms = HologramRepositories.cached(persistence);
-        WorldRepository worldRegistry = WorldRepositories.cached(persistence);
+            Optional<ConfigStore> messagingConfig,
+            ImportTargets targets,
+            BusPublisher publisher) {
         CurrencyRegistry currencies = new EconomyConfig(economyConfig).currencies();
         Currency defaultCurrency = currencies.defaultCurrency();
         Clock clock = Clock.systemUTC();
-        WalletRepository wallets = WalletRepositories.repository(persistence, currencies, clock);
-        PlayerWarpRecordWriter playerWarps = playerWarpWriter(persistence, clock, log);
+        // Each target is the running module's own repository; only a module that is off gets a store over the
+        // database, and each cached store is wrapped in that kind's cross-server broadcaster, so a peer that runs
+        // the module still drops or reloads its copy of an imported row.
+        HomeRepository homes =
+                targets.homesOr(() -> HomeSync.repository(HomeRepositories.cachedConcrete(persistence), publisher));
+        WalletRepository wallets = targets.walletsOr(
+                () -> WalletSync.repository(WalletRepositories.repository(persistence, currencies, clock), publisher));
+        WarpRepository warps =
+                targets.warpsOr(() -> WarpSync.repository(WarpRepositories.cachedConcrete(persistence), publisher));
+        KitRepository kits = targets.kitsOr(() -> kitRepository(plugin, log));
+        HologramRepository holograms = targets.hologramsOr(
+                () -> HologramSync.repository(HologramRepositories.cachedConcrete(persistence), publisher));
+        // The worlds register has no cross-server frame, so a peer has nothing to hear.
+        WorldRepository worldRegistry = targets.worldsOr(() -> WorldRepositories.cached(persistence));
+        PlayerWarpRepository playerWarpRepository = targets.playerWarpsOr(() -> PlayerWarpSync.repository(
+                PlayerWarpRepositories.cachedConcrete(persistence, UUID::toString), publisher));
+        // Moderation, mail and the player-warp side stores keep no cache: every reader queries the database, so a
+        // fresh store sees exactly what the running modules see.
+        ModerationRepository moderation = ModerationStores.repository(persistence);
+        PlayerWarpRecordWriter playerWarps = playerWarpWriter(playerWarpRepository, persistence, clock, log);
         // The mail table ships with every install, but a disabled messaging module means the operator does not want
         // mail, so the import leaves it out rather than filling a mailbox nobody can open.
         Optional<MailRepository> mail = messagingConfig.map(ignored -> MessagingStores.mail(persistence));
@@ -244,9 +272,10 @@ public final class MigrationWiring {
      * can never reach a state a live command could not. The AxPlayerWarps, Athelion and Olzie sources all funnel
      * through this one writer.
      */
-    private static PlayerWarpRecordWriter playerWarpWriter(Persistence persistence, Clock clock, Logger log) {
+    private static PlayerWarpRecordWriter playerWarpWriter(
+            PlayerWarpRepository repository, Persistence persistence, Clock clock, Logger log) {
         return new PlayerWarpRecordWriter(
-                PlayerWarpRepositories.cached(persistence),
+                repository,
                 PlayerWarpRepositories.passwordStore(persistence),
                 PlayerWarpRepositories.memberStore(persistence, log),
                 PlayerWarpRepositories.whitelistStore(persistence, clock),
@@ -256,10 +285,9 @@ public final class MigrationWiring {
     }
 
     /**
-     * The file-backed kit catalog the import writes through. The same {@code modules/kits/kits/} tree the kits
-     * module owns, since kits are deliberately file-based rather than in the relational store. The kits module
-     * caches its own instance, so an imported kit becomes visible to {@code /kit} after a {@code reload kits} or
-     * a restart, exactly as a hand-edited kit file would.
+     * The file-backed kit catalog, the same {@code modules/kits/kits/} tree the kits module owns, since kits are
+     * deliberately file-based rather than in the relational store. Used only when the kits module is off; a running
+     * kits module hands its own catalog in, so an imported kit is offered by {@code /kit} at once.
      */
     private static KitRepository kitRepository(Plugin plugin, Logger log) {
         Path dataFolder = plugin.getDataFolder().toPath();

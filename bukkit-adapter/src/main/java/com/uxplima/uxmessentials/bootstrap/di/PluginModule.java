@@ -122,6 +122,7 @@ import com.uxplima.uxmessentials.messaging.adapter.outbound.PresenceAfkStatus;
 import com.uxplima.uxmessentials.messaging.adapter.outbound.api.MessagingQueries;
 import com.uxplima.uxmessentials.migration.MigrationModule;
 import com.uxplima.uxmessentials.migration.adapter.DataDirBackupSnapshot;
+import com.uxplima.uxmessentials.migration.adapter.ImportTargets;
 import com.uxplima.uxmessentials.migration.adapter.MigrationImportService;
 import com.uxplima.uxmessentials.migration.adapter.MigrationWiring;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationWiring;
@@ -821,6 +822,9 @@ public final class PluginModule {
                 plugin.getServer(),
                 kernel.log());
 
+        // The repositories the running modules serve players from, filled as each one wires, so the importer
+        // built below writes through those caches rather than past them.
+        ImportTargets importTargets = new ImportTargets();
         PlaceholderContexts placeholders = wireModules(
                 plugin,
                 registry,
@@ -829,6 +833,7 @@ public final class PluginModule {
                 auditChannel,
                 queries,
                 actions,
+                importTargets,
                 persistence,
                 resources,
                 log,
@@ -864,7 +869,8 @@ public final class PluginModule {
         resources.onClose(pauseLinks.stop());
         resources.addReloadTask(ReloadTask.kernel(
                 "server links", pauseLinks.reload(), "pause-menu links re-read and sent to every player"));
-        MigrationImportNode importNode = wireMigration(plugin, registry, config, kernel, persistence, auditChannel);
+        MigrationImportNode importNode =
+                wireMigration(plugin, registry, config, kernel, persistence, auditChannel, importTargets, bus.bus());
         List<HealthCheck> healthChecks =
                 healthChecks(plugin, registry, config, persistence, bus, resources, placeholdersPublished::get);
         // The management-GUI hub is bootstrap-level (no feature context owns it): /uxmess gui draws the
@@ -999,7 +1005,9 @@ public final class PluginModule {
             ConfigStore config,
             KernelPorts kernel,
             Persistence persistence,
-            AuditChannel auditChannel) {
+            AuditChannel auditChannel,
+            ImportTargets importTargets,
+            Bus bus) {
         // The migration adapter is command-gated, not a steady-state feature context, so it is wired here in
         // the operator surface rather than registered in the feature-module registry. Its enable gate ships
         // disabled; an enabled module publishes a live /uxmess import, a disabled one a dormant command that
@@ -1016,7 +1024,9 @@ public final class PluginModule {
                 module.enabled(config),
                 moduleEnabled(registry, config, "messaging")
                         ? Optional.of(config.scoped(ModuleId.of("messaging").configRoot()))
-                        : Optional.empty());
+                        : Optional.empty(),
+                importTargets,
+                bus.publisher());
         return new MigrationImportNode(service, kernel.messages());
     }
 
@@ -1125,6 +1135,7 @@ public final class PluginModule {
             AuditChannel auditChannel,
             QueryContexts queries,
             ActionContexts actions,
+            ImportTargets importTargets,
             Persistence persistence,
             CloseableResources resources,
             Logger log,
@@ -1138,7 +1149,7 @@ public final class PluginModule {
             Function<com.uxplima.uxmessentials.shared.domain.PlayerRef, Locale> languages) {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
-        ContextLinks links = new ContextLinks(auditChannel, queries, actions);
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions, importTargets);
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -2243,6 +2254,7 @@ public final class PluginModule {
         // reconcile: auto-load may load a world declaring generator: uxmEssentials:void|flat, which routes
         // back through that hook, so the resolver must be reachable first.
         resources.worldGeneratorResolver(wired.generatorResolver());
+        links.importTargets.worlds(wired.repository());
         links.placeholders.worlds(wired.worldsPlaceholders());
         links.queries.register(
                 UxmWorldsQuery.class,
@@ -2301,6 +2313,7 @@ public final class PluginModule {
         // cache-backed locator, so a HOME step in a configured respawn chain now lands on the player's home.
         // When teleport is disabled its holder is absent and this bind is a no-op.
         bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
+        links.importTargets.homes(wired.repository());
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
         links.queries.register(
                 UxmHomesQuery.class,
@@ -2361,6 +2374,7 @@ public final class PluginModule {
         // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
         // a give-money click resolves against the same backend and currency registries a warp fee spends through.
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
+        links.importTargets.wallets(wired.ledger().repository());
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
         wireMoneyBoards(ctx, resources, links, wired.defaultCurrency());
@@ -2452,6 +2466,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         bindWarpRespawn(links, new RepositoryWarpRespawnLocator(wired.repository()));
+        links.importTargets.warps(wired.repository());
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
         links.queries.register(
                 UxmWarpsQuery.class,
@@ -2500,6 +2515,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
+        links.importTargets.kits(wired.repository());
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
         links.queries.register(
                 UxmKitsQuery.class,
@@ -3073,6 +3089,7 @@ public final class PluginModule {
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
+        links.importTargets.holograms(wired.repository(), wired.renderer());
         // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "holograms",
@@ -3149,6 +3166,7 @@ public final class PluginModule {
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
         // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
         links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));
+        links.importTargets.playerWarps(wired.repository());
         links.queries.register(
                 UxmPlayerWarpsQuery.class,
                 new PlayerWarpQueries(
@@ -3610,14 +3628,19 @@ public final class PluginModule {
         private final com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions;
         // The one audit channel, so every module that writes a line writes it where the Discord bridge hears it.
         private final AuditChannel auditChannel;
+        // The repositories the importer writes through, each set by its module as it wires; a module that never
+        // wires leaves its slot empty and the importer falls back to the database for that kind.
+        private final ImportTargets importTargets;
 
         private ContextLinks(
                 AuditChannel auditChannel,
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts queries,
-                com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions) {
+                com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions,
+                ImportTargets importTargets) {
             this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
+            this.importTargets = importTargets;
         }
         // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.
         private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();
