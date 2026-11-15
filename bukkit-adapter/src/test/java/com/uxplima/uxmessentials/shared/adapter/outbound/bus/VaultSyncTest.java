@@ -54,13 +54,13 @@ class VaultSyncTest {
 
     @Test
     void createAndUpdateReportWhetherTheyWrote() {
-        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(1), NOW))
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(1), NOW), "close", null)
                         .isPresent())
                 .isFalse();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE)))
                 .isTrue();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
-        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(2), NOW))
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(2), NOW), "close", null)
                         .isPresent())
                 .isTrue();
 
@@ -76,7 +76,9 @@ class VaultSyncTest {
 
         VaultStamp written = store.writeContents(
                         opened.withContents(ALEX, VaultContents.of(new byte[] {5}), NOW.plusSeconds(1))
-                                .result())
+                                .result(),
+                        "close",
+                        null)
                 .orElseThrow();
         rows.held.clear();
 

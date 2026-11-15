@@ -1,10 +1,8 @@
 package com.uxplima.uxmessentials.vaults.application;
 
-import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -26,36 +24,20 @@ public final class SaveVault {
 
     private final VaultRepository repository;
     private final DomainEventPublisher events;
-    private final Clock clock;
 
-    public SaveVault(VaultRepository repository, DomainEventPublisher events, Clock clock) {
+    public SaveVault(VaultRepository repository, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.events = Objects.requireNonNull(events, "events");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
-     * Write {@code newContents} into {@code vault} as {@code owner}'s save and publish the change, returning
-     * whether the vault was still there. A vault deleted while its window was open is not brought back: nothing
-     * is written and the result is {@code false}, so the caller hands the window's items to the player instead.
-     * Bringing it back would give the player a vault they had already been refunded for, or undo a staff delete.
-     */
-    public boolean save(PlayerRef owner, Vault vault, VaultContents newContents) {
-        return save(owner, vault, newContents, clock.instant()).isPresent();
-    }
-
-    /**
-     * {@link #save(PlayerRef, Vault, VaultContents)} with {@code at} as the vault's last-touched instant, returning the
-     * row's stamp after the write, or empty when the vault was gone.
-     */
-    public Optional<VaultStamp> save(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
-        return save(owner, vault, newContents, at, UUID.randomUUID().toString(), null);
-    }
-
-    /**
-     * {@link #save(PlayerRef, Vault, VaultContents, Instant)} recording {@code writer} as the row's writer, and with
-     * {@code onlyAt} writing only while the row is still at that stamp or already carries {@code writer} (see
-     * {@link VaultRepository#writeContents(Vault, String, VaultStamp)}). Empty when nothing was written.
+     * Write {@code newContents} into {@code vault} as {@code owner}'s save, with {@code at} as the vault's last-touched
+     * instant and {@code writer} recorded as the row's writer, and publish the change. Returns the row's stamp after
+     * the write, or empty when nothing was written. A vault deleted while its window was open is not brought back:
+     * that would give the player a vault they had already been refunded for, or undo a staff delete. With
+     * {@code onlyAt} the write applies only while the row is still at that stamp or already carries {@code writer}
+     * (see {@link VaultRepository#writeContents(Vault, String, VaultStamp)}), so it never writes over what another
+     * server wrote.
      */
     public Optional<VaultStamp> save(
             PlayerRef owner,
@@ -78,23 +60,11 @@ public final class SaveVault {
     }
 
     /**
-     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window: the
-     * staff member is not the owner the items belong to, and it is how staff fill a vault the owner has not opened
-     * yet. A vault this brings back records no payment, so deleting it again refunds nothing.
+     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window that found
+     * the row missing: the staff member is not the owner the items belong to, and it is how staff fill a vault the
+     * owner has not opened yet. Records {@code writer} as the row's writer and returns the row's stamp after the write.
+     * A vault this brings back records no payment, so deleting it again refunds nothing.
      */
-    public void keep(PlayerRef owner, Vault vault, VaultContents newContents) {
-        keep(owner, vault, newContents, clock.instant());
-    }
-
-    /**
-     * {@link #keep(PlayerRef, Vault, VaultContents)} with {@code at} as the vault's last-touched instant, returning the
-     * row's stamp after the write.
-     */
-    public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
-        return keep(owner, vault, newContents, at, UUID.randomUUID().toString());
-    }
-
-    /** {@link #keep(PlayerRef, Vault, VaultContents, Instant)} recording {@code writer} as the row's writer. */
     public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at, String writer) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");

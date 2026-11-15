@@ -43,7 +43,7 @@ class VaultWindowsTest {
     private final VaultPurse purse = new VaultPurse("100");
     private final VaultCharge charge = new VaultCharge(permissions, Optional.of(purse), CREATE_5_REFUND_5);
     private final VaultNotifier notifier = new VaultNotifier((viewer, key, placeholders) -> key.key(), (v, t) -> {});
-    private final SaveVault saveVault = new SaveVault(store, new RecordingEvents(), clock);
+    private final SaveVault saveVault = new SaveVault(store, new RecordingEvents());
     private final QuietLog log = new QuietLog();
     private final List<String> handedBack = new ArrayList<>();
     private final QueuedScheduler retries = new QueuedScheduler();
@@ -259,7 +259,7 @@ class VaultWindowsTest {
         // The survival server's clock is five seconds behind this one, and it shares the same store.
         MutableClock behind = new MutableClock(clock.instant().minusSeconds(5));
         VaultWindows<Chest> survival = new VaultWindows<>(
-                new SaveVault(vaults, new RecordingEvents(), behind),
+                new SaveVault(vaults, new RecordingEvents()),
                 vaults,
                 (owner, items) -> {},
                 retries,
@@ -348,14 +348,26 @@ class VaultWindowsTest {
      * is its own, so the failures armed on this server's store never reach it.
      */
     private VaultWindows<Chest> anotherServer() {
+        return anotherServer(new QuietLog());
+    }
+
+    private VaultWindows<Chest> anotherServer(QuietLog itsLog) {
         return new VaultWindows<>(
-                new SaveVault(vaults, new RecordingEvents(), clock),
+                new SaveVault(vaults, new RecordingEvents()),
                 vaults,
                 (owner, items) -> handedBack.add("there " + owner.name() + ":" + bytes(items)),
                 new QueuedScheduler(),
                 () -> true,
                 clock,
-                new QuietLog());
+                itsLog);
+    }
+
+    /** SAM opens ALEX's vault 2 as staff on {@code server}, from the row as it is now. */
+    private Chest staffOn(VaultWindows<Chest> server) {
+        Chest staff = new Chest();
+        staff.items =
+                server.claim(SAM, ALEX, stored(SECOND), staff, old -> old.items).orElseThrow();
+        return staff;
     }
 
     /** Open, change and close ALEX's vault 2 on {@code server}, writing {@code items} there. */
@@ -426,6 +438,47 @@ class VaultWindowsTest {
         assertThat(stored(SECOND).contents()).isEqualTo(VaultContents.of(new byte[] {9}));
         assertThat(handedBack).isEmpty();
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
+    }
+
+    @Test
+    void theOwnersCloseNeverWritesOverAStaffWriteFromAnotherServerWhileItsWindowWasOpen() {
+        vaultHolding(X);
+        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        VaultWindows<Chest> survival = anotherServer();
+        Chest staff = staffOn(survival);
+        owner.items = Y; // X taken out, Y put in by the owner here
+        staff.items = VaultContents.of(new byte[] {9}); // X taken out, 9 put in by staff there
+
+        survival.release(SECOND, staff, staff.items).orElseThrow().run();
+        close(SECOND, owner);
+        runWrites();
+
+        assertThat(stored(SECOND).contents()).isEqualTo(VaultContents.of(new byte[] {9}));
+        assertThat(handedBack).isEmpty();
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
+        assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+    }
+
+    @Test
+    void aStaffCloseNeverWritesOverTheOwnersWriteFromAnotherServerWhileItsWindowWasOpen() {
+        vaultHolding(X);
+        QuietLog survivalLog = new QuietLog();
+        VaultWindows<Chest> survival = anotherServer(survivalLog);
+        Chest staff = staffOn(survival);
+        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        owner.items = Y;
+        staff.items = VaultContents.of(new byte[] {9});
+
+        close(SECOND, owner);
+        runWrites();
+        survival.release(SECOND, staff, staff.items).orElseThrow().run();
+
+        assertThat(stored(SECOND).contents()).isEqualTo(Y);
+        assertThat(handedBack).isEmpty();
+        assertThat(survivalLog.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
+        assertThat(survival.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
     }
 
     @Test

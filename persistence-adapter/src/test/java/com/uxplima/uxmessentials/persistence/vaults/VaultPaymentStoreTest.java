@@ -110,9 +110,13 @@ class VaultPaymentStoreTest {
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
-        vaults.save(created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                .result());
-        vaults.save(Vault.allocate(vault(1), new VaultSize(2), NOW, new VaultPayment(new BigDecimal("99"), "gems")));
+        vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                        .result(),
+                "staff");
+        vaults.save(
+                Vault.allocate(vault(1), new VaultSize(2), NOW, new VaultPayment(new BigDecimal("99"), "gems")),
+                "staff");
 
         assertThat(stored(1).paid()).hasValueSatisfying(paid -> {
             assertThat(paid.amount()).isEqualByComparingTo("5");
@@ -128,8 +132,10 @@ class VaultPaymentStoreTest {
         vaults.create(created);
 
         assertThat(vaults.delete(vault(1), stored(1).paid())).isTrue();
-        vaults.save(created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                .result());
+        vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                        .result(),
+                "staff");
 
         assertThat(stored(1).paid()).isEmpty();
     }
@@ -194,9 +200,12 @@ class VaultPaymentStoreTest {
         upgrade();
         assertThat(vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS)))
                 .isTrue();
-        vaults.writeContents(stored(1)
-                .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
-                .result());
+        vaults.writeContents(
+                stored(1)
+                        .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
+                        .result(),
+                "close",
+                null);
 
         assertThat(vaults.create(Vault.allocate(
                         vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("50"), "coins"))))
@@ -260,9 +269,12 @@ class VaultPaymentStoreTest {
 
         vaults.update(opened.renamedTo("loot").iconSet("DIAMOND"), Columns.PRESENTATION);
         Instant later = NOW.plusSeconds(60);
-        vaults.writeContents(opened.openedAt(new VaultSize(3))
-                .withContents(ALEX, VaultContents.of(new byte[] {9}), later)
-                .result());
+        vaults.writeContents(
+                opened.openedAt(new VaultSize(3))
+                        .withContents(ALEX, VaultContents.of(new byte[] {9}), later)
+                        .result(),
+                "close",
+                null);
 
         Vault after = stored(1);
         assertThat(after.displayName()).isEqualTo("loot");
@@ -287,7 +299,7 @@ class VaultPaymentStoreTest {
         vaults.update(opened.renamedTo("loot"), Columns.PRESENTATION);
 
         vaults.save(
-                opened.withContents(ALEX, VaultContents.of(new byte[] {4}), NOW).result());
+                opened.withContents(ALEX, VaultContents.of(new byte[] {4}), NOW).result(), "staff");
 
         assertThat(stored(1).displayName()).isEqualTo("loot");
         assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {4}));
@@ -313,11 +325,14 @@ class VaultPaymentStoreTest {
         Vault old = stored(1);
         assertThat(old.stamp()).isEqualTo(VaultStamp.UNRECORDED);
 
-        VaultStamp first = vaults.writeContents(old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                        .result())
+        VaultStamp first = vaults.writeContents(
+                        old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                                .result(),
+                        "close",
+                        null)
                 .orElseThrow();
         VaultStamp second = vaults.save(
-                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result());
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result(), "staff");
 
         assertThat(first).isEqualTo(new VaultStamp(null, 1L));
         assertThat(second).isEqualTo(new VaultStamp(null, 2L));
@@ -334,7 +349,7 @@ class VaultPaymentStoreTest {
         vaults.create(bought);
         Vault first = stored(1);
         vaults.writeContents(
-                first.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result());
+                first.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result(), "close", null);
         Vault written = stored(1);
         vaults.delete(vault(1), written.paid());
 
@@ -346,15 +361,16 @@ class VaultPaymentStoreTest {
         assertThat(again.stamp().version()).isZero();
         assertThat(again.stamp().sameRow(written.stamp())).isFalse();
         assertThat(again.stamp().before(written.stamp())).isFalse();
-        assertThat(vaults.writeContents(written).orElseThrow().version()).isEqualTo(1L);
+        assertThat(vaults.writeContents(written, "close", null).orElseThrow().version())
+                .isEqualTo(1L);
     }
 
     @Test
     void aStaffUpsertThatInsertsARowGivesItALineageAndAFirstVersion() {
         upgrade();
 
-        VaultStamp inserted =
-                vaults.save(Vault.of(vault(1), new VaultSize(1), VaultContents.of(new byte[] {3}), null, null, NOW));
+        VaultStamp inserted = vaults.save(
+                Vault.of(vault(1), new VaultSize(1), VaultContents.of(new byte[] {3}), null, null, NOW), "staff");
 
         assertThat(inserted.lineage()).isNotNull();
         assertThat(inserted.version()).isEqualTo(1L);
@@ -366,11 +382,11 @@ class VaultPaymentStoreTest {
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         Vault old = stored(1);
         vaults.writeContents(
-                old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result());
+                old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result(), "close", null);
         vaults.delete(vault(1), old.paid());
 
         VaultStamp back = vaults.save(
-                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result());
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result(), "staff");
 
         assertThat(back.lineage()).isNotEqualTo(old.stamp().lineage());
         assertThat(old.stamp().sameRow(back)).isFalse();

@@ -49,18 +49,27 @@ import org.jspecify.annotations.Nullable;
  * the write: a write only waits for another write of a vault that shares its lock, and a per-vault queue would need its
  * own executor and its own shutdown, for no difference a player could notice.
  *
+ * <p>Every write is a compare-and-set. A snapshot's base is the stamp of the row its items were built on: the copy its
+ * window was filled from, or this server's own last write of the vault when that is newer. Every attempt to write one
+ * snapshot records the same random writer token in the row, and writes, in one statement, only while the row is still
+ * at the base or already carries that token. When nothing was written, or the write threw, the row is read to learn
+ * why: the row carrying the token means the write landed; no row, or a row of another lineage, means the owner's vault
+ * is gone and the items go back to the owner (a staff window inserts the row again instead, since staff fill vaults
+ * whether or not they exist); the row still at the base means nothing was written, and the write is tried again.
+ *
+ * <p>A row that moved past the base under another writer means another server wrote the vault while this server's
+ * window was open, or between a failed write and its retry: a staff member on one server and the owner on another
+ * can each hold the vault, since a window only refuses a second viewer on its own server, and a reloaded module may
+ * write a vault while the old instance's retry is still queued. Writing over that row would undo the other server's
+ * changes and settling would drop this one's, so neither happens: the snapshot stays pending for a reopen on this
+ * server, and its items go to the log for an operator with a line saying two servers edited the vault. Whichever of
+ * the two writes reaches the store second is the one that is logged; the store keeps the first.
+ *
  * <p>A write that throws is never answered by handing the items back: the row usually still holds what the window was
  * opened with, so handing the window's items back as well would duplicate everything the two have in common, and a
  * write that was applied but not acknowledged would be given twice. The snapshot stays pending instead (a reopen still
- * takes it over), the row is read to learn what happened, and the write is retried with a growing delay. Every attempt
- * to write one snapshot records the same random writer token in the row, and the row's version before the first
- * attempt is that snapshot's base. The row carrying the token means the write landed; no row means the vault is gone
- * and the items go back to the owner; the row still at the base means nothing was written, and the retry writes only
- * while that holds (or the row carries the token), in one statement. A row that moved past the base under another
- * writer means another server wrote the vault in between, from a copy that never had this snapshot's changes: writing
- * over it would undo that server's changes and settling would drop this one's, so neither happens. The snapshot stays
- * pending for a reopen here, and its items go to the log for an operator. When the retries run out the snapshot stays
- * pending in memory the same way.
+ * takes it over) and the write is retried with a growing delay. When the retries run out the snapshot stays pending in
+ * memory and its items go to the log the same way.
  *
  * <p>The window handle {@code W} is the adapter's GUI; this class never looks inside it, it only asks the caller for
  * its live items when it is taken over.
@@ -369,27 +378,29 @@ public final class VaultWindows<W> {
     }
 
     /**
-     * Write a snapshot once. The first attempt writes unconditionally; a retry writes only over the row at the
-     * snapshot's base or over its own earlier attempt, and reads the row to learn why when that wrote nothing.
+     * Write a snapshot once: only over the row at the snapshot's base or over its own earlier attempt, reading the row
+     * to learn why when that wrote nothing. A staff window that found the row missing inserts it again.
      */
     private Outcome attempt(VaultId id, Closed<W> written, VaultStamp base) {
         Window<W> window = written.window;
-        boolean retry = written.retries > 0;
-        if (window.staffView() && (!retry || written.rowMissing)) {
-            // Staff fill a vault whether or not it has a row, so a staff write upserts.
-            return Outcome.landed(
-                    saveVault.keep(window.owner(), window.vault(), written.contents, written.at, written.writer));
+        if (!window.staffView() || !written.rowMissing) {
+            Optional<VaultStamp> stored =
+                    saveVault.save(window.owner(), window.vault(), written.contents, written.at, written.writer, base);
+            if (stored.isPresent()) {
+                return Outcome.landed(stored.get());
+            }
+            Outcome learned = learn(id, written, base);
+            if (!window.staffView() || !written.rowMissing || learned.kind() != Kind.RETRY) {
+                return learned;
+            }
         }
-        Optional<VaultStamp> stored = saveVault.save(
-                window.owner(), window.vault(), written.contents, written.at, written.writer, retry ? base : null);
-        if (stored.isPresent()) {
-            return Outcome.landed(stored.get());
-        }
-        return retry ? learn(id, written, base) : Outcome.GONE;
+        // Staff fill a vault whether or not it has a row, and no row means no other write to keep.
+        return Outcome.landed(
+                saveVault.keep(window.owner(), window.vault(), written.contents, written.at, written.writer));
     }
 
     /**
-     * Read the row to learn what a write that threw, or a retry that wrote nothing, did. The row carrying this
+     * Read the row to learn what a write that threw, or one that wrote nothing, did. The row carrying this
      * snapshot's token means it landed. A missing row, or a row of another lineage, means the owner's vault was
      * deleted; a staff window writes its items back anyway, so a missing row is retried there and a row someone else
      * created is a conflict. A row still at the base means nothing was written: retry. A row that moved on under
@@ -418,13 +429,14 @@ public final class VaultWindows<W> {
     }
 
     /**
-     * Another server wrote the vault after this snapshot's write failed. Its items stay pending in memory, where a
-     * reopen on this server takes them over, and go to the log so an operator can reconcile the two.
+     * Another server wrote the vault after the row this snapshot was built on. Its items stay pending in memory, where
+     * a reopen on this server takes them over, and go to the log so an operator can reconcile the two.
      */
     private void conflict(VaultId id, Closed<W> written) {
         log.warn(
                 "event=vault_write_conflict owner={} index={} (two servers edited this vault: another server wrote it"
-                        + " after this server's write failed, so this server's items were not written over it)",
+                        + " after the copy this server's window was built on, so this server's items were not written"
+                        + " over it)",
                 id.owner(),
                 id.index());
         logForOperator(written, "two servers edited the vault; compare them with what it holds now");

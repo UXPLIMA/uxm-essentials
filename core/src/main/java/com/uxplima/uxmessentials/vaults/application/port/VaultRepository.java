@@ -4,7 +4,6 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
@@ -43,17 +42,12 @@ public interface VaultRepository {
      * Persist {@code vault}'s items, upserting on the {@code (owner, index)} key, record {@code writer} as the row's
      * writer, and return the row's stamp after the write. A vault with no row is inserted whole, with a fresh lineage;
      * an existing row takes the items, size and last-touched only, so a name or icon changed meanwhile stays. Either
-     * way the row's version goes up by one. Only a staff window saves this way, because the staff member is not the
-     * owner the items could go back to. Every other item write goes through {@link #writeContents}, so it cannot bring
-     * back a vault that was deleted. The upsert never writes a payment, and never changes one already stored, so a
+     * way the row's version goes up by one. Only a staff window that found the row missing saves this way, because
+     * the staff member is not the owner the items could go back to, and no row means no other write to keep. Every
+     * other item write goes through {@link #writeContents}, so it cannot bring back a vault that was deleted. The upsert never writes a payment, and never changes one already stored, so a
      * vault it brings back carries none and cannot be refunded.
      */
     VaultStamp save(Vault vault, String writer);
-
-    /** {@link #save(Vault, String)} by a writer nobody needs to recognise later. */
-    default VaultStamp save(Vault vault) {
-        return save(vault, UUID.randomUUID().toString());
-    }
 
     /**
      * Overwrite the items, size and last-touched of the existing row at the vault's id, record {@code writer} as its
@@ -65,11 +59,6 @@ public interface VaultRepository {
      * between. Empty when nothing was written: no row, or a row that moved on.
      */
     Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt);
-
-    /** {@link #writeContents(Vault, String, VaultStamp)} unconditionally, by a writer nobody needs to recognise. */
-    default Optional<VaultStamp> writeContents(Vault vault) {
-        return writeContents(vault, UUID.randomUUID().toString(), null);
-    }
 
     /**
      * The row's stamp and the writer of its last item write, read straight from the store (never from a cache): what

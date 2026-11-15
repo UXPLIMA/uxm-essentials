@@ -141,7 +141,7 @@ public final class VaultsWiring {
         // The windows keep a closed vault's items until their write lands; a peer's change to a vault also drops what
         // they remember about it, on top of the version check that already tells a stale copy from a fresh one.
         VaultWindows<StorageGui> windows = new VaultWindows<>(
-                new SaveVault(repository, kernel.events(), clock),
+                new SaveVault(repository, kernel.events()),
                 repository,
                 returns,
                 kernel.scheduler(),
@@ -215,7 +215,7 @@ public final class VaultsWiring {
             MenuBindings menuBindings) {
         VaultNotifier notifier = new VaultNotifier(kernel.messages(), kernel.messageSink());
         VaultCharge charge = buildCharge(kernel, settings, vaultEconomy);
-        SaveVault saveVault = new SaveVault(repository, kernel.events(), clock);
+        SaveVault saveVault = new SaveVault(repository, kernel.events());
         @Nullable Sound openSound = BukkitRegistryKeys.resolveSound(settings.openSound());
         VaultView view = new VaultView(
                 kernel.messages(),

@@ -61,7 +61,7 @@ class DeleteVaultTest {
     }
 
     private SaveVault saveVault() {
-        return new SaveVault(store, new RecordingEvents(), CLOCK);
+        return new SaveVault(store, new RecordingEvents());
     }
 
     private DeleteVault deleteVault() {
@@ -192,7 +192,9 @@ class DeleteVaultTest {
         Vault opened = buy(1, CREATE_5_REFUND_5);
         deleteVault().delete(ALEX, 1);
 
-        boolean stored = saveVault().save(ALEX, opened, VaultContents.of(new byte[] {1}));
+        boolean stored = saveVault()
+                .save(ALEX, opened, VaultContents.of(new byte[] {1}), NOW, "close", null)
+                .isPresent();
 
         assertThat(stored).isFalse();
         assertThat(vaults.find(VaultId.of(ALEX, 1))).isEmpty();
@@ -204,7 +206,7 @@ class DeleteVaultTest {
         Vault opened = buy(1, CREATE_5_REFUND_5);
         deleteVault().delete(ALEX, 1);
 
-        saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {1}));
+        saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {1}), NOW, "staff");
         assertThat(deleteVault().delete(ALEX, 1).isOk()).isTrue();
 
         assertThat(purse.moves()).containsExactly("-5", "+5 coins");
@@ -218,7 +220,7 @@ class DeleteVaultTest {
         // puts the row back, without a payment.
         store.beforeNextDelete(() -> {
             assertThat(deleteVault().delete(ALEX, 1).isOk()).isTrue();
-            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}));
+            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}), NOW, "staff");
         });
 
         assertThat(first.delete(ALEX, 1).errorOrThrow()).isEqualTo(VaultError.DELETE_UNKNOWN);
@@ -232,7 +234,7 @@ class DeleteVaultTest {
         Vault opened = buy(2, CREATE_5_REFUND_5);
         store.beforeNextDelete(() -> {
             deleteVault().delete(ALEX, 2);
-            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}));
+            saveVault().keep(ALEX, opened, VaultContents.of(new byte[] {2}), NOW, "staff");
         });
 
         assertThat(deleteVault().deleteOther(SAM, ALEX, 2).errorOrThrow()).isEqualTo(VaultError.DELETE_UNKNOWN);
