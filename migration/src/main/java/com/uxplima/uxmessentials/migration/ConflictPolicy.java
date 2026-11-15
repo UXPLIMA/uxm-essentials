@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.migration;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * What the importer does when an imported record collides with an existing uxmEssentials record.
@@ -11,7 +12,8 @@ import java.util.Objects;
  *   <li>{@link #SKIP} (default): keep the existing record; the safe, re-runnable choice.
  *   <li>{@link #OVERWRITE}. The source value replaces the existing one (balance still honours the
  *       separate {@code balance-policy}).
- *   <li>{@link #MERGE}: union by identity: the source contributes only records the target lacks.
+ *   <li>{@link #MERGE}: accepted so an operator file that names it keeps loading; every writer treats it as
+ *       {@link #OVERWRITE}.
  * </ul>
  */
 public enum ConflictPolicy {
@@ -24,13 +26,17 @@ public enum ConflictPolicy {
         return SKIP;
     }
 
-    /** Parse a {@code migration.conf > on-conflict} value, defaulting to {@link #SKIP} when unrecognised. */
-    public static ConflictPolicy parse(String raw) {
+    /**
+     * Parse an {@code on-conflict} value. Empty when the value is not one of {@code skip}, {@code overwrite} or
+     * {@code merge}, so the caller can tell the operator instead of quietly picking a policy for them.
+     */
+    public static Optional<ConflictPolicy> parse(String raw) {
         Objects.requireNonNull(raw, "raw");
         return switch (raw.strip().toLowerCase(Locale.ROOT)) {
-            case "overwrite" -> OVERWRITE;
-            case "merge" -> MERGE;
-            default -> SKIP;
+            case "skip" -> Optional.of(SKIP);
+            case "overwrite" -> Optional.of(OVERWRITE);
+            case "merge" -> Optional.of(MERGE);
+            default -> Optional.empty();
         };
     }
 }
