@@ -184,15 +184,7 @@ public final class WorldGuardImporter {
         this.service = Objects.requireNonNull(service, "service");
         this.backups = Objects.requireNonNull(backups, "backups");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.offTick = task -> {
-            try {
-                scheduler.async(task);
-            } catch (RuntimeException refused) {
-                // The lane refuses work while the plugin stops. The stage then runs on the service's own async
-                // thread that completed it, so the run still ends and releases the guard.
-                task.run();
-            }
-        };
+        this.offTick = scheduler::async;
         this.warn = Objects.requireNonNull(warn, "warn");
     }
 

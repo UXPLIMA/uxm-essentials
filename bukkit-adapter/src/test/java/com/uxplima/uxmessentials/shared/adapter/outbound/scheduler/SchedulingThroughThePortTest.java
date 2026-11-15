@@ -8,8 +8,11 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -23,32 +26,60 @@ import org.junit.jupiter.api.Test;
  */
 class SchedulingThroughThePortTest {
 
+    /** One way of running work around the port. */
+    private enum Rule {
+        GET_SCHEDULER("\\bgetScheduler\\b"),
+        GET_ASYNC_SCHEDULER("\\bgetAsyncScheduler\\b"),
+        GET_GLOBAL_REGION_SCHEDULER("\\bgetGlobalRegionScheduler\\b"),
+        GET_REGION_SCHEDULER("\\bgetRegionScheduler\\b"),
+        BUKKIT_RUNNABLE("\\bBukkitRunnable\\b"),
+        BUKKIT_SCHEDULER("\\bBukkitScheduler\\b"),
+        NEW_THREAD("\\bnew\\s+(?:java\\.lang\\.)?Thread\\s*\\("),
+        THREAD_BUILDER("\\bThread\\s*\\.\\s*of(?:Virtual|Platform)\\s*\\("),
+        VIRTUAL_THREAD_START("\\bThread\\s*\\.\\s*startVirtualThread\\s*\\("),
+        EXECUTORS("\\bExecutors\\s*\\.\\s*new\\w*\\s*\\("),
+        THREAD_POOL_EXECUTOR("\\bnew\\s+(?:java\\.util\\.concurrent\\.)?(?:Scheduled)?ThreadPoolExecutor\\s*\\("),
+        FORK_JOIN_POOL("\\bnew\\s+(?:java\\.util\\.concurrent\\.)?ForkJoinPool\\s*\\("
+                + "|\\bForkJoinPool\\s*\\.\\s*commonPool\\s*\\("),
+        TIMER("\\bnew\\s+(?:java\\.util\\.)?Timer\\s*\\("),
+        /** Only the one-argument form, which runs on the common pool; with an executor it is the caller's choice. */
+        DEFAULT_POOL_FUTURE("\\b(?:supplyAsync|runAsync)\\s*\\(");
+
+        private final Pattern pattern;
+
+        Rule(String regex) {
+            this.pattern = Pattern.compile(regex);
+        }
+    }
+
+    /** What one file may use, and why it owns that work itself. */
+    private record Allowance(Set<Rule> rules, String reason) {}
+
     private static final String FOLIA_SCHEDULER =
             "bukkit-adapter/src/main/java/com/uxplima/uxmessentials/shared/adapter/outbound/scheduler/"
                     + "FoliaScheduler.java";
 
-    /** The files allowed their own threads, each with the reason it owns them. */
-    private static final Map<String, String> ALLOWED = Map.of(
+    private static final Map<String, Allowance> ALLOWED = Map.of(
             FOLIA_SCHEDULER,
-            "implements the port on Paper's schedulers",
+            new Allowance(
+                    EnumSet.of(
+                            Rule.GET_SCHEDULER,
+                            Rule.GET_ASYNC_SCHEDULER,
+                            Rule.GET_GLOBAL_REGION_SCHEDULER,
+                            Rule.GET_REGION_SCHEDULER),
+                    "implements the port on Paper's schedulers"),
             "rest-adapter/src/main/java/com/uxplima/uxmessentials/rest/http/RestServer.java",
-            "the HTTP server's connection threads, which never touch the Bukkit API",
+            new Allowance(
+                    EnumSet.of(Rule.EXECUTORS),
+                    "the HTTP server's connection threads, which never touch the Bukkit API"),
             "rest-adapter/src/main/java/com/uxplima/uxmessentials/rest/bridge/EventBridge.java",
-            "the HTTP event stream's sender thread, which never touches the Bukkit API",
+            new Allowance(
+                    EnumSet.of(Rule.THREAD_BUILDER),
+                    "the HTTP event stream's sender thread, which never touches the Bukkit API"),
             "migration/src/main/java/com/uxplima/uxmessentials/migration/ImportExecutor.java",
-            "the bounded database writer pool that caps import write pressure");
-
-    private static final Pattern DIRECT = Pattern.compile("\\bgetScheduler\\b"
-            + "|\\bgetAsyncScheduler\\b"
-            + "|\\bgetGlobalRegionScheduler\\b"
-            + "|\\bgetRegionScheduler\\b"
-            + "|\\bBukkitRunnable\\b"
-            + "|\\bBukkitScheduler\\b"
-            + "|\\bnew\\s+Thread\\s*\\("
-            + "|\\bThread\\s*\\.\\s*of(?:Virtual|Platform)\\s*\\("
-            + "|\\bExecutors\\s*\\.\\s*new\\w*\\s*\\("
-            + "|\\bnew\\s+(?:Scheduled)?ThreadPoolExecutor\\s*\\("
-            + "|\\bnew\\s+(?:java\\.util\\.)?Timer\\s*\\(");
+            new Allowance(
+                    EnumSet.of(Rule.THREAD_POOL_EXECUTOR),
+                    "the bounded database writer pool that caps import write pressure"));
 
     @Test
     void noMainSourceSchedulesAroundThePort() throws IOException {
@@ -66,9 +97,9 @@ class SchedulingThroughThePortTest {
                             files.filter(f -> f.toString().endsWith(".java")).toList()) {
                         scanned++;
                         String relative = root.relativize(file).toString().replace('\\', '/');
-                        if (!ALLOWED.containsKey(relative)) {
-                            found.addAll(directCalls(relative, read(file)));
-                        }
+                        Allowance allowance = ALLOWED.get(relative);
+                        Set<Rule> allowed = allowance == null ? EnumSet.noneOf(Rule.class) : allowance.rules();
+                        found.addAll(directCalls(relative, read(file), allowed));
                     }
                 }
             }
@@ -81,10 +112,33 @@ class SchedulingThroughThePortTest {
     }
 
     @Test
+    void everyAllowedFileStillExists() {
+        Path root = repositoryRoot();
+
+        assertThat(ALLOWED.keySet())
+                .as("an allowance for a file that moved or went away would silently cover its new home")
+                .allSatisfy(file -> assertThat(root.resolve(file)).isRegularFile());
+    }
+
+    @Test
     void theAllowedAdapterStillReachesPapersSchedulers() {
-        assertThat(directCalls("adapter", read(repositoryRoot().resolve(FOLIA_SCHEDULER))))
+        assertThat(directCalls("adapter", read(repositoryRoot().resolve(FOLIA_SCHEDULER)), EnumSet.noneOf(Rule.class)))
                 .as("the pattern still matches the calls the adapter makes, so an empty scan means something")
                 .isNotEmpty();
+    }
+
+    @Test
+    void anAllowanceCoversOnlyItsOwnRules() {
+        String code = """
+                class RestServer {
+                    ExecutorService connections = Executors.newVirtualThreadPerTaskExecutor();
+                    void stray(Player player) {
+                        player.getScheduler().run(plugin, task -> {}, null);
+                    }
+                }
+                """;
+
+        assertThat(directCalls("rest", code, EnumSet.of(Rule.EXECUTORS))).containsExactly("rest:4 getScheduler");
     }
 
     @Test
@@ -99,11 +153,18 @@ class SchedulingThroughThePortTest {
                         var pool = Executors.newFixedThreadPool(2);
                         var timer = new Timer();
                         Thread.ofVirtual().start(this::work);
+                        Thread.startVirtualThread(this::work);
+                        new java.lang.Thread(this::work);
+                        var forks = new ForkJoinPool(2);
+                        ForkJoinPool.commonPool().execute(this::work);
+                        CompletableFuture.supplyAsync(() -> load(a, b));
+                        CompletableFuture.runAsync(this::work);
+                        CompletableFuture.supplyAsync(() -> load(a, b), offTick);
                     }
                 }
                 """;
 
-        assertThat(directCalls("sample", code))
+        assertThat(directCalls("sample", code, EnumSet.noneOf(Rule.class)))
                 .containsExactly(
                         "sample:1 getAsyncScheduler",
                         "sample:4 getAsyncScheduler",
@@ -111,7 +172,13 @@ class SchedulingThroughThePortTest {
                         "sample:6 new Thread(",
                         "sample:7 Executors.newFixedThreadPool(",
                         "sample:8 new Timer(",
-                        "sample:9 Thread.ofVirtual(");
+                        "sample:9 Thread.ofVirtual(",
+                        "sample:10 Thread.startVirtualThread(",
+                        "sample:11 new java.lang.Thread(",
+                        "sample:12 new ForkJoinPool(",
+                        "sample:13 ForkJoinPool.commonPool(",
+                        "sample:14 supplyAsync(",
+                        "sample:15 runAsync(");
     }
 
     @Test
@@ -125,22 +192,52 @@ class SchedulingThroughThePortTest {
                 }
                 """;
 
-        assertThat(directCalls("sample", code)).isEmpty();
+        assertThat(directCalls("sample", code, EnumSet.noneOf(Rule.class))).isEmpty();
     }
 
-    private static List<String> directCalls(String name, String source) {
+    private static List<String> directCalls(String name, String source, Set<Rule> allowed) {
         String code = codeOnly(source);
-        List<String> hits = new ArrayList<>();
-        Matcher matcher = DIRECT.matcher(code);
-        while (matcher.find()) {
-            long line = code.substring(0, matcher.start())
-                            .chars()
-                            .filter(c -> c == '\n')
-                            .count()
-                    + 1;
-            hits.add(name + ":" + line + " " + matcher.group());
+        List<Hit> hits = new ArrayList<>();
+        for (Rule rule : Rule.values()) {
+            if (allowed.contains(rule)) {
+                continue;
+            }
+            Matcher matcher = rule.pattern.matcher(code);
+            while (matcher.find()) {
+                if (rule == Rule.DEFAULT_POOL_FUTURE && hasSecondArgument(code, matcher.end())) {
+                    continue;
+                }
+                long line = code.substring(0, matcher.start())
+                                .chars()
+                                .filter(c -> c == '\n')
+                                .count()
+                        + 1;
+                hits.add(new Hit(matcher.start(), name + ":" + line + " " + matcher.group()));
+            }
         }
-        return hits;
+        hits.sort(Comparator.comparingInt(Hit::at));
+        return hits.stream().map(Hit::text).toList();
+    }
+
+    private record Hit(int at, String text) {}
+
+    /** Whether the call whose argument list opens just before {@code from} passes more than one argument. */
+    private static boolean hasSecondArgument(String code, int from) {
+        int depth = 0;
+        for (int i = from; i < code.length(); i++) {
+            char c = code.charAt(i);
+            if (c == '(' || c == '[' || c == '{') {
+                depth++;
+            } else if (c == ')' || c == ']' || c == '}') {
+                if (depth == 0) {
+                    return false;
+                }
+                depth--;
+            } else if (c == ',' && depth == 0) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
