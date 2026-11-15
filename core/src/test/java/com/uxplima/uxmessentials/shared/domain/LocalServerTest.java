@@ -45,6 +45,18 @@ class LocalServerTest {
     }
 
     @Test
+    void aServerNameNoScopeCanHoldStillResolvesItsSetsAndTheNetwork() {
+        LocalServer spaced = new LocalServer("Lobby 1", List.of("lobby"));
+
+        assertThat(spaced.serverScope()).isEmpty();
+        assertThat(spaced.loadedScopes()).containsExactly(ServerScope.set("lobby"));
+        assertThat(spaced.covers(ServerScope.set("lobby"))).isTrue();
+        assertThat(spaced.covers(null)).isTrue();
+        assertThat(spaced.parse("server")).isEmpty();
+        assertThat(spaced.suggestions()).containsExactly("set:lobby");
+    }
+
+    @Test
     void aTypedScopeReadsTheWordsGuardTakes() {
         assertThat(LOBBY_1.parse("server")).contains(ServerScope.server("lobby-1"));
         assertThat(LOBBY_1.parse("server:survival")).contains(ServerScope.server("survival"));

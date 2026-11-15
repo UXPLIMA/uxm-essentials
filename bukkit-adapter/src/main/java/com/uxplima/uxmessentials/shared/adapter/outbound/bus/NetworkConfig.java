@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
@@ -175,7 +177,21 @@ public record NetworkConfig(
      * backend opens no Redis connection unless asked.
      */
     public static NetworkConfig from(ConfigStore config) {
+        return from(config, problem -> {});
+    }
+
+    /**
+     * As {@link #from(ConfigStore)}, reporting to {@code problems} each shared set name dropped because a scope
+     * cannot hold it, and a server name no scope can hold. The store must be the root {@code config.conf}: a
+     * module's subtree has no {@code network} block, and reading one there would quietly run every backend as
+     * {@code server-1} with the network off.
+     */
+    public static NetworkConfig from(ConfigStore config, Consumer<String> problems) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(problems, "problems");
+        if (config.isScoped()) {
+            throw new IllegalArgumentException("the network block is read from the root config.conf, not a module's");
+        }
         boolean enabled = config.getBoolean("network.enabled", false);
         // server-name is what every plugin of ours calls it; a file an earlier release wrote says server-id.
         String serverId =
@@ -189,11 +205,23 @@ public record NetworkConfig(
         // A negative value reads as off, the same as 0, rather than failing the enable.
         int cacheRefresh = Math.max(0, config.getInt("network.cache-refresh-seconds", DEFAULT_CACHE_REFRESH_SECONDS));
         // A name that is not a valid set name could never match a scope, so it is dropped rather than kept.
-        List<String> sets = config.getStringList("network.shared-sets", List.of()).stream()
-                .map(String::strip)
-                .filter(set -> ServerScope.isScope("set:" + set))
-                .distinct()
-                .toList();
+        List<String> sets = new ArrayList<>();
+        for (String written : config.getStringList("network.shared-sets", List.of())) {
+            String set = written.strip();
+            if (!ServerScope.isScope("set:" + set)) {
+                problems.accept(
+                        "network.shared-sets: " + written
+                                + " is not a set name (letters A to Z, digits, _ . - and at most 64 characters); it is ignored");
+            } else if (!sets.contains(set)) {
+                sets.add(set);
+            }
+        }
+        String name = serverId.isBlank() ? DEFAULT_SERVER_ID : serverId;
+        if (!ServerScope.isScope("server:" + name)) {
+            problems.accept("network.server-name: " + name
+                    + " cannot be a scope (letters A to Z, digits, _ . - and at most 64 characters), so nothing can be"
+                    + " scoped to this server alone; its shared sets and the whole network still apply");
+        }
         return new NetworkConfig(
                 enabled,
                 serverId.isBlank() ? DEFAULT_SERVER_ID : serverId,

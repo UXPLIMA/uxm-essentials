@@ -136,6 +136,7 @@ public final class NpcWiring {
             ModuleContext ctx,
             Persistence persistence,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
+            NetworkConfig network,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
             Supplier<Theme> theme,
@@ -170,7 +171,7 @@ public final class NpcWiring {
                 new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
         // Every render goes through the scoped view, so an NPC scoped to other servers is never shown here and one
         // whose scope changed, here or on a peer, is taken off on the render of the changed snapshot.
-        LocalServer local = NetworkConfig.from(ctx.config()).localServer();
+        LocalServer local = network.localServer();
         NpcView view = new ScopedNpcView(renderer, local);
         // Close the cross-server loop: a remote NPC change reloads exactly that NPC into the same cache the
         // commands and renderer read, then re-renders (or despawns) the live fake player through the renderer
@@ -359,7 +360,7 @@ public final class NpcWiring {
                 new SetNpcRange(repository, renderer, notifier),
                 new SetNpcState(repository, renderer, notifier),
                 new SetNpcSkinSlim(repository, renderer, notifier),
-                new SetNpcScope(repository, renderer, notifier, local));
+                new SetNpcScope(repository, renderer, notifier, kernel.events(), local));
     }
 
     /**

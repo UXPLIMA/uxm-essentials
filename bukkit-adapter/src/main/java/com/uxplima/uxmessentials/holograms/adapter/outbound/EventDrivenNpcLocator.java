@@ -12,8 +12,11 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
 import com.uxplima.uxmessentials.npc.domain.event.NpcDeleted;
 import com.uxplima.uxmessentials.npc.domain.event.NpcMoved;
+import com.uxplima.uxmessentials.npc.domain.event.NpcRescoped;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -22,8 +25,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>It keeps a live {@code name → position} index of every NPC, seeded once from the npc repository when the
  * holograms module wires (so an NPC that already existed before enable is locatable at once) and kept current off
- * the in-process domain-event bus: {@link NpcCreated} and {@link NpcMoved} write the index, {@link NpcDeleted}
- * clears the entry. A {@link #locate(String)} therefore reads an in-memory map, allocation-light, never a
+ * the in-process domain-event bus: {@link NpcCreated} and {@link NpcMoved} write the index, {@link NpcRescoped}
+ * records which servers show the NPC, {@link NpcDeleted} clears the entry. A {@link #locate(String)} therefore reads an in-memory map, allocation-light, never a
  * database hit on the render path. The npc name is the canonical lowercase {@code NpcName}, matching the value a
  * hologram stores when linked.
  *
@@ -40,18 +43,32 @@ import org.jspecify.annotations.NullMarked;
 public final class EventDrivenNpcLocator implements LinkedNpcLocator, Consumer<DomainEvent> {
 
     private final Map<String, Position> positions = new ConcurrentHashMap<>();
+    // Only scoped NPCs have an entry; an NPC with none shows on every server.
+    private final Map<String, ServerScope> scopes = new ConcurrentHashMap<>();
+    private final LocalServer local;
     private final Consumer<String> reanchor;
 
     /**
      * Seed the index from {@code repository} and route re-anchors to {@code reanchor}. The repository is read once
      * here (warm after the npc module's own load) and never again: every later change rides the event bus.
      */
-    public EventDrivenNpcLocator(NpcRepository repository, Consumer<String> reanchor) {
+    public EventDrivenNpcLocator(NpcRepository repository, LocalServer local, Consumer<String> reanchor) {
         Objects.requireNonNull(repository, "repository");
+        this.local = Objects.requireNonNull(local, "local");
         this.reanchor = Objects.requireNonNull(reanchor, "reanchor");
         for (Npc npc : repository.all()) {
             positions.put(npc.name().value(), npc.location());
+            ServerScope scope = npc.scope();
+            if (scope != null) {
+                scopes.put(npc.name().value(), scope);
+            }
         }
+    }
+
+    @Override
+    public boolean shownHere(String npcName) {
+        Objects.requireNonNull(npcName, "npcName");
+        return !positions.containsKey(npcName) || local.covers(scopes.get(npcName));
     }
 
     @Override
@@ -65,11 +82,21 @@ public final class EventDrivenNpcLocator implements LinkedNpcLocator, Consumer<D
         Objects.requireNonNull(event, "event");
         if (event instanceof NpcCreated created) {
             positions.put(created.name().value(), created.location());
+            scopes.remove(created.name().value());
+        } else if (event instanceof NpcRescoped rescoped) {
+            ServerScope scope = rescoped.scope();
+            if (scope == null) {
+                scopes.remove(rescoped.name().value());
+            } else {
+                scopes.put(rescoped.name().value(), scope);
+            }
+            reanchor.accept(rescoped.name().value());
         } else if (event instanceof NpcMoved moved) {
             positions.put(moved.name().value(), moved.to());
             reanchor.accept(moved.name().value());
         } else if (event instanceof NpcDeleted deleted) {
             positions.remove(deleted.name().value());
+            scopes.remove(deleted.name().value());
             reanchor.accept(deleted.name().value());
         }
     }

@@ -97,7 +97,7 @@ final class HologramRows {
     }
 
     private static Hologram scopeOf(Record row, Hologram hologram) {
-        // An unscoped row, and every row written before scopes existed, shows on every server.
+        // A NULL scope shows on every server.
         return hologram.withScope(StoredScope.read(row.get(HOLOGRAMS.SCOPE)));
     }
 

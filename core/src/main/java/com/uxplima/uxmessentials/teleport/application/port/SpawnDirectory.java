@@ -11,9 +11,10 @@ import org.jspecify.annotations.Nullable;
 /**
  * Outbound port for spawn resolution: the operator-set per-world spawn, the main spawns used when a world has
  * no spawn of its own (one network-wide and one for each server scope an operator set), operator-defined named
- * spawns, and the per-world spawn-mirror rules. The {@link com.uxplima.uxmessentials.teleport.application.ResolveSpawn} use case folds a mirror (when
- * present) through this directory so a mirrored {@code /spawn} reads the live target-world spawn rather than
- * a copied location.
+ * spawns, and the per-world spawn-mirror rules. The
+ * {@link com.uxplima.uxmessentials.teleport.application.ResolveSpawn} use case folds a mirror (when present)
+ * through this directory so a mirrored {@code /spawn} reads the live target-world spawn rather than a copied
+ * location.
  *
  * <p>Two read methods address the per-world spawn at different layers. {@link #operatorSpawn} returns only
  * the operator-set row (empty when none) so the use case can fall through to the {@link #mainSpawn} and then

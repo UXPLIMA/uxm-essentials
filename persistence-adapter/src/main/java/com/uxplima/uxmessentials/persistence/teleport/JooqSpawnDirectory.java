@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportNamedSp
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnMirrorsRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.runtime.StoredScope;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
@@ -31,9 +32,9 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The jOOQ-backed {@link SpawnDirectory} over the V10 spawn tables: a per-world spawn keyed by world uid, the
- * network-wide main spawn pinned at id 0 and one main spawn row per server scope, named spawns keyed by canonical lowercase name, and per-world mirror
- * redirects. Every read is a single keyed lookup and every write upserts on the key, so a re-anchor overwrites
- * the same row rather than inserting. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * network-wide main spawn pinned at id 0 and one main spawn row per server scope, named spawns keyed by canonical
+ * lowercase name, and per-world mirror redirects. Every read is a single keyed lookup and every write upserts on
+ * the key, so a re-anchor overwrites the same row rather than inserting. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
  *
  * <p>This store has no vanilla-world fallback: {@link #defaultSpawn} returns only the operator-set per-world
  * row, the same as {@link #operatorSpawn}. The vanilla last-resort lives in the bukkit-adapter's decorator,
@@ -43,7 +44,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class JooqSpawnDirectory extends JooqRepository implements SpawnDirectory {
 
-    /** The id of the network-wide main spawn row, the one every release before scopes wrote. */
+    /** The id of the network-wide main spawn row; scoped rows take the ids after it. */
     private static final int NETWORK_ID = 0;
 
     public JooqSpawnDirectory(DSLContext dsl) {
@@ -142,12 +143,25 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
     public void setMainSpawn(@Nullable ServerScope scope, Position position) {
         Objects.requireNonNull(position, "position");
         long savedAt = System.currentTimeMillis();
-        write(dsl -> {
-            if (scope == null) {
+        if (scope == null) {
+            write(dsl -> {
                 upsertMain(dsl, position, savedAt);
-            } else {
-                replaceScopedMain(dsl, scope, position, savedAt);
-            }
+                return null;
+            });
+            return;
+        }
+        try {
+            replaceScopedMain(scope, position, savedAt);
+        } catch (PersistenceException collided) {
+            // Another server took the same next id, or wrote the same scope, between the read and the insert; the
+            // second attempt reads what it committed. A second failure is a real fault and reaches the caller.
+            replaceScopedMain(scope, position, savedAt);
+        }
+    }
+
+    private void replaceScopedMain(ServerScope scope, Position position, long savedAt) {
+        write(dsl -> {
+            replaceScopedMain(dsl, scope, position, savedAt);
             return null;
         });
     }
@@ -221,7 +235,7 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
     /**
      * Replace the main spawn of {@code scope}: its row goes and a new one takes the next free id, in one
      * transaction. The unique index on the scope turns a peer writing the same scope at the same moment into a
-     * failed write rather than a second row.
+     * failed write rather than a second row, and the caller tries once more.
      */
     private static void replaceScopedMain(DSLContext dsl, ServerScope scope, Position spawn, long savedAt) {
         dsl.deleteFrom(TELEPORT_MAIN_SPAWN)

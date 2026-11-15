@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.holograms.adapter.inbound.command;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Supplier;
+
+import org.bukkit.command.CommandSender;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
@@ -14,10 +17,12 @@ import com.mojang.brigadier.context.CommandContext;
 import com.uxplima.uxmessentials.holograms.adapter.HologramServices;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
+import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -56,7 +61,16 @@ final class HologramScopeCommand extends HologramCommandSupport {
         PlayerRef actor = actor(ctx);
         HologramName name = HologramName.of(ctx.getArgument("name", String.class));
         String scope = ctx.getArgument("scope", String.class);
-        scheduler.async(() -> services.scope().set(actor, name, scope));
+        CommandSender sender = Sender.audience(ctx.getSource());
+        scheduler.async(() -> {
+            try {
+                services.scope().set(actor, name, scope);
+            } catch (RuntimeException failed) {
+                // A failed write tells the operator rather than ending in silence, and still reaches the error log.
+                feedback.send(sender, SharedMessageKey.COMMAND_ERROR, Map.of());
+                throw failed;
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 }

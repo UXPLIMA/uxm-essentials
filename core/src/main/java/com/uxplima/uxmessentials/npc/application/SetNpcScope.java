@@ -11,7 +11,9 @@ import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.npc.domain.event.NpcRescoped;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -32,12 +34,15 @@ public final class SetNpcScope {
     private final NpcRepository repository;
     private final NpcView view;
     private final Notifier notifier;
+    private final DomainEventPublisher events;
     private final LocalServer local;
 
-    public SetNpcScope(NpcRepository repository, NpcView view, Notifier notifier, LocalServer local) {
+    public SetNpcScope(
+            NpcRepository repository, NpcView view, Notifier notifier, DomainEventPublisher events, LocalServer local) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.view = Objects.requireNonNull(view, "view");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.events = Objects.requireNonNull(events, "events");
         this.local = Objects.requireNonNull(local, "local");
     }
 
@@ -78,6 +83,8 @@ public final class SetNpcScope {
         Npc updated = existing.get().withScope(scope);
         repository.save(updated);
         view.render(updated);
+        // A hologram riding the NPC follows it off this server or back on.
+        events.publish(new NpcRescoped(name, scope));
         if (scope == null) {
             notifier.send(actor, NpcMessageKey.NPC_SCOPE_CLEARED, Map.of("name", name.value()));
         } else {

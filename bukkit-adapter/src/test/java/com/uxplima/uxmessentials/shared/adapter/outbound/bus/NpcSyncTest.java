@@ -78,6 +78,7 @@ class NpcSyncTest {
                 new Notifier(
                         (PlayerRef viewer, MessageKey key, Map<String, String> placeholders) -> key.key(),
                         (viewer, text) -> {}),
+                event -> {},
                 lobby);
 
         scope.set(ADMIN, NpcName.of("guide"), "server");

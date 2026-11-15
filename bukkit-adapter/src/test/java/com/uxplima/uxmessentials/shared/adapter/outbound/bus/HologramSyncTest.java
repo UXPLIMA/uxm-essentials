@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.holograms.application.ScopedHologramView;
 import com.uxplima.uxmessentials.holograms.application.SetHologramScope;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
+import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -37,6 +38,17 @@ class HologramSyncTest {
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
     private static final HologramName BOARD = HologramName.of("board");
     private static final PlayerRef ADMIN = new PlayerRef(UUID.randomUUID(), "Admin");
+    private static final LinkedNpcLocator NO_NPCS = new LinkedNpcLocator() {
+        @Override
+        public Optional<Position> locate(String npcName) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean shownHere(String npcName) {
+            return true;
+        }
+    };
 
     private final SharedRows rows = new SharedRows();
     private final Frames bus = new Frames("lobby-1");
@@ -49,7 +61,7 @@ class HologramSyncTest {
         final RemoteSyncListener listener;
 
         Backend(LocalServer local) {
-            view = new ScopedHologramView(drawn, local);
+            view = new ScopedHologramView(drawn, local, NO_NPCS);
             listener = HologramSync.listener(cache, view, new InlineScheduler());
             cache.all();
         }
@@ -63,7 +75,7 @@ class HologramSyncTest {
         Backend survival = new Backend(new LocalServer("survival", List.of()));
         SetHologramScope scope = new SetHologramScope(
                 HologramSync.repository(new CachedHologramRepository(rows, Duration.ofMinutes(5)), bus),
-                new ScopedHologramView(new RecordingView(), origin),
+                new ScopedHologramView(new RecordingView(), origin, NO_NPCS),
                 quietNotifier(),
                 origin);
 
@@ -83,7 +95,7 @@ class HologramSyncTest {
         Backend survival = new Backend(new LocalServer("survival", List.of()));
         SetHologramScope scope = new SetHologramScope(
                 HologramSync.repository(new CachedHologramRepository(rows, Duration.ofMinutes(5)), bus),
-                new ScopedHologramView(new RecordingView(), origin),
+                new ScopedHologramView(new RecordingView(), origin, NO_NPCS),
                 quietNotifier(),
                 origin);
 

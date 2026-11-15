@@ -7,7 +7,7 @@ import java.util.regex.Pattern;
  * Which servers of a network a thing belongs to: one server ({@code server:<id>}) or every server of a shared set
  * ({@code set:<name>}). Lobby-1 to lobby-5 can share {@code set:lobby} and edit its guard regions, holograms, NPCs
  * and main spawn from any of them. Something with no scope at all belongs to every server; that case is an absent
- * scope, never a value of this type, so stored rows written before scopes existed keep applying everywhere.
+ * scope, never a value of this type, so an unscoped stored row applies everywhere.
  *
  * @param value the stored form
  */

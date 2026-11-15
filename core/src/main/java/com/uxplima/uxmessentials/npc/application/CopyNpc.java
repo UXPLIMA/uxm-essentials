@@ -11,11 +11,13 @@ import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcError;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.event.NpcCreated;
+import com.uxplima.uxmessentials.npc.domain.event.NpcRescoped;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
@@ -69,6 +71,10 @@ public final class CopyNpc {
         repository.save(clone);
         view.render(clone);
         events.publish(new NpcCreated(target, actor, at));
+        ServerScope scope = clone.scope();
+        if (scope != null) {
+            events.publish(new NpcRescoped(target, scope));
+        }
         notifier.send(actor, NpcMessageKey.NPC_COPIED, Map.of("source", source.value(), "name", target.value()));
         return Result.ok();
     }

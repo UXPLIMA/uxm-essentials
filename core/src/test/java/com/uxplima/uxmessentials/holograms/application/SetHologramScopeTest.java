@@ -14,11 +14,13 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
+import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramError;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.testing.Fixtures;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
@@ -33,7 +35,8 @@ class SetHologramScopeTest {
     private final Rows rows = new Rows();
     private final RecordingView drawn = new RecordingView();
     private final RecordingNotifier notifier = new RecordingNotifier();
-    private final HologramView view = new ScopedHologramView(drawn, LOBBY);
+    private final Npcs npcs = new Npcs();
+    private final HologramView view = new ScopedHologramView(drawn, LOBBY, npcs);
     private final SetHologramScope scope = new SetHologramScope(rows, view, notifier.notifier(), LOBBY);
 
     private static Hologram board() {
@@ -43,7 +46,7 @@ class SetHologramScopeTest {
     @Test
     void aHologramWithNoScopeShowsOnEveryServer() {
         view.render(board());
-        new ScopedHologramView(drawn, new LocalServer("survival", List.of())).render(board());
+        new ScopedHologramView(drawn, new LocalServer("survival", List.of()), npcs).render(board());
 
         assertThat(drawn.rendered).containsExactly("board", "board");
         assertThat(drawn.despawned).isEmpty();
@@ -61,6 +64,17 @@ class SetHologramScopeTest {
     void aHologramScopedToASetThisServerIsInIsDrawn() {
         view.render(board().withScope(ServerScope.set("hubs")));
 
+        assertThat(drawn.rendered).containsExactly("board");
+    }
+
+    @Test
+    void aHologramRidingAnNpcScopedAwayFromThisServerIsNotDrawnHere() {
+        npcs.scopedAway.add("guide");
+
+        view.render(board().linkedTo("guide"));
+        view.render(board().linkedTo("greeter"));
+
+        assertThat(drawn.despawned).containsExactly("board");
         assertThat(drawn.rendered).containsExactly("board");
     }
 
@@ -97,6 +111,21 @@ class SetHologramScopeTest {
         assertThat(rows.find(BOARD).orElseThrow().scope()).isNull();
         assertThat(drawn.rendered).isEmpty();
         assertThat(notifier.keys()).containsExactly("hologram.scope.invalid");
+    }
+
+    /** The NPCs a hologram can ride; every NPC shows here unless the test scoped it away. */
+    private static final class Npcs implements LinkedNpcLocator {
+        private final Set<String> scopedAway = new java.util.HashSet<>();
+
+        @Override
+        public Optional<Position> locate(String npcName) {
+            return Optional.of(Fixtures.at(5, 70, 5));
+        }
+
+        @Override
+        public boolean shownHere(String npcName) {
+            return !scopedAway.contains(npcName);
+        }
     }
 
     /** Hologram rows in memory, the durable store the use case writes through. */

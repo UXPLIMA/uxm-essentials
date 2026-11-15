@@ -151,6 +151,7 @@ public final class HologramsWiring {
             ModuleContext ctx,
             Persistence persistence,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
+            NetworkConfig network,
             com.uxplima.uxmessentials.holograms.application.port.LeaderboardProviders leaderboards,
             Optional<ClickActionEconomy> economy,
             GuiText guiText,
@@ -207,8 +208,9 @@ public final class HologramsWiring {
         // Break the renderer↔locator construction cycle: the locator's re-anchor forwards through a holder the
         // renderer is written into once it exists, so a move event re-renders only the holograms linked to that NPC.
         RendererHolder rendererHolder = new RendererHolder();
+        LocalServer local = network.localServer();
         EventDrivenNpcLocator npcLocator =
-                new EventDrivenNpcLocator(npcRepository, name -> rendererHolder.reanchor(name));
+                new EventDrivenNpcLocator(npcRepository, local, name -> rendererHolder.reanchor(name));
         // The shared click-action engine: a hologram's chain runs through the same BukkitClickActionRunner npc uses,
         // built over the shared filtered command runner. Holograms ship no blocked-commands config key, so the
         // blocklist is empty (a transparent pass-through: an operator-owned fixture, no command filtering needed yet).
@@ -249,11 +251,11 @@ public final class HologramsWiring {
                 pageState,
                 clicks,
                 clickHandler);
-        rendererHolder.set(renderer);
-        // Every render goes through the scoped view, so a hologram scoped to other servers is never drawn here and
-        // one whose scope changed, here or on a peer, is taken off on the render of the changed snapshot.
-        LocalServer local = NetworkConfig.from(ctx.config()).localServer();
-        HologramView view = new ScopedHologramView(renderer, local);
+        // Every render goes through the scoped view, so a hologram scoped to other servers, or riding an NPC that is,
+        // is never drawn here, and one whose scope changed, here or on a peer, is taken off on the render of the
+        // changed snapshot.
+        HologramView view = new ScopedHologramView(renderer, local, npcLocator);
+        rendererHolder.set(renderer, view, repository);
         // Close the cross-server loop: a remote hologram change reloads exactly that hologram into the same cache
         // the commands and renderer read, then re-renders (or despawns) the live display through the renderer
         // the same render path the local edit runs, hopped onto the right region thread by the renderer itself.
@@ -371,15 +373,30 @@ public final class HologramsWiring {
     private static final class RendererHolder {
 
         private @Nullable PacketHologramView renderer;
+        private @Nullable HologramView view;
+        private @Nullable HologramRepository stored;
 
-        void set(PacketHologramView renderer) {
+        void set(PacketHologramView renderer, HologramView view, HologramRepository stored) {
             this.renderer = Objects.requireNonNull(renderer, "renderer");
+            this.view = Objects.requireNonNull(view, "view");
+            this.stored = Objects.requireNonNull(stored, "stored");
         }
 
+        /**
+         * Draw every hologram linked to {@code npcName} again through the scoped view: it follows the NPC's move, and
+         * it leaves or comes back when the NPC's scope stops or starts covering this server, which the shown set
+         * alone could not tell.
+         */
         void reanchor(String npcName) {
-            PacketHologramView current = renderer;
-            if (current != null) {
-                current.reanchorLinkedTo(npcName);
+            HologramView current = view;
+            HologramRepository holograms = stored;
+            if (current == null || holograms == null) {
+                return;
+            }
+            for (Hologram hologram : holograms.all()) {
+                if (npcName.equals(hologram.linkedNpcName())) {
+                    current.render(hologram);
+                }
             }
         }
 

@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -63,8 +64,7 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
         }
         PlayerRef who = ref(sender);
         Position at = TeleportRefs.positionOf(sender);
-        // The write reaches the database, so it leaves the command thread; the reply follows from there.
-        services.scheduler().async(() -> services.resolveSpawn().setMain(who, at));
+        write(who, () -> services.resolveSpawn().setMain(who, at));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -76,7 +76,7 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
         PlayerRef who = ref(sender);
         Position at = TeleportRefs.positionOf(sender);
         String scope = ctx.getArgument(SCOPE, String.class);
-        services.scheduler().async(() -> services.resolveSpawn().setMain(who, scope, at));
+        write(who, () -> services.resolveSpawn().setMain(who, scope, at));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -87,7 +87,7 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
         }
         PlayerRef who = actor(ctx);
         String scope = ctx.getArgument(SCOPE, String.class);
-        services.scheduler().async(() -> services.resolveSpawn().setMain(who, scope, at));
+        write(who, () -> services.resolveSpawn().setMain(who, scope, at));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -97,7 +97,22 @@ public final class SetMainSpawnCommand extends TeleportCommandSupport implements
             return 0;
         }
         PlayerRef who = actor(ctx);
-        services.scheduler().async(() -> services.resolveSpawn().setMain(who, at));
+        write(who, () -> services.resolveSpawn().setMain(who, at));
         return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Run a spawn write on the async lane, since it reaches the database; the reply follows from there. A write that
+     * fails tells the operator rather than ending in silence, and still reaches the scheduler's error log.
+     */
+    private void write(PlayerRef who, Runnable work) {
+        services.scheduler().async(() -> {
+            try {
+                work.run();
+            } catch (RuntimeException failed) {
+                services.notifier().send(who, SharedMessageKey.COMMAND_ERROR);
+                throw failed;
+            }
+        });
     }
 }

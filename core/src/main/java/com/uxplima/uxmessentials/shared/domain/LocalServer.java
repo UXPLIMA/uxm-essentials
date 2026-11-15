@@ -11,6 +11,10 @@ import org.jspecify.annotations.Nullable;
  * This server as the network sees it: its own id and the shared sets it belongs to. It answers which
  * {@link ServerScope scopes} apply here, the one rule guard regions, holograms, NPCs and the main spawn follow.
  *
+ * <p>A server name a scope cannot hold (a space, a letter outside A to Z, more than 64 characters) leaves the server
+ * without a scope of its own: its sets and the network still apply, and nothing can be scoped to it alone. Spawn
+ * resolution and rendering keep working rather than failing on every join.
+ *
  * @param serverId this server's network name
  * @param sharedSets the shared sets this server belongs to, in the order the operator listed them
  */
@@ -21,15 +25,16 @@ public record LocalServer(String serverId, List<String> sharedSets) {
         sharedSets = List.copyOf(sharedSets);
     }
 
-    /** This server's own scope. */
-    public ServerScope serverScope() {
-        return ServerScope.server(serverId);
+    /** This server's own scope, or empty when its name cannot be one. */
+    public Optional<ServerScope> serverScope() {
+        String own = "server:" + serverId;
+        return ServerScope.isScope(own) ? Optional.of(new ServerScope(own)) : Optional.empty();
     }
 
     /** Every scope that applies here, the server's own first and then each shared set. */
     public List<ServerScope> loadedScopes() {
         List<ServerScope> scopes = new ArrayList<>();
-        scopes.add(serverScope());
+        serverScope().ifPresent(scopes::add);
         for (String set : sharedSets) {
             scopes.add(ServerScope.set(set));
         }
@@ -47,7 +52,9 @@ public record LocalServer(String serverId, List<String> sharedSets) {
     /** The scope words a command completes: {@code server}, then each scope that applies here in stored form. */
     public List<String> suggestions() {
         List<String> words = new ArrayList<>();
-        words.add("server");
+        if (serverScope().isPresent()) {
+            words.add("server");
+        }
         for (ServerScope scope : loadedScopes()) {
             words.add(scope.value());
         }
@@ -62,7 +69,7 @@ public record LocalServer(String serverId, List<String> sharedSets) {
     public Optional<ServerScope> parse(String written) {
         String text = Objects.requireNonNull(written, "written").strip();
         if (text.equalsIgnoreCase("server")) {
-            return Optional.of(serverScope());
+            return serverScope();
         }
         if (ServerScope.isScope(text)) {
             return Optional.of(new ServerScope(text));

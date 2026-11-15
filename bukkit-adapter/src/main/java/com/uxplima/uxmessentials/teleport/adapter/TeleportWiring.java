@@ -137,6 +137,7 @@ public final class TeleportWiring {
             ModuleContext ctx,
             Persistence persistence,
             Bus bus,
+            NetworkConfig network,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -188,7 +189,7 @@ public final class TeleportWiring {
                 jailGate,
                 combatGate,
                 spawns,
-                NetworkConfig.from(config),
+                network,
                 clock,
                 rtp,
                 fee,
@@ -460,12 +461,13 @@ public final class TeleportWiring {
             @Nullable Listener hotspotListener) {}
 
     /**
-     * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn no
-     * longer moves every other's, and the network-wide main spawn on a lone server, which has no other server to
-     * keep apart from and so keeps its spawn when its server name changes.
+     * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn leaves
+     * every other's alone, and the network-wide main spawn on a lone server, which has no other server to keep apart
+     * from and so keeps its spawn when its server name changes. A server name no scope can hold also writes the
+     * network-wide spawn; the enable log names that name.
      */
     private static @Nullable ServerScope defaultMainScope(NetworkConfig network) {
-        return network.enabled() ? network.localServer().serverScope() : null;
+        return network.enabled() ? network.localServer().serverScope().orElse(null) : null;
     }
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence, Bus bus) {

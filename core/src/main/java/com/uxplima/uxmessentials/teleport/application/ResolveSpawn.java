@@ -33,8 +33,10 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The main spawn is chosen per server: the one stored for this server's own scope, else the one of the first
  * shared set it belongs to that has one, else the network-wide one. {@code /setmainspawn} writes the scope this
- * server was given as its default, so on a network a lobby's spawn no longer moves every other server's. All writes go through the spawn directory; resolution reads the live target spawn through it rather
- * than a copied location, so a moved target spawn is reflected immediately.
+ * server was given as its default, so on a network a lobby's spawn leaves every other server's alone.
+ *
+ * <p>All writes go through the spawn directory; resolution reads the live target spawn through it rather than a
+ * copied location, so a moved target spawn is reflected immediately.
  */
 public final class ResolveSpawn {
 
