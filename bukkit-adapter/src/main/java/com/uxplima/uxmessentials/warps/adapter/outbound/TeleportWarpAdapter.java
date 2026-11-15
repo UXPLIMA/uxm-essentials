@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.warps.adapter.outbound;
 
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -27,10 +28,12 @@ public final class TeleportWarpAdapter implements WarpTeleporter {
 
     private final TeleportEngine engine;
     private final WarpTeleportRegistry registry;
+    private final Scheduler scheduler;
 
-    public TeleportWarpAdapter(TeleportEngine engine, WarpTeleportRegistry registry) {
+    public TeleportWarpAdapter(TeleportEngine engine, WarpTeleportRegistry registry, Scheduler scheduler) {
         this.engine = Objects.requireNonNull(engine, "engine");
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -45,7 +48,14 @@ public final class TeleportWarpAdapter implements WarpTeleporter {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
-        engine.launch(who, destinationOf(warp), TeleportKind.WARP);
+        // The use case runs on the async lane, but the launch reads where the player stands and what they may do,
+        // which only their own region thread may ask; so it starts there, after a hop when the caller is elsewhere.
+        Runnable launch = () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP);
+        if (scheduler.ownsEntity(who)) {
+            launch.run();
+        } else {
+            scheduler.onEntity(who, launch);
+        }
     }
 
     @Override

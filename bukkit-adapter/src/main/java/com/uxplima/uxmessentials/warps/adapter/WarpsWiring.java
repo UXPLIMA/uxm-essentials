@@ -129,7 +129,7 @@ public final class WarpsWiring {
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WarpTeleportRegistry teleportRegistry = new WarpTeleportRegistry();
-        WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry);
+        WarpTeleporter teleporter = new TeleportWarpAdapter(teleportEngine, teleportRegistry, kernel.scheduler());
         var playerWarpHandle = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpRepositoryHandle();
         var playerWarpGoTo = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.PlayerWarpGoToHandle();
         // A warp records the backend it was set on. With cross-server.enabled on, a warp of another backend is used
