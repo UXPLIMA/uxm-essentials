@@ -243,7 +243,8 @@ public final class WarpsWiring {
                 teleportRegistry::clear,
                 services.setWarp(),
                 services.moveWarp(),
-                services.delWarp());
+                services.delWarp(),
+                cached);
     }
 
     private static WarpServices assemble(
@@ -289,6 +290,8 @@ public final class WarpsWiring {
      * @param playerWarpGoTo the late-bound handle player-warps binds its go-to teleport into for the editor button
      * @param teleportRegistry the warp-arrival notification handoff player-warps shares so its hops also notify
      * @param stopAction cleanup action on shutdown
+     * @param cache the cache under the broadcasting repository, which the importer writes through so a large
+     *     import updates this server without one cross-server frame per row
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -304,7 +307,8 @@ public final class WarpsWiring {
             Runnable stopAction,
             SetWarp setWarp,
             MoveWarp moveWarp,
-            DelWarp delWarp) {
+            DelWarp delWarp,
+            CachedWarpRepository cache) {
 
         public Wired {
             commands = List.copyOf(commands);

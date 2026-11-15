@@ -841,9 +841,9 @@ public final class PluginModule {
                 plugin.getServer(),
                 kernel.log());
 
-        // The repositories the running modules serve players from, filled as each one wires, so the importer
-        // built below writes through those caches rather than past them.
-        ImportTargets importTargets = new ImportTargets();
+        // The caches the running modules serve players from, filled as each one wires, so the importer built
+        // below writes through those caches rather than past them.
+        ImportTargets importTargets = new ImportTargets(kernel.log());
         PlaceholderContexts placeholders = wireModules(
                 plugin,
                 registry,
@@ -2282,7 +2282,7 @@ public final class PluginModule {
         // reconcile: auto-load may load a world declaring generator: uxmEssentials:void|flat, which routes
         // back through that hook, so the resolver must be reachable first.
         resources.worldGeneratorResolver(wired.generatorResolver());
-        links.importTargets.worlds(wired.repository());
+        resources.onClose(links.importTargets.worlds(wired.repository()));
         links.placeholders.worlds(wired.worldsPlaceholders());
         links.queries.register(
                 UxmWorldsQuery.class,
@@ -2341,7 +2341,7 @@ public final class PluginModule {
         // cache-backed locator, so a HOME step in a configured respawn chain now lands on the player's home.
         // When teleport is disabled its holder is absent and this bind is a no-op.
         bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
-        links.importTargets.homes(wired.repository());
+        resources.onClose(links.importTargets.homes(wired.cache()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
         links.queries.register(
                 UxmHomesQuery.class,
@@ -2402,7 +2402,7 @@ public final class PluginModule {
         // Fill the deferred reference the menu-currency façade was handed at menu-wiring time (above): from here on
         // a give-money click resolves against the same backend and currency registries a warp fee spends through.
         menuCurrencyBackends.set(new EconomyBackends(wired.backends(), wired.currencies()));
-        links.importTargets.wallets(wired.ledger().repository());
+        resources.onClose(links.importTargets.wallets(wired.cache()));
         links.economyProvider = wired.provider();
         links.economyCurrency = wired.defaultCurrency();
         wireMoneyBoards(ctx, resources, links, wired.defaultCurrency());
@@ -2494,7 +2494,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         bindWarpRespawn(links, new RepositoryWarpRespawnLocator(wired.repository()));
-        links.importTargets.warps(wired.repository());
+        resources.onClose(links.importTargets.warps(wired.cache()));
         links.placeholders.warps(new RepositoryWarpsPlaceholders(wired.listWarps()));
         links.queries.register(
                 UxmWarpsQuery.class,
@@ -2543,7 +2543,7 @@ public final class PluginModule {
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
-        links.importTargets.kits(wired.repository());
+        resources.onClose(links.importTargets.kits(wired.repository()));
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
         links.queries.register(
                 UxmKitsQuery.class,
@@ -3118,7 +3118,7 @@ public final class PluginModule {
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
-        links.importTargets.holograms(wired.repository(), wired.renderer());
+        resources.onClose(links.importTargets.holograms(wired.cache(), wired.renderer()));
         // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "holograms",
@@ -3195,7 +3195,7 @@ public final class PluginModule {
         // The player-warps PAPI seam reads the same cached repository and count-limit quota the /pwarp commands
         // hold, so a placeholder matches what /setpwarp enforces and the /pwarps list shows.
         links.placeholders.playerwarps(new RepositoryPlayerwarpsPlaceholders(wired.repository(), wired.quota()));
-        links.importTargets.playerWarps(wired.repository());
+        resources.onClose(links.importTargets.playerWarps(wired.cache()));
         links.queries.register(
                 UxmPlayerWarpsQuery.class,
                 new PlayerWarpQueries(
@@ -3661,8 +3661,9 @@ public final class PluginModule {
         private final AuditChannel auditChannel;
         // Which backend each online player is on; a context that names a player asks it before offline data.
         private final NetworkPresence presence;
-        // The repositories the importer writes through, each set by its module as it wires; a module that never
-        // wires leaves its slot empty and the importer falls back to the database for that kind.
+        // The caches the importer writes through, each set by its module as it wires and withdrawn through the
+        // module's resources, so a module that fails part way leaves its slot empty and the importer falls back
+        // to the database for that kind.
         private final ImportTargets importTargets;
 
         private ContextLinks(
