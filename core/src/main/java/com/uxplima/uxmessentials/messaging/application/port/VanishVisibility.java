@@ -19,4 +19,21 @@ public interface VanishVisibility {
 
     /** True when {@code target} is vanished and {@code viewer} cannot see them (so cannot message them). */
     boolean isHiddenFrom(PlayerRef viewer, PlayerRef target);
+
+    /**
+     * The vanish see level {@code viewer} holds here, carried with a message to another backend so that backend can
+     * apply its own vanish to them. {@code 0} sees no vanished player, which is also the answer with vanish off.
+     */
+    default int seeLevel(PlayerRef viewer) {
+        return 0;
+    }
+
+    /**
+     * Whether {@code target}, vanished on this backend, is hidden from {@code viewer} on another backend who holds
+     * {@code viewerSeeLevel} there. Only this backend knows for sure who it hides, which is why a message from another
+     * backend asks here rather than trusting the sender's view.
+     */
+    default boolean isHiddenHereFrom(PlayerRef viewer, int viewerSeeLevel, PlayerRef target) {
+        return false;
+    }
 }

@@ -21,11 +21,17 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * A moderation store that keeps IP bans in memory, with no lockdown and no player ban: what the IP ban use cases
- * and the login check read.
+ * and the login check read, plus the seen records {@code /seen} reads.
  */
 final class InMemoryIpBans implements ModerationRepository {
 
     private final Map<String, IpBan> ipBans = new HashMap<>();
+    private final Map<java.util.UUID, SeenRecord> seen = new HashMap<>();
+
+    /** Keep {@code record} as the seen record of its player. */
+    void recordSeen(SeenRecord record) {
+        seen.put(record.player().uuid(), record);
+    }
 
     @Override
     public void saveIpBan(IpBan ban) {
@@ -119,7 +125,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public Optional<SeenRecord> seen(PlayerRef who) {
-        throw new UnsupportedOperationException();
+        return Optional.ofNullable(seen.get(who.uuid()));
     }
 
     @Override

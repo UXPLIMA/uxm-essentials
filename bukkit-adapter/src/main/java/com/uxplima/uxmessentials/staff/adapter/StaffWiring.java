@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -40,6 +41,7 @@ import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffGadgetActio
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffJoinListener;
 import com.uxplima.uxmessentials.staff.adapter.inbound.listener.StaffModeListener;
 import com.uxplima.uxmessentials.staff.adapter.outbound.BukkitStaffLoadoutCapture;
+import com.uxplima.uxmessentials.staff.adapter.outbound.BusStaffChatNetwork;
 import com.uxplima.uxmessentials.staff.adapter.outbound.MessagingStaffChannel;
 import com.uxplima.uxmessentials.staff.adapter.outbound.ModerationStaffFreeze;
 import com.uxplima.uxmessentials.staff.adapter.outbound.PlayerstateStaffInspector;
@@ -90,13 +92,13 @@ public final class StaffWiring {
      * enter/exit roster-alert subscriber can be registered here and unsubscribed on stop, the kernel port
      * exposes only {@code publish}. The {@code serverId} is this backend's id from the root {@code network}
      * block, the one the bus stamps on its frames; the module's own config is scoped under {@code modules.staff}
-     * and never holds it.
+     * and never holds it. Staff chat reaches the staff of the other backends over {@code bus}.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
-            String serverId,
+            Bus bus,
             StaffSeams seams,
             InProcessDomainEventPublisher events,
             ManagementGuiRegistry guiRegistry,
@@ -105,13 +107,14 @@ public final class StaffWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
-        Objects.requireNonNull(serverId, "serverId");
+        Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(seams, "seams");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
+        String serverId = bus.publisher().serverId();
         StaffSettings settings = new StaffSettings(ctx.config(), kernel.log());
         AtomicBoolean running = new AtomicBoolean(true);
 
@@ -149,7 +152,10 @@ public final class StaffWiring {
                 StaffSettings.DEFAULT_MODE,
                 settings.vanishOnEnter());
         ExitStaffMode exit = new ExitStaffMode(store, repository, capture, vanish, notifier, kernel.events());
-        SendStaffChat staffChat = new SendStaffChat(channel, kernel.events());
+        BusStaffChatNetwork staffChatNetwork = new BusStaffChatNetwork(bus.publisher());
+        SendStaffChat staffChat = new SendStaffChat(channel, kernel.events(), staffChatNetwork, kernel.scheduler());
+        staffChatNetwork.bind(staffChat);
+        bus.registry().register(staffChatNetwork::onFrame);
         StaffServices services = new StaffServices(enter, exit, recover, staffChat, inspector, store);
 
         StaffFollowService followService = new StaffFollowService(

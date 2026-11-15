@@ -38,7 +38,11 @@ public sealed interface NetworkMessage
                 IpBanChanged,
                 RankChanged,
                 PresenceChanged,
-                PresenceSnapshot {
+                PresenceSnapshot,
+                PrivateMessageFrame,
+                PrivateMessageAnswerFrame,
+                HelpOpFrame,
+                StaffChatFrame {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -71,7 +75,11 @@ public sealed interface NetworkMessage
         RANK_CHANGED(17),
         IP_BAN_CHANGED(18),
         PRESENCE_CHANGED(19),
-        PRESENCE_SNAPSHOT(20);
+        PRESENCE_SNAPSHOT(20),
+        PRIVATE_MESSAGE(21),
+        PRIVATE_MESSAGE_ANSWER(22),
+        HELP_OP(23),
+        STAFF_CHAT(24);
 
         private final byte wireTag;
 

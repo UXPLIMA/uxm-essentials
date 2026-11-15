@@ -20,8 +20,10 @@ import java.util.function.Predicate;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.application.port.SeenVisibility;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
@@ -133,13 +135,91 @@ class LiveTargetsTest {
                 notifier.notifier(),
                 false,
                 CLOCK,
-                presence);
+                presence,
+                SeenVisibility.ALWAYS_VISIBLE);
 
         seen.seen(STAFF, REMOTE);
 
         assertThat(notifier.sent())
                 .containsExactly(new RecordingNotifier.Sent(
                         STAFF, "moderation.seen.online-elsewhere", Map.of("player", "Steve", "server", "lobby-1")));
+    }
+
+    @Test
+    void seenReportsAPlayerHereAsOnlineOnThisServer() {
+        InMemoryIpBans repository = new InMemoryIpBans();
+        repository.recordSeen(SeenRecord.firstJoin(LOCAL, Optional.empty(), Instant.parse("2026-01-02T03:04:05Z")));
+        Seen seen = new Seen(
+                repository,
+                new IpAlts(new NoIpHistory(), address -> address),
+                new OnlyOnline(LOCAL),
+                notifier.notifier(),
+                false,
+                CLOCK,
+                presence,
+                SeenVisibility.ALWAYS_VISIBLE);
+
+        seen.seen(STAFF, LOCAL);
+
+        assertThat(notifier.sent())
+                .containsExactly(new RecordingNotifier.Sent(
+                        STAFF,
+                        "moderation.seen.online-here",
+                        Map.of("player", "Alex", "first", "2026-01-02T03:04:05Z", "server", "survival-1")));
+    }
+
+    @Test
+    void seenShowsAVanishedPlayerOnAnotherBackendAsLastSeenToSomeoneWhoMayNotSeeThem() {
+        Seen seen = seenHiding(REMOTE, new OnlyOnline(LOCAL));
+
+        seen.seen(STAFF, REMOTE);
+
+        assertThat(notifier.keys()).containsExactly("moderation.seen.report");
+    }
+
+    @Test
+    void seenShowsAVanishedPlayerHereAsLastSeenToSomeoneWhoMayNotSeeThem() {
+        Seen seen = seenHiding(LOCAL, new OnlyOnline(LOCAL));
+
+        seen.seen(STAFF, LOCAL);
+
+        assertThat(notifier.keys()).containsExactly("moderation.seen.report");
+    }
+
+    /** A /seen whose records hold both players, joined an hour ago, and whose vanish hides {@code hidden}. */
+    private Seen seenHiding(PlayerRef hidden, PlayerLookup players) {
+        InMemoryIpBans repository = new InMemoryIpBans();
+        Instant joined = CLOCK.instant().minus(Duration.ofHours(1));
+        repository.recordSeen(SeenRecord.firstJoin(LOCAL, Optional.empty(), joined));
+        repository.recordSeen(SeenRecord.firstJoin(REMOTE, Optional.empty(), joined));
+        return new Seen(
+                repository,
+                new IpAlts(new NoIpHistory(), address -> address),
+                players,
+                notifier.notifier(),
+                false,
+                CLOCK,
+                presence,
+                new Hiding(hidden));
+    }
+
+    /** Vanish that hides one player from a viewer without any see level, here or elsewhere. */
+    private record Hiding(PlayerRef hidden) implements SeenVisibility {
+
+        @Override
+        public int seeLevel(PlayerRef viewer) {
+            return 0;
+        }
+
+        @Override
+        public boolean isHiddenHere(PlayerRef viewer, int viewerSeeLevel, PlayerRef target) {
+            return target.equals(hidden);
+        }
+
+        @Override
+        public boolean isHiddenElsewhere(int viewerSeeLevel, PlayerRef target) {
+            return target.equals(hidden);
+        }
     }
 
     /** The live side of this backend: who was kicked and who is frozen. */
@@ -330,6 +410,25 @@ class LiveTargetsTest {
         @Override
         public void lockdown(UUID actor, boolean enabled) {
             lines.add("lockdown " + enabled);
+        }
+    }
+
+    /** A server with one player connected. */
+    private record OnlyOnline(PlayerRef player) implements PlayerLookup {
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return player.name().equals(name) ? Optional.of(player) : Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return player.uuid().equals(uuid) ? Optional.of(player) : Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return player.uuid().equals(uuid);
         }
     }
 

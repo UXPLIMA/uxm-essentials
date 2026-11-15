@@ -72,6 +72,13 @@ public final class BukkitMessageDelivery implements MessageDelivery {
     }
 
     @Override
+    public void deliverRemoteHelpOp(PlayerRef requester, String server, PlayerRef viewer, MessageBody body) {
+        Map<String, String> placeholders = two("player", requester.name(), "message", body.value());
+        placeholders.put("server", server);
+        send(viewer, MessagingMessageKey.HELPOP_RECEIVED_REMOTE, placeholders);
+    }
+
+    @Override
     public void deliverSpy(PlayerRef observer, PlayerRef sender, PlayerRef recipient, MessageBody body) {
         Map<String, String> placeholders = new HashMap<>();
         placeholders.put("from", sender.name());
