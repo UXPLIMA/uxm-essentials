@@ -58,6 +58,14 @@ public record NetworkConfig(
         }
     }
 
+    /**
+     * Whether {@code serverName} is the shipped default. Every backend starts with it, so on a network it is the
+     * name most likely to be shared by two backends that then drop each other's frames.
+     */
+    public static boolean isDefaultServerName(String serverName) {
+        return DEFAULT_SERVER_ID.equals(serverName);
+    }
+
     /** The heartbeat publish interval the {@code ClusterHeartbeat} schedules on. */
     public java.time.Duration heartbeatInterval() {
         return java.time.Duration.ofSeconds(heartbeatSeconds);

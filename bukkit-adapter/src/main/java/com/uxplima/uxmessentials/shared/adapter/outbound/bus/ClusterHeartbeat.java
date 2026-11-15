@@ -11,7 +11,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Announces this backend's presence to the cluster on a bounded interval. Each tick publishes a fresh
- * {@link ServerPing} stamped with this backend's {@code server-id} and the current wall-clock time; peers
+ * {@link ServerPing} stamped with this backend's {@code server-id}, the current wall-clock time and the nonce
+ * this boot drew; peers
  * record it into their {@link ClusterPeers} roster so the cluster-peer line in {@code /uxmess doctor} stays
  * current. A backend that stops heartbeating ages out of every peer's roster once its last ping leaves the
  * liveness window.
@@ -33,15 +34,27 @@ public final class ClusterHeartbeat {
     private final Logger log;
     private final Duration interval;
     private final LongSupplier clock;
+    private final long bootNonce;
     private volatile boolean running;
 
-    /** Heartbeat publishing through {@code publisher} every {@code interval}, reading the wall clock for each stamp. */
-    public ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval, Logger log) {
-        this(publisher, scheduler, interval, log, System::currentTimeMillis);
+    /**
+     * Heartbeat publishing through {@code publisher} every {@code interval}, reading the wall clock for each stamp
+     * and carrying {@code bootNonce} so a peer under the same name can tell this boot from its own.
+     */
+    public ClusterHeartbeat(
+            BusPublisher publisher, Scheduler scheduler, Duration interval, long bootNonce, Logger log) {
+        this(publisher, scheduler, interval, bootNonce, log, System::currentTimeMillis);
     }
 
-    ClusterHeartbeat(BusPublisher publisher, Scheduler scheduler, Duration interval, Logger log, LongSupplier clock) {
+    ClusterHeartbeat(
+            BusPublisher publisher,
+            Scheduler scheduler,
+            Duration interval,
+            long bootNonce,
+            Logger log,
+            LongSupplier clock) {
         this.publisher = Objects.requireNonNull(publisher, "publisher");
+        this.bootNonce = bootNonce;
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
         this.interval = Objects.requireNonNull(interval, "interval");
@@ -74,7 +87,7 @@ public final class ClusterHeartbeat {
             return;
         }
         try {
-            publisher.publish(new ServerPing(publisher.serverId(), clock.getAsLong()));
+            publisher.publish(new ServerPing(publisher.serverId(), clock.getAsLong(), bootNonce));
         } catch (RuntimeException failure) {
             // A throwing publish must not skip the reschedule below, or this backend would drop off every peer's
             // roster.

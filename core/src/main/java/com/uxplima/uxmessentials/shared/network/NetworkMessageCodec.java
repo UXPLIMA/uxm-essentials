@@ -19,7 +19,8 @@ import java.util.UUID;
  * <p>Wire layout: a one-byte protocol {@link #VERSION}, then a one-byte {@link NetworkMessage.MessageType}
  * wire tag, then the variant's fields. The version byte lets a future format change be detected rather than
  * silently mis-decoded; {@code bus-channel} and frame-codec compatibility are guaranteed across patch
- * versions only, so a mismatched version is rejected loudly.
+ * versions only, so a mismatched version is rejected loudly. A field added to an existing variant goes at the end
+ * of its body and is read only when present: an older decoder ignores the bytes after the fields it knows.
  * UUIDs are written as two longs; strings via {@link DataOutputStream#writeUTF}.
  */
 public final class NetworkMessageCodec {
@@ -86,7 +87,11 @@ public final class NetworkMessageCodec {
             case HologramChanged hologram -> out.writeUTF(hologram.name());
             case NpcChanged npc -> out.writeUTF(npc.name());
             case IgnoreChanged ignore -> writeUuid(out, ignore.owner());
-            case ServerPing ping -> out.writeLong(ping.epochMillis());
+            case ServerPing ping -> {
+                out.writeLong(ping.epochMillis());
+                // Written last: a peer on the older layout stops reading after the timestamp and never sees it.
+                out.writeLong(ping.bootNonce());
+            }
             case VotePartyFired party -> out.writeInt(party.threshold());
             case VoteCounterChanged counter -> {
                 // origin already written above; the counter frame carries no further body.
@@ -126,7 +131,7 @@ public final class NetworkMessageCodec {
             case HOLOGRAM_CHANGED -> new HologramChanged(origin, in.readUTF());
             case NPC_CHANGED -> new NpcChanged(origin, in.readUTF());
             case IGNORE_CHANGED -> new IgnoreChanged(origin, readUuid(in));
-            case SERVER_PING -> new ServerPing(origin, in.readLong());
+            case SERVER_PING -> new ServerPing(origin, in.readLong(), readOptionalLong(in, ServerPing.NO_NONCE));
             case VOTE_PARTY_FIRED -> new VotePartyFired(origin, in.readInt());
             case VOTE_COUNTER_CHANGED -> new VoteCounterChanged(origin);
             case TRADE_SIGNAL ->
@@ -136,6 +141,15 @@ public final class NetworkMessageCodec {
                 new VanishStateChanged(origin, readUuid(in), in.readUTF(), in.readBoolean(), in.readInt());
             case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
         };
+    }
+
+    /**
+     * A trailing field a newer peer appends to a frame. A frame from an older peer ends before it, so the
+     * absence reads as {@code absent} rather than as a truncated frame; this keeps a field addition compatible
+     * in both directions without moving {@link #VERSION}.
+     */
+    private static long readOptionalLong(DataInputStream in, long absent) throws IOException {
+        return in.available() >= Long.BYTES ? in.readLong() : absent;
     }
 
     private static void writeUuid(DataOutputStream out, UUID uuid) throws IOException {

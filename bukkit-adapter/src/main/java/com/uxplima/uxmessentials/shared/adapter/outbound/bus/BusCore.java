@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
+import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -31,12 +32,19 @@ final class BusCore implements BusPublisher {
     private final BusTransport transport;
     private final String serverId;
     private final RemoteSyncRegistry registry;
+    private final DuplicateServerNames duplicates;
     private final Logger log;
 
-    BusCore(BusTransport transport, String serverId, RemoteSyncRegistry registry, Logger log) {
+    BusCore(
+            BusTransport transport,
+            String serverId,
+            RemoteSyncRegistry registry,
+            DuplicateServerNames duplicates,
+            Logger log) {
         this.transport = Objects.requireNonNull(transport, "transport");
         this.serverId = Objects.requireNonNull(serverId, "serverId");
         this.registry = Objects.requireNonNull(registry, "registry");
+        this.duplicates = Objects.requireNonNull(duplicates, "duplicates");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -84,7 +92,11 @@ final class BusCore implements BusPublisher {
             return;
         }
         if (serverId.equals(message.originServer())) {
-            // The loop sentinel: our own mutation echoed back. Drop it.
+            // The loop sentinel: our own mutation echoed back. Drop it, but first let a heartbeat show whether it
+            // was really ours or another backend's under the same name, which this drop would otherwise hide.
+            if (message instanceof ServerPing ping) {
+                duplicates.inspect(ping);
+            }
             return;
         }
         registry.dispatch(message, this::logListenerFailure);
