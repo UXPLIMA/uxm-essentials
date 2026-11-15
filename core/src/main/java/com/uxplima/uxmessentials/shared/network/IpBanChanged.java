@@ -9,7 +9,8 @@ import java.util.Objects;
  * from the shared database on the peer, never carried on the wire.
  *
  * @param originServer the backend that issued the ban
- * @param ip the banned address literal, compared exactly as the login check compares it
+ * @param ip the banned address in its canonical literal form; a peer compares it exactly with each player's own
+ *     address (the forwarded one behind a proxy), as the login check does
  */
 public record IpBanChanged(String originServer, String ip) implements NetworkMessage {
 

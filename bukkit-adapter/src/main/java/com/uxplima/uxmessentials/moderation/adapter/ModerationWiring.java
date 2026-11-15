@@ -209,7 +209,7 @@ public final class ModerationWiring {
         EnforceRemoteBan enforce = new EnforceRemoteBan(
                 repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
-                repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
+                repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         bus.registry().register(ModerationSync.listener(enforce::onRemoteBan, enforceIp::onRemoteIpBan));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
@@ -427,9 +427,27 @@ public final class ModerationWiring {
                 .checkBan(new CheckBan(repository, notifier, clock))
                 .checkMute(new CheckMute(repository, notifier, clock))
                 .banIp(new BanIp(
-                        repository, sanctionPort, sync, ipAlts, notifier, audit, kernel.events(), history, clock))
+                        repository,
+                        sanctionPort,
+                        guard,
+                        sync,
+                        ipAlts,
+                        notifier,
+                        audit,
+                        kernel.events(),
+                        history,
+                        clock))
                 .tempBanIp(new TempBanIp(
-                        repository, sanctionPort, sync, ipAlts, notifier, audit, kernel.events(), history, clock))
+                        repository,
+                        sanctionPort,
+                        guard,
+                        sync,
+                        ipAlts,
+                        notifier,
+                        audit,
+                        kernel.events(),
+                        history,
+                        clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
                 .freeze(new Freeze(sanctionPort, guard, notifier, audit))
                 .seen(new Seen(

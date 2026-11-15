@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.util.Collection;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -23,12 +24,13 @@ public interface Sanctions {
     void kick(PlayerRef target, MessageKey reasonKey, String reasonText);
 
     /**
-     * Kick every connected player whose address is exactly {@code ip}, each with the text {@code reasonFor}
-     * renders for them so every player reads the screen in their own language; no-op when nobody matches. The
-     * address is compared the way the login check reads it, so a player the login check would admit is never
-     * kicked. Callable from any thread: the adapter enumerates the players on the thread that may read them.
+     * Kick every connected player whose address is exactly {@code ip} and whom {@code kickable} accepts, each
+     * with the text {@code reasonFor} renders for them so every player reads the screen in their own language;
+     * no-op when nobody matches. The address is the player's own (the forwarded one behind a proxy), the same
+     * address the login check and the IP history read. Callable from any thread: the adapter enumerates the
+     * players, and asks {@code kickable}, on the thread that may read them.
      */
-    void kickAddress(String ip, Function<PlayerRef, String> reasonFor);
+    void kickAddress(String ip, Predicate<PlayerRef> kickable, Function<PlayerRef, String> reasonFor);
 
     /** Every currently-connected player, for a {@code /kickall} fan-out. */
     Collection<PlayerRef> onlinePlayers();

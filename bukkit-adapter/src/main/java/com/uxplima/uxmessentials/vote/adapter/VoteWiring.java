@@ -130,7 +130,7 @@ public final class VoteWiring {
      * so the party sound/particle subscriber and the cross-server party publisher can be registered and later
      * unregistered on stop. The repository is the concrete counter-cached jOOQ adapter wrapped by
      * {@link VoteSync#repository} so each counter mutation announces a {@code VoteCounterChanged} to peers; the
-     * same cache is handed to {@link VoteSync#listener} so a remote advance or party fire invalidates it. With
+     * same cache's invalidation is handed to {@link VoteSync#listener} so a remote advance or party fire drops it. With
      * the bus disabled both seams are no-ops, so the single-server path is unchanged. Every vote a saved tally
      * adds is also counted on the votes board through {@code board}.
      */
@@ -226,7 +226,9 @@ public final class VoteWiring {
         // bus is a no-op when the cluster is disabled, so this is unconditional and free on a single server.
         Set<BroadcastChannel> broadcastChannels = broadcastConfig.settings().channels();
         RewardNetworkParty networkRewards = new RewardNetworkParty(applier, audience, party);
-        bus.registry().register(VoteSync.listener(cachedRepository, broadcaster, broadcastChannels, networkRewards));
+        bus.registry()
+                .register(VoteSync.listener(
+                        cachedRepository::invalidate, broadcaster, broadcastChannels, networkRewards));
         Consumer<DomainEvent> partyPublisher = VoteSync.partyPublisher(bus.publisher());
         events.subscribe(partyPublisher);
 

@@ -19,7 +19,10 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
-/** A moderation store that keeps IP bans in memory; the IP ban use cases touch nothing else. */
+/**
+ * A moderation store that keeps IP bans in memory, with no lockdown and no player ban: what the IP ban use cases
+ * and the login check read.
+ */
 final class InMemoryIpBans implements ModerationRepository {
 
     private final Map<String, IpBan> ipBans = new HashMap<>();
@@ -56,7 +59,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public TempbanState loadTempban(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        return TempbanState.none();
     }
 
     @Override
@@ -111,7 +114,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void recordSeen(PlayerRef who, Optional<String> ip, Instant at) {
-        throw new UnsupportedOperationException();
+        // Last-seen records are not what these tests look at.
     }
 
     @Override
@@ -126,7 +129,7 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public boolean isLockedDown() {
-        throw new UnsupportedOperationException();
+        return false;
     }
 
     @Override

@@ -40,6 +40,7 @@ public final class BanIp {
 
     private final ModerationRepository repository;
     private final Sanctions sanctions;
+    private final ModerationGuard guard;
     private final SanctionSync sync;
     private final IpAlts ipAlts;
     private final Notifier notifier;
@@ -51,6 +52,7 @@ public final class BanIp {
     public BanIp(
             ModerationRepository repository,
             Sanctions sanctions,
+            ModerationGuard guard,
             SanctionSync sync,
             IpAlts ipAlts,
             Notifier notifier,
@@ -60,6 +62,7 @@ public final class BanIp {
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.guard = Objects.requireNonNull(guard, "guard");
         this.sync = Objects.requireNonNull(sync, "sync");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -80,7 +83,7 @@ public final class BanIp {
         IpBan ban = new IpBan(target.ip(), span.map(now::plus), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
         history.banIp(actor, target.uuid(), target.ip(), reason, span.map(now::plus));
-        IpBanKick.kickEveryoneOn(ban, sanctions, notifier);
+        IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
         List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));

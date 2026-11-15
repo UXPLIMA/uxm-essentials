@@ -11,6 +11,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,9 @@ class EnforceRemoteIpBanTest {
     private final OnlinePlayers online =
             new OnlinePlayers().connect(ALEX, BANNED).connect(SAM, "198.51.100.2");
     private final RecordingNotifier notifier = new RecordingNotifier();
-    private final EnforceRemoteIpBan enforce = new EnforceRemoteIpBan(repository, online, notifier.notifier(), CLOCK);
+    private final FakePermissions permissions = new FakePermissions();
+    private final EnforceRemoteIpBan enforce =
+            new EnforceRemoteIpBan(repository, online, new ModerationGuard(permissions), notifier.notifier(), CLOCK);
 
     @Test
     void thePlayersOnABannedAddressAreKickedWithTheBanScreen() {
@@ -35,6 +38,16 @@ class EnforceRemoteIpBanTest {
         assertThat(notifier.sent())
                 .containsExactly(new RecordingNotifier.Sent(
                         ALEX, ModerationMessageKey.BANIP_KICK.key(), Map.of("reason", "alts")));
+    }
+
+    @Test
+    void anExemptHolderOnTheAddressStaysOnline() {
+        permissions.grant(ALEX, ModerationGuard.EXEMPT_NODE);
+        repository.saveIpBan(ban(Optional.empty()));
+
+        enforce.onRemoteIpBan(BANNED);
+
+        assertThat(online.kicked()).isEmpty();
     }
 
     @Test

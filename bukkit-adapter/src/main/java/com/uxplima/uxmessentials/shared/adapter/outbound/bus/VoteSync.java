@@ -31,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
  *   <li><b>Outbound (party fire)</b>: {@link #partyPublisher(BusPublisher)} returns a domain-event consumer
  *       that, on a local {@link VotePartyTriggered}, publishes a {@link VotePartyFired} frame so peers run
  *       their own party celebration once, in lockstep, rather than each racing to detect the crossing.
- *   <li><b>Inbound</b>: {@link #listener(CachedVoteRepository, VoteBroadcaster, Set, RewardNetworkParty)}
+ *   <li><b>Inbound</b>: {@link #listener(Runnable, VoteBroadcaster, Set, RewardNetworkParty)}
  *       returns a {@link RemoteSyncListener} that, on a remote {@link VoteCounterChanged}, drops the cached
  *       counter, and on a remote {@link VotePartyFired}, drops the cached counter, re-broadcasts the party
  *       announcement on the configured channels and rewards the players online here whom the frame makes
@@ -65,23 +65,24 @@ public final class VoteSync {
      * A listener that drops the cached counter on a remote {@link VoteCounterChanged}, and on a remote
      * {@link VotePartyFired} drops the counter, re-broadcasts {@link VoteMessageKey#VOTEPARTY_REACHED} on
      * {@code channels} and hands the frame's eligible players to {@code rewards}, which pays the ones online
-     * here.
+     * here. {@code dropCachedCounter} is the cache's invalidation ({@link CachedVoteRepository#invalidate}),
+     * passed as a {@code Runnable} so this seam is testable without the persistence graph.
      */
     public static RemoteSyncListener listener(
-            CachedVoteRepository cache,
+            Runnable dropCachedCounter,
             VoteBroadcaster broadcaster,
             Set<BroadcastChannel> channels,
             RewardNetworkParty rewards) {
-        Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(dropCachedCounter, "dropCachedCounter");
         Objects.requireNonNull(broadcaster, "broadcaster");
         Objects.requireNonNull(channels, "channels");
         Objects.requireNonNull(rewards, "rewards");
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
         return message -> {
             if (message instanceof VoteCounterChanged) {
-                cache.invalidate();
+                dropCachedCounter.run();
             } else if (message instanceof VotePartyFired fired) {
-                cache.invalidate();
+                dropCachedCounter.run();
                 broadcaster.broadcast(
                         VoteMessageKey.VOTEPARTY_REACHED,
                         Map.of("threshold", Integer.toString(fired.threshold())),
@@ -90,7 +91,7 @@ public final class VoteSync {
                     case EVERYONE -> rewards.rewardEveryone();
                     case VOTERS -> rewards.rewardVoters(fired.voters());
                     case NONE -> {
-                        // The origin predates network rewards or its voter list was too long to send.
+                        // The frame names nobody for this server to reward.
                     }
                 }
             }

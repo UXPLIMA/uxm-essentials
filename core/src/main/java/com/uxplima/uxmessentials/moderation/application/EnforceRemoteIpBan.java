@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
@@ -15,18 +16,25 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
  * <p>Runs on the bus thread, so it touches nothing Bukkit itself: the database read is safe off the tick
  * thread, and {@link Sanctions#kickAddress} enumerates and kicks players on the threads that own them. The
  * backend that issued the ban never sees its own frame (the bus drops self-origin frames), so nobody is kicked
- * twice.
+ * twice. Exempt holders are spared, as everywhere else an IP ban applies.
  */
 public final class EnforceRemoteIpBan {
 
     private final ModerationRepository repository;
     private final Sanctions sanctions;
+    private final ModerationGuard guard;
     private final Notifier notifier;
     private final Clock clock;
 
-    public EnforceRemoteIpBan(ModerationRepository repository, Sanctions sanctions, Notifier notifier, Clock clock) {
+    public EnforceRemoteIpBan(
+            ModerationRepository repository,
+            Sanctions sanctions,
+            ModerationGuard guard,
+            Notifier notifier,
+            Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -36,6 +44,6 @@ public final class EnforceRemoteIpBan {
         Objects.requireNonNull(ip, "ip");
         repository
                 .activeIpBan(ip, clock.instant())
-                .ifPresent(ban -> IpBanKick.kickEveryoneOn(ban, sanctions, notifier));
+                .ifPresent(ban -> IpBanKick.kickEveryoneOn(ban, Optional.empty(), guard, sanctions, notifier));
     }
 }

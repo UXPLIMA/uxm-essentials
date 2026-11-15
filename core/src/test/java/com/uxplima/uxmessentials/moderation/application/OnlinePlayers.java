@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
@@ -34,9 +35,9 @@ final class OnlinePlayers implements Sanctions {
     }
 
     @Override
-    public void kickAddress(String ip, Function<PlayerRef, String> reasonFor) {
+    public void kickAddress(String ip, Predicate<PlayerRef> kickable, Function<PlayerRef, String> reasonFor) {
         List<PlayerRef> matching = addresses.entrySet().stream()
-                .filter(entry -> entry.getValue().equals(ip))
+                .filter(entry -> entry.getValue().equals(ip) && kickable.test(entry.getKey()))
                 .map(Map.Entry::getKey)
                 .toList();
         for (PlayerRef player : matching) {

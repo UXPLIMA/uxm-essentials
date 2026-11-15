@@ -49,7 +49,10 @@ public record VotePartyFired(String originServer, int threshold, Reach reach, Se
      * {@link MessageType}.
      */
     public enum Reach {
-        /** Peers reward nobody: a frame from a release that predates network rewards, or a voter list too long to send. */
+        /**
+         * Peers reward nobody. A frame without the reach byte decodes as this, and so does a voters-only party
+         * whose voter list was too long to send.
+         */
         NONE(0),
         /** Every player online on the peer. */
         EVERYONE(1),

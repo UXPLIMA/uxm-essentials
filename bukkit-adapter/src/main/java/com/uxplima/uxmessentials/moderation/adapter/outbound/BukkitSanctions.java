@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import org.bukkit.Location;
 import org.bukkit.Server;
@@ -69,23 +70,27 @@ public final class BukkitSanctions implements Sanctions {
     }
 
     @Override
-    public void kickAddress(String ip, Function<PlayerRef, String> reasonFor) {
+    public void kickAddress(String ip, Predicate<PlayerRef> kickable, Function<PlayerRef, String> reasonFor) {
         Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(kickable, "kickable");
         Objects.requireNonNull(reasonFor, "reasonFor");
         // Callers reach this from a command thread or the async bus thread, and the roster is only consistently
         // readable on the global region thread on Folia, so the scan hops there; each kick then hops to the
         // player's own entity thread like kick() does.
         scheduler.onGlobal(() -> {
             for (Player player : server.getOnlinePlayers()) {
-                if (ip.equals(addressOf(player))) {
-                    PlayerRef ref = BukkitRefs.toRef(player);
+                PlayerRef ref = BukkitRefs.toRef(player);
+                if (ip.equals(addressOf(player)) && kickable.test(ref)) {
                     kick(ref, ModerationMessageKey.BANIP_KICK, reasonFor.apply(ref));
                 }
             }
         });
     }
 
-    /** The address the join listener records for the player, which is what {@code /banip <player>} bans. */
+    /**
+     * The player's own address, the forwarded one behind a proxy: the address the login check, the join listener
+     * and the IP history read, so a kick here matches what {@code /banip <player>} banned.
+     */
     private static @Nullable String addressOf(Player player) {
         InetSocketAddress socket = player.getAddress();
         if (socket == null) {
