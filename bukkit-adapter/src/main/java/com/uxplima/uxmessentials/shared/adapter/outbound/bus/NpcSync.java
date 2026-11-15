@@ -71,6 +71,26 @@ public final class NpcSync {
         };
     }
 
+    /**
+     * A resync for {@link SharedCacheRefresh}: reload the whole set from the shared DB without emptying it, then
+     * render each NPC a missed frame left stale and despawn each one deleted meanwhile. NPCs that did not change
+     * are not redrawn. It runs on the async lane, as the listener's reload does.
+     */
+    public static Runnable resync(CachedNpcRepository cache, NpcView renderer) {
+        Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(renderer, "renderer");
+        return () -> cache.reloadAll().ifPresent(swap -> {
+            for (String key : swap.changedKeys()) {
+                Npc fresh = swap.after().get(key);
+                if (fresh != null) {
+                    renderer.render(fresh);
+                } else {
+                    renderer.despawn(NpcName.of(key));
+                }
+            }
+        });
+    }
+
     /** Reload the named NPC from the shared DB and render it if present, despawn it if it was deleted. */
     private static void reRender(CachedNpcRepository cache, NpcView renderer, NpcName name) {
         Optional<Npc> fresh = cache.reload(name);

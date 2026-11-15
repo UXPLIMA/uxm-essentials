@@ -27,6 +27,8 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
  * @param currencyId the currency the rent is charged in ({@code "default"} for the server default)
  * @param period how long one paid term lasts
  * @param grace how long a suspended warp waits before it is archived
+ * @param hardDeleteAfter how long after its archive deadline a rent-archived warp is deleted for good;
+ *     {@link Duration#ZERO} keeps archived warps forever
  * @param reminderWindows the "rent due soon" heads-up windows, widest-first and distinct
  * @param exemptPlayers owner names or uuid strings that are never charged rent (lower-cased)
  * @param exemptCategories category ids that are never charged rent (lower-cased)
@@ -38,6 +40,7 @@ public record RentConfig(
         String currencyId,
         Duration period,
         Duration grace,
+        Duration hardDeleteAfter,
         List<Duration> reminderWindows,
         Set<String> exemptPlayers,
         Set<String> exemptCategories,
@@ -48,12 +51,16 @@ public record RentConfig(
         Objects.requireNonNull(currencyId, "currencyId");
         Objects.requireNonNull(period, "period");
         Objects.requireNonNull(grace, "grace");
+        Objects.requireNonNull(hardDeleteAfter, "hardDeleteAfter");
         Objects.requireNonNull(reminderWindows, "reminderWindows");
         Objects.requireNonNull(exemptPlayers, "exemptPlayers");
         Objects.requireNonNull(exemptCategories, "exemptCategories");
         Objects.requireNonNull(exemptWorlds, "exemptWorlds");
         if (amount.signum() < 0) {
             throw new IllegalArgumentException("rent amount must not be negative: " + amount);
+        }
+        if (hardDeleteAfter.isNegative()) {
+            throw new IllegalArgumentException("rent hard delete delay must not be negative: " + hardDeleteAfter);
         }
         reminderWindows = normalizeWindows(reminderWindows);
         exemptPlayers = lowerCased(exemptPlayers);
@@ -69,10 +76,16 @@ public record RentConfig(
                 "default",
                 Duration.ofDays(7),
                 Duration.ofDays(3),
+                Duration.ZERO,
                 List.of(),
                 Set.of(),
                 Set.of(),
                 Set.of());
+    }
+
+    /** True when rent-archived warps are deleted for good once {@link #hardDeleteAfter} has passed. */
+    public boolean hardDeletes() {
+        return enabled && !hardDeleteAfter.isZero();
     }
 
     /** The number of reminder windows: the highest reminder stage a warp can reach before its term lapses. */

@@ -104,6 +104,10 @@ public final class WarpsWiring {
         // the single-server path; the cross-server bus listener drops the set on a peer's change and the next
         // read lazily reloads.
         cached.all();
+        bus.registry().registerResync(() -> {
+            cached.reloadAll();
+            categoryRepository.reloadAll();
+        });
         WarpRepository repository = WarpSync.repository(cached, bus.publisher());
 
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());

@@ -63,6 +63,7 @@ public enum KitsMessageKey implements MessageKey {
     KIT_NO_PERMISSION("kit.no-permission"),
     KIT_ON_COOLDOWN("kit.on-cooldown"),
     KIT_ALREADY_CLAIMED("kit.already-claimed"),
+    KIT_LOADING("kit.loading"),
     KIT_REQUIREMENTS_NOT_MET("kit.requirements-not-met"),
     KIT_CANNOT_AFFORD("kit.cannot-afford"),
     KIT_INVENTORY_FULL("kit.inventory-full"),

@@ -4,6 +4,8 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
+import java.util.OptionalLong;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
@@ -13,6 +15,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.economy.application.ClaimDailyReward;
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
@@ -29,6 +32,11 @@ import org.jspecify.annotations.NullMarked;
  * join (entity) thread where the player is safe to touch; the credit and the confirmation are bridged off-tick
  * through the kernel {@link Scheduler}, so the ledger write never blocks the join. Disabled by default and a
  * no-op for a non-positive amount.
+ *
+ * <p>On a network ({@code network}, present when {@code network.enabled} is on) the PDC is per backend, so the
+ * stamp is taken in the shared database instead, off the tick, and only the backend that took it pays. The PDC
+ * stamp this server still holds is read on the join thread and folded in, so switching the network on does not pay
+ * everybody again.
  */
 @NullMarked
 public final class DailyRewardListener implements Listener {
@@ -41,6 +49,7 @@ public final class DailyRewardListener implements Listener {
     private final BigDecimal amount;
     private final long cooldownMillis;
     private final NamespacedKey claimKey;
+    private final Optional<ClaimDailyReward> network;
 
     public DailyRewardListener(
             Plugin plugin,
@@ -50,7 +59,8 @@ public final class DailyRewardListener implements Listener {
             Currency currency,
             boolean enabled,
             BigDecimal amount,
-            Duration cooldown) {
+            Duration cooldown,
+            Optional<ClaimDailyReward> network) {
         Objects.requireNonNull(plugin, "plugin");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -60,6 +70,7 @@ public final class DailyRewardListener implements Listener {
         this.amount = Objects.requireNonNull(amount, "amount");
         this.cooldownMillis = Objects.requireNonNull(cooldown, "cooldown").toMillis();
         this.claimKey = new NamespacedKey(plugin, "daily_reward_claim");
+        this.network = Objects.requireNonNull(network, "network");
     }
 
     @EventHandler
@@ -68,6 +79,10 @@ public final class DailyRewardListener implements Listener {
             return;
         }
         Player player = event.getPlayer();
+        if (network.isPresent()) {
+            payIfClaimed(player, network.get());
+            return;
+        }
         long now = System.currentTimeMillis();
         Long last = player.getPersistentDataContainer().get(claimKey, PersistentDataType.LONG);
         if (last != null && now - last < cooldownMillis) {
@@ -75,12 +90,26 @@ public final class DailyRewardListener implements Listener {
         }
         player.getPersistentDataContainer().set(claimKey, PersistentDataType.LONG, now);
         PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
-        Money reward = Money.of(currency, amount);
+        scheduler.async(() -> pay(ref));
+    }
+
+    private void payIfClaimed(Player player, ClaimDailyReward claim) {
+        Long local = player.getPersistentDataContainer().get(claimKey, PersistentDataType.LONG);
+        OptionalLong localStamp = local == null ? OptionalLong.empty() : OptionalLong.of(local);
+        PlayerRef ref = new PlayerRef(player.getUniqueId(), player.getName());
         scheduler.async(() -> {
-            economy.ensureAccount(ref, currency);
-            if (economy.credit(ref, reward).isOk()) {
-                notifier.send(ref, EconomyMessageKey.DAILY_REWARD_GRANTED, Map.of("amount", notifier.amount(reward)));
+            if (claim.claim(ref.uuid(), localStamp)) {
+                pay(ref);
             }
         });
+    }
+
+    /** Credit the reward and confirm it; runs on the async lane. */
+    private void pay(PlayerRef ref) {
+        Money reward = Money.of(currency, amount);
+        economy.ensureAccount(ref, currency);
+        if (economy.credit(ref, reward).isOk()) {
+            notifier.send(ref, EconomyMessageKey.DAILY_REWARD_GRANTED, Map.of("amount", notifier.amount(reward)));
+        }
     }
 }
