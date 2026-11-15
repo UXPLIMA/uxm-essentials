@@ -51,6 +51,7 @@ and mutes, ignore lists, vanish, guard regions, holograms, NPCs, trades and vote
 servers: a player warp on another server takes the player there, two players on different servers can trade, a ban
 kicks the player wherever they are, and vanish hides a player on every server. Add the Velocity jar on the proxy,
 or the Redis jar with no proxy at all. Optional jars bring a Discord bridge and a REST and WebSocket API.
+[docs/user/network.md](docs/user/network.md) lists what each module shares and what stays on one server.
 
 ### Moving in from another plugin
 
@@ -58,6 +59,7 @@ With the migration module switched on, `/uxmess import` reads EssentialsX (homes
 jails and mutes), LiteBans (bans, mutes and warnings), player warps from AxPlayerWarps, AthelionPlayerWarps and
 OlziePlayerWarps, holograms from DecentHolograms and FancyHolograms, worlds from Multiverse, and balances from
 PlayerPoints or the running Vault economy. Guard imports WorldGuard regions with a dry run and an undo.
+[docs/user/import.md](docs/user/import.md) says what each importer reads and what it leaves behind.
 
 Every line a player reads is in `messages/`, in twelve languages: English, Turkish, German, Spanish, French,
 Portuguese, Russian, Ukrainian, Polish, Japanese, Korean and Chinese.
