@@ -43,6 +43,7 @@ import com.uxplima.uxmessentials.npc.application.NpcMessageKey;
 import com.uxplima.uxmessentials.npc.application.NpcQuota;
 import com.uxplima.uxmessentials.npc.application.NpcSettings;
 import com.uxplima.uxmessentials.npc.application.RemoveNpcAction;
+import com.uxplima.uxmessentials.npc.application.ScopedNpcView;
 import com.uxplima.uxmessentials.npc.application.SetNpcAction;
 import com.uxplima.uxmessentials.npc.application.SetNpcClickCommand;
 import com.uxplima.uxmessentials.npc.application.SetNpcCollidable;
@@ -56,6 +57,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcMirrorSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
 import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
+import com.uxplima.uxmessentials.npc.application.SetNpcScope;
 import com.uxplima.uxmessentials.npc.application.SetNpcShowInTab;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
@@ -63,6 +65,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcState;
 import com.uxplima.uxmessentials.npc.application.SetNpcTypeData;
 import com.uxplima.uxmessentials.npc.application.TeleportToNpc;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.application.port.NpcView;
 import com.uxplima.uxmessentials.npc.application.port.SkinService;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.persistence.npc.NpcRepositories;
@@ -80,6 +83,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.NpcPlaceholders;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MineSkinService;
@@ -88,6 +92,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
@@ -163,6 +168,10 @@ public final class NpcWiring {
         NpcViewSpawner spawner = new NpcViewSpawner(packets, kernel.log());
         NpcRenderer renderer =
                 new NpcRenderer(packets, spawner, kernel.scheduler(), RENDER_RANGE, settings.lookRange());
+        // Every render goes through the scoped view, so an NPC scoped to other servers is never shown here and one
+        // whose scope changed, here or on a peer, is taken off on the render of the changed snapshot.
+        LocalServer local = NetworkConfig.from(ctx.config()).localServer();
+        NpcView view = new ScopedNpcView(renderer, local);
         // Close the cross-server loop: a remote NPC change reloads exactly that NPC into the same cache the
         // commands and renderer read, then re-renders (or despawns) the live fake player through the renderer
         // the same render path the local edit runs, hopped onto the global region thread by the renderer itself.
@@ -170,12 +179,12 @@ public final class NpcWiring {
         // path is unchanged.
         bus.registry()
                 .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.listener(
-                        cached, renderer, kernel.scheduler()));
+                        cached, view, kernel.scheduler()));
         bus.registry()
-                .registerResync(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.resync(cached, renderer));
+                .registerResync(com.uxplima.uxmessentials.shared.adapter.outbound.bus.NpcSync.resync(cached, view));
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         NpcQuota quota = new NpcQuota(kernel.permissions(), settings.defaultLimit());
-        NpcServices services = assemble(kernel, repository, renderer, notifier, quota);
+        NpcServices services = assemble(kernel, repository, view, notifier, quota, local);
         MineSkinService mineSkins = new MineSkinService(
                 kernel.scheduler(),
                 kernel.log(),
@@ -196,8 +205,12 @@ public final class NpcWiring {
                 org.bukkit.Material.PLAYER_HEAD,
                 "uxmessentials.npc.gui",
                 listMenu::open));
-        List<CommandRegistration> commands =
-                List.of(new NpcCommand(services, renderer::npcNames, skinByName, kernel.messages(), listMenu));
+        // Names come from the stored set rather than the shown one, so an NPC scoped to other servers still
+        // completes here and can be scoped back.
+        java.util.function.Supplier<List<String>> npcNames =
+                () -> repository.all().stream().map(npc -> npc.name().value()).toList();
+        List<CommandRegistration> commands = List.of(
+                new NpcCommand(services, npcNames, skinByName, kernel.messages(), listMenu, kernel.scheduler()));
         ClickCommandRunner commandRunner = new FilteredClickCommandRunner(
                 new BukkitClickCommandRunner(), BlockedCommands.of(settings.blockedCommands()), kernel.log());
         BukkitServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
@@ -227,6 +240,7 @@ public final class NpcWiring {
                 commands,
                 listeners,
                 renderer,
+                view,
                 repository,
                 services,
                 connector,
@@ -300,7 +314,12 @@ public final class NpcWiring {
     }
 
     private static NpcServices assemble(
-            KernelPorts kernel, NpcRepository repository, NpcRenderer renderer, Notifier notifier, NpcQuota quota) {
+            KernelPorts kernel,
+            NpcRepository repository,
+            NpcView renderer,
+            Notifier notifier,
+            NpcQuota quota,
+            LocalServer local) {
         Clock clock = Clock.systemUTC();
         return new NpcServices(
                 new CreateNpc(repository, renderer, notifier, kernel.events(), clock, quota),
@@ -339,7 +358,8 @@ public final class NpcWiring {
                 new SetNpcShowInTab(repository, renderer, notifier),
                 new SetNpcRange(repository, renderer, notifier),
                 new SetNpcState(repository, renderer, notifier),
-                new SetNpcSkinSlim(repository, renderer, notifier));
+                new SetNpcSkinSlim(repository, renderer, notifier),
+                new SetNpcScope(repository, renderer, notifier, local));
     }
 
     /**
@@ -349,6 +369,7 @@ public final class NpcWiring {
      * @param commands the Brigadier command registrations to publish
      * @param listeners the lifecycle listener to register
      * @param renderer the packet renderer, drained on stop
+     * @param view the scoped view in front of the renderer that every stored NPC is shown through
      * @param connector the proxy connect channel, unregistered on stop so nothing outlives a disable
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
      * @param lookTask the look-at-player timer handle, cancelled on stop alongside the refresh timer
@@ -357,6 +378,7 @@ public final class NpcWiring {
             List<CommandRegistration> commands,
             List<Listener> listeners,
             NpcRenderer renderer,
+            NpcView view,
             NpcRepository repository,
             NpcServices services,
             BukkitServerConnector connector,
@@ -368,6 +390,7 @@ public final class NpcWiring {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
             Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(view, "view");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(connector, "connector");
@@ -384,7 +407,7 @@ public final class NpcWiring {
          */
         public void spawnStored() {
             for (Npc npc : repository.all()) {
-                renderer.render(npc);
+                view.render(npc);
             }
         }
 

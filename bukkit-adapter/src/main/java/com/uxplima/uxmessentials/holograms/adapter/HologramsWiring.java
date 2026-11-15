@@ -59,6 +59,7 @@ import com.uxplima.uxmessentials.holograms.application.RemoveHologramAction;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramLine;
 import com.uxplima.uxmessentials.holograms.application.RemoveHologramPage;
 import com.uxplima.uxmessentials.holograms.application.RotateHologram;
+import com.uxplima.uxmessentials.holograms.application.ScopedHologramView;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAction;
 import com.uxplima.uxmessentials.holograms.application.SetHologramAppearance;
 import com.uxplima.uxmessentials.holograms.application.SetHologramClickCommand;
@@ -67,10 +68,12 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
+import com.uxplima.uxmessentials.holograms.application.SetHologramScope;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
 import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
+import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
@@ -89,6 +92,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConn
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.FilteredClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.miniplaceholders.MiniPlaceholdersSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
@@ -101,6 +105,7 @@ import com.uxplima.uxmessentials.shared.application.port.DirectTeleporter;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.hologram.HologramManager;
 import com.uxplima.uxmlib.item.SerializedItems;
@@ -245,6 +250,10 @@ public final class HologramsWiring {
                 clicks,
                 clickHandler);
         rendererHolder.set(renderer);
+        // Every render goes through the scoped view, so a hologram scoped to other servers is never drawn here and
+        // one whose scope changed, here or on a peer, is taken off on the render of the changed snapshot.
+        LocalServer local = NetworkConfig.from(ctx.config()).localServer();
+        HologramView view = new ScopedHologramView(renderer, local);
         // Close the cross-server loop: a remote hologram change reloads exactly that hologram into the same cache
         // the commands and renderer read, then re-renders (or despawns) the live display through the renderer
         // the same render path the local edit runs, hopped onto the right region thread by the renderer itself.
@@ -252,15 +261,15 @@ public final class HologramsWiring {
         // path is unchanged.
         bus.registry()
                 .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.listener(
-                        cached, renderer, kernel.scheduler()));
+                        cached, view, kernel.scheduler()));
         bus.registry()
                 .registerResync(
-                        com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.resync(cached, renderer));
+                        com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.resync(cached, view));
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
         events.subscribe(npcSubscriber);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
-        HologramServices services = assemble(kernel, repository, renderer, notifier, npcLocator);
+        HologramServices services = assemble(kernel, repository, view, notifier, npcLocator, local);
         // What was resolved for a player is dropped as they leave, so it does not outlive them.
         HologramQuitListener quitListener = new HologramQuitListener(renderer);
         plugin.getServer().getPluginManager().registerEvents(quitListener, plugin);
@@ -318,8 +327,10 @@ public final class HologramsWiring {
         listHolder[0] = listMenu;
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         return new Wired(
-                HologramCommands.all(services, kernel.messages(), hologramNames, npcNames, listMenu),
+                HologramCommands.all(
+                        services, kernel.messages(), hologramNames, npcNames, listMenu, kernel.scheduler()),
                 renderer,
+                view,
                 repository,
                 services,
                 refreshTask,
@@ -390,9 +401,10 @@ public final class HologramsWiring {
     private static HologramServices assemble(
             KernelPorts kernel,
             HologramRepository repository,
-            PacketHologramView renderer,
+            HologramView renderer,
             Notifier notifier,
-            LinkedNpcLocator npcLocator) {
+            LinkedNpcLocator npcLocator,
+            LocalServer local) {
         Clock clock = Clock.systemUTC();
         DirectTeleporter teleporter = new BukkitDirectTeleporter(kernel.scheduler(), kernel.log());
         return new HologramServices(
@@ -430,7 +442,8 @@ public final class HologramsWiring {
                 new MoveHologramAction(repository, notifier),
                 new RemoveHologramAction(repository, renderer, notifier),
                 new ClearHologramActions(repository, renderer, notifier),
-                new ListHologramActions(repository, notifier));
+                new ListHologramActions(repository, notifier),
+                new SetHologramScope(repository, renderer, notifier, local));
     }
 
     /**
@@ -439,6 +452,7 @@ public final class HologramsWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param renderer the live-entity renderer, despawned on stop
+     * @param view the scoped view in front of the renderer that every stored hologram is drawn through
      * @param repository the cached hologram repository the PAPI seam reads the server-wide count from
      * @param refreshTask the global refresh timer handle, cancelled on stop so no task outlives a disable
      * @param events the domain-event bus the npc-link locator subscribed to, dropped on stop
@@ -450,6 +464,7 @@ public final class HologramsWiring {
     public record Wired(
             List<CommandRegistration> commands,
             PacketHologramView renderer,
+            HologramView view,
             HologramRepository repository,
             HologramServices services,
             AutoCloseable refreshTask,
@@ -462,6 +477,7 @@ public final class HologramsWiring {
         public Wired {
             commands = List.copyOf(commands);
             Objects.requireNonNull(renderer, "renderer");
+            Objects.requireNonNull(view, "view");
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(refreshTask, "refreshTask");
@@ -482,7 +498,7 @@ public final class HologramsWiring {
          */
         public void spawnStored() {
             for (Hologram hologram : repository.all()) {
-                renderer.render(hologram);
+                view.render(hologram);
             }
         }
 

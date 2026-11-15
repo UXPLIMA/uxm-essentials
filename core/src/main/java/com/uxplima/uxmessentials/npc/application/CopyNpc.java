@@ -59,7 +59,13 @@ public final class CopyNpc {
             return Result.err(NpcError.NAME_TAKEN);
         }
         Npc clone = new Npc(
-                target, at, original.get().appearance(), original.get().behavior(), clock.instant(), actor.uuid());
+                target,
+                at,
+                original.get().appearance(),
+                original.get().behavior(),
+                clock.instant(),
+                actor.uuid(),
+                original.get().scope());
         repository.save(clone);
         view.render(clone);
         events.publish(new NpcCreated(target, actor, at));

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcBehavior;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.NpcRecord;
+import com.uxplima.uxmessentials.persistence.runtime.StoredScope;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
@@ -85,7 +86,8 @@ final class NpcRows {
                 appearance,
                 behavior,
                 Instant.ofEpochMilli(row.get(NPC.CREATED_AT)),
-                ownerOf(row.get(NPC.OWNER_UUID)));
+                ownerOf(row.get(NPC.OWNER_UUID)),
+                StoredScope.read(row.get(NPC.SCOPE)));
     }
 
     /** Populate an {@link NpcRecord} from a domain {@link Npc} for an upsert. */
@@ -134,6 +136,7 @@ final class NpcRows {
                 .setViewDistance(narrow(npc.viewDistance()))
                 .setTurnDistance(narrow(npc.turnDistance()))
                 .setOwnerUuid(npc.owner() == null ? null : npc.owner().toString())
+                .setScope(StoredScope.write(npc.scope()))
                 .setCreatedAt(npc.createdAt().toEpochMilli());
     }
 

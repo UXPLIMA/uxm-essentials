@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.holograms.domain.Transform;
 import com.uxplima.uxmessentials.holograms.domain.Visibility;
 import com.uxplima.uxmessentials.persistence.jooq.tables.Holograms;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.HologramsRecord;
+import com.uxplima.uxmessentials.persistence.runtime.StoredScope;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
@@ -86,11 +87,18 @@ final class HologramRows {
         // is layered on the same way: a pre-V54 / never-clickable row (NULL) reads back without a click action.
         // The V57 extra pages and the V60 action chain are applied last: a row with no hologram_pages rows stays a
         // single-page hologram, and a row with no hologram_action rows reads back with an empty action chain.
-        return actionsOf(
-                pagesOf(
-                        growUpOf(row, leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)))),
-                        extraPageTexts),
-                orderedActions);
+        return scopeOf(
+                row,
+                actionsOf(
+                        pagesOf(
+                                growUpOf(row, leaderboardOf(row, clickCommandOf(row, linkedNpcOf(row, hologram)))),
+                                extraPageTexts),
+                        orderedActions));
+    }
+
+    private static Hologram scopeOf(Record row, Hologram hologram) {
+        // An unscoped row, and every row written before scopes existed, shows on every server.
+        return hologram.withScope(StoredScope.read(row.get(HOLOGRAMS.SCOPE)));
     }
 
     private static Hologram actionsOf(Hologram hologram, List<ClickAction> orderedActions) {
@@ -218,7 +226,8 @@ final class HologramRows {
                         hologram.leaderboard() == null
                                 ? null
                                 : hologram.leaderboard().limit())
-                .setGrowUp((short) (hologram.growUp() ? 1 : 0));
+                .setGrowUp((short) (hologram.growUp() ? 1 : 0))
+                .setScope(StoredScope.write(hologram.scope()));
     }
 
     private static Appearance appearanceOf(Record row) {

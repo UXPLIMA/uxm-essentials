@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
@@ -31,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.RtpCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
@@ -186,6 +188,7 @@ public final class TeleportWiring {
                 jailGate,
                 combatGate,
                 spawns,
+                NetworkConfig.from(config),
                 clock,
                 rtp,
                 fee,
@@ -249,6 +252,7 @@ public final class TeleportWiring {
             MutableJailGate jailGate,
             CombatGate combatGate,
             SpawnDirectory spawns,
+            NetworkConfig network,
             Clock clock,
             RtpBundle rtp,
             TeleportFee fee,
@@ -317,7 +321,13 @@ public final class TeleportWiring {
                 .resolveRtp(new ResolveRtp(rtp.queue(), kernel.worldLookup(), engine, notifier, settings))
                 .resolveBiomeRtp(resolveBiomeRtp)
                 .biomeCatalog(rtp.biomeCatalog())
-                .resolveSpawn(new ResolveSpawn(spawns, kernel.worldLookup(), engine, notifier))
+                .resolveSpawn(new ResolveSpawn(
+                        spawns,
+                        kernel.worldLookup(),
+                        engine,
+                        notifier,
+                        network.localServer(),
+                        defaultMainScope(network)))
                 .build();
     }
 
@@ -448,6 +458,15 @@ public final class TeleportWiring {
             BiomeCatalog biomeCatalog,
             BiomeTargetedSearch biomeSearch,
             @Nullable Listener hotspotListener) {}
+
+    /**
+     * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn no
+     * longer moves every other's, and the network-wide main spawn on a lone server, which has no other server to
+     * keep apart from and so keeps its spawn when its server name changes.
+     */
+    private static @Nullable ServerScope defaultMainScope(NetworkConfig network) {
+        return network.enabled() ? network.localServer().serverScope() : null;
+    }
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence, Bus bus) {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror

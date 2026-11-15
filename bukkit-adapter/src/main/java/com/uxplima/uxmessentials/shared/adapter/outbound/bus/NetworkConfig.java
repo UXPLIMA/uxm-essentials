@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import org.jspecify.annotations.NullMarked;
 
@@ -27,6 +30,8 @@ import org.jspecify.annotations.NullMarked;
  * @param redis the canonical Redis connection block the Redis transport consumes
  * @param cacheRefreshSeconds how often the caches a peer can change are reloaded from the shared database as a
  *     safety net for frames the transport lost; {@code 0} turns the timer off
+ * @param sharedSets the shared sets this backend belongs to, which decide where a hologram, an NPC or a main spawn
+ *     scoped to {@code set:<name>} applies
  */
 @NullMarked
 public record NetworkConfig(
@@ -38,7 +43,8 @@ public record NetworkConfig(
         Transport transport,
         boolean transportRecognized,
         Redis redis,
-        int cacheRefreshSeconds) {
+        int cacheRefreshSeconds,
+        List<String> sharedSets) {
 
     private static final int DEFAULT_QUEUE = 256;
     private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
@@ -63,6 +69,12 @@ public record NetworkConfig(
         if (cacheRefreshSeconds < 0) {
             throw new IllegalArgumentException("cache-refresh-seconds must not be negative: " + cacheRefreshSeconds);
         }
+        sharedSets = List.copyOf(sharedSets);
+    }
+
+    /** This backend as scopes see it: its server name and the shared sets it belongs to. */
+    public LocalServer localServer() {
+        return new LocalServer(serverId, sharedSets);
     }
 
     /**
@@ -176,6 +188,12 @@ public record NetworkConfig(
         java.util.Optional<Transport> parsed = Transport.parse(rawTransport);
         // A negative value reads as off, the same as 0, rather than failing the enable.
         int cacheRefresh = Math.max(0, config.getInt("network.cache-refresh-seconds", DEFAULT_CACHE_REFRESH_SECONDS));
+        // A name that is not a valid set name could never match a scope, so it is dropped rather than kept.
+        List<String> sets = config.getStringList("network.shared-sets", List.of()).stream()
+                .map(String::strip)
+                .filter(set -> ServerScope.isScope("set:" + set))
+                .distinct()
+                .toList();
         return new NetworkConfig(
                 enabled,
                 serverId.isBlank() ? DEFAULT_SERVER_ID : serverId,
@@ -185,6 +203,7 @@ public record NetworkConfig(
                 parsed.orElse(Transport.VELOCITY),
                 parsed.isPresent(),
                 Redis.from(config),
-                cacheRefresh);
+                cacheRefresh,
+                sets);
     }
 }

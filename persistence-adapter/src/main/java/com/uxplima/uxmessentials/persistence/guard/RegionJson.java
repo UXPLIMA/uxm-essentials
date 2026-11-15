@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
@@ -26,6 +25,7 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -129,7 +129,7 @@ public final class RegionJson {
         }
         return new Region(
                 key,
-                new GuardScope(o.get("scope").getAsString()),
+                new ServerScope(o.get("scope").getAsString()),
                 shape(o.getAsJsonObject("shape")),
                 o.has("priority") ? o.get("priority").getAsInt() : 0,
                 o.has("parent") ? RegionId.of(o.get("parent").getAsString()) : null,
