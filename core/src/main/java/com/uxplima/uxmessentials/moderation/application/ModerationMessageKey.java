@@ -135,6 +135,7 @@ public enum ModerationMessageKey implements MessageKey {
     TEMPBANIP_APPLIED("moderation.tempbanip.applied"),
     BANIP_ALTS_DETECTED("moderation.banip.alts-detected"),
     BANIP_KICK("moderation.banip.kick"),
+    BANIP_INVALID_IP("moderation.banip.invalid-ip"),
     UNBANIP_APPLIED("moderation.unbanip.applied"),
     UNBANIP_NOT_BANNED("moderation.unbanip.not-banned"),
 

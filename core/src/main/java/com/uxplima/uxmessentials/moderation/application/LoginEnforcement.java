@@ -52,8 +52,13 @@ public final class LoginEnforcement {
      * {@code hasBypass} is whether the connecting player holds {@code uxmessentials.moderation.lockdown.bypass};
      * the listener resolves it from the live {@code Player} (a permission cannot be read for a connecting player
      * inside this pure use case) and threads it in so a locked-down server refuses every login but theirs.
+     * {@code exempt} is whether they hold {@link ModerationGuard#EXEMPT_NODE}, read the same way: an exempt holder
+     * passes an IP ban on their address, as the live IP ban kick spares them.
+     *
+     * <p>{@code ip} must be the player's own address (the forwarded one behind a proxy), the address the IP
+     * history records and {@code /banip <player>} bans; the proxy's address would match nothing.
      */
-    public Decision evaluate(PlayerRef who, String ip, boolean hasBypass) {
+    public Decision evaluate(PlayerRef who, String ip, boolean hasBypass, boolean exempt) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(ip, "ip");
         Instant now = clock.instant();
@@ -66,7 +71,7 @@ public final class LoginEnforcement {
             recordAndDetect(who, ip, now, true);
             return tempban.get();
         }
-        Optional<IpBan> ipBan = repository.activeIpBan(ip, now);
+        Optional<IpBan> ipBan = exempt ? Optional.empty() : repository.activeIpBan(ip, now);
         if (ipBan.isPresent()) {
             recordAndDetect(who, ip, now, true);
             return Decision.deny(ipBanReason(who, ipBan.get()));

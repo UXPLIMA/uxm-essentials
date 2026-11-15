@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.vote.application.HandleVote;
 import com.uxplima.uxmessentials.vote.application.PartyConfig;
 import com.uxplima.uxmessentials.vote.application.ResetVoterTotals;
 import com.uxplima.uxmessentials.vote.application.RewardEngine;
+import com.uxplima.uxmessentials.vote.application.RewardNetworkParty;
 import com.uxplima.uxmessentials.vote.application.SetPartyCount;
 import com.uxplima.uxmessentials.vote.application.ShowLastVote;
 import com.uxplima.uxmessentials.vote.application.ShowNextVote;
@@ -129,7 +130,7 @@ public final class VoteWiring {
      * so the party sound/particle subscriber and the cross-server party publisher can be registered and later
      * unregistered on stop. The repository is the concrete counter-cached jOOQ adapter wrapped by
      * {@link VoteSync#repository} so each counter mutation announces a {@code VoteCounterChanged} to peers; the
-     * same cache is handed to {@link VoteSync#listener} so a remote advance or party fire invalidates it. With
+     * same cache's invalidation is handed to {@link VoteSync#listener} so a remote advance or party fire drops it. With
      * the bus disabled both seams are no-ops, so the single-server path is unchanged. Every vote a saved tally
      * adds is also counted on the votes board through {@code board}.
      */
@@ -220,11 +221,14 @@ public final class VoteWiring {
         events.subscribe(partyEffects);
 
         // Cross-server sync: a remote VoteCounterChanged drops the cached counter; a remote VotePartyFired
-        // drops it and echoes the party announcement (no reward: the origin already paid its players out).
+        // drops it, echoes the party announcement and pays the players online here (voteparty.network-rewards).
         // A local VotePartyTriggered is published as a VotePartyFired so peers celebrate the same party. The
         // bus is a no-op when the cluster is disabled, so this is unconditional and free on a single server.
         Set<BroadcastChannel> broadcastChannels = broadcastConfig.settings().channels();
-        bus.registry().register(VoteSync.listener(cachedRepository, broadcaster, broadcastChannels));
+        RewardNetworkParty networkRewards = new RewardNetworkParty(applier, audience, party);
+        bus.registry()
+                .register(VoteSync.listener(
+                        cachedRepository::invalidate, broadcaster, broadcastChannels, networkRewards));
         Consumer<DomainEvent> partyPublisher = VoteSync.partyPublisher(bus.publisher());
         events.subscribe(partyPublisher);
 
@@ -538,7 +542,8 @@ public final class VoteWiring {
         int escalateBy = Math.max(0, config.getInt("voteparty.escalate-by", 0));
         PartyResetSchedule resetSchedule = parseResetSchedule(config.getString("voteparty.reset", "none"));
         List<Integer> announceAt = parseAnnounceAt(config.getStringList("voteparty.announce-at", List.of()));
-        return new PartyConfig(reward, threshold, onlyVoters, escalateBy, resetSchedule, announceAt);
+        boolean networkRewards = config.getBoolean("voteparty.network-rewards", true);
+        return new PartyConfig(reward, threshold, onlyVoters, escalateBy, resetSchedule, announceAt, networkRewards);
     }
 
     private static RewardSpec loadPartyRewardSpec(ConfigStore config) {

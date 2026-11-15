@@ -11,6 +11,8 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
+import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
@@ -26,8 +28,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * given, their last-seen IP is resolved from the {@link ModerationRepository} (an indexed column, a real DB
  * read) and recorded as the ban's target UUID for a replayable audit line. The ban is upserted, then
  * alt-detection runs: the other UUIDs that have connected from the same IP are gathered and an
- * {@code AltDetected} event is published for the audit trail. The login listener enforces the ban (and the
- * alt set) before player data loads on every reconnect.
+ * {@code AltDetected} event is published for the audit trail. Everyone connected from the address is kicked
+ * at once, here and, through {@link SanctionSync}, on every peer; the login listener refuses the address on
+ * every reconnect.
  *
  * <p>A duration is optional: blank means a permanent IP ban, a parsed span a timed one. This use case takes
  * an already-resolved {@link Target} from the command adapter (which decides whether the argument was a
@@ -36,6 +39,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public final class BanIp {
 
     private final ModerationRepository repository;
+    private final Sanctions sanctions;
+    private final ModerationGuard guard;
+    private final SanctionSync sync;
     private final IpAlts ipAlts;
     private final Notifier notifier;
     private final ModerationAudit audit;
@@ -45,6 +51,9 @@ public final class BanIp {
 
     public BanIp(
             ModerationRepository repository,
+            Sanctions sanctions,
+            ModerationGuard guard,
+            SanctionSync sync,
             IpAlts ipAlts,
             Notifier notifier,
             ModerationAudit audit,
@@ -52,6 +61,9 @@ public final class BanIp {
             SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.guard = Objects.requireNonNull(guard, "guard");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
@@ -71,12 +83,15 @@ public final class BanIp {
         IpBan ban = new IpBan(target.ip(), span.map(now::plus), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
         history.banIp(actor, target.uuid(), target.ip(), reason, span.map(now::plus));
+        IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
         List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));
         audit.ipBanned(actor, target.ip(), target.uuid(), span.map(SanctionDuration::format), true, reason);
         audit.altDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true);
         notify(actor, target, alts);
+        // The local kick above cleared this backend; peers kick the players they have on the address.
+        sync.ipBanChanged(target.ip());
         return new Result(ban, alts);
     }
 

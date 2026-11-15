@@ -11,6 +11,8 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
+import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -28,7 +30,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * timed sibling of {@code /banip}: the duration is mandatory (a permanent IP ban is {@code /banip}), so a
  * blank or malformed span is refused as {@link ModerationError#BAD_DURATION} with nothing written. On a valid
  * span the {@link IpBan} is upserted with its {@code until} instant, alt-detection runs, and the events and
- * audit line mirror {@code /banip}; the existing login listener already honours the {@code until} expiry, so
+ * audit line, the kick of everyone on the address and the peer announcement mirror {@code /banip}; the
+ * existing login listener already honours the {@code until} expiry, so
  * the address is admitted again once the span passes.
  *
  * <p>Like {@code /banip} this takes an already-resolved {@link BanIp.Target} from the command adapter (which
@@ -39,6 +42,9 @@ public final class TempBanIp {
     private static final UUID NO_UUID = new UUID(0L, 0L);
 
     private final ModerationRepository repository;
+    private final Sanctions sanctions;
+    private final ModerationGuard guard;
+    private final SanctionSync sync;
     private final IpAlts ipAlts;
     private final Notifier notifier;
     private final ModerationAudit audit;
@@ -48,6 +54,9 @@ public final class TempBanIp {
 
     public TempBanIp(
             ModerationRepository repository,
+            Sanctions sanctions,
+            ModerationGuard guard,
+            SanctionSync sync,
             IpAlts ipAlts,
             Notifier notifier,
             ModerationAudit audit,
@@ -55,6 +64,9 @@ public final class TempBanIp {
             SanctionHistoryRecorder history,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.guard = Objects.requireNonNull(guard, "guard");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
@@ -85,12 +97,14 @@ public final class TempBanIp {
         IpBan ban = new IpBan(target.ip(), Optional.of(now.plus(span)), reason, target.uuid(), Issuer.of(actor), now);
         repository.saveIpBan(ban);
         history.banIp(actor, target.uuid(), target.ip(), reason, Optional.of(now.plus(span)));
+        IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
         List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));
         events.publish(new PlayerIpBanned(ban));
         events.publish(new AltDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true));
         audit.ipBanned(actor, target.ip(), target.uuid(), Optional.of(SanctionDuration.format(span)), true, reason);
         audit.altDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true);
         notify(actor, target, span, alts);
+        sync.ipBanChanged(target.ip());
         return Result.ok(new BanIp.Result(ban, alts));
     }
 

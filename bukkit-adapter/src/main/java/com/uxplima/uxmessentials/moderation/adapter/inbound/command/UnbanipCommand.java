@@ -41,7 +41,10 @@ public final class UnbanipCommand extends ModerationCommandSupport implements Co
     }
 
     private int run(CommandContext<CommandSourceStack> ctx) {
-        services.unbanIp().unbanIp(actor(ctx), ctx.getArgument("ip", String.class));
+        String typed = ctx.getArgument("ip", String.class);
+        // Bans are stored in canonical form, so the typed spelling is canonicalised too; text that is not an
+        // address passes unchanged so a row stored verbatim before canonical storage can still be lifted.
+        services.unbanIp().unbanIp(actor(ctx), IpLiteral.canonical(typed).orElse(typed));
         return Command.SINGLE_SUCCESS;
     }
 }

@@ -27,6 +27,8 @@ import com.uxplima.uxmessentials.vote.domain.reward.RewardSpec;
  * @param resetSchedule  when the party counter resets on a calendar boundary
  * @param announceAt     intermediate counts at which a broadcast announces remaining votes needed;
  *                       empty = no mid-run announcements
+ * @param networkRewards when {@code true} a party fired on another backend also rewards this backend's
+ *                       online players; when {@code false} a remote party is only announced here
  */
 public record PartyConfig(
         RewardSpec reward,
@@ -34,7 +36,8 @@ public record PartyConfig(
         boolean onlyVoters,
         int escalateBy,
         PartyResetSchedule resetSchedule,
-        List<Integer> announceAt) {
+        List<Integer> announceAt,
+        boolean networkRewards) {
 
     public PartyConfig {
         Objects.requireNonNull(reward, "reward");

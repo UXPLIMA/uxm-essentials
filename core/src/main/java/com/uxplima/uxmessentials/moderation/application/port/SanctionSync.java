@@ -11,7 +11,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  * <p>Kept bus-agnostic so {@code :core} never imports the bus adapter: the adapter binds it to the bus
  * publisher (it builds the {@link com.uxplima.uxmessentials.shared.network.BanChanged} /
- * {@link com.uxplima.uxmessentials.shared.network.MuteChanged} frame and routes it), and a backend with no bus
+ * {@link com.uxplima.uxmessentials.shared.network.MuteChanged} /
+ * {@link com.uxplima.uxmessentials.shared.network.IpBanChanged} frame and routes it), and a backend with no bus
  * runs against {@link #NONE}, so the single-server path is unchanged: the durable enforcement needs no bus.
  */
 public interface SanctionSync {
@@ -27,6 +28,11 @@ public interface SanctionSync {
         public void muteChanged(PlayerRef target) {
             // No bus: a peer re-reads the mute from the shared DB on the next chat attempt regardless.
         }
+
+        @Override
+        public void ipBanChanged(String ip) {
+            // No bus: the local kick already ran, and the login check refuses the address on every backend.
+        }
     };
 
     /** Announce that {@code target}'s ban changed so a peer with them online kicks them live. */
@@ -34,4 +40,7 @@ public interface SanctionSync {
 
     /** Announce that {@code target}'s mute changed so a peer that caches mute state may refresh it. */
     void muteChanged(PlayerRef target);
+
+    /** Announce that {@code ip} was banned so a peer kicks the players it has connected from that address. */
+    void ipBanChanged(String ip);
 }
