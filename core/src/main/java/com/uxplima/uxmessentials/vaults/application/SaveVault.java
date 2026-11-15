@@ -3,12 +3,14 @@ package com.uxplima.uxmessentials.vaults.application;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 
 /**
  * The write-through that runs when an open vault GUI closes ({@code InventoryCloseEvent}). The adapter resolves
@@ -37,21 +39,24 @@ public final class SaveVault {
      * Bringing it back would give the player a vault they had already been refunded for, or undo a staff delete.
      */
     public boolean save(PlayerRef owner, Vault vault, VaultContents newContents) {
-        return save(owner, vault, newContents, clock.instant());
+        return save(owner, vault, newContents, clock.instant()).isPresent();
     }
 
-    /** {@link #save(PlayerRef, Vault, VaultContents)} stamped with {@code at} as the vault's last-touched instant. */
-    public boolean save(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
+    /**
+     * {@link #save(PlayerRef, Vault, VaultContents)} with {@code at} as the vault's last-touched instant, returning the
+     * row's stamp after the write, or empty when the vault was gone.
+     */
+    public Optional<VaultStamp> save(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
         Vault.Change change = vault.withContents(owner, newContents, at);
-        if (!repository.update(change.result(), VaultRepository.Columns.CONTENTS)) {
-            return false;
+        Optional<VaultStamp> written = repository.writeContents(change.result());
+        if (written.isPresent()) {
+            events.publish(change.event());
         }
-        events.publish(change.event());
-        return true;
+        return written;
     }
 
     /**
@@ -63,14 +68,18 @@ public final class SaveVault {
         keep(owner, vault, newContents, clock.instant());
     }
 
-    /** {@link #keep(PlayerRef, Vault, VaultContents)} stamped with {@code at} as the vault's last-touched instant. */
-    public void keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
+    /**
+     * {@link #keep(PlayerRef, Vault, VaultContents)} with {@code at} as the vault's last-touched instant, returning the
+     * row's stamp after the write.
+     */
+    public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
         Vault.Change change = vault.withContents(owner, newContents, at);
-        repository.save(change.result());
+        VaultStamp written = repository.save(change.result());
         events.publish(change.event());
+        return written;
     }
 }

@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 
 /**
  * A Caffeine read-cache decorator over a delegate {@link VaultRepository}, keyed by {@link VaultId}. An open
@@ -72,10 +73,28 @@ public final class CachedVaultRepository implements VaultRepository {
     }
 
     @Override
-    public void save(Vault vault) {
+    public VaultStamp save(Vault vault) {
         Objects.requireNonNull(vault, "vault");
-        delegate.save(vault);
+        VaultStamp written = delegate.save(vault);
         cache.invalidate(vault.id());
+        return written;
+    }
+
+    @Override
+    public Optional<VaultStamp> writeContents(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        Optional<VaultStamp> written = delegate.writeContents(vault);
+        if (written.isPresent()) {
+            // The cached copy takes exactly what was written and the row's new stamp, so the next open sees the items
+            // the window closed with. The name and icon stay as cached, since the write left them as they were.
+            VaultStamp stamp = written.get();
+            cache.asMap()
+                    .computeIfPresent(
+                            vault.id(), (id, cached) -> cached.map(stale -> stale.withContentsOf(vault, stamp)));
+        } else {
+            cache.invalidate(vault.id());
+        }
+        return written;
     }
 
     @Override
@@ -83,14 +102,7 @@ public final class CachedVaultRepository implements VaultRepository {
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(columns, "columns");
         boolean updated = delegate.update(vault, columns);
-        if (updated && columns == Columns.CONTENTS) {
-            // The cached copy takes exactly what was written, so the next open sees the items the window closed with.
-            // The name and icon stay as cached, since the write left them as they were.
-            cache.asMap()
-                    .computeIfPresent(vault.id(), (id, cached) -> cached.map(stale -> stale.withContentsOf(vault)));
-        } else {
-            cache.invalidate(vault.id());
-        }
+        cache.invalidate(vault.id());
         return updated;
     }
 

@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 
 /**
  * Outbound port for durable, per-owner vault storage. A vault's queryable facts (owner, index, size,
@@ -36,28 +37,34 @@ public interface VaultRepository {
     int count(PlayerRef owner);
 
     /**
-     * Persist {@code vault}, upserting on the {@code (owner, index)} key: a vault with no row is inserted whole, and
-     * an existing row takes the vault's {@link Columns#CONTENTS} only, so a name or icon changed meanwhile stays.
+     * Persist {@code vault}'s items, upserting on the {@code (owner, index)} key, and return the row's stamp after the
+     * write. A vault with no row is inserted whole (with the vault's lineage); an existing row takes the items, size
+     * and last-touched only, so a name or icon changed meanwhile stays. Either way the row's version goes up by one.
      * Only a staff window saves this way, because the staff member is not the owner the items could go back to.
-     * Every other write to an existing vault goes through {@link #update}, so it cannot bring back a vault that was
-     * deleted. The upsert never writes a payment, and never changes one already stored, so a vault it brings back
-     * carries none and cannot be refunded.
+     * Every other item write goes through {@link #writeContents}, so it cannot bring back a vault that was deleted.
+     * The upsert never writes a payment, and never changes one already stored, so a vault it brings back carries none
+     * and cannot be refunded.
      */
-    void save(Vault vault);
+    VaultStamp save(Vault vault);
+
+    /**
+     * Overwrite the items, size and last-touched of the existing row at the vault's id, raise its version by one, and
+     * return the row's stamp after the write, read in the same transaction. Empty when no row was there: a vault
+     * deleted in the meantime stays deleted. The name, icon and payment are left as they are, so a closing window never
+     * rewrites a name set while it was open.
+     */
+    Optional<VaultStamp> writeContents(Vault vault);
 
     /**
      * Overwrite {@code columns} of the existing row at the vault's id with the vault's values, leaving every other
-     * column (and the payment) as it is, and report whether that row was there. A vault deleted in the meantime
-     * stays deleted: nothing is inserted and the result is {@code false}. Writing only the columns an action changed
-     * keeps a stale copy of the vault from undoing another write: a rename never rewrites the items, and a closing
-     * window never rewrites a name set while it was open.
+     * column (the items and payment among them) as it is, and report whether that row was there. A vault deleted in the
+     * meantime stays deleted: nothing is inserted and the result is {@code false}. Writing only the columns an action
+     * changed keeps a stale copy of the vault from undoing another write: a rename or a resize never rewrites items.
      */
     boolean update(Vault vault, Columns columns);
 
     /** The groups of columns {@link #update} can write. */
     enum Columns {
-        /** The items, the size they are laid out in, and the last-touched instant: what a closing window writes. */
-        CONTENTS,
         /** The player-chosen display name and icon. */
         PRESENTATION,
         /** The size alone, for an open that adopts a changed size quota. */

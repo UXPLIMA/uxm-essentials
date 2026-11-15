@@ -9,6 +9,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -24,6 +25,7 @@ final class InterleavedVaults implements VaultRepository {
     private @Nullable Runnable beforeUpdate;
     private boolean createFails;
     private boolean createFailsAfterWriting;
+    private boolean writeFails;
 
     InterleavedVaults(InMemoryVaults rows) {
         this.rows = rows;
@@ -47,6 +49,11 @@ final class InterleavedVaults implements VaultRepository {
     /** Make the next create throw, as a lost database connection does. */
     void failNextCreate() {
         createFails = true;
+    }
+
+    /** Make the next item write throw, as a lost database connection does. */
+    void failNextWrite() {
+        writeFails = true;
     }
 
     /** Make the next create store its row and then throw, as a connection lost while the commit was answered does. */
@@ -75,8 +82,22 @@ final class InterleavedVaults implements VaultRepository {
     }
 
     @Override
-    public void save(Vault vault) {
-        rows.save(vault);
+    public VaultStamp save(Vault vault) {
+        failWriteIfArmed();
+        return rows.save(vault);
+    }
+
+    @Override
+    public Optional<VaultStamp> writeContents(Vault vault) {
+        failWriteIfArmed();
+        return rows.writeContents(vault);
+    }
+
+    private void failWriteIfArmed() {
+        if (writeFails) {
+            writeFails = false;
+            throw new IllegalStateException("the database went away");
+        }
     }
 
     @Override

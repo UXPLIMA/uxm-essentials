@@ -13,6 +13,8 @@ public interface VaultItemReceiver {
     /**
      * Add {@code items} to {@code owner}'s inventory. Empty when the owner is not online, and then nothing was given.
      * Otherwise reports how many items went in and the ones that did not fit, which are left for the caller to keep.
+     * A failure part way through is reported the same way, with what was not given yet as the leftover, never thrown:
+     * the caller treats a throw as nothing given and keeps the whole batch.
      */
     Optional<Receipt> give(PlayerRef owner, VaultContents items);
 

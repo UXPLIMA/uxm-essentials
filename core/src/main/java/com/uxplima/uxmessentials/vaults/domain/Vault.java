@@ -34,6 +34,7 @@ public final class Vault {
     private final @Nullable String iconMaterial;
     private final Instant lastTouched;
     private final @Nullable VaultPayment paid;
+    private final VaultStamp stamp;
 
     private Vault(
             VaultId id,
@@ -42,7 +43,8 @@ public final class Vault {
             @Nullable String displayName,
             @Nullable String iconMaterial,
             Instant lastTouched,
-            @Nullable VaultPayment paid) {
+            @Nullable VaultPayment paid,
+            VaultStamp stamp) {
         this.id = id;
         this.size = size;
         this.contents = contents;
@@ -50,6 +52,7 @@ public final class Vault {
         this.iconMaterial = iconMaterial;
         this.lastTouched = lastTouched;
         this.paid = paid;
+        this.stamp = stamp;
     }
 
     /**
@@ -79,6 +82,19 @@ public final class Vault {
             @Nullable String iconMaterial,
             Instant lastTouched,
             @Nullable VaultPayment paid) {
+        return of(id, size, contents, displayName, iconMaterial, lastTouched, paid, VaultStamp.UNRECORDED);
+    }
+
+    /** Rebuild a vault from its persisted row, with its payment and the {@link VaultStamp} of the row it came from. */
+    public static Vault of(
+            VaultId id,
+            VaultSize size,
+            VaultContents contents,
+            @Nullable String displayName,
+            @Nullable String iconMaterial,
+            Instant lastTouched,
+            @Nullable VaultPayment paid,
+            VaultStamp stamp) {
         return new Vault(
                 Objects.requireNonNull(id, "id"),
                 Objects.requireNonNull(size, "size"),
@@ -86,7 +102,8 @@ public final class Vault {
                 displayName,
                 iconMaterial,
                 Objects.requireNonNull(lastTouched, "lastTouched"),
-                paid);
+                paid,
+                Objects.requireNonNull(stamp, "stamp"));
     }
 
     /**
@@ -104,7 +121,15 @@ public final class Vault {
      * The payment caps what deleting this vault may refund.
      */
     public static Vault allocate(VaultId id, VaultSize size, Instant at, @Nullable VaultPayment paid) {
-        return of(id, size, VaultContents.empty(), null, null, Objects.requireNonNull(at, "at"), paid);
+        return of(
+                id,
+                size,
+                VaultContents.empty(),
+                null,
+                null,
+                Objects.requireNonNull(at, "at"),
+                paid,
+                VaultStamp.newRow());
     }
 
     /** This vault's identity (owner + index). */
@@ -162,20 +187,27 @@ public final class Vault {
         Objects.requireNonNull(newSize, "newSize");
         return newSize.equals(size)
                 ? this
-                : new Vault(id, newSize, contents, displayName, iconMaterial, lastTouched, paid);
+                : new Vault(id, newSize, contents, displayName, iconMaterial, lastTouched, paid, stamp);
     }
 
     /**
      * This vault with the size, contents and last-touched instant of {@code written}, a copy of the same vault that a
-     * closing window wrote back. The name, icon and payment stay this vault's, since that write leaves them as they
-     * are.
+     * closing window wrote back, stamped {@code stamp}, the row's stamp after that write. The name, icon and payment
+     * stay this vault's, since that write leaves them as they are.
      */
-    public Vault withContentsOf(Vault written) {
+    public Vault withContentsOf(Vault written, VaultStamp stamp) {
         Objects.requireNonNull(written, "written");
+        Objects.requireNonNull(stamp, "stamp");
         if (!written.id.equals(id)) {
             throw new IllegalArgumentException("a different vault: " + written.id + " is not " + id);
         }
-        return new Vault(id, written.size, written.contents, displayName, iconMaterial, written.lastTouched, paid);
+        return new Vault(
+                id, written.size, written.contents, displayName, iconMaterial, written.lastTouched, paid, stamp);
+    }
+
+    /** Which row this copy was read from and how many item writes that row had seen. */
+    public VaultStamp stamp() {
+        return stamp;
     }
 
     /**
@@ -188,7 +220,7 @@ public final class Vault {
         if (name != null && name.length() > MAX_NAME_LENGTH) {
             throw new IllegalArgumentException("vault name exceeds " + MAX_NAME_LENGTH + " chars: " + name.length());
         }
-        return new Vault(id, size, contents, name, iconMaterial, lastTouched, paid);
+        return new Vault(id, size, contents, name, iconMaterial, lastTouched, paid, stamp);
     }
 
     /**
@@ -196,7 +228,7 @@ public final class Vault {
      * a material <em>name</em> the adapter resolves to a real {@code Material}; a {@code null} name clears it.
      */
     public Vault iconSet(@Nullable String materialName) {
-        return new Vault(id, size, contents, displayName, materialName, lastTouched, paid);
+        return new Vault(id, size, contents, displayName, materialName, lastTouched, paid, stamp);
     }
 
     /**
@@ -208,7 +240,7 @@ public final class Vault {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
-        Vault saved = new Vault(id, size, newContents, displayName, iconMaterial, at, paid);
+        Vault saved = new Vault(id, size, newContents, displayName, iconMaterial, at, paid, stamp);
         return new Change(saved, new VaultContentsChanged(owner, index(), at));
     }
 

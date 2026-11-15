@@ -97,6 +97,7 @@ public final class ReturnVaultItems implements VaultItemHandBack {
         try {
             receipt = receiver.give(owner, items);
         } catch (RuntimeException failure) {
+            // A receiver reports a partial give as leftover, so a throw means nothing went in and the batch is kept.
             log.error("event=vault_return_give_failed player=" + owner.uuid() + " (kept for the next join)", failure);
             keepLater(owner, items);
             return;

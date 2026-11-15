@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -52,12 +53,14 @@ class VaultSyncTest {
 
     @Test
     void createAndUpdateReportWhetherTheyWrote() {
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(1), NOW), VaultRepository.Columns.CONTENTS))
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(1), NOW))
+                        .isPresent())
                 .isFalse();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW, FIVE)))
                 .isTrue();
         assertThat(store.create(Vault.allocate(FIRST, new VaultSize(1), NOW))).isFalse();
-        assertThat(store.update(Vault.allocate(FIRST, new VaultSize(2), NOW), VaultRepository.Columns.CONTENTS))
+        assertThat(store.writeContents(Vault.allocate(FIRST, new VaultSize(2), NOW))
+                        .isPresent())
                 .isTrue();
 
         assertThat(frames.published).allSatisfy(frame -> assertThat(frame).isInstanceOf(VaultChanged.class));
@@ -70,10 +73,10 @@ class VaultSyncTest {
         store.update(opened.renamedTo("loot"), VaultRepository.Columns.PRESENTATION);
         Vault named = store.find(FIRST).orElseThrow();
 
-        store.update(
-                opened.withContents(ALEX, VaultContents.of(new byte[] {5}), NOW.plusSeconds(1))
-                        .result(),
-                VaultRepository.Columns.CONTENTS);
+        VaultStamp written = store.writeContents(
+                        opened.withContents(ALEX, VaultContents.of(new byte[] {5}), NOW.plusSeconds(1))
+                                .result())
+                .orElseThrow();
         rows.held.clear();
 
         Vault cached = store.find(FIRST).orElseThrow();
@@ -81,6 +84,19 @@ class VaultSyncTest {
         assertThat(cached.contents()).isEqualTo(VaultContents.of(new byte[] {5}));
         assertThat(cached.displayName()).isEqualTo("loot");
         assertThat(cached.lastTouched()).isEqualTo(NOW.plusSeconds(1));
+        assertThat(cached.stamp()).isEqualTo(written);
+        assertThat(written.version()).isEqualTo(opened.stamp().version() + 1);
+    }
+
+    @Test
+    void aPeersChangeToAVaultIsPassedOnAfterTheCacheDropsIt() {
+        List<VaultId> forgotten = new ArrayList<>();
+        CachedVaultRepository cache = new CachedVaultRepository(rows);
+        RemoteSyncListener listener = VaultSync.listener(cache, forgotten::add);
+
+        listener.onRemoteChange(new VaultChanged("survival", ALEX.uuid(), 1));
+
+        assertThat(forgotten).containsExactly(FIRST);
     }
 
     /** Rows keyed by vault, with the store's payment rules: only a create records one, a delete must match it. */
@@ -109,14 +125,26 @@ class VaultSyncTest {
         }
 
         @Override
-        public void save(Vault vault) {
+        public VaultStamp save(Vault vault) {
             held.put(vault.id(), vault);
+            return vault.stamp();
+        }
+
+        @Override
+        public Optional<VaultStamp> writeContents(Vault vault) {
+            Vault stored = held.get(vault.id());
+            if (stored == null) {
+                return Optional.empty();
+            }
+            VaultStamp stamp =
+                    new VaultStamp(stored.stamp().lineage(), stored.stamp().version() + 1);
+            held.put(vault.id(), stored.withContentsOf(vault, stamp));
+            return Optional.of(stamp);
         }
 
         @Override
         public boolean update(Vault vault, Columns columns) {
             return held.computeIfPresent(vault.id(), (id, stored) -> switch (columns) {
-                        case CONTENTS -> stored.withContentsOf(vault);
                         case PRESENTATION ->
                             stored.renamedTo(vault.displayName()).iconSet(vault.iconMaterial());
                         case SIZE -> stored.openedAt(vault.size());

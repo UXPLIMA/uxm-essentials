@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.jooq.DSLContext;
 import org.jooq.Field;
 
@@ -78,11 +79,31 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     }
 
     @Override
-    public void save(Vault vault) {
+    public VaultStamp save(Vault vault) {
         Objects.requireNonNull(vault, "vault");
-        write(dsl -> {
+        return write(dsl -> {
             upsert(dsl, vault);
-            return null;
+            return stampOf(dsl, vault.id()).orElseThrow();
+        });
+    }
+
+    @Override
+    public Optional<VaultStamp> writeContents(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        return write(dsl -> {
+            VaultsRecord record = dsl.newRecord(VAULTS);
+            VaultRows.apply(record, vault);
+            int updated = dsl.update(VAULTS)
+                    .set(VAULTS.SIZE, record.getSize())
+                    .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
+                    .set(VAULTS.CONTENTS, record.getContents())
+                    .set(VAULTS.VERSION, VAULTS.VERSION.plus(1L))
+                    .where(VAULTS.OWNER.eq(record.getOwner()))
+                    .and(VAULTS.IDX.eq(record.getIdx()))
+                    .execute();
+            // Read in the same transaction: the row is locked by the update until commit, so this is the version
+            // this write produced, not one a concurrent write on another server produced after it.
+            return updated > 0 ? stampOf(dsl, vault.id()) : Optional.<VaultStamp>empty();
         });
     }
 
@@ -95,11 +116,6 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
             VaultRows.apply(record, vault);
             Map<Field<?>, Object> values = new LinkedHashMap<>();
             switch (columns) {
-                case CONTENTS -> {
-                    values.put(VAULTS.SIZE, record.getSize());
-                    values.put(VAULTS.LAST_TOUCHED, record.getLastTouched());
-                    values.put(VAULTS.CONTENTS, record.getContents());
-                }
                 case PRESENTATION -> {
                     values.put(VAULTS.DISPLAY_NAME, record.getDisplayName());
                     values.put(VAULTS.ICON, record.getIcon());
@@ -122,6 +138,8 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
             VaultsRecord record = dsl.newRecord(VAULTS);
             VaultRows.apply(record, vault);
             VaultRows.applyPayment(record, vault);
+            record.setLineage(VaultRows.lineageOf(vault))
+                    .setVersion(vault.stamp().version());
             return dsl.insertInto(VAULTS)
                             .set(record)
                             .onConflict(VAULTS.OWNER, VAULTS.IDX)
@@ -157,6 +175,7 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     private static void upsert(DSLContext dsl, Vault vault) {
         VaultsRecord record = dsl.newRecord(VAULTS);
         VaultRows.apply(record, vault);
+        record.setLineage(VaultRows.lineageOf(vault)).setVersion(1L);
         dsl.insertInto(VAULTS)
                 .set(record)
                 .onConflict(VAULTS.OWNER, VAULTS.IDX)
@@ -164,6 +183,15 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
                 .set(VAULTS.SIZE, record.getSize())
                 .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
                 .set(VAULTS.CONTENTS, record.getContents())
+                .set(VAULTS.VERSION, VAULTS.VERSION.plus(1L))
                 .execute();
+    }
+
+    private static Optional<VaultStamp> stampOf(DSLContext dsl, VaultId id) {
+        return dsl.select(VAULTS.LINEAGE, VAULTS.VERSION)
+                .from(VAULTS)
+                .where(VAULTS.OWNER.eq(id.owner().toString()))
+                .and(VAULTS.IDX.eq(id.index()))
+                .fetchOptional(row -> new VaultStamp(row.value1(), row.value2()));
     }
 }

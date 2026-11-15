@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -14,9 +15,11 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -100,6 +103,7 @@ public final class VaultView {
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
     private final BooleanSupplier running;
+    private final Logger log;
 
     public VaultView(
             Messages messages,
@@ -109,7 +113,8 @@ public final class VaultView {
             Permissions permissions,
             VaultItemPolicy itemPolicy,
             @Nullable Sound openSound,
-            BooleanSupplier running) {
+            BooleanSupplier running,
+            Logger log) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.windows = Objects.requireNonNull(windows, "windows");
@@ -118,6 +123,7 @@ public final class VaultView {
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
         this.openSound = openSound;
         this.running = Objects.requireNonNull(running, "running");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /**
@@ -202,11 +208,31 @@ public final class VaultView {
         player.playSound(Objects.requireNonNull(player.getLocation(), "player location"), openSound, 1.0f, 1.0f);
     }
 
-    /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
+    /**
+     * Close and save every still-open vault, then wait at most {@code timeout} for the writes, warning when they did
+     * not all finish in time.
+     */
+    public void stop(Duration timeout) {
+        flushAll();
+        if (!windows.awaitIdle(timeout)) {
+            log.warn(
+                    "event=vault_stop_writes_pending open-guis={} (still being written after {})",
+                    windows.count(),
+                    timeout);
+        }
+    }
+
+    /**
+     * Close and save every still-open vault; called on module stop so none is lost. Each window is closed on its
+     * viewer's thread so nothing can be taken out of it after its items were written; once the plugin has stopped they
+     * are written on this thread, since the scheduler runs nothing more.
+     */
     public void flushAll() {
         for (VaultWindows.Window<StorageGui> window : windows.held()) {
             if (running.getAsBoolean()) {
-                scheduler.onEntity(window.viewer(), () -> closeOnViewerThread(window), () -> writeNow(window));
+                // Closed right here when this thread owns the viewer (the main thread on Paper), so the stop can wait
+                // for the writes; otherwise on the viewer's own thread.
+                PlayerThread.run(scheduler, window.viewer(), () -> closeOnViewerThread(window), () -> writeNow(window));
             } else {
                 writeNow(window);
             }

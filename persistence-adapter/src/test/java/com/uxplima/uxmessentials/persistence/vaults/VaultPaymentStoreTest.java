@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -192,11 +193,9 @@ class VaultPaymentStoreTest {
         upgrade();
         assertThat(vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS)))
                 .isTrue();
-        vaults.update(
-                stored(1)
-                        .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
-                        .result(),
-                Columns.CONTENTS);
+        vaults.writeContents(stored(1)
+                .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
+                .result());
 
         assertThat(vaults.create(Vault.allocate(
                         vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("50"), "coins"))))
@@ -260,11 +259,9 @@ class VaultPaymentStoreTest {
 
         vaults.update(opened.renamedTo("loot").iconSet("DIAMOND"), Columns.PRESENTATION);
         Instant later = NOW.plusSeconds(60);
-        vaults.update(
-                opened.openedAt(new VaultSize(3))
-                        .withContents(ALEX, VaultContents.of(new byte[] {9}), later)
-                        .result(),
-                Columns.CONTENTS);
+        vaults.writeContents(opened.openedAt(new VaultSize(3))
+                .withContents(ALEX, VaultContents.of(new byte[] {9}), later)
+                .result());
 
         Vault after = stored(1);
         assertThat(after.displayName()).isEqualTo("loot");
@@ -293,5 +290,72 @@ class VaultPaymentStoreTest {
 
         assertThat(stored(1).displayName()).isEqualTo("loot");
         assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {4}));
+    }
+
+    @Test
+    void aVaultFromBeforeTheUpgradeStartsAtVersionZeroAndEveryItemWriteRaisesIt() {
+        Flyway.configure()
+                .dataSource(data)
+                .locations("classpath:db/migration")
+                .placeholders(Map.of("prefix", ""))
+                .target("100")
+                .load()
+                .migrate();
+        dsl.insertInto(VAULTS)
+                .set(VAULTS.OWNER, ALEX.uuid().toString())
+                .set(VAULTS.IDX, 1)
+                .set(VAULTS.SIZE, (short) 1)
+                .set(VAULTS.LAST_TOUCHED, NOW.toEpochMilli())
+                .execute();
+        upgrade();
+
+        Vault old = stored(1);
+        assertThat(old.stamp()).isEqualTo(VaultStamp.UNRECORDED);
+
+        VaultStamp first = vaults.writeContents(old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                        .result())
+                .orElseThrow();
+        VaultStamp second = vaults.save(
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result());
+
+        assertThat(first).isEqualTo(new VaultStamp(null, 1L));
+        assertThat(second).isEqualTo(new VaultStamp(null, 2L));
+        assertThat(stored(1).stamp()).isEqualTo(second);
+        assertThat(old.stamp().before(second)).isTrue();
+        assertThat(vaults.update(old.renamedTo("loot"), Columns.PRESENTATION)).isTrue();
+        assertThat(stored(1).stamp()).isEqualTo(second);
+    }
+
+    @Test
+    void aVaultBoughtAgainAfterADeleteIsANewRowWhoseVersionsAreNotComparedWithTheOldOne() {
+        upgrade();
+        Vault bought = Vault.allocate(vault(1), new VaultSize(1), NOW);
+        vaults.create(bought);
+        Vault first = stored(1);
+        vaults.writeContents(
+                first.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result());
+        Vault written = stored(1);
+        vaults.delete(vault(1), written.paid());
+
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault again = stored(1);
+
+        assertThat(first.stamp()).isEqualTo(bought.stamp());
+        assertThat(written.stamp().version()).isEqualTo(1L);
+        assertThat(again.stamp().version()).isZero();
+        assertThat(again.stamp().sameRow(written.stamp())).isFalse();
+        assertThat(again.stamp().before(written.stamp())).isFalse();
+        assertThat(vaults.writeContents(written).orElseThrow().version()).isEqualTo(1L);
+    }
+
+    @Test
+    void aStaffUpsertThatInsertsARowGivesItALineageAndAFirstVersion() {
+        upgrade();
+
+        VaultStamp inserted =
+                vaults.save(Vault.of(vault(1), new VaultSize(1), VaultContents.of(new byte[] {3}), null, null, NOW));
+
+        assertThat(inserted.lineage()).isNotNull();
+        assertThat(inserted.version()).isEqualTo(1L);
     }
 }

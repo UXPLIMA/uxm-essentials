@@ -6,12 +6,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 
 /** Vault rows keyed by owner and index, upserted on save, with a count of every write for no-churn checks. */
 final class InMemoryVaults implements VaultRepository {
@@ -60,21 +62,46 @@ final class InMemoryVaults implements VaultRepository {
      * existing row takes the contents columns only.
      */
     @Override
-    public void save(Vault vault) {
+    public VaultStamp save(Vault vault) {
         saves++;
         Vault stored = rows.get(vault.id());
-        rows.put(vault.id(), stored == null ? withPayment(vault, Optional.empty()) : stored.withContentsOf(vault));
+        if (stored == null) {
+            String lineage = vault.stamp().lineage() != null
+                    ? vault.stamp().lineage()
+                    : UUID.randomUUID().toString();
+            VaultStamp stamp = new VaultStamp(lineage, 1L);
+            rows.put(
+                    vault.id(),
+                    Vault.of(
+                            vault.id(),
+                            vault.size(),
+                            vault.contents(),
+                            vault.displayName(),
+                            vault.iconMaterial(),
+                            vault.lastTouched(),
+                            null,
+                            stamp));
+            return stamp;
+        }
+        return writeOver(stored, vault);
     }
 
-    private static Vault withPayment(Vault vault, Optional<VaultPayment> paid) {
-        return Vault.of(
-                vault.id(),
-                vault.size(),
-                vault.contents(),
-                vault.displayName(),
-                vault.iconMaterial(),
-                vault.lastTouched(),
-                paid.orElse(null));
+    @Override
+    public Optional<VaultStamp> writeContents(Vault vault) {
+        Vault stored = rows.get(vault.id());
+        if (stored == null) {
+            return Optional.empty();
+        }
+        saves++;
+        return Optional.of(writeOver(stored, vault));
+    }
+
+    /** The row takes the written items and its version goes up by one, as the database does it. */
+    private VaultStamp writeOver(Vault stored, Vault written) {
+        VaultStamp stamp =
+                new VaultStamp(stored.stamp().lineage(), stored.stamp().version() + 1);
+        rows.put(written.id(), stored.withContentsOf(written, stamp));
+        return stamp;
     }
 
     @Override
@@ -86,7 +113,6 @@ final class InMemoryVaults implements VaultRepository {
         saves++;
         Vault updated =
                 switch (columns) {
-                    case CONTENTS -> stored.withContentsOf(vault);
                     case PRESENTATION -> stored.renamedTo(vault.displayName()).iconSet(vault.iconMaterial());
                     case SIZE -> stored.openedAt(vault.size());
                 };

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.vaults.CachedVaultRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -12,6 +13,7 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -47,10 +49,21 @@ public final class VaultSync {
 
     /** A listener that invalidates the affected vault on a remote {@link VaultChanged}. */
     public static RemoteSyncListener listener(CachedVaultRepository cache) {
+        return listener(cache, id -> {});
+    }
+
+    /**
+     * A listener that invalidates the affected vault on a remote {@link VaultChanged} and then tells {@code changed}
+     * which vault it was, so whatever else this backend remembers about that vault can be dropped as well.
+     */
+    public static RemoteSyncListener listener(CachedVaultRepository cache, Consumer<VaultId> changed) {
         Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(changed, "changed");
         return message -> {
-            if (message instanceof VaultChanged changed) {
-                cache.invalidate(new VaultId(changed.owner(), changed.vaultIndex()));
+            if (message instanceof VaultChanged remote) {
+                VaultId id = new VaultId(remote.owner(), remote.vaultIndex());
+                cache.invalidate(id);
+                changed.accept(id);
             }
         };
     }
@@ -87,9 +100,17 @@ public final class VaultSync {
         }
 
         @Override
-        public void save(Vault vault) {
-            delegate.save(vault);
+        public VaultStamp save(Vault vault) {
+            VaultStamp written = delegate.save(vault);
             announce(vault.id());
+            return written;
+        }
+
+        @Override
+        public Optional<VaultStamp> writeContents(Vault vault) {
+            Optional<VaultStamp> written = delegate.writeContents(vault);
+            announce(vault.id());
+            return written;
         }
 
         @Override
