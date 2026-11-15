@@ -54,6 +54,9 @@ public enum TeleportError {
     /** The player cannot afford the configured random-teleport cost, rejected before any search runs. */
     RTP_CANT_AFFORD(TeleportMessageKey.RTP_CANT_AFFORD),
 
+    /** A random-teleport fee was taken for a hop that failed, and giving it back failed too. */
+    RTP_REFUND_FAILED(TeleportMessageKey.RTP_REFUND_FAILED),
+
     /** {@code /rtp biome <biome>} named a biome the server's registry does not know. */
     RTP_BIOME_UNKNOWN(TeleportMessageKey.RTP_BIOME_UNKNOWN),
 

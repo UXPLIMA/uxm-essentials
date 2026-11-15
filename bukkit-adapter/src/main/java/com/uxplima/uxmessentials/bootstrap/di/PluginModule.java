@@ -2104,8 +2104,8 @@ public final class PluginModule {
             ClaimProvidersConfig claimProviders) {
         // The /rtp cost bridges to the resolved economy provider lazily: teleport is wired before economy, so the
         // provider/currency are read through suppliers at charge time (free until economy is up, free for good when
-        // economy is disabled), mirroring the worlds entry fee. The affordability is checked before the search and the
-        // debit is dispatched off-tick only after a successful landing.
+        // economy is disabled), mirroring the worlds entry fee. The affordability is checked before the search; the
+        // debit and any refund run off-tick when the warmup ends.
         LinkedTeleportFee fee = new LinkedTeleportFee(
                 () -> links.economyProvider,
                 () -> links.economyCurrency,

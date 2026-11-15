@@ -51,8 +51,8 @@ public final class ResolveRtp {
     /**
      * The manual {@code /rtp}: redirect to the fallback world if needed, gate cost and cooldown <em>before</em>
      * consulting the queue (a player who cannot pay or is on cooldown never triggers a serve), then poll, fire a
-     * refill, and hand a served location to the move-cancellable warmup. The cost is withdrawn and the cooldown
-     * stamped only once the teleport lands (see {@link TeleportEngine#launchRandom}).
+     * refill, and hand a served location to the move-cancellable warmup. The cost is withdrawn when the warmup
+     * ends and the cooldown stamped only once the teleport lands (see {@link TeleportEngine#launchRandom}).
      */
     public Result<Unit, TeleportError> background(PlayerRef who, WorldRef requestedWorld) {
         Objects.requireNonNull(who, "who");

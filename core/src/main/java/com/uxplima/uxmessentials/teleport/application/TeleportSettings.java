@@ -300,7 +300,8 @@ public final class TeleportSettings {
 
     /**
      * The cost of a manual {@code /rtp} in the default currency; {@code 0} (the default) makes it free. The
-     * amount is checked before the search ({@code canAfford}) and withdrawn only after a successful landing.
+     * amount is checked before the search ({@code canAfford}), withdrawn when the warmup ends and refunded when
+     * the hop then fails.
      */
     public BigDecimal rtpCost() {
         return BigDecimal.valueOf(Math.max(0.0, config.getDouble("rtp.cost", 0.0)));
