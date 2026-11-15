@@ -78,10 +78,18 @@ public final class CachedVaultRepository implements VaultRepository {
     }
 
     @Override
-    public void delete(VaultId id) {
+    public void create(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        delegate.create(vault);
+        cache.invalidate(vault.id());
+    }
+
+    @Override
+    public boolean delete(VaultId id) {
         Objects.requireNonNull(id, "id");
-        delegate.delete(id);
+        boolean removed = delegate.delete(id);
         cache.invalidate(id);
+        return removed;
     }
 
     @Override

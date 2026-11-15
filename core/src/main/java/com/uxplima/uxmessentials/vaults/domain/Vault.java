@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.domain;
 
 import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.domain.event.VaultContentsChanged;
@@ -32,6 +33,7 @@ public final class Vault {
     private final @Nullable String displayName;
     private final @Nullable String iconMaterial;
     private final Instant lastTouched;
+    private final @Nullable VaultPayment paid;
 
     private Vault(
             VaultId id,
@@ -39,13 +41,15 @@ public final class Vault {
             VaultContents contents,
             @Nullable String displayName,
             @Nullable String iconMaterial,
-            Instant lastTouched) {
+            Instant lastTouched,
+            @Nullable VaultPayment paid) {
         this.id = id;
         this.size = size;
         this.contents = contents;
         this.displayName = displayName;
         this.iconMaterial = iconMaterial;
         this.lastTouched = lastTouched;
+        this.paid = paid;
     }
 
     /**
@@ -60,13 +64,29 @@ public final class Vault {
             @Nullable String displayName,
             @Nullable String iconMaterial,
             Instant lastTouched) {
+        return of(id, size, contents, displayName, iconMaterial, lastTouched, null);
+    }
+
+    /**
+     * Rebuild a vault from its persisted row, with what was paid to create it. {@code paid} is {@code null} for a
+     * vault that cost nothing, and for one whose payment was never recorded, so neither can be refunded.
+     */
+    public static Vault of(
+            VaultId id,
+            VaultSize size,
+            VaultContents contents,
+            @Nullable String displayName,
+            @Nullable String iconMaterial,
+            Instant lastTouched,
+            @Nullable VaultPayment paid) {
         return new Vault(
                 Objects.requireNonNull(id, "id"),
                 Objects.requireNonNull(size, "size"),
                 Objects.requireNonNull(contents, "contents"),
                 displayName,
                 iconMaterial,
-                Objects.requireNonNull(lastTouched, "lastTouched"));
+                Objects.requireNonNull(lastTouched, "lastTouched"),
+                paid);
     }
 
     /**
@@ -76,7 +96,15 @@ public final class Vault {
      * sets one.
      */
     public static Vault allocate(VaultId id, VaultSize size, Instant at) {
-        return of(id, size, VaultContents.empty(), null, null, Objects.requireNonNull(at, "at"));
+        return allocate(id, size, at, null);
+    }
+
+    /**
+     * Allocate a brand-new, empty vault that the owner paid {@code paid} for, or {@code null} when it was free.
+     * The payment caps what deleting this vault may refund.
+     */
+    public static Vault allocate(VaultId id, VaultSize size, Instant at, @Nullable VaultPayment paid) {
+        return of(id, size, VaultContents.empty(), null, null, Objects.requireNonNull(at, "at"), paid);
     }
 
     /** This vault's identity (owner + index). */
@@ -119,6 +147,11 @@ public final class Vault {
         return lastTouched;
     }
 
+    /** What the owner paid to create this vault, or empty when it was free or the payment is unknown. */
+    public Optional<VaultPayment> paid() {
+        return Optional.ofNullable(paid);
+    }
+
     /**
      * Open this vault at {@code size}: a re-open after the owner's size quota changed adopts the new height
      * without dropping stored rows (the repository keeps the contents; a wider GUI simply exposes more slots,
@@ -127,7 +160,9 @@ public final class Vault {
      */
     public Vault openedAt(VaultSize newSize) {
         Objects.requireNonNull(newSize, "newSize");
-        return newSize.equals(size) ? this : new Vault(id, newSize, contents, displayName, iconMaterial, lastTouched);
+        return newSize.equals(size)
+                ? this
+                : new Vault(id, newSize, contents, displayName, iconMaterial, lastTouched, paid);
     }
 
     /**
@@ -140,7 +175,7 @@ public final class Vault {
         if (name != null && name.length() > MAX_NAME_LENGTH) {
             throw new IllegalArgumentException("vault name exceeds " + MAX_NAME_LENGTH + " chars: " + name.length());
         }
-        return new Vault(id, size, contents, name, iconMaterial, lastTouched);
+        return new Vault(id, size, contents, name, iconMaterial, lastTouched, paid);
     }
 
     /**
@@ -148,7 +183,7 @@ public final class Vault {
      * a material <em>name</em> the adapter resolves to a real {@code Material}; a {@code null} name clears it.
      */
     public Vault iconSet(@Nullable String materialName) {
-        return new Vault(id, size, contents, displayName, materialName, lastTouched);
+        return new Vault(id, size, contents, displayName, materialName, lastTouched, paid);
     }
 
     /**
@@ -160,7 +195,7 @@ public final class Vault {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(newContents, "newContents");
         Objects.requireNonNull(at, "at");
-        Vault saved = new Vault(id, size, newContents, displayName, iconMaterial, at);
+        Vault saved = new Vault(id, size, newContents, displayName, iconMaterial, at, paid);
         return new Change(saved, new VaultContentsChanged(owner, index(), at));
     }
 

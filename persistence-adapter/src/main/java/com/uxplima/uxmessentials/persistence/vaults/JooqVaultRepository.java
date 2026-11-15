@@ -21,9 +21,10 @@ import org.jooq.DSLContext;
  * owner's vault by the {@code (owner, idx)} primary key; the listing reads an owner's indices in ascending
  * order off the {@code idx_vaults_owner} index; the count is a {@code COUNT(*)} so the amount-quota check never
  * materialises the rows. A {@code save} upserts on the primary key. A re-save of the same vault overwrites its
- * size, contents and last-touched in place, so a close-save never inserts a duplicate row. A {@code delete}
- * removes the one {@code (owner, idx)} row, freeing the owner's quota slot; deleting an id with no row affects
- * zero rows and is a silent no-op. The inactive-vault purge deletes every row whose {@code last_touched} is
+ * size, contents and last-touched in place, so a close-save never inserts a duplicate row. A save never writes
+ * the payment columns: only {@code create} does, so a payment cannot reappear on a row a stale save re-inserts.
+ * A {@code delete} removes the one {@code (owner, idx)} row, freeing the owner's quota slot, and reports whether
+ * it removed one; deleting an id with no row affects zero rows. The inactive-vault purge deletes every row whose {@code last_touched} is
  * strictly before the cutoff in one statement and returns the affected count. Every statement is typed jOOQ
  * DSL; no SQL is ever string-concatenated.
  */
@@ -79,15 +80,29 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     }
 
     @Override
-    public void delete(VaultId id) {
-        Objects.requireNonNull(id, "id");
+    public void create(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
         write(dsl -> {
-            dsl.deleteFrom(VAULTS)
-                    .where(VAULTS.OWNER.eq(id.owner().toString()))
-                    .and(VAULTS.IDX.eq(id.index()))
+            VaultsRecord record = dsl.newRecord(VAULTS);
+            VaultRows.apply(record, vault);
+            VaultRows.applyPayment(record, vault);
+            dsl.insertInto(VAULTS)
+                    .set(record)
+                    .onConflict(VAULTS.OWNER, VAULTS.IDX)
+                    .doNothing()
                     .execute();
             return null;
         });
+    }
+
+    @Override
+    public boolean delete(VaultId id) {
+        Objects.requireNonNull(id, "id");
+        return write(dsl -> dsl.deleteFrom(VAULTS)
+                        .where(VAULTS.OWNER.eq(id.owner().toString()))
+                        .and(VAULTS.IDX.eq(id.index()))
+                        .execute()
+                > 0);
     }
 
     @Override

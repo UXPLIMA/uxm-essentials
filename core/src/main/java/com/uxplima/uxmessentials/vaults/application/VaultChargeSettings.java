@@ -14,7 +14,8 @@ import java.util.Objects;
  *
  * @param costToCreate charged once when a not-yet-existing vault index is first allocated
  * @param costToOpen charged each time a vault is opened (a per-open fee; zero disables it)
- * @param refundOnDelete paid back to the owner when their vault is deleted (zero disables the refund)
+ * @param refundOnDelete paid back to the owner when their vault is deleted, never more than that vault cost to
+ *     create (zero disables the refund)
  */
 public record VaultChargeSettings(BigDecimal costToCreate, BigDecimal costToOpen, BigDecimal refundOnDelete) {
 

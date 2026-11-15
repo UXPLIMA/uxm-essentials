@@ -54,15 +54,32 @@ final class InMemoryVaults implements VaultRepository {
         return ownedIndices(owner).size();
     }
 
+    /** Like the real store, a save neither writes nor changes a payment: only {@link #create} records one. */
     @Override
     public void save(Vault vault) {
         saves++;
-        rows.put(vault.id(), vault);
+        Vault stored = rows.get(vault.id());
+        rows.put(
+                vault.id(),
+                Vault.of(
+                        vault.id(),
+                        vault.size(),
+                        vault.contents(),
+                        vault.displayName(),
+                        vault.iconMaterial(),
+                        vault.lastTouched(),
+                        stored == null ? null : stored.paid().orElse(null)));
     }
 
     @Override
-    public void delete(VaultId id) {
-        rows.remove(id);
+    public void create(Vault vault) {
+        saves++;
+        rows.putIfAbsent(vault.id(), vault);
+    }
+
+    @Override
+    public boolean delete(VaultId id) {
+        return rows.remove(id) != null;
     }
 
     @Override

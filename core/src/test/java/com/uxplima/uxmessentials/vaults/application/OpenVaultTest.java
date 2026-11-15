@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import org.junit.jupiter.api.Test;
 
@@ -52,6 +53,27 @@ class OpenVaultTest {
         assertThat(opened.isOk()).isTrue();
         assertThat(purse.moves()).containsExactly("-12");
         assertThat(vaults.find(VaultId.of(ALEX, 1))).isPresent();
+    }
+
+    @Test
+    void aFirstOpenRecordsTheCreateFeeAndItsCurrencyAsWhatTheVaultCost() {
+        openVault(CREATE_10_OPEN_2).open(ALEX, 1);
+
+        assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid())
+                .contains(new VaultPayment(new BigDecimal("10"), "coins"));
+    }
+
+    @Test
+    void aVaultOpenedForFreeRecordsNoPayment() {
+        permissions.quota(VaultAmountQuota.FAMILY.node(), QuotaResult.limited(3));
+        openVault(CREATE_10_OPEN_2, Optional.empty()).open(ALEX, 2);
+        openVault(VaultChargeSettings.allFree()).open(ALEX, 3);
+        permissions.grant(ALEX, "uxmessentials.vault.free");
+        openVault(CREATE_10_OPEN_2).open(ALEX, 1);
+
+        assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid()).isEmpty();
+        assertThat(vaults.find(VaultId.of(ALEX, 2)).orElseThrow().paid()).isEmpty();
+        assertThat(vaults.find(VaultId.of(ALEX, 3)).orElseThrow().paid()).isEmpty();
     }
 
     @Test

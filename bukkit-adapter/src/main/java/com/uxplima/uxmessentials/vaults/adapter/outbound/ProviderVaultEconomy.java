@@ -24,8 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>A vault cost is a bare {@link BigDecimal} in vaults' own terms; this adapter denominates it in the
  * configured default {@link Currency} before charging. {@code canAfford} is a balance read, {@code withdraw}
  * is the guarded debit whose {@code isOk()} reports whether the funds sufficed (no separate {@code canAfford}
- * gate precedes it), and {@code deposit} is the single-sided credit that pays the delete refund back, whose
- * {@code isOk()} reports whether the refund landed.
+ * gate precedes it), and {@code deposit} is the single-sided credit that pays the delete refund back, in the
+ * currency the vault was paid in, whose {@code isOk()} reports whether the refund landed.
  */
 @NullMarked
 public final class ProviderVaultEconomy implements VaultEconomy {
@@ -63,12 +63,33 @@ public final class ProviderVaultEconomy implements VaultEconomy {
     }
 
     @Override
-    public boolean deposit(PlayerRef who, BigDecimal amount) {
+    public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
+        Optional<Currency> target = currency(currencyId);
+        if (target.isEmpty()) {
+            // The currency the vault was paid in is gone. Paying the default instead could hand back something
+            // worth more than was taken, so the refund is dropped and reported as such.
+            return false;
+        }
         // A vault refund gives back what was spent, so it is not counted as earned.
         return com.uxplima.uxmessentials.economy.application.UncountedMoney.call(
-                        () -> economy.credit(who, Money.of(currency, amount)))
+                        () -> economy.credit(who, Money.of(target.get(), amount)))
                 .isOk();
+    }
+
+    @Override
+    public String currencyId() {
+        return currency.id().value();
+    }
+
+    private Optional<Currency> currency(String currencyId) {
+        if (currency.id().value().equalsIgnoreCase(currencyId)) {
+            return Optional.of(currency);
+        }
+        return economy.currencies().stream()
+                .filter(candidate -> candidate.id().value().equalsIgnoreCase(currencyId))
+                .findFirst();
     }
 }

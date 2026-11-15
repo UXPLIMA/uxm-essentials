@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.application;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -11,6 +12,7 @@ import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 
 /**
@@ -86,12 +88,14 @@ public final class OpenVault {
         // Quota passed (the free check); charge the combined create + per-open fee in one atomic withdrawal
         // before allocating, so a player who cannot afford the vault never leaves a phantom row behind and the
         // create fee is never taken on its own when the open fee cannot be paid.
-        Result<Unit, VaultError> charged = charge.chargeAllocate(owner);
+        Result<Optional<VaultPayment>, VaultError> charged = charge.chargeAllocate(owner);
         if (charged.isErr()) {
             return Result.err(charged.errorOrThrow());
         }
-        Vault allocated = Vault.allocate(id, size, clock.instant());
-        repository.save(allocated);
+        // The create fee is stored with the row because it is the ceiling on what deleting this vault refunds.
+        Vault allocated =
+                Vault.allocate(id, size, clock.instant(), charged.orElseThrow().orElse(null));
+        repository.create(allocated);
         return Result.ok(allocated);
     }
 }

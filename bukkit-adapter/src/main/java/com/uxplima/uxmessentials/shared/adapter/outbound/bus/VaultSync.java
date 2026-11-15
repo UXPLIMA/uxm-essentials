@@ -92,9 +92,16 @@ public final class VaultSync {
         }
 
         @Override
-        public void delete(VaultId id) {
-            delegate.delete(id);
+        public void create(Vault vault) {
+            delegate.create(vault);
+            announce(vault.id());
+        }
+
+        @Override
+        public boolean delete(VaultId id) {
+            boolean removed = delegate.delete(id);
             announce(id);
+            return removed;
         }
 
         @Override

@@ -42,11 +42,22 @@ public interface VaultRepository {
     void save(Vault vault);
 
     /**
-     * Remove the vault row at {@code id}, freeing the owner's quota slot. Idempotent: deleting an id with no
-     * row is a no-op, never an error. The cache invalidation and cross-server {@code VaultChanged} emit are
-     * the adapter's concern; the use case depends only on this contract.
+     * Insert a freshly allocated {@code vault} together with what its owner paid for it
+     * ({@link Vault#paid()}). This is the only write that stores a payment: {@link #save} never writes one, and
+     * never changes one already stored. A close-save that re-inserts a vault deleted while its window was open
+     * therefore carries no payment, so the same payment can never be refunded twice. When a row already exists
+     * at the vault's id this is a no-op, keeping that row's contents and payment.
      */
-    void delete(VaultId id);
+    void create(Vault vault);
+
+    /**
+     * Remove the vault row at {@code id}, freeing the owner's quota slot, and report whether a row was removed.
+     * Idempotent: deleting an id with no row is a no-op that returns {@code false}, never an error. Only the
+     * call that removed the row sees {@code true}, so two deletes racing for the same vault refund it once. The
+     * cache invalidation and cross-server {@code VaultChanged} emit are the adapter's concern; the use case
+     * depends only on this contract.
+     */
+    boolean delete(VaultId id);
 
     /**
      * Delete every vault row whose last-touched instant is strictly before {@code cutoff}, returning the number
