@@ -68,7 +68,8 @@ public final class JailServerAdoption implements Runnable {
             kernel.log()
                     .warn(
                             "event=jail_server_mismatch server={} jails={} reason=world loaded here but jail names"
-                                    + " another server fix=/setjail <jail> on the server that should hold it",
+                                    + " another server impact=players jailed there may not reach the cell until this"
+                                    + " is fixed fix=run /setjail <jail> on the server that should hold it",
                             server,
                             String.join(",", foreign));
         }

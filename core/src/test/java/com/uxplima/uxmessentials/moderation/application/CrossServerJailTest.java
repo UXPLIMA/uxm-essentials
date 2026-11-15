@@ -186,6 +186,24 @@ class CrossServerJailTest {
     }
 
     @Test
+    void aPrisonerAStaffMemberFrozeIsNotSentAwayUntilTheFreezeIsLifted() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        lobby.live.frozen.add(ALEX.uuid());
+
+        jailAlex();
+        scheduler.advance(JailTransfer.FIRST_RETRY);
+
+        assertThat(connects).isEmpty();
+        assertThat(staffLines()).isEmpty();
+
+        lobby.live.frozen.remove(ALEX.uuid());
+        scheduler.advance(JailTransfer.FIRST_RETRY.multipliedBy(2));
+
+        assertThat(connects).containsExactly("Alex->prison");
+    }
+
+    @Test
     void aPrisonerWhoKeepsReloggingWhileTheJailServerIsDownIsReportedOnce() {
         jailSetOn(PRISON);
         network.live.remove(PRISON);

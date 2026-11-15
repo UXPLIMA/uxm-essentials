@@ -257,6 +257,7 @@ final class JailNetworkFakes {
         final List<String> moved = new ArrayList<>();
         boolean cellWorldMissing;
         boolean hasCellWorld;
+        final Set<UUID> frozen = new HashSet<>();
 
         LiveSide(String server, Network network) {
             this.server = server;
@@ -323,7 +324,7 @@ final class JailNetworkFakes {
 
         @Override
         public boolean isFrozen(PlayerRef target) {
-            throw new UnsupportedOperationException();
+            return frozen.contains(target.uuid());
         }
     }
 

@@ -39,7 +39,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * is loaded here (a backend renamed since the jail was set); otherwise, and when a hop fails, the player stays where
  * they are, restricted by the jail gate as on any backend, staff are told through {@link JailHopAlerts}, and the
  * transfer is tried again with a growing delay, so a prisoner dropped to the lobby while the jail's backend restarts
- * is sent back once it is up, without relogging.
+ * is sent back once it is up, without relogging. A player a staff member froze is not sent away either: the hop waits
+ * for the freeze to be lifted, through the same retries.
  *
  * <p>With the network off ({@code departures} empty) every jail is applied on this backend, as it always was. The
  * reads run on the async lane, and every move hops to the player's own thread.
@@ -174,9 +175,16 @@ public final class JailTransfer {
         }
         String server = cell.knownServer().orElseThrow();
         if (network.isLive(server)) {
+            if (sanctions.isFrozen(target)) {
+                // A staff member froze them to talk to them here; the transfer waits until the freeze is lifted.
+                retryLater(target);
+                return;
+            }
             HopDeparture departure =
                     new HopDeparture(HopKind.JAIL, cell.name(), server, cell.name(), cell.location(), Optional.empty());
             departures.get().send(target, departure, Optional.empty(), Optional.empty());
+            // A hop that fails later starts its own retries; this one counts as a fresh start.
+            forget(player);
             return;
         }
         scheduler.onEntity(target, () -> {
