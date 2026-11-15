@@ -72,6 +72,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
@@ -285,7 +286,13 @@ public final class HomesWiring {
                         recordedServer),
                 renameHome,
                 deleteHome);
-        TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge, homeHops);
+        TeleportHome teleportHome = new TeleportHome(
+                repository,
+                teleporter,
+                notifier,
+                charge,
+                homeHops,
+                new PaidTeleports(kernel.scheduler(), kernel.log()));
         ListHomes listHomes = new ListHomes(repository);
         ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);

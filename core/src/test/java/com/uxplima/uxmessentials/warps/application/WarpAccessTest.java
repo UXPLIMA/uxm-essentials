@@ -12,11 +12,13 @@ import java.util.List;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.testing.SteppedScheduler;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
@@ -63,7 +65,8 @@ class WarpAccessTest {
                 permissions,
                 new SteppedScheduler(clock),
                 new WarpFakes.Online(),
-                WarpHops.local(LOBBY));
+                WarpHops.local(LOBBY),
+                new PaidTeleports(new SteppedScheduler(clock), new RecordingLogger()));
     }
 
     private UseWarp useWarp() {

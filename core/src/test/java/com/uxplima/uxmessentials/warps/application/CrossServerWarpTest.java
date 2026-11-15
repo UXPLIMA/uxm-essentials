@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -136,7 +137,8 @@ class CrossServerWarpTest {
                 permissions,
                 lanes,
                 online,
-                hops);
+                hops,
+                new PaidTeleports(lanes, log));
     }
 
     private Result<Unit, WarpError> useMarket() {

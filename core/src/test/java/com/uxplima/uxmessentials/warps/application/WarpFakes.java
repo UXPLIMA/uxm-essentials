@@ -8,11 +8,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
@@ -121,6 +124,7 @@ final class WarpFakes {
         BigDecimal wallet = BigDecimal.ZERO;
         int charges;
         int refunds;
+        boolean refundFails;
 
         @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
@@ -139,6 +143,9 @@ final class WarpFakes {
 
         @Override
         public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (refundFails) {
+                return false;
+            }
             wallet = wallet.add(amount);
             refunds++;
             return true;
@@ -153,6 +160,11 @@ final class WarpFakes {
 
         final List<String> made = new ArrayList<>();
         boolean refuses;
+        /** Outcomes the test finishes itself, oldest first, while {@code holds} is set. */
+        final List<CompletableFuture<TeleportOutcome>> held = new ArrayList<>();
+
+        /** Leave each local teleport's outcome to the test instead of landing it. */
+        boolean holds;
 
         @Nullable TeleportEngine engine;
 
@@ -165,15 +177,28 @@ final class WarpFakes {
         }
 
         @Override
-        public void teleportTo(PlayerRef who, Warp warp) {
+        public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, Warp warp) {
+            CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
+            if (holds) {
+                held.add(outcome);
+                return outcome;
+            }
             TeleportEngine through = engine;
             if (through == null) {
                 made.add(who.name() + "->" + warp.name().value());
-                return;
+                outcome.complete(TeleportOutcome.LANDED);
+                return outcome;
             }
-            if (through.launch(who, destinationOf(warp), TeleportKind.WARP).isOk()) {
+            if (through.launch(who, destinationOf(warp), TeleportKind.WARP, outcome::complete)
+                    .isOk()) {
                 made.add(who.name() + "->" + warp.name().value());
             }
+            return outcome;
+        }
+
+        /** End the oldest held teleport with {@code outcome}. */
+        void finish(TeleportOutcome outcome) {
+            held.remove(0).complete(outcome);
         }
 
         @Override

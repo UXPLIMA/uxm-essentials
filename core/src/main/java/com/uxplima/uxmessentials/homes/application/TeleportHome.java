@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.homes.application;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
@@ -11,6 +12,8 @@ import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -20,7 +23,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * <em>delegated</em> to the teleport context through {@link HomeTeleporter}. This use case never moves the
  * player itself, so the shared cooldown, the move-cancellable warmup, and the region-aware async hop are all
  * the teleport context's concern. An empty slot is rejected with {@link HomeError#NOT_FOUND}; an optional
- * economy charge is applied after the home is found but before the hop is handed to the teleport context.
+ * economy charge is applied after the home is found but before the hop is handed to the teleport context, and comes
+ * back once, through {@link PaidTeleports}, when the teleport then never lands (a move during the warmup, a newer
+ * teleport, a missed hop, the player leaving).
  *
  * <p>A home set on another backend, while the homes {@code cross-server} block is on, is handed to the shared
  * cross-server hop through {@link HomeHops} instead: the teleport rules, then the charge, then the hop that carries
@@ -34,14 +39,21 @@ public final class TeleportHome {
     private final Notifier notifier;
     private final HomeCharge charge;
     private final HomeHops hops;
+    private final PaidTeleports paid;
 
     public TeleportHome(
-            HomeRepository repository, HomeTeleporter teleporter, Notifier notifier, HomeCharge charge, HomeHops hops) {
+            HomeRepository repository,
+            HomeTeleporter teleporter,
+            Notifier notifier,
+            HomeCharge charge,
+            HomeHops hops,
+            PaidTeleports paid) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.charge = Objects.requireNonNull(charge, "charge");
         this.hops = Objects.requireNonNull(hops, "hops");
+        this.paid = Objects.requireNonNull(paid, "paid");
     }
 
     /** Teleport {@code who} to the home in {@code slot}, or reject when the slot is empty or the player cannot afford the charge. */
@@ -61,8 +73,19 @@ public final class TeleportHome {
             return Result.err(charged.errorOrThrow());
         }
         notifier.send(who, HomesMessageKey.HOME_TELEPORTING, slotPlaceholder(slot));
-        teleporter.teleportTo(who, home.get());
+        var outcome = teleporter.teleportTo(who, home.get());
+        charged.orElseThrow().ifPresent(cost -> refundUnlessLanded(outcome, who, home.get(), cost));
         return Result.ok();
+    }
+
+    /** Give {@code who} back what the teleport cost them if it does not land, and tell them once. */
+    private void refundUnlessLanded(CompletionStage<TeleportOutcome> outcome, PlayerRef who, Home home, HomeCost cost) {
+        String label = HomeHops.labelOf(home);
+        paid.settle(
+                outcome,
+                PaidTeleports.subject("home", label, who, cost.amount(), cost.currencyId()),
+                () -> charge.refund(who, cost),
+                () -> notifier.send(who, HomesMessageKey.HOME_CROSS_SERVER_REFUNDED, Map.of("home", label)));
     }
 
     /** Take the teleport cost, telling a player who cannot pay; answers exactly what was taken. */

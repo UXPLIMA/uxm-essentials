@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.network.WarpChanged;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
@@ -161,7 +162,8 @@ public final class WarpsWiring {
                 kernel.permissions(),
                 kernel.scheduler(),
                 kernel.playerLookup(),
-                warpHops);
+                warpHops,
+                new PaidTeleports(kernel.scheduler(), kernel.log()));
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the
         // sub-screen back buttons reopen it. Its category/welcome/sound/particle sub-screens are all engine now and

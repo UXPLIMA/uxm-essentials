@@ -3,12 +3,15 @@ package com.uxplima.uxmessentials.warps.application;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -29,7 +32,8 @@ import org.jspecify.annotations.Nullable;
  * region-aware async hop are the teleport context's concern.
  *
  * <p>The jail, combat and cooldown checks of the teleport run before the charge too, so a use they refuse costs
- * nothing.
+ * nothing. The charge is still taken before the warmup, so a use whose teleport then never lands (a move during the
+ * warmup, a newer teleport, a missed hop, the player leaving) gets it back once, through {@link PaidTeleports}.
  *
  * <p>A warp set on another backend, while the warps {@code cross-server} block is on, is handed to the shared
  * cross-server hop through {@link WarpHops} instead, on the async lane, since the hop writes to the shared database.
@@ -54,6 +58,7 @@ public final class UseWarp {
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final WarpHops hops;
+    private final PaidTeleports paid;
 
     public UseWarp(
             WarpRepository repository,
@@ -64,7 +69,8 @@ public final class UseWarp {
             Permissions permissions,
             Scheduler scheduler,
             PlayerLookup players,
-            WarpHops hops) {
+            WarpHops hops,
+            PaidTeleports paid) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
@@ -74,6 +80,7 @@ public final class UseWarp {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
         this.hops = Objects.requireNonNull(hops, "hops");
+        this.paid = Objects.requireNonNull(paid, "paid");
     }
 
     /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
@@ -136,8 +143,22 @@ public final class UseWarp {
         Warp updated = warp.incrementedVisitors();
         scheduler.async(() -> repository.save(updated));
 
-        teleporter.teleportTo(recipient, updated);
+        var outcome = teleporter.teleportTo(recipient, updated);
+        charged.orElseThrow().ifPresent(cost -> refundUnlessLanded(outcome, recipient, warp, cost));
         return Result.ok();
+    }
+
+    /** Give {@code recipient} back what the use cost them if the teleport does not land, and tell them once. */
+    private void refundUnlessLanded(
+            CompletionStage<TeleportOutcome> outcome, PlayerRef recipient, Warp warp, WarpCost cost) {
+        paid.settle(
+                outcome,
+                PaidTeleports.subject("warp", warp.name().value(), recipient, cost.amount(), cost.currencyId()),
+                () -> access.refund(recipient, cost),
+                () -> notifier.send(
+                        recipient,
+                        WarpsMessageKey.WARP_CROSS_SERVER_REFUNDED,
+                        Map.of("warp", warp.name().value())));
     }
 
     /**

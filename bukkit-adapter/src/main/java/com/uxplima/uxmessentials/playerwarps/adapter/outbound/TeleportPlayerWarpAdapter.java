@@ -1,11 +1,14 @@
 package com.uxplima.uxmessentials.playerwarps.adapter.outbound;
 
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -46,18 +49,24 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
     }
 
     @Override
-    public void teleportTo(PlayerRef who, PlayerWarp warp) {
+    public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, PlayerWarp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
+        CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
         // The use case runs on the async lane, but the launch reads where the player stands and what they may do,
         // which only their own region thread may ask. A player who left before the hop lands hears nothing and their
-        // arrival notice is dropped, so it cannot play on a later, unrelated teleport.
+        // arrival notice is dropped, so it cannot play on a later, unrelated teleport; the outcome still says the
+        // teleport never started, so a charge taken for it comes back.
         PlayerThread.run(
                 scheduler,
                 who,
-                () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP),
-                () -> registry.getAndRemove(who.uuid()));
+                () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP, outcome::complete),
+                () -> {
+                    registry.getAndRemove(who.uuid());
+                    outcome.complete(TeleportOutcome.RETIRED);
+                });
+        return outcome;
     }
 
     @Override

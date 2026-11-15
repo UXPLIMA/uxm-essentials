@@ -10,8 +10,12 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
@@ -21,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -31,12 +36,14 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
+import com.uxplima.uxmessentials.teleport.domain.Destination;
+import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
  * A home teleport asked for from the async lane, where the home use cases look the home up, through the real engine
- * and the tracking warmups that read where the player stands.
+ * and the tracking warmups that read where the player stands, and the outcome it reports to the use case that paid.
  */
 class TeleportHomeAdapterTest {
 
@@ -49,15 +56,16 @@ class TeleportHomeAdapterTest {
 
     private final Threads threads = new Threads();
     private final List<String> locatedOn = new ArrayList<>();
-    private final List<Position> arrived = new ArrayList<>();
-    private final TeleportHomeAdapter teleporter = new TeleportHomeAdapter(engine(), threads);
+    private final List<Position> arrived = new CopyOnWriteArrayList<>();
+    private final WarmupTracker tracker = new WarmupTracker();
+    private final TeleportHomeAdapter teleporter = new TeleportHomeAdapter(engine(0), threads);
 
-    private TeleportEngine engine() {
+    private TeleportEngine engine(int warmupSeconds) {
         Notifier notifier = new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {});
-        TeleportSettings settings = new TeleportSettings(new NoWarmup());
+        TeleportSettings settings = new TeleportSettings(new Warmup(warmupSeconds));
         TrackingWarmups warmups = new TrackingWarmups(
                 new SchedulerWarmups(threads, new NoNodes()),
-                new WarmupTracker(),
+                tracker,
                 settings::cancelToggles,
                 new NoNodes(),
                 Clock.fixed(Instant.parse("2026-11-15T12:00:00Z"), ZoneOffset.UTC),
@@ -101,11 +109,116 @@ class TeleportHomeAdapterTest {
         assertThat(arrived).containsExactly(HOME);
     }
 
-    /** Names the thread a task runs on, and holds the player's thread work until the test runs it. */
+    @Test
+    void aTeleportThatArrivesReportsALanding() {
+        threads.current = "async";
+
+        CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(ALEX, home());
+        assertThat(outcome.toCompletableFuture()).isNotDone();
+        threads.runPlayerThread();
+
+        assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.LANDED);
+    }
+
+    @Test
+    void aPlayerGoneBeforeTheTeleportReachedTheirThreadIsReportedAsRetired() {
+        threads.current = "async";
+        threads.gone = true;
+
+        CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(ALEX, home());
+
+        assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.RETIRED);
+        assertThat(locatedOn).isEmpty();
+        assertThat(arrived).isEmpty();
+    }
+
+    @Test
+    void aPlayerWhoLeavesDuringTheWarmupIsReportedAsCancelled() {
+        TeleportHomeAdapter warming = new TeleportHomeAdapter(engine(3), threads);
+        threads.current = "player";
+        CompletionStage<TeleportOutcome> outcome = warming.teleportTo(ALEX, home());
+        assertThat(outcome.toCompletableFuture()).isNotDone();
+
+        threads.gone = true;
+        threads.runDelayed();
+
+        assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.CANCELLED);
+        assertThat(arrived).isEmpty();
+    }
+
+    @Test
+    void aMoveDuringTheWarmupIsReportedAsCancelled() {
+        TeleportHomeAdapter warming = new TeleportHomeAdapter(engine(3), threads);
+        threads.current = "player";
+        CompletionStage<TeleportOutcome> outcome = warming.teleportTo(ALEX, home());
+
+        tracker.onMove(ALEX.uuid(), HOME);
+        threads.runDelayed();
+
+        assertThat(outcome.toCompletableFuture()).isCompletedWithValue(TeleportOutcome.CANCELLED);
+        assertThat(arrived).isEmpty();
+    }
+
+    @Test
+    void aLandingAndAMoveRacingOnTwoThreadsReportExactlyOneOutcome() throws Exception {
+        threads.current = "player";
+        threads.inline = true;
+        TeleportEngine engine = engine(3);
+        for (int round = 0; round < 300; round++) {
+            arrived.clear();
+            List<TeleportOutcome> outcomes = new CopyOnWriteArrayList<>();
+            engine.launch(ALEX, Destination.at(HOME), TeleportKind.HOME, outcomes::add);
+            Runnable countdownEnds = threads.takeDelayed();
+            CountDownLatch start = new CountDownLatch(1);
+            Thread lands = new Thread(() -> awaitThen(start, countdownEnds));
+            Thread moves = new Thread(() -> awaitThen(start, () -> tracker.onMove(ALEX.uuid(), HOME)));
+            lands.start();
+            moves.start();
+            start.countDown();
+            lands.join();
+            moves.join();
+
+            assertThat(outcomes).hasSize(1);
+            assertThat(outcomes.get(0)).isIn(TeleportOutcome.LANDED, TeleportOutcome.CANCELLED);
+            assertThat(arrived)
+                    .as("the player moved exactly when the landing was reported")
+                    .hasSize(outcomes.get(0) == TeleportOutcome.LANDED ? 1 : 0);
+        }
+    }
+
+    private static void awaitThen(CountDownLatch start, Runnable work) {
+        try {
+            start.await();
+        } catch (InterruptedException interrupted) {
+            Thread.currentThread().interrupt();
+            return;
+        }
+        work.run();
+    }
+
+    /**
+     * Names the thread a task runs on, and holds the player's thread work and every countdown until the test runs
+     * it. A player who is gone has their thread work retired, as the entity scheduler does.
+     */
     private static final class Threads implements Scheduler {
 
         private final Deque<Runnable> playerThread = new ArrayDeque<>();
+        private final Deque<Runnable> delayed = new ArrayDeque<>();
         private String current = "async";
+        private volatile boolean gone;
+        // Runs the player's thread work where it is asked for, for the test that races two threads.
+        private volatile boolean inline;
+
+        void runDelayed() {
+            Runnable next;
+            while ((next = delayed.pollFirst()) != null) {
+                next.run();
+            }
+        }
+
+        Runnable takeDelayed() {
+            return Objects.requireNonNull(delayed.pollFirst(), "no countdown is waiting");
+        }
 
         void runPlayerThread() {
             Runnable next;
@@ -132,7 +245,18 @@ class TeleportHomeAdapterTest {
 
         @Override
         public void onEntity(PlayerRef player, Runnable task) {
-            playerThread.add(task);
+            onEntity(player, task, () -> {});
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+            if (gone) {
+                retired.run();
+            } else if (inline) {
+                task.run();
+            } else {
+                playerThread.add(task);
+            }
         }
 
         @Override
@@ -147,7 +271,7 @@ class TeleportHomeAdapterTest {
 
         @Override
         public void asyncAfter(Duration delay, Runnable task) {
-            task.run();
+            delayed.add(task);
         }
     }
 
@@ -188,8 +312,8 @@ class TeleportHomeAdapterTest {
         }
     }
 
-    /** Teleport settings at their defaults with no warmup, so the hop follows the start directly. */
-    private record NoWarmup() implements ConfigStore {
+    /** Teleport settings at their defaults with the given warmup; none makes the hop follow the start directly. */
+    private record Warmup(int seconds) implements ConfigStore {
 
         @Override
         public boolean getBoolean(String path, boolean fallback) {
@@ -203,7 +327,7 @@ class TeleportHomeAdapterTest {
 
         @Override
         public int getInt(String path, int fallback) {
-            return path.equals("default-warmup") ? 0 : fallback;
+            return path.equals("default-warmup") ? seconds : fallback;
         }
     }
 }

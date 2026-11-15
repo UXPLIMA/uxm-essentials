@@ -15,6 +15,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
@@ -46,6 +48,8 @@ import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -56,6 +60,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.ManualWarmups;
 import com.uxplima.uxmessentials.testing.MemoryHopStore;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
@@ -65,6 +70,8 @@ import com.uxplima.uxmessentials.testing.SteppedScheduler;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * A use of a player warp on another backend, from the charge on the origin to the hop on the target, and every way
@@ -148,7 +155,8 @@ class CrossServerTeleportTest {
                 LOBBY,
                 new PlayerWarpHops(
                         departures, charges, new PlayerWarpHopResolver(warps, moves, Optional.of(purse), LOBBY)),
-                clock);
+                clock,
+                new PaidTeleports(scheduler, log));
     }
 
     private UsePlayerWarp lobbyGate() {
@@ -543,6 +551,116 @@ class CrossServerTeleportTest {
     }
 
     @Test
+    void aLocalUseThatLandsPaysTheOwnerOnlyOnceTheVisitorHasArrived() {
+        warps.put(marketOn(LOBBY));
+        moves.holds = true;
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        assertThat(wallet()).as("the visitor pays before the warmup").isEqualByComparingTo("74.50");
+        assertThat(vault())
+                .as("the owner is not paid for a teleport that may not happen")
+                .isEqualByComparingTo("0");
+
+        moves.finish(TeleportOutcome.LANDED);
+
+        assertThat(wallet()).isEqualByComparingTo("74.50");
+        assertThat(vault()).isEqualByComparingTo("25.50");
+        assertThat(purse.refunds).isZero();
+        assertThat(notifier.keys()).containsExactly("pwarp.teleporting");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TeleportOutcome.class, names = "LANDED", mode = EnumSource.Mode.EXCLUDE)
+    void aLocalUseThatNeverLandsRefundsTheVisitorInFullAndNeverPaysTheOwner(TeleportOutcome ended) {
+        warps.put(marketOn(LOBBY));
+        moves.holds = true;
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        moves.finish(ended);
+
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("pwarp.teleporting", "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aLocalUseMovedOutOfItsWarmupRefundsTheVisitorAndLeavesTheOwnerUnpaid() {
+        warps.put(marketOn(LOBBY));
+        ManualWarmups warmups = new ManualWarmups();
+        moves.engine = warmingEngine(warmups);
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        warmups.move(ALEX);
+
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(notifier.keys())
+                .containsExactly("pwarp.teleporting", "teleport.warmup.cancelled", "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aLocalUseWhoseWarmupEndsPaysTheOwnerOnce() {
+        warps.put(marketOn(LOBBY));
+        ManualWarmups warmups = new ManualWarmups();
+        moves.engine = warmingEngine(warmups);
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        warmups.finish(ALEX);
+
+        assertThat(wallet()).isEqualByComparingTo("74.50");
+        assertThat(vault()).isEqualByComparingTo("25.50");
+        assertThat(purse.refunds).isZero();
+    }
+
+    @Test
+    void aLocalLandingWhoseOwnerShareCannotBeBankedGivesTheVisitorTheirMoneyBack() {
+        warps.put(marketOn(LOBBY));
+        moves.holds = true;
+        purse.accrualFails = true;
+
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        moves.finish(TeleportOutcome.LANDED);
+
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(vault()).isEqualByComparingTo("0");
+        assertThat(log.warnings())
+                .singleElement()
+                .satisfies(line ->
+                        assertThat(line).contains(ALEX.uuid().toString()).contains("player_refunded"));
+    }
+
+    @Test
+    void aCrossServerUseThatMissesIsRefundedOnceByTheHopAlone() {
+        moves.holds = true;
+        moves.refuses = true;
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+        scheduler.advance(TTL);
+
+        assertThat(moves.held)
+                .as("a cross-server use never takes the local outcome route")
+                .isEmpty();
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+    }
+
+    /** The engine with a warmup the test ends itself; its hops always land. */
+    private TeleportEngine warmingEngine(ManualWarmups warmups) {
+        return new TeleportEngine(
+                cooldowns,
+                warmups,
+                (who, destination, kind) -> {},
+                notifier.notifier(),
+                new RecordingEvents(),
+                new TeleportSettings(new Defaults()),
+                who -> false,
+                who -> tagged);
+    }
+
+    @Test
     void aLandedCrossServerWarpStartsItsCooldownAndTheNextUseIsRefusedBeforeTheCharge() {
         warps.put(marketOn(SURVIVAL).withTiming(new WarpTimingOverrides(Optional.empty(), Optional.of(60.0)), NOW));
         TeleportEngine engine = engine();
@@ -705,6 +823,11 @@ class CrossServerTeleportTest {
         private final List<String> made = new ArrayList<>();
         private boolean refuses;
         private @Nullable TeleportEngine engine;
+        /** Outcomes the test finishes itself, oldest first, while {@code holds} is set. */
+        private final List<CompletableFuture<TeleportOutcome>> held = new ArrayList<>();
+
+        /** Leave each local teleport's outcome to the test instead of landing it. */
+        private boolean holds;
 
         @Override
         public boolean admits(PlayerRef who, PlayerWarp warp) {
@@ -721,8 +844,30 @@ class CrossServerTeleportTest {
         }
 
         @Override
-        public void teleportTo(PlayerRef who, PlayerWarp warp) {
-            made.add(who.name() + "->" + warp.name().value());
+        public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, PlayerWarp warp) {
+            CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
+            if (holds) {
+                held.add(outcome);
+                return outcome;
+            }
+            TeleportEngine through = engine;
+            if (through == null) {
+                made.add(who.name() + "->" + warp.name().value());
+                outcome.complete(TeleportOutcome.LANDED);
+                return outcome;
+            }
+            Destination destination = Destination.at(
+                    warp.location(), warp.timing().warmup(), warp.timing().cooldown());
+            if (through.launch(who, destination, TeleportKind.WARP, outcome::complete)
+                    .isOk()) {
+                made.add(who.name() + "->" + warp.name().value());
+            }
+            return outcome;
+        }
+
+        /** End the oldest held teleport with {@code outcome}. */
+        private void finish(TeleportOutcome outcome) {
+            held.remove(0).complete(outcome);
         }
 
         @Override

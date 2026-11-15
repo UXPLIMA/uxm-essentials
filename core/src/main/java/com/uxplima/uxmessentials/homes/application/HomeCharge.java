@@ -59,4 +59,14 @@ public final class HomeCharge {
         boolean withdrawn = economy.get().withdraw(who, cost.amount(), cost.currencyId());
         return withdrawn ? Result.ok(Optional.of(cost)) : Result.err(HomeError.CANNOT_AFFORD);
     }
+
+    /**
+     * Give back {@code cost}, which {@link #chargeExactly} took from {@code who} for an action that did not happen,
+     * through the same provider and in the same currency. True once the credit has landed.
+     */
+    public boolean refund(PlayerRef who, HomeCost cost) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(cost, "cost");
+        return economy.isPresent() && economy.get().refund(who, cost.amount(), cost.currencyId());
+    }
 }

@@ -66,4 +66,14 @@ public final class WarpAccess {
         }
         return Result.ok(Optional.of(cost));
     }
+
+    /**
+     * Give back {@code cost}, which {@link #charge} took from {@code who} for a use that never moved them, through the
+     * same provider and in the same currency. True once the credit has landed.
+     */
+    public boolean refund(PlayerRef who, WarpCost cost) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(cost, "cost");
+        return economy.isPresent() && economy.get().refund(who, cost.amount(), cost.currencyId());
+    }
 }

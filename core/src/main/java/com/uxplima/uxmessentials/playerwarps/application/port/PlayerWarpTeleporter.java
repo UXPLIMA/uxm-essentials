@@ -1,6 +1,9 @@
 package com.uxplima.uxmessentials.playerwarps.application.port;
 
+import java.util.concurrent.CompletionStage;
+
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -20,8 +23,13 @@ public interface PlayerWarpTeleporter {
      */
     boolean admits(PlayerRef who, PlayerWarp warp);
 
-    /** Send {@code who} to {@code warp}, routing the hop through the teleport context's gated flow. */
-    void teleportTo(PlayerRef who, PlayerWarp warp);
+    /**
+     * Send {@code who} to {@code warp}, routing the hop through the teleport context's gated flow. The stage completes
+     * exactly once with how the teleport ended, {@link TeleportOutcome#LANDED} only once the player stands at the
+     * warp: the use pays the owner on a landing and refunds the visitor on any other outcome. It may complete on any
+     * thread, the player's region thread included.
+     */
+    CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, PlayerWarp warp);
 
     /**
      * Finish a cross-server use on the target backend: move {@code who} to {@code warp} at once, with no warmup and
