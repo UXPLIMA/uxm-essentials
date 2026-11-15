@@ -45,9 +45,6 @@ public final class OlzieWarpMapper {
     /** The currency imported prices are recorded in; Olzie's {@code cost} is a bare Vault amount, not a currency id. */
     private static final String DEFAULT_CURRENCY = "default";
 
-    /** Olzie does not serialise the owner's name; the browse author line falls back to this until the owner logs in. */
-    private static final String UNKNOWN_OWNER = "Unknown";
-
     private final WorldNameResolver worlds;
 
     public OlzieWarpMapper(WorldNameResolver worlds) {
@@ -71,7 +68,7 @@ public final class OlzieWarpMapper {
         Position location = new Position(world, row.x(), row.y(), row.z(), row.yaw(), row.pitch());
         return new ImportedPlayerWarp(
                 owner,
-                UNKNOWN_OWNER,
+                Optional.empty(),
                 row.name(),
                 Optional.of(row.name()),
                 location,

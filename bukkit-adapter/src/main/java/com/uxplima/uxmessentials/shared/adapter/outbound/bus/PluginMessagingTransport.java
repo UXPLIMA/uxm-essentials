@@ -5,6 +5,7 @@ import java.util.Collection;
 import java.util.Deque;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -36,11 +37,19 @@ import org.jspecify.annotations.NullMarked;
  * With no proxy, no peers, or no online players the buffered frames simply never drain and the bus is a no-op,
  * the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
  * nothing about the single-server happy path depends on the transport.
+ *
+ * <h2>Proxy contact</h2>
+ * A registered channel proves nothing about the proxy: without the {@code uxmEssentials-velocity} broker every frame
+ * leaves and none ever comes back. Velocity routes nothing from one backend to another on its own, so any frame that
+ * arrives on the channel came through the broker: a peer's frame, or this backend's own heartbeat, which the broker
+ * returns to its sender. {@link #link()} reports when the last one arrived, which is what {@code /uxmess doctor}
+ * calls connected.
  */
 @NullMarked
 public final class PluginMessagingTransport implements PluginMessageListener, BusTransport {
 
     private static final byte[] EMPTY = new byte[0];
+    private static final long NEVER = Long.MIN_VALUE;
 
     private final Plugin plugin;
     private final Scheduler scheduler;
@@ -48,12 +57,24 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     private final int outboundQueueSize;
     private final Deque<byte[]> outbound = new ArrayDeque<>();
     private final OversizeFrameReport oversize;
+    private final LongSupplier clock;
+    private final java.time.Duration answerWindow;
 
     private volatile boolean running;
+    private volatile long lastHeardMillis = NEVER;
     private @org.jspecify.annotations.Nullable Consumer<byte[]> onFrame;
 
+    /**
+     * A transport on {@code channel} that counts the proxy as answering while a frame came back within
+     * {@code answerWindow}, a few heartbeats, so one late frame does not flip it.
+     */
     public PluginMessagingTransport(
-            Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize, Logger log) {
+            Plugin plugin,
+            Scheduler scheduler,
+            String channel,
+            int outboundQueueSize,
+            java.time.Duration answerWindow,
+            Logger log) {
         this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), System::currentTimeMillis);
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -62,6 +83,8 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             throw new IllegalArgumentException("outboundQueueSize must be positive: " + outboundQueueSize);
         }
         this.outboundQueueSize = outboundQueueSize;
+        this.clock = System::currentTimeMillis;
+        this.answerWindow = Objects.requireNonNull(answerWindow, "answerWindow");
     }
 
     /** Register the plugin-messaging channel and route every inbound frame's bytes to {@code onFrame}. */
@@ -112,10 +135,20 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         scheduler.onGlobal(this::flush);
     }
 
-    /** True when the channel is registered and a frame can be carried as soon as a player is online. */
+    /**
+     * True when the channel is registered and a frame came back through the broker within the answer window. A
+     * registered channel alone is not enough, since frames leave whether or not anything on the proxy relays them.
+     */
     @Override
     public boolean healthy() {
-        return running;
+        return link().answeredWithin(clock.getAsLong(), answerWindow);
+    }
+
+    /** What the doctor reports for this carrier: whether the channel is up and when the proxy last answered. */
+    BusHealth.ProxyLink link() {
+        long heard = lastHeardMillis;
+        return new BusHealth.ProxyLink(
+                running, heard == NEVER ? java.util.OptionalLong.empty() : java.util.OptionalLong.of(heard));
     }
 
     @Override
@@ -124,6 +157,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         if (!running || sink == null || !channel.equals(inboundChannel)) {
             return;
         }
+        lastHeardMillis = clock.getAsLong();
         // Hand the bytes off the tick thread: this handler may run on the carrier's region thread and the core's
         // decode + dispatch does cache work, not Bukkit work.
         byte[] copy = frame.clone();

@@ -102,6 +102,15 @@ public final class NetworkMessageCodec {
         }
     }
 
+    /**
+     * Whether {@code frame} is a {@link ServerPing}, read from the header alone so the proxy can answer a heartbeat
+     * without decoding the body. A frame of another version, or too short to carry a type, is not one.
+     */
+    public static boolean isServerPing(byte[] frame) {
+        Objects.requireNonNull(frame, "frame");
+        return frame.length >= 2 && frame[0] == VERSION && frame[1] == NetworkMessage.MessageType.SERVER_PING.wireTag();
+    }
+
     /** How many bytes {@link DataOutputStream#writeUTF} spends on {@code text}, its two-byte length included. */
     static int utfBytes(String text) {
         int bytes = 2;

@@ -83,6 +83,7 @@ class OlziePlayerWarpsImportTest {
         ImportedPlayerWarp arena = warp("Arena");
 
         assertThat(arena.owner()).isEqualTo(OWNER);
+        assertThat(arena.ownerName()).isEmpty();
         assertThat(arena.location()).isEqualTo(new Position(WORLD, 10.5, 64, -3.5, 90f, 5f));
         assertThat(arena.description()).contains("Fight club");
         assertThat(arena.categoryId()).contains("pvp");

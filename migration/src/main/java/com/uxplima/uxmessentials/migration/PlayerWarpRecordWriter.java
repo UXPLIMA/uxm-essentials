@@ -4,6 +4,8 @@ import java.time.Instant;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 
 import com.uxplima.uxmessentials.migration.convert.map.ImportedPlayerWarp;
@@ -41,6 +43,8 @@ import org.jspecify.annotations.NullMarked;
  *       warp that wants a taken name gets {@code base2}, {@code base3}, ….
  *   <li><b>Password.</b> A plaintext password is hashed through the {@link PlayerWarpPasswordStore} (PBKDF2 behind
  *       that seam) and only the digest is written; the plaintext never leaves this method and is never logged.
+ *   <li><b>Owner name.</b> A source that never stored the owner's name leaves it to the server, which knows every
+ *       player who joined it. Only an owner the server never saw is shown by uuid, as a live warp of such an owner is.
  *   <li><b>The rest.</b> Access, category, description, icon, price, earnings, the rating and visit rollups, and
  *       {@code createdAt} carry across; {@code status} is {@link WarpStatus#ACTIVE} and {@code server_id} is left
  *       local (NULL). The members / whitelist / bans / favourites / per-vote ratings go into their side stores.
@@ -71,7 +75,12 @@ public final class PlayerWarpRecordWriter {
     private final WarpBanStore bans;
     private final WarpFavouriteStore favourites;
     private final WarpRatingStore ratings;
+    private final Function<UUID, Optional<String>> knownNames;
 
+    /**
+     * A writer over the player-warp stores; {@code knownNames} gives the name the server knows a player by, empty for
+     * a player it never saw, and names the owner of a warp whose source kept no name.
+     */
     public PlayerWarpRecordWriter(
             PlayerWarpRepository repository,
             PlayerWarpPasswordStore passwords,
@@ -79,7 +88,8 @@ public final class PlayerWarpRecordWriter {
             WarpWhitelistStore whitelist,
             WarpBanStore bans,
             WarpFavouriteStore favourites,
-            WarpRatingStore ratings) {
+            WarpRatingStore ratings,
+            Function<UUID, Optional<String>> knownNames) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.passwords = Objects.requireNonNull(passwords, "passwords");
         this.members = Objects.requireNonNull(members, "members");
@@ -87,6 +97,7 @@ public final class PlayerWarpRecordWriter {
         this.bans = Objects.requireNonNull(bans, "bans");
         this.favourites = Objects.requireNonNull(favourites, "favourites");
         this.ratings = Objects.requireNonNull(ratings, "ratings");
+        this.knownNames = Objects.requireNonNull(knownNames, "knownNames");
     }
 
     /** Land {@code imported} on the schema, or skip it when this owner already holds the same import. */
@@ -150,10 +161,11 @@ public final class PlayerWarpRecordWriter {
 
     private PlayerWarp aggregate(ImportedPlayerWarp imported, PlayerWarpName name) {
         Instant createdAt = imported.createdAt();
+        String ownerName = ownerName(imported);
         return new PlayerWarp(
                 Optional.empty(),
-                new PlayerRef(imported.owner(), imported.ownerName()),
-                imported.ownerName(),
+                new PlayerRef(imported.owner(), ownerName),
+                ownerName,
                 name,
                 displayName(imported.displayName()),
                 imported.location(),
@@ -175,6 +187,13 @@ public final class PlayerWarpRecordWriter {
                 com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides.none(),
                 createdAt,
                 createdAt);
+    }
+
+    private String ownerName(ImportedPlayerWarp imported) {
+        return imported.ownerName()
+                .filter(name -> !name.isBlank())
+                .or(() -> knownNames.apply(imported.owner()))
+                .orElseGet(() -> imported.owner().toString());
     }
 
     private static RatingSummary ratingSummary(ImportedPlayerWarp imported) {

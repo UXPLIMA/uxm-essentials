@@ -1145,8 +1145,8 @@ public final class PluginModule {
         // Not an integration check: this one names plugins we deliberately do not talk to, whose command
         // names collide with ours. It is informational, so it never fails the doctor run.
         checks.add(new CommandConflictHealthCheck(plugin.getServer().getPluginManager()));
-        // The bus line reads the running transport's live healthy() flag (a cheap volatile read) so the operator
-        // sees whether cross-server delivery is actually working, not just configured.
+        // The bus line reads each carrier's live state (cheap volatile reads) so the operator sees whether frames
+        // actually come back from the network, not just whether the bus is configured.
         checks.add(new BusTransportHealthCheck(bus.health()));
         // The cluster-peer line reads the in-memory roster the presence heartbeat feeds; only an enabled backend
         // has a roster, so the check is added only when the bus is enabled.

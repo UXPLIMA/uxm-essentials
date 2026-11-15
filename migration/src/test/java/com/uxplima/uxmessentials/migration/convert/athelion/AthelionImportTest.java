@@ -58,6 +58,7 @@ class AthelionImportTest {
         ImportedPlayerWarp shop = warp("Shop");
 
         assertThat(shop.owner()).isEqualTo(OWNER);
+        assertThat(shop.ownerName()).isEmpty();
         assertThat(shop.displayName()).contains("&6The Shop");
         assertThat(shop.description()).contains("Best prices in town");
         assertThat(shop.location()).isEqualTo(new Position(WORLD, 10.5, 64, -3.5, 90f, 5f));

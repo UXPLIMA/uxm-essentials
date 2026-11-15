@@ -1,0 +1,108 @@
+package com.uxplima.uxmessentials.bootstrap.health;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.time.Duration;
+import java.util.Optional;
+import java.util.OptionalLong;
+
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusHealth;
+import com.uxplima.uxmessentials.shared.application.health.HealthResult;
+import com.uxplima.uxmessentials.shared.application.health.HealthStatus;
+import org.junit.jupiter.api.Test;
+
+/** The bus line says connected only when frames come back from the network, and names what is missing otherwise. */
+class BusTransportHealthCheckTest {
+
+    private static final long NOW = 1_700_000_000_000L;
+    private static final Duration WINDOW = Duration.ofSeconds(90);
+
+    private static final BusHealth.ProxyLink NOT_STARTED = new BusHealth.ProxyLink(false, OptionalLong.empty());
+    private static final BusHealth.ProxyLink NEVER_ANSWERED = new BusHealth.ProxyLink(true, OptionalLong.empty());
+
+    private static BusHealth.ProxyLink answered(long millisAgo) {
+        return new BusHealth.ProxyLink(true, OptionalLong.of(NOW - millisAgo));
+    }
+
+    private static HealthResult check(String transport, Optional<BusHealth.ProxyLink> proxy, Optional<Boolean> redis) {
+        BusHealth health = new FakeBusHealth(true, transport, proxy, redis);
+        return new BusTransportHealthCheck(health, () -> NOW).check();
+    }
+
+    @Test
+    void aDisabledBusIsReportedAsLocalOnly() {
+        BusHealth health = new FakeBusHealth(false, "velocity", Optional.of(NEVER_ANSWERED), Optional.empty());
+
+        HealthResult result = new BusTransportHealthCheck(health, () -> NOW).check();
+
+        assertThat(result.status()).isEqualTo(HealthStatus.OK);
+        assertThat(result.message()).contains("disabled");
+    }
+
+    @Test
+    void aRegisteredChannelWithNoAnswerFromTheProxyIsNotConnected() {
+        HealthResult result = check("velocity", Optional.of(NEVER_ANSWERED), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message()).contains("uxmEssentials-velocity").doesNotContain("connected");
+    }
+
+    @Test
+    void aProxyThatAnsweredWithinTheWindowIsConnected() {
+        HealthResult result = check("velocity", Optional.of(answered(12_000)), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.OK);
+        assertThat(result.message()).contains("proxy connected", "12s ago");
+    }
+
+    @Test
+    void aProxyThatFellSilentLongerThanTheWindowIsNotConnected() {
+        HealthResult result = check("velocity", Optional.of(answered(WINDOW.toMillis() + 1)), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message()).contains("NOT ANSWERING for 90s");
+    }
+
+    @Test
+    void aBusThatHasNotStartedIsNotConnected() {
+        HealthResult result = check("velocity", Optional.of(NOT_STARTED), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message()).contains("not registered");
+    }
+
+    @Test
+    void redisIsConnectedWhileItsConnectionIsUp() {
+        assertThat(check("redis", Optional.empty(), Optional.of(true)).status()).isEqualTo(HealthStatus.OK);
+
+        HealthResult down = check("redis", Optional.empty(), Optional.of(false));
+        assertThat(down.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(down.message()).contains("redis DISCONNECTED");
+    }
+
+    @Test
+    void withBothCarriersALiveRedisDoesNotHideASilentProxy() {
+        HealthResult result = check("both", Optional.of(NEVER_ANSWERED), Optional.of(true));
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message()).contains("redis connected", "proxy NOT ANSWERING");
+    }
+
+    @Test
+    void withBothCarriersWorkingTheLineIsOk() {
+        HealthResult result = check("both", Optional.of(answered(5_000)), Optional.of(true));
+
+        assertThat(result.status()).isEqualTo(HealthStatus.OK);
+        assertThat(result.message()).contains("proxy connected", "redis connected");
+    }
+
+    private record FakeBusHealth(
+            boolean enabled, String transport, Optional<BusHealth.ProxyLink> proxy, Optional<Boolean> redisConnected)
+            implements BusHealth {
+
+        @Override
+        public Duration answerWindow() {
+            return WINDOW;
+        }
+    }
+}

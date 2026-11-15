@@ -118,10 +118,56 @@ class PlayerWarpRecordWriterTest {
         assertThat(writer.preview(shop)).isEqualTo(RecordOutcome.SKIPPED);
     }
 
+    @Test
+    void anOwnerTheSourceNeverNamedIsStoredUnderTheNameTheServerKnows() {
+        tables.knownNames.put(ALICE, "Alice");
+
+        writer.write(withoutOwnerName(warp(ALICE, "Shop")));
+        writer.write(withoutOwnerName(warp(BOB, "Farm")));
+
+        assertThat(tables.named("shop").ownerName()).isEqualTo("Alice");
+        assertThat(tables.named("shop").owner().name()).isEqualTo("Alice");
+        assertThat(tables.named("farm").ownerName()).isEqualTo(BOB.toString());
+    }
+
+    @Test
+    void aNameTheSourceKeptWinsOverTheServersOwn() {
+        tables.knownNames.put(ALICE, "Renamed");
+
+        writer.write(warp(ALICE, "Shop"));
+
+        assertThat(tables.named("shop").ownerName()).isEqualTo("Owner");
+    }
+
+    private static ImportedPlayerWarp withoutOwnerName(ImportedPlayerWarp base) {
+        return new ImportedPlayerWarp(
+                base.owner(),
+                Optional.empty(),
+                base.name(),
+                base.displayName(),
+                base.location(),
+                base.categoryId(),
+                base.description(),
+                base.icon(),
+                base.access(),
+                base.plaintextPassword(),
+                base.price(),
+                base.currencyId(),
+                base.earnedMoney(),
+                base.createdAt(),
+                base.visits(),
+                base.uniqueVisitors(),
+                base.ratings(),
+                base.members(),
+                base.whitelist(),
+                base.bans(),
+                base.favourites());
+    }
+
     private static ImportedPlayerWarp warp(UUID owner, String name) {
         return new ImportedPlayerWarp(
                 owner,
-                "Owner",
+                Optional.of("Owner"),
                 name,
                 Optional.of(name),
                 new Position(WORLD, 1, 64, 1, 0f, 0f),

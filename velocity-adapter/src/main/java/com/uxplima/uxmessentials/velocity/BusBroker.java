@@ -28,6 +28,10 @@ import org.slf4j.Logger;
  *       origin equals its own id, belt and suspenders, so a mutation reaches each peer exactly once.
  * </ol>
  *
+ * <p>A heartbeat ({@code ServerPing}) is also sent back to the backend it came from. The backend drops it as its
+ * own frame, but its transport counts it as an answer from the broker, which is how {@code /uxmess doctor} on a
+ * backend tells a proxy running this plugin from one without it, where frames leave and nothing relays them.
+ *
  * <p>Every relayed frame is marked {@link PluginMessageEvent.ForwardResult#handled() handled} so the proxy
  * does not also forward it onward through its default plugin-message routing. A frame that fails to decode
  * (a truncated or version-incompatible payload) is dropped with a logged warning rather than relayed blind.
@@ -58,6 +62,11 @@ final class BusBroker {
             return;
         }
         fanOut(event.getData(), origin, sourceConnection.getServerInfo().getName());
+        if (NetworkMessageCodec.isServerPing(event.getData())) {
+            // The heartbeat goes back to its sender as proof that this broker is there: a backend alone behind the
+            // proxy has no peer to hear from, and without this answer it could not tell the broker from no broker.
+            sourceConnection.sendPluginMessage(channel, event.getData());
+        }
     }
 
     private void fanOut(byte[] frame, String origin, String sourceServerName) {

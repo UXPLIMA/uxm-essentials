@@ -56,7 +56,7 @@ public final class AxWarpMapper {
         Position location = new Position(world, row.x(), row.y(), row.z(), row.yaw(), row.pitch());
         return new ImportedPlayerWarp(
                 UUID.fromString(owner.uuid()),
-                owner.name(),
+                Optional.of(owner.name()),
                 row.name(),
                 Optional.of(row.name()),
                 location,
