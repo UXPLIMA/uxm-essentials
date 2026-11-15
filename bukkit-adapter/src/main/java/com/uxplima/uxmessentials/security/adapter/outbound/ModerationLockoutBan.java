@@ -27,7 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * to the in-memory cooldown.
  *
  * <p>A reason written as an {@code @key} reference is recorded in the target's own language, read when the ban is
- * made: the ban row keeps words, not a key, so the kick screen and the history show the sentence the player read.
+ * made: the ban row keeps words, not a key, so the kick screen and the history show the sentence the player read. That
+ * catalogue line must be plain words without tags, because the row stores it as written.
  *
  * <p>Bound only when the moderation module is enabled; with moderation off the wiring binds {@link LockoutBan#NONE}.
  */

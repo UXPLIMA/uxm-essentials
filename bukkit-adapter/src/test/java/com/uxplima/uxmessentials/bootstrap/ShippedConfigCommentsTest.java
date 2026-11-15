@@ -110,36 +110,44 @@ class ShippedConfigCommentsTest {
         return comment != null && !comment.isBlank();
     }
 
+    /**
+     * Every settings file a module ships: only each module's own {@code src/main/resources} is walked, so build output,
+     * the Git and Gradle folders and any checkout nested inside this one are never read.
+     */
     private static List<Path> shippedSettingsFiles(Path repository) throws IOException {
-        try (Stream<Path> walk = Files.walk(repository)) {
-            return walk.filter(Files::isRegularFile)
-                    .filter(file -> isShippedSettingsFile(slashed(repository.relativize(file))))
-                    .sorted()
-                    .toList();
-        }
-    }
-
-    private static boolean isShippedSettingsFile(String name) {
-        return name.endsWith(".conf")
-                && name.contains("/src/main/resources/")
-                && !name.contains("/build/")
-                && !name.contains("/messages/")
-                && !name.contains("/gui/")
-                && !name.contains("/menus/");
-    }
-
-    /** The checkout this test runs in: the nearest folder above the working directory that holds the build settings. */
-    private static Path repositoryRoot() {
-        Path at = Path.of("").toAbsolutePath();
-        while (!Files.exists(at.resolve("settings.gradle.kts"))) {
-            @Nullable Path parent = at.getParent();
-            if (parent == null) {
-                throw new IllegalStateException(
-                        "no settings.gradle.kts above " + Path.of("").toAbsolutePath());
+        List<Path> found = new ArrayList<>();
+        try (Stream<Path> modules = Files.list(repository)) {
+            for (Path module : modules.filter(Files::isDirectory).sorted().toList()) {
+                Path resources = module.resolve("src/main/resources");
+                if (!Files.isDirectory(resources)) {
+                    continue;
+                }
+                try (Stream<Path> files = Files.walk(resources)) {
+                    files.filter(Files::isRegularFile)
+                            .filter(file -> isSettingsFile(slashed(resources.relativize(file))))
+                            .sorted()
+                            .forEach(found::add);
+                }
             }
-            at = parent;
         }
-        return at;
+        return found;
+    }
+
+    /** A settings file, by its path under {@code src/main/resources}: not a catalogue and not a menu layout. */
+    private static boolean isSettingsFile(String name) {
+        return name.endsWith(".conf")
+                && !name.startsWith("messages/")
+                && !name.contains("/gui/")
+                && !name.startsWith("menus/");
+    }
+
+    /** The checkout the build passes in, so the scan does not depend on where the test JVM starts. */
+    private static Path repositoryRoot() {
+        @Nullable String root = System.getProperty("uxm.repositoryRoot");
+        if (root == null) {
+            throw new IllegalStateException("the build passes uxm.repositoryRoot to the test JVM");
+        }
+        return Path.of(root).toAbsolutePath().normalize();
     }
 
     private static String slashed(Path path) {

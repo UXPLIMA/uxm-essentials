@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.security.domain.AltLimitPolicy;
 import com.uxplima.uxmessentials.security.domain.ClientIdMode;
@@ -61,19 +62,33 @@ public record SecurityConfig(
         Objects.requireNonNull(allowedOperators, "allowedOperators");
     }
 
+    /** Whether this server start has already told the operator about the shipped lockout ban reason. */
+    private static final AtomicBoolean TOLD_SHIPPED_REASON = new AtomicBoolean();
+
     /**
-     * Resolve the security config as {@link #from(ConfigStore)} does, telling {@code log} once when the lockout ban
-     * reason is still the English sentence the file shipped with, since the operator sees different words from then on.
+     * Resolve the security config as {@link #from(ConfigStore)} does, telling {@code log} when the lockout ban reason
+     * is still the English sentence the file shipped with, since the operator sees different words from then on. It is
+     * said only while lockout bans are in use, and once per server start rather than on every reload.
      */
     public static SecurityConfig from(ConfigStore config, Logger log) {
+        return from(config, log, TOLD_SHIPPED_REASON);
+    }
+
+    /** The same, with the once-per-start flag handed in, so a test starts from a server that has said nothing. */
+    static SecurityConfig from(ConfigStore config, Logger log, AtomicBoolean told) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
-        if (JoinVerification.holdsShippedReason(config)) {
+        Objects.requireNonNull(told, "told");
+        SecurityConfig read = from(config);
+        boolean bansInUse = read.enabled()
+                && read.joinVerification().enabled()
+                && read.joinVerification().lockoutBans();
+        if (bansInUse && JoinVerification.holdsShippedReason(config) && told.compareAndSet(false, true)) {
             log.info("modules/security/config.conf still holds the shipped English lockout-ban-reason; recording the"
                     + " @security.verify.lockout-ban-reason line from the message files instead, in the locked-out"
                     + " player's language. Write your own reason there to keep one of your own.");
         }
-        return from(config);
+        return read;
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */

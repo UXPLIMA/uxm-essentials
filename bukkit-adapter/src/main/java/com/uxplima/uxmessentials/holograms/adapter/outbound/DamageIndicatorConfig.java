@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.holograms.adapter.outbound;
 
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -60,6 +61,9 @@ public record DamageIndicatorConfig(
             "<gold><bold>-{amount} ✦", CRIT_FORMAT,
             "<green>+{amount}", HEAL_FORMAT);
 
+    /** Whether this server start has already told the operator about the shipped named-colour formats. */
+    private static final AtomicBoolean TOLD_SHIPPED_FORMATS = new AtomicBoolean();
+
     public DamageIndicatorConfig {
         Objects.requireNonNull(damageFormat, "damageFormat");
         Objects.requireNonNull(critFormat, "critFormat");
@@ -76,24 +80,33 @@ public record DamageIndicatorConfig(
 
     /**
      * Read the {@code damage-indicators.*} subtree of a hologram module's scoped config, off by default. A format still
-     * holding the named colour the file shipped with reads as its theme format instead, and {@code log} is told so
-     * once, since the operator sees different colours from then on.
+     * holding the named colour the file shipped with reads as its theme format instead, and {@code log} is told so,
+     * since the operator sees different colours from then on: only while the indicators are on, and once per server
+     * start rather than on every reload.
      */
     public static DamageIndicatorConfig fromConfig(ConfigStore config, Logger log) {
+        return fromConfig(config, log, TOLD_SHIPPED_FORMATS);
+    }
+
+    /** The same, with the once-per-start flag handed in, so a test starts from a server that has said nothing. */
+    static DamageIndicatorConfig fromConfig(ConfigStore config, Logger log, AtomicBoolean told) {
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(told, "told");
+        boolean enabled = config.getBoolean("damage-indicators.enabled", false);
         String damage = config.getString("damage-indicators.damage-format", DAMAGE_FORMAT);
         String crit = config.getString("damage-indicators.crit-format", CRIT_FORMAT);
         String heal = config.getString("damage-indicators.heal-format", HEAL_FORMAT);
-        if (SHIPPED_FORMATS.containsKey(damage)
+        boolean shipped = SHIPPED_FORMATS.containsKey(damage)
                 || SHIPPED_FORMATS.containsKey(crit)
-                || SHIPPED_FORMATS.containsKey(heal)) {
+                || SHIPPED_FORMATS.containsKey(heal);
+        if (enabled && shipped && told.compareAndSet(false, true)) {
             log.info("modules/holograms/config.conf still holds the shipped named-colour damage indicator formats;"
                     + " drawing them in the theme's bad, warn and good colours instead. Write your own format there to"
                     + " keep one of your own.");
         }
         return new DamageIndicatorConfig(
-                config.getBoolean("damage-indicators.enabled", false),
+                enabled,
                 config.getBoolean("damage-indicators.show-for-players", true),
                 config.getBoolean("damage-indicators.show-for-mobs", true),
                 config.getBoolean("damage-indicators.show-heal", true),

@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -16,9 +17,12 @@ class DamageIndicatorFormatsTest {
 
     private final Notices log = new Notices();
 
+    /** A server start that has said nothing yet. */
+    private final AtomicBoolean told = new AtomicBoolean();
+
     @Test
     void unwrittenFormatsUseTheThemeColours() {
-        DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(new Written(), log);
+        DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(new Written(), log, told);
 
         assertThat(config.format(4.0, DamageIndicatorConfig.Kind.DAMAGE)).isEqualTo("<bad>-4");
         assertThat(config.format(6.5, DamageIndicatorConfig.Kind.CRIT)).isEqualTo("<warn><bold>-6.5 ✦");
@@ -28,12 +32,7 @@ class DamageIndicatorFormatsTest {
 
     @Test
     void theNamedColoursTheFileShippedWithFollowTheThemeToo() {
-        DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(
-                new Written()
-                        .set("damage-indicators.damage-format", "<red>-{amount}")
-                        .set("damage-indicators.crit-format", "<gold><bold>-{amount} ✦")
-                        .set("damage-indicators.heal-format", "<green>+{amount}"),
-                log);
+        DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(shippedNamedColours(true), log, told);
 
         assertThat(config.format(4.0, DamageIndicatorConfig.Kind.DAMAGE)).isEqualTo("<bad>-4");
         assertThat(config.format(4.0, DamageIndicatorConfig.Kind.CRIT)).isEqualTo("<warn><bold>-4 ✦");
@@ -44,10 +43,39 @@ class DamageIndicatorFormatsTest {
     @Test
     void aFormatTheOperatorWroteIsKept() {
         DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(
-                new Written().set("damage-indicators.damage-format", "<dark_red>{amount} dmg"), log);
+                new Written()
+                        .set("damage-indicators.enabled", true)
+                        .set("damage-indicators.damage-format", "<dark_red>{amount} dmg"),
+                log,
+                told);
 
         assertThat(config.format(3.0, DamageIndicatorConfig.Kind.DAMAGE)).isEqualTo("<dark_red>3 dmg");
         assertThat(log.notices).isEmpty();
+    }
+
+    @Test
+    void theShippedColoursAreMentionedOncePerServerStart() {
+        DamageIndicatorConfig.fromConfig(shippedNamedColours(true), log, told);
+        DamageIndicatorConfig.fromConfig(shippedNamedColours(true), log, told);
+
+        assertThat(log.notices).hasSize(1);
+    }
+
+    @Test
+    void theShippedColoursAreNotMentionedWhileTheIndicatorsAreOff() {
+        DamageIndicatorConfig config = DamageIndicatorConfig.fromConfig(shippedNamedColours(false), log, told);
+
+        assertThat(config.format(4.0, DamageIndicatorConfig.Kind.DAMAGE)).isEqualTo("<bad>-4");
+        assertThat(log.notices).isEmpty();
+    }
+
+    /** A file that still holds the named-colour formats it shipped with. */
+    private static Written shippedNamedColours(boolean enabled) {
+        return new Written()
+                .set("damage-indicators.enabled", enabled)
+                .set("damage-indicators.damage-format", "<red>-{amount}")
+                .set("damage-indicators.crit-format", "<gold><bold>-{amount} ✦")
+                .set("damage-indicators.heal-format", "<green>+{amount}");
     }
 
     /** Keeps the info lines, the ones an operator is told about a value read differently. */
@@ -74,15 +102,21 @@ class DamageIndicatorFormatsTest {
     private static final class Written implements ConfigStore {
 
         private final Map<String, String> values = new HashMap<>();
+        private final Map<String, Boolean> switches = new HashMap<>();
 
         Written set(String path, String value) {
             values.put(path, value);
             return this;
         }
 
+        Written set(String path, boolean value) {
+            switches.put(path, value);
+            return this;
+        }
+
         @Override
         public boolean getBoolean(String path, boolean fallback) {
-            return fallback;
+            return switches.getOrDefault(path, fallback);
         }
 
         @Override

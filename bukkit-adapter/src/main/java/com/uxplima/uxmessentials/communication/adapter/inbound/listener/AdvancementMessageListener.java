@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.communication.adapter.inbound.listener;
 
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
@@ -66,9 +68,10 @@ import org.jspecify.annotations.Nullable;
  * <p><b>Translatable titles.</b> A vanilla advancement's title and description are {@link Component#translatable
  * translatable} components keyed by name (e.g. {@code advancements.end.kill_dragon.title}). Flattening those straight
  * to plain text yields the raw translation key rather than readable text, so each is first resolved through
- * {@link GlobalTranslator#render(Component, Locale)} in the server-default locale before it is serialized, the project
- * is English-only, so that locale is {@link Locale#ENGLISH}. A title already built from literal text passes through the
- * render unchanged.
+ * {@link GlobalTranslator#render(Component, Locale)} in the language each viewer reads before it is serialized, once
+ * per language for one notice, so the title sits in the same language as a catalogue template around it. Before the
+ * plugin knows a viewer's language the server-default locale is used. A title already built from literal text passes
+ * through the render unchanged.
  *
  * <p>The event fires on the earner's region thread. The handler clears the vanilla line there, then hops the vanish
  * test and the broadcast decision onto {@code scheduler.onGlobal} (the only thread that can read the roster's
@@ -146,12 +149,16 @@ public final class AdvancementMessageListener implements Listener {
             String earnerName = earner.getName();
             @Nullable Sound sound = cfg.sound().map(BukkitRegistryKeys::resolveSound).orElse(null);
             // A template written as @key is read in each viewer's language first, so the {player} and {title} its
-            // catalogue line spells are filled like the ones an operator writes on the line itself.
+            // catalogue line spells are filled like the ones an operator writes on the line itself. The title and
+            // description are flattened once per language the viewers read.
+            Map<Locale, Words> words = new ConcurrentHashMap<>();
             channels.broadcast(
-                    viewer -> render(
-                            viewer,
-                            substitute(
-                                    HudText.lineFor(viewer.getUniqueId(), template), earnerName, key, display, locale)),
+                    viewer -> {
+                        Words read = words.computeIfAbsent(readsIn(viewer), language -> Words.of(display, language));
+                        return render(
+                                viewer,
+                                substitute(HudText.lineFor(viewer.getUniqueId(), template), earnerName, key, read));
+                    },
                     cfg.channels(),
                     sound);
         });
@@ -174,29 +181,44 @@ public final class AdvancementMessageListener implements Listener {
         return HudText.render(who.uuid(), template);
     }
 
+    /** The language {@code viewer} reads, or the server's own before the plugin has one for them. */
+    private Locale readsIn(Player viewer) {
+        Locale language = HudText.languageOf(viewer.getUniqueId());
+        return Locale.ROOT.equals(language) ? locale : language;
+    }
+
     /** Whether {@code key} names a recipe-unlock advancement ({@code <namespace>:recipes/…}). */
     static boolean isRecipe(String key) {
         return key.contains(RECIPE_INFIX);
     }
 
     /**
-     * Substitute the advancement placeholders into {@code template}: {@code {player}} → the earner's name,
-     * {@code {advancement}} → the namespaced {@code key}, and {@code {title}}/{@code {description}} → the display's
-     * title/description flattened to plain text. A vanilla title/description is a translatable component, so each is
-     * resolved through {@link GlobalTranslator} in {@code locale} before flattening, otherwise the raw translation
-     * key ({@code advancements.end.kill_dragon.title}) would surface instead of readable text. A {@code null} display
-     * (recipes and some hidden advancements have none) substitutes an empty title and description rather than failing,
-     * so a template referencing them still renders. Package-private so it can be exercised directly: MockBukkit cannot
-     * construct a real {@code Advancement}/{@code AdvancementDisplay}, so the substitution is tested through this seam.
+     * Substitute the advancement placeholders into {@code template}: {@code {player}} the earner's name,
+     * {@code {advancement}} the namespaced {@code key}, and {@code {title}}/{@code {description}} the display's
+     * title and description as {@code words} flattened them.
      */
-    static String substitute(
-            String template, String player, String key, @Nullable AdvancementDisplay display, Locale locale) {
-        String title = display == null ? "" : flatten(display.title(), locale);
-        String description = display == null ? "" : flatten(display.description(), locale);
+    static String substitute(String template, String player, String key, Words words) {
         return template.replace("{player}", player)
                 .replace("{advancement}", key)
-                .replace("{title}", title)
-                .replace("{description}", description);
+                .replace("{title}", words.title())
+                .replace("{description}", words.description());
+    }
+
+    /**
+     * An advancement's title and description flattened to plain text in one language. A vanilla title is a
+     * translatable component, so each is resolved through {@link GlobalTranslator} in {@code language} before
+     * flattening, otherwise the raw translation key ({@code advancements.end.kill_dragon.title}) would surface. A
+     * {@code null} display (recipes and some hidden advancements have none) gives an empty title and description, so a
+     * template referencing them still renders.
+     */
+    record Words(String title, String description) {
+
+        static Words of(@Nullable AdvancementDisplay display, Locale language) {
+            if (display == null) {
+                return new Words("", "");
+            }
+            return new Words(flatten(display.title(), language), flatten(display.description(), language));
+        }
     }
 
     /** Resolve any translatable parts of {@code component} in {@code locale}, then flatten to plain text. */
