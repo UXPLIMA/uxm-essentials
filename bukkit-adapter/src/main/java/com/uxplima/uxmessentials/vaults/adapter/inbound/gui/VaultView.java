@@ -1,9 +1,12 @@
 package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 
+import java.time.Duration;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.BooleanSupplier;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
@@ -12,17 +15,17 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
-import com.uxplima.uxmessentials.vaults.application.CloseVaultWindow;
-import com.uxplima.uxmessentials.vaults.application.SaveVault;
 import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
@@ -70,10 +73,16 @@ import org.jspecify.annotations.Nullable;
  * safely with the player, no loss, no dupe. When staff open another player's vault the overflow returns to the
  * staff opener, consistent with the blacklist's admin semantics.
  *
- * <p>A vault deleted while its window is open stays deleted. Closing the window goes through
- * {@link CloseVaultWindow}: the owner's own window writes back with an update only, and when the row is gone the
- * items still in the window go back to the owner through the {@code VaultItemHandBack} (their live inventory, or kept
- * for their next join), never into a recreated row. Only a staff window keeps the upsert.
+ * <p>Closing a window hands its items to {@link VaultWindows}, which keeps them as the vault's pending state until
+ * the write lands, so a reopen in the same tick is filled with them rather than with a cached copy from before the
+ * close. A vault deleted while its window is open stays deleted: the owner's own window writes back with an update
+ * only, and when the row is gone the items go back to the owner (their live inventory, or kept for their next join),
+ * never into a recreated row. Only a staff window keeps the upsert. The write writes the items, size and
+ * last-touched only, so a rename made while the window was open stays.
+ *
+ * <p>When the module stops, every open window is closed on its viewer's own thread, so nothing can be taken out of it
+ * after its items were written. When the plugin is no longer running (the server is stopping), the scheduler runs
+ * nothing more, so the writes run on the calling thread instead.
  *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
@@ -88,31 +97,33 @@ public final class VaultView {
 
     private final Messages messages;
     private final MessageSink sink;
-    private final SaveVault saveVault;
-    private final CloseVaultWindow closeWindow;
+    private final VaultWindows<StorageGui> windows;
     private final Scheduler scheduler;
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
-    private final VaultWindows<StorageGui> windows = new VaultWindows<>();
+    private final BooleanSupplier running;
+    private final Logger log;
 
     public VaultView(
             Messages messages,
             MessageSink sink,
-            SaveVault saveVault,
-            CloseVaultWindow closeWindow,
+            VaultWindows<StorageGui> windows,
             Scheduler scheduler,
             Permissions permissions,
             VaultItemPolicy itemPolicy,
-            @Nullable Sound openSound) {
+            @Nullable Sound openSound,
+            BooleanSupplier running,
+            Logger log) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
-        this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
-        this.closeWindow = Objects.requireNonNull(closeWindow, "closeWindow");
+        this.windows = Objects.requireNonNull(windows, "windows");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
         this.openSound = openSound;
+        this.running = Objects.requireNonNull(running, "running");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /**
@@ -148,12 +159,17 @@ public final class VaultView {
         if (rescued > 0) {
             // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
             // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
-            persistOpen(owner, vault, gui);
+            windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
+                    .ifPresent(this::write);
         }
-        gui.onClose(event -> windows.release(vault.id(), gui).ifPresent(window -> {
+        gui.onClose(event -> {
+            if (!windows.holds(vault.id(), gui)) {
+                return; // taken over by a newer window of the same viewer, which writes these items
+            }
             returnBlockedItems(event.getPlayer(), viewer, gui);
-            persistClosed(window);
-        }));
+            windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
+                    .ifPresent(this::write);
+        });
         gui.open(player);
         playOpenSound(player);
     }
@@ -192,9 +208,68 @@ public final class VaultView {
         player.playSound(Objects.requireNonNull(player.getLocation(), "player location"), openSound, 1.0f, 1.0f);
     }
 
-    /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
+    /**
+     * Close and save every still-open vault, then wait at most {@code timeout} for the writes, naming the vaults whose
+     * items are still at risk when they did not all finish, and logging the items of any write that never landed.
+     *
+     * <p>The wait blocks the stopping thread only when it is the global thread: the main thread on Paper (whose windows
+     * the flush has already closed, leaving only async writes to wait for) or Folia's global region, which runs no
+     * player's tasks. On any other thread, a Folia region thread among them, blocking would stall the players it owns,
+     * so the wait moves to the async lane and the stop returns; the next instance of the module is then guarded by the
+     * row versions, and by these writes still landing.
+     */
+    public void stop(Duration timeout) {
+        flushAll();
+        if (scheduler.onGlobalThread() || !running.getAsBoolean()) {
+            awaitWrites(timeout);
+        } else {
+            scheduler.async(() -> awaitWrites(timeout));
+        }
+    }
+
+    private void awaitWrites(Duration timeout) {
+        if (!windows.awaitIdle(timeout)) {
+            log.warn(
+                    "event=vault_stop_writes_pending after={} vaults={}"
+                            + " (their items may be lost if the server stops now)",
+                    timeout,
+                    windows.unsettled());
+        }
+        windows.logUnwritten();
+    }
+
+    /**
+     * Close and save every still-open vault; called on module stop so none is lost. Each window is closed on its
+     * viewer's thread so nothing can be taken out of it after its items were written; once the plugin has stopped they
+     * are written on this thread, since the scheduler runs nothing more.
+     */
     public void flushAll() {
-        windows.releaseAll().forEach(this::persistClosed);
+        for (VaultWindows.Window<StorageGui> window : windows.held()) {
+            if (running.getAsBoolean()) {
+                // Closed right here when this thread owns the viewer (the main thread on Paper), so the stop can wait
+                // for the writes; otherwise on the viewer's own thread.
+                PlayerThread.run(scheduler, window.viewer(), () -> closeOnViewerThread(window), () -> writeNow(window));
+            } else {
+                writeNow(window);
+            }
+        }
+    }
+
+    /**
+     * Close the window on its viewer's thread; its close handler writes it. A window whose viewer no longer looks at
+     * it raises no close, so it is written here instead.
+     */
+    private void closeOnViewerThread(VaultWindows.Window<StorageGui> window) {
+        StorageGui gui = window.window();
+        List.copyOf(gui.getInventory().getViewers()).forEach(HumanEntity::closeInventory);
+        writeNow(window);
+    }
+
+    /** Release and write {@code window} if it still holds its vault, with whatever it holds now. */
+    private void writeNow(VaultWindows.Window<StorageGui> window) {
+        StorageGui gui = window.window();
+        windows.release(window.vault().id(), gui, VaultItemCodec.encode(gui.contents()))
+                .ifPresent(this::write);
     }
 
     /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
@@ -274,19 +349,13 @@ public final class VaultView {
                         viewer, VaultsMessageKey.VAULT_OVERFLOW_RETURNED, Map.of("count", Integer.toString(count))));
     }
 
-    /**
-     * Write back a window that is still open. A vault deleted meanwhile is left deleted and nothing else happens:
-     * the items are still in the window, and its close hands them back.
-     */
-    private void persistOpen(PlayerRef owner, Vault vault, StorageGui gui) {
-        VaultContents contents = VaultItemCodec.encode(gui.contents());
-        scheduler.async(() -> saveVault.save(owner, vault, contents));
-    }
-
-    /** Write back a window that has closed, or that is still open when the module stops. */
-    private void persistClosed(VaultWindows.Window<StorageGui> window) {
-        VaultContents contents = VaultItemCodec.encode(window.window().contents());
-        scheduler.async(() -> closeWindow.close(window.viewer(), window.owner(), window.vault(), contents));
+    /** Run a write off the tick, or on this thread once the plugin has stopped and the scheduler runs nothing. */
+    private void write(Runnable write) {
+        if (running.getAsBoolean()) {
+            scheduler.async(write);
+        } else {
+            write.run();
+        }
     }
 
     private Component title(PlayerRef viewer, PlayerRef owner, int index) {

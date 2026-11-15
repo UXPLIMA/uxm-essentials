@@ -17,11 +17,15 @@ import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vaults.application.port.VaultItemReturns;
+import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
+import com.uxplima.uxmessentials.vaults.application.port.VaultRepository.Columns;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
 import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
@@ -106,9 +110,13 @@ class VaultPaymentStoreTest {
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
-        vaults.save(created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                .result());
-        vaults.save(Vault.allocate(vault(1), new VaultSize(2), NOW, new VaultPayment(new BigDecimal("99"), "gems")));
+        vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                        .result(),
+                "staff");
+        vaults.save(
+                Vault.allocate(vault(1), new VaultSize(2), NOW, new VaultPayment(new BigDecimal("99"), "gems")),
+                "staff");
 
         assertThat(stored(1).paid()).hasValueSatisfying(paid -> {
             assertThat(paid.amount()).isEqualByComparingTo("5");
@@ -124,8 +132,10 @@ class VaultPaymentStoreTest {
         vaults.create(created);
 
         assertThat(vaults.delete(vault(1), stored(1).paid())).isTrue();
-        vaults.save(created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                .result());
+        vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                        .result(),
+                "staff");
 
         assertThat(stored(1).paid()).isEmpty();
     }
@@ -136,12 +146,14 @@ class VaultPaymentStoreTest {
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
-        assertThat(vaults.update(created.renamedTo("loot"))).isTrue();
+        assertThat(vaults.update(created.renamedTo("loot"), Columns.PRESENTATION))
+                .isTrue();
         assertThat(stored(1).displayName()).isEqualTo("loot");
         assertThat(stored(1).paid().orElseThrow().amount()).isEqualByComparingTo("5");
 
         vaults.delete(vault(1), stored(1).paid());
-        assertThat(vaults.update(created.renamedTo("again"))).isFalse();
+        assertThat(vaults.update(created.renamedTo("again"), Columns.PRESENTATION))
+                .isFalse();
         assertThat(vaults.find(vault(1))).isEmpty();
     }
 
@@ -188,9 +200,12 @@ class VaultPaymentStoreTest {
         upgrade();
         assertThat(vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS)))
                 .isTrue();
-        vaults.update(stored(1)
-                .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
-                .result());
+        vaults.writeContents(
+                stored(1)
+                        .withContents(ALEX, VaultContents.of(new byte[] {7}), NOW)
+                        .result(),
+                "close",
+                null);
 
         assertThat(vaults.create(Vault.allocate(
                         vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("50"), "coins"))))
@@ -234,8 +249,187 @@ class VaultPaymentStoreTest {
         earlier.keep(ALEX.uuid(), first);
         returns.keep(ALEX.uuid(), VaultContents.empty());
 
-        assertThat(returns.takeAll(UUID.randomUUID())).isEmpty();
-        assertThat(returns.takeAll(ALEX.uuid())).containsExactly(first, second);
-        assertThat(returns.takeAll(ALEX.uuid())).isEmpty();
+        assertThat(returns.kept(UUID.randomUUID())).isEmpty();
+        List<VaultItemReturns.Kept> kept = returns.kept(ALEX.uuid());
+        assertThat(kept).extracting(VaultItemReturns.Kept::items).containsExactly(first, second);
+
+        assertThat(returns.claim(kept.get(0).id())).isTrue();
+        assertThat(returns.claim(kept.get(0).id())).isFalse();
+        assertThat(returns.kept(ALEX.uuid()))
+                .extracting(VaultItemReturns.Kept::items)
+                .containsExactly(second);
+    }
+
+    @Test
+    void eachWriteTouchesOnlyItsOwnColumns() {
+        upgrade();
+        Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
+        vaults.create(created);
+        Vault opened = stored(1);
+
+        vaults.update(opened.renamedTo("loot").iconSet("DIAMOND"), Columns.PRESENTATION);
+        Instant later = NOW.plusSeconds(60);
+        vaults.writeContents(
+                opened.openedAt(new VaultSize(3))
+                        .withContents(ALEX, VaultContents.of(new byte[] {9}), later)
+                        .result(),
+                "close",
+                null);
+
+        Vault after = stored(1);
+        assertThat(after.displayName()).isEqualTo("loot");
+        assertThat(after.iconMaterial()).isEqualTo("DIAMOND");
+        assertThat(after.contents()).isEqualTo(VaultContents.of(new byte[] {9}));
+        assertThat(after.size()).isEqualTo(new VaultSize(3));
+        assertThat(after.lastTouched()).isEqualTo(later);
+
+        vaults.update(opened.openedAt(new VaultSize(6)).renamedTo("stale"), Columns.SIZE);
+        vaults.update(opened.renamedTo("fresh"), Columns.PRESENTATION);
+
+        assertThat(stored(1).size()).isEqualTo(new VaultSize(6));
+        assertThat(stored(1).displayName()).isEqualTo("fresh");
+        assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {9}));
+    }
+
+    @Test
+    void anUpsertOverAnExistingRowWritesTheItemsButLeavesTheName() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault opened = stored(1);
+        vaults.update(opened.renamedTo("loot"), Columns.PRESENTATION);
+
+        vaults.save(
+                opened.withContents(ALEX, VaultContents.of(new byte[] {4}), NOW).result(), "staff");
+
+        assertThat(stored(1).displayName()).isEqualTo("loot");
+        assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {4}));
+    }
+
+    @Test
+    void aVaultFromBeforeTheUpgradeStartsAtVersionZeroAndEveryItemWriteRaisesIt() {
+        Flyway.configure()
+                .dataSource(data)
+                .locations("classpath:db/migration")
+                .placeholders(Map.of("prefix", ""))
+                .target("100")
+                .load()
+                .migrate();
+        dsl.insertInto(VAULTS)
+                .set(VAULTS.OWNER, ALEX.uuid().toString())
+                .set(VAULTS.IDX, 1)
+                .set(VAULTS.SIZE, (short) 1)
+                .set(VAULTS.LAST_TOUCHED, NOW.toEpochMilli())
+                .execute();
+        upgrade();
+
+        Vault old = stored(1);
+        assertThat(old.stamp()).isEqualTo(VaultStamp.UNRECORDED);
+
+        VaultStamp first = vaults.writeContents(
+                        old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
+                                .result(),
+                        "close",
+                        null)
+                .orElseThrow();
+        VaultStamp second = vaults.save(
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result(), "staff");
+
+        assertThat(first).isEqualTo(new VaultStamp(null, 1L));
+        assertThat(second).isEqualTo(new VaultStamp(null, 2L));
+        assertThat(stored(1).stamp()).isEqualTo(second);
+        assertThat(old.stamp().before(second)).isTrue();
+        assertThat(vaults.update(old.renamedTo("loot"), Columns.PRESENTATION)).isTrue();
+        assertThat(stored(1).stamp()).isEqualTo(second);
+    }
+
+    @Test
+    void aVaultBoughtAgainAfterADeleteIsANewRowWhoseVersionsAreNotComparedWithTheOldOne() {
+        upgrade();
+        Vault bought = Vault.allocate(vault(1), new VaultSize(1), NOW);
+        vaults.create(bought);
+        Vault first = stored(1);
+        vaults.writeContents(
+                first.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result(), "close", null);
+        Vault written = stored(1);
+        vaults.delete(vault(1), written.paid());
+
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault again = stored(1);
+
+        assertThat(first.stamp()).isEqualTo(bought.stamp());
+        assertThat(written.stamp().version()).isEqualTo(1L);
+        assertThat(again.stamp().version()).isZero();
+        assertThat(again.stamp().sameRow(written.stamp())).isFalse();
+        assertThat(again.stamp().before(written.stamp())).isFalse();
+        assertThat(vaults.writeContents(written, "close", null).orElseThrow().version())
+                .isEqualTo(1L);
+    }
+
+    @Test
+    void aStaffUpsertThatInsertsARowGivesItALineageAndAFirstVersion() {
+        upgrade();
+
+        VaultStamp inserted = vaults.save(
+                Vault.of(vault(1), new VaultSize(1), VaultContents.of(new byte[] {3}), null, null, NOW), "staff");
+
+        assertThat(inserted.lineage()).isNotNull();
+        assertThat(inserted.version()).isEqualTo(1L);
+    }
+
+    @Test
+    void aStaffUpsertThatBringsBackADeletedVaultStartsANewLineage() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault old = stored(1);
+        vaults.writeContents(
+                old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result(), "close", null);
+        vaults.delete(vault(1), old.paid());
+
+        VaultStamp back = vaults.save(
+                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result(), "staff");
+
+        assertThat(back.lineage()).isNotEqualTo(old.stamp().lineage());
+        assertThat(old.stamp().sameRow(back)).isFalse();
+        assertThat(stored(1).stamp()).isEqualTo(back);
+    }
+
+    @Test
+    void aRetryWritesOnlyOverTheRowItWasWrittenAgainstOrOverItsOwnEarlierAttempt() {
+        upgrade();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault base = stored(1);
+        Vault mine =
+                base.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW).result();
+        Vault theirs =
+                base.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result();
+
+        VaultStamp first = vaults.writeContents(mine, "mine", base.stamp()).orElseThrow();
+        Optional<VaultStamp> again = vaults.writeContents(mine, "mine", base.stamp());
+        VaultStamp other = vaults.writeContents(theirs, "theirs", null).orElseThrow();
+        Optional<VaultStamp> late = vaults.writeContents(mine, "mine", base.stamp());
+
+        assertThat(first.version()).isEqualTo(base.stamp().version() + 1);
+        assertThat(again).contains(new VaultStamp(base.stamp().lineage(), first.version() + 1));
+        assertThat(late).isEmpty();
+        assertThat(stored(1).contents()).isEqualTo(VaultContents.of(new byte[] {2}));
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(other, "theirs"));
+    }
+
+    @Test
+    void theLastWriterOfARowIsReadWithItsStamp() {
+        upgrade();
+        assertThat(vaults.lastWrite(vault(1))).isEmpty();
+        vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
+        Vault created = stored(1);
+
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(created.stamp(), null));
+        VaultStamp kept = vaults.save(
+                created.withContents(ALEX, VaultContents.of(new byte[] {3}), NOW)
+                        .result(),
+                "staff");
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(kept, "staff"));
+        assertThat(vaults.update(created.renamedTo("loot"), Columns.PRESENTATION))
+                .isTrue();
+        assertThat(vaults.lastWrite(vault(1))).contains(new VaultRepository.LastWrite(kept, "staff"));
     }
 }

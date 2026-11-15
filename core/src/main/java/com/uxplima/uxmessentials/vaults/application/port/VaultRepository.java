@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.vaults.application.port;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -9,6 +10,8 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Outbound port for durable, per-owner vault storage. A vault's queryable facts (owner, index, size,
@@ -36,21 +39,61 @@ public interface VaultRepository {
     int count(PlayerRef owner);
 
     /**
-     * Persist {@code vault}, upserting on the {@code (owner, index)} key: a re-save of an existing vault
-     * overwrites its size, contents, name, icon and last-touched in place, and a vault with no row is inserted.
-     * Only a staff window and a window still open when the module stops save this way, because for them losing
-     * the items would be worse than keeping the vault. Every other write to an existing vault goes through
-     * {@link #update}, so it cannot bring back a vault that was deleted. The upsert never writes a payment, and
-     * never changes one already stored, so a vault it brings back carries none and cannot be refunded.
+     * Persist {@code vault}'s items, upserting on the {@code (owner, index)} key, record {@code writer} as the row's
+     * writer, and return the row's stamp after the write. A vault with no row is inserted whole, with a fresh lineage;
+     * an existing row takes the items, size and last-touched only, so a name or icon changed meanwhile stays. Either
+     * way the row's version goes up by one. Only a staff window that found the row missing saves this way, because
+     * the staff member is not the owner the items could go back to, and no row means no other write to keep. Every
+     * other item write goes through {@link #writeContents}, so it cannot bring back a vault that was deleted. The upsert never writes a payment, and never changes one already stored, so a
+     * vault it brings back carries none and cannot be refunded.
      */
-    void save(Vault vault);
+    VaultStamp save(Vault vault, String writer);
 
     /**
-     * Overwrite the size, contents, name, icon and last-touched of the existing row at the vault's id, leaving
-     * its payment as it is, and report whether that row was there. A vault deleted in the meantime stays deleted:
-     * nothing is inserted and the result is {@code false}.
+     * Overwrite the items, size and last-touched of the existing row at the vault's id, record {@code writer} as its
+     * writer, raise its version by one, and return the row's stamp after the write, read in the same transaction. The
+     * name, icon and payment are left as they are, so a closing window never rewrites a name set while it was open.
+     *
+     * <p>With {@code onlyAt} the write applies only while the row is still that row at that version, or already
+     * carries {@code writer}: the retry of a write that failed, which must never overwrite what another server wrote in
+     * between. Empty when nothing was written: no row, or a row that moved on.
      */
-    boolean update(Vault vault);
+    Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt);
+
+    /**
+     * The row's stamp and the writer of its last item write, read straight from the store (never from a cache): what
+     * a failed write reads to learn whether it landed. Empty when there is no row.
+     */
+    Optional<LastWrite> lastWrite(VaultId id);
+
+    /**
+     * Who wrote a row's items last.
+     *
+     * @param stamp the row's stamp
+     * @param writer the token of the snapshot that wrote its items last, or {@code null} when none was recorded
+     */
+    record LastWrite(VaultStamp stamp, @Nullable String writer) {
+
+        public LastWrite {
+            Objects.requireNonNull(stamp, "stamp");
+        }
+    }
+
+    /**
+     * Overwrite {@code columns} of the existing row at the vault's id with the vault's values, leaving every other
+     * column (the items and payment among them) as it is, and report whether that row was there. A vault deleted in the
+     * meantime stays deleted: nothing is inserted and the result is {@code false}. Writing only the columns an action
+     * changed keeps a stale copy of the vault from undoing another write: a rename or a resize never rewrites items.
+     */
+    boolean update(Vault vault, Columns columns);
+
+    /** The groups of columns {@link #update} can write. */
+    enum Columns {
+        /** The player-chosen display name and icon. */
+        PRESENTATION,
+        /** The size alone, for an open that adopts a changed size quota. */
+        SIZE
+    }
 
     /**
      * Insert a freshly allocated {@code vault} together with what its owner paid for it ({@link Vault#paid()}),
