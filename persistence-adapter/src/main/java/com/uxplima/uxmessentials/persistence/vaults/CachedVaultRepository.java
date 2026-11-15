@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 
 /**
  * A Caffeine read-cache decorator over a delegate {@link VaultRepository}, keyed by {@link VaultId}. An open
@@ -78,10 +79,28 @@ public final class CachedVaultRepository implements VaultRepository {
     }
 
     @Override
-    public void delete(VaultId id) {
+    public boolean update(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        boolean updated = delegate.update(vault);
+        cache.invalidate(vault.id());
+        return updated;
+    }
+
+    @Override
+    public boolean create(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        boolean created = delegate.create(vault);
+        cache.invalidate(vault.id());
+        return created;
+    }
+
+    @Override
+    public boolean delete(VaultId id, Optional<VaultPayment> expected) {
         Objects.requireNonNull(id, "id");
-        delegate.delete(id);
+        boolean removed = delegate.delete(id, expected);
+        // Dropped whatever the outcome: a delete that removed nothing found the cached copy stale.
         cache.invalidate(id);
+        return removed;
     }
 
     @Override

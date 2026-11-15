@@ -41,9 +41,19 @@ public interface VaultEconomy {
         }
 
         @Override
-        public boolean deposit(PlayerRef who, BigDecimal amount) {
+        public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
             // No economy backing: there was nothing charged, so the refund trivially "succeeds".
             return true;
+        }
+
+        @Override
+        public String currencyId() {
+            return "default";
+        }
+
+        @Override
+        public BigDecimal denominate(BigDecimal amount) {
+            return amount;
         }
     };
 
@@ -64,9 +74,24 @@ public interface VaultEconomy {
     boolean withdraw(PlayerRef who, BigDecimal amount);
 
     /**
-     * Deposit {@code amount} into {@code who}'s balance: the refund paid back when their vault is deleted.
-     * Returns {@code true} when the funds were credited and {@code false} when the credit was rejected (e.g. a
-     * {@code max-balance} clamp), so a dropped refund can be surfaced rather than silently lost.
+     * Deposit {@code amount} of the currency {@code currencyId} into {@code who}'s balance: the refund paid back
+     * when their vault is deleted, in the currency the vault was paid for in. Returns {@code true} when the funds
+     * were credited and {@code false} when the credit was rejected (e.g. a {@code max-balance} clamp, or a currency
+     * the economy no longer has), so a dropped refund can be surfaced rather than silently lost. A currency that
+     * is gone is never swapped for another one: the other currency could be worth more than what was paid.
      */
-    boolean deposit(PlayerRef who, BigDecimal amount);
+    boolean deposit(PlayerRef who, BigDecimal amount, String currencyId);
+
+    /**
+     * The id of the currency {@link #withdraw} takes fees in. It is recorded with each vault's create fee so the
+     * refund can go back in that same currency.
+     */
+    String currencyId();
+
+    /**
+     * {@code amount} as a {@link #withdraw} in {@link #currencyId()} would actually move it, rounded to that
+     * currency's precision. A fee is denominated before it is charged so the amount recorded as paid is the
+     * amount that left the balance, not the raw config value.
+     */
+    BigDecimal denominate(BigDecimal amount);
 }

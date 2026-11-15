@@ -37,11 +37,11 @@ public final class RenameVault {
         Objects.requireNonNull(owner, "owner");
         VaultId id = VaultId.of(owner, index);
         Vault vault = repository.find(id).orElse(null);
-        if (vault == null) {
+        // An update rather than an upsert: a vault deleted since it was read must stay deleted, items and all.
+        if (vault == null || !repository.update(vault.renamedTo(name))) {
             notifier.renameUnknown(owner, index);
             return Result.err(VaultError.VAULT_UNKNOWN);
         }
-        repository.save(vault.renamedTo(name));
         if (name == null) {
             notifier.nameCleared(owner, index);
         } else {

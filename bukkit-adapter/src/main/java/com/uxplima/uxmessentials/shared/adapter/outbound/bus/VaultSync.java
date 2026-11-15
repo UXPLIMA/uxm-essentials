@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -92,9 +93,24 @@ public final class VaultSync {
         }
 
         @Override
-        public void delete(VaultId id) {
-            delegate.delete(id);
+        public boolean update(Vault vault) {
+            boolean updated = delegate.update(vault);
+            announce(vault.id());
+            return updated;
+        }
+
+        @Override
+        public boolean create(Vault vault) {
+            boolean created = delegate.create(vault);
+            announce(vault.id());
+            return created;
+        }
+
+        @Override
+        public boolean delete(VaultId id, Optional<VaultPayment> expected) {
+            boolean removed = delegate.delete(id, expected);
             announce(id);
+            return removed;
         }
 
         @Override

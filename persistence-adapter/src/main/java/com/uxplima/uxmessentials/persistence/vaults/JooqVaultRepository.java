@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.persistence.vaults;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.Vaults.VAULTS;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -14,18 +15,21 @@ import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
+import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import org.jooq.DSLContext;
 
 /**
  * The jOOQ-backed {@link VaultRepository} over the generated {@code VAULTS} table. A point read resolves one
  * owner's vault by the {@code (owner, idx)} primary key; the listing reads an owner's indices in ascending
  * order off the {@code idx_vaults_owner} index; the count is a {@code COUNT(*)} so the amount-quota check never
- * materialises the rows. A {@code save} upserts on the primary key. A re-save of the same vault overwrites its
- * size, contents and last-touched in place, so a close-save never inserts a duplicate row. A {@code delete}
- * removes the one {@code (owner, idx)} row, freeing the owner's quota slot; deleting an id with no row affects
- * zero rows and is a silent no-op. The inactive-vault purge deletes every row whose {@code last_touched} is
- * strictly before the cutoff in one statement and returns the affected count. Every statement is typed jOOQ
- * DSL; no SQL is ever string-concatenated.
+ * materialises the rows. A {@code save} upserts on the primary key and an {@code update} rewrites an existing row
+ * only, so a vault deleted in the meantime stays deleted. Neither writes the payment columns: only
+ * {@code create} does, as a plain insert that does nothing when the row exists. A {@code delete} removes the one
+ * {@code (owner, idx)} row only while it still records the expected payment, compared with
+ * {@code IS NOT DISTINCT FROM} so a row with no payment matches an empty expectation, and reports whether it
+ * removed one. The inactive-vault purge deletes every row whose {@code last_touched} is strictly before the
+ * cutoff in one statement and returns the affected count. Every statement is typed jOOQ DSL; no SQL is ever
+ * string-concatenated.
  */
 public final class JooqVaultRepository extends JooqRepository implements VaultRepository {
 
@@ -79,15 +83,53 @@ public final class JooqVaultRepository extends JooqRepository implements VaultRe
     }
 
     @Override
-    public void delete(VaultId id) {
-        Objects.requireNonNull(id, "id");
-        write(dsl -> {
-            dsl.deleteFrom(VAULTS)
-                    .where(VAULTS.OWNER.eq(id.owner().toString()))
-                    .and(VAULTS.IDX.eq(id.index()))
-                    .execute();
-            return null;
+    public boolean update(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        return write(dsl -> {
+            VaultsRecord record = dsl.newRecord(VAULTS);
+            VaultRows.apply(record, vault);
+            return dsl.update(VAULTS)
+                            .set(VAULTS.SIZE, record.getSize())
+                            .set(VAULTS.LAST_TOUCHED, record.getLastTouched())
+                            .set(VAULTS.CONTENTS, record.getContents())
+                            .set(VAULTS.DISPLAY_NAME, record.getDisplayName())
+                            .set(VAULTS.ICON, record.getIcon())
+                            .where(VAULTS.OWNER.eq(record.getOwner()))
+                            .and(VAULTS.IDX.eq(record.getIdx()))
+                            .execute()
+                    > 0;
         });
+    }
+
+    @Override
+    public boolean create(Vault vault) {
+        Objects.requireNonNull(vault, "vault");
+        return write(dsl -> {
+            VaultsRecord record = dsl.newRecord(VAULTS);
+            VaultRows.apply(record, vault);
+            VaultRows.applyPayment(record, vault);
+            return dsl.insertInto(VAULTS)
+                            .set(record)
+                            .onConflict(VAULTS.OWNER, VAULTS.IDX)
+                            .doNothing()
+                            .execute()
+                    > 0;
+        });
+    }
+
+    @Override
+    public boolean delete(VaultId id, Optional<VaultPayment> expected) {
+        Objects.requireNonNull(id, "id");
+        Objects.requireNonNull(expected, "expected");
+        BigDecimal amount = expected.map(VaultRows::storedAmount).orElse(null);
+        String currency = amount == null ? null : expected.get().currencyId();
+        return write(dsl -> dsl.deleteFrom(VAULTS)
+                        .where(VAULTS.OWNER.eq(id.owner().toString()))
+                        .and(VAULTS.IDX.eq(id.index()))
+                        .and(VAULTS.PAID_AMOUNT.isNotDistinctFrom(amount))
+                        .and(VAULTS.PAID_CURRENCY.isNotDistinctFrom(currency))
+                        .execute()
+                > 0);
     }
 
     @Override
