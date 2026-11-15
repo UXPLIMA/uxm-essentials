@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.security.application.port.LockoutBan;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -24,6 +25,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>The ban is deliberately <em>not</em> silent: staff seeing "the server tempbanned this account" is the point. If
  * an operator would rather it were quiet, the security config can turn the escalation off and the lockout falls back
  * to the in-memory cooldown.
+ *
+ * <p>A reason written as an {@code @key} reference is recorded in the target's own language, read when the ban is
+ * made: the ban row keeps words, not a key, so the kick screen and the history show the sentence the player read. That
+ * catalogue line must be plain words without tags, because the row stores it as written.
  *
  * <p>Bound only when the moderation module is enabled; with moderation off the wiring binds {@link LockoutBan#NONE}.
  */
@@ -46,13 +51,14 @@ public final class ModerationLockoutBan implements LockoutBan {
         if (duration.isZero() || duration.isNegative()) {
             return false;
         }
+        String recorded = HudText.lineFor(target.uuid(), reason);
         // A refusal (an exempt target, most likely a staff account) is reported honestly rather than swallowed, so
         // the caller still applies the in-memory lockout instead of believing the account was barred.
         return tempBan.tempban(
                         issuer,
                         target,
                         SanctionDuration.format(duration),
-                        reason.isBlank() ? Optional.empty() : Optional.of(reason),
+                        recorded.isBlank() ? Optional.empty() : Optional.of(recorded),
                         false)
                 .isOk();
     }

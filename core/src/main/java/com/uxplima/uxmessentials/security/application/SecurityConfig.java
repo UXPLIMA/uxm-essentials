@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.security.domain.AltLimitPolicy;
 import com.uxplima.uxmessentials.security.domain.ClientIdMode;
@@ -20,6 +21,7 @@ import com.uxplima.uxmessentials.security.domain.RevokedAccess;
 import com.uxplima.uxmessentials.security.domain.SafetyNet;
 import com.uxplima.uxmessentials.security.domain.SpectatorPolicy;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 
 /**
  * The typed, immutable view of {@code modules/security/config.conf} for Phase 1: the module enable gate and the
@@ -58,6 +60,35 @@ public record SecurityConfig(
         Objects.requireNonNull(clientId, "clientId");
         Objects.requireNonNull(feedback, "feedback");
         Objects.requireNonNull(allowedOperators, "allowedOperators");
+    }
+
+    /** Whether this server start has already told the operator about the shipped lockout ban reason. */
+    private static final AtomicBoolean TOLD_SHIPPED_REASON = new AtomicBoolean();
+
+    /**
+     * Resolve the security config as {@link #from(ConfigStore)} does, telling {@code log} when the lockout ban reason
+     * is still the English sentence the file shipped with, since the operator sees different words from then on. It is
+     * said only while lockout bans are in use, and once per server start rather than on every reload.
+     */
+    public static SecurityConfig from(ConfigStore config, Logger log) {
+        return from(config, log, TOLD_SHIPPED_REASON);
+    }
+
+    /** The same, with the once-per-start flag handed in, so a test starts from a server that has said nothing. */
+    static SecurityConfig from(ConfigStore config, Logger log, AtomicBoolean told) {
+        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(told, "told");
+        SecurityConfig read = from(config);
+        boolean bansInUse = read.enabled()
+                && read.joinVerification().enabled()
+                && read.joinVerification().lockoutBans();
+        if (bansInUse && JoinVerification.holdsShippedReason(config) && told.compareAndSet(false, true)) {
+            log.info("modules/security/config.conf still holds the shipped English lockout-ban-reason; recording the"
+                    + " @security.verify.lockout-ban-reason line from the message files instead, in the locked-out"
+                    + " player's language. Write your own reason there to keep one of your own.");
+        }
+        return read;
     }
 
     /** Resolve the security config from the module's scoped {@link ConfigStore} ({@code modules.security}). */
@@ -156,7 +187,8 @@ public record SecurityConfig(
      *     ({@code join-verification.entry-timeout-seconds}, default 60)
      * @param lockoutBans whether a lockout is also a real tempban on the server's own ban list
      *     ({@code join-verification.lockout-bans}, default true)
-     * @param lockoutBanReason the reason recorded against that ban ({@code join-verification.lockout-ban-reason})
+     * @param lockoutBanReason the reason recorded against that ban, an {@code @key} catalogue reference or the words
+     *     themselves ({@code join-verification.lockout-ban-reason}, default {@code @security.verify.lockout-ban-reason})
      * @param holdingArea where a verifying player is held, {@code world,x,y,z[,yaw,pitch]}, blank to leave them put
      *     ({@code join-verification.holding-area})
      * @param transferTo the proxy backend a verified player is sent to, blank to leave them here
@@ -187,7 +219,12 @@ public record SecurityConfig(
         private static final int DEFAULT_MAX_ATTEMPTS = 3;
         private static final int DEFAULT_LOCKOUT_SECONDS = 300;
         private static final int DEFAULT_ENTRY_TIMEOUT_SECONDS = 60;
-        private static final String DEFAULT_LOCKOUT_REASON = "Too many failed verification attempts";
+        private static final String DEFAULT_LOCKOUT_REASON = "@security.verify.lockout-ban-reason";
+        private static final String LOCKOUT_REASON_PATH = "join-verification.lockout-ban-reason";
+
+        // The English sentence the file shipped with. A file still holding it was never edited, so it reads the
+        // catalogue line in the locked-out player's language rather than English for everybody.
+        private static final String SHIPPED_LOCKOUT_REASON = "Too many failed verification attempts";
 
         public JoinVerification {
             Objects.requireNonNull(trustDuration, "trustDuration");
@@ -236,11 +273,18 @@ public record SecurityConfig(
                             0,
                             config.getInt("join-verification.entry-timeout-seconds", DEFAULT_ENTRY_TIMEOUT_SECONDS))),
                     config.getBoolean("join-verification.lockout-bans", true),
-                    config.getString("join-verification.lockout-ban-reason", DEFAULT_LOCKOUT_REASON),
+                    holdsShippedReason(config)
+                            ? DEFAULT_LOCKOUT_REASON
+                            : config.getString(LOCKOUT_REASON_PATH, DEFAULT_LOCKOUT_REASON),
                     config.getString("join-verification.holding-area", ""),
                     config.getString("join-verification.transfer-to", ""),
                     config.getBoolean("join-verification.wait-for-login-plugin", true),
                     RevokedAccess.parse(config.getString("join-verification.on-access-revoked", "reverify")));
+        }
+
+        /** Whether the lockout ban reason is still the English sentence the shipped file wrote. */
+        static boolean holdsShippedReason(ConfigStore config) {
+            return config.getString(LOCKOUT_REASON_PATH, DEFAULT_LOCKOUT_REASON).equals(SHIPPED_LOCKOUT_REASON);
         }
 
         /** Whether a frozen player is kicked after a time limit rather than left at the keypad indefinitely. */

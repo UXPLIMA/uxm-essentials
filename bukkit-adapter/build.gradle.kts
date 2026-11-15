@@ -105,4 +105,9 @@ tasks.test {
         .files(fileTree(rootDir) { include("*/src/main/java/**/*.java") })
         .withPropertyName("allMainSources")
         .withPathSensitivity(PathSensitivity.RELATIVE)
+    // The shipped-config comment guard reads every module's settings files the same way.
+    inputs
+        .files(fileTree(rootDir) { include("*/src/main/resources/**/*.conf") })
+        .withPropertyName("allShippedConfigs")
+        .withPathSensitivity(PathSensitivity.RELATIVE)
 }

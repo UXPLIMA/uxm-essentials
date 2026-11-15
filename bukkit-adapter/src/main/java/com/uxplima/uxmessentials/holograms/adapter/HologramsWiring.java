@@ -292,7 +292,7 @@ public final class HologramsWiring {
         plugin.getServer().getPluginManager().registerEvents(aimListener, plugin);
         // The damage-indicator feature ships disabled: only when its config switches it on is the combat listener
         // registered, so a default server sends no floating numbers and the listener costs nothing.
-        DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config());
+        DamageIndicatorConfig damageIndicators = DamageIndicatorConfig.fromConfig(ctx.config(), kernel.log());
         if (damageIndicators.enabled()) {
             plugin.getServer()
                     .getPluginManager()
