@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.security.SecureRandom;
 import java.util.Objects;
 
 import org.bukkit.plugin.Plugin;
@@ -8,6 +9,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
+import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -45,20 +47,48 @@ public final class BusWiring {
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
             log.info("network sync disabled (network.conf > enabled=false); bus runs local-only");
-            return new Wired(Bus.disabled(network.serverId()), null, null, network, scheduler);
+            return new Wired(Bus.disabled(network.serverId()), null, null, null, network, scheduler);
+        }
+        if (NetworkConfig.isDefaultServerName(network.serverId())) {
+            log.warn(
+                    "network.server-name in config.conf is still the default '{}' while network.enabled is true."
+                            + " Give every backend its own name (for example server-name = \"survival-1\"): two"
+                            + " backends left on the same name drop each other's sync frames.",
+                    network.serverId());
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         BusTransport transport = selectTransport(plugin, network, scheduler, log);
-        BusCore core = new BusCore(transport, network.serverId(), registry, log);
+        long bootNonce = bootNonce();
+        DuplicateServerNames duplicates = new DuplicateServerNames(
+                network.serverId(), bootNonce, network.peerLivenessWindow(), System::currentTimeMillis, log);
+        BusCore core = new BusCore(transport, network.serverId(), registry, duplicates, log);
         // The cluster roster and the presence heartbeat are kernel concerns (one per backend), so they are wired
         // here next to the core rather than in any feature context. The roster's listener records inbound pings;
         // the heartbeat publishes this backend's own ping on the bounded interval, both bound to the live
         // lifecycle below: a disabled backend builds neither.
         ClusterPeers peers = new ClusterPeers(network.peerLivenessWindow());
         registry.register(peers.listener());
-        ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval(), log);
+        ClusterHeartbeat heartbeat = new ClusterHeartbeat(core, scheduler, network.heartbeatInterval(), bootNonce, log);
         return new Wired(
-                new Bus(core, registry), new Lifecycle(core, heartbeat, log, network), peers, network, scheduler);
+                new Bus(core, registry),
+                new Lifecycle(core, heartbeat, log, network),
+                peers,
+                duplicates,
+                network,
+                scheduler);
+    }
+
+    /**
+     * A fresh random number for this boot. Drawn on every enable, so a reload counts as a new boot too; it only
+     * has to differ between two backends running at once, which 64 random bits make all but certain.
+     */
+    private static long bootNonce() {
+        SecureRandom random = new SecureRandom();
+        long nonce;
+        do {
+            nonce = random.nextLong();
+        } while (nonce == ServerPing.NO_NONCE);
+        return nonce;
     }
 
     /**
@@ -111,6 +141,7 @@ public final class BusWiring {
         private final Bus bus;
         private final @org.jspecify.annotations.Nullable Lifecycle lifecycle;
         private final @org.jspecify.annotations.Nullable ClusterPeers peers;
+        private final @org.jspecify.annotations.Nullable DuplicateServerNames duplicates;
         private final NetworkConfig network;
         private final Scheduler scheduler;
 
@@ -132,11 +163,13 @@ public final class BusWiring {
                 Bus bus,
                 @org.jspecify.annotations.Nullable Lifecycle lifecycle,
                 @org.jspecify.annotations.Nullable ClusterPeers peers,
+                @org.jspecify.annotations.Nullable DuplicateServerNames duplicates,
                 NetworkConfig network,
                 Scheduler scheduler) {
             this.bus = Objects.requireNonNull(bus, "bus");
             this.lifecycle = lifecycle;
             this.peers = peers;
+            this.duplicates = duplicates;
             this.network = Objects.requireNonNull(network, "network");
             this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         }
@@ -163,6 +196,14 @@ public final class BusWiring {
          */
         public java.util.Optional<ClusterPeers> peers() {
             return java.util.Optional.ofNullable(peers);
+        }
+
+        /**
+         * The watch for other backends using this backend's name, present only for an enabled backend: a disabled
+         * one hears no heartbeats, so a shared name cannot hurt it and is not checked.
+         */
+        public java.util.Optional<DuplicateServerNames> duplicateServerNames() {
+            return java.util.Optional.ofNullable(duplicates);
         }
 
         /**

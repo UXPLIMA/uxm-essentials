@@ -77,6 +77,7 @@ import com.uxplima.uxmessentials.bootstrap.health.MenuFilesHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.ModuleCountHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.PlaceholderExpansionHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SchedulerHealthCheck;
+import com.uxplima.uxmessentials.bootstrap.health.ServerNameHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.SoftDependencyHealthCheck;
 import com.uxplima.uxmessentials.bootstrap.health.UpdateHealthCheck;
 import com.uxplima.uxmessentials.commandcontrol.adapter.CommandControlWiring;
@@ -1044,6 +1045,8 @@ public final class PluginModule {
         // The cluster-peer line reads the in-memory roster the presence heartbeat feeds; only an enabled backend
         // has a roster, so the check is added only when the bus is enabled.
         bus.peers().ifPresent(peers -> checks.add(new ClusterPeersHealthCheck(peers)));
+        // A name another backend shares silences sync without any other symptom, so it gets its own line.
+        bus.duplicateServerNames().ifPresent(duplicates -> checks.add(new ServerNameHealthCheck(duplicates)));
         checks.add(new SchedulerHealthCheck());
         checks.add(new UpdateHealthCheck(UpdateCheckSettings.from(config).enabled()));
         checks.add(new ModuleCountHealthCheck(registry, config));
