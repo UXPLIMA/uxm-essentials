@@ -6,9 +6,9 @@ import java.util.Objects;
 import java.util.OptionalLong;
 
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
+import com.uxplima.uxmessentials.shared.application.port.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -56,7 +56,7 @@ public final class NetworkCooldowns implements Cooldowns {
         if (permissions.has(who, kind.bypassNode())) {
             return;
         }
-        long seconds = resolveSeconds(who, kind.cooldownNode(), kind.defaultSeconds());
+        long seconds = CooldownTiers.waitSeconds(permissions, who, kind);
         write(who, kind.stampScope(), seconds);
     }
 
@@ -83,7 +83,7 @@ public final class NetworkCooldowns implements Cooldowns {
         if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return;
         }
-        long seconds = resolveSeconds(who, SharedPermissions.cooldown(label), configDefault.toSeconds());
+        long seconds = CooldownTiers.labelWaitSeconds(permissions, who, label, configDefault.toSeconds());
         write(who, LABEL_SCOPE_PREFIX + label, seconds);
     }
 
@@ -105,10 +105,5 @@ public final class NetworkCooldowns implements Cooldowns {
             return;
         }
         claims.stampCooldown(who.uuid(), CooldownScope.normalize(name), clock.millis() + seconds * 1000L);
-    }
-
-    private long resolveSeconds(PlayerRef who, String node, long defaultSeconds) {
-        QuotaFamily family = QuotaFamily.threshold(node);
-        return permissions.resolveQuota(who, family, null, defaultSeconds).orElse(defaultSeconds);
     }
 }

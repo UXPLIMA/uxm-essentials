@@ -11,9 +11,9 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
+import com.uxplima.uxmessentials.shared.application.port.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
-import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -21,8 +21,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link Cooldowns} implementation: a per-holder "ready-at" epoch-millis stamped in PDC. The
- * duration is resolved from the player's numbered {@code uxmessentials.cooldown.<feature>.<seconds>}
- * nodes via {@link Permissions} (the {@code min}-reducer: the shortest tier wins), and
+ * duration is resolved by {@link CooldownTiers} from the player's numbered
+ * {@code uxmessentials.<feature>.cooldown.<seconds>} nodes (a held tier sets the wait, the shortest held wins), and
  * {@code uxmessentials.bypass.cooldown.<feature>} skips the gate entirely. The generic per-command
  * layer ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label,
  * skipped by {@code uxmessentials.bypass.cooldown.label.<label>} so a label can never lift a feature.
@@ -68,7 +68,7 @@ public final class PdcCooldowns implements Cooldowns {
         if (permissions.has(who, kind.bypassNode())) {
             return;
         }
-        long seconds = resolveSeconds(who, kind.cooldownNode(), kind.defaultSeconds());
+        long seconds = CooldownTiers.waitSeconds(permissions, who, kind);
         writeStamp(who, keys.forName(kind.stampScope()), seconds);
     }
 
@@ -95,7 +95,7 @@ public final class PdcCooldowns implements Cooldowns {
         if (permissions.has(who, SharedPermissions.cooldownBypass(label))) {
             return;
         }
-        long seconds = resolveSeconds(who, SharedPermissions.cooldown(label), configDefault.toSeconds());
+        long seconds = CooldownTiers.labelWaitSeconds(permissions, who, label, configDefault.toSeconds());
         writeStamp(who, keys.forName(LABEL_FEATURE_PREFIX + label), seconds);
     }
 
@@ -119,10 +119,5 @@ public final class PdcCooldowns implements Cooldowns {
         }
         long readyAt = clock.millis() + seconds * 1000L;
         player.getPersistentDataContainer().set(key, PersistentDataType.LONG, readyAt);
-    }
-
-    private long resolveSeconds(PlayerRef who, String node, long defaultSeconds) {
-        QuotaFamily family = QuotaFamily.threshold(node);
-        return permissions.resolveQuota(who, family, null, defaultSeconds).orElse(defaultSeconds);
     }
 }

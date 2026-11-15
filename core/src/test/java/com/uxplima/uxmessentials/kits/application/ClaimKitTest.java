@@ -164,6 +164,34 @@ class ClaimKitTest {
     }
 
     @Test
+    void aKitCooldownTierShortensAKitsWait() {
+        define(starter().cooldown(Duration.ofHours(1)).build());
+        permissions.holdTier("uxmessentials.kit.cooldown", 600);
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(new MemoryClaimLedger(), scheduler);
+        scheduler.runAll();
+        claim.claim(ALEX, STARTER).join();
+        scheduler.runAll();
+
+        clock.advance(Duration.ofMinutes(10));
+
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
+    }
+
+    @Test
+    void aKitCooldownTierNeverLengthensAKitConfiguredShorter() {
+        define(starter().build());
+        permissions.holdTier("uxmessentials.kit.cooldown", 3600);
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(new MemoryClaimLedger(), scheduler);
+        scheduler.runAll();
+        claim.claim(ALEX, STARTER).join();
+        scheduler.runAll();
+
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
+    }
+
+    @Test
     void aPaidKitTakesTheMoneyAndARefusedOneDoesNot() {
         define(starter().cost(KitCost.of(new BigDecimal("50"))).build());
         purse.balance = new BigDecimal("70");
