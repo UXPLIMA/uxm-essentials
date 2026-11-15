@@ -41,6 +41,7 @@ import com.uxplima.uxmessentials.homes.application.ListHomes;
 import com.uxplima.uxmessentials.homes.application.RelocateHome;
 import com.uxplima.uxmessentials.homes.application.RenameHome;
 import com.uxplima.uxmessentials.homes.application.SetHomeIcon;
+import com.uxplima.uxmessentials.homes.application.SetHomeServer;
 import com.uxplima.uxmessentials.homes.application.SetHomeVisibility;
 import com.uxplima.uxmessentials.homes.application.TeleportHome;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
@@ -69,6 +70,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaReduction;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -114,6 +116,8 @@ public final class HomesWiring {
             Optional<HomeEconomy> homeEconomy,
             Bus bus,
             CrossServerHops hops,
+            boolean recordsServer,
+            NetworkPresence presence,
             GuiLayouts guiLayouts,
             CloseableResources resources,
             TextInput textInput,
@@ -127,6 +131,7 @@ public final class HomesWiring {
         Objects.requireNonNull(homeEconomy, "homeEconomy");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(resources, "resources");
         Objects.requireNonNull(textInput, "textInput");
@@ -147,9 +152,10 @@ public final class HomesWiring {
         // A home records the backend it was set on. With cross-server.enabled on, a home of another backend is reached
         // by sending the player there through the hop the bootstrap shares between every kind: the jail, combat and
         // cooldown checks run here before the charge, and the charge comes back on every miss. Off, the resolver is not
-        // registered and every home is used on this backend, as it always was.
+        // registered and every home is used on this backend, as it always was. A backend off a network or under the
+        // shipped default name records no server, so its homes are not sent to a name it will not keep.
         String localServer = hops.server();
-        HomeHops homeHops = HomeHops.local(kernel.playerLookup(), localServer);
+        HomeHops homeHops = HomeHops.local(kernel.playerLookup(), localServer, recordsServer);
         if (ctx.config().getBoolean("cross-server.enabled", false)) {
             hops.register(new HomeHopResolver(
                     repository,
@@ -165,8 +171,15 @@ public final class HomesWiring {
             homeHops = new HomeHops(
                     Optional.of(hops.departures(new TeleportHopGate(teleportEngine))),
                     kernel.playerLookup(),
-                    localServer);
+                    localServer,
+                    recordsServer);
         }
+        // Writes every owner's rows at once, so it drops this backend's cache and tells the peers with one frame.
+        SetHomeServer setHomeServer =
+                new SetHomeServer(HomeRepositories.servers(persistence), notifier, presence, () -> {
+                    cached.invalidateAll();
+                    bus.publisher().publish(HomeSync.everyOwnerChanged(localServer));
+                });
         HomeServices services = assemble(
                 plugin,
                 ctx,
@@ -179,6 +192,7 @@ public final class HomesWiring {
                 homeHops,
                 safeGuard,
                 claimService,
+                setHomeServer,
                 guiLayouts,
                 textInput,
                 menus,
@@ -193,7 +207,7 @@ public final class HomesWiring {
                 services.apiWrites(),
                 cached,
                 homeHops::routes,
-                new HomeServerAdoption(persistence, kernel, localServer, cached));
+                new HomeServerAdoption(persistence, kernel, localServer, recordsServer, cached, bus.publisher()));
     }
 
     private static HomeServices assemble(
@@ -208,6 +222,7 @@ public final class HomesWiring {
             HomeHops homeHops,
             SafeLocationGuard safeGuard,
             ClaimService claimService,
+            SetHomeServer setHomeServer,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -217,6 +232,7 @@ public final class HomesWiring {
         int unlimitedMax = unlimitedMax(ctx);
         DateTimeFormatter dateFormat = dateFormat(ctx);
         String localServer = homeHops.localServer();
+        Optional<String> recordedServer = homeHops.recordedServer();
 
         List<SethomeGuard> guards = buildGuards(ctx);
         HomeCharge charge = buildCharge(ctx, kernel, homeEconomy);
@@ -231,9 +247,9 @@ public final class HomesWiring {
                 charge,
                 unlimitedMax,
                 clock,
-                localServer);
+                recordedServer);
         RelocateHome relocateHome = new RelocateHome(
-                repository, guards, notifier, kernel.events(), kernel.gate(), charge, clock, localServer);
+                repository, guards, notifier, kernel.events(), kernel.gate(), charge, clock, recordedServer);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         SetHomeVisibility setHomeVisibility = new SetHomeVisibility(repository, notifier, kernel.events(), clock);
@@ -253,9 +269,16 @@ public final class HomesWiring {
                         freeCharge,
                         unlimitedMax,
                         clock,
-                        localServer),
+                        recordedServer),
                 new RelocateHome(
-                        repository, guards, notifier, kernel.events(), kernel.gate(), freeCharge, clock, localServer),
+                        repository,
+                        guards,
+                        notifier,
+                        kernel.events(),
+                        kernel.gate(),
+                        freeCharge,
+                        clock,
+                        recordedServer),
                 renameHome,
                 deleteHome);
         TeleportHome teleportHome = new TeleportHome(repository, teleporter, notifier, charge, homeHops);
@@ -263,7 +286,7 @@ public final class HomesWiring {
         ListHomeInvites listHomeInvites = new ListHomeInvites(invites);
         InviteToHome inviteToHome = new InviteToHome(repository, invites, notifier);
         UninviteFromHome uninviteFromHome = new UninviteFromHome(invites, notifier);
-        VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier, homeHops);
+        VisitHome visitHome = new VisitHome(repository, invites, teleporter, notifier, homeHops, teleportHome);
 
         boolean confirmDelete = ctx.config().getBoolean("confirm-delete", true);
         boolean confirmRelocate = ctx.config().getBoolean("confirm-relocate", false);
@@ -349,7 +372,8 @@ public final class HomesWiring {
                 uninviteFromHome,
                 kernel.playerLookup(),
                 repository,
-                apiWrites);
+                apiWrites,
+                setHomeServer);
     }
 
     /**

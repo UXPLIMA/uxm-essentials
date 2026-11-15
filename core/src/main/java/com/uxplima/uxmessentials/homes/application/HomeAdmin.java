@@ -124,10 +124,11 @@ public final class HomeAdmin {
         Result<HomeSet.Change, HomeError> outcome;
         if (set.find(slot).isPresent()) {
             // Slot occupied: re-anchor, keeping label and icon.
-            outcome = set.relocate(slot, at, hops.localServer(), clock.instant());
+            outcome = set.relocate(slot, at, hops.recordedServer(), clock.instant());
         } else {
             // Slot free: create, bypassing the owner's quota.
-            outcome = set.createAt(slot, at, hops.localServer(), HomeLimit.noLimit(), MAX_ADMIN_SLOTS, clock.instant());
+            outcome = set.createAt(
+                    slot, at, hops.recordedServer(), HomeLimit.noLimit(), MAX_ADMIN_SLOTS, clock.instant());
         }
         if (outcome.isErr()) {
             notifier.send(actor, outcome.errorOrThrow().messageKey(), slotPlaceholder(slot));

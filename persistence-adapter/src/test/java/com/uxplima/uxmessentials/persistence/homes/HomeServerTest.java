@@ -157,7 +157,7 @@ class HomeServerTest {
 
         Home moved = homes.findSlot(ALEX, FIRST)
                 .orElseThrow()
-                .relocatedTo(in(CREATIVE_WORLD), "creative", Instant.ofEpochMilli(2L));
+                .relocatedTo(in(CREATIVE_WORLD), Optional.of("creative"), Instant.ofEpochMilli(2L));
         homes.save(moved);
 
         assertThat(serverOf(ALEX)).contains("creative");
@@ -167,5 +167,18 @@ class HomeServerTest {
                                 CREATIVE_WORLD.uid().toString(),
                                 SURVIVAL_WORLD.uid().toString())))
                 .isZero();
+    }
+
+    @Test
+    void aRenamedServerTakesEveryHomeRecordedUnderTheOldName() {
+        upgrade();
+        homes.save(Home.create(ALEX, FIRST, in(SURVIVAL_WORLD), "server-1", Instant.ofEpochMilli(1L)));
+        homes.save(Home.create(SAM, FIRST, in(CREATIVE_WORLD), "creative", Instant.ofEpochMilli(1L)));
+
+        int moved = new JooqHomeServers(dsl).rename("server-1", "survival");
+
+        assertThat(moved).isOne();
+        assertThat(serverOf(ALEX)).contains("survival");
+        assertThat(serverOf(SAM)).contains("creative");
     }
 }

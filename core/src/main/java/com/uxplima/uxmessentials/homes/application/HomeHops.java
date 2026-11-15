@@ -32,21 +32,34 @@ public final class HomeHops {
     private final Optional<HopDepartures> departures;
     private final PlayerLookup players;
     private final String localServer;
+    private final boolean recordsServer;
 
-    public HomeHops(Optional<HopDepartures> departures, PlayerLookup players, String localServer) {
+    /**
+     * {@code recordsServer} is false off a network or under the shipped default server name: a name every standalone
+     * backend shares would send each home to a server that does not exist once the backend joins a network under its
+     * own name, so such a backend writes no server and its rows stay for the claim.
+     */
+    public HomeHops(
+            Optional<HopDepartures> departures, PlayerLookup players, String localServer, boolean recordsServer) {
         this.departures = Objects.requireNonNull(departures, "departures");
         this.players = Objects.requireNonNull(players, "players");
         this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.recordsServer = recordsServer;
     }
 
     /** The route that is never taken: every home is used on this backend. */
-    public static HomeHops local(PlayerLookup players, String localServer) {
-        return new HomeHops(Optional.empty(), players, localServer);
+    public static HomeHops local(PlayerLookup players, String localServer, boolean recordsServer) {
+        return new HomeHops(Optional.empty(), players, localServer, recordsServer);
     }
 
-    /** This backend's network name, which a home set or moved here records. */
+    /** This backend's network name, which a home of unknown server is used on. */
     public String localServer() {
         return localServer;
+    }
+
+    /** The server a home set or moved here records, or empty when this backend records none. */
+    public Optional<String> recordedServer() {
+        return recordsServer ? Optional.of(localServer) : Optional.empty();
     }
 
     /** True when {@code home} is used by sending the player to the backend it was set on. */

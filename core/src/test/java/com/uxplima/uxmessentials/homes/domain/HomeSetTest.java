@@ -21,7 +21,7 @@ class HomeSetTest {
     private static HomeSet withHomesIn(int... slots) {
         HomeSet set = HomeSet.empty(ALEX);
         for (int slot : slots) {
-            set = set.createAt(HomeSlot.of(slot), at(slot, 64, 0), "lobby", HomeLimit.noLimit(), 100, NOW)
+            set = set.createAt(HomeSlot.of(slot), at(slot, 64, 0), Optional.of("lobby"), HomeLimit.noLimit(), 100, NOW)
                     .orElseThrow()
                     .result();
         }
@@ -31,7 +31,7 @@ class HomeSetTest {
     @Test
     void aHomeIsCreatedInAFreeSlotInsideTheLimit() {
         HomeSet.Change change = HomeSet.empty(ALEX)
-                .createAt(HomeSlot.of(0), at(1, 64, 2), "lobby", HomeLimit.of(3), 3, NOW)
+                .createAt(HomeSlot.of(0), at(1, 64, 2), Optional.of("lobby"), HomeLimit.of(3), 3, NOW)
                 .orElseThrow();
 
         assertThat(change.result().count()).isEqualTo(1);
@@ -43,7 +43,7 @@ class HomeSetTest {
     @Test
     void aTakenSlotIsRefused() {
         assertThat(withHomesIn(0)
-                        .createAt(HomeSlot.of(0), at(5, 64, 5), "lobby", HomeLimit.of(5), 5, NOW)
+                        .createAt(HomeSlot.of(0), at(5, 64, 5), Optional.of("lobby"), HomeLimit.of(5), 5, NOW)
                         .asError())
                 .contains(HomeError.SLOT_TAKEN);
     }
@@ -51,7 +51,7 @@ class HomeSetTest {
     @Test
     void aSlotPastTheGridIsRefused() {
         assertThat(HomeSet.empty(ALEX)
-                        .createAt(HomeSlot.of(3), at(0, 64, 0), "lobby", HomeLimit.of(3), 3, NOW)
+                        .createAt(HomeSlot.of(3), at(0, 64, 0), Optional.of("lobby"), HomeLimit.of(3), 3, NOW)
                         .asError())
                 .contains(HomeError.SLOT_OUT_OF_RANGE);
     }
@@ -60,7 +60,7 @@ class HomeSetTest {
     void theLimitStopsANewHomeEvenWhenASlotIsFree() {
         HomeSet two = withHomesIn(0, 1);
 
-        assertThat(two.createAt(HomeSlot.of(4), at(0, 64, 0), "lobby", HomeLimit.of(2), 10, NOW)
+        assertThat(two.createAt(HomeSlot.of(4), at(0, 64, 0), Optional.of("lobby"), HomeLimit.of(2), 10, NOW)
                         .asError())
                 .contains(HomeError.LIMIT_REACHED);
         assertThat(two.limitReached(HomeLimit.of(2)).currentCount()).isEqualTo(2);
@@ -102,7 +102,7 @@ class HomeSetTest {
                 .orElseThrow()
                 .result();
 
-        Home moved = labelled.relocate(HomeSlot.of(0), at(9, 70, 9), "lobby", LATER)
+        Home moved = labelled.relocate(HomeSlot.of(0), at(9, 70, 9), Optional.of("lobby"), LATER)
                 .orElseThrow()
                 .home();
 
@@ -118,7 +118,8 @@ class HomeSetTest {
         HomeSlot slot = HomeSlot.of(0);
 
         assertThat(List.of(
-                        empty.relocate(slot, at(0, 64, 0), "lobby", NOW).asError(),
+                        empty.relocate(slot, at(0, 64, 0), Optional.of("lobby"), NOW)
+                                .asError(),
                         empty.renameLabel(slot, Optional.empty(), NOW).asError(),
                         empty.setIcon(slot, Optional.empty(), NOW).asError(),
                         empty.setVisibility(slot, true, NOW).asError(),

@@ -51,10 +51,11 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 |---|---|---|
 | `uxmessentials.home.admin` | /home admin <player> to list, teleport to, set, delete, clear and inspect another player's homes. | op |
 | `uxmessentials.home.bypass.cost` | Skip the per-action economy cost for home create, relocate, and teleport actions. | op |
-| `uxmessentials.home.bypass.unsafe` | Skip the unsafe-destination confirm when teleporting to a home via the GUI. | op |
+| `uxmessentials.home.bypass.unsafe` | Skip the unsafe-destination confirm when teleporting to a home via the GUI, and land at an unsafe home on another server. | op |
 | `uxmessentials.home.icon` | Pick a custom GUI icon for one of your homes from the grid. | true |
 | `uxmessentials.home.invite` | /home invite and /home uninvite to grant or revoke another player's access to one of your homes. | true |
 | `uxmessentials.home.limit.<n>` | How many homes you may keep; the largest tier held wins. | true |
+| `uxmessentials.home.setserver` | /home setserver <from> <to> to move every home recorded on one server to another without moving any. | op |
 | `uxmessentials.home.use` | /home to open and manage your slot-based home grid. | true |
 | `uxmessentials.home.visit` | /home visit <player> [slot] to teleport to another player's public home or one you were invited to. | true |
 | `uxmessentials.module.homes` | Hot-reload / inspect the homes module (per-player homes and the slot grid). | op |

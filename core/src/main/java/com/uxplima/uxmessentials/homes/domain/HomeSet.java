@@ -93,10 +93,11 @@ public final class HomeSet {
      * {@code /sethome}: create a new home in {@code slot}. The slot must be within range ({@code slot.index()
      * < maxSlots}) and free, and the owner must be under their resolved {@code limit}; otherwise the matching
      * {@link HomeError} is returned. A successful create raises {@link HomeCreated}. The home is recorded on
-     * {@code onServer}, the backend whose world {@code location} is in.
+     * {@code onServer}, the backend whose world {@code location} is in, or with no server when that backend records
+     * none.
      */
     public Result<Change, HomeError> createAt(
-            HomeSlot slot, Position location, String onServer, HomeLimit limit, int maxSlots, Instant now) {
+            HomeSlot slot, Position location, Optional<String> onServer, HomeLimit limit, int maxSlots, Instant now) {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(onServer, "onServer");
@@ -111,7 +112,8 @@ public final class HomeSet {
         if (limit.isReachedAt(count())) {
             return Result.err(HomeError.LIMIT_REACHED);
         }
-        Home created = Home.create(owner, slot, location, onServer, now);
+        Home unplaced = Home.create(owner, slot, location, now);
+        Home created = onServer.map(unplaced::onServer).orElse(unplaced);
         return Result.ok(Change.raising(put(created), created, new HomeCreated(owner, slot, location)));
     }
 
@@ -119,7 +121,8 @@ public final class HomeSet {
      * Re-anchor the home in {@code slot} to {@code location} on {@code onServer}, keeping its label, icon, and creation
      * time.
      */
-    public Result<Change, HomeError> relocate(HomeSlot slot, Position location, String onServer, Instant now) {
+    public Result<Change, HomeError> relocate(
+            HomeSlot slot, Position location, Optional<String> onServer, Instant now) {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(location, "location");
         Objects.requireNonNull(onServer, "onServer");

@@ -141,8 +141,9 @@ class CrossServerHomeTest {
                         Optional.of(new HopDepartures(
                                 gate, proxy, watchdog, charges, lobbyResolvers, scheduler, LOBBY, clock)),
                         online,
-                        LOBBY)
-                : HomeHops.local(online, LOBBY);
+                        LOBBY,
+                        true)
+                : HomeHops.local(online, LOBBY, true);
     }
 
     /** {@code /home} on the lobby: the menu's teleport button. */
@@ -443,22 +444,64 @@ class CrossServerHomeTest {
         assertThat(connects).isEmpty();
     }
 
-    @Test
-    void aVisitToAPublicHomeOnAnotherServerGoesThroughTheHopFreeOfCharge() {
-        homes.save(baseOn(SURVIVAL).withVisibility(true, NOW));
-        scheduler.online(SAM);
-        online.here.add(SAM.uuid());
-        VisitHome visit = new VisitHome(homes, homes, moves, notifier.notifier(), hops(true));
-
-        Result<Unit, HomeError> visited = visit.visit(SAM, ALEX, SLOT);
+    /** Sam, a guest, goes to Alex's home through the hop and lands on the survival server. */
+    private void samLandsOnSurvival() {
         new HopArrival(store, resolversOn(SURVIVAL), charges, scheduler, log, SURVIVAL, SETTLE, TTL, clock)
                 .onArrival(SAM);
         scheduler.advance(SETTLE);
+    }
+
+    private void samIsOnline() {
+        scheduler.online(SAM);
+        online.here.add(SAM.uuid());
+    }
+
+    private VisitHome visits() {
+        return new VisitHome(homes, homes, moves, notifier.notifier(), hops(true), lobby(true));
+    }
+
+    @Test
+    void aVisitToAPublicHomeOnAnotherServerSkipsTheOwnersLandingChecksAndIsFree() {
+        homes.save(baseOn(SURVIVAL).withVisibility(true, NOW));
+        samIsOnline();
+        claims.ownerOnly = true;
+        unsafe = true;
+
+        Result<Unit, HomeError> visited = visits().visit(SAM, ALEX, SLOT);
+        samLandsOnSurvival();
 
         assertThat(visited.isOk()).isTrue();
         assertThat(connects).containsExactly("Sam->survival");
         assertThat(moves.made).containsExactly("Sam->base");
         assertThat(purse.charges).isZero();
+        assertThat(purse.refunds).isZero();
+    }
+
+    @Test
+    void aStaffTeleportToAHomeOnAnotherServerGoesThroughTheHopWithoutTheOwnersChecks() {
+        samIsOnline();
+        claims.ownerOnly = true;
+        unsafe = true;
+        HomeAdmin admin =
+                new HomeAdmin(homes, homes, moves, notifier.notifier(), new RecordingEvents(), clock, hops(true));
+
+        Result<Unit, HomeError> sent = admin.teleport(SAM, ALEX, SLOT);
+        samLandsOnSurvival();
+
+        assertThat(sent.isOk()).isTrue();
+        assertThat(connects).containsExactly("Sam->survival");
+        assertThat(moves.made).containsExactly("Sam->base");
+        assertThat(purse.charges).isZero();
+    }
+
+    @Test
+    void theOwnerVisitingTheirOwnHomePaysTheTeleportCost() {
+        Result<Unit, HomeError> visited = visits().visit(ALEX, ALEX, SLOT);
+        join(survival);
+
+        assertThat(visited.isOk()).isTrue();
+        assertThat(moves.made).containsExactly("Alex->base");
+        assertThat(purse.wallet).isEqualByComparingTo("74.50");
     }
 
     /** The teleport engine both backends run, sharing one cooldown store as a player's cooldowns follow them. */
@@ -587,6 +630,8 @@ class CrossServerHomeTest {
     private static final class Claims implements ClaimService {
 
         ClaimDecision access = ClaimDecision.ALLOWED;
+        // A claim of Alex's that only Alex may enter.
+        boolean ownerOnly;
 
         @Override
         public ClaimDecision canPlace(PlayerRef who, Position at) {
@@ -595,6 +640,9 @@ class CrossServerHomeTest {
 
         @Override
         public ClaimDecision canAccess(PlayerRef who, Position at) {
+            if (ownerOnly) {
+                return who.equals(ALEX) ? ClaimDecision.ALLOWED : ClaimDecision.DENIED_ACCESS;
+            }
             return access;
         }
     }

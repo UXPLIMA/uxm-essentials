@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
@@ -26,7 +27,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * {@link HomeError#NOT_FOUND}; once the aggregate transition succeeds, the optional economy charge is
  * applied before committing. A successful relocate saves the row, publishes {@code HomeRelocated}, and
  * notifies {@link HomesMessageKey#HOME_RELOCATED}. The moved home is recorded on this backend, whose world it now
- * points into.
+ * points into, when this backend records a server at all.
  */
 public final class RelocateHome {
 
@@ -37,7 +38,7 @@ public final class RelocateHome {
     private final DomainGate gate;
     private final HomeCharge charge;
     private final Clock clock;
-    private final String localServer;
+    private final Optional<String> recordedServer;
 
     public RelocateHome(
             HomeRepository repository,
@@ -47,7 +48,7 @@ public final class RelocateHome {
             DomainGate gate,
             HomeCharge charge,
             Clock clock,
-            String localServer) {
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -55,7 +56,7 @@ public final class RelocateHome {
         this.gate = Objects.requireNonNull(gate, "gate");
         this.charge = Objects.requireNonNull(charge, "charge");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Relocate {@code owner}'s home in {@code slot} to {@code at}, or reject on a guard, empty slot, or insufficient balance. */
@@ -72,7 +73,7 @@ public final class RelocateHome {
             }
         }
         HomeSet set = repository.load(owner);
-        Result<HomeSet.Change, HomeError> outcome = set.relocate(slot, at, localServer, clock.instant());
+        Result<HomeSet.Change, HomeError> outcome = set.relocate(slot, at, recordedServer, clock.instant());
         if (outcome.isErr()) {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));

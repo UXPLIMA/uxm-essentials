@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeInviteRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
@@ -30,7 +31,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * charge is applied before the result is committed. Hitting the cap publishes {@code HomeLimitReached} and
  * returns {@link HomeError#LIMIT_REACHED} so the command renders the limit message, never an inline literal.
  *
- * <p>The home is recorded on this backend, since its world is one this backend holds.
+ * <p>The home is recorded on this backend, since its world is one this backend holds, unless this backend records no
+ * server (off a network, or under the shipped default name); the row is then left for the claim at a later start.
  */
 public final class CreateHomeAtSlot {
 
@@ -44,7 +46,7 @@ public final class CreateHomeAtSlot {
     private final HomeCharge charge;
     private final int unlimitedMaxSlots;
     private final Clock clock;
-    private final String localServer;
+    private final Optional<String> recordedServer;
 
     public CreateHomeAtSlot(
             HomeRepository repository,
@@ -57,7 +59,7 @@ public final class CreateHomeAtSlot {
             HomeCharge charge,
             int unlimitedMaxSlots,
             Clock clock,
-            String localServer) {
+            Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.quota = Objects.requireNonNull(quota, "quota");
@@ -71,7 +73,7 @@ public final class CreateHomeAtSlot {
         }
         this.unlimitedMaxSlots = unlimitedMaxSlots;
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
     /** Create {@code owner}'s home in {@code slot} at {@code at}, gating on the guards, the aggregate, and the economy charge. */
@@ -87,7 +89,7 @@ public final class CreateHomeAtSlot {
             return guarded;
         }
         // Validate via the aggregate first: free checks before the paid charge gate.
-        Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, localServer, limit, max, clock.instant());
+        Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, recordedServer, limit, max, clock.instant());
         if (outcome.isErr()) {
             return reject(set, limit, outcome.errorOrThrow());
         }

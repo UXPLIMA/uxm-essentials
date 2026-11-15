@@ -25,7 +25,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * concern.
  *
  * <p>A home set on another backend, while the homes {@code cross-server} block is on, is reached through the shared
- * cross-server hop instead, after the same teleport rules; a visit carries no charge.
+ * cross-server hop instead, after the same teleport rules; a visit carries no charge. An owner visiting their own
+ * home takes {@link TeleportHome}'s path, so the visit command is no way around the teleport cost.
  */
 public final class VisitHome {
 
@@ -34,18 +35,21 @@ public final class VisitHome {
     private final HomeTeleporter teleporter;
     private final Notifier notifier;
     private final HomeHops hops;
+    private final TeleportHome ownTeleport;
 
     public VisitHome(
             HomeRepository repository,
             HomeInviteRepository invites,
             HomeTeleporter teleporter,
             Notifier notifier,
-            HomeHops hops) {
+            HomeHops hops,
+            TeleportHome ownTeleport) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.hops = Objects.requireNonNull(hops, "hops");
+        this.ownTeleport = Objects.requireNonNull(ownTeleport, "ownTeleport");
     }
 
     /** Teleport {@code actor} to {@code owner}'s home in {@code slot} when an access gate admits them. */
@@ -53,15 +57,16 @@ public final class VisitHome {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(slot, "slot");
+        if (actor.uuid().equals(owner.uuid())) {
+            return ownTeleport.toSlot(actor, slot);
+        }
         Optional<Home> found = repository.findSlot(owner, slot);
         if (found.isEmpty()) {
             notifier.send(actor, HomeError.NOT_FOUND.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_FOUND);
         }
         Home home = found.get();
-        boolean accessible = actor.uuid().equals(owner.uuid())
-                || home.isPublic()
-                || invites.invites(owner, slot).contains(actor.uuid());
+        boolean accessible = home.isPublic() || invites.invites(owner, slot).contains(actor.uuid());
         if (!accessible) {
             notifier.send(actor, HomeError.NOT_ACCESSIBLE.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_ACCESSIBLE);

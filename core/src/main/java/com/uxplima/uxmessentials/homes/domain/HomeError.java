@@ -36,6 +36,9 @@ public enum HomeError {
     /** A visit to another owner's home that is neither public nor extended an invite to the actor. */
     NOT_ACCESSIBLE(HomesMessageKey.HOME_NOT_ACCESSIBLE),
 
+    /** A server name that cannot be a backend's: letters, digits, '-', '_' and '.', at most 64. */
+    INVALID_SERVER(HomesMessageKey.HOME_SERVER_INVALID),
+
     /** Another plugin refused the action through the developer API. Nothing was written. */
     VETOED(SharedMessageKey.COMMON_ACTION_VETOED),
 

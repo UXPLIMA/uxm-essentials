@@ -32,6 +32,9 @@ public enum HomesMessageKey implements MessageKey {
     HOME_CROSS_SERVER_MISROUTED("home.cross-server.misrouted"),
     HOME_CROSS_SERVER_REFUNDED("home.cross-server.refunded"),
     HOME_CROSS_SERVER_UNSAFE("home.cross-server.unsafe"),
+    HOME_SERVER_SET("home.server-set"),
+    HOME_SERVER_INVALID("home.server-invalid"),
+    HOME_SERVER_NOT_RUNNING("home.server-not-running"),
 
     // public/private visibility + invites/visit
     HOME_VISIBILITY_PUBLIC("home.visibility.public"),

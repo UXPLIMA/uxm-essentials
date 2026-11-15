@@ -37,6 +37,7 @@ class CreateHomeAtSlotTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final RecordingEvents events = new RecordingEvents();
     private final Wallet wallet = new Wallet(BigDecimal.ZERO);
+    private Optional<String> recordedServer = Optional.of("lobby");
 
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards, DomainGate gate, HomeChargeSettings costs) {
         return new CreateHomeAtSlot(
@@ -50,7 +51,7 @@ class CreateHomeAtSlotTest {
                 new HomeCharge(permissions, Optional.of(wallet), costs),
                 54,
                 CLOCK,
-                "lobby");
+                recordedServer);
     }
 
     private CreateHomeAtSlot useCase() {
@@ -73,6 +74,15 @@ class CreateHomeAtSlotTest {
             assertThat(line.key()).isEqualTo("home.created");
             assertThat(line.placeholders()).containsEntry("slot", "1");
         });
+    }
+
+    @Test
+    void aBackendThatRecordsNoServerLeavesTheNewHomeForTheClaim() {
+        recordedServer = Optional.empty();
+
+        useCase().create(ALEX, HomeSlot.of(0), at(10, 64, 10));
+
+        assertThat(homes.findSlot(ALEX, HomeSlot.of(0)).orElseThrow().server()).isEmpty();
     }
 
     @Test

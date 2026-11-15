@@ -29,13 +29,17 @@ import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 
 /**
  * The home side of the shared cross-server hop. A hop's target is the home's owner and slot. On the target the home
- * is read again and moved to only while it still exists and still lives on this backend, and only when the checks a
- * local teleport from the home menu runs pass here, where the home's world is: the claim access check, and the unsafe
- * destination check while {@code confirm-unsafe-teleport} is on (there is no one to confirm with on a landing, so an
- * unsafe home is refused unless the player may bypass it). The move is the teleport context's immediate arrival,
- * through {@link HomeTeleporter#arrive}, which stamps the home cooldown the origin checked. The charge goes back
- * through the same {@link HomeEconomy} that took it, whether or not this backend charges for homes itself. A home's teleport cost is the server's, so a hop to one never
- * carries a settlement.
+ * is read again and moved to only while it still exists and still lives on this backend.
+ *
+ * <p>When the owner travels to their own home, the checks a local teleport from the home menu runs are run here, where
+ * the home's world is: the claim access check, and the unsafe destination check while {@code confirm-unsafe-teleport}
+ * is on (there is no one to confirm with on a landing, so an unsafe home is refused unless the player may bypass it).
+ * A visit or a staff teleport skips them, as it does locally. The move is the teleport context's immediate arrival,
+ * through {@link HomeTeleporter#arrive}, which stamps the home cooldown the origin checked.
+ *
+ * <p>A refund is paid through this backend's {@link HomeEconomy}, whether or not this backend charges for homes itself,
+ * so the economy module must be on wherever a home hop can land. A home's teleport cost is the server's, so a hop to
+ * one never carries a settlement.
  */
 public final class HomeHopResolver implements HopResolver {
 
@@ -148,8 +152,15 @@ public final class HomeHopResolver implements HopResolver {
                 onMissed);
     }
 
-    /** On the destination's region thread: the line that refuses the landing, or empty when it may go ahead. */
+    /**
+     * On the destination's region thread: the line that refuses the landing, or empty when it may go ahead. Only the
+     * owner's own teleport is checked, matching the home menu; a visit and a staff teleport are not checked locally
+     * either.
+     */
     private Optional<MessageKey> refusal(PlayerRef who, Home home) {
+        if (!who.equals(home.owner())) {
+            return Optional.empty();
+        }
         try {
             ClaimDecision access = claims.canAccess(who, home.location());
             if (!access.allowed()) {
