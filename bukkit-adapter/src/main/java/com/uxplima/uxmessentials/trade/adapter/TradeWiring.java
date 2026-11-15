@@ -6,6 +6,8 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -31,6 +33,7 @@ import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeExperience;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemDelivery;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BusTradeBus;
 import com.uxplima.uxmessentials.trade.adapter.outbound.LoggingTradeAudit;
+import com.uxplima.uxmessentials.trade.application.CrossServerInvites;
 import com.uxplima.uxmessentials.trade.application.CrossServerTrade;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
@@ -70,7 +73,8 @@ public final class TradeWiring {
 
     /**
      * Build the trade adapters from {@code ctx}, ready to register. The {@code economy} seam is present only when the
-     * economy provider is wired; when absent the money row is hidden and a trade moves items only.
+     * economy provider is wired; when absent the money row is hidden and a trade moves items only. {@code livePeers}
+     * names the peer backends that answer a cross-server invite.
      */
     public static Wired wire(
             ModuleContext ctx,
@@ -81,7 +85,8 @@ public final class TradeWiring {
             Bus bus,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            Supplier<Set<String>> livePeers) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(bus, "bus");
@@ -144,7 +149,17 @@ public final class TradeWiring {
         @Nullable CrossServerTradeView crossView = null;
         if (config.crossServer() && persistence != null) {
             crossView = buildCrossServer(
-                    ctx, config, economy, persistence, bus, clock, listeners, menus, menuBindings, dataFolder);
+                    ctx,
+                    config,
+                    economy,
+                    persistence,
+                    bus,
+                    clock,
+                    listeners,
+                    menus,
+                    menuBindings,
+                    dataFolder,
+                    new CrossInviteSeams(sessions, cooldown, livePeers));
         }
         TradeCommand command =
                 new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
@@ -156,7 +171,8 @@ public final class TradeWiring {
      * pure {@link CrossServerTrade} coordinator, and the solo trade window. The bus subscriber routes every inbound
      * signal to both the coordinator (the {@code READY}/{@code COMMIT}/{@code ABORT} escrow engine) and the view (the
      * rendezvous), and a join listener reconciles a rejoining player's dangling escrow. Returns the view the command
-     * opens a remote trade through and appends the window and reconcile listeners to {@code listeners}.
+     * opens a remote trade through and appends the window and reconcile listeners to {@code listeners}. The invite
+     * step shares the same-server cooldown and request expiry, so a remote request behaves like a local one.
      */
     private static CrossServerTradeView buildCrossServer(
             ModuleContext ctx,
@@ -168,7 +184,8 @@ public final class TradeWiring {
             List<Listener> listeners,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            CrossInviteSeams seams) {
         KernelPorts kernel = ctx.kernel();
         TradeEscrowStore escrows = TradeRepositories.escrowStore(persistence);
         TradeItemDelivery delivery = new BukkitTradeItemDelivery(kernel.scheduler());
@@ -182,7 +199,15 @@ public final class TradeWiring {
                 kernel.scheduler(),
                 coordinator,
                 tradeBus,
-                new CrossTradeWindow(kernel.messages(), menus, dataFolder, kernel.log()));
+                new CrossTradeWindow(kernel.messages(), menus, dataFolder, kernel.log()),
+                seams.sessions(),
+                presence -> new CrossServerInvites(
+                        tradeBus,
+                        presence,
+                        seams.livePeers(),
+                        seams.cooldown(),
+                        clock,
+                        Duration.ofSeconds(config.requestExpirySeconds())));
         crossView.register(menuBindings);
         java.util.function.Consumer<TradeSignal> route = signal -> {
             coordinator.onSignal(signal);
@@ -198,6 +223,9 @@ public final class TradeWiring {
     private static void crossViewOnSignal(CrossServerTradeView crossView, TradeSignal signal) {
         crossView.onSignal(signal);
     }
+
+    /** What the cross-server invite step shares with the same-server flow, plus the live peer roster. */
+    private record CrossInviteSeams(TradeSessions sessions, TradeCooldown cooldown, Supplier<Set<String>> livePeers) {}
 
     /** A no-op economy for an items-only cross-server install (no economy provider); money is never staked in v1. */
     private static TradeEconomy itemsOnlyEconomy() {
