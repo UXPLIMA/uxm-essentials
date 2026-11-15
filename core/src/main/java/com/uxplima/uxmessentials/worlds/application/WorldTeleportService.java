@@ -129,6 +129,14 @@ public final class WorldTeleportService {
     }
 
     /**
+     * Staff override to a world of this backend only, for a hand-off that must never leave it: a login redirect or the
+     * evacuation of a world being restored.
+     */
+    public Result<Unit, WorldError> forcedHere(PlayerRef actor, PlayerRef subject, WorldName target) {
+        return forced(actor, subject, target, Optional.of(hops.localServer()));
+    }
+
+    /**
      * Staff override: resolve, load, then teleport the subject to the world spawn ignoring restriction and fee.
      * {@code server}, when named, picks the backend whose world of that name is meant.
      */

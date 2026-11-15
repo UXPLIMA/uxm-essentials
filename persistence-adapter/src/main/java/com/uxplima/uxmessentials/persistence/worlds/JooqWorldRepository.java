@@ -29,12 +29,15 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
 
     private final String server;
 
-    /** {@code server} is this backend's network name; it must not be {@value NetworkWorld#UNSCOPED}. */
+    /**
+     * {@code server} is the scope this backend keeps its rows under: its network name, or
+     * {@value NetworkWorld#UNSCOPED} when it records no server.
+     */
     public JooqWorldRepository(DSLContext dsl, String server) {
         super(dsl);
         this.server = Objects.requireNonNull(server, "server");
-        if (server.isBlank() || server.equals(NetworkWorld.UNSCOPED)) {
-            throw new IllegalArgumentException("worlds cannot be kept for the server '" + server + "'");
+        if (server.isBlank()) {
+            throw new IllegalArgumentException("worlds cannot be kept under a blank server");
         }
     }
 

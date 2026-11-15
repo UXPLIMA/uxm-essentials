@@ -78,6 +78,7 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     private static final String BACKUP = "uxmessentials.world.backup";
     private static final String RESTORE = "uxmessentials.world.restore";
     private static final String CLAIM = "uxmessentials.world.claim";
+    private static final String SETSERVER = "uxmessentials.world.setserver";
 
     /** A network name, as the warps' server column holds it: what may follow the {@code @} of a destination. */
     private static final Pattern SERVER_NAME = Pattern.compile("[A-Za-z0-9_.-]{1,64}");
@@ -180,13 +181,20 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                         .then(Commands.argument("name", Args.token())
                                 .suggests(CommandSuggestions.fromStrings(this::unclaimedNames))
                                 .executes(this::runClaim)))
+                .then(Commands.literal("setserver")
+                        .requires(p(SETSERVER))
+                        .then(Commands.argument("from", Args.token())
+                                .suggests(CommandSuggestions.fromStrings(this::recordedServers))
+                                .then(Commands.argument("to", Args.token())
+                                        .suggests(CommandSuggestions.fromStrings(this::targetServers))
+                                        .executes(this::runSetServer))))
                 .build();
     }
 
     @Override
     public String description() {
         return "Manage worlds: create, import, load, unload, unregister, delete, list, info, spawn, tp, gui, pregen,"
-                + " backup, backups, restore, restoreconfirm, claim.";
+                + " backup, backups, restore, restoreconfirm, claim, setserver.";
     }
 
     /**
@@ -219,21 +227,37 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
     }
 
     private List<String> destinations() {
-        String local = services.localServer();
+        String local = services.localScope();
         List<String> names = new java.util.ArrayList<>();
         for (NetworkWorld world : services.repository().network()) {
-            Optional<String> server = world.knownServer();
-            if (server.isEmpty()) {
-                continue;
+            if (world.livesOn(local)) {
+                names.add(world.name().value());
+            } else if (services.showRemote()) {
+                world.knownServer().ifPresent(server -> names.add(world.name().value() + "@" + server));
             }
-            names.add(world.livesOn(local) ? world.name().value() : world.name().value() + "@" + server.get());
         }
         return names;
     }
 
-    private List<String> unclaimedNames() {
+    /** The servers some world is recorded on, the ones {@code setserver} can move worlds from. */
+    private List<String> recordedServers() {
         return services.repository().network().stream()
-                .filter(NetworkWorld::unclaimed)
+                .flatMap(world -> world.knownServer().stream())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private List<String> targetServers() {
+        List<String> servers = new java.util.ArrayList<>(recordedServers());
+        servers.add(NetworkWorld.UNSCOPED);
+        return servers;
+    }
+
+    private List<String> unclaimedNames() {
+        String local = services.localScope();
+        return services.repository().network().stream()
+                .filter(world -> world.unclaimed() && !world.livesOn(local))
                 .map(world -> world.name().value())
                 .distinct()
                 .toList();
@@ -432,6 +456,12 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
                                 entry.server().orElseThrow()));
             }
         }
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runSetServer(CommandContext<CommandSourceStack> ctx) {
+        services.setWorldServer()
+                .rename(actor(ctx), ctx.getArgument("from", String.class), ctx.getArgument("to", String.class));
         return Command.SINGLE_SUCCESS;
     }
 

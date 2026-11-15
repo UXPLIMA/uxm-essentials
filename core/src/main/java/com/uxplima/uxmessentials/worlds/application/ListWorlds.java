@@ -12,39 +12,56 @@ import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 
 /**
- * Lists every managed world of the network with the backend that runs it, for {@code /world list}. Only this
- * backend's worlds can say whether they are loaded; another backend's world reads as not loaded here.
+ * Lists the managed worlds for {@code /world list}: this backend's, then, while worlds of other servers can be reached,
+ * the other backends' by server, then the worlds no backend has claimed yet. Only this backend's worlds can say
+ * whether they are loaded.
  */
 public final class ListWorlds {
 
     private final WorldRepository repository;
     private final WorldEngine engine;
-    private final String localServer;
+    private final String localScope;
+    private final String localName;
+    private final boolean showRemote;
 
-    public ListWorlds(WorldRepository repository, WorldEngine engine, String localServer) {
+    /**
+     * Lists over {@code repository}, with the loaded state read from {@code engine}.
+     *
+     * @param localScope the server this backend keeps its rows under, {@value NetworkWorld#UNSCOPED} when it records
+     *     none
+     * @param localName the name this backend's worlds are listed under
+     * @param showRemote whether the worlds other backends run are listed, which is only useful while they can be
+     *     reached
+     */
+    public ListWorlds(
+            WorldRepository repository, WorldEngine engine, String localScope, String localName, boolean showRemote) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.localScope = Objects.requireNonNull(localScope, "localScope");
+        this.localName = Objects.requireNonNull(localName, "localName");
+        this.showRemote = showRemote;
     }
 
-    /** This backend's worlds first, then the other backends' by server, then the unclaimed ones. */
     public List<WorldListEntry> all() {
         return repository.network().stream()
                 .map(this::entryOf)
+                .flatMap(Optional::stream)
                 .sorted(Comparator.comparingInt(WorldListEntry::rank)
                         .thenComparing(entry -> entry.server().orElse(""))
                         .thenComparing(entry -> entry.name().value()))
                 .toList();
     }
 
-    private WorldListEntry entryOf(NetworkWorld world) {
-        boolean here = world.livesOn(localServer);
-        return new WorldListEntry(
-                world.name(),
-                here && engine.isLoaded(world.name()),
-                world.world().spec().environment(),
-                world.knownServer(),
-                here);
+    private Optional<WorldListEntry> entryOf(NetworkWorld world) {
+        WorldEnvironment environment = world.world().spec().environment();
+        if (world.livesOn(localScope)) {
+            return Optional.of(new WorldListEntry(
+                    world.name(), engine.isLoaded(world.name()), environment, Optional.of(localName), true));
+        }
+        if (world.unclaimed() || showRemote) {
+            return Optional.of(new WorldListEntry(world.name(), false, environment, world.knownServer(), false));
+        }
+        return Optional.empty();
     }
 
     /**

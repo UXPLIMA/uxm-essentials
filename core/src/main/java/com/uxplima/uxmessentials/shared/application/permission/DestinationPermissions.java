@@ -443,6 +443,12 @@ final class DestinationPermissions {
                         PermissionDefault.OP,
                         WORLDS),
                 PermissionSpec.of(
+                        "uxmessentials.world.setserver",
+                        "/worlds setserver <from> <to>: move every world recorded on one server to another, settings"
+                                + " included, without touching a world's files.",
+                        PermissionDefault.OP,
+                        WORLDS),
+                PermissionSpec.of(
                         "uxmessentials.world.setspawn",
                         "/worlds setspawn [name]: set a world's spawn point to where you are standing.",
                         PermissionDefault.OP,

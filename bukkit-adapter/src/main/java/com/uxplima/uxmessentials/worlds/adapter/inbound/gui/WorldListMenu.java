@@ -67,7 +67,7 @@ public final class WorldListMenu {
     private final WorldMainMenu mainMenu;
     private final WorldCreateMenu createMenu;
     private final Notifier notifier;
-    private final String localServer;
+    private final Scope scope;
 
     public WorldListMenu(
             Menus menus,
@@ -78,7 +78,7 @@ public final class WorldListMenu {
             WorldMainMenu mainMenu,
             WorldCreateMenu createMenu,
             Notifier notifier,
-            String localServer) {
+            Scope scope) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -87,7 +87,7 @@ public final class WorldListMenu {
         this.mainMenu = Objects.requireNonNull(mainMenu, "mainMenu");
         this.createMenu = Objects.requireNonNull(createMenu, "createMenu");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
-        this.localServer = Objects.requireNonNull(localServer, "localServer");
+        this.scope = Objects.requireNonNull(scope, "scope");
     }
 
     /** Register the bindings the spec names and the spec itself; called once at worlds wiring time. */
@@ -119,19 +119,21 @@ public final class WorldListMenu {
     }
 
     /**
-     * The claimed worlds of the network paired with their live loaded state, read on the calling region thread. Only
-     * this backend's worlds can be loaded here; an unclaimed world has no server to manage or reach it on, so it is
-     * left to {@code /worlds list}.
+     * This backend's worlds paired with their live loaded state, read on the calling region thread, then, while they
+     * can be reached, the worlds other servers run. An unclaimed world of no backend has no server to manage or reach
+     * it on, so it is left to {@code /worlds list}.
      */
     private WorldGrid snapshot() {
         List<WorldRow> rows = new ArrayList<>();
         for (NetworkWorld world : repository.network()) {
-            Optional<String> server = world.knownServer();
-            if (server.isEmpty()) {
+            if (world.livesOn(scope.local())) {
+                rows.add(new WorldRow(world.world(), engine.isLoaded(world.name()), scope.localName(), true));
                 continue;
             }
-            boolean here = world.livesOn(localServer);
-            rows.add(new WorldRow(world.world(), here && engine.isLoaded(world.name()), server.get(), here));
+            Optional<String> server = world.knownServer();
+            if (server.isPresent() && scope.showRemote()) {
+                rows.add(new WorldRow(world.world(), false, server.get(), false));
+            }
         }
         return new WorldGrid(rows);
     }
@@ -169,8 +171,13 @@ public final class WorldListMenu {
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         WorldRow row = ctx.entry(WorldRow.class);
         ctx.player().closeInventory();
-        scheduler.onGlobal(
-                () -> worldTeleport.forced(viewer, viewer, row.world().name(), Optional.of(row.server())));
+        scheduler.onGlobal(() -> {
+            if (row.here()) {
+                worldTeleport.forcedHere(viewer, viewer, row.world().name());
+            } else {
+                worldTeleport.forced(viewer, viewer, row.world().name(), Optional.of(row.server()));
+            }
+        });
     }
 
     /** Left-click the create button: open the engine new-world configuration screen, exactly as the old button did. */
@@ -184,6 +191,21 @@ public final class WorldListMenu {
             case THE_END -> "END_STONE";
             case NORMAL -> "GRASS_BLOCK";
         };
+    }
+
+    /**
+     * Which worlds the picker shows and how it names this backend.
+     *
+     * @param local the server this backend's worlds are recorded under
+     * @param localName the name this backend's worlds are shown under
+     * @param showRemote whether the worlds other servers run are shown, which is only useful while they can be reached
+     */
+    public record Scope(String local, String localName, boolean showRemote) {
+
+        public Scope {
+            Objects.requireNonNull(local, "local");
+            Objects.requireNonNull(localName, "localName");
+        }
     }
 
     /**

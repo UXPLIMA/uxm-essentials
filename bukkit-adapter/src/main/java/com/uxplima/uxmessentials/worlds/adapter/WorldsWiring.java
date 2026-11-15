@@ -6,6 +6,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -29,9 +30,11 @@ import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.network.WorldChanged;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -82,6 +85,7 @@ import com.uxplima.uxmessentials.worlds.application.RestoreWorld;
 import com.uxplima.uxmessentials.worlds.application.SetGamerule;
 import com.uxplima.uxmessentials.worlds.application.SetWorldAlias;
 import com.uxplima.uxmessentials.worlds.application.SetWorldProperty;
+import com.uxplima.uxmessentials.worlds.application.SetWorldServer;
 import com.uxplima.uxmessentials.worlds.application.SetWorldSpawn;
 import com.uxplima.uxmessentials.worlds.application.UnloadWorld;
 import com.uxplima.uxmessentials.worlds.application.UnregisterWorld;
@@ -138,6 +142,8 @@ public final class WorldsWiring {
             MenuBindings menuBindings,
             RescueTargets rescueTargets,
             CrossServerHops hops,
+            boolean networkEnabled,
+            NetworkPresence presence,
             Path dataFolder) {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -152,14 +158,18 @@ public final class WorldsWiring {
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(rescueTargets, "rescueTargets");
         Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(presence, "presence");
         Objects.requireNonNull(dataFolder, "dataFolder");
         KernelPorts kernel = ctx.kernel();
 
         // Every backend keeps its own rows in the shared table, keyed by its network name; the cache holds the whole
         // network's set so the list and the cross-server teleport read it from memory. A peer's change arrives as a
         // WorldChanged frame and reloads the set off the tick; the periodic resync covers a frame that was lost.
-        String localServer = hops.server();
-        CachedWorldRepository cache = WorldRepositories.cachedConcrete(persistence, localServer);
+        // A backend off a network, or under the shipped default name, keeps its worlds unscoped, as before servers were
+        // recorded, so naming the server later lets the claim move them rather than hiding them under server-1.
+        String localName = hops.server();
+        String scope = WorldScope.of(networkEnabled, localName);
+        CachedWorldRepository cache = WorldRepositories.cachedConcrete(persistence, scope);
         cache.all(); // warm the in-memory snapshot once on enable (tick-safe reads thereafter)
         bus.registry().registerResync(cache::reloadAll);
         bus.registry().register(WorldSync.listener(() -> kernel.scheduler().async(cache::reloadAll)));
@@ -189,7 +199,7 @@ public final class WorldsWiring {
         // player there through the hop the bootstrap shares between every kind: the teleport rules run here before the
         // fee, and the fee comes back on every miss. Off, the resolver is not registered and only this backend's
         // worlds can be reached, as before.
-        WorldHops worldHops = WorldHops.local(localServer);
+        WorldHops worldHops = WorldHops.local(scope);
         if (ctx.config().getBoolean("cross-server.enabled", false)) {
             hops.register(new WorldHopResolver(
                     repository,
@@ -209,7 +219,7 @@ public final class WorldsWiring {
             worldHops = new WorldHops(
                     Optional.of(hops.departures(new TeleportHopGate(teleportEngine))),
                     Optional.of(hops.departures(staffGate)),
-                    localServer);
+                    scope);
         }
         WorldTeleportService worldTeleport = new WorldTeleportService(
                 repository,
@@ -280,7 +290,8 @@ public final class WorldsWiring {
         BiConsumer<Player, PlayerRef> reopenList = (player, viewer) -> listHolder[0].open(player, viewer);
         WorldMainMenu mainMenu = new WorldMainMenu(menus, tracked, repository, engine, reopenList);
         WorldServerAdoption adoption = new WorldServerAdoption(
-                persistence, tracked, kernel.log(), localServer, engine, cache, bus.publisher());
+                persistence, tracked, kernel.log(), scope, localName, engine, cache, bus.publisher());
+        boolean showRemote = worldHops.enabled();
         WorldsServices services = assemble(
                 kernel,
                 tracked,
@@ -299,7 +310,10 @@ public final class WorldsWiring {
                 reopenList,
                 mainMenu::open,
                 new ClaimWorld(adoption, notifier, tracked),
-                localServer);
+                new SetWorldServer(adoption, notifier, presence, tracked, kernel.log()),
+                scope,
+                localName,
+                showRemote);
         // The create screen reopens the engine list on cancel/create through the shared reopen seam, runs the started
         // CreateWorld use case, and captures text through the shared input seam.
         WorldCreateMenu createMenu = new WorldCreateMenu(
@@ -331,15 +345,31 @@ public final class WorldsWiring {
         // the create screen) and the forced-teleport service (right-click), then close the cycle and register every
         // editor screen's bindings and spec with the menu engine.
         WorldListMenu worldListMenu = new WorldListMenu(
-                menus, tracked, repository, engine, worldTeleport, mainMenu, createMenu, notifier, localServer);
+                menus,
+                tracked,
+                repository,
+                engine,
+                worldTeleport,
+                mainMenu,
+                createMenu,
+                notifier,
+                new WorldListMenu.Scope(scope, localName, showRemote));
         listHolder[0] = worldListMenu;
         worldListMenu.register(menuBindings, dataFolder, kernel.log());
         mainMenu.register(menuBindings, dataFolder, kernel.log());
         createMenu.register(menuBindings, dataFolder, kernel.log());
         generationMenu.register(menuBindings, dataFolder, kernel.log());
         gridMenu.register(menuBindings, dataFolder, kernel.log());
+        // The reconcile writes through the cache alone and the peers hear one change once it is done, not one per
+        // world.
+        AtomicBoolean claimWent = new AtomicBoolean(true);
         ReconcileWorldsOnEnable reconcile = new ReconcileWorldsOnEnable(
-                repository, engine, kernel.events(), clock, settings::autoAdoptLoaded, settings::autoLoadRegistered);
+                cache,
+                engine,
+                kernel.events(),
+                clock,
+                () -> settings.autoAdoptLoaded() && claimWent.get(),
+                settings::autoLoadRegistered);
 
         // Re-apply a world's stored settings to the live world on load and after any setting change, on the global
         // region thread (the applier touches Bukkit world handles). Creating a world publishes no WorldLoaded, so a
@@ -364,10 +394,15 @@ public final class WorldsWiring {
                 portalListener);
         List<CommandRegistration> commands = WorldCommands.all(services, kernel.messages());
         // The claim of the unclaimed rows this backend has comes first, so the reconcile that follows adopts and
-        // auto-loads only this backend's rows and never adds a second row beside an unclaimed one.
-        Runnable startReconcile = () -> adoption.claimThen(() -> {
+        // auto-loads only this backend's rows and never adds a second row beside an unclaimed one. A claim that failed
+        // skips the adopt phase for this start, for the same reason.
+        Runnable startReconcile = () -> adoption.claimThen(claimed -> {
+            claimWent.set(claimed);
             reconcile.run();
-            tracked.async(cache::reloadAll);
+            tracked.async(() -> {
+                cache.reloadAll();
+                WorldSync.announce(bus.publisher(), WorldChanged.SEVERAL);
+            });
             services.refreshImportableFolders();
         });
         return new Wired(
@@ -424,7 +459,10 @@ public final class WorldsWiring {
             BiConsumer<Player, PlayerRef> openWorldList,
             com.uxplima.uxmessentials.worlds.adapter.inbound.gui.WorldMainOpener openWorldMain,
             ClaimWorld claimWorld,
-            String localServer) {
+            SetWorldServer setWorldServer,
+            String scope,
+            String localName,
+            boolean showRemote) {
         CreateWorld createWorld = new CreateWorld(
                 repository, engine, notifier, kernel.events(), scheduler, clock, settings::creationDefaults);
         ImportWorld importWorld = new ImportWorld(repository, engine, notifier, kernel.events(), scheduler, clock);
@@ -441,7 +479,7 @@ public final class WorldsWiring {
                 clock,
                 settings::protectDefaultWorld,
                 settings::deleteConfirmTimeout);
-        ListWorlds listWorlds = new ListWorlds(repository, engine, localServer);
+        ListWorlds listWorlds = new ListWorlds(repository, engine, scope, localName, showRemote);
         WorldInfo worldInfo = new WorldInfo(repository);
         SetWorldProperty setProperty = new SetWorldProperty(repository, notifier, kernel.events(), scheduler);
         SetGamerule setGamerule = new SetGamerule(repository, ruleCatalog, notifier, kernel.events(), scheduler);
@@ -473,7 +511,9 @@ public final class WorldsWiring {
                 openWorldList,
                 openWorldMain,
                 claimWorld,
-                localServer);
+                setWorldServer,
+                scope,
+                showRemote);
     }
 
     /**

@@ -322,6 +322,7 @@ import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.adapter.outbound.RepositoryWarpRespawnLocator;
 import com.uxplima.uxmessentials.warps.adapter.outbound.api.WarpQueries;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
+import com.uxplima.uxmessentials.worlds.adapter.WorldScope;
 import com.uxplima.uxmessentials.worlds.adapter.WorldsWiring;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.LinkedWorldEntryFee;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.TeleportRescueTargets;
@@ -1088,7 +1089,9 @@ public final class PluginModule {
                         ? Optional.of(config.scoped(ModuleId.of("messaging").configRoot()))
                         : Optional.empty(),
                 importTargets,
-                bus.publisher());
+                bus.publisher(),
+                WorldScope.of(
+                        NetworkConfig.from(config).enabled(), bus.publisher().serverId()));
         return new MigrationImportNode(service, kernel.messages());
     }
 
@@ -2335,6 +2338,9 @@ public final class PluginModule {
                 menuBindings,
                 rescueTargets,
                 links.hops,
+                // Off a network, or under the shipped default name, a backend records no server on its worlds.
+                links.network.enabled(),
+                links.presence,
                 plugin.getDataFolder().toPath());
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);

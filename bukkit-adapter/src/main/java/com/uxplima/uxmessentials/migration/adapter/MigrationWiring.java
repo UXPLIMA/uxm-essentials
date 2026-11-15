@@ -97,6 +97,8 @@ public final class MigrationWiring {
      *     messaging module is off; then imported mail is skipped and audited
      * @param targets the running modules' own repositories, which the import writes through so their caches see it
      * @param publisher the cross-server bus, which hears what an import changed once it ends
+     * @param worldScope the server imported worlds are recorded under when the worlds module is not running, the
+     *     same scope that module keeps this backend's worlds under
      */
     public static MigrationImportService wire(
             Plugin plugin,
@@ -109,7 +111,8 @@ public final class MigrationWiring {
             boolean enabled,
             Optional<ConfigStore> messagingConfig,
             ImportTargets targets,
-            BusPublisher publisher) {
+            BusPublisher publisher,
+            String worldScope) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
@@ -118,11 +121,12 @@ public final class MigrationWiring {
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(publisher, "publisher");
+        Objects.requireNonNull(worldScope, "worldScope");
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(
                 targets,
-                new DatabaseStores(plugin, persistence, economyConfig, log, publisher.serverId()),
+                new DatabaseStores(plugin, persistence, economyConfig, log, worldScope),
                 ports(persistence, economyConfig, log, messagingConfig),
                 publisher,
                 scheduler);

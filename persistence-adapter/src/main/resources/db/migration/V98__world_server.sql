@@ -7,10 +7,16 @@
 -- table still holds V61's names until it is dropped), the rows are copied, and the old table is dropped.
 --
 -- Every existing row is copied under the server 'unscoped', the sentinel V89 and V94 use: this file cannot know which
--- backend holds a world. Each backend claims, when it starts, the unscoped rows of the worlds it actually has (a world
--- loaded under the row's uid, or a world folder of that name with no loaded world of another uid), so the first
--- backend to start never takes the rows of another. A row no backend claims stays unscoped and is listed as unclaimed.
--- Nothing ever saves under 'unscoped'.
+-- backend holds a world. A backend that records no server (off a network, or under the shipped default name) keeps
+-- reading and writing these rows as its own, so a standalone server behaves exactly as before. A backend on a network
+-- under its own name claims, when it starts, the unscoped rows of the worlds it actually has (a world loaded under the
+-- row's uid, or a world folder of that name with no world of that name loaded), and copies the row for itself when its
+-- loaded world of that name has another uid, so the first backend to start never takes the rows of another. A row no
+-- backend claims stays unscoped and is listed as unclaimed.
+--
+-- MySQL and MariaDB do not roll DDL back, so a run that fails half way leaves the tables part renamed, and the retry
+-- fails on the first RENAME. To recover, drop world and world_setting if this file created them, rename
+-- world_v1_legacy and world_setting_v1_legacy back to world and world_setting, and start the server again.
 --
 -- Plain ALTER, CREATE, INSERT ... SELECT and DROP statements run unchanged on SQLite, MySQL/MariaDB and PostgreSQL.
 

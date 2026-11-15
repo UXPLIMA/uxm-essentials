@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.worlds.adapter.outbound;
 
 import java.math.BigDecimal;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -47,13 +48,20 @@ public final class EconomyWorldEntryFee implements WorldEntryFee {
     }
 
     /**
-     * Fees are only ever taken in the one currency this module is wired with, so the credit goes back in it whatever
-     * id the hop carried: a peer configured with another currency cannot make this backend pay out in a third.
+     * Credit back in the currency the fee was taken in, which the hop carried. A backend's fee currency can differ from
+     * the origin's, or change on a reload, so crediting this backend's own currency could pay out money that was never
+     * taken. A currency this backend does not know is not credited at all: false lets the hop log the charge it could
+     * not give back.
      */
     @Override
     public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
-        return provider.credit(who, Money.of(currency, amount)).isOk();
+        Objects.requireNonNull(currencyId, "currencyId");
+        Optional<Currency> charged = provider.currencies().stream()
+                .filter(known -> known.id().value().equalsIgnoreCase(currencyId))
+                .findFirst();
+        return charged.isPresent()
+                && provider.credit(who, Money.of(charged.get(), amount)).isOk();
     }
 }
