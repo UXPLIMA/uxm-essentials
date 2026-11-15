@@ -61,6 +61,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.HomeSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
@@ -186,7 +187,8 @@ public final class HomesWiring {
                     cached.invalidateAll();
                     bus.publisher().publish(HomeSync.everyOwnerChanged(localServer));
                 },
-                kernel.log());
+                kernel.log(),
+                NetworkConfig.DEFAULT_SERVER_ID);
         HomeServices services = assemble(
                 plugin,
                 ctx,
