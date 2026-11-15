@@ -23,6 +23,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * context through {@link HomeTeleporter}; this use case never moves the player itself, so the shared
  * cooldown, the move-cancellable warmup, and the region-aware async hop are all the teleport context's
  * concern.
+ *
+ * <p>A home set on another backend, while the homes {@code cross-server} block is on, is reached through the shared
+ * cross-server hop instead, after the same teleport rules; a visit carries no charge.
  */
 public final class VisitHome {
 
@@ -30,13 +33,19 @@ public final class VisitHome {
     private final HomeInviteRepository invites;
     private final HomeTeleporter teleporter;
     private final Notifier notifier;
+    private final HomeHops hops;
 
     public VisitHome(
-            HomeRepository repository, HomeInviteRepository invites, HomeTeleporter teleporter, Notifier notifier) {
+            HomeRepository repository,
+            HomeInviteRepository invites,
+            HomeTeleporter teleporter,
+            Notifier notifier,
+            HomeHops hops) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.hops = Objects.requireNonNull(hops, "hops");
     }
 
     /** Teleport {@code actor} to {@code owner}'s home in {@code slot} when an access gate admits them. */
@@ -56,6 +65,9 @@ public final class VisitHome {
         if (!accessible) {
             notifier.send(actor, HomeError.NOT_ACCESSIBLE.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_ACCESSIBLE);
+        }
+        if (hops.routes(home)) {
+            return hops.travel(actor, home, () -> Result.ok(Optional.empty()));
         }
         notifier.send(actor, HomesMessageKey.HOME_TELEPORTING, slotPlaceholder(slot));
         teleporter.teleportTo(actor, home);

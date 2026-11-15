@@ -39,6 +39,7 @@ public final class HomeAdmin {
     private final Notifier notifier;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final HomeHops hops;
 
     public HomeAdmin(
             HomeRepository repository,
@@ -46,13 +47,15 @@ public final class HomeAdmin {
             HomeTeleporter teleporter,
             Notifier notifier,
             DomainEventPublisher events,
-            Clock clock) {
+            Clock clock,
+            HomeHops hops) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.hops = Objects.requireNonNull(hops, "hops");
     }
 
     /** List {@code target}'s homes to {@code actor}, returning them for the adapter to render. */
@@ -85,7 +88,10 @@ public final class HomeAdmin {
         return Result.ok();
     }
 
-    /** Teleport {@code actor} to {@code target}'s home in {@code slot}, delegating the hop to teleport. */
+    /**
+     * Teleport {@code actor} to {@code target}'s home in {@code slot}, delegating the hop to teleport, or, for a home on
+     * another backend while the homes {@code cross-server} block is on, to the shared cross-server hop.
+     */
     public Result<Unit, HomeError> teleport(PlayerRef actor, PlayerRef target, HomeSlot slot) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -94,6 +100,9 @@ public final class HomeAdmin {
         if (home.isEmpty()) {
             notifier.send(actor, HomeError.NOT_FOUND.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_FOUND);
+        }
+        if (hops.routes(home.get())) {
+            return hops.travel(actor, home.get(), () -> Result.ok(Optional.empty()));
         }
         teleporter.teleportTo(actor, home.get());
         return Result.ok();
@@ -115,10 +124,10 @@ public final class HomeAdmin {
         Result<HomeSet.Change, HomeError> outcome;
         if (set.find(slot).isPresent()) {
             // Slot occupied: re-anchor, keeping label and icon.
-            outcome = set.relocate(slot, at, clock.instant());
+            outcome = set.relocate(slot, at, hops.localServer(), clock.instant());
         } else {
             // Slot free: create, bypassing the owner's quota.
-            outcome = set.createAt(slot, at, HomeLimit.noLimit(), MAX_ADMIN_SLOTS, clock.instant());
+            outcome = set.createAt(slot, at, hops.localServer(), HomeLimit.noLimit(), MAX_ADMIN_SLOTS, clock.instant());
         }
         if (outcome.isErr()) {
             notifier.send(actor, outcome.errorOrThrow().messageKey(), slotPlaceholder(slot));

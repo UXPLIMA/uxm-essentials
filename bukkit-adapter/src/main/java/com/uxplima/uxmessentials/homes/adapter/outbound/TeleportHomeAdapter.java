@@ -37,4 +37,17 @@ public final class TeleportHomeAdapter implements HomeTeleporter {
         Objects.requireNonNull(home, "home");
         engine.launch(who, Destination.at(home.location()), TeleportKind.HOME);
     }
+
+    @Override
+    public void arrive(PlayerRef who, Home home, Runnable onLanded, Runnable onMissed) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(home, "home");
+        Objects.requireNonNull(onLanded, "onLanded");
+        Objects.requireNonNull(onMissed, "onMissed");
+        // The same destination shape as a launch, so the landing stamps the home cooldown key the origin checked.
+        if (engine.arriveImmediately(who, Destination.at(home.location()), TeleportKind.HOME, onLanded, onMissed)
+                .isErr()) {
+            onMissed.run();
+        }
+    }
 }

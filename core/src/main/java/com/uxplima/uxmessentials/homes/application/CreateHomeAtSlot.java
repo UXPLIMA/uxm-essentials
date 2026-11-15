@@ -29,6 +29,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * range/occupancy/limit invariants and creates the home; if the transition succeeds, the optional economy
  * charge is applied before the result is committed. Hitting the cap publishes {@code HomeLimitReached} and
  * returns {@link HomeError#LIMIT_REACHED} so the command renders the limit message, never an inline literal.
+ *
+ * <p>The home is recorded on this backend, since its world is one this backend holds.
  */
 public final class CreateHomeAtSlot {
 
@@ -42,6 +44,7 @@ public final class CreateHomeAtSlot {
     private final HomeCharge charge;
     private final int unlimitedMaxSlots;
     private final Clock clock;
+    private final String localServer;
 
     public CreateHomeAtSlot(
             HomeRepository repository,
@@ -53,7 +56,8 @@ public final class CreateHomeAtSlot {
             DomainGate gate,
             HomeCharge charge,
             int unlimitedMaxSlots,
-            Clock clock) {
+            Clock clock,
+            String localServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.quota = Objects.requireNonNull(quota, "quota");
@@ -67,6 +71,7 @@ public final class CreateHomeAtSlot {
         }
         this.unlimitedMaxSlots = unlimitedMaxSlots;
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
     /** Create {@code owner}'s home in {@code slot} at {@code at}, gating on the guards, the aggregate, and the economy charge. */
@@ -82,7 +87,7 @@ public final class CreateHomeAtSlot {
             return guarded;
         }
         // Validate via the aggregate first: free checks before the paid charge gate.
-        Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, limit, max, clock.instant());
+        Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, localServer, limit, max, clock.instant());
         if (outcome.isErr()) {
             return reject(set, limit, outcome.errorOrThrow());
         }

@@ -92,12 +92,14 @@ public final class HomeSet {
     /**
      * {@code /sethome}: create a new home in {@code slot}. The slot must be within range ({@code slot.index()
      * < maxSlots}) and free, and the owner must be under their resolved {@code limit}; otherwise the matching
-     * {@link HomeError} is returned. A successful create raises {@link HomeCreated}.
+     * {@link HomeError} is returned. A successful create raises {@link HomeCreated}. The home is recorded on
+     * {@code onServer}, the backend whose world {@code location} is in.
      */
     public Result<Change, HomeError> createAt(
-            HomeSlot slot, Position location, HomeLimit limit, int maxSlots, Instant now) {
+            HomeSlot slot, Position location, String onServer, HomeLimit limit, int maxSlots, Instant now) {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(onServer, "onServer");
         Objects.requireNonNull(limit, "limit");
         Objects.requireNonNull(now, "now");
         if (slot.index() >= maxSlots) {
@@ -109,20 +111,24 @@ public final class HomeSet {
         if (limit.isReachedAt(count())) {
             return Result.err(HomeError.LIMIT_REACHED);
         }
-        Home created = Home.create(owner, slot, location, now);
+        Home created = Home.create(owner, slot, location, onServer, now);
         return Result.ok(Change.raising(put(created), created, new HomeCreated(owner, slot, location)));
     }
 
-    /** Re-anchor the home in {@code slot} to {@code location}, keeping its label, icon, and creation time. */
-    public Result<Change, HomeError> relocate(HomeSlot slot, Position location, Instant now) {
+    /**
+     * Re-anchor the home in {@code slot} to {@code location} on {@code onServer}, keeping its label, icon, and creation
+     * time.
+     */
+    public Result<Change, HomeError> relocate(HomeSlot slot, Position location, String onServer, Instant now) {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(onServer, "onServer");
         Objects.requireNonNull(now, "now");
         Home existing = homes.get(slot);
         if (existing == null) {
             return Result.err(HomeError.NOT_FOUND);
         }
-        Home moved = existing.relocatedTo(location, now);
+        Home moved = existing.relocatedTo(location, onServer, now);
         return Result.ok(Change.raising(put(moved), moved, new HomeRelocated(owner, slot)));
     }
 

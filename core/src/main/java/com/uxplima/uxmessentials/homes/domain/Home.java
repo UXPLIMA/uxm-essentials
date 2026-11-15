@@ -28,6 +28,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * @param isPublic whether any player may visit this home; a new home is private until the owner shares it
  * @param createdAt when the home was first created (preserved across every copy-op)
  * @param updatedAt when the home was last changed (bumped by every copy-op)
+ * @param server the network name of the backend the home was set on, or empty when that is not known (a home from
+ *     before homes recorded it, or one an importer wrote)
  */
 public record Home(
         PlayerRef owner,
@@ -37,7 +39,11 @@ public record Home(
         Optional<HomeIcon> icon,
         boolean isPublic,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        Optional<String> server) {
+
+    /** The server of a home whose backend is not known; never the name of a running backend. */
+    public static final String UNSCOPED = "unscoped";
 
     public Home {
         Objects.requireNonNull(owner, "owner");
@@ -47,38 +53,74 @@ public record Home(
         Objects.requireNonNull(icon, "icon");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");
+        Objects.requireNonNull(server, "server");
+        if (server.filter(String::isBlank).isPresent()) {
+            throw new IllegalArgumentException("a home's server must not be blank");
+        }
     }
 
-    /** A new private home created now at {@code location} with no label and no icon. */
+    /**
+     * A new private home created now at {@code location} with no label, no icon and no known server, as an importer
+     * writes one: the backend that holds its world claims it on its next start.
+     */
     public static Home create(PlayerRef owner, HomeSlot slot, Position location, Instant now) {
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, Optional.empty(), Optional.empty(), false, now, now);
+        return new Home(owner, slot, location, Optional.empty(), Optional.empty(), false, now, now, Optional.empty());
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping slot, label, icon, and visibility; bumps {@code updatedAt}. */
-    public Home relocatedTo(Position newLocation, Instant now) {
+    /** A new private home created now at {@code location} on the backend {@code onServer}. */
+    public static Home create(PlayerRef owner, HomeSlot slot, Position location, String onServer, Instant now) {
+        return create(owner, slot, location, now).onServer(onServer);
+    }
+
+    /**
+     * A copy re-anchored to {@code newLocation} on the backend {@code onServer}, keeping slot, label, icon, and
+     * visibility; bumps {@code updatedAt}. The server moves with the position: a home lives where its world is.
+     */
+    public Home relocatedTo(Position newLocation, String onServer, Instant now) {
         Objects.requireNonNull(newLocation, "newLocation");
+        Objects.requireNonNull(onServer, "onServer");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, newLocation, label, icon, isPublic, createdAt, now);
+        return new Home(owner, slot, newLocation, label, icon, isPublic, createdAt, now, Optional.of(onServer));
+    }
+
+    /** A copy recorded as set on the backend {@code onServer}. */
+    public Home onServer(String onServer) {
+        Objects.requireNonNull(onServer, "onServer");
+        return new Home(owner, slot, location, label, icon, isPublic, createdAt, updatedAt, Optional.of(onServer));
+    }
+
+    /**
+     * The backend the home lives on, when it is known. {@value #UNSCOPED} marks a row from before homes recorded their
+     * server, and reads as not known.
+     */
+    public Optional<String> knownServer() {
+        return server.filter(name -> !name.equals(UNSCOPED));
+    }
+
+    /** True when the home is known to live on a backend other than {@code localServer}. */
+    public boolean livesElsewhere(String localServer) {
+        Objects.requireNonNull(localServer, "localServer");
+        return knownServer().filter(name -> !name.equals(localServer)).isPresent();
     }
 
     /** A copy under {@code newLabel}, keeping slot, location, icon, and visibility; bumps {@code updatedAt}. */
     public Home withLabel(Optional<HomeLabel> newLabel, Instant now) {
         Objects.requireNonNull(newLabel, "newLabel");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, newLabel, icon, isPublic, createdAt, now);
+        return new Home(owner, slot, location, newLabel, icon, isPublic, createdAt, now, server);
     }
 
     /** A copy under {@code newIcon}, keeping slot, location, label, and visibility; bumps {@code updatedAt}. */
     public Home withIcon(Optional<HomeIcon> newIcon, Instant now) {
         Objects.requireNonNull(newIcon, "newIcon");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, label, newIcon, isPublic, createdAt, now);
+        return new Home(owner, slot, location, label, newIcon, isPublic, createdAt, now, server);
     }
 
     /** A copy with visibility set to {@code makePublic}, keeping everything else; bumps {@code updatedAt}. */
     public Home withVisibility(boolean makePublic, Instant now) {
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, location, label, icon, makePublic, createdAt, now);
+        return new Home(owner, slot, location, label, icon, makePublic, createdAt, now, server);
     }
 }

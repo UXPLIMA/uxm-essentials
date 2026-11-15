@@ -23,6 +23,16 @@ public enum HomesMessageKey implements MessageKey {
     // teleport
     HOME_TELEPORTING("home.teleporting"),
 
+    // a home on another server of the network, reached through the proxy
+    HOME_CROSS_SERVER_SENDING("home.cross-server.sending"),
+    HOME_CROSS_SERVER_UNAVAILABLE("home.cross-server.unavailable"),
+    HOME_CROSS_SERVER_ARRIVED("home.cross-server.arrived"),
+    HOME_CROSS_SERVER_FAILED("home.cross-server.failed"),
+    HOME_CROSS_SERVER_TIMED_OUT("home.cross-server.timed-out"),
+    HOME_CROSS_SERVER_MISROUTED("home.cross-server.misrouted"),
+    HOME_CROSS_SERVER_REFUNDED("home.cross-server.refunded"),
+    HOME_CROSS_SERVER_UNSAFE("home.cross-server.unsafe"),
+
     // public/private visibility + invites/visit
     HOME_VISIBILITY_PUBLIC("home.visibility.public"),
     HOME_VISIBILITY_PRIVATE("home.visibility.private"),
