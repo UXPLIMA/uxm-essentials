@@ -51,7 +51,7 @@ class FakeConnectionLineTest {
     }
 
     @Test
-    void anOperatorsLineReadsTheViewersPlaceholdersAndThePrefix() {
+    void anOperatorsLineReadsThePlaceholdersAndThePrefix() {
         UnaryOperator<String> placeholders = source -> source.replace("%luckperms_prefix%", "[VIP] ");
 
         Component line = VanishConnectionMessenger.render(
@@ -61,6 +61,39 @@ class FakeConnectionLineTest {
         assertThat(String.join(
                         "", texts(line).stream().map(TextComponent::content).toList()))
                 .isEqualTo("[server] [VIP] Steve left the game");
+    }
+
+    @Test
+    void everyViewerSeesTheSubjectsRankNotTheirOwn() {
+        // The VIP and the member reading the line each have a rank of their own; only the subject's is ever asked for.
+        UnaryOperator<String> subjectsRank = source -> source.replace("%luckperms_prefix%", "[Owner] ");
+        List<VanishConnectionMessenger.Pending> viewers = List.of(
+                new VanishConnectionMessenger.Pending("%luckperms_prefix%{player} left the game", ""),
+                new VanishConnectionMessenger.Pending("%luckperms_prefix%{player} hat das Spiel verlassen", ""));
+
+        List<String> lines = VanishConnectionMessenger.finish(viewers, "Steve", DISPLAY, subjectsRank).stream()
+                .map(line -> String.join(
+                        "",
+                        texts(line.orElseThrow()).stream()
+                                .map(TextComponent::content)
+                                .toList()))
+                .toList();
+
+        assertThat(lines).containsExactly("[Owner] Steve left the game", "[Owner] Steve hat das Spiel verlassen");
+    }
+
+    @Test
+    void aSharedLineReadsTheSubjectsPlaceholdersOnce() {
+        List<String> asked = new ArrayList<>();
+        UnaryOperator<String> subject = source -> {
+            asked.add(source);
+            return source;
+        };
+        VanishConnectionMessenger.Pending same = new VanishConnectionMessenger.Pending("{player} left the game", "");
+
+        VanishConnectionMessenger.finish(List.of(same, same, same), "Steve", DISPLAY, subject);
+
+        assertThat(asked).hasSize(1);
     }
 
     @Test

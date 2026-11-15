@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.vanish.adapter.outbound;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -43,11 +46,12 @@ import org.jspecify.annotations.NullMarked;
  * template, everyone else gets the public one; a blank template sends that group nothing. The whole broadcast is a
  * no-op when {@code fake-join-quit} is off.
  *
- * <p>Like a line through the message sink, each one reads the viewer's PlaceholderAPI values, the shared
- * {@code <prefix>} and a leading {@code <center>}, so a fake line written to match a server's real join line (a rank
- * prefix from a placeholder, say) reads the same as the real one. The online roster is enumerated on the global region
- * thread (Folia forbids reading {@code getOnlinePlayers()} off it), and each line is finished and handed to its viewer
- * on the viewer's own thread. The vanishing player themselves is skipped:
+ * <p>Like a line through the message sink, each one reads PlaceholderAPI values, the shared {@code <prefix>} and a
+ * leading {@code <center>}, so a fake line written to match a server's real join line reads the same as the real one.
+ * The placeholders are the vanishing player's, as in a real join line (a rank prefix is theirs, never the reader's),
+ * and are read on that player's own thread together with their display name. The online roster and each viewer's
+ * language line are read on the global region thread (Folia forbids reading {@code getOnlinePlayers()} off it), and
+ * each finished line is handed to its viewer on the viewer's own thread. The vanishing player themselves is skipped:
  * they already know, and get their own {@code /vanish} confirmation.
  */
 @NullMarked
@@ -86,21 +90,8 @@ public final class VanishConnectionMessenger {
             return;
         }
         VanishLevel useLevel = levels.useLevel(who);
-        // The name is read on the player's own thread, once, so every viewer is drawn the same one; a player who left
-        // in between is drawn by their bare name.
-        scheduler.onEntity(
-                who,
-                () -> {
-                    Player subject = Bukkit.getPlayer(who.uuid());
-                    Component display = subject != null ? subject.teamDisplayName() : Component.text(who.name());
-                    fanOut(who, useLevel, publicTemplate, staffTemplate, display);
-                },
-                () -> fanOut(who, useLevel, publicTemplate, staffTemplate, Component.text(who.name())));
-    }
-
-    private void fanOut(
-            PlayerRef who, VanishLevel useLevel, String publicTemplate, String staffTemplate, Component display) {
         scheduler.onGlobal(() -> {
+            List<Recipient> recipients = new ArrayList<>();
             for (Player online : Bukkit.getOnlinePlayers()) {
                 PlayerRef viewer = BukkitRefs.toRef(online);
                 if (viewer.equals(who)) {
@@ -108,26 +99,70 @@ public final class VanishConnectionMessenger {
                 }
                 boolean canSee = VanishLevels.sees(levels.seeLevel(viewer), useLevel);
                 String template = canSee ? staffTemplate : publicTemplate;
-                if (template.isBlank()) {
-                    continue;
+                if (!template.isBlank()) {
+                    recipients.add(new Recipient(
+                            online,
+                            viewer,
+                            new Pending(
+                                    HudText.lineFor(viewer.uuid(), template),
+                                    messages.resolve(viewer, PREFIX, Map.of()))));
                 }
-                // Placeholders read the viewer's own state, so the line is finished on the viewer's thread.
-                scheduler.onEntity(
-                        viewer,
-                        () -> render(
-                                        HudText.lineFor(viewer.uuid(), template),
-                                        who.name(),
-                                        display,
-                                        PlaceholderApiSupport.messageBridge(viewer.uuid()),
-                                        messages.resolve(viewer, PREFIX, Map.of()))
-                                .ifPresent(online::sendMessage));
             }
+            if (recipients.isEmpty()) {
+                return;
+            }
+            // The name and the placeholders describe the player who "left" or "joined", as in a real line, so both are
+            // read on that player's own thread. A player gone by then is drawn by their bare name, placeholders unread.
+            scheduler.onEntity(
+                    who,
+                    () -> {
+                        Player subject = Bukkit.getPlayer(who.uuid());
+                        Component display = subject != null ? subject.teamDisplayName() : Component.text(who.name());
+                        deliver(recipients, who, display, PlaceholderApiSupport.messageBridge(who.uuid()));
+                    },
+                    () -> deliver(recipients, who, Component.text(who.name()), UnaryOperator.identity()));
         });
     }
 
+    private void deliver(List<Recipient> recipients, PlayerRef who, Component display, UnaryOperator<String> subject) {
+        List<Optional<Component>> lines =
+                finish(recipients.stream().map(Recipient::pending).toList(), who.name(), display, subject);
+        for (int index = 0; index < recipients.size(); index++) {
+            Recipient recipient = recipients.get(index);
+            lines.get(index)
+                    .ifPresent(line -> scheduler.onEntity(
+                            recipient.ref(), () -> recipient.player().sendMessage(line)));
+        }
+    }
+
+    /**
+     * Each viewer's line finished with the subject's own placeholders, read through {@code subject} once per distinct
+     * line however many viewers share it. A viewer adds only their language's line and their language's prefix.
+     */
+    static List<Optional<Component>> finish(
+            List<Pending> pending, String name, Component display, UnaryOperator<String> subject) {
+        Map<String, String> expanded = new HashMap<>();
+        UnaryOperator<String> once = source -> expanded.computeIfAbsent(source, subject);
+        List<Optional<Component>> lines = new ArrayList<>(pending.size());
+        for (Pending line : pending) {
+            lines.add(render(line.line(), name, display, once, line.prefix()));
+        }
+        return lines;
+    }
+
+    /**
+     * One viewer's share of a broadcast, read on the global thread: the line in their language and the prefix in it.
+     *
+     * @param line the template as this viewer reads it
+     * @param prefix the shared chat prefix in this viewer's language
+     */
+    record Pending(String line, String prefix) {}
+
+    private record Recipient(Player player, PlayerRef ref, Pending pending) {}
+
     /**
      * {@code line} finished the way every other chat line is: {@code {player}} as the bare {@code name},
-     * {@code <display_name>} as the {@code display} component, the viewer's placeholders through {@code bridge},
+     * {@code <display_name>} as the {@code display} component, the subject's placeholders through {@code bridge},
      * {@code <prefix>} as {@code prefix}, and a leading {@code <center>} drawn in the middle of the chat. Empty when the
      * line is blank, or when the name is one no account could have, which is never filled in.
      */
