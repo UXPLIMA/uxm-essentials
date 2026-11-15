@@ -17,7 +17,12 @@ final class LocationNodes {
 
     /** Read a location node, or {@code null} when the world key is absent (an unusable entry). */
     static @Nullable EssXLocation read(ConfigurationNode node) {
-        String world = node.node("world-name").getString(node.node("world").getString());
+        String world = node.node("world-name").getString();
+        if (world == null || world.isBlank()) {
+            // Read separately: Configurate rejects a null default, so a node with only one of the two keys must not
+            // pass the missing one's null as the other's default.
+            world = node.node("world").getString();
+        }
         if (world == null || world.isBlank()) {
             return null;
         }

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.map.JailMuteMappe
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.KitMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.UserdataMapper;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.WarpMapper;
+import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXKit;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.KitsParser;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.UserdataParser;
@@ -107,8 +108,18 @@ final class EssentialsXPlan implements ImportPlan {
             return Stream.empty();
         }
         try {
-            return kits.parse(file).stream().map(kitMapper::map).map(ImportRecord.KitRecord::new);
+            return kits.parse(file).stream().flatMap(this::toKitRecord);
         } catch (IOException | RuntimeException badFile) {
+            return Stream.empty();
+        }
+    }
+
+    private Stream<ImportRecord> toKitRecord(EssXKit kit) {
+        // Mapped per kit, here and not later in the stream, so a kit that cannot be imported is dropped on its own
+        // instead of throwing out of the importer's drain and ending the whole run.
+        try {
+            return Stream.of(new ImportRecord.KitRecord(kitMapper.map(kit)));
+        } catch (RuntimeException badKit) {
             return Stream.empty();
         }
     }
