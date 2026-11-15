@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.guard.adapter.inbound.command;
 
+import java.time.Duration;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -67,8 +68,11 @@ import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmlib.command.Gate;
@@ -96,6 +100,7 @@ public final class GuardCommand implements CommandRegistration {
     private final Consumer<Player> openMenu;
     private final Runnable reload;
     private final BiConsumer<Player, Runnable> onPlayer;
+    private final Scheduler scheduler;
     private final boolean rgAlias;
 
     public GuardCommand(
@@ -109,6 +114,7 @@ public final class GuardCommand implements CommandRegistration {
             Consumer<Player> openMenu,
             Runnable reload,
             BiConsumer<Player, Runnable> onPlayer,
+            Scheduler scheduler,
             boolean rgAlias) {
         this.guard = Objects.requireNonNull(guard, "guard");
         this.service = guard.service();
@@ -121,6 +127,7 @@ public final class GuardCommand implements CommandRegistration {
         this.openMenu = Objects.requireNonNull(openMenu, "openMenu");
         this.reload = Objects.requireNonNull(reload, "reload");
         this.onPlayer = Objects.requireNonNull(onPlayer, "onPlayer");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.rgAlias = rgAlias;
     }
 
@@ -157,12 +164,13 @@ public final class GuardCommand implements CommandRegistration {
      */
     public record ImportOutcome(ImportKind kind, int regions, int rules, int behaviours, int notes, int skipped) {}
 
-    /** The four ways an import ends. */
+    /** The ways an import ends; {@code BUSY} is a request refused because another import is still running. */
     public enum ImportKind {
         NOTHING_TO_UNDO,
         UNDONE,
         DRY_RUN,
-        IMPORTED
+        IMPORTED,
+        BUSY
     }
 
     @Override
@@ -997,23 +1005,22 @@ public final class GuardCommand implements CommandRegistration {
 
     private void scheduleHide(Player player, List<Shape> shapes, GuardConfig config) {
         long seconds = config.displayDuration().toSeconds();
+        PlayerRef viewer = BukkitRefs.toRef(player);
         if (config.displayMode().equals("particles")) {
             for (long s = 1; s < seconds; s++) {
-                player.getScheduler()
-                        .runDelayed(
-                                guardPlugin(),
-                                task -> display.particles(
-                                        player,
-                                        player.getWorld(),
-                                        shapes,
-                                        config.displayRange(),
-                                        Color.fromRGB(0x55, 0xFF, 0xFF)),
-                                null,
-                                s * 20);
+                scheduler.laterEntity(
+                        viewer,
+                        Duration.ofSeconds(s),
+                        () -> display.particles(
+                                player,
+                                player.getWorld(),
+                                shapes,
+                                config.displayRange(),
+                                Color.fromRGB(0x55, 0xFF, 0xFF)));
             }
             return;
         }
-        player.getScheduler().runDelayed(guardPlugin(), task -> display.hide(player), null, seconds * 20);
+        scheduler.laterEntity(viewer, Duration.ofSeconds(seconds), () -> display.hide(player));
     }
 
     private void hide(CommandSender sender) {
@@ -1410,6 +1417,7 @@ public final class GuardCommand implements CommandRegistration {
                             case UNDONE -> GuardMessageKey.IMPORT_UNDONE;
                             case DRY_RUN -> GuardMessageKey.IMPORT_REPORT;
                             case IMPORTED -> GuardMessageKey.IMPORT_DONE;
+                            case BUSY -> GuardMessageKey.IMPORT_BUSY;
                         },
                         values);
             }
@@ -1845,9 +1853,5 @@ public final class GuardCommand implements CommandRegistration {
         } catch (NumberFormatException e) {
             return fallback;
         }
-    }
-
-    private org.bukkit.plugin.Plugin guardPlugin() {
-        return guard.plugin();
     }
 }

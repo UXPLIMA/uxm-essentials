@@ -22,6 +22,10 @@ import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
  * <p>The families that guard borders (nature, explosions, hoppers) are on whenever any world has a region with a
  * rule or is locked, because the border test protects every region with rules, not only those naming
  * {@code world.*}.
+ *
+ * <p>Registering and unregistering a listener is Bukkit work, so {@link #sync} and {@link #close} run on the global
+ * thread only, and the map of registered families belongs to that thread. Other threads read {@link #active} from an
+ * immutable copy published after every change.
  */
 public final class ListenerRegistry {
 
@@ -90,6 +94,7 @@ public final class ListenerRegistry {
     private final Plugin plugin;
     private final GuardRuntime guard;
     private final Map<String, Listener> registered = new java.util.LinkedHashMap<>();
+    private volatile List<String> active = List.of();
 
     public ListenerRegistry(Plugin plugin, GuardRuntime guard) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -97,7 +102,7 @@ public final class ListenerRegistry {
     }
 
     /** Bring the registered families in line with a snapshot. Call on the global thread. */
-    public synchronized void sync(GuardSnapshot snapshot) {
+    public void sync(GuardSnapshot snapshot) {
         for (Family family : FAMILIES) {
             boolean needed = family.needed(snapshot);
             Listener current = registered.get(family.name());
@@ -110,16 +115,18 @@ public final class ListenerRegistry {
                 registered.remove(family.name());
             }
         }
+        active = List.copyOf(registered.keySet());
     }
 
-    /** The families registered now, for status. */
-    public synchronized List<String> active() {
-        return List.copyOf(registered.keySet());
+    /** The families registered now, for status; safe from any thread. */
+    public List<String> active() {
+        return active;
     }
 
-    /** Unregister everything. */
-    public synchronized void close() {
+    /** Unregister everything. Call on the global thread. */
+    public void close() {
         registered.values().forEach(HandlerList::unregisterAll);
         registered.clear();
+        active = List.of();
     }
 }

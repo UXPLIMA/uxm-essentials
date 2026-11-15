@@ -138,7 +138,7 @@ public final class GuardWiring {
         GuardRuntime runtime = new GuardRuntime(
                 plugin, kernel.scheduler(), service, store, kernel.messages(), kernel.messageSink(), clock, audit);
         Selections selections = new Selections(plugin.getServer());
-        RegionDisplay display = new RegionDisplay(plugin);
+        RegionDisplay display = new RegionDisplay(plugin, kernel.scheduler());
         PlayerTracks tracks = new PlayerTracks(runtime, actions, heldGod);
         ListenerRegistry registry = new ListenerRegistry(plugin, runtime);
 
@@ -224,7 +224,8 @@ public final class GuardWiring {
                         Duration.ofSeconds(5)));
         timers.add(kernel.scheduler().repeatGlobal(service::poll, config.pollInterval(), config.pollInterval()));
 
-        WorldGuardImporter importer = new WorldGuardImporter(plugin, service, backups, warn);
+        WorldGuardImporter importer =
+                new WorldGuardImporter(plugin.getDataFolder().toPath(), service, backups, kernel.scheduler(), warn);
         // The command opens the menus and the menus answer through the command, so the menus are reached through a
         // holder filled right after both exist.
         GuardMenus[] menusHolder = new GuardMenus[1];
@@ -294,6 +295,7 @@ public final class GuardWiring {
                     }
                 },
                 onPlayer,
+                kernel.scheduler(),
                 config.rgAlias());
         GuardMenus guardMenus = new GuardMenus(
                 menus, service, command, new CommandFeedback(kernel.messages()), kernel.messages(), onPlayer);

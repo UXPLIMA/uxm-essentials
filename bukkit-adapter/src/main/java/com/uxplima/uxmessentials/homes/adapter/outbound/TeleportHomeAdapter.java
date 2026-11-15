@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -21,21 +22,32 @@ import org.jspecify.annotations.NullMarked;
  * <p>The hop is attributed to {@link TeleportKind#HOME} so the cooldown/warmup tier and the audit verb are
  * the home ones; the engine's cooldown gate result is intentionally ignored here because the engine already
  * notifies the player when a cooldown is active.
+ *
+ * <p>The home use cases look the home up on the async lane, but the launch reads where the player stands to arm the
+ * move-cancel, and on Folia only the player's own region thread may read that. So the launch always runs on the
+ * player's entity thread: at once when the caller is already there, otherwise after one hop.
  */
 @NullMarked
 public final class TeleportHomeAdapter implements HomeTeleporter {
 
     private final TeleportEngine engine;
+    private final Scheduler scheduler;
 
-    public TeleportHomeAdapter(TeleportEngine engine) {
+    public TeleportHomeAdapter(TeleportEngine engine, Scheduler scheduler) {
         this.engine = Objects.requireNonNull(engine, "engine");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
     public void teleportTo(PlayerRef who, Home home) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(home, "home");
-        engine.launch(who, Destination.at(home.location()), TeleportKind.HOME);
+        Runnable launch = () -> engine.launch(who, Destination.at(home.location()), TeleportKind.HOME);
+        if (scheduler.ownsEntity(who)) {
+            launch.run();
+        } else {
+            scheduler.onEntity(who, launch);
+        }
     }
 
     @Override

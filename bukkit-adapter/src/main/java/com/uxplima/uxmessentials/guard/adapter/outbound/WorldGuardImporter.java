@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.guard.adapter.outbound;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -23,6 +24,9 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -30,7 +34,6 @@ import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.YamlConfiguration;
-import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportKind;
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand.ImportOutcome;
@@ -49,6 +52,7 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -63,6 +67,11 @@ import org.yaml.snakeyaml.constructor.SafeConstructor;
  * <p>WorldGuard lets only members build in a region without flags. That default becomes explicit rules here
  * (everyone denied, owners, members and member groups allowed) because a guard region without rules does nothing.
  * Every flag either becomes rules or behaviours or is listed in the report as not converted.
+ *
+ * <p>The files, the database and the report are read and written on the async lane. Players stored by name are
+ * looked up on the global thread, the one place the server's player cache may be asked. Only one import runs at a
+ * time: a second request while one is running is answered with {@link ImportKind#BUSY} and starts nothing, since two
+ * runs would race on the batch file and the second backup would already hold the first run's regions.
  */
 public final class WorldGuardImporter {
 
@@ -158,15 +167,24 @@ public final class WorldGuardImporter {
     /** Flags whose default region group is not everyone. */
     private static final Map<String, String> DEFAULT_GROUP = Map.of("entry", "non_members", "exit", "non_members");
 
-    private final Plugin plugin;
+    private final Path dataFolder;
     private final GuardService service;
     private final GuardBackups backups;
+    private final Scheduler scheduler;
+    private final Executor offTick;
     private final Consumer<String> warn;
+    private final AtomicBoolean running = new AtomicBoolean();
 
-    public WorldGuardImporter(Plugin plugin, GuardService service, GuardBackups backups, Consumer<String> warn) {
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
+    /**
+     * @param dataFolder this plugin's data folder; WorldGuard's files are read from its sibling folder
+     */
+    public WorldGuardImporter(
+            Path dataFolder, GuardService service, GuardBackups backups, Scheduler scheduler, Consumer<String> warn) {
+        this.dataFolder = Objects.requireNonNull(dataFolder, "dataFolder");
         this.service = Objects.requireNonNull(service, "service");
         this.backups = Objects.requireNonNull(backups, "backups");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.offTick = scheduler::async;
         this.warn = Objects.requireNonNull(warn, "warn");
     }
 
@@ -193,45 +211,84 @@ public final class WorldGuardImporter {
             Set<String> ownerNames,
             Set<String> memberNames) {}
 
-    /** Run {@code mode} from {@code source}; answers what happened. */
+    /** Run {@code mode} from {@code source}; answers what happened, or {@link ImportKind#BUSY} while one runs. */
     public CompletableFuture<ImportOutcome> run(String mode, String source, EditContext ctx) {
+        if (!running.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(new ImportOutcome(ImportKind.BUSY, 0, 0, 0, 0, 0));
+        }
         CompletableFuture<ImportOutcome> future = new CompletableFuture<>();
-        // A thread of its own: the import waits on the service, which works on the async lane.
-        Thread worker = new Thread(
-                () -> {
-                    try {
-                        future.complete(runNow(mode, source, ctx));
-                    } catch (Exception e) {
-                        warn.accept("WorldGuard import failed: " + e.getMessage());
-                        future.completeExceptionally(e);
-                    }
-                },
-                "uxmEssentials guard import");
-        worker.setDaemon(true);
-        worker.start();
+        try {
+            scheduler.async(() -> {
+                CompletableFuture<ImportOutcome> work;
+                try {
+                    work = start(mode, source, ctx);
+                } catch (IOException | SQLException | RuntimeException e) {
+                    work = CompletableFuture.failedFuture(e);
+                }
+                var unused = work.whenComplete((outcome, error) -> finish(future, outcome, error));
+            });
+        } catch (RuntimeException refused) {
+            // The async lane refuses work while the plugin stops; nothing started, so nothing is left running.
+            finish(future, null, refused);
+        }
         return future;
     }
 
-    private ImportOutcome runNow(String mode, String source, EditContext ctx) throws Exception {
-        Path folder = plugin.getDataFolder().toPath().resolve("guard");
+    private void finish(
+            CompletableFuture<ImportOutcome> future, @Nullable ImportOutcome outcome, @Nullable Throwable error) {
+        // Released before the answer goes out, so a caller that retries as soon as it hears back is not refused.
+        running.set(false);
+        if (error != null) {
+            Throwable cause = unwrap(error);
+            warn.accept("WorldGuard import failed: " + cause.getMessage());
+            future.completeExceptionally(cause);
+        } else {
+            future.complete(Objects.requireNonNull(outcome, "outcome"));
+        }
+    }
+
+    private static Throwable unwrap(Throwable error) {
+        Throwable current = error;
+        while ((current instanceof CompletionException || current instanceof UncheckedIOException)
+                && current.getCause() != null) {
+            current = current.getCause();
+        }
+        return current;
+    }
+
+    /** Reads what the mode needs and hands the store work to the service; runs on the async lane. */
+    private CompletableFuture<ImportOutcome> start(String mode, String source, EditContext ctx)
+            throws IOException, SQLException {
+        Path folder = dataFolder.resolve("guard");
         Files.createDirectories(folder);
         Path batchFile = folder.resolve("import-batch.txt");
         if (mode.equals("undo")) {
             if (!Files.exists(batchFile)) {
-                return new ImportOutcome(ImportKind.NOTHING_TO_UNDO, 0, 0, 0, 0, 0);
+                return CompletableFuture.completedFuture(new ImportOutcome(ImportKind.NOTHING_TO_UNDO, 0, 0, 0, 0, 0));
             }
             String batch = Files.readString(batchFile, StandardCharsets.UTF_8).strip();
-            int removed = service.removeBatch(batch, ctx).get();
-            Files.deleteIfExists(batchFile);
-            return new ImportOutcome(ImportKind.UNDONE, removed, 0, 0, 0, 0);
+            return service.removeBatch(batch, ctx)
+                    .thenApplyAsync(
+                            removed -> {
+                                deleteIfExists(batchFile);
+                                return new ImportOutcome(ImportKind.UNDONE, removed, 0, 0, 0, 0);
+                            },
+                            offTick);
         }
         List<WgRegion> read = source.equals("sql") ? readSql() : readYaml();
+        return resolveNames(read)
+                .thenComposeAsync(names -> convertAndStore(mode, source, ctx, folder, read, names), offTick);
+    }
+
+    private CompletableFuture<ImportOutcome> convertAndStore(
+            String mode, String source, EditContext ctx, Path folder, List<WgRegion> read, Map<String, UUID> names) {
         String batch = "wg-" + Instant.now().toEpochMilli();
         List<String> report = new ArrayList<>();
         List<Region> converted = new ArrayList<>();
+        ServerScope scope = service.config().newRegionScope();
         for (WgRegion region : read) {
             try {
-                converted.add(convert(region, batch, report));
+                converted.add(convert(region, batch, scope, names::get, report));
             } catch (RuntimeException e) {
                 report.add(region.world() + ":" + region.id() + " skipped: " + e.getMessage());
             }
@@ -245,27 +302,76 @@ public final class WorldGuardImporter {
                 + " behaviours, " + report.size() + " notes");
         header.add("");
         header.addAll(report);
-        Path reportFile = folder.resolve("import-report.txt");
-        Files.write(reportFile, header, StandardCharsets.UTF_8);
+        write(folder.resolve("import-report.txt"), header);
         if (!mode.equals("run")) {
-            return new ImportOutcome(ImportKind.DRY_RUN, converted.size(), rules, behaviours, report.size(), 0);
+            return CompletableFuture.completedFuture(
+                    new ImportOutcome(ImportKind.DRY_RUN, converted.size(), rules, behaviours, report.size(), 0));
         }
         backups.write(service.all(), "before-import", service.config().backupsKept());
-        List<RegionKey> skipped = service.importRegions(converted, ctx).get();
-        Files.writeString(batchFile, batch, StandardCharsets.UTF_8);
-        return new ImportOutcome(
-                ImportKind.IMPORTED,
-                converted.size() - skipped.size(),
-                rules,
-                behaviours,
-                report.size(),
-                skipped.size());
+        return service.importRegions(converted, ctx)
+                .thenApplyAsync(
+                        skipped -> {
+                            write(folder.resolve("import-batch.txt"), List.of(batch));
+                            return new ImportOutcome(
+                                    ImportKind.IMPORTED,
+                                    converted.size() - skipped.size(),
+                                    rules,
+                                    behaviours,
+                                    report.size(),
+                                    skipped.size());
+                        },
+                        offTick);
+    }
+
+    /**
+     * The UUID of every player the regions store by name, as far as the server's player cache knows them. Asked on
+     * the global thread, then the import carries on off the tick.
+     */
+    private CompletableFuture<Map<String, UUID>> resolveNames(List<WgRegion> read) {
+        Set<String> wanted = new HashSet<>();
+        for (WgRegion region : read) {
+            wanted.addAll(region.ownerNames());
+            wanted.addAll(region.memberNames());
+        }
+        if (wanted.isEmpty()) {
+            return CompletableFuture.completedFuture(Map.of());
+        }
+        CompletableFuture<Map<String, UUID>> resolved = new CompletableFuture<>();
+        scheduler.onGlobal(
+                () -> {
+                    Map<String, UUID> found = new HashMap<>();
+                    for (String name : wanted) {
+                        OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
+                        if (player != null) {
+                            found.put(name, player.getUniqueId());
+                        }
+                    }
+                    resolved.complete(found);
+                },
+                () -> resolved.completeExceptionally(new IllegalStateException("the server is stopping")));
+        return resolved;
+    }
+
+    private static void write(Path file, List<String> lines) {
+        try {
+            Files.write(file, lines, StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static void deleteIfExists(Path file) {
+        try {
+            Files.deleteIfExists(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     // ---- reading ------------------------------------------------------------------------------------------------
 
     private List<WgRegion> readYaml() throws IOException {
-        File worldsFolder = new File(plugin.getDataFolder().getParentFile(), "WorldGuard/worlds");
+        File worldsFolder = new File(dataFolder.toFile().getParentFile(), "WorldGuard/worlds");
         List<WgRegion> out = new ArrayList<>();
         File[] worlds = worldsFolder.listFiles(File::isDirectory);
         if (worlds == null) {
@@ -331,7 +437,7 @@ public final class WorldGuardImporter {
     }
 
     private List<WgRegion> readSql() throws IOException, SQLException {
-        File configFile = new File(plugin.getDataFolder().getParentFile(), "WorldGuard/config.yml");
+        File configFile = new File(dataFolder.toFile().getParentFile(), "WorldGuard/config.yml");
         YamlConfiguration config = YamlConfiguration.loadConfiguration(configFile);
         String dsn = config.getString("regions.sql.dsn", "");
         String user = config.getString("regions.sql.username", "");
@@ -488,18 +594,6 @@ public final class WorldGuardImporter {
     }
 
     // ---- converting ---------------------------------------------------------------------------------------------
-
-    Region convert(WgRegion wg, String batch, List<String> report) {
-        return convert(
-                wg,
-                batch,
-                service.config().newRegionScope(),
-                name -> {
-                    OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
-                    return player == null ? null : player.getUniqueId();
-                },
-                report);
-    }
 
     /**
      * Convert one WorldGuard region: shape, priority, parent, owners and members as roles, flags as rules or

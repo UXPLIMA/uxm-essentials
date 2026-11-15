@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Function;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -35,6 +36,9 @@ import org.jspecify.annotations.Nullable;
  * add button writes a new message through the input seam; the clear button drops every message; the back button
  * reopens the warp editor. Each mutation saves the edited warp through the shared {@link EditableWarp} loader and
  * re-opens this list with the new subject so the operator sees the result.
+ *
+ * <p>A save writes the warp's row, so it runs on the async lane and never on the click's tick; the list is re-opened
+ * on the viewer's entity thread once the write has finished, so the operator sees the saved result.
  *
  * <p>The edited warp is handed in as the menu subject, its name, owner, and a welcome-message snapshot read off the
  * viewer's entity thread at open, so the entry list (the {@code warps:welcome} list source) and every entry line
@@ -155,38 +159,41 @@ public final class WarpWelcomeMessagesView {
 
     /** Replace the entry's text, keeping its delivery type, then save and re-open. Package-private for the test. */
     void applyEdit(Player player, PlayerRef viewer, WelcomeList list, int index, String input) {
-        List<WelcomeMessage> messages = currentMessages(list);
-        if (index >= 0 && index < messages.size()) {
+        saveThenOpen(player, viewer, list, messages -> {
+            if (index < 0 || index >= messages.size()) {
+                return null;
+            }
             WelcomeMessage existing = messages.get(index);
             messages.set(index, new WelcomeMessage(input, existing.type()));
-            saveWelcome(list, messages);
-        }
-        open(player, viewer, list.warpName(), list.warpOwner());
+            return messages;
+        });
     }
 
     /** Right-click an entry: drop it, then save and re-open. */
     private void removeEntry(MenuActionContext ctx) {
         WelcomeList list = subject(ctx);
         int index = entry(ctx).index();
-        List<WelcomeMessage> messages = currentMessages(list);
-        if (index >= 0 && index < messages.size()) {
+        saveThenOpen(ctx, list, messages -> {
+            if (index < 0 || index >= messages.size()) {
+                return null;
+            }
             messages.remove(index);
-            saveWelcome(list, messages);
-        }
-        reopen(ctx, list);
+            return messages;
+        });
     }
 
     /** Shift-click an entry: cycle its delivery type, keeping its text, then save and re-open. */
     private void cycleEntry(MenuActionContext ctx) {
         WelcomeList list = subject(ctx);
         int index = entry(ctx).index();
-        List<WelcomeMessage> messages = currentMessages(list);
-        if (index >= 0 && index < messages.size()) {
+        saveThenOpen(ctx, list, messages -> {
+            if (index < 0 || index >= messages.size()) {
+                return null;
+            }
             WelcomeMessage existing = messages.get(index);
             messages.set(index, new WelcomeMessage(existing.message(), nextType(existing.type())));
-            saveWelcome(list, messages);
-        }
-        reopen(ctx, list);
+            return messages;
+        });
     }
 
     /** Click add: capture a new message through the input seam; cancel re-opens the list unchanged. */
@@ -204,17 +211,15 @@ public final class WarpWelcomeMessagesView {
 
     /** Append a new CHAT-typed message, then save and re-open. Package-private for the golden test. */
     void applyAdd(Player player, PlayerRef viewer, WelcomeList list, String input) {
-        List<WelcomeMessage> messages = currentMessages(list);
-        messages.add(new WelcomeMessage(input, "CHAT"));
-        saveWelcome(list, messages);
-        open(player, viewer, list.warpName(), list.warpOwner());
+        saveThenOpen(player, viewer, list, messages -> {
+            messages.add(new WelcomeMessage(input, "CHAT"));
+            return messages;
+        });
     }
 
     /** Click clear: drop every message, then save and re-open. */
     private void clear(MenuActionContext ctx) {
-        WelcomeList list = subject(ctx);
-        saveWelcome(list, List.of());
-        reopen(ctx, list);
+        saveThenOpen(ctx, subject(ctx), messages -> new ArrayList<>());
     }
 
     /** Click back: reopen the warp editor for this warp. */
@@ -223,23 +228,37 @@ public final class WarpWelcomeMessagesView {
         editorView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list.warpName(), list.warpOwner());
     }
 
-    /** The warp's live welcome messages as a mutable list, or an empty list when the warp is gone. */
-    private List<WelcomeMessage> currentMessages(WelcomeList list) {
-        EditableWarp warp = loader.load(list.warpName(), list.warpOwner());
-        return warp == null ? new ArrayList<>() : new ArrayList<>(warp.welcomeMessages());
+    private void saveThenOpen(
+            MenuActionContext ctx,
+            WelcomeList list,
+            Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit) {
+        saveThenOpen(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list, edit);
     }
 
-    /** Save the warp's welcome messages through the shared loader; a stale warp is a no-op. */
-    private void saveWelcome(WelcomeList list, List<WelcomeMessage> messages) {
-        EditableWarp warp = loader.load(list.warpName(), list.warpOwner());
-        if (warp != null) {
-            warp.setWelcomeMessages(messages);
-        }
-    }
-
-    /** Re-read the warp and re-open the list with a fresh subject so the operator sees the result. */
-    private void reopen(MenuActionContext ctx, WelcomeList list) {
-        open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), list.warpName(), list.warpOwner());
+    /**
+     * Apply {@code edit} to the warp's live welcome messages and save them on the async lane, then re-open the list on
+     * the viewer's thread. The edit gets a mutable copy and answers the list to save, or null to save nothing; a warp
+     * that is gone saves nothing. The list re-opens even when the save throws, so the operator is never left without
+     * the menu, and the failure still reaches the async lane's log.
+     */
+    private void saveThenOpen(
+            Player player,
+            PlayerRef viewer,
+            WelcomeList list,
+            Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit) {
+        scheduler.async(() -> {
+            try {
+                EditableWarp warp = loader.load(list.warpName(), list.warpOwner());
+                if (warp != null) {
+                    List<WelcomeMessage> next = edit.apply(new ArrayList<>(warp.welcomeMessages()));
+                    if (next != null) {
+                        warp.setWelcomeMessages(next);
+                    }
+                }
+            } finally {
+                open(player, viewer, list.warpName(), list.warpOwner());
+            }
+        });
     }
 
     private static Material materialFor(String type) {

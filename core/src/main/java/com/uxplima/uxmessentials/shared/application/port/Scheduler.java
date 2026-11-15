@@ -83,6 +83,19 @@ public interface Scheduler {
     }
 
     /**
+     * Run on the region thread owning {@code player}'s entity once {@code delay} has passed. Silently no-ops when the
+     * player is offline by then, like {@link #onEntity(PlayerRef, Runnable)}. A delay shorter than one tick still
+     * lands on the next tick.
+     *
+     * <p>The default waits on the global thread and then hops to the entity, which is correct for any scheduler that
+     * implements {@link #laterGlobal}; the Folia adapter overrides it with the entity's own delayed task so the work
+     * takes one hop instead of two.
+     */
+    default void laterEntity(PlayerRef player, Duration delay, Runnable task) {
+        laterGlobal(delay, () -> onEntity(player, task));
+    }
+
+    /**
      * Whether the calling thread already owns the global region. I.e. {@link #onGlobal} work would
      * run on this very thread. A caller that marshals onto the global region and then blocks on the
      * result must check this first: scheduling and blocking from the global thread itself deadlocks,
