@@ -18,6 +18,7 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_DELETE_CONFIRM("world.delete-confirm"),
     WORLD_DELETED("world.deleted"),
     WORLD_DELETE_NONE("world.delete-none"),
+    WORLD_DELETE_EXPIRED("world.delete-expired"),
 
     WORLD_NAME_INVALID("world.name-invalid"),
     WORLD_ALREADY_EXISTS("world.already-exists"),

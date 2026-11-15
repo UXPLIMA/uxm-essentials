@@ -26,7 +26,8 @@ public enum WorldError {
     BACKUP_FAILED(WorldsMessageKey.WORLD_BACKUP_FAILED),
     BACKUP_NOT_FOUND(WorldsMessageKey.WORLD_BACKUP_NOT_FOUND),
     RESTORE_FAILED(WorldsMessageKey.WORLD_RESTORE_FAILED),
-    RESTORE_NONE_PENDING(WorldsMessageKey.WORLD_RESTORE_NONE_PENDING);
+    RESTORE_NONE_PENDING(WorldsMessageKey.WORLD_RESTORE_NONE_PENDING),
+    DELETE_EXPIRED(WorldsMessageKey.WORLD_DELETE_EXPIRED);
 
     private final WorldsMessageKey messageKey;
 

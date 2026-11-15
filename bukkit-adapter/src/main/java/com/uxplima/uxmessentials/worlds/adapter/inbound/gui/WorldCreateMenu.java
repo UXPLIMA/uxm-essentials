@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
 
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.worlds.application.CreateWorld;
 import com.uxplima.uxmessentials.worlds.application.WorldEditorMessageKey;
 import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.BuiltInGenerators;
+import com.uxplima.uxmessentials.worlds.domain.WorldDefaults;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
@@ -35,15 +37,14 @@ import org.jspecify.annotations.Nullable;
  * Registers the new-world configuration screen with the menu engine and opens it. A three-row panel carrying one
  * button per field of an in-flight {@link WorldCreateDraft}: the name and seed are captured through the shared
  * {@link TextInput} seam, while the environment, world type and generator are selectors a click cycles in place. The
- * create button builds the draft's {@link WorldName} and {@code WorldSpec} and runs {@link CreateWorld} on the global
+ * create button builds the draft's {@link WorldName} and options and runs {@link CreateWorld} on the global
  * region thread (the only place a Bukkit world handle may be created), then re-opens the world list so the new world
  * appears. A back button returns to the list.
  *
  * <p>The draft is the menu subject, so every cycle or input submission re-opens this screen with a fresh draft, the
- * screen holds no per-viewer mutable state of its own. The spec mapping mirrors {@code /worlds create} exactly
- * (defaults NORMAL/NORMAL, empty seed and generator), so a GUI-built world is identical to a command-built one. This
- * replays the old bespoke {@code WorldCreateView} verbatim through the engine. Every visible string resolves from the
- * worlds catalog.
+ * screen holds no per-viewer mutable state of its own. A new draft starts from the {@code defaults} block of the worlds
+ * config, the same values {@code /worlds create} uses for anything left out, so a GUI-built world matches a
+ * command-built one. Every visible string resolves from the worlds catalog.
  */
 @NullMarked
 public final class WorldCreateMenu {
@@ -66,6 +67,7 @@ public final class WorldCreateMenu {
     private final Menus menus;
     private final Scheduler scheduler;
     private final CreateWorld createWorld;
+    private final Supplier<WorldDefaults> defaults;
     private final Notifier notifier;
     private final TextInput textInput;
     private final BiConsumer<Player, PlayerRef> reopenList;
@@ -74,12 +76,14 @@ public final class WorldCreateMenu {
             Menus menus,
             Scheduler scheduler,
             CreateWorld createWorld,
+            Supplier<WorldDefaults> defaults,
             Notifier notifier,
             TextInput textInput,
             BiConsumer<Player, PlayerRef> reopenList) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.createWorld = Objects.requireNonNull(createWorld, "createWorld");
+        this.defaults = Objects.requireNonNull(defaults, "defaults");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.reopenList = Objects.requireNonNull(reopenList, "reopenList");
@@ -115,7 +119,7 @@ public final class WorldCreateMenu {
 
     /** Open a fresh create screen for {@code viewer}. */
     public void open(Player player, PlayerRef viewer) {
-        open(player, viewer, WorldCreateDraft.empty());
+        open(player, viewer, WorldCreateDraft.from(defaults.get()));
     }
 
     /** Open the create screen showing {@code draft}, scheduled on the viewer's entity thread. */
@@ -218,7 +222,7 @@ public final class WorldCreateMenu {
         }
         notifier.send(viewer, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
         scheduler.onGlobal(() -> {
-            createWorld.create(viewer, name, draft.toSpec(), true);
+            createWorld.create(viewer, name, draft.toOptions(), true);
             reopenList.accept(player, viewer);
         });
     }

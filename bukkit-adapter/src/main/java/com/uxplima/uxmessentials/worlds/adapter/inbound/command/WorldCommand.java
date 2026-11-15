@@ -41,10 +41,10 @@ import com.uxplima.uxmessentials.worlds.domain.DimensionKey;
 import com.uxplima.uxmessentials.worlds.domain.DimensionNames;
 import com.uxplima.uxmessentials.worlds.domain.GeneratorRef;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.WorldCreateOptions;
 import com.uxplima.uxmessentials.worlds.domain.WorldEnvironment;
 import com.uxplima.uxmessentials.worlds.domain.WorldGenType;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
-import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
@@ -248,16 +248,15 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         if (name == null) {
             return 0;
         }
-        WorldSpec spec = new WorldSpec(
-                arg(ctx, "environment", WorldEnvironment.class, WorldEnvironment.NORMAL),
-                arg(ctx, "type", WorldGenType.class, WorldGenType.NORMAL),
+        // An environment or type left out, or not one the server knows, is taken from the configured defaults.
+        WorldCreateOptions options = new WorldCreateOptions(
+                optionalEnum(ctx, "environment", WorldEnvironment.class),
+                optionalEnum(ctx, "type", WorldGenType.class),
                 Optional.empty(),
-                parseGenerator(ctx),
-                true,
-                Optional.empty());
+                parseGenerator(ctx));
         PlayerRef who = actor(ctx);
         feedback.send(sender, WorldsMessageKey.WORLD_CREATING, Map.of("world", name.value()));
-        onGlobal(() -> services.createWorld().create(who, name, spec, true));
+        onGlobal(() -> services.createWorld().create(who, name, options, true));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -699,6 +698,17 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         } catch (IllegalArgumentException missingOrInvalid) {
             return fallback;
         }
+    }
+
+    private static <E extends Enum<E>> Optional<E> optionalEnum(
+            CommandContext<CommandSourceStack> ctx, String key, Class<E> type) {
+        return optionalString(ctx, key).flatMap(raw -> {
+            try {
+                return Optional.of(Enum.valueOf(type, raw.toUpperCase(Locale.ROOT)));
+            } catch (IllegalArgumentException unknown) {
+                return Optional.empty();
+            }
+        });
     }
 
     private static Optional<String> optionalString(CommandContext<CommandSourceStack> ctx, String key) {
