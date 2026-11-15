@@ -1,12 +1,12 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.cooldown;
 
-import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.NamespacedKey;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownScope;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -35,18 +35,6 @@ final class PdcKeys {
     /** The cached key for {@code name}, building it once on first request. */
     NamespacedKey forName(String name) {
         Objects.requireNonNull(name, "name");
-        return cache.computeIfAbsent(name, n -> new NamespacedKey(plugin, prefix + sanitize(n)));
-    }
-
-    /** A NamespacedKey value segment accepts only {@code [a-z0-9._-]}; fold anything else to {@code _}. */
-    private static String sanitize(String name) {
-        String lower = name.toLowerCase(Locale.ROOT);
-        StringBuilder out = new StringBuilder(lower.length());
-        for (int i = 0; i < lower.length(); i++) {
-            char c = lower.charAt(i);
-            boolean legal = (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
-            out.append(legal ? c : '_');
-        }
-        return out.toString();
+        return cache.computeIfAbsent(name, n -> new NamespacedKey(plugin, prefix + CooldownScope.normalize(n)));
     }
 }

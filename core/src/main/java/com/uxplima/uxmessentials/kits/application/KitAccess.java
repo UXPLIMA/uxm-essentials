@@ -120,11 +120,18 @@ public final class KitAccess {
         if (kit.requiresPermission() && !permissions.has(who, kit.permissionNode())) {
             return Result.err(KitError.NO_PERMISSION);
         }
-        if (kit.isOneTime() && claims.hasClaimed(who, kit.id()) && !permissions.has(who, COOLDOWN_BYPASS_NODE)) {
-            return Result.err(KitError.ALREADY_CLAIMED);
+        if (kit.isOneTime() && !permissions.has(who, COOLDOWN_BYPASS_NODE)) {
+            if (!claims.ready(who)) {
+                return Result.err(KitError.LOADING);
+            }
+            if (claims.hasClaimed(who, kit.id())) {
+                return Result.err(KitError.ALREADY_CLAIMED);
+            }
         }
         if (cooldowns.check(who, cooldownKind(who, kit)).isErr()) {
-            return Result.err(KitError.ON_COOLDOWN);
+            // The shared cooldowns are read together with the shared claims, so an unread player waits on both: say
+            // so rather than quoting a wait that is only a placeholder.
+            return Result.err(claims.ready(who) ? KitError.ON_COOLDOWN : KitError.LOADING);
         }
         if (!meetsRequirements(who, kit)) {
             return Result.err(KitError.REQUIREMENTS_NOT_MET);
@@ -208,6 +215,30 @@ public final class KitAccess {
         if (kit.unlockOnce()) {
             unlocks.ifPresent(store -> store.markUnlocked(who, kit.id()));
         }
+    }
+
+    /**
+     * Whether the one-time claim on {@code kit} has to be taken before it is granted to {@code who}: a one-time kit
+     * the holder cannot re-claim through the bypass node.
+     */
+    public boolean claimsBeforeGrant(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        return kit.isOneTime() && !permissions.has(who, COOLDOWN_BYPASS_NODE);
+    }
+
+    /** Take {@code who}'s one-time claim on {@code kit}; see {@link KitClaimStore#acquire}. */
+    public java.util.concurrent.CompletableFuture<Boolean> acquireOneTime(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        return claims.acquire(who, kit.id());
+    }
+
+    /** Give back a one-time claim taken by {@link #acquireOneTime} for a grant that did not go through. */
+    public void releaseOneTime(PlayerRef who, KitDefinition kit) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(kit, "kit");
+        claims.release(who, kit.id());
     }
 
     /** The remaining cooldown for {@code who} on {@code kit}; ok when ready. */

@@ -21,7 +21,8 @@ import org.jspecify.annotations.NullMarked;
  * Settles one warp's rent for the current pass: the {@link RentPolicy} decides what to do, this use case moves the
  * money through {@link PlayerWarpEconomy#collectRent} and writes the resulting lifecycle transition. It is the one
  * place the suspend-then-archive rule lives, and it never hard-deletes. A warp only ever moves
- * ACTIVE→SUSPENDED→ARCHIVED, every step recoverable.
+ * ACTIVE→SUSPENDED→ARCHIVED, every step recoverable; deleting a long archived warp is
+ * {@link PurgeArchivedRentWarps}, and only when the operator sets a delay.
  *
  * <ul>
  *   <li>{@link RentDecision#DUE}/{@link RentDecision#RETRY}: collect the rent (bank-first, then owner wallet). On

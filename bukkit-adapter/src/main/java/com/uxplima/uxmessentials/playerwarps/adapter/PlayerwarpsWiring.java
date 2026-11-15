@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
+import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatingRewardConfig;
 import com.uxplima.uxmessentials.playerwarps.application.RatingRewards;
@@ -122,6 +123,7 @@ public final class PlayerwarpsWiring {
 
     private static final int DEFAULT_LIMIT = 3;
     private static final int DEFAULT_CONFIDENCE = 10;
+    private static final long MAX_HARD_DELETE_DAYS = 36_500L;
 
     private PlayerwarpsWiring() {}
 
@@ -509,7 +511,10 @@ public final class PlayerwarpsWiring {
                 new MailRentMailer(MessagingStores.mail(persistence), kernel.messages(), clock, kernel.log());
         RentReminders reminders = new RentReminders(repository, mailer, config, clock);
         Duration interval = Duration.ofMinutes(Math.max(1L, ctx.config().getLong("rent.check-interval-minutes", 60L)));
-        return new RentSweep(repository, settle, reminders, config, kernel.scheduler(), interval, clock, kernel.log());
+        PurgeArchivedRentWarps purge = new PurgeArchivedRentWarps(
+                repository, economy.orElseThrow(), kernel.events(), config, clock, kernel.log());
+        return new RentSweep(
+                repository, settle, reminders, purge, config, kernel.scheduler(), interval, clock, kernel.log());
     }
 
     /**
@@ -636,6 +641,10 @@ public final class PlayerwarpsWiring {
                 cfg.getString("rent.currency", "default"),
                 Duration.ofDays(Math.max(1L, cfg.getLong("rent.period-days", 7L))),
                 Duration.ofDays(Math.max(0L, cfg.getLong("rent.grace-days", 3L))),
+                // Zero or below keeps archived warps forever, so a negative value can never delete early; the cap keeps
+                // the cutoff a representable instant whatever the operator types.
+                Duration.ofDays(
+                        Math.min(MAX_HARD_DELETE_DAYS, Math.max(0L, cfg.getLong("rent.hard-delete-after-days", 0L)))),
                 reminderWindows(cfg.getStringList("rent.reminder-hours", List.of("24", "12", "6", "1"))),
                 Set.copyOf(cfg.getStringList("rent.exempt.players", List.of())),
                 Set.copyOf(cfg.getStringList("rent.exempt.categories", List.of())),
