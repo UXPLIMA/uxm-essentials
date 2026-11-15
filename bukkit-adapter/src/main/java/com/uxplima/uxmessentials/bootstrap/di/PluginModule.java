@@ -616,7 +616,8 @@ public final class PluginModule {
                 () -> config,
                 new EngineMenuApi(menuBindings, menuItemRenderer, runtimeIcons),
                 queries,
-                actions);
+                actions,
+                new CommandFeedback(kernel.messages()));
         plugin.getServer()
                 .getServicesManager()
                 .register(UxmEssentialsApi.class, devApi, plugin, ServicePriority.Normal);

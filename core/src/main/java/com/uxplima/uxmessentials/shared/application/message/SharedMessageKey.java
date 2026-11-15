@@ -116,6 +116,25 @@ public enum SharedMessageKey implements MessageKey {
     ADMIN_PERMISSIONS_PAGE("admin.permissions.page"),
     ADMIN_PERMISSIONS_NO_AREA("admin.permissions.no-area"),
     ADMIN_PERMISSIONS_EXPORTED("admin.permissions.exported"),
+    // The update notice an operator reads on join, in the server's own language because one notice serves them all.
+    ADMIN_UPDATE_AVAILABLE("admin.update.available"),
+    ADMIN_UPDATE_OPEN("admin.update.open"),
+
+    // The REST add-on's /uxmapi replies. The add-on has no catalogue of its own and asks this one through the
+    // developer API, so its lines are translated and themed like every other operator reply.
+    ADMIN_REST_CREATED("admin.rest.created"),
+    ADMIN_REST_SECRET("admin.rest.secret"),
+    ADMIN_REST_EXISTS("admin.rest.exists"),
+    ADMIN_REST_NO_SCOPE("admin.rest.no-scope"),
+    ADMIN_REST_BAD_LABEL("admin.rest.bad-label"),
+    ADMIN_REST_LIST_EMPTY("admin.rest.list-empty"),
+    ADMIN_REST_LIST_HEADER("admin.rest.list-header"),
+    ADMIN_REST_LIST_ENTRY("admin.rest.list-entry"),
+    ADMIN_REST_REVOKED("admin.rest.revoked"),
+    ADMIN_REST_NOT_FOUND("admin.rest.not-found"),
+    ADMIN_REST_OFF("admin.rest.off"),
+    ADMIN_REST_LISTENING("admin.rest.listening"),
+    ADMIN_REST_CONNECTIONS("admin.rest.connections"),
 
     // What a player is told when another plugin refused an action through the developer API's veto events. One key
     // for every context rather than one per context: this line only has to say that something outside uxmEssentials

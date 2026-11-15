@@ -496,7 +496,7 @@ public final class GuardCommand implements CommandRegistration {
 
     private void wand(CommandSender sender, String[] args) {
         withPlayer(sender, player -> {
-            ItemStack wand = GuardWand.create();
+            ItemStack wand = GuardWand.create(feedback.render(player, GuardMessageKey.WAND_NAME, Map.of()));
             player.getInventory().addItem(wand);
             feedback.send(player, GuardMessageKey.WAND_GIVEN);
         });

@@ -9,8 +9,9 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
  * the context: every message resolves through one of these.
  *
  * <p>Per the i18n contract, a disabled module still ships its keys so the catalog stays whole and the
- * locale-parity guard sees the full {@code en} key set. The gadget item names themselves are
- * operator-authored config content under {@code modules/staff/config.conf}, not keys here.
+ * locale-parity guard sees the full {@code en} key set. The gadget item names are config values under
+ * {@code modules/staff/config.conf} that point at the {@code staff.gadget.*} lines here by default, so an
+ * operator can still write their own name in place of the reference.
  */
 public enum StaffMessageKey implements MessageKey {
 
@@ -54,7 +55,14 @@ public enum StaffMessageKey implements MessageKey {
 
     // /stafflist output, heading and the empty-roster line
     STAFF_LIST_TITLE("staff.list.title"),
-    STAFF_LIST_EMPTY("staff.list.empty");
+    STAFF_LIST_EMPTY("staff.list.empty"),
+
+    // the gadget item names the shipped config points at with @staff.gadget.<name>
+    STAFF_GADGET_VANISH("staff.gadget.vanish"),
+    STAFF_GADGET_EXAMINE("staff.gadget.examine"),
+    STAFF_GADGET_FREEZE("staff.gadget.freeze"),
+    STAFF_GADGET_COMPASS("staff.gadget.compass"),
+    STAFF_GADGET_FOLLOW("staff.gadget.follow");
 
     private final String key;
 

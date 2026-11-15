@@ -132,6 +132,7 @@ public final class CommunicationWiring {
         ChannelBroadcaster channelBroadcaster = new ChannelBroadcaster(kernel.scheduler(), settings.announcerDisplay());
         BukkitAnnouncerBroadcaster broadcaster = new BukkitAnnouncerBroadcaster(
                 kernel.messageSink(),
+                kernel.messages(),
                 optOutStore,
                 channelBroadcaster,
                 CommunicationWiring::conditionContext,
@@ -173,7 +174,6 @@ public final class CommunicationWiring {
                 kernel.messages(),
                 chatLock,
                 broadcaster,
-                CommunicationCommands.BROADCAST_PREFIX,
                 mergedConfig,
                 notifier,
                 kernel.messageSink(),

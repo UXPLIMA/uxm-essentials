@@ -136,17 +136,17 @@ public final class CommandControlListener {
         }
         return switch (rateLimiter.action()) {
             case KICK -> {
-                messages.spamKickComponent().ifPresent(player::disconnect);
+                messages.spamKickComponent(player.getEffectiveLocale()).ifPresent(player::disconnect);
                 event.setResult(CommandResult.denied());
                 yield true;
             }
             case BLOCK -> {
-                messages.spamBlockedComponent().ifPresent(player::sendMessage);
+                messages.spamBlockedComponent(player.getEffectiveLocale()).ifPresent(player::sendMessage);
                 event.setResult(CommandResult.denied());
                 yield true;
             }
             case WARN -> {
-                messages.spamWarnComponent().ifPresent(player::sendMessage);
+                messages.spamWarnComponent(player.getEffectiveLocale()).ifPresent(player::sendMessage);
                 yield false;
             }
         };
@@ -165,9 +165,9 @@ public final class CommandControlListener {
         }
         event.setResult(CommandResult.denied());
         if (hidden) {
-            messages.pluginHiddenComponent().ifPresent(player::sendMessage);
+            messages.pluginHiddenComponent(player.getEffectiveLocale()).ifPresent(player::sendMessage);
         } else {
-            messages.deny(useUnknownCommandMessage).ifPresent(player::sendMessage);
+            messages.deny(useUnknownCommandMessage, player.getEffectiveLocale()).ifPresent(player::sendMessage);
         }
     }
 

@@ -29,7 +29,11 @@ public enum VanishMessageKey implements MessageKey {
     VANISH_PICKUP_OFF("vanish.pickup-off"),
 
     // The persistent action-bar indicator refreshed to a vanished player while they are hidden.
-    VANISH_ACTIONBAR("vanish.actionbar");
+    VANISH_ACTIONBAR("vanish.actionbar"),
+
+    // the fake connection lines the shipped config points at with @vanish.fake-quit and @vanish.fake-join, {player}
+    VANISH_FAKE_QUIT("vanish.fake-quit"),
+    VANISH_FAKE_JOIN("vanish.fake-join");
 
     private final String key;
 
