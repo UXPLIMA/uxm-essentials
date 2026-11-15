@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.DomainEvent;
@@ -79,7 +80,8 @@ class TrackingWarmupsTest {
                 new NoNodes(),
                 Clock.fixed(Instant.parse("2026-11-15T12:00:00Z"), ZoneOffset.UTC),
                 notifier,
-                who -> Optional.of(STANDING));
+                who -> Optional.of(STANDING),
+                new QuietLog());
         return new TeleportEngine(new NoCooldowns(), warmups, hops, notifier, published::add, settings, who -> false);
     }
 
@@ -297,5 +299,21 @@ class TrackingWarmupsTest {
         public int getInt(String path, int fallback) {
             return path.equals("default-warmup") ? Integer.parseInt(warmupSeconds) : fallback;
         }
+    }
+
+    /** A logger nobody reads. */
+    private static final class QuietLog implements Logger {
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }

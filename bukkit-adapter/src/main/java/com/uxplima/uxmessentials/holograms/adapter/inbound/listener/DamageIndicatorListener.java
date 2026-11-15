@@ -16,10 +16,10 @@ import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityRegainHealthEvent;
 
 import net.kyori.adventure.text.Component;
-import net.kyori.adventure.text.minimessage.MiniMessage;
 
 import com.uxplima.uxmessentials.holograms.adapter.outbound.DamageIndicatorConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.packet.display.HologramAppearance;
@@ -43,7 +43,6 @@ public final class DamageIndicatorListener implements Listener {
     private final Scheduler scheduler;
     private final com.uxplima.uxmlib.scheduler.Scheduler frames;
     private final HologramPackets packets;
-    private final MiniMessage miniMessage = MiniMessage.miniMessage();
 
     /**
      * @param scheduler this plugin's port, which times the removal
@@ -107,7 +106,8 @@ public final class DamageIndicatorListener implements Listener {
     }
 
     private void spawn(Entity victim, String source) {
-        Component text = miniMessage.deserialize(source);
+        // Drawn with the theme, so the shipped formats' <bad>, <warn> and <good> follow the server's theme.
+        Component text = StyledText.render(source);
         ThreadLocalRandom random = ThreadLocalRandom.current();
         Location at = victim.getLocation()
                 .add(random.nextDouble(-0.3, 0.3), victim.getHeight() + 0.4, random.nextDouble(-0.3, 0.3));

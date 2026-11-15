@@ -61,7 +61,9 @@ public final class SchedulerWarmups implements Warmups {
         if (handle.isCancelled()) {
             return; // the owning context already cancelled this warmup; onCancel ran at cancel time
         }
-        scheduler.onEntity(who, handle::complete);
+        // A player who left during the countdown is gone by the time it ends. Their warmup ends as a cancel rather
+        // than silently, so the owner of the warmup can undo what it set up for it, a charge taken up front included.
+        scheduler.onEntity(who, handle::complete, handle::cancel);
     }
 
     private Duration resolveDuration(PlayerRef who, WarmupKind kind) {

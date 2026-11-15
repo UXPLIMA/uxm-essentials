@@ -91,6 +91,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -131,6 +132,7 @@ public final class PlayerwarpsWiring {
             ModuleContext ctx,
             Persistence persistence,
             TeleportEngine teleportEngine,
+            PaidTeleports paid,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
             CrossServerHops hops,
             Optional<String> recordedServer,
@@ -156,6 +158,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
+        Objects.requireNonNull(paid, "paid");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(hops, "hops");
         Objects.requireNonNull(recordedServer, "recordedServer");
@@ -232,7 +235,9 @@ public final class PlayerwarpsWiring {
                 economy,
                 localServerId,
                 new PlayerWarpHops(departures, hops.charges(), hopResolver),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                paid,
+                kernel.log());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
         }

@@ -316,7 +316,8 @@ public final class TeleportWiring {
                 kernel.permissions(),
                 clock,
                 notifier,
-                kernel.playerLocator());
+                kernel.playerLocator(),
+                kernel.log());
         TeleportEngine engine = new TeleportEngine(
                 kernel.cooldowns(),
                 warmups,

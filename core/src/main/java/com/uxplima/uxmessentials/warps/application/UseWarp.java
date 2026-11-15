@@ -3,12 +3,17 @@ package com.uxplima.uxmessentials.warps.application;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports.Settlement;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -29,7 +34,8 @@ import org.jspecify.annotations.Nullable;
  * region-aware async hop are the teleport context's concern.
  *
  * <p>The jail, combat and cooldown checks of the teleport run before the charge too, so a use they refuse costs
- * nothing.
+ * nothing. The charge is still taken before the warmup, so a use whose teleport then never lands (a move during the
+ * warmup, a newer teleport, a missed hop, the player leaving) gets it back once, through {@link PaidTeleports}.
  *
  * <p>A warp set on another backend, while the warps {@code cross-server} block is on, is handed to the shared
  * cross-server hop through {@link WarpHops} instead, on the async lane, since the hop writes to the shared database.
@@ -54,6 +60,8 @@ public final class UseWarp {
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final WarpHops hops;
+    private final PaidTeleports paid;
+    private final Logger log;
 
     public UseWarp(
             WarpRepository repository,
@@ -64,7 +72,9 @@ public final class UseWarp {
             Permissions permissions,
             Scheduler scheduler,
             PlayerLookup players,
-            WarpHops hops) {
+            WarpHops hops,
+            PaidTeleports paid,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
@@ -74,6 +84,8 @@ public final class UseWarp {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
         this.hops = Objects.requireNonNull(hops, "hops");
+        this.paid = Objects.requireNonNull(paid, "paid");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Teleport {@code who} to the warp {@code name} themselves, gating access and cost first. */
@@ -123,21 +135,52 @@ public final class UseWarp {
         if (!teleporter.admits(recipient, warp)) {
             return teleportRefused(actor, recipient, warp);
         }
-        Result<Optional<WarpCost>, WarpError> charged = charge(actor, recipient, warp);
+        Result<Optional<WarpCost>, WarpError> charged = takeCharge(actor, recipient, warp);
         if (charged.isErr()) {
             return Result.err(charged.errorOrThrow());
         }
-        notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
-
-        // Increment the visitor counter. The write persists to the DB (a single-writer SQLite by default),
-        // so it is handed to the async scheduler rather than run on the caller's region thread, the counter
-        // is a display statistic the teleport does not depend on, and the in-memory {@code updated} warp
-        // already carries the new count for the hop below.
-        Warp updated = warp.incrementedVisitors();
-        scheduler.async(() -> repository.save(updated));
-
-        teleporter.teleportTo(recipient, updated);
+        // Opened before anything else can fail, so a fault between the charge and the launch gives the money back
+        // instead of leaving it taken for a teleport that never started.
+        Optional<Settlement> settlement = charged.orElseThrow().map(cost -> settlementFor(recipient, warp, cost));
+        try {
+            tellSent(actor, recipient, warp);
+            notifier.send(recipient, WarpsMessageKey.WARP_TELEPORTING, placeholders);
+            // The in-memory warp already carries the new visitor count for the hop below.
+            Warp updated = warp.incrementedVisitors();
+            countVisit(updated);
+            CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(recipient, updated);
+            settlement.ifPresent(open -> open.follow(outcome));
+        } catch (RuntimeException failure) {
+            settlement.ifPresent(Settlement::refuse);
+            throw failure;
+        }
         return Result.ok();
+    }
+
+    /**
+     * Persist the visitor counter off the caller's thread, since the write goes to the database. The counter is a
+     * display statistic the teleport does not depend on, so a lane that refuses it costs the count, not the use.
+     */
+    private void countVisit(Warp updated) {
+        try {
+            scheduler.async(() -> repository.save(updated));
+        } catch (RuntimeException refused) {
+            log.warn(
+                    "event=warp_visit_not_counted warp={} reason={}",
+                    updated.name().value(),
+                    refused.toString());
+        }
+    }
+
+    /** Give {@code recipient} back what the use cost them if the teleport does not land, and tell them once. */
+    private Settlement settlementFor(PlayerRef recipient, Warp warp, WarpCost cost) {
+        return paid.open(
+                PaidTeleports.subject("warp", warp.name().value(), recipient, cost.amount(), cost.currencyId()),
+                () -> access.refund(recipient, cost),
+                () -> notifier.send(
+                        recipient,
+                        WarpsMessageKey.WARP_CROSS_SERVER_REFUNDED,
+                        Map.of("warp", warp.name().value())));
     }
 
     /**
@@ -182,19 +225,31 @@ public final class UseWarp {
 
     /** Charge the use to {@code recipient}, telling {@code actor} a failed charge or a staff send that went through. */
     private Result<Optional<WarpCost>, WarpError> charge(PlayerRef actor, PlayerRef recipient, Warp warp) {
+        Result<Optional<WarpCost>, WarpError> charged = takeCharge(actor, recipient, warp);
+        if (charged.isOk()) {
+            tellSent(actor, recipient, warp);
+        }
+        return charged;
+    }
+
+    /** Charge the use to {@code recipient}, telling {@code actor} when the charge failed. */
+    private Result<Optional<WarpCost>, WarpError> takeCharge(PlayerRef actor, PlayerRef recipient, Warp warp) {
         Result<Optional<WarpCost>, WarpError> charged = access.charge(recipient, warp);
         if (charged.isErr()) {
             notifier.send(
                     actor,
                     charged.errorOrThrow().messageKey(),
                     Map.of("warp", warp.name().value()));
-            return charged;
         }
+        return charged;
+    }
+
+    /** Tell a staff member who sent another player that the send went through. */
+    private void tellSent(PlayerRef actor, PlayerRef recipient, Warp warp) {
         if (!actor.uuid().equals(recipient.uuid())) {
             notifier.send(
                     actor, WarpsMessageKey.WARP_SENT, Map.of("warp", warp.name().value(), "player", recipient.name()));
         }
-        return charged;
     }
 
     /**

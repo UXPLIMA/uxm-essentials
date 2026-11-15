@@ -297,6 +297,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinQueries;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
@@ -2424,11 +2425,13 @@ public final class PluginModule {
             ClaimProvidersConfig claimProviders) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "homes delegates teleport execution but the teleport engine is unavailable");
+        PaidTeleports paid = paidTeleports(ctx, resources);
         HomesWiring.Wired wired = HomesWiring.wire(
                 plugin,
                 ctx,
                 persistence,
                 engine,
+                paid,
                 Optional.ofNullable(links.homeEconomy),
                 bus,
                 links.hops,
@@ -2472,6 +2475,17 @@ public final class PluginModule {
                 Material.RED_BED,
                 DestinationPermissions.HOME_USE,
                 (player, viewer) -> wired.listView().open(player)));
+    }
+
+    /**
+     * The settlement of a module's paid local teleports, closed with the module so a charge still waiting on its
+     * teleport when the module stops is logged for an operator rather than lost without a trace.
+     */
+    private static PaidTeleports paidTeleports(ModuleContext ctx, CloseableResources resources) {
+        PaidTeleports paid =
+                new PaidTeleports(ctx.kernel().scheduler(), ctx.kernel().log());
+        resources.onClose(paid::close);
+        return paid;
     }
 
     private static void bindHomeRespawn(ContextLinks links, HomeRespawnLocator locator) {
@@ -2584,10 +2598,12 @@ public final class PluginModule {
             MenuBindings menuBindings) {
         TeleportEngine engine = Objects.requireNonNull(
                 links.teleportEngine, "warps delegates teleport execution but the teleport engine is unavailable");
+        PaidTeleports paid = paidTeleports(ctx, resources);
         WarpsWiring.Wired wired = WarpsWiring.wire(
                 ctx,
                 persistence,
                 engine,
+                paid,
                 Optional.ofNullable(links.warpEconomy),
                 bus,
                 links.hops,
@@ -3327,11 +3343,13 @@ public final class PluginModule {
                 links.teleportEngine,
                 "playerwarps delegates teleport execution but the teleport engine is unavailable");
         GuiText guiText = new GuiText(ctx.kernel().messages());
+        PaidTeleports paid = paidTeleports(ctx, resources);
         PlayerwarpsWiring.Wired wired = PlayerwarpsWiring.wire(
                 plugin,
                 ctx,
                 persistence,
                 engine,
+                paid,
                 bus,
                 links.hops,
                 links.network.recordedServer(),

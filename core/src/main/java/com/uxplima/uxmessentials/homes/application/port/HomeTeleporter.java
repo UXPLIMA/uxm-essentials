@@ -1,6 +1,9 @@
 package com.uxplima.uxmessentials.homes.application.port;
 
+import java.util.concurrent.CompletionStage;
+
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -13,8 +16,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface HomeTeleporter {
 
-    /** Send {@code who} to {@code home}, routing the hop through the teleport context's gated flow. */
-    void teleportTo(PlayerRef who, Home home);
+    /**
+     * Send {@code who} to {@code home}, routing the hop through the teleport context's gated flow. The stage completes
+     * exactly once with how the teleport ended, {@link TeleportOutcome#LANDED} only once the player stands at the
+     * home, so a teleport charged before the warmup can give the money back on any other outcome. It may complete on
+     * any thread, the player's region thread included.
+     */
+    CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, Home home);
 
     /**
      * On {@code who}'s region thread: move them to {@code home} at once, the landing of a cross-server hop. The origin

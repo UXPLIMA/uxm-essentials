@@ -8,8 +8,8 @@ package com.uxplima.uxmessentials.playerwarps.domain;
  *
  * <ul>
  *   <li>{@link #INSUFFICIENT_FUNDS}: the payer's balance could not cover the price; nothing was debited.
- *   <li>{@link #ACCRUAL_FAILED}. The payer was debited but crediting the owner's bank failed, so the adapter
- *       issued a compensating refund and the visit was refused; the payer ends whole.
+ *   <li>{@link #ACCRUAL_FAILED}: crediting the owner's bank failed after the visitor landed, so nothing was
+ *       banked and the caller gives the visitor's charge back; the payer ends whole.
  *   <li>{@link #PROVIDER_ERROR}: the economy provider raised an unexpected fault; treated as no charge taken.
  * </ul>
  */

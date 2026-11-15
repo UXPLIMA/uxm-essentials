@@ -6,6 +6,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static com.uxplima.uxmessentials.testing.Fixtures.at;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -15,6 +16,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
@@ -32,10 +35,13 @@ import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -56,6 +62,8 @@ import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.testing.SteppedScheduler;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 
 /**
  * A teleport to a home set on another backend, from the charge on the origin to the move on the target, and every way
@@ -154,7 +162,8 @@ class CrossServerHomeTest {
                 moves,
                 notifier.notifier(),
                 new HomeCharge(permissions, Optional.of(purse), costs),
-                hops(routed));
+                hops(routed),
+                new PaidTeleports(scheduler, log));
     }
 
     private Result<Unit, HomeError> goHome() {
@@ -424,6 +433,78 @@ class CrossServerHomeTest {
     }
 
     @Test
+    void aLocalTeleportThatLandsKeepsItsCharge() {
+        homes.save(baseOn(LOBBY));
+        moves.holds = true;
+
+        goHome();
+        moves.finish(TeleportOutcome.LANDED);
+
+        assertThat(purse.wallet).isEqualByComparingTo("74.50");
+        assertThat(purse.refunds).isZero();
+        assertThat(notifier.keys()).containsExactly("home.teleporting");
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = TeleportOutcome.class, names = "LANDED", mode = EnumSource.Mode.EXCLUDE)
+    void aLocalTeleportThatNeverLandsIsRefundedOnceAndTheyAreToldOnce(TeleportOutcome ended) {
+        homes.save(baseOn(LOBBY));
+        moves.holds = true;
+
+        goHome();
+        assertThat(purse.wallet).as("charged before the warmup").isEqualByComparingTo("74.50");
+        moves.finish(ended);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.sent())
+                .extracting(RecordingNotifier.Sent::key)
+                .containsExactly("home.teleporting", "home.cross-server.refunded");
+        assertThat(notifier.sent().get(1).placeholders()).containsEntry("home", "base");
+    }
+
+    @Test
+    void aLocalLaunchThatThrowsAfterTheChargeGivesTheMoneyBackOnceAndStillFails() {
+        homes.save(baseOn(LOBBY));
+        moves.throwsOnTeleport = true;
+
+        assertThatThrownBy(this::goHome).isInstanceOf(IllegalStateException.class);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.teleporting", "home.cross-server.refunded");
+    }
+
+    @Test
+    void aLocalTeleportForAPlayerWhoMayTeleportFreeMovesNoMoneyWhenItNeverLands() {
+        homes.save(baseOn(LOBBY));
+        permissions.grant(ALEX, DestinationPermissions.HOME_BYPASS_COST);
+        moves.holds = true;
+
+        goHome();
+        moves.finish(TeleportOutcome.CANCELLED);
+
+        assertThat(purse.charges).isZero();
+        assertThat(purse.refunds).isZero();
+    }
+
+    @Test
+    void aCrossServerHomeThatMissesIsRefundedOnceByTheHopAlone() {
+        moves.holds = true;
+        moves.refuses = true;
+
+        goHome();
+        join(survival);
+        scheduler.advance(TTL);
+
+        assertThat(moves.held)
+                .as("a cross-server hop never takes the local outcome route")
+                .isEmpty();
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+    }
+
+    @Test
     void aHomeOfThisServerIsUsedHereWithTheBlockOn() {
         homes.save(baseOn(LOBBY));
 
@@ -575,12 +656,35 @@ class CrossServerHomeTest {
         final List<String> teleported = new ArrayList<>();
         final List<String> made = new ArrayList<>();
         boolean refuses;
+        /** Outcomes the test finishes itself, oldest first, while {@code holds} is set. */
+        final List<CompletableFuture<TeleportOutcome>> held = new ArrayList<>();
+
+        /** Leave each local teleport's outcome to the test instead of landing it. */
+        boolean holds;
+
+        /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
+        boolean throwsOnTeleport;
 
         @Nullable TeleportEngine engine;
 
         @Override
-        public void teleportTo(PlayerRef who, Home home) {
+        public CompletionStage<TeleportOutcome> teleportTo(PlayerRef who, Home home) {
+            if (throwsOnTeleport) {
+                throw new IllegalStateException("the launch failed");
+            }
+            CompletableFuture<TeleportOutcome> outcome = new CompletableFuture<>();
+            if (holds) {
+                held.add(outcome);
+                return outcome;
+            }
             teleported.add(who.name() + "->" + HomeHops.labelOf(home));
+            outcome.complete(TeleportOutcome.LANDED);
+            return outcome;
+        }
+
+        /** End the oldest held teleport with {@code outcome}. */
+        void finish(TeleportOutcome outcome) {
+            held.remove(0).complete(outcome);
         }
 
         @Override

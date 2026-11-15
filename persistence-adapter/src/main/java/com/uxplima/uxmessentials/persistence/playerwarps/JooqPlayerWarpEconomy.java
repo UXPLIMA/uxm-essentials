@@ -41,21 +41,16 @@ import org.jspecify.annotations.Nullable;
  * <em>is</em> the cut; there is no separate sink credit. Routing the cut to a named holding account instead of
  * deflating it is a future config option, deliberately out of scope here.
  *
- * <h2>debit-then-accrue-then-compensate</h2>
+ * <h2>A use is paid in two steps</h2>
  * A single transaction spanning the wallet table and the warp bank would mean reaching across the economy port
  * into its storage: a layering violation, and impossible for a foreign backend that offers no transaction. So
- * the charge is uniform for every backend: the {@link EconomyProvider#debit(PlayerRef, Money) debit} is the
- * DB-guarded, double-spend-safe point (two concurrent uses can never both pass it past zero), and only once it
- * takes does the bank accrue. If the accrue then throws, a compensating {@link EconomyProvider#credit credit}
- * makes the payer whole and the charge reports {@link ChargeError#ACCRUAL_FAILED}; if that compensation also
- * fails the payer is genuinely short, which is logged at error as an operator-visible money discrepancy (never a
- * secret): the honest outcome, never swallowed. There is no check-then-charge: the debit either takes in full
- * or reports {@link ChargeError#INSUFFICIENT_FUNDS}, so no affordability probe opens a double-spend window.
- *
- * <h2>A cross-server use is paid in two steps</h2>
- * {@link #charge} only debits the visitor on the origin, and {@link #accrue} banks the owner's share once the
- * target has moved them. A cross-server use can still be refunded after the charge (the proxy never moved the
- * player), and a refund after an immediate accrual would leave the owner paid with money nobody lost.
+ * {@link #charge} only debits the visitor, through the {@link EconomyProvider#debit(PlayerRef, Money) debit} that
+ * is the DB-guarded, double-spend-safe point (two concurrent uses can never both pass it past zero), and
+ * {@link #accrue} banks the owner's share once the visitor has landed, here or on another backend. A use can still
+ * be refunded between the two (a cancelled warmup, a missed hop, a cross-server hop that timed out), and a refund
+ * after an immediate accrual would leave the owner paid with money nobody lost. An accrue that banks nothing reports
+ * {@link ChargeError#ACCRUAL_FAILED} and the caller gives the visitor's charge back. There is no check-then-charge:
+ * the debit either takes in full or reports {@link ChargeError#INSUFFICIENT_FUNDS}.
  *
  * <h2>Withdraw is a guarded read-then-zero</h2>
  * {@link #withdraw} reads the bank, zeroes it with a guard ({@code SET earned_amount = 0 WHERE id = ? AND
@@ -89,22 +84,6 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     }
 
     @Override
-    public Result<Unit, ChargeError> chargeAndAccrue(
-            PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId) {
-        Objects.requireNonNull(payer, "payer");
-        Objects.requireNonNull(warp, "warp");
-        Objects.requireNonNull(price, "price");
-        Objects.requireNonNull(currencyId, "currencyId");
-        Currency currency = resolve(currencyId);
-        Money charge = Money.of(currency, price);
-        Result<Unit, TransferError> debited = economy.debit(payer, charge);
-        if (debited.isErr()) {
-            return Result.err(chargeErrorFor(debited.errorOrThrow()));
-        }
-        return accrueThenPayout(payer, warp, currency, charge);
-    }
-
-    @Override
     public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
         Objects.requireNonNull(payer, "payer");
         Objects.requireNonNull(price, "price");
@@ -129,34 +108,6 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
                             + currency.id().value() + " amount=" + net,
                     accrualFailure);
             return Result.err(ChargeError.ACCRUAL_FAILED);
-        }
-        autoPayout(warp, currency);
-        return Result.ok();
-    }
-
-    /**
-     * The debit has taken; bank {@code net} to the owner and, if configured and safe, immediately pay it out. An
-     * accrue that throws unwinds the debit with a compensating credit rather than leaving the payer short.
-     */
-    private Result<Unit, ChargeError> accrueThenPayout(
-            PlayerRef payer, PlayerWarpId warp, Currency currency, Money charge) {
-        BigDecimal net = netOf(currency, charge.amount());
-        int accrued;
-        try {
-            accrued = bumpBank(warp, net, currency.id().value());
-        } catch (RuntimeException accrualFailure) {
-            return compensate(payer, warp, charge, accrualFailure);
-        }
-        if (accrued == 0) {
-            // The warp row vanished between the debit and this accrue, a concurrent /pwarp delete or admin purge
-            // in the off-tick window (holding the aggregate in memory does not lock the DB row). The increment hit
-            // no rows, so nothing banked; refund the payer exactly as a thrown accrue would rather than debiting
-            // them with nothing to show for it.
-            return compensate(
-                    payer,
-                    warp,
-                    charge,
-                    new IllegalStateException("accrue affected 0 rows: warp " + warp.value() + " no longer exists"));
         }
         autoPayout(warp, currency);
         return Result.ok();
@@ -320,22 +271,6 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
                 .where(PLAYER_WARPS.ID.eq(warp.value()))
                 .and(PLAYER_WARPS.EARNED_AMOUNT.eq(expected))
                 .execute());
-    }
-
-    /** The debit could not be banked; refund the payer and, if even that fails, log the discrepancy honestly. */
-    private Result<Unit, ChargeError> compensate(
-            PlayerRef payer, PlayerWarpId warp, Money charge, RuntimeException cause) {
-        Result<Unit, TransferError> restored = economy.credit(payer, charge);
-        if (restored.isErr()) {
-            log.error(
-                    "event=playerwarp_charge_discrepancy warp=" + warp.value() + " payer=" + payer.uuid() + " name="
-                            + payer.name() + " currency="
-                            + charge.currency().id().value() + " amount="
-                            + charge.amount(),
-                    new IllegalStateException(
-                            "compensating credit rejected after accrual failure: " + restored.errorOrThrow(), cause));
-        }
-        return Result.err(ChargeError.ACCRUAL_FAILED);
     }
 
     /** The bank was zeroed but the owner credit was refused; put the money back and report a provider fault. */
