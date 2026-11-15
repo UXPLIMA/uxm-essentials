@@ -15,12 +15,13 @@ import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 
 /**
  * The typed view of {@code modules/guard/config.conf}, read whole on start and on reload.
@@ -52,9 +53,9 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  */
 public record GuardConfig(
         boolean enabled,
-        GuardScope serverScope,
+        ServerScope serverScope,
         List<String> sharedSets,
-        GuardScope newRegionScope,
+        ServerScope newRegionScope,
         Duration pollInterval,
         String denyChannel,
         Duration denyCooldown,
@@ -125,19 +126,14 @@ public record GuardConfig(
     }
 
     /** Every scope this server loads. */
-    public List<GuardScope> loadedScopes() {
-        List<GuardScope> scopes = new ArrayList<>();
-        scopes.add(serverScope);
-        for (String set : sharedSets) {
-            scopes.add(GuardScope.set(set));
-        }
-        return List.copyOf(scopes);
+    public List<ServerScope> loadedScopes() {
+        return new LocalServer(serverScope.name(), sharedSets).loadedScopes();
     }
 
     /** Read the module config. {@code serverId} is the network's id for this server. */
     public static GuardConfig from(ConfigStore config, String serverId, Consumer<String> problems) {
         Objects.requireNonNull(config, "config");
-        GuardScope server = GuardScope.server(serverId);
+        ServerScope server = ServerScope.server(serverId);
         List<String> sets = config.getStringList("network.shared-sets", List.of()).stream()
                 .map(String::strip)
                 .filter(s -> !s.isEmpty())
@@ -146,8 +142,8 @@ public record GuardConfig(
         String written = config.getString("network.new-region-scope", "server").strip();
         // "set:lobby" and "lobby" both name the set, as the comment in the file and /guard scope accept either.
         String scopeName = written.startsWith("set:") ? written.substring(4) : written;
-        GuardScope newScope =
-                scopeName.equalsIgnoreCase("server") || !sets.contains(scopeName) ? server : GuardScope.set(scopeName);
+        ServerScope newScope =
+                scopeName.equalsIgnoreCase("server") || !sets.contains(scopeName) ? server : ServerScope.set(scopeName);
         if (!scopeName.equalsIgnoreCase("server") && !sets.contains(scopeName)) {
             problems.accept("network.new-region-scope names a set this server does not load: " + written);
         }

@@ -17,18 +17,25 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportNamedSp
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnMirrorsRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.persistence.runtime.StoredScope;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The jOOQ-backed {@link SpawnDirectory} over the V10 spawn tables: a per-world spawn keyed by world uid, the
- * singleton main spawn pinned at id 0, named spawns keyed by canonical lowercase name, and per-world mirror
- * redirects. Every read is a single keyed lookup and every write upserts on the key, so a re-anchor overwrites
- * the same row rather than inserting. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * network-wide main spawn pinned at id 0 and one main spawn row per server scope, named spawns keyed by canonical
+ * lowercase name, and per-world mirror redirects. Every read is a single keyed lookup and every write upserts on
+ * the key, so a re-anchor overwrites the same row rather than inserting. Every statement is typed jOOQ DSL; no
+ * SQL is ever string-concatenated.
  *
  * <p>This store has no vanilla-world fallback: {@link #defaultSpawn} returns only the operator-set per-world
  * row, the same as {@link #operatorSpawn}. The vanilla last-resort lives in the bukkit-adapter's decorator,
@@ -37,6 +44,9 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class JooqSpawnDirectory extends JooqRepository implements SpawnDirectory {
+
+    /** The id of the network-wide main spawn row; scoped rows take the ids after it. */
+    private static final int NETWORK_ID = 0;
 
     public JooqSpawnDirectory(DSLContext dsl) {
         super(dsl);
@@ -61,11 +71,16 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
                 SpawnMirror mirror = SpawnRows.toMirror(row);
                 mirrors.put(mirror.sourceWorld(), mirror);
             }
-            Optional<Position> main = dsl.selectFrom(TELEPORT_MAIN_SPAWN)
-                    .where(TELEPORT_MAIN_SPAWN.ID.eq(0))
-                    .fetchOptional()
-                    .map(SpawnRows::toPosition);
-            return new SpawnDirectorySnapshot(worlds, named, mirrors, main);
+            Map<String, Position> mains = new LinkedHashMap<>();
+            for (TeleportMainSpawnRecord row :
+                    dsl.selectFrom(TELEPORT_MAIN_SPAWN).fetch()) {
+                ServerScope scope = StoredScope.read(row.getScope());
+                // Only id 0 is network-wide; a stray unscoped row never shadows it.
+                if (scope != null || row.getId() == NETWORK_ID) {
+                    mains.put(SpawnDirectorySnapshot.mainKey(scope), SpawnRows.toPosition(row));
+                }
+            }
+            return new SpawnDirectorySnapshot(worlds, named, mirrors, mains);
         });
     }
 
@@ -84,11 +99,15 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
     }
 
     @Override
-    public Optional<Position> mainSpawn() {
+    public Optional<Position> mainSpawn(@Nullable ServerScope scope) {
         return read(dsl -> dsl.selectFrom(TELEPORT_MAIN_SPAWN)
-                .where(TELEPORT_MAIN_SPAWN.ID.eq(0))
+                .where(mainRow(scope))
                 .fetchOptional()
                 .map(SpawnRows::toPosition));
+    }
+
+    private static Condition mainRow(@Nullable ServerScope scope) {
+        return scope == null ? TELEPORT_MAIN_SPAWN.ID.eq(NETWORK_ID) : TELEPORT_MAIN_SPAWN.SCOPE.eq(scope.value());
     }
 
     @Override
@@ -122,11 +141,28 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
     }
 
     @Override
-    public void setMainSpawn(Position position) {
+    public void setMainSpawn(@Nullable ServerScope scope, Position position) {
         Objects.requireNonNull(position, "position");
         long savedAt = System.currentTimeMillis();
+        if (scope == null) {
+            write(dsl -> {
+                upsertMain(dsl, position, savedAt);
+                return null;
+            });
+            return;
+        }
+        try {
+            replaceScopedMain(scope, position, savedAt);
+        } catch (PersistenceException collided) {
+            // Another server took the same next id, or wrote the same scope, between the read and the insert; the
+            // second attempt reads what it committed. A second failure is a real fault and reaches the caller.
+            replaceScopedMain(scope, position, savedAt);
+        }
+    }
+
+    private void replaceScopedMain(ServerScope scope, Position position, long savedAt) {
         write(dsl -> {
-            upsertMain(dsl, position, savedAt);
+            replaceScopedMain(dsl, scope, position, savedAt);
             return null;
         });
     }
@@ -181,7 +217,7 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
 
     private static void upsertMain(DSLContext dsl, Position spawn, long savedAt) {
         TeleportMainSpawnRecord record = dsl.newRecord(TELEPORT_MAIN_SPAWN);
-        SpawnRows.applyMain(record, spawn, savedAt);
+        SpawnRows.applyMain(record, NETWORK_ID, null, spawn, savedAt);
         dsl.insertInto(TELEPORT_MAIN_SPAWN)
                 .set(record)
                 .onConflict(TELEPORT_MAIN_SPAWN.ID)
@@ -195,6 +231,24 @@ public final class JooqSpawnDirectory extends JooqRepository implements SpawnDir
                 .set(TELEPORT_MAIN_SPAWN.PITCH, record.getPitch())
                 .set(TELEPORT_MAIN_SPAWN.CREATED_AT, record.getCreatedAt())
                 .execute();
+    }
+
+    /**
+     * Replace the main spawn of {@code scope}: its row goes and a new one takes the next free id, in one
+     * transaction. The unique index on the scope turns a peer writing the same scope at the same moment into a
+     * failed write rather than a second row, and the caller tries once more.
+     */
+    private static void replaceScopedMain(DSLContext dsl, ServerScope scope, Position spawn, long savedAt) {
+        dsl.deleteFrom(TELEPORT_MAIN_SPAWN)
+                .where(TELEPORT_MAIN_SPAWN.SCOPE.eq(scope.value()))
+                .execute();
+        Integer maxId = dsl.select(DSL.max(TELEPORT_MAIN_SPAWN.ID))
+                .from(TELEPORT_MAIN_SPAWN)
+                .fetchOne(0, Integer.class);
+        int id = Math.max(NETWORK_ID, maxId == null ? NETWORK_ID : maxId) + 1;
+        TeleportMainSpawnRecord record = dsl.newRecord(TELEPORT_MAIN_SPAWN);
+        SpawnRows.applyMain(record, id, scope, spawn, savedAt);
+        dsl.insertInto(TELEPORT_MAIN_SPAWN).set(record).execute();
     }
 
     private static void upsertNamed(DSLContext dsl, String name, Position spawn, long savedAt) {

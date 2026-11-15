@@ -13,12 +13,12 @@ import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
 import com.uxplima.uxmessentials.shared.adapter.outbound.config.ConfigurateConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -149,9 +149,9 @@ class GuardConfigTest {
                 network { shared-sets = ["hub"], new-region-scope = "arena" }
                 """);
 
-        assertThat(config.loadedScopes()).containsExactly(GuardScope.server("lobby"), GuardScope.set("hub"));
-        assertThat(config.newRegionScope()).isEqualTo(GuardScope.set("hub"));
-        assertThat(unknown.newRegionScope()).isEqualTo(GuardScope.server("lobby"));
+        assertThat(config.loadedScopes()).containsExactly(ServerScope.server("lobby"), ServerScope.set("hub"));
+        assertThat(config.newRegionScope()).isEqualTo(ServerScope.set("hub"));
+        assertThat(unknown.newRegionScope()).isEqualTo(ServerScope.server("lobby"));
         assertThat(problems).singleElement().asString().contains("arena");
     }
 }

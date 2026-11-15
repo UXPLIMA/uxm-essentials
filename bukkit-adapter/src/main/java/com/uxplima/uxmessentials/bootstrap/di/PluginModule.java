@@ -1220,7 +1220,9 @@ public final class PluginModule {
         CrossServerHops hops = HopWiring.wire(
                 plugin, config, kernel, persistence, bus.publisher().serverId());
         resources.addListener(hops.arrivalListener());
-        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets);
+        NetworkConfig network =
+                NetworkConfig.from(config, problem -> kernel.log().warn("event=network_config_problem {}", problem));
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets, network);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.livePeers = livePeers;
@@ -1330,8 +1332,12 @@ public final class PluginModule {
         // The relational keys read across two players. Vanish visibility is the same gate messaging resolves a
         // target through, built here from the one vanish authority; with vanish disabled the seam stays absent and
         // "can see" answers yes, which is what a server without vanish means.
-        if (links.vanishStore != null && links.vanishLevelResolver != null) {
-            links.placeholders.visibility(new AuthorityVanishVisibility(links.vanishStore, links.vanishLevelResolver));
+        if (links.vanishStore != null && links.vanishLevelResolver != null && links.vanishNetwork != null) {
+            links.placeholders.visibility(new AuthorityVanishVisibility(
+                    links.vanishStore,
+                    links.vanishNetwork,
+                    links.vanishLevelResolver,
+                    kernel.playerLookup()::isOnline));
         }
         if (links.tradeSessions != null) {
             links.placeholders.trade(new SessionsTradePlaceholders(links.tradeSessions));
@@ -2227,6 +2233,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 guiLayouts,
                 guiRegistry,
                 menus,
@@ -2738,7 +2745,10 @@ public final class PluginModule {
         com.uxplima.uxmessentials.messaging.application.port.VanishVisibility vanish = vanishStore == null
                 ? com.uxplima.uxmessentials.messaging.application.port.VanishVisibility.ALWAYS_VISIBLE
                 : new com.uxplima.uxmessentials.messaging.adapter.outbound.AuthorityVanishVisibility(
-                        vanishStore, java.util.Objects.requireNonNull(links.vanishLevelResolver));
+                        vanishStore,
+                        java.util.Objects.requireNonNull(links.vanishNetwork),
+                        java.util.Objects.requireNonNull(links.vanishLevelResolver),
+                        ctx.kernel().playerLookup()::isOnline);
         MessagingWiring.Wired wired = MessagingWiring.wire(
                 plugin,
                 ctx,
@@ -2746,6 +2756,7 @@ public final class PluginModule {
                 Optional.empty(),
                 vanish,
                 bus,
+                links.presence,
                 guiText,
                 guiLayouts,
                 textInput,
@@ -2793,6 +2804,21 @@ public final class PluginModule {
         links.staffAudience = new com.uxplima.uxmessentials.messaging.adapter.outbound.BukkitStaffAudience();
     }
 
+    /**
+     * What keeps {@code /seen} from showing a vanished player as online to someone who may not see them: the vanish
+     * authority here and the vanish rows every backend shares, or nothing to hide with the vanish module disabled.
+     */
+    private static com.uxplima.uxmessentials.moderation.application.port.SeenVisibility seenVisibility(
+            ContextLinks links, Persistence persistence) {
+        com.uxplima.uxmessentials.vanish.application.port.VanishStore vanishStore = links.vanishStore;
+        com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver levels = links.vanishLevelResolver;
+        if (vanishStore == null || levels == null) {
+            return com.uxplima.uxmessentials.moderation.application.port.SeenVisibility.ALWAYS_VISIBLE;
+        }
+        return new com.uxplima.uxmessentials.moderation.adapter.outbound.VanishSeenVisibility(
+                vanishStore, com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores.jooq(persistence), levels);
+    }
+
     private static void wireModeration(
             JavaPlugin plugin,
             ModuleContext ctx,
@@ -2835,7 +2861,8 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath(),
                 ipCapture.store(),
                 ipCapture.tokens(),
-                links.presence);
+                links.presence,
+                seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3034,6 +3061,7 @@ public final class PluginModule {
             requestVisibility.bind(new com.uxplima.uxmessentials.teleport.adapter.outbound.VanishRequestVisibility(
                     wired.vanishStore(), wired.levels()));
         }
+        links.vanishNetwork = wired.network();
         links.queries.register(
                 UxmVanishQuery.class,
                 new VanishQueries(
@@ -3181,6 +3209,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 leaderboards,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
@@ -3199,7 +3228,7 @@ public final class PluginModule {
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
-        resources.onClose(links.importTargets.holograms(wired.cache(), wired.renderer()));
+        resources.onClose(links.importTargets.holograms(wired.cache(), wired.view()));
         // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "holograms",
@@ -3484,6 +3513,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 engineTheme(resources),
@@ -3548,8 +3578,8 @@ public final class PluginModule {
         // and unsubscribed on stop (the kernel port exposes only publish). With messaging off no alert is wired.
         InProcessDomainEventPublisher events =
                 (InProcessDomainEventPublisher) ctx.kernel().events();
-        StaffWiring.Wired wired = StaffWiring.wire(
-                plugin, ctx, persistence, bus.publisher().serverId(), seams, events, guiRegistry, menus, menuBindings);
+        StaffWiring.Wired wired =
+                StaffWiring.wire(plugin, ctx, persistence, bus, seams, events, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // The staff PAPI seam reads the same staff-mode marker the /staffmode use cases hold and counts the online
@@ -3718,6 +3748,10 @@ public final class PluginModule {
         // see level the world does. Null when the vanish module is disabled (the gates degrade to fully-visible).
         private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable VanishLevelResolver
                 vanishLevelResolver;
+        // Who is vanished on the other backends, captured with the store so the messaging gate hides a player vanished
+        // elsewhere. Null when the vanish module is disabled.
+        private com.uxplima.uxmessentials.vanish.application.port.@org.jspecify.annotations.Nullable NetworkVanishStore
+                vanishNetwork;
         // The live trade registry, captured during trade wiring so the relational trade placeholders can read it
         // after every module has wired. Null when the trade module is disabled, which reads as "nobody is trading".
         private @org.jspecify.annotations.Nullable TradeSessions tradeSessions;
@@ -3758,6 +3792,8 @@ public final class PluginModule {
         // module's resources, so a module that fails part way leaves its slot empty and the importer falls back
         // to the database for that kind.
         private final ImportTargets importTargets;
+        // The root network block, read once: a module's own config is scoped to its subtree, where it is absent.
+        private final NetworkConfig network;
 
         private ContextLinks(
                 AuditChannel auditChannel,
@@ -3765,13 +3801,15 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions,
                 NetworkPresence presence,
                 CrossServerHops hops,
-                ImportTargets importTargets) {
+                ImportTargets importTargets,
+                NetworkConfig network) {
             this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
             this.presence = presence;
             this.hops = hops;
             this.importTargets = importTargets;
+            this.network = network;
         }
         // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.
         private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();

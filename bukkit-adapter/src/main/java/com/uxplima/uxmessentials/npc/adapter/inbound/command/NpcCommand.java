@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.npc.domain.NpcSkin;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -63,6 +64,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     private static final String ACTION = "uxmessentials.npc.action";
     private static final String VIEW = "uxmessentials.npc.view";
     private static final String EDIT = "uxmessentials.npc.edit";
+    private static final String SCOPE = "uxmessentials.npc.scope";
 
     /**
      * Which capability each verb belongs to, so the many verbs of {@code /npc} are grantable in the shapes an
@@ -84,6 +86,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             Map.entry("teleport", MOVE),
             Map.entry("center", MOVE),
             Map.entry("fix", MOVE),
+            Map.entry("scope", SCOPE),
             Map.entry("command", ACTION),
             Map.entry("action", ACTION),
             Map.entry("skin", APPEARANCE),
@@ -100,6 +103,7 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
     private final NpcDataCommands dataCommands;
     private final NpcActionCommands actionCommands;
     private final NpcStateCommands stateCommands;
+    private final NpcScopeCommand scopeCommand;
     private final NpcListMenu listView;
 
     public NpcCommand(
@@ -107,13 +111,15 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
             Supplier<? extends Collection<String>> npcNames,
             NpcSkinByName skinByName,
             Messages messages,
-            NpcListMenu listView) {
+            NpcListMenu listView,
+            Scheduler scheduler) {
         super(services, npcNames, messages);
         this.skinCommands = new NpcSkinCommands(services, npcNames, skinByName, messages);
         this.appearanceCommands = new NpcAppearanceCommands(services, npcNames, messages);
         this.dataCommands = new NpcDataCommands(services, npcNames, messages);
         this.actionCommands = new NpcActionCommands(services, npcNames, messages);
         this.stateCommands = new NpcStateCommands(services, npcNames, messages);
+        this.scopeCommand = new NpcScopeCommand(services, npcNames, messages, scheduler);
         this.listView = java.util.Objects.requireNonNull(listView, "listView");
     }
 
@@ -154,7 +160,8 @@ public final class NpcCommand extends NpcCommandSupport implements CommandRegist
                 bool("lookatplayer", this::lookAtPlayer),
                 skinCommands.node(),
                 dataCommands.node(),
-                actionCommands.node()));
+                actionCommands.node(),
+                scopeCommand.node()));
         verbs.addAll(appearanceCommands.nodes());
         verbs.addAll(stateCommands.nodes());
         for (LiteralArgumentBuilder<CommandSourceStack> verb : verbs) {

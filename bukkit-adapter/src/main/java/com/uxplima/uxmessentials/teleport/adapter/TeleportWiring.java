@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
@@ -37,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.RtpCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
@@ -147,6 +149,7 @@ public final class TeleportWiring {
             ModuleContext ctx,
             Persistence persistence,
             Bus bus,
+            NetworkConfig network,
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -205,6 +208,7 @@ public final class TeleportWiring {
                 jailGate,
                 combatGate,
                 spawns,
+                network,
                 clock,
                 rtp,
                 fee,
@@ -282,6 +286,7 @@ public final class TeleportWiring {
             MutableJailGate jailGate,
             CombatGate combatGate,
             SpawnDirectory spawns,
+            NetworkConfig network,
             Clock clock,
             RtpBundle rtp,
             TeleportFee fee,
@@ -342,12 +347,13 @@ public final class TeleportWiring {
             }
             playerHops = new PlayerHops(Optional.of(crossServer.hops().departures(new TeleportHopGate(engine))));
         }
-        BusTeleportNetwork network = new BusTeleportNetwork(crossServer.bus().publisher(), kernel.log());
+        BusTeleportNetwork teleportNetwork =
+                new BusTeleportNetwork(crossServer.bus().publisher(), kernel.log());
         // The accept use case and the remote side refer to each other: a remote request is accepted with the usual
         // verb, and a remote request a target auto-accepts is accepted through it.
         AtomicReference<@Nullable AcceptTeleport> acceptHolder = new AtomicReference<>();
         CrossServerRequests crossServerRequests = new CrossServerRequests(
-                network,
+                teleportNetwork,
                 crossServer.presence(),
                 kernel.playerLookup(),
                 requests,
@@ -365,7 +371,7 @@ public final class TeleportWiring {
                 new AcceptTeleport(requests, engine, notifier, kernel.events(), clock, crossServerRequests);
         acceptHolder.set(acceptTeleport);
         CrossServerStaffTeleport crossServerStaff = new CrossServerStaffTeleport(
-                network,
+                teleportNetwork,
                 crossServer.presence(),
                 kernel.playerLookup(),
                 kernel.playerLocator(),
@@ -375,11 +381,11 @@ public final class TeleportWiring {
                 kernel.scheduler(),
                 kernel.log());
         if (crossServer.enabled()) {
-            network.subscribe(message -> {
+            teleportNetwork.subscribe(message -> {
                 crossServerRequests.onMessage(message);
                 crossServerStaff.onMessage(message);
             });
-            crossServer.bus().registry().register(network::onFrame);
+            crossServer.bus().registry().register(teleportNetwork::onFrame);
         }
         return new TeleportServices.Builder()
                 .crossServerRequests(crossServerRequests)
@@ -403,7 +409,13 @@ public final class TeleportWiring {
                 .resolveRtp(new ResolveRtp(rtp.queue(), kernel.worldLookup(), engine, notifier, settings))
                 .resolveBiomeRtp(resolveBiomeRtp)
                 .biomeCatalog(rtp.biomeCatalog())
-                .resolveSpawn(new ResolveSpawn(spawns, kernel.worldLookup(), engine, notifier))
+                .resolveSpawn(new ResolveSpawn(
+                        spawns,
+                        kernel.worldLookup(),
+                        engine,
+                        notifier,
+                        network.localServer(),
+                        defaultMainScope(network)))
                 .build();
     }
 
@@ -546,6 +558,16 @@ public final class TeleportWiring {
             BiomeCatalog biomeCatalog,
             BiomeTargetedSearch biomeSearch,
             @Nullable Listener hotspotListener) {}
+
+    /**
+     * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn leaves
+     * every other's alone, and the network-wide main spawn on a lone server, which has no other server to keep apart
+     * from and so keeps its spawn when its server name changes. A server name no scope can hold also writes the
+     * network-wide spawn; the enable log names that name.
+     */
+    private static @Nullable ServerScope defaultMainScope(NetworkConfig network) {
+        return network.enabled() ? network.localServer().serverScope().orElse(null) : null;
+    }
 
     private static SpawnDirectory spawns(Plugin plugin, Persistence persistence, Bus bus) {
         // The durable jOOQ store holds the per-world spawns, the main spawn, named spawns and mirror

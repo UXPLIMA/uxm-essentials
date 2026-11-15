@@ -189,6 +189,40 @@ public final class NetworkMessageCodec {
                     out.writeUTF(member.name());
                 }
             }
+            case PrivateMessageFrame privateMessage -> {
+                writeUuid(out, privateMessage.messageId());
+                out.writeUTF(privateMessage.targetServer());
+                writeUuid(out, privateMessage.senderUuid());
+                out.writeUTF(privateMessage.senderName());
+                out.writeInt(privateMessage.senderSeeLevel());
+                writeUuid(out, privateMessage.targetUuid());
+                out.writeUTF(privateMessage.targetName());
+                out.writeUTF(privateMessage.body());
+                out.writeBoolean(privateMessage.reply());
+            }
+            case PrivateMessageAnswerFrame answer -> {
+                writeUuid(out, answer.messageId());
+                out.writeUTF(answer.outcome());
+                writeUuid(out, answer.senderUuid());
+                out.writeUTF(answer.senderName());
+                writeUuid(out, answer.targetUuid());
+                out.writeUTF(answer.targetName());
+                out.writeUTF(answer.body());
+                out.writeBoolean(answer.afk());
+                out.writeUTF(answer.afkReason());
+            }
+            case HelpOpFrame helpOp -> {
+                writeUuid(out, helpOp.requestId());
+                writeUuid(out, helpOp.requesterUuid());
+                out.writeUTF(helpOp.requesterName());
+                out.writeUTF(helpOp.body());
+            }
+            case StaffChatFrame staffChat -> {
+                writeUuid(out, staffChat.messageId());
+                writeUuid(out, staffChat.senderUuid());
+                out.writeUTF(staffChat.senderName());
+                out.writeUTF(staffChat.message());
+            }
             case TeleportRequestFrame request -> {
                 writeUuid(out, request.requestId());
                 writeUuid(out, request.requesterUuid());
@@ -255,6 +289,32 @@ public final class NetworkMessageCodec {
             case PRESENCE_CHANGED ->
                 new PresenceChanged(origin, in.readLong(), in.readLong(), readUuid(in), in.readUTF(), in.readBoolean());
             case PRESENCE_SNAPSHOT -> readSnapshot(in, origin);
+            case PRIVATE_MESSAGE ->
+                new PrivateMessageFrame(
+                        origin,
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readInt(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readBoolean());
+            case PRIVATE_MESSAGE_ANSWER ->
+                new PrivateMessageAnswerFrame(
+                        origin,
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        readUuid(in),
+                        in.readUTF(),
+                        in.readUTF(),
+                        in.readBoolean(),
+                        in.readUTF());
+            case HELP_OP -> new HelpOpFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
+            case STAFF_CHAT -> new StaffChatFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case TELEPORT_REQUEST ->
                 new TeleportRequestFrame(
                         origin,

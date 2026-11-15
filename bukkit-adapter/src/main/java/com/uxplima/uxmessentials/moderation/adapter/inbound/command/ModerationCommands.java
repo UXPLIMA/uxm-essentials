@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.ModerationGuiViews;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.PunishmentGuiFlow;
+import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
@@ -127,6 +128,9 @@ public final class ModerationCommands {
                         messages,
                         sink,
                         (a, t) -> services.freeze().unfreeze(a, t)),
+                // The records it reads (the seen record, the vanish row) are read on the async lane; where the target
+                // is
+                // and what the actor may see ask the server, so they are found here first.
                 target(
                         "seen",
                         "uxmessentials.moderation.seen",
@@ -134,7 +138,10 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.seen().seen(a, t)),
+                        (a, t) -> {
+                            Seen.Lookup lookup = services.seen().look(a, t);
+                            scheduler.async(() -> services.seen().report(lookup));
+                        }),
                 target(
                         "seenip",
                         "uxmessentials.moderation.seen",

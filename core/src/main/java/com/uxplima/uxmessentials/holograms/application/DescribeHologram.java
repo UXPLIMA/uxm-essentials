@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
@@ -76,6 +77,10 @@ public final class DescribeHologram {
         String linkedNpc = hologram.linkedNpcName();
         if (linkedNpc != null) {
             notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_LINKED_NPC, Map.of("npc", linkedNpc));
+        }
+        ServerScope scope = hologram.scope();
+        if (scope != null) {
+            notifier.send(viewer, HologramsMessageKey.HOLOGRAM_INFO_SCOPE, Map.of("scope", scope.value()));
         }
     }
 

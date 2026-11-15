@@ -48,6 +48,18 @@ public final class MessagingStaffChannel implements StaffChannel {
     }
 
     @Override
+    public void sendRemote(String server, PlayerRef from, List<PlayerRef> recipients, String message) {
+        Objects.requireNonNull(server, "server");
+        Objects.requireNonNull(from, "from");
+        Objects.requireNonNull(recipients, "recipients");
+        Objects.requireNonNull(message, "message");
+        Map<String, String> placeholders = Map.of("server", server, "player", from.name(), "message", message);
+        for (PlayerRef viewer : recipients) {
+            sink.deliver(viewer, messages.resolve(viewer, StaffMessageKey.STAFF_CHAT_FORMAT_REMOTE, placeholders));
+        }
+    }
+
+    @Override
     public List<PlayerRef> onlineStaff() {
         return audience.onlineWith(staffChatNode);
     }

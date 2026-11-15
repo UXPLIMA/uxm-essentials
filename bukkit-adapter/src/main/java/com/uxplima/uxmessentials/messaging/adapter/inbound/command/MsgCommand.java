@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -40,6 +41,9 @@ import org.jspecify.annotations.NullMarked;
  * sender can never infer "online-but-hidden" from the feedback. A hidden player's presence is never leaked and
  * they never receive a live delivery. Only a name that resolves to no online player and no played-before
  * profile is rejected as unknown.
+ *
+ * <p>A target online on another backend of the network takes neither path here: the message is relayed to their
+ * backend, with the same vanish rule, and the sender reads the offline line only when the target is on no backend.
  */
 @NullMarked
 public final class MsgCommand extends MessagingCommandSupport implements CommandRegistration {
@@ -88,6 +92,12 @@ public final class MsgCommand extends MessagingCommandSupport implements Command
             }
             // The online path: a visible target takes the live delivery through the 3-arg send (targetOnline=true).
             services.sendMessage().send(from, target, text);
+            return Command.SINGLE_SUCCESS;
+        }
+        Optional<OnlinePlayer> elsewhere = services.relay().elsewhere(name);
+        if (elsewhere.isPresent()) {
+            // Online on another backend: the message goes there, and that backend applies the target's switches.
+            services.relay().send(from, elsewhere.get(), text);
             return Command.SINGLE_SUCCESS;
         }
         Optional<PlayerRef> offline = services.players().findByName(name);

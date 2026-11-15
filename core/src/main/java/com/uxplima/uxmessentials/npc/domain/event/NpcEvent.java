@@ -11,4 +11,4 @@ import com.uxplima.uxmessentials.shared.domain.DomainEvent;
  * <p>Names are past tense. A domain event records something that already happened ({@code NpcCreated},
  * {@code NpcMoved}, {@code NpcDeleted}), never an imperative command.
  */
-public sealed interface NpcEvent extends DomainEvent permits NpcCreated, NpcMoved, NpcDeleted {}
+public sealed interface NpcEvent extends DomainEvent permits NpcCreated, NpcMoved, NpcDeleted, NpcRescoped {}

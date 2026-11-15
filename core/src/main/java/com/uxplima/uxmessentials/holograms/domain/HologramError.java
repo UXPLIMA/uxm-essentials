@@ -32,7 +32,10 @@ public enum HologramError {
     PAGE_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_PAGE_INDEX_INVALID),
 
     /** An action index outside the hologram's current action chain ({@code /hologram action set|move|remove}). */
-    ACTION_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_ACTION_INDEX_INVALID);
+    ACTION_INDEX_OUT_OF_RANGE(HologramsMessageKey.HOLOGRAM_ACTION_INDEX_INVALID),
+
+    /** A scope word {@code /hologram scope} does not read as a server, a shared set or every server. */
+    INVALID_SCOPE(HologramsMessageKey.HOLOGRAM_SCOPE_INVALID);
 
     private final HologramsMessageKey messageKey;
 
