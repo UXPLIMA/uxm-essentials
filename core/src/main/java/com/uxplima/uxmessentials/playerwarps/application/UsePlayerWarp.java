@@ -5,6 +5,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
@@ -22,7 +23,11 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports.Settlement;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -55,6 +60,12 @@ import org.jspecify.annotations.Nullable;
  *       payer is never debited for a hop that safety would refuse, and the visit and teleport happen only once
  *       it succeeds: a refused charge leaves no recorded visit and no hop.
  * </ol>
+ *
+ * <p>The visitor is charged before the warmup, but the owner is paid only once the visitor has landed. The teleport
+ * can still end without moving them (a move during the warmup, a newer teleport, a missed hop, the player leaving),
+ * and then the visitor gets the whole price back while the owner was never paid, so no refund has to reach into an
+ * owner's bank that may already have been paid out. A landing whose owner share cannot be banked gives the visitor
+ * their money back too, as a use whose payout fails always has: the money is never left with no one.
  *
  * <p>This use case never moves the player itself: once the gate passes it <em>delegates</em> execution to the
  * teleport context through {@link PlayerWarpTeleporter}, so the shared cooldown, the move-cancellable warmup,
@@ -90,6 +101,8 @@ public final class UsePlayerWarp {
     private final String localServerId;
     private final PlayerWarpHops hops;
     private final Clock clock;
+    private final PaidTeleports paid;
+    private final Logger log;
 
     public UsePlayerWarp(
             PlayerWarpRepository repository,
@@ -105,7 +118,9 @@ public final class UsePlayerWarp {
             Optional<PlayerWarpEconomy> economy,
             String localServerId,
             PlayerWarpHops hops,
-            Clock clock) {
+            Clock clock,
+            PaidTeleports paid,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -120,6 +135,8 @@ public final class UsePlayerWarp {
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.hops = Objects.requireNonNull(hops, "hops");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.paid = Objects.requireNonNull(paid, "paid");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Teleport {@code actor} to the warp {@code name} with no password supplied. */
@@ -173,16 +190,56 @@ public final class UsePlayerWarp {
             hops.send(actor, warp, admission.charged());
             return Result.ok();
         }
-        notifier.send(
-                actor,
-                PlayerwarpsMessageKey.PWARP_TELEPORTING,
-                Map.of("warp", warp.name().value()));
-        // Bump the visit counter in storage rather than read-modify-write here. The atomic increment avoids a
-        // last-writer-wins race and needless cross-server cache invalidation. It runs only after the whole gate
-        // (including the charge) has passed, so a refused teleport leaves no phantom visit.
-        repository.recordVisit(warp.id().orElseThrow());
-        teleporter.teleportTo(actor, warp);
+        // Opened before anything else can fail, so a fault between the charge and the launch gives the money back.
+        Optional<Settlement> settlement = admission.charged().map(cost -> settlementFor(actor, warp, cost));
+        try {
+            notifier.send(
+                    actor,
+                    PlayerwarpsMessageKey.PWARP_TELEPORTING,
+                    Map.of("warp", warp.name().value()));
+            countVisit(warp);
+            CompletionStage<TeleportOutcome> outcome = teleporter.teleportTo(actor, warp);
+            settlement.ifPresent(open -> open.follow(outcome));
+        } catch (RuntimeException failure) {
+            settlement.ifPresent(Settlement::refuse);
+            throw failure;
+        }
         return Result.ok();
+    }
+
+    /**
+     * Bump the visit counter in storage rather than read-modify-write here. The atomic increment avoids a
+     * last-writer-wins race and needless cross-server cache invalidation. It runs only after the whole gate (including
+     * the charge) has passed, so a refused teleport leaves no phantom visit. The count is a statistic the teleport
+     * does not depend on, so a failed write costs the count, not the use.
+     */
+    private void countVisit(PlayerWarp warp) {
+        try {
+            repository.recordVisit(warp.id().orElseThrow());
+        } catch (RuntimeException failure) {
+            log.warn(
+                    "event=pwarp_visit_not_counted warp={} reason={}",
+                    warp.name().value(),
+                    failure.toString());
+        }
+    }
+
+    /**
+     * Pay the owner their share once {@code actor} has landed, or give {@code actor} the whole price back when the
+     * teleport did not land or the share could not be banked. Only a charge taken here reaches this, so a provider is
+     * wired.
+     */
+    private Settlement settlementFor(PlayerRef actor, PlayerWarp warp, WarpCost cost) {
+        PlayerWarpEconomy provider = economy.orElseThrow();
+        return paid.open(
+                PaidTeleports.subject("pwarp", warp.name().value(), actor, cost.amount(), cost.currencyId()),
+                () -> provider.accrue(warp.id().orElseThrow(), cost.amount(), cost.currencyId())
+                        .isOk(),
+                () -> provider.refund(actor, cost.amount(), cost.currencyId()).isOk(),
+                () -> notifier.send(
+                        actor,
+                        PlayerwarpsMessageKey.PWARP_CROSS_SERVER_REFUNDED,
+                        Map.of("warp", warp.name().value())));
     }
 
     /** True when the warp is tagged for a backend other than this one, so it needs the cross-server route. */
@@ -317,25 +374,20 @@ public final class UsePlayerWarp {
     /**
      * Step 6: the guarded charge, reached only for a non-member. A free warp, the cost bypass, or an absent
      * economy provider all skip the debit and admit for free (the {@code WarpEconomy} soft-coupling precedent).
-     * A priced warp with a provider present charges through {@link PlayerWarpEconomy#chargeAndAccrue}, or through
-     * {@link PlayerWarpEconomy#charge} alone for a warp on another backend; any
-     * {@link ChargeError} refuses {@link PlayerWarpError#CANNOT_AFFORD} so no visit is recorded and no hop occurs.
-     * A successful charge carries the exact price forward so a cross-server route can refund it if arrival fails.
+     * A priced warp with a provider present debits the visitor through {@link PlayerWarpEconomy#charge}, with nothing
+     * accrued yet; any {@link ChargeError} refuses {@link PlayerWarpError#CANNOT_AFFORD} so no visit is recorded and
+     * no hop occurs. A successful charge carries the exact price forward, so the owner is paid once the visitor lands
+     * and the visitor is refunded exactly that when they do not.
      */
     private Admission charge(PlayerRef actor, PlayerWarp warp) {
         if (warp.price().amount().signum() <= 0 || permissions.has(actor, BYPASS_COST) || economy.isEmpty()) {
             return Admission.free();
         }
-        PlayerWarpEconomy provider = economy.get();
-        // A remote warp can still be refunded after this charge, so its owner is paid only when the target backend
-        // has moved the visitor (the hop settles it then).
-        Result<Unit, ChargeError> charged = isRemote(warp)
-                ? provider.charge(actor, warp.price().amount(), warp.price().currencyId())
-                : provider.chargeAndAccrue(
-                        actor,
-                        warp.id().orElseThrow(),
-                        warp.price().amount(),
-                        warp.price().currencyId());
+        // Either route can still be refunded after this charge (a local warmup can be cancelled, a remote hop can
+        // miss), so the owner is paid only once the visitor has landed: the outcome of a local teleport settles it,
+        // the cross-server hop settles a remote one.
+        Result<Unit, ChargeError> charged =
+                economy.get().charge(actor, warp.price().amount(), warp.price().currencyId());
         return charged.isErr() ? Admission.refused(PlayerWarpError.CANNOT_AFFORD) : Admission.paid(warp.price());
     }
 

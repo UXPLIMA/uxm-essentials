@@ -44,6 +44,11 @@ public interface TeleportExecutor {
      * hang off {@code onLanded}, and a paid {@code /rtp} hangs its refund off {@code onFailed}, so exactly one of
      * the two callbacks runs for a hop that was issued.
      *
+     * <p>{@code onLanded} normally runs on the player's region thread. A player who leaves in the tick after the hop
+     * moved them, or a server that stops then, still gets {@code onLanded}, from whichever thread found them gone,
+     * since a paid teleport settles its money on the landing; what hangs off it must tolerate a player who is no
+     * longer there.
+     *
      * <p>The default never fails, matching the four-argument form it delegates to; the real async executor
      * overrides it to report every way the hop can miss.
      */

@@ -6,7 +6,9 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -17,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -177,14 +180,40 @@ public final class TeleportEngine {
      * move listener by the caller through {@link #beginGatedWarmup}.
      */
     public Result<Unit, TeleportError> launch(PlayerRef mover, Destination destination, TeleportKind kind) {
+        return launch(mover, destination, kind, ended -> {});
+    }
+
+    /**
+     * {@link #launch(PlayerRef, Destination, TeleportKind)}, reporting how the teleport ended to {@code outcome}
+     * exactly once: {@link TeleportOutcome#LANDED} when the player arrives, and otherwise why they did not (a refusal
+     * before the warmup, a cancelled or superseded warmup, a hop that missed). A caller that charged before the
+     * warmup gives the money back on anything but a landing. The landing and a cancel can be reported from different
+     * threads, so a single guard per launch lets only the first through.
+     */
+    public Result<Unit, TeleportError> launch(
+            PlayerRef mover, Destination destination, TeleportKind kind, Consumer<TeleportOutcome> outcome) {
         Objects.requireNonNull(mover, "mover");
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(kind, "kind");
-        Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
-        if (admitted.isErr()) {
-            return admitted;
+        Objects.requireNonNull(outcome, "outcome");
+        OneOutcome reported = new OneOutcome(outcome, log);
+        WarmupHandle handle;
+        try {
+            Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
+            if (admitted.isErr()) {
+                reported.report(TeleportOutcome.REFUSED);
+                return admitted;
+            }
+            handle = beginGatedWarmup(mover, destination, kind, reported);
+        } catch (RuntimeException failure) {
+            // A fault in the gates or before the warmup port hands back a handle (reading where the player stands,
+            // replacing an earlier warmup) leaves no teleport for the caller to wait on, so it hears a refusal and
+            // can give a charge back. Once a handle exists its own callbacks report the outcome, which is why the
+            // warmup port must not throw after its countdown has started.
+            reported.report(TeleportOutcome.REFUSED);
+            throw failure;
         }
-        if (beginGatedWarmup(mover, destination, kind).isCancelled()) {
+        if (handle.isCancelled()) {
             // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
             // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
             return Result.err(TeleportError.VETOED);
@@ -249,11 +278,33 @@ public final class TeleportEngine {
      * gate (an accepted {@code tpa}) reuses the warmup wiring without re-checking.
      */
     public WarmupHandle beginGatedWarmup(PlayerRef mover, Destination destination, TeleportKind kind) {
+        return beginGatedWarmup(mover, destination, kind, OneOutcome.unheard());
+    }
+
+    private WarmupHandle beginGatedWarmup(
+            PlayerRef mover, Destination destination, TeleportKind kind, OneOutcome reported) {
         return beginWarmup(
-                mover,
-                destination,
-                kind,
-                () -> hop(mover, destination, kind, TeleportEngine::noPostArrival, TeleportEngine::nothingToUndo));
+                mover, destination, kind, () -> hopAfterWarmup(mover, destination, kind, reported), reported);
+    }
+
+    private void hopAfterWarmup(PlayerRef mover, Destination destination, TeleportKind kind, OneOutcome reported) {
+        try {
+            executor.teleport(
+                    mover,
+                    destination,
+                    kind,
+                    () -> {
+                        // Reported before the stamp, so a stamp that throws cannot turn a landing into a miss.
+                        reported.report(TeleportOutcome.LANDED);
+                        stampLanding(mover, destination, kind);
+                    },
+                    () -> reported.report(TeleportOutcome.MISSED));
+        } catch (RuntimeException failure) {
+            // The warmup has already completed, so no cancel will follow: an executor that throws before it could
+            // report anything leaves the player where they stood, which is a miss.
+            log.error("teleport of " + mover.name() + " failed after its warmup", failure);
+            reported.report(TeleportOutcome.MISSED);
+        }
     }
 
     /**
@@ -266,7 +317,8 @@ public final class TeleportEngine {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onComplete, "onComplete");
         WarmupKind warmupKind = new WarmupKind(FEATURE, settings.defaultWarmupSeconds());
-        return startWarmup(mover, warmupKind, kind, onComplete);
+        // A hop to another backend settles its money through the cross-server hop, which refunds a missed hop itself.
+        return startWarmup(mover, warmupKind, kind, onComplete, OneOutcome.unheard());
     }
 
     private static void nothingToUndo() {
@@ -316,7 +368,8 @@ public final class TeleportEngine {
     public void launchRandom(PlayerRef who, Destination destination) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(destination, "destination");
-        beginWarmup(who, destination, TeleportKind.RANDOM, () -> chargeThenHop(who, destination));
+        // A random teleport charges after its warmup and refunds its own miss, so nothing listens for the outcome.
+        beginWarmup(who, destination, TeleportKind.RANDOM, () -> chargeThenHop(who, destination), OneOutcome.unheard());
     }
 
     /**
@@ -508,6 +561,39 @@ public final class TeleportEngine {
         }
     }
 
+    /**
+     * The outcome of one launch, passed on once. The warmup handle already lets only one of its complete, cancel and
+     * supersede callbacks run, and the executor reports one of landed and failed; this guard holds the promise even
+     * when an executor reports both, or a refusal races a cancel on another thread.
+     */
+    private static final class OneOutcome {
+
+        private final Consumer<TeleportOutcome> listener;
+        private final Logger log;
+        private final AtomicBoolean reported = new AtomicBoolean();
+
+        OneOutcome(Consumer<TeleportOutcome> listener, Logger log) {
+            this.listener = listener;
+            this.log = log;
+        }
+
+        /** For a teleport whose money, if any, is settled elsewhere. */
+        static OneOutcome unheard() {
+            return new OneOutcome(ended -> {}, new SilentLog());
+        }
+
+        void report(TeleportOutcome outcome) {
+            if (!reported.compareAndSet(false, true)) {
+                return;
+            }
+            try {
+                listener.accept(outcome);
+            } catch (RuntimeException listenerFailure) {
+                log.error("teleport outcome " + outcome + " could not be reported", listenerFailure);
+            }
+        }
+    }
+
     /** The logger behind the pure-test constructor, which has no operator to tell. */
     private static final class SilentLog implements Logger {
 
@@ -532,32 +618,53 @@ public final class TeleportEngine {
         }
     }
 
-    private WarmupHandle beginWarmup(PlayerRef mover, Destination destination, TeleportKind kind, Runnable onComplete) {
+    private WarmupHandle beginWarmup(
+            PlayerRef mover, Destination destination, TeleportKind kind, Runnable onComplete, OneOutcome reported) {
         // The one choke point every voluntary teleport passes through, which is why the veto question lives here
         // rather than at each of the half-dozen entry points. Before the warmup, so a refused teleport does not
         // make the player stand still first.
         if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
-            notifier.send(mover, TeleportError.VETOED.messageKey());
+            try {
+                notifier.send(mover, TeleportError.VETOED.messageKey());
+            } finally {
+                reported.report(TeleportOutcome.REFUSED);
+            }
             return new Warmups.RefusedWarmup();
         }
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
-        return startWarmup(mover, warmupKind, kind, onComplete);
+        return startWarmup(mover, warmupKind, kind, onComplete, reported);
     }
 
-    private WarmupHandle startWarmup(PlayerRef mover, WarmupKind warmupKind, TeleportKind kind, Runnable onComplete) {
+    private WarmupHandle startWarmup(
+            PlayerRef mover, WarmupKind warmupKind, TeleportKind kind, Runnable onComplete, OneOutcome reported) {
         return warmups.begin(
                 mover,
                 warmupKind,
                 onComplete,
-                () -> onWarmupCancelled(mover, kind, TeleportMessageKey.WARMUP_CANCELLED),
-                () -> onWarmupCancelled(mover, kind, TeleportMessageKey.WARMUP_REPLACED));
+                () -> onWarmupCancelled(
+                        mover, kind, TeleportMessageKey.WARMUP_CANCELLED, reported, TeleportOutcome.CANCELLED),
+                () -> onWarmupCancelled(
+                        mover, kind, TeleportMessageKey.WARMUP_REPLACED, reported, TeleportOutcome.SUPERSEDED));
     }
 
     private void hop(
             PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival, Runnable onFailed) {
         executor.teleport(mover, destination, kind, () -> onLanded(mover, destination, kind, postArrival), onFailed);
+    }
+
+    /**
+     * Stamp a gated landing's cooldown. The executor reports a landing whose player left right after teleportAsync
+     * moved them from the thread that retired the hop, where the stamp has nobody to write to; a stamp that fails
+     * there, or anywhere, is logged, since the landing it follows has already been reported.
+     */
+    private void stampLanding(PlayerRef mover, Destination destination, TeleportKind kind) {
+        try {
+            onLanded(mover, destination, kind, TeleportEngine::noPostArrival);
+        } catch (RuntimeException stampFailure) {
+            log.error("cooldown stamp for the landing of " + mover.name() + " failed", stampFailure);
+        }
     }
 
     private void onLanded(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
@@ -567,11 +674,17 @@ public final class TeleportEngine {
         postArrival.run();
     }
 
-    private void onWarmupCancelled(PlayerRef mover, TeleportKind kind, TeleportMessageKey notice) {
+    private void onWarmupCancelled(
+            PlayerRef mover, TeleportKind kind, TeleportMessageKey notice, OneOutcome reported, TeleportOutcome ended) {
         // A warmup stopped by a move and one replaced by the player's next teleport both end here and differ only in
-        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped.
-        notifier.send(mover, notice);
-        events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
+        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped. The
+        // outcome is reported even when the notice fails, since a caller gives a charge back on it.
+        try {
+            notifier.send(mover, notice);
+            events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
+        } finally {
+            reported.report(ended);
+        }
     }
 
     /**

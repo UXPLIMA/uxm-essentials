@@ -9,6 +9,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLocator;
@@ -59,6 +60,7 @@ public final class TrackingWarmups implements Warmups {
     private final Clock clock;
     private final Notifier notifier;
     private final PlayerLocator locator;
+    private final Logger log;
 
     public TrackingWarmups(
             Warmups delegate,
@@ -67,7 +69,8 @@ public final class TrackingWarmups implements Warmups {
             Permissions permissions,
             Clock clock,
             Notifier notifier,
-            PlayerLocator locator) {
+            PlayerLocator locator,
+            Logger log) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.tracker = Objects.requireNonNull(tracker, "tracker");
         this.toggles = Objects.requireNonNull(toggles, "toggles");
@@ -75,6 +78,7 @@ public final class TrackingWarmups implements Warmups {
         this.clock = Objects.requireNonNull(clock, "clock");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.locator = Objects.requireNonNull(locator, "locator");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     @Override
@@ -118,7 +122,14 @@ public final class TrackingWarmups implements Warmups {
                 PendingTeleport.arm(who, TeleportKind.ADMIN, origin, Destination.at(origin), toggles.get());
         Duration waiting = resolveDuration(who, kind);
         tracker.arm(who, warmup, handle, clock.instant().plus(waiting));
-        notifier.send(who, TeleportMessageKey.WARMUP_STARTED, Map.of("seconds", Long.toString(waiting.toSeconds())));
+        // The warmup is already counting down here, so a notice that cannot be sent must not throw out of begin:
+        // the caller would take the teleport for one that never started while it still lands.
+        try {
+            notifier.send(
+                    who, TeleportMessageKey.WARMUP_STARTED, Map.of("seconds", Long.toString(waiting.toSeconds())));
+        } catch (RuntimeException noticeFailure) {
+            log.warn("warmup notice for {} could not be sent: {}", who.name(), noticeFailure.toString());
+        }
     }
 
     private Duration resolveDuration(PlayerRef who, WarmupKind kind) {

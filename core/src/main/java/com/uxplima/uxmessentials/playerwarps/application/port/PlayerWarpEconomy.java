@@ -12,8 +12,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * The narrow economy seam the player-warps context owns so a per-warp entry price can be charged <em>without</em>
  * a hard dependency on the economy context. It mirrors the sibling {@code warps} {@code WarpEconomy}, expressed
  * purely in this context's own terms ({@link BigDecimal} + a {@code currencyId} string, never an economy type)
- * but is richer because a player warp has an owner who banks the takings: a use of a priced warp both debits the
- * visitor and accrues to the owner's bank in one step.
+ * but is richer because a player warp has an owner who banks the takings: a use of a priced warp debits the
+ * visitor through {@link #charge} and, once the visitor has landed, accrues the owner's share through {@link #accrue}.
  *
  * <p>Soft coupling: the port is injected into {@code UsePlayerWarp} as an {@link java.util.Optional}. With no
  * provider present a priced warp's cost is simply ignored at use time (the warp still teleports, for free) so
@@ -23,33 +23,27 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  *
  * <p>The configured owner <em>cut</em> (the share the server keeps rather than passing to the owner) is the
  * implementation's concern (P4-T4 reads it from config), not a gate parameter: the gate passes only the
- * {@code price} and its {@code currencyId}, keeping this seam as narrow as {@code WarpEconomy}. The
- * {@code chargeAndAccrue} contract is deliberately charge-then-settle with no check-then-charge window, so two
- * simultaneous uses can never both pass an affordability probe and then overdraw.
+ * {@code price} and its {@code currencyId}, keeping this seam as narrow as {@code WarpEconomy}. The charge is a
+ * guarded debit with no check-then-charge window, so two simultaneous uses can never both pass an affordability
+ * probe and then overdraw.
+ *
+ * <p>The owner is paid in a second step because a use can still be refunded after the charge: a local warmup can be
+ * cancelled or replaced, a hop can miss, a cross-server hop can time out. Accruing only after the landing means a
+ * refund never has to take money back out of a bank that may already have been paid out to the owner.
  */
 public interface PlayerWarpEconomy {
 
     /**
-     * Guarded debit of {@code payer} by {@code price} in {@code currencyId} and accrual of the price minus the
-     * configured cut to the warp owner's bank, as one transaction. Under the native provider this is a single
-     * atomic step; under a foreign provider a debit that succeeds but whose accrual then fails is unwound with a
-     * compensating credit to the payer and reported as {@link ChargeError#ACCRUAL_FAILED}. There is no
-     * check-then-charge: the debit either takes in full or reports {@link ChargeError#INSUFFICIENT_FUNDS}.
-     */
-    Result<Unit, ChargeError> chargeAndAccrue(PlayerRef payer, PlayerWarpId warp, BigDecimal price, String currencyId);
-
-    /**
-     * Guarded debit of {@code payer} by {@code price} in {@code currencyId} with nothing accrued yet, for a use of a
-     * warp on another backend. The owner's share is written later by {@link #accrue}, only once the target backend
-     * has actually moved the visitor, so a cross-server use that is refunded never leaves the owner paid for it.
-     * Same guard as {@link #chargeAndAccrue}: it either takes in full or reports
+     * Guarded debit of {@code payer} by {@code price} in {@code currencyId} with nothing accrued yet. The owner's share
+     * is written later by {@link #accrue}, only once the visitor has actually landed, so a use that is refunded never
+     * leaves the owner paid for it. There is no check-then-charge: it either takes in full or reports
      * {@link ChargeError#INSUFFICIENT_FUNDS}.
      */
     Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId);
 
     /**
-     * Bank the owner's share of {@code price} (the price minus the configured cut) on {@code warp}, for a
-     * cross-server use whose visitor {@link #charge} debited on the origin and the target has now moved. Reports
+     * Bank the owner's share of {@code price} (the price minus the configured cut) on {@code warp}, for a use whose
+     * visitor {@link #charge} debited and who has now landed, here or on another backend. Reports
      * {@link ChargeError#ACCRUAL_FAILED} when nothing was banked (the warp row is gone or the write failed), and the
      * caller then gives the visitor's charge back.
      */
@@ -58,7 +52,7 @@ public interface PlayerWarpEconomy {
     /**
      * True when {@code who} could currently afford {@code amount} of {@code currencyId}. For UI preview only
      * the gate never calls this, because an affordability probe followed by a separate charge is exactly the
-     * double-spend window {@link #chargeAndAccrue} closes.
+     * double-spend window the guarded {@link #charge} closes.
      */
     boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId);
 

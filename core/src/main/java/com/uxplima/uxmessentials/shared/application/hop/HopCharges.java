@@ -78,8 +78,8 @@ public final class HopCharges {
 
     /**
      * Pay {@code hop}'s charge on to its settlement now that the target moved {@code who}. A settlement that banks
-     * nothing gives the player their charge back, the same outcome a local use gets when its payout fails. A hop
-     * with no charge or no settlement has nothing to pay.
+     * nothing, or throws, gives the player their charge back, the same rule a local paid teleport follows when its
+     * payout fails. A hop with no charge or no settlement has nothing to pay.
      */
     public void settle(HopResolver resolver, PlayerRef who, PendingHop hop, String label) {
         Objects.requireNonNull(resolver, "resolver");
