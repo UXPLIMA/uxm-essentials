@@ -34,7 +34,8 @@ import org.jspecify.annotations.Nullable;
  * The jOOQ-backed {@link SpawnDirectory} over the V10 spawn tables: a per-world spawn keyed by world uid, the
  * network-wide main spawn pinned at id 0 and one main spawn row per server scope, named spawns keyed by canonical
  * lowercase name, and per-world mirror redirects. Every read is a single keyed lookup and every write upserts on
- * the key, so a re-anchor overwrites the same row rather than inserting. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ * the key, so a re-anchor overwrites the same row rather than inserting. Every statement is typed jOOQ DSL; no
+ * SQL is ever string-concatenated.
  *
  * <p>This store has no vanilla-world fallback: {@link #defaultSpawn} returns only the operator-set per-world
  * row, the same as {@link #operatorSpawn}. The vanilla last-resort lives in the bukkit-adapter's decorator,

@@ -12,6 +12,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.application.ScopedHologramView;
 import com.uxplima.uxmessentials.holograms.application.SetHologramScope;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
@@ -20,7 +21,14 @@ import com.uxplima.uxmessentials.holograms.application.port.LinkedNpcLocator;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.npc.application.ScopedNpcView;
+import com.uxplima.uxmessentials.npc.application.SetNpcScope;
+import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
+import com.uxplima.uxmessentials.npc.application.port.NpcView;
+import com.uxplima.uxmessentials.npc.domain.Npc;
+import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.persistence.holograms.CachedHologramRepository;
+import com.uxplima.uxmessentials.persistence.npc.CachedNpcRepository;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -32,7 +40,10 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import org.junit.jupiter.api.Test;
 
-/** A hologram scoped on one backend leaves the peers outside the scope and stays on the ones inside it. */
+/**
+ * A hologram scoped on one backend leaves the peers outside the scope and stays on the ones inside it, and a hologram
+ * riding an NPC follows the NPC when it is scoped on another backend.
+ */
 class HologramSyncTest {
 
     private static final WorldRef WORLD = new WorldRef(UUID.randomUUID(), "world");
@@ -105,6 +116,44 @@ class HologramSyncTest {
         assertThat(survival.drawn.rendered).containsExactly("board");
     }
 
+    @Test
+    void anNpcScopedAwayOnOneBackendTakesTheHologramRidingItOffAPeerAndClearingBringsItBack() {
+        SharedNpcs npcRows = new SharedNpcs();
+        npcRows.save(Npc.create(NpcName.of("guide"), new Position(WORLD, 3, 64, 3, 0, 0), null, Instant.EPOCH));
+        rows.save(board().linkedTo("guide"));
+        // The peer, survival: its own copy of the NPCs, a locator over it, and the scoped view the holograms use.
+        LocalServer survival = new LocalServer("survival", List.of());
+        CachedHologramRepository peerHolograms = new CachedHologramRepository(rows, Duration.ofMinutes(5));
+        RecordingView drawn = new RecordingView();
+        HologramView[] view = new HologramView[1];
+        CachedNpcRepository peerNpcs = new CachedNpcRepository(npcRows);
+        EventDrivenNpcLocator locator = new EventDrivenNpcLocator(peerNpcs, survival, name -> {}, name -> {
+            for (Hologram hologram : peerHolograms.all()) {
+                if (name.equals(hologram.linkedNpcName())) {
+                    view[0].render(hologram);
+                }
+            }
+        });
+        view[0] = new ScopedHologramView(drawn, survival, locator);
+        RemoteSyncListener peer = HologramSync.npcListener(peerNpcs, locator, new InlineScheduler());
+        // The origin, lobby-1, scopes the NPC through the npc module's broadcasting repository.
+        LocalServer lobby = new LocalServer("lobby-1", List.of());
+        SetNpcScope scope = new SetNpcScope(
+                NpcSync.repository(new CachedNpcRepository(npcRows), bus),
+                new ScopedNpcView(new NoNpcView(), lobby),
+                quietNotifier(),
+                event -> {},
+                lobby);
+
+        scope.set(ADMIN, NpcName.of("guide"), "server");
+        bus.deliverTo(peer);
+        assertThat(drawn.despawned).containsExactly("board");
+
+        scope.set(ADMIN, NpcName.of("guide"), "clear");
+        bus.deliverTo(peer);
+        assertThat(drawn.rendered).containsExactly("board");
+    }
+
     private static Hologram board() {
         return Hologram.create(
                 BOARD, new Position(WORLD, 0, 70, 0, 0, 0), List.of(new HologramLine("Welcome")), Instant.EPOCH);
@@ -143,6 +192,44 @@ class HologramSyncTest {
             }
             published.clear();
         }
+    }
+
+    /** The shared NPC rows every backend reads. */
+    private static final class SharedNpcs implements NpcRepository {
+        private final Map<String, Npc> rows = new LinkedHashMap<>();
+
+        @Override
+        public Optional<Npc> find(NpcName name) {
+            return Optional.ofNullable(rows.get(name.value()));
+        }
+
+        @Override
+        public List<Npc> all() {
+            return List.copyOf(rows.values());
+        }
+
+        @Override
+        public boolean exists(NpcName name) {
+            return rows.containsKey(name.value());
+        }
+
+        @Override
+        public void save(Npc npc) {
+            rows.put(npc.name().value(), npc);
+        }
+
+        @Override
+        public void delete(NpcName name) {
+            rows.remove(name.value());
+        }
+    }
+
+    private static final class NoNpcView implements NpcView {
+        @Override
+        public void render(Npc npc) {}
+
+        @Override
+        public void despawn(NpcName name) {}
     }
 
     /** The shared database every backend reads. */

@@ -6,13 +6,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.holograms.adapter.outbound.EventDrivenNpcLocator;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
+import com.uxplima.uxmessentials.npc.domain.NpcName;
 import com.uxplima.uxmessentials.persistence.holograms.CachedHologramRepository;
+import com.uxplima.uxmessentials.persistence.npc.CachedNpcRepository;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.HologramChanged;
+import com.uxplima.uxmessentials.shared.network.NpcChanged;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -91,6 +95,39 @@ public final class HologramSync {
                 } else {
                     renderer.despawn(HologramName.of(key));
                 }
+            }
+        });
+    }
+
+    /**
+     * A listener that, on a remote {@link NpcChanged}, reloads the named NPC into the holograms module's own copy
+     * of the NPCs and hands it to {@code locator}, so a hologram riding it here follows a move, a rescope or a delete
+     * made on another server. The reload reads the database, so it runs on the async lane.
+     */
+    public static RemoteSyncListener npcListener(
+            CachedNpcRepository npcs, EventDrivenNpcLocator locator, Scheduler scheduler) {
+        Objects.requireNonNull(npcs, "npcs");
+        Objects.requireNonNull(locator, "locator");
+        Objects.requireNonNull(scheduler, "scheduler");
+        return message -> {
+            if (!(message instanceof NpcChanged changed)) {
+                return;
+            }
+            NpcName name = NpcName.of(changed.name());
+            scheduler.async(() -> locator.refresh(name.value(), npcs.reload(name)));
+        };
+    }
+
+    /**
+     * A resync for {@link SharedCacheRefresh}: reload the holograms module's copy of the NPCs and hand each NPC a
+     * missed frame left stale to {@code locator}. It runs on the async lane, as the listener's reload does.
+     */
+    public static Runnable npcResync(CachedNpcRepository npcs, EventDrivenNpcLocator locator) {
+        Objects.requireNonNull(npcs, "npcs");
+        Objects.requireNonNull(locator, "locator");
+        return () -> npcs.reloadAll().ifPresent(swap -> {
+            for (String key : swap.changedKeys()) {
+                locator.refresh(key, Optional.ofNullable(swap.after().get(key)));
             }
         });
     }

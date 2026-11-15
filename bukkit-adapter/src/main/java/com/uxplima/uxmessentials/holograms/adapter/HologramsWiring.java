@@ -204,13 +204,15 @@ public final class HologramsWiring {
         // re-anchoring a linked hologram when its NPC moves or is removed. The locator reads the npc persistence
         // directly (the npc table ships in the persistence V38 baseline, always applied), so a hologram may link to
         // an NPC even with the npc module disabled: it simply sees no live moves in that case.
-        NpcRepository npcRepository = NpcRepositories.cached(persistence);
+        com.uxplima.uxmessentials.persistence.npc.CachedNpcRepository npcCache =
+                NpcRepositories.cachedConcrete(persistence);
+        NpcRepository npcRepository = npcCache;
         // Break the renderer↔locator construction cycle: the locator's re-anchor forwards through a holder the
         // renderer is written into once it exists, so a move event re-renders only the holograms linked to that NPC.
         RendererHolder rendererHolder = new RendererHolder();
         LocalServer local = network.localServer();
         EventDrivenNpcLocator npcLocator =
-                new EventDrivenNpcLocator(npcRepository, local, name -> rendererHolder.reanchor(name));
+                new EventDrivenNpcLocator(npcRepository, local, rendererHolder::reanchor, rendererHolder::rescope);
         // The shared click-action engine: a hologram's chain runs through the same BukkitClickActionRunner npc uses,
         // built over the shared filtered command runner. Holograms ship no blocked-commands config key, so the
         // blocklist is empty (a transparent pass-through: an operator-owned fixture, no command filtering needed yet).
@@ -267,6 +269,14 @@ public final class HologramsWiring {
         bus.registry()
                 .registerResync(
                         com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.resync(cached, view));
+        // An NPC moved, rescoped or deleted on another server moves, hides or shows the holograms riding it here too:
+        // its change frame reloads the NPC into this module's own copy and hands it to the locator.
+        bus.registry()
+                .register(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.npcListener(
+                        npcCache, npcLocator, kernel.scheduler()));
+        bus.registry()
+                .registerResync(com.uxplima.uxmessentials.shared.adapter.outbound.bus.HologramSync.npcResync(
+                        npcCache, npcLocator));
         InProcessDomainEventPublisher events = (InProcessDomainEventPublisher) kernel.events();
         Consumer<DomainEvent> npcSubscriber = npcLocator;
         events.subscribe(npcSubscriber);
@@ -382,12 +392,20 @@ public final class HologramsWiring {
             this.stored = Objects.requireNonNull(stored, "stored");
         }
 
-        /**
-         * Draw every hologram linked to {@code npcName} again through the scoped view: it follows the NPC's move, and
-         * it leaves or comes back when the NPC's scope stops or starts covering this server, which the shown set
-         * alone could not tell.
-         */
+        /** Draw the shown holograms linked to {@code npcName} again, so they follow the NPC to where it now stands. */
         void reanchor(String npcName) {
+            PacketHologramView current = renderer;
+            if (current != null) {
+                current.reanchorLinkedTo(npcName);
+            }
+        }
+
+        /**
+         * Draw every stored hologram linked to {@code npcName} again through the scoped view, shown or not: the NPC
+         * started or stopped showing on this server, so its holograms leave or come back, which the shown set alone
+         * could not tell.
+         */
+        void rescope(String npcName) {
             HologramView current = view;
             HologramRepository holograms = stored;
             if (current == null || holograms == null) {

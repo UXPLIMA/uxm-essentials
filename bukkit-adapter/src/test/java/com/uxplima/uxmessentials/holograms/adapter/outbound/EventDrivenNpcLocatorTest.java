@@ -11,6 +11,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.npc.application.port.NpcRepository;
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
+import com.uxplima.uxmessentials.npc.domain.event.NpcMoved;
 import com.uxplima.uxmessentials.npc.domain.event.NpcRescoped;
 import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -25,6 +26,7 @@ class EventDrivenNpcLocatorTest {
     private static final LocalServer SURVIVAL = new LocalServer("survival", List.of());
 
     private final List<String> reanchored = new ArrayList<>();
+    private final List<String> rescoped = new ArrayList<>();
 
     private static Npc npc(String name) {
         return Npc.create(NpcName.of(name), new Position(WORLD, 0, 64, 0, 0, 0), null, Instant.EPOCH);
@@ -35,7 +37,8 @@ class EventDrivenNpcLocatorTest {
         EventDrivenNpcLocator locator = new EventDrivenNpcLocator(
                 new Stored(List.of(npc("guide").withScope(ServerScope.server("lobby-1")), npc("greeter"))),
                 SURVIVAL,
-                reanchored::add);
+                reanchored::add,
+                rescoped::add);
 
         assertThat(locator.shownHere("guide")).isFalse();
         assertThat(locator.shownHere("greeter")).isTrue();
@@ -43,16 +46,30 @@ class EventDrivenNpcLocatorTest {
     }
 
     @Test
-    void rescopingAnNpcRedrawsWhatRidesIt() {
+    void anNpcLeavingOrReturningToThisServerRescopesWhatRidesItAndAMoveOnlyReanchors() {
         EventDrivenNpcLocator locator =
-                new EventDrivenNpcLocator(new Stored(List.of(npc("guide"))), SURVIVAL, reanchored::add);
+                new EventDrivenNpcLocator(new Stored(List.of(npc("guide"))), SURVIVAL, reanchored::add, rescoped::add);
 
         locator.accept(new NpcRescoped(NpcName.of("guide"), ServerScope.server("lobby-1")));
         assertThat(locator.shownHere("guide")).isFalse();
-
         locator.accept(new NpcRescoped(NpcName.of("guide"), null));
         assertThat(locator.shownHere("guide")).isTrue();
-        assertThat(reanchored).containsExactly("guide", "guide");
+        locator.accept(new NpcMoved(NpcName.of("guide"), new Position(WORLD, 9, 64, 0, 0, 0)));
+
+        assertThat(rescoped).containsExactly("guide", "guide");
+        assertThat(reanchored).containsExactly("guide");
+        assertThat(locator.locate("guide")).contains(new Position(WORLD, 9, 64, 0, 0, 0));
+    }
+
+    @Test
+    void anNpcRescopedOnAnotherServerIsTakenInThroughARefresh() {
+        EventDrivenNpcLocator locator =
+                new EventDrivenNpcLocator(new Stored(List.of(npc("guide"))), SURVIVAL, reanchored::add, rescoped::add);
+
+        locator.refresh("guide", Optional.of(npc("guide").withScope(ServerScope.set("lobby"))));
+
+        assertThat(locator.shownHere("guide")).isFalse();
+        assertThat(rescoped).containsExactly("guide");
     }
 
     private record Stored(List<Npc> npcs) implements NpcRepository {
