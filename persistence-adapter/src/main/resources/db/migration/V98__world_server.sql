@@ -9,19 +9,24 @@
 -- Every existing row is copied under the server 'unscoped', the sentinel V89 and V94 use: this file cannot know which
 -- backend holds a world. A backend that records no server (off a network, or under the shipped default name) keeps
 -- reading and writing these rows as its own, so a standalone server behaves exactly as before. A backend on a network
--- under its own name copies, when it starts, the unscoped row and settings of each world it actually has (loaded, or a
--- world folder of that name) onto its own name, and the unscoped row stays as a template for every other backend that
--- has the same world, since several backends may hold copies of one world folder. A row no backend has copied is
--- listed as unclaimed.
+-- under its own name copies, at its first start under that name, the unscoped row and settings of each world it
+-- actually has (loaded, or a world folder of that name) onto its own name, and the unscoped row stays as a template
+-- for every other backend that has the same world, since several backends may hold copies of one world folder and
+-- some may not start for a while. A row no backend has copied is listed as unclaimed.
+--
+-- world_claim records each server name whose start-up claim has run, written in the same transaction as the copies.
+-- The claim runs once per name, so a world a backend later unregisters is not copied back from its template at the
+-- next start, and no backend's unregister or delete has to touch a template another backend may still need.
 --
 -- MySQL and MariaDB do not roll DDL back, so a run that fails half way leaves the tables part renamed, and the retry
 -- fails on the first RENAME. To recover, look at which tables exist (with your table prefix):
 --   * world_setting_v1_legacy does not exist: the copy finished and only the last DROP failed. Drop world_v1_legacy
---     only, and start the server again. Do not drop world or world_setting: they hold the copied rows. The start
---     repairs the history, which removes the failed V98 entry, and this file then runs once more over the copied
---     tables, which keeps every row, since no backend has claimed one yet.
---   * world_setting_v1_legacy exists: drop world and world_setting if this file created them, rename world_v1_legacy
---     and world_setting_v1_legacy back to world and world_setting, fix the cause and start the server again.
+--     and world_claim only, and start the server again. Do not drop world or world_setting: they hold the copied
+--     rows. The start repairs the history, which removes the failed V98 entry, and this file then runs once more over
+--     the copied tables, which keeps every row, since no backend has claimed one yet.
+--   * world_setting_v1_legacy exists: drop world, world_setting and world_claim if this file created them, rename
+--     world_v1_legacy and world_setting_v1_legacy back to world and world_setting, fix the cause and start the server
+--     again.
 --
 -- Plain ALTER, CREATE, INSERT ... SELECT and DROP statements run unchanged on SQLite, MySQL/MariaDB and PostgreSQL.
 
@@ -63,6 +68,12 @@ FROM ${prefix}world_v1_legacy;
 INSERT INTO ${prefix}world_setting (server_id, world_name, setting_key, setting_value)
 SELECT 'unscoped', world_name, setting_key, setting_value
 FROM ${prefix}world_setting_v1_legacy;
+
+CREATE TABLE ${prefix}world_claim (
+    server_id   VARCHAR(64)  NOT NULL,
+    claimed_at  BIGINT       NOT NULL,
+    CONSTRAINT ${prefix}pk_world_claim PRIMARY KEY (server_id)
+);
 
 DROP TABLE ${prefix}world_setting_v1_legacy;
 DROP TABLE ${prefix}world_v1_legacy;

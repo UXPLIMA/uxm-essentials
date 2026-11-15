@@ -65,14 +65,23 @@ The entry fee is taken once the jail, combat and cooldown checks pass, and given
 in, if the player does not land: the proxy never moves them, the world is gone, full or will not load, or its spawn is
 unsafe. A player holding `uxmessentials.world.bypass.safety` lands on an unsafe spawn anyway.
 
-A world that records no server is claimed, on start, by every named server that has it: a world loaded there, or a
-world folder of that name. Each such server gets its own copy of the world and its settings, recorded under the uid of
-its own world, so servers that all ran a copy of one world before servers were recorded each keep the settings it had.
-A `world_server_claim_conflict` warning names the worlds whose shared settings belonged to a different world of the
-same name. The shared world stays, hidden from `/worlds list` once a server has copied it, for a server that gets the
-world later; unregistering or deleting a server's copy removes it, so the world does not come back on the next start.
-One no server has is listed as unclaimed: `/worlds claim <world>` on the server it belongs to copies it there, and
-`/worlds load <world>` then loads it.
+A world that records no server is claimed by every named server that has it, at that server's first start under its
+name: a world loaded there, or a world folder of that name. Each such server gets its own copy of the world and its
+settings, recorded under the uid of its own world, so servers that all ran a copy of one world before servers were
+recorded each keep the settings it had, even one that only starts months later. A `world_server_claim_conflict`
+warning names the worlds whose shared settings belonged to a different world of the same name. The claim runs once
+per server name, so a world you unregister or delete does not come back on the next start; a world that arrives on a
+server after its first start is taken with `/worlds claim <world>`, which copies it there, and `/worlds load <world>`
+then loads it. One no server has copied is listed as unclaimed.
+
+The shared world stays in the database, hidden from `/worlds list` once a server has copied it, for servers that get
+the world later. Nothing removes it on its own: `/worlds setserver <server> unscoped` replaces it with that server's
+worlds, and one no server will ever need can be deleted by hand (add your table prefix to the table names):
+
+```sql
+DELETE FROM world_setting WHERE server_id = 'unscoped' AND world_name = 'arena';
+DELETE FROM world WHERE server_id = 'unscoped' AND name = 'arena';
+```
 
 A server on a network that never set its own `network.server-name` shares the unclaimed worlds with every other server
 in that state. It warns about it on start (`world_server_claim_skipped`) and does not create an auto-load world it has

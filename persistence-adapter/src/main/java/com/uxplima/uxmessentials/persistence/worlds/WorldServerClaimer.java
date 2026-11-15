@@ -1,8 +1,10 @@
 package com.uxplima.uxmessentials.persistence.worlds;
 
 import static com.uxplima.uxmessentials.persistence.jooq.tables.World.WORLD;
+import static com.uxplima.uxmessentials.persistence.jooq.tables.WorldClaim.WORLD_CLAIM;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.WorldSetting.WORLD_SETTING;
 
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -32,9 +34,14 @@ import org.jspecify.annotations.NullMarked;
  * stays as a template. A move would hand the row to whichever backend starts first: several backends may each hold a
  * copy of one world folder, uid and all, and before servers were recorded they all read that one row, so none of them
  * can tell from the uid that it is the only owner. A template some backend already copied is left out of the world
- * list; the template of a world a backend unregisters or deletes goes with it (see {@link JooqWorldRepository#delete}),
- * so the next start does not bring the world back. A name this backend already keeps is never touched, which makes a
- * second run claim nothing.
+ * list. A name this backend already keeps is never touched.
+ *
+ * <p>The start-up claim runs once per server name: the first run records the name in {@code world_claim} in the same
+ * transaction as the copies, and every later start skips it. So a world a backend unregisters is not copied back from
+ * its template at the next start, and the template stays for a backend that has not started since the upgrade. A
+ * world that arrives later is taken with {@link #claimNamed}. Templates are removed only by an operator: handing a
+ * server's worlds back with {@link #rename} to {@value NetworkWorld#UNSCOPED} replaces them, and one nobody needs is
+ * deleted by hand from {@code world} and {@code world_setting}.
  */
 @NullMarked
 public final class WorldServerClaimer extends JooqRepository {
@@ -42,15 +49,20 @@ public final class WorldServerClaimer extends JooqRepository {
     /**
      * What one start-up claim did.
      *
+     * @param ran false when this server name had already run its start-up claim, so nothing was looked at
      * @param claimed the unclaimed rows this backend got its own copy of
      * @param conflicting the claimed rows whose template recorded another uid than the world this backend has, which
      *     means two different worlds shared one row before servers were recorded
      */
-    public record Claims(List<String> claimed, List<String> conflicting) {
+    public record Claims(boolean ran, List<String> claimed, List<String> conflicting) {
 
         public Claims {
             claimed = List.copyOf(claimed);
             conflicting = List.copyOf(conflicting);
+        }
+
+        static Claims alreadyRan() {
+            return new Claims(false, List.of(), List.of());
         }
 
         /** True when nothing was claimed. */
@@ -59,8 +71,16 @@ public final class WorldServerClaimer extends JooqRepository {
         }
     }
 
+    private final Clock clock;
+
     public WorldServerClaimer(DSLContext dsl) {
+        this(dsl, Clock.systemUTC());
+    }
+
+    /** {@code clock} stamps the {@code world_claim} row. */
+    public WorldServerClaimer(DSLContext dsl, Clock clock) {
         super(dsl);
+        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** {@link #claimPresent} over the shared {@link Persistence} handle, keeping jOOQ off the bukkit-adapter. */
@@ -84,7 +104,8 @@ public final class WorldServerClaimer extends JooqRepository {
 
     /**
      * Copy onto {@code serverId} every unclaimed world this backend has, with its settings, as the class comment
-     * describes, returning the names claimed so the operator can see what this backend took.
+     * describes, returning the names claimed so the operator can see what this backend took. Does nothing when this
+     * server name already ran it.
      *
      * @param serverId this backend's non-blank network name, never {@value NetworkWorld#UNSCOPED}
      * @param present the name of every world this backend has: loaded, or with a folder on its disk
@@ -94,11 +115,12 @@ public final class WorldServerClaimer extends JooqRepository {
         requireClaimable(serverId);
         Objects.requireNonNull(present, "present");
         Objects.requireNonNull(uids, "uids");
-        if (present.isEmpty()) {
-            return new Claims(List.of(), List.of());
-        }
         Set<String> here = Set.copyOf(present);
         return write(dsl -> {
+            if (hasRun(dsl, serverId)) {
+                return Claims.alreadyRan();
+            }
+            markRun(dsl, serverId);
             Set<String> kept = keptBy(dsl, serverId);
             List<String> claimed = new ArrayList<>();
             List<String> conflicting = new ArrayList<>();
@@ -120,8 +142,14 @@ public final class WorldServerClaimer extends JooqRepository {
                     }
                 }
             }
-            return new Claims(claimed, conflicting);
+            return new Claims(true, claimed, conflicting);
         });
+    }
+
+    /** Whether the server {@code serverId} has run its start-up claim. */
+    public boolean hasRun(String serverId) {
+        Objects.requireNonNull(serverId, "serverId");
+        return read(dsl -> hasRun(dsl, serverId));
     }
 
     /**
@@ -160,12 +188,28 @@ public final class WorldServerClaimer extends JooqRepository {
             if (to.equals(NetworkWorld.UNSCOPED) && !names.isEmpty()) {
                 dropTemplates(dsl, names);
             }
+            // The worlds of the old name were claimed already; a claim under the new name would copy back the
+            // templates of worlds that server has since unregistered.
+            if (!to.equals(NetworkWorld.UNSCOPED) && hasRun(dsl, from) && !hasRun(dsl, to)) {
+                markRun(dsl, to);
+            }
             return move(dsl, from, to, names).size();
         });
     }
 
-    /** Drop the unclaimed rows named {@code names} and their settings, so no later claim hands them out again. */
-    static void dropTemplates(DSLContext dsl, Collection<String> names) {
+    private static boolean hasRun(DSLContext dsl, String serverId) {
+        return dsl.fetchExists(WORLD_CLAIM, WORLD_CLAIM.SERVER_ID.eq(serverId));
+    }
+
+    private void markRun(DSLContext dsl, String serverId) {
+        dsl.insertInto(WORLD_CLAIM)
+                .set(WORLD_CLAIM.SERVER_ID, serverId)
+                .set(WORLD_CLAIM.CLAIMED_AT, clock.millis())
+                .execute();
+    }
+
+    /** Drop the unclaimed rows named {@code names} and their settings before a server's own rows replace them. */
+    private static void dropTemplates(DSLContext dsl, Collection<String> names) {
         dsl.deleteFrom(WORLD_SETTING)
                 .where(WORLD_SETTING.SERVER_ID.eq(NetworkWorld.UNSCOPED))
                 .and(WORLD_SETTING.WORLD_NAME.in(names))

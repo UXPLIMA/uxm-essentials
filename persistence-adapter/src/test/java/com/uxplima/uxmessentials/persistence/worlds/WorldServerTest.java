@@ -134,6 +134,7 @@ class WorldServerTest {
         assertThat(world.createdBy()).contains(UUID.fromString(CREATOR));
         assertThat(world.settings().get(WorldProperties.PVP)).isFalse();
         assertThat(on(LOBBY).all()).isEmpty();
+        assertThat(dsl.fetchCount(DSL.table("world_claim"))).isZero();
     }
 
     @Test
@@ -274,7 +275,7 @@ class WorldServerTest {
     }
 
     @Test
-    void unregisteringAClaimedWorldDropsItsTemplateSoTheNextStartDoesNotBringItBack() {
+    void aWorldUnregisteredAfterTheFirstStartDoesNotComeBackAtTheNextStart() {
         oldReleaseRegisters(ARENA, Optional.empty(), "false");
         upgrade();
         claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
@@ -282,8 +283,53 @@ class WorldServerTest {
         on(LOBBY).delete(ARENA);
         WorldServerClaimer.Claims nextStart = claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
 
-        assertThat(nextStart.isEmpty()).isTrue();
-        assertThat(on(LOBBY).network()).isEmpty();
+        assertThat(nextStart.ran()).isFalse();
+        assertThat(on(LOBBY).exists(ARENA)).isFalse();
+    }
+
+    @Test
+    void aServerFirstStartedAfterAnotherUnregisteredTheWorldStillGetsItWithItsSettings() {
+        // A seasonal backend that was down through the upgrade has the folder but has not claimed yet.
+        oldReleaseRegisters(ARENA, Optional.of(LOBBY_WORLD_UID), "false");
+        upgrade();
+        claimer().claimPresent(LOBBY, Set.of("arena"), Map.of("arena", LOBBY_WORLD_UID));
+        on(LOBBY).delete(ARENA);
+
+        WorldServerClaimer.Claims survivals =
+                claimer().claimPresent(SURVIVAL, Set.of("arena"), Map.of("arena", LOBBY_WORLD_UID));
+
+        assertThat(survivals.claimed()).containsExactly("arena");
+        assertThat(on(SURVIVAL).find(ARENA).orElseThrow().settings().get(WorldProperties.PVP))
+                .isFalse();
+    }
+
+    @Test
+    void eachServerNameRunsItsStartUpClaimOnceEvenWithNothingToClaim() {
+        upgrade();
+
+        boolean before = claimer().hasRun(LOBBY);
+        WorldServerClaimer.Claims first = claimer().claimPresent(LOBBY, Set.of(), Map.of());
+        WorldServerClaimer.Claims second = claimer().claimPresent(LOBBY, Set.of("world"), Map.of());
+
+        assertThat(before).isFalse();
+        assertThat(first.ran()).isTrue();
+        assertThat(second.ran()).isFalse();
+        assertThat(claimer().hasRun(LOBBY)).isTrue();
+        assertThat(claimer().hasRun(SURVIVAL)).isFalse();
+        assertThat(dsl.fetchCount(DSL.table("world_claim"))).isOne();
+    }
+
+    @Test
+    void aRenamedServerKeepsHavingRunItsClaimUnderTheNewName() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
+        upgrade();
+        claimer().claimPresent(LOBBY, Set.of("world"), Map.of());
+
+        claimer().rename(LOBBY, "hub");
+        WorldServerClaimer.Claims hubStart = claimer().claimPresent("hub", Set.of("arena"), Map.of());
+
+        assertThat(hubStart.ran()).isFalse();
+        assertThat(on("hub").exists(ARENA)).isFalse();
     }
 
     @Test

@@ -4,12 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.HexFormat;
+import java.util.Objects;
 import java.util.UUID;
-import java.util.zip.GZIPOutputStream;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,13 +16,7 @@ import org.junit.jupiter.api.io.TempDir;
 /** The uid a world folder records, read without loading the world. */
 class WorldUidFilesTest {
 
-    /**
-     * The decompressed {@code data/paper/metadata.dat} a Paper 26.2 server wrote for its overworld: a root compound
-     * holding {@code DataVersion} and {@code data.uuid}.
-     */
-    private static final String METADATA = "0a000003000b4461746156657273696f6e000013270a0004646174610b0004757569640000"
-            + "0004b86fce70f5184b55bfc91767fb9d10fb0000";
-
+    /** The uid the Paper 26.2 server whose overworld wrote {@code worlds/paper-26.2-metadata.dat} gave it. */
     private static final UUID RECORDED = UUID.fromString("b86fce70-f518-4b55-bfc9-1767fb9d10fb");
 
     @TempDir
@@ -31,9 +24,11 @@ class WorldUidFilesTest {
 
     @Test
     void aDimensionFolderOfThisServerVersionAnswersTheUidInItsMetadata() throws IOException {
+        // Copied byte for byte from a Paper 26.2 server's world/dimensions/minecraft/overworld/data/paper.
         Path paper = Files.createDirectories(folder.resolve("data").resolve("paper"));
-        try (OutputStream out = new GZIPOutputStream(Files.newOutputStream(paper.resolve("metadata.dat")))) {
-            out.write(HexFormat.of().parseHex(METADATA));
+        try (InputStream real = Objects.requireNonNull(
+                WorldUidFilesTest.class.getResourceAsStream("/worlds/paper-26.2-metadata.dat"), "metadata fixture")) {
+            Files.copy(real, paper.resolve("metadata.dat"));
         }
 
         assertThat(WorldUidFiles.read(folder)).contains(RECORDED);

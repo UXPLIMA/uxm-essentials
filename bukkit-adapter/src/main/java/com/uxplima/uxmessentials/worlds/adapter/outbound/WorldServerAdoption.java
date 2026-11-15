@@ -22,9 +22,10 @@ import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Gives this backend its own copy of the unclaimed worlds it actually has, before the enable-time reconcile runs, so
- * the reconcile adopts and auto-loads only this backend's rows and never creates a second row beside an unclaimed
- * one. The loaded worlds and their uids are read on the global region; the folder scan, the uid recorded in each world
+ * Gives this backend, at its first start under its name, its own copy of the unclaimed worlds it actually has, before
+ * the enable-time reconcile runs, so the reconcile adopts and auto-loads only this backend's rows and never creates a
+ * second row beside an unclaimed one. Later starts skip it, so a world unregistered here is not copied back. The
+ * loaded worlds and their uids are read on the global region; the folder scan, the uid recorded in each world
  * folder and the write run on the async lane. A claim that took any row reloads this backend's cached set and tells
  * the peers to reload theirs.
  *
@@ -109,6 +110,13 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
             // The live world is the authority for a loaded one, whatever its folder last recorded.
             uids.putAll(loaded);
             WorldServerClaimer.Claims claims = WorldServerClaimer.claimPresent(persistence, scope, present, uids);
+            if (!claims.ran()) {
+                log.info(
+                        "event=world_server_claim_skipped reason=already_claimed server={} fix=/worlds claim <world> for"
+                                + " a world that arrived after this server's first start",
+                        scope);
+                return true;
+            }
             if (claims.isEmpty()) {
                 return true;
             }
