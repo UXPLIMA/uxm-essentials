@@ -156,12 +156,11 @@ class WorldServerTest {
         ManagedWorld kept = fresh(ARENA);
         on(NetworkWorld.UNSCOPED).save(kept.withSettings(kept.settings().with(WorldProperties.PLAYER_LIMIT, 4)));
 
-        WorldServerClaimer.Claims claims = claimer().claimPresent(LOBBY, Map.of(), Set.of("arena"));
+        WorldServerClaimer.Claims claims = claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
 
         assertThat(claims.claimed()).containsExactly("arena");
         assertThat(on(LOBBY).find(ARENA).orElseThrow().settings().get(WorldProperties.PLAYER_LIMIT))
                 .isEqualTo(4);
-        assertThat(on(NetworkWorld.UNSCOPED).all()).isEmpty();
     }
 
     @Test
@@ -200,64 +199,91 @@ class WorldServerTest {
         upgrade();
 
         WorldServerClaimer.Claims claims =
-                claimer().claimPresent(LOBBY, Map.of("world", LOBBY_WORLD_UID), Set.of("world"));
+                claimer().claimPresent(LOBBY, Set.of("world"), Map.of("world", LOBBY_WORLD_UID));
 
         assertThat(claims.claimed()).containsExactly("world");
-        assertThat(claims.copied()).isEmpty();
-        assertThat(on(LOBBY).find(WORLD).orElseThrow().settings().get(WorldProperties.PVP))
-                .isFalse();
+        assertThat(claims.conflicting()).isEmpty();
+        ManagedWorld lobbys = on(LOBBY).find(WORLD).orElseThrow();
+        assertThat(lobbys.settings().get(WorldProperties.PVP)).isFalse();
+        assertThat(lobbys.knownUid()).contains(UUID.fromString(LOBBY_WORLD_UID));
     }
 
     @Test
-    void aServerWithASameNamedWorldOfAnotherUidGetsACopyAndLeavesTheSharedRowForItsOwner() {
+    void aServerWithASameNamedWorldOfAnotherUidGetsItsOwnCopyUnderItsOwnUid() {
         oldReleaseRegisters(WORLD, Optional.of(LOBBY_WORLD_UID), "false");
         upgrade();
 
         WorldServerClaimer.Claims survivals =
-                claimer().claimPresent(SURVIVAL, Map.of("world", SURVIVAL_WORLD_UID), Set.of("world"));
+                claimer().claimPresent(SURVIVAL, Set.of("world"), Map.of("world", SURVIVAL_WORLD_UID));
         WorldServerClaimer.Claims lobbys =
-                claimer().claimPresent(LOBBY, Map.of("world", LOBBY_WORLD_UID), Set.of("world"));
+                claimer().claimPresent(LOBBY, Set.of("world"), Map.of("world", LOBBY_WORLD_UID));
 
-        assertThat(survivals.claimed()).isEmpty();
-        assertThat(survivals.copied()).containsExactly("world");
+        assertThat(survivals.claimed()).containsExactly("world");
+        assertThat(survivals.conflicting()).containsExactly("world");
         assertThat(lobbys.claimed()).containsExactly("world");
+        assertThat(lobbys.conflicting()).isEmpty();
         ManagedWorld survivalCopy = on(SURVIVAL).find(WORLD).orElseThrow();
         assertThat(survivalCopy.knownUid()).contains(UUID.fromString(SURVIVAL_WORLD_UID));
         assertThat(survivalCopy.settings().get(WorldProperties.PVP)).isFalse();
         assertThat(on(LOBBY).find(WORLD).orElseThrow().knownUid()).contains(UUID.fromString(LOBBY_WORLD_UID));
-        assertThat(on(LOBBY).network()).noneMatch(NetworkWorld::unclaimed);
     }
 
     @Test
-    void aWorldFolderClaimsARowWhenNoWorldOfThatNameIsLoaded() {
+    void twoServersWithASameNamedWorldFolderNotLoadedBothGetTheRowWithItsSettings() {
+        // Before servers were recorded both ran a copy of one custom world, which loads only later, through the
+        // reconcile: at claim time each has nothing but the folder and the uid it records.
+        oldReleaseRegisters(ARENA, Optional.of(LOBBY_WORLD_UID), "false");
+        upgrade();
+
+        WorldServerClaimer.Claims lobbys =
+                claimer().claimPresent(LOBBY, Set.of("world", "arena"), Map.of("arena", LOBBY_WORLD_UID));
+        WorldServerClaimer.Claims survivals =
+                claimer().claimPresent(SURVIVAL, Set.of("world", "arena"), Map.of("arena", LOBBY_WORLD_UID));
+
+        assertThat(lobbys.claimed()).containsExactly("arena");
+        assertThat(survivals.claimed()).containsExactly("arena");
+        for (String server : List.of(LOBBY, SURVIVAL)) {
+            ManagedWorld arena = on(server).find(ARENA).orElseThrow();
+            assertThat(arena.autoLoad()).isTrue();
+            assertThat(arena.alias()).contains("The arena");
+            assertThat(arena.settings().get(WorldProperties.PVP)).isFalse();
+            assertThat(arena.knownUid()).contains(UUID.fromString(LOBBY_WORLD_UID));
+        }
+        assertThat(claimer().claimPresent(LOBBY, Set.of("arena"), Map.of()).isEmpty())
+                .isTrue();
+    }
+
+    @Test
+    void aFolderThatRecordsNoUidClaimsWithoutTheTemplatesUid() {
         oldReleaseRegisters(ARENA, Optional.of(SURVIVAL_WORLD_UID), "true");
         oldReleaseRegisters(WorldName.of("games"), Optional.empty(), "true");
         upgrade();
 
         WorldServerClaimer.Claims lobbys =
-                claimer().claimPresent(LOBBY, Map.of("world", LOBBY_WORLD_UID), Set.of("world"));
-        WorldServerClaimer.Claims survivals =
-                claimer().claimPresent(SURVIVAL, Map.of("world", SURVIVAL_WORLD_UID), Set.of("world", "arena"));
+                claimer().claimPresent(LOBBY, Set.of("world"), Map.of("world", LOBBY_WORLD_UID));
+        WorldServerClaimer.Claims survivals = claimer().claimPresent(SURVIVAL, Set.of("world", "arena"), Map.of());
 
         assertThat(lobbys.isEmpty()).isTrue();
         assertThat(survivals.claimed()).containsExactly("arena");
+        assertThat(on(SURVIVAL).find(ARENA).orElseThrow().knownUid()).isEmpty();
+        assertThat(on(LOBBY).exists(ARENA)).isFalse();
         assertThat(on(LOBBY).network())
                 .filteredOn(NetworkWorld::unclaimed)
                 .extracting(world -> world.name().value())
-                .containsExactly("games");
+                .containsExactly("arena", "games");
     }
 
     @Test
-    void aClaimedRowIsNeverTakenAgainByTheNextServer() {
-        oldReleaseRegisters(ARENA, Optional.empty(), "true");
+    void unregisteringAClaimedWorldDropsItsTemplateSoTheNextStartDoesNotBringItBack() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
         upgrade();
+        claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
 
-        claimer().claimPresent(LOBBY, Map.of(), Set.of("arena"));
-        WorldServerClaimer.Claims second = claimer().claimPresent(SURVIVAL, Map.of(), Set.of("arena"));
+        on(LOBBY).delete(ARENA);
+        WorldServerClaimer.Claims nextStart = claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
 
-        assertThat(second.isEmpty()).isTrue();
-        assertThat(on(LOBBY).exists(ARENA)).isTrue();
-        assertThat(on(SURVIVAL).exists(ARENA)).isFalse();
+        assertThat(nextStart.isEmpty()).isTrue();
+        assertThat(on(LOBBY).network()).isEmpty();
     }
 
     @Test
@@ -266,7 +292,7 @@ class WorldServerTest {
         upgrade();
         on(LOBBY).save(fresh(WORLD));
 
-        WorldServerClaimer.Claims claims = claimer().claimPresent(LOBBY, Map.of(), Set.of("world"));
+        WorldServerClaimer.Claims claims = claimer().claimPresent(LOBBY, Set.of("world"), Map.of());
 
         assertThat(claims.isEmpty()).isTrue();
         assertThat(on(LOBBY).find(WORLD).orElseThrow().settings().get(WorldProperties.PVP))
@@ -275,17 +301,40 @@ class WorldServerTest {
     }
 
     @Test
-    void anOperatorClaimsAnUnclaimedWorldByNameOnlyOnce() {
+    void anOperatorClaimsAnUnclaimedWorldByNameOncePerServer() {
         oldReleaseRegisters(ARENA, Optional.empty(), "false");
         upgrade();
 
         boolean first = claimer().claimNamed(SURVIVAL, "arena");
-        boolean second = claimer().claimNamed(LOBBY, "arena");
+        boolean again = claimer().claimNamed(SURVIVAL, "arena");
+        boolean elsewhere = claimer().claimNamed(LOBBY, "arena");
 
         assertThat(first).isTrue();
-        assertThat(second).isFalse();
+        assertThat(again).isFalse();
+        assertThat(elsewhere).isTrue();
         assertThat(on(SURVIVAL).find(ARENA).orElseThrow().settings().get(WorldProperties.PVP))
                 .isFalse();
+        assertThat(claimer().claimNamed(LOBBY, "games")).isFalse();
+    }
+
+    @Test
+    void handingAServersWorldsBackToTheClaimReplacesTheirTemplate() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
+        upgrade();
+        claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
+        ManagedWorld lobbys = on(LOBBY).find(ARENA).orElseThrow();
+        on(LOBBY).save(lobbys.withSettings(lobbys.settings().with(WorldProperties.PLAYER_LIMIT, 9)));
+
+        int moved = claimer().rename(LOBBY, NetworkWorld.UNSCOPED);
+
+        assertThat(moved).isOne();
+        assertThat(on(NetworkWorld.UNSCOPED)
+                        .find(ARENA)
+                        .orElseThrow()
+                        .settings()
+                        .get(WorldProperties.PLAYER_LIMIT))
+                .isEqualTo(9);
+        assertThat(on(LOBBY).all()).isEmpty();
     }
 
     @Test

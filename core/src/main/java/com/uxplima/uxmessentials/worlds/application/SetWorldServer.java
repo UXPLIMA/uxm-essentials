@@ -30,14 +30,25 @@ public final class SetWorldServer {
     private final NetworkPresence presence;
     private final Scheduler scheduler;
     private final Logger log;
+    private final String defaultServerName;
 
+    /**
+     * @param defaultServerName the shipped {@code network.server-name}: a backend still under it records no server, so
+     *     a world moved to that name would be read by no backend at all
+     */
     public SetWorldServer(
-            WorldServers servers, Notifier notifier, NetworkPresence presence, Scheduler scheduler, Logger log) {
+            WorldServers servers,
+            Notifier notifier,
+            NetworkPresence presence,
+            Scheduler scheduler,
+            Logger log,
+            String defaultServerName) {
         this.servers = Objects.requireNonNull(servers, "servers");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.defaultServerName = Objects.requireNonNull(defaultServerName, "defaultServerName");
     }
 
     /** Validate on the caller's thread, then move the worlds on the async lane and tell {@code actor} how many. */
@@ -55,12 +66,26 @@ public final class SetWorldServer {
             tell(actor, WorldsMessageKey.WORLD_SERVER_FROM_UNSCOPED, Map.of("server", from));
             return;
         }
+        if (to.equals(defaultServerName)) {
+            tell(actor, WorldsMessageKey.WORLD_SERVER_DEFAULT, Map.of("server", to));
+            return;
+        }
         // A name no running backend answers to is set anyway: the operator may be preparing a server not up yet.
         if (!to.equals(NetworkWorld.UNSCOPED) && !presence.isLive(to)) {
             tell(actor, WorldsMessageKey.WORLD_SERVER_NOT_RUNNING, Map.of("server", to));
         }
         scheduler.async(() -> {
-            int moved = servers.rename(from, to);
+            int moved;
+            try {
+                moved = servers.rename(from, to);
+            } catch (RuntimeException failed) {
+                // Nothing moved: the write is one transaction, so the operator can run the command again.
+                log.error(
+                        "event=world_server_rename_failed actor=" + actor.uuid() + " from=" + from + " to=" + to,
+                        failed);
+                tell(actor, WorldsMessageKey.WORLD_SERVER_SET_FAILED, Map.of("from", from, "to", to));
+                return;
+            }
             log.info("event=world_server_rename actor={} from={} to={} moved={}", actor.uuid(), from, to, moved);
             tell(
                     actor,

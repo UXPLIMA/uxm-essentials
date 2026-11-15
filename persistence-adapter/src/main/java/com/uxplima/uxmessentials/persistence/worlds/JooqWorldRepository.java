@@ -89,6 +89,11 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
         });
     }
 
+    /**
+     * Delete this backend's world {@code name}, and the unclaimed template of that name with it: the start-up claim
+     * copies a template onto every backend that has the world and keeps it, so a template left behind would bring an
+     * unregistered world back on this backend's next start.
+     */
     @Override
     public void delete(WorldName name) {
         write(dsl -> {
@@ -96,9 +101,11 @@ public final class JooqWorldRepository extends JooqRepository implements WorldRe
                     .where(WORLD_SETTING.SERVER_ID.eq(server))
                     .and(WORLD_SETTING.WORLD_NAME.eq(name.value()))
                     .execute();
-            return dsl.deleteFrom(WORLD)
-                    .where(mine().and(WORLD.NAME.eq(name.value())))
-                    .execute();
+            dsl.deleteFrom(WORLD).where(mine().and(WORLD.NAME.eq(name.value()))).execute();
+            if (!server.equals(NetworkWorld.UNSCOPED)) {
+                WorldServerClaimer.dropTemplates(dsl, List.of(name.value()));
+            }
+            return null;
         });
     }
 

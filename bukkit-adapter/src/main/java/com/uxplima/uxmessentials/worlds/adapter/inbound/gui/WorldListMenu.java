@@ -127,7 +127,7 @@ public final class WorldListMenu {
         List<WorldRow> rows = new ArrayList<>();
         for (NetworkWorld world : repository.network()) {
             if (world.livesOn(scope.local())) {
-                rows.add(new WorldRow(world.world(), engine.isLoaded(world.name()), scope.localName(), true));
+                rows.add(new WorldRow(world.world(), engine.isLoaded(world.name()), scope.local(), true));
                 continue;
             }
             Optional<String> server = world.knownServer();
@@ -196,15 +196,13 @@ public final class WorldListMenu {
     /**
      * Which worlds the picker shows and how it names this backend.
      *
-     * @param local the server this backend's worlds are recorded under
-     * @param localName the name this backend's worlds are shown under
+     * @param local the server this backend's worlds are recorded and shown under, as {@code /worlds list} shows them
      * @param showRemote whether the worlds other servers run are shown, which is only useful while they can be reached
      */
-    public record Scope(String local, String localName, boolean showRemote) {
+    public record Scope(String local, boolean showRemote) {
 
         public Scope {
             Objects.requireNonNull(local, "local");
-            Objects.requireNonNull(localName, "localName");
         }
     }
 

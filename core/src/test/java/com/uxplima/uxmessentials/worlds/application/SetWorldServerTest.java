@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
+import com.uxplima.uxmessentials.worlds.application.port.WorldServers;
 import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import org.junit.jupiter.api.Test;
 
@@ -23,15 +24,15 @@ class SetWorldServerTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
 
     private SetWorldServer setServer(Set<String> live) {
+        return setServer(live, (from, to) -> {
+            renames.add(from + "->" + to);
+            return 2;
+        });
+    }
+
+    private SetWorldServer setServer(Set<String> live, WorldServers servers) {
         return new SetWorldServer(
-                (from, to) -> {
-                    renames.add(from + "->" + to);
-                    return 2;
-                },
-                notifier.notifier(),
-                new Live(live),
-                new InlineScheduler(),
-                new RecordingLogger());
+                servers, notifier.notifier(), new Live(live), new InlineScheduler(), new RecordingLogger(), "server-1");
     }
 
     @Test
@@ -59,6 +60,27 @@ class SetWorldServerTest {
 
         assertThat(renames).isEmpty();
         assertThat(notifier.keys()).containsExactly("world.server-invalid");
+    }
+
+    @Test
+    void theShippedServerNameIsRefusedAsTheNewServerSinceNoServerReadsItsWorlds() {
+        setServer(Set.of("server-1")).rename(SAM, "lobby", "server-1");
+
+        assertThat(renames).isEmpty();
+        assertThat(notifier.keys()).containsExactly("world.server-default");
+    }
+
+    @Test
+    void aMoveThatFailsTellsTheOperator() {
+        setServer(Set.of("lobby"), (from, to) -> {
+                    throw new IllegalStateException("database gone");
+                })
+                .rename(SAM, "server-1", "lobby");
+
+        assertThat(notifier.sent()).singleElement().satisfies(line -> {
+            assertThat(line.key()).isEqualTo("world.server-set-failed");
+            assertThat(line.placeholders()).containsEntry("from", "server-1").containsEntry("to", "lobby");
+        });
     }
 
     @Test

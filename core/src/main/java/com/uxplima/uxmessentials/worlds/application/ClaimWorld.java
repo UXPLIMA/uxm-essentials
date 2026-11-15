@@ -10,8 +10,8 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldClaims;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 
 /**
- * {@code /worlds claim <world>}: an operator takes a world no backend has claimed onto this backend, for a world the
- * start-up claim could not place (no backend has its folder, or it arrives later). The claim is a database write, so
+ * {@code /worlds claim <world>}: an operator copies a world no backend has claimed onto this backend, for a world the
+ * start-up claim could not place (this backend had no folder of it at start, or the world arrives later). The claim is a database write, so
  * it runs on the async lane and only the answer comes back to the requester.
  */
 public final class ClaimWorld {

@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -254,11 +255,21 @@ public final class WorldCommand extends WorldCommandSupport implements CommandRe
         return servers;
     }
 
+    /**
+     * The unclaimed worlds {@code /worlds claim} can copy here: every template this backend does not keep yet, those
+     * another backend already copied included, since this backend may hold the same world.
+     */
     private List<String> unclaimedNames() {
         String local = services.localScope();
-        return services.repository().network().stream()
+        List<NetworkWorld> network = services.repository().network();
+        Set<String> kept = network.stream()
+                .filter(world -> world.livesOn(local))
+                .map(world -> world.name().value())
+                .collect(Collectors.toSet());
+        return network.stream()
                 .filter(world -> world.unclaimed() && !world.livesOn(local))
                 .map(world -> world.name().value())
+                .filter(name -> !kept.contains(name))
                 .distinct()
                 .toList();
     }

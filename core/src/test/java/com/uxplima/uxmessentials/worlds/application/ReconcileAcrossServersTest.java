@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
 import com.uxplima.uxmessentials.worlds.domain.WorldSpec;
@@ -30,6 +31,13 @@ class ReconcileAcrossServersTest {
 
     private void reconcileLobby() {
         new ReconcileWorldsOnEnable(lobbyWorlds, lobbyEngine, new RecordingEvents(), CLOCK, () -> true, () -> true)
+                .run();
+    }
+
+    /** A networked backend under the shipped name: it reads the unclaimed rows and may not create their worlds. */
+    private void reconcileUnnamed(InMemoryWorlds unnamed) {
+        new ReconcileWorldsOnEnable(
+                        unnamed, lobbyEngine, new RecordingEvents(), CLOCK, () -> true, () -> true, () -> false)
                 .run();
     }
 
@@ -53,6 +61,17 @@ class ReconcileAcrossServersTest {
         lobbyEngine.onDisk(ARENA, false, Position.of(new WorldRef(new UUID(0, 7), "arena"), 0, 64, 0));
 
         reconcileLobby();
+
+        assertThat(lobbyEngine.loads()).containsExactly(ARENA);
+    }
+
+    @Test
+    void aServerWithoutANameOfItsOwnLoadsUnclaimedWorldsItHasButCreatesNoneWithoutAFolder() {
+        table.put(NetworkWorld.UNSCOPED, registered(ARENA));
+        table.put(NetworkWorld.UNSCOPED, registered(WorldName.of("games")));
+        lobbyEngine.onDisk(ARENA, false, Position.of(new WorldRef(new UUID(0, 7), "arena"), 0, 64, 0));
+
+        reconcileUnnamed(new InMemoryWorlds(table, NetworkWorld.UNSCOPED));
 
         assertThat(lobbyEngine.loads()).containsExactly(ARENA);
     }

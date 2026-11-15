@@ -58,7 +58,10 @@ public final class CachedWorldRepository implements WorldRepository {
     @Override
     public void delete(WorldName name) {
         delegate.delete(name);
-        republish(next -> next.remove(key(server, name.value())));
+        republish(next -> {
+            next.remove(key(server, name.value()));
+            next.remove(key(NetworkWorld.UNSCOPED, name.value()));
+        });
     }
 
     @Override

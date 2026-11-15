@@ -55,6 +55,11 @@ final class InMemoryWorlds implements WorldRepository {
     @Override
     public void delete(WorldName name) {
         mine().remove(name);
+        if (!server.equals(NetworkWorld.UNSCOPED)) {
+            table.rows
+                    .getOrDefault(NetworkWorld.UNSCOPED, new LinkedHashMap<>())
+                    .remove(name);
+        }
     }
 
     @Override

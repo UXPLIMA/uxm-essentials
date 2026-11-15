@@ -4,6 +4,8 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
@@ -15,35 +17,40 @@ import com.uxplima.uxmessentials.worlds.domain.WorldName;
  * Lists the managed worlds for {@code /world list}: this backend's, then, while worlds of other servers can be reached,
  * the other backends' by server, then the worlds no backend has claimed yet. Only this backend's worlds can say
  * whether they are loaded.
+ *
+ * <p>An unclaimed row that some backend already holds a copy of is a template the start-up claim keeps for other
+ * backends with the same world, not a world waiting for a home, so it is left out.
  */
 public final class ListWorlds {
 
     private final WorldRepository repository;
     private final WorldEngine engine;
     private final String localScope;
-    private final String localName;
     private final boolean showRemote;
 
     /**
      * Lists over {@code repository}, with the loaded state read from {@code engine}.
      *
-     * @param localScope the server this backend keeps its rows under, {@value NetworkWorld#UNSCOPED} when it records
-     *     none
-     * @param localName the name this backend's worlds are listed under
+     * @param localScope the server this backend keeps its rows under, and lists its worlds under:
+     *     {@value NetworkWorld#UNSCOPED} when it records none, the value the database and {@code /worlds setserver} use
      * @param showRemote whether the worlds other backends run are listed, which is only useful while they can be
      *     reached
      */
-    public ListWorlds(
-            WorldRepository repository, WorldEngine engine, String localScope, String localName, boolean showRemote) {
+    public ListWorlds(WorldRepository repository, WorldEngine engine, String localScope, boolean showRemote) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.localScope = Objects.requireNonNull(localScope, "localScope");
-        this.localName = Objects.requireNonNull(localName, "localName");
         this.showRemote = showRemote;
     }
 
     public List<WorldListEntry> all() {
-        return repository.network().stream()
+        List<NetworkWorld> network = repository.network();
+        Set<WorldName> held = network.stream()
+                .filter(world -> !world.unclaimed())
+                .map(NetworkWorld::name)
+                .collect(Collectors.toSet());
+        return network.stream()
+                .filter(world -> world.livesOn(localScope) || !world.unclaimed() || !held.contains(world.name()))
                 .map(this::entryOf)
                 .flatMap(Optional::stream)
                 .sorted(Comparator.comparingInt(WorldListEntry::rank)
@@ -56,7 +63,7 @@ public final class ListWorlds {
         WorldEnvironment environment = world.world().spec().environment();
         if (world.livesOn(localScope)) {
             return Optional.of(new WorldListEntry(
-                    world.name(), engine.isLoaded(world.name()), environment, Optional.of(localName), true));
+                    world.name(), engine.isLoaded(world.name()), environment, Optional.of(localScope), true));
         }
         if (world.unclaimed() || showRemote) {
             return Optional.of(new WorldListEntry(world.name(), false, environment, world.knownServer(), false));

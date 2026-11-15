@@ -22,17 +22,19 @@ import org.jooq.Record2;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Records this backend as the server of the world rows no networked backend has claimed yet: the rows the migration
- * marked {@value NetworkWorld#UNSCOPED} because they predate the column, and the rows a backend that recorded no
- * server (off a network, or under the shipped default name) kept there. SQL cannot know which backend runs a world, so
- * this runs when the plugin starts, once the worlds have loaded.
+ * Gives this backend its own copy of the world rows no networked backend has claimed: the rows the migration marked
+ * {@value NetworkWorld#UNSCOPED} because they predate the column, and the rows a backend that recorded no server (off a
+ * network, or under the shipped default name) kept there. SQL cannot know which backend runs a world, so this runs
+ * when the plugin starts, once the worlds have loaded.
  *
- * <p>A row is taken only for a world this backend actually has. When a world of the row's name is loaded here under
- * the row's uid, or the row has no uid, the row moves here with its settings. When the loaded world has another uid,
- * the row belongs to another backend's copy of that name, so it stays unclaimed for that backend and this backend gets
- * a copy of it and its settings under its own uid: every backend that shared one row before servers were recorded
- * keeps the settings it had. When no world of that name is loaded, a world folder of that name on this backend's disk
- * counts. A name this backend already keeps is never touched, which makes a second run claim nothing.
+ * <p>A row is taken only for a world this backend actually has: one loaded here, or a world folder of that name on
+ * this backend's disk. Each backend gets a copy of the row and its settings under its own uid, and the unclaimed row
+ * stays as a template. A move would hand the row to whichever backend starts first: several backends may each hold a
+ * copy of one world folder, uid and all, and before servers were recorded they all read that one row, so none of them
+ * can tell from the uid that it is the only owner. A template some backend already copied is left out of the world
+ * list; the template of a world a backend unregisters or deletes goes with it (see {@link JooqWorldRepository#delete}),
+ * so the next start does not bring the world back. A name this backend already keeps is never touched, which makes a
+ * second run claim nothing.
  */
 @NullMarked
 public final class WorldServerClaimer extends JooqRepository {
@@ -40,19 +42,20 @@ public final class WorldServerClaimer extends JooqRepository {
     /**
      * What one start-up claim did.
      *
-     * @param claimed the unclaimed rows moved onto this backend
-     * @param copied the unclaimed rows of a same-named world of another uid, copied onto this backend
+     * @param claimed the unclaimed rows this backend got its own copy of
+     * @param conflicting the claimed rows whose template recorded another uid than the world this backend has, which
+     *     means two different worlds shared one row before servers were recorded
      */
-    public record Claims(List<String> claimed, List<String> copied) {
+    public record Claims(List<String> claimed, List<String> conflicting) {
 
         public Claims {
             claimed = List.copyOf(claimed);
-            copied = List.copyOf(copied);
+            conflicting = List.copyOf(conflicting);
         }
 
-        /** True when nothing was claimed or copied. */
+        /** True when nothing was claimed. */
         public boolean isEmpty() {
-            return claimed.isEmpty() && copied.isEmpty();
+            return claimed.isEmpty();
         }
     }
 
@@ -62,9 +65,9 @@ public final class WorldServerClaimer extends JooqRepository {
 
     /** {@link #claimPresent} over the shared {@link Persistence} handle, keeping jOOQ off the bukkit-adapter. */
     public static Claims claimPresent(
-            Persistence persistence, String serverId, Map<String, String> loadedUids, Collection<String> onDisk) {
+            Persistence persistence, String serverId, Collection<String> present, Map<String, String> uids) {
         Objects.requireNonNull(persistence, "persistence");
-        return new WorldServerClaimer(persistence.dsl()).claimPresent(serverId, loadedUids, onDisk);
+        return new WorldServerClaimer(persistence.dsl()).claimPresent(serverId, present, uids);
     }
 
     /** {@link #claimNamed} over the shared {@link Persistence} handle. */
@@ -80,63 +83,64 @@ public final class WorldServerClaimer extends JooqRepository {
     }
 
     /**
-     * Take onto {@code serverId} every unclaimed world this backend has, with its settings, as the class comment
-     * describes, returning the names claimed and copied so the operator can see what this backend took.
+     * Copy onto {@code serverId} every unclaimed world this backend has, with its settings, as the class comment
+     * describes, returning the names claimed so the operator can see what this backend took.
      *
      * @param serverId this backend's non-blank network name, never {@value NetworkWorld#UNSCOPED}
-     * @param loadedUids the uid of every world loaded here, by world name
-     * @param onDisk the name of every world with a folder on this backend's disk, loaded or not
+     * @param present the name of every world this backend has: loaded, or with a folder on its disk
+     * @param uids the uid of each of those worlds that has one, from the loaded world or read from its folder
      */
-    public Claims claimPresent(String serverId, Map<String, String> loadedUids, Collection<String> onDisk) {
+    public Claims claimPresent(String serverId, Collection<String> present, Map<String, String> uids) {
         requireClaimable(serverId);
-        Objects.requireNonNull(loadedUids, "loadedUids");
-        Objects.requireNonNull(onDisk, "onDisk");
-        if (loadedUids.isEmpty() && onDisk.isEmpty()) {
+        Objects.requireNonNull(present, "present");
+        Objects.requireNonNull(uids, "uids");
+        if (present.isEmpty()) {
             return new Claims(List.of(), List.of());
         }
-        Set<String> folders = Set.copyOf(onDisk);
+        Set<String> here = Set.copyOf(present);
         return write(dsl -> {
             Set<String> kept = keptBy(dsl, serverId);
-            List<String> claimable = new ArrayList<>();
-            List<String> copied = new ArrayList<>();
+            List<String> claimed = new ArrayList<>();
+            List<String> conflicting = new ArrayList<>();
             for (Record2<String, String> row : dsl.select(WORLD.NAME, WORLD.UID)
                     .from(WORLD)
                     .where(WORLD.SERVER_ID.eq(NetworkWorld.UNSCOPED))
                     .orderBy(WORLD.NAME)
                     .fetch()) {
                 String name = row.value1();
-                if (kept.contains(name)) {
+                if (kept.contains(name) || !here.contains(name)) {
                     continue;
                 }
-                Optional<String> rowUid = Optional.ofNullable(row.value2());
-                String loadedUid = loadedUids.get(name);
-                if (loadedUid != null && rowUid.isPresent() && !rowUid.get().equals(loadedUid)) {
-                    if (copy(dsl, serverId, name, loadedUid)) {
-                        copied.add(name);
+                Optional<String> uid = Optional.ofNullable(uids.get(name));
+                if (copy(dsl, serverId, name, uid)) {
+                    claimed.add(name);
+                    Optional<String> rowUid = Optional.ofNullable(row.value2());
+                    if (uid.isPresent() && rowUid.isPresent() && !rowUid.equals(uid)) {
+                        conflicting.add(name);
                     }
-                } else if (loadedUid != null || folders.contains(name)) {
-                    claimable.add(name);
                 }
             }
-            return new Claims(move(dsl, NetworkWorld.UNSCOPED, serverId, claimable), copied);
+            return new Claims(claimed, conflicting);
         });
     }
 
     /**
-     * Stamp {@code serverId} onto the unclaimed world named {@code name}, for an operator who knows it belongs here.
-     * False when no unclaimed world has that name, or this backend already keeps a world of that name.
+     * Copy the unclaimed world named {@code name} onto {@code serverId} with its settings, for an operator who knows
+     * it belongs here. False when no unclaimed world has that name, or this backend already keeps a world of that
+     * name. The template stays, as it does for the start-up claim.
      */
     public boolean claimNamed(String serverId, String name) {
         requireClaimable(serverId);
         Objects.requireNonNull(name, "name");
-        return write(dsl ->
-                !move(dsl, NetworkWorld.UNSCOPED, serverId, List.of(name)).isEmpty());
+        return write(dsl -> !keptBy(dsl, serverId).contains(name) && copy(dsl, serverId, name, Optional.empty()));
     }
 
     /**
      * Move every world recorded on {@code from} to {@code to}, with its settings, returning how many moved. A name
      * {@code to} already keeps stays on {@code from}. {@code to} may be {@value NetworkWorld#UNSCOPED}, which hands the
-     * worlds back to the start-up claim; {@code from} may not, since those rows are the claim's to place.
+     * worlds back to the start-up claim and replaces a template of the same name, since the operator asked for this
+     * server's current row to be the one the claim hands out; {@code from} may not, since those rows are the claim's
+     * to place.
      */
     public int rename(String from, String to) {
         requireClaimable(from);
@@ -153,15 +157,31 @@ public final class WorldServerClaimer extends JooqRepository {
                     .where(WORLD.SERVER_ID.eq(from))
                     .orderBy(WORLD.NAME)
                     .fetch(WORLD.NAME);
+            if (to.equals(NetworkWorld.UNSCOPED) && !names.isEmpty()) {
+                dropTemplates(dsl, names);
+            }
             return move(dsl, from, to, names).size();
         });
     }
 
+    /** Drop the unclaimed rows named {@code names} and their settings, so no later claim hands them out again. */
+    static void dropTemplates(DSLContext dsl, Collection<String> names) {
+        dsl.deleteFrom(WORLD_SETTING)
+                .where(WORLD_SETTING.SERVER_ID.eq(NetworkWorld.UNSCOPED))
+                .and(WORLD_SETTING.WORLD_NAME.in(names))
+                .execute();
+        dsl.deleteFrom(WORLD)
+                .where(WORLD.SERVER_ID.eq(NetworkWorld.UNSCOPED))
+                .and(WORLD.NAME.in(names))
+                .execute();
+    }
+
     /**
-     * Copy the unclaimed row {@code name} and its settings onto {@code serverId} under this backend's {@code uid},
-     * leaving the unclaimed row for the backend whose uid it records.
+     * Copy the unclaimed row {@code name} and its settings onto {@code serverId}, recording {@code uid} as the uid of
+     * this backend's world. Without one the copy records none rather than the template's, which may name another
+     * backend's world: the uid is filled in once the world loads here.
      */
-    private static boolean copy(DSLContext dsl, String serverId, String name, String uid) {
+    private static boolean copy(DSLContext dsl, String serverId, String name, Optional<String> uid) {
         Optional<WorldRecord> source = dsl.selectFrom(WORLD)
                 .where(WORLD.SERVER_ID.eq(NetworkWorld.UNSCOPED))
                 .and(WORLD.NAME.eq(name))
@@ -172,7 +192,7 @@ public final class WorldServerClaimer extends JooqRepository {
         WorldRecord copy = source.get().copy();
         copy.setServerId(serverId);
         copy.setName(name);
-        copy.setUid(uid);
+        copy.setUid(uid.orElse(null));
         dsl.insertInto(WORLD).set(copy).execute();
         // A setting row of this server with no world row would collide with the copies, so it goes first.
         dsl.deleteFrom(WORLD_SETTING)

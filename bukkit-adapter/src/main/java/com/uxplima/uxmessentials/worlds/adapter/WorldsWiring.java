@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WorldSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
@@ -101,6 +102,7 @@ import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
 import com.uxplima.uxmessentials.worlds.application.port.WorldPregen;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.application.port.WorldSettingApplier;
+import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldCreated;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldLoaded;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldSettingChanged;
@@ -166,7 +168,7 @@ public final class WorldsWiring {
         // network's set so the list and the cross-server teleport read it from memory. A peer's change arrives as a
         // WorldChanged frame and reloads the set off the tick; the periodic resync covers a frame that was lost.
         // A backend off a network, or under the shipped default name, keeps its worlds unscoped, as before servers were
-        // recorded, so naming the server later lets the claim move them rather than hiding them under server-1.
+        // recorded, so naming the server later lets the claim copy them rather than hiding them under server-1.
         String localName = hops.server();
         String scope = WorldScope.of(networkEnabled, localName);
         CachedWorldRepository cache = WorldRepositories.cachedConcrete(persistence, scope);
@@ -290,7 +292,7 @@ public final class WorldsWiring {
         BiConsumer<Player, PlayerRef> reopenList = (player, viewer) -> listHolder[0].open(player, viewer);
         WorldMainMenu mainMenu = new WorldMainMenu(menus, tracked, repository, engine, reopenList);
         WorldServerAdoption adoption = new WorldServerAdoption(
-                persistence, tracked, kernel.log(), scope, localName, engine, cache, bus.publisher());
+                persistence, tracked, kernel.log(), scope, networkEnabled, localName, engine, cache, bus.publisher());
         boolean showRemote = worldHops.enabled();
         WorldsServices services = assemble(
                 kernel,
@@ -310,9 +312,9 @@ public final class WorldsWiring {
                 reopenList,
                 mainMenu::open,
                 new ClaimWorld(adoption, notifier, tracked),
-                new SetWorldServer(adoption, notifier, presence, tracked, kernel.log()),
+                new SetWorldServer(
+                        adoption, notifier, presence, tracked, kernel.log(), NetworkConfig.DEFAULT_SERVER_ID),
                 scope,
-                localName,
                 showRemote);
         // The create screen reopens the engine list on cancel/create through the shared reopen seam, runs the started
         // CreateWorld use case, and captures text through the shared input seam.
@@ -353,7 +355,7 @@ public final class WorldsWiring {
                 mainMenu,
                 createMenu,
                 notifier,
-                new WorldListMenu.Scope(scope, localName, showRemote));
+                new WorldListMenu.Scope(scope, showRemote));
         listHolder[0] = worldListMenu;
         worldListMenu.register(menuBindings, dataFolder, kernel.log());
         mainMenu.register(menuBindings, dataFolder, kernel.log());
@@ -369,7 +371,10 @@ public final class WorldsWiring {
                 kernel.events(),
                 clock,
                 () -> settings.autoAdoptLoaded() && claimWent.get(),
-                settings::autoLoadRegistered);
+                settings::autoLoadRegistered,
+                // A networked backend without a name of its own reads every unclaimed row as its own, so creating
+                // the ones it has no folder for would make it generate worlds that belong to other servers.
+                () -> !networkEnabled || !scope.equals(NetworkWorld.UNSCOPED));
 
         // Re-apply a world's stored settings to the live world on load and after any setting change, on the global
         // region thread (the applier touches Bukkit world handles). Creating a world publishes no WorldLoaded, so a
@@ -461,7 +466,6 @@ public final class WorldsWiring {
             ClaimWorld claimWorld,
             SetWorldServer setWorldServer,
             String scope,
-            String localName,
             boolean showRemote) {
         CreateWorld createWorld = new CreateWorld(
                 repository, engine, notifier, kernel.events(), scheduler, clock, settings::creationDefaults);
@@ -479,7 +483,7 @@ public final class WorldsWiring {
                 clock,
                 settings::protectDefaultWorld,
                 settings::deleteConfirmTimeout);
-        ListWorlds listWorlds = new ListWorlds(repository, engine, scope, localName, showRemote);
+        ListWorlds listWorlds = new ListWorlds(repository, engine, scope, showRemote);
         WorldInfo worldInfo = new WorldInfo(repository);
         SetWorldProperty setProperty = new SetWorldProperty(repository, notifier, kernel.events(), scheduler);
         SetGamerule setGamerule = new SetGamerule(repository, ruleCatalog, notifier, kernel.events(), scheduler);

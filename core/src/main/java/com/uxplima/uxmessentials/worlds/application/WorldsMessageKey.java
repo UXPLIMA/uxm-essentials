@@ -76,6 +76,8 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_SERVER_INVALID("world.server-invalid"),
     WORLD_SERVER_NOT_RUNNING("world.server-not-running"),
     WORLD_SERVER_FROM_UNSCOPED("world.server-from-unscoped"),
+    WORLD_SERVER_DEFAULT("world.server-default"),
+    WORLD_SERVER_SET_FAILED("world.server-set-failed"),
 
     WORLD_PREGEN_STARTED("world.pregen.started"),
     WORLD_PREGEN_DONE("world.pregen.done"),
