@@ -8,10 +8,12 @@ import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.UncountedMoney;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -35,7 +37,8 @@ import org.jspecify.annotations.Nullable;
  * the guarded single-sided debit and {@code refund} the matching credit; both are reached from a region thread
  * (the end of the warmup, a missed hop), so they run on the async scheduler and complete their stage from there,
  * keeping the database write off the tick. A charge or refund that does not go through is logged, since the
- * player sees only the refusal line and an operator may need to settle a balance by hand.
+ * player sees only the refusal line and an operator may need to settle a balance by hand. Both stages always
+ * complete normally: a provider that throws answers {@code RTP_CHARGE_FAILED} or {@code RTP_REFUND_FAILED}.
  */
 @NullMarked
 public final class LinkedTeleportFee implements TeleportFee {
@@ -81,7 +84,14 @@ public final class LinkedTeleportFee implements TeleportFee {
             return CompletableFuture.completedFuture(Result.ok()); // economy disabled: nothing to withdraw
         }
         CompletableFuture<Result<Unit, TeleportError>> outcome = new CompletableFuture<>();
-        scheduler.async(() -> outcome.complete(debit(live, unit, who, amount)));
+        try {
+            scheduler.async(() -> outcome.complete(debit(live, unit, who, amount)));
+        } catch (RuntimeException refused) {
+            // The async lane refuses work once the plugin is disabling; nothing was taken, so the teleport is simply
+            // off.
+            log.warn("rtp charge for {} not taken: {}", who.name(), String.valueOf(refused.getMessage()));
+            outcome.complete(Result.err(TeleportError.RTP_CHARGE_FAILED));
+        }
         return outcome;
     }
 
@@ -95,37 +105,60 @@ public final class LinkedTeleportFee implements TeleportFee {
             return CompletableFuture.completedFuture(Result.ok()); // economy disabled: nothing was taken
         }
         CompletableFuture<Result<Unit, TeleportError>> outcome = new CompletableFuture<>();
-        scheduler.async(() -> outcome.complete(credit(live, unit, who, amount)));
+        try {
+            scheduler.async(() -> outcome.complete(credit(live, unit, who, amount)));
+        } catch (RuntimeException refused) {
+            // The async lane refuses work once the plugin is disabling, but the money is still owed, and the server
+            // has stopped ticking by then, so the credit runs here rather than being dropped.
+            outcome.complete(credit(live, unit, who, amount));
+        }
         return outcome;
+    }
+
+    @Override
+    public String format(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount");
+        Currency unit = currency.get();
+        return unit == null ? amount.toPlainString() : MoneyFormat.withSymbol(Money.of(unit, amount));
     }
 
     private Result<Unit, TeleportError> debit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
         Money charge = Money.of(unit, amount);
         try {
-            if (live.debit(who, charge).isErr()) {
-                log.warn(
-                        "rtp charge of {} refused for {} at the end of the warmup", amount.toPlainString(), who.name());
-                return Result.err(TeleportError.RTP_CANT_AFFORD);
+            Result<Unit, TransferError> debited = live.debit(who, charge);
+            if (debited.isErr()) {
+                TransferError reason = debited.errorOrThrow();
+                log.warn("rtp charge of {} refused for {}: {}", amount.toPlainString(), who.name(), reason);
+                return Result.err(
+                        reason == TransferError.INSUFFICIENT_FUNDS || reason == TransferError.BELOW_MINIMUM
+                                ? TeleportError.RTP_CANT_AFFORD
+                                : TeleportError.RTP_CHARGE_FAILED);
             }
-        } catch (RuntimeException e) {
+        } catch (RuntimeException debitFailure) {
             // The stage must complete either way, or the player is left standing with no teleport and no answer.
-            log.error("rtp charge of " + amount.toPlainString() + " failed for " + who.name(), e);
-            return Result.err(TeleportError.RTP_CANT_AFFORD);
+            log.error("rtp charge of " + amount.toPlainString() + " failed for " + who.name(), debitFailure);
+            return Result.err(TeleportError.RTP_CHARGE_FAILED);
         }
-        receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_TELEPORT));
+        try {
+            receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_TELEPORT));
+        } catch (RuntimeException receiptFailure) {
+            // The money has left, so the charge stands; only the notice about it was lost.
+            log.error("rtp charge receipt for " + who.name() + " could not be sent", receiptFailure);
+        }
         return Result.ok();
     }
 
     private Result<Unit, TeleportError> credit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
         try {
             // A refund gives back what was spent, so it is not counted as earned.
-            if (UncountedMoney.call(() -> live.credit(who, Money.of(unit, amount)))
-                    .isOk()) {
+            Result<Unit, TransferError> credited = UncountedMoney.call(() -> live.credit(who, Money.of(unit, amount)));
+            if (credited.isOk()) {
                 return Result.ok();
             }
-            log.warn("rtp refund of {} refused for {} after a failed teleport", amount.toPlainString(), who.name());
-        } catch (RuntimeException e) {
-            log.error("rtp refund of " + amount.toPlainString() + " failed for " + who.name(), e);
+            log.warn(
+                    "rtp refund of {} refused for {}: {}", amount.toPlainString(), who.name(), credited.errorOrThrow());
+        } catch (RuntimeException creditFailure) {
+            log.error("rtp refund of " + amount.toPlainString() + " failed for " + who.name(), creditFailure);
         }
         return Result.err(TeleportError.RTP_REFUND_FAILED);
     }

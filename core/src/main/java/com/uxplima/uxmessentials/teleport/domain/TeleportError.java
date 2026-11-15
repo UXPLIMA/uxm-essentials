@@ -54,6 +54,9 @@ public enum TeleportError {
     /** The player cannot afford the configured random-teleport cost, rejected before any search runs. */
     RTP_CANT_AFFORD(TeleportMessageKey.RTP_CANT_AFFORD),
 
+    /** The economy failed while taking a random-teleport fee, so the hop did not run and staff may need to check. */
+    RTP_CHARGE_FAILED(TeleportMessageKey.RTP_CHARGE_FAILED),
+
     /** A random-teleport fee was taken for a hop that failed, and giving it back failed too. */
     RTP_REFUND_FAILED(TeleportMessageKey.RTP_REFUND_FAILED),
 

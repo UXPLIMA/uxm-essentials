@@ -91,6 +91,9 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(task, "task");
         Objects.requireNonNull(retired, "retired");
         if (disabled()) {
+            // The task will never run, and a caller that passed a retired branch is waiting on one of the two (a
+            // future to complete, a latch to release, a fee to refund), so it gets its fallback rather than silence.
+            retired.run();
             return;
         }
         if (player.isSystem()) {

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 
 import java.time.Clock;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 import org.bukkit.Bukkit;
@@ -93,8 +94,8 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onLanded, "onLanded");
         Objects.requireNonNull(onFailed, "onFailed");
-        scheduler.onEntity(
-                who, () -> hop(who, destination, kind, new Arrival(onLanded, onFailed), true, true), onFailed);
+        Arrival arrival = new Arrival(onLanded, onFailed);
+        scheduler.onEntity(who, () -> hop(who, destination, kind, arrival, true, true), arrival::failed);
     }
 
     @Override
@@ -114,8 +115,33 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
                         false));
     }
 
-    /** What runs once the hop resolves: exactly one of the two, depending on whether the player arrived. */
-    private record Arrival(Runnable onLanded, Runnable onFailed) {}
+    /**
+     * What runs once the hop resolves. Exactly one of the two callbacks runs, at most once: a paid hop refunds from
+     * {@code onFailed}, so a miss reported twice, or a miss reported after a landing, would hand money out.
+     */
+    private static final class Arrival {
+
+        private final Runnable onLanded;
+        private final Runnable onFailed;
+        private final AtomicBoolean settled = new AtomicBoolean();
+
+        Arrival(Runnable onLanded, Runnable onFailed) {
+            this.onLanded = onLanded;
+            this.onFailed = onFailed;
+        }
+
+        void landed() {
+            if (settled.compareAndSet(false, true)) {
+                onLanded.run();
+            }
+        }
+
+        void failed() {
+            if (settled.compareAndSet(false, true)) {
+                onFailed.run();
+            }
+        }
+    }
 
     private void hop(
             PlayerRef who,
@@ -124,16 +150,33 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             Arrival arrival,
             boolean captureBack,
             boolean showArrival) {
+        try {
+            dispatch(who, destination, kind, arrival, captureBack, showArrival);
+        } catch (RuntimeException failure) {
+            // Anything thrown before teleportAsync took over (the /back capture, the follow lookup, the call itself)
+            // leaves the player where they stood, so it is a miss like any other.
+            log.error("teleport of " + who.name() + " failed before the hop", failure);
+            arrival.failed();
+        }
+    }
+
+    private void dispatch(
+            PlayerRef who,
+            Destination destination,
+            TeleportKind kind,
+            Arrival arrival,
+            boolean captureBack,
+            boolean showArrival) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null || !player.isOnline()) {
-            arrival.onFailed().run(); // despawned between launch and hop: nothing to move
+            arrival.failed(); // despawned between launch and hop: nothing to move
             return;
         }
         Position target = applyCentering(resolveTarget(destination));
         Location to = locationFor(target);
         if (to == null) {
             log.warn("teleport target world unloaded for {}", who.name());
-            arrival.onFailed().run();
+            arrival.failed();
             return;
         }
         Position from = TeleportRefs.positionOf(player);
@@ -157,12 +200,11 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
             boolean showArrival) {
         if (err != null) {
             log.warn("teleport failed for {}: {}", who.name(), String.valueOf(err.getMessage()));
-            arrival.onFailed().run();
+            arrival.failed();
             return;
         }
         if (Boolean.FALSE.equals(ok)) {
-            // Paper refused the hop (e.g. unloaded target); the player stayed put: no landed callback
-            arrival.onFailed().run();
+            arrival.failed(); // Paper refused the hop (e.g. unloaded target), so the player stayed put
             return;
         }
         scheduler.onEntity(who, () -> {
@@ -172,7 +214,7 @@ public final class AsyncTeleportExecutor implements TeleportExecutor {
                 arrivalEffects.arrived(who, kind);
             }
             // The cooldown stamp and arrival grace hang off a real landing only, never a refusal.
-            arrival.onLanded().run();
+            arrival.landed();
         });
     }
 

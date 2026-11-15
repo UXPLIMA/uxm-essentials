@@ -279,8 +279,9 @@ public final class TeleportWiring {
                 combatGate,
                 fee,
                 grace,
-                kernel.gate());
-        // The /rtp biome use case shares the engine (so it charges after success like a normal RTP), the live area
+                kernel.gate(),
+                kernel.log());
+        // The /rtp biome use case shares the engine (so it charges and refunds like a normal RTP), the live area
         // source (so /settpr moves both zones at once), and the biome-targeted search built in buildRtp.
         ResolveBiomeRtp resolveBiomeRtp = new ResolveBiomeRtp(
                 rtp.biomeCatalog(),

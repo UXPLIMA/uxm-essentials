@@ -34,7 +34,7 @@ import org.junit.jupiter.api.Test;
 class TeleportEngineTest {
 
     private static final Position LANDING = Fixtures.at(1200, 70, -340);
-    private static final Map<String, String> PRICE = Map.of("cost", "50.0");
+    private static final Map<String, String> PRICE = Map.of("cost", "50.0 coins");
 
     private final HeldWarmups warmups = new HeldWarmups();
     private final Hops hops = new Hops();
@@ -91,7 +91,7 @@ class TeleportEngineTest {
 
     @Test
     void aHopThatMissesAfterTheChargeGivesTheFeeBack() {
-        hops.landing = false;
+        hops.outcome = Hop.MISS;
         startRandomTeleport();
 
         warmups.finish();
@@ -100,6 +100,32 @@ class TeleportEngineTest {
         assertThat(purse.balance).isEqualByComparingTo("100");
         assertThat(shielded).isEmpty();
         assertThat(notifier.sent()).containsExactly(new RecordingNotifier.Sent(ALEX, "teleport.rtp.refunded", PRICE));
+    }
+
+    @Test
+    void aHopThatThrowsAfterTheChargeGivesTheFeeBackOnce() {
+        hops.outcome = Hop.THROW;
+        startRandomTeleport();
+
+        warmups.finish();
+
+        assertThat(hops.arrived).isEmpty();
+        assertThat(purse.balance).isEqualByComparingTo("100");
+        assertThat(notifier.sent()).containsExactly(new RecordingNotifier.Sent(ALEX, "teleport.rtp.refunded", PRICE));
+    }
+
+    @Test
+    void aRefundThatFailsTellsThePlayerTheFeeIsStillTaken() {
+        hops.outcome = Hop.MISS;
+        purse.refunds = false;
+        startRandomTeleport();
+
+        warmups.finish();
+
+        assertThat(hops.arrived).isEmpty();
+        assertThat(purse.balance).isEqualByComparingTo("50");
+        assertThat(notifier.sent())
+                .containsExactly(new RecordingNotifier.Sent(ALEX, "teleport.rtp.refund-failed", PRICE));
     }
 
     /** Warmups that hold the completion until the test says the countdown has elapsed. */
@@ -120,11 +146,19 @@ class TeleportEngineTest {
         }
     }
 
-    /** An executor whose hops either all land or all miss. */
+    /** How every hop of the fake executor ends. */
+    private enum Hop {
+        LAND,
+        MISS,
+        // Reports the miss and then throws as well, the worst case for paying the refund exactly once.
+        THROW
+    }
+
+    /** An executor whose hops all end the same way. */
     private static final class Hops implements TeleportExecutor {
 
         private final List<Position> arrived = new ArrayList<>();
-        private boolean landing = true;
+        private Hop outcome = Hop.LAND;
 
         @Override
         public void teleport(PlayerRef who, Destination destination, TeleportKind kind) {
@@ -134,8 +168,11 @@ class TeleportEngineTest {
         @Override
         public void teleport(
                 PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
-            if (!landing) {
+            if (outcome != Hop.LAND) {
                 onFailed.run();
+                if (outcome == Hop.THROW) {
+                    throw new IllegalStateException("the hop broke after reporting its miss");
+                }
                 return;
             }
             teleport(who, destination, kind);
@@ -147,6 +184,7 @@ class TeleportEngineTest {
     private static final class Purse implements TeleportFee {
 
         private BigDecimal balance;
+        private boolean refunds = true;
 
         Purse(BigDecimal balance) {
             this.balance = balance;
@@ -168,8 +206,16 @@ class TeleportEngineTest {
 
         @Override
         public CompletionStage<Result<Unit, TeleportError>> refund(PlayerRef who, BigDecimal amount) {
+            if (!refunds) {
+                return CompletableFuture.completedFuture(Result.err(TeleportError.RTP_REFUND_FAILED));
+            }
             balance = balance.add(amount);
             return CompletableFuture.completedFuture(Result.ok());
+        }
+
+        @Override
+        public String format(BigDecimal amount) {
+            return amount.toPlainString() + " coins";
         }
     }
 

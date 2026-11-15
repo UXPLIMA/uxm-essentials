@@ -43,21 +43,30 @@ public interface TeleportFee {
         public CompletionStage<Result<Unit, TeleportError>> refund(PlayerRef who, BigDecimal amount) {
             return CompletableFuture.completedFuture(Result.ok());
         }
+
+        @Override
+        public String format(BigDecimal amount) {
+            return amount.toPlainString();
+        }
     };
 
     /** True when {@code who} can cover {@code amount} in the default currency. */
     boolean canAfford(PlayerRef who, BigDecimal amount);
 
     /**
-     * Withdraw {@code amount} from {@code who}'s balance. Completes with {@code ok} once the money has left, or
-     * with {@link TeleportError#RTP_CANT_AFFORD} when it did not, in which case nothing was taken.
+     * Withdraw {@code amount} from {@code who}'s balance. Completes with {@code ok} once the money has left, with
+     * {@link TeleportError#RTP_CANT_AFFORD} when the balance did not cover it, or with
+     * {@link TeleportError#RTP_CHARGE_FAILED} when the economy itself failed. The stage always completes normally.
      */
     CompletionStage<Result<Unit, TeleportError>> charge(PlayerRef who, BigDecimal amount);
 
     /**
      * Give back an {@code amount} that {@link #charge} took for a teleport that never landed. Completes with
      * {@code ok} once the money is back, or with {@link TeleportError#RTP_REFUND_FAILED} when it could not be
-     * returned.
+     * returned. The stage always completes normally.
      */
     CompletionStage<Result<Unit, TeleportError>> refund(PlayerRef who, BigDecimal amount);
+
+    /** {@code amount} written the way the currency writes it, so every fee line reads like {@code /balance}. */
+    String format(BigDecimal amount);
 }
