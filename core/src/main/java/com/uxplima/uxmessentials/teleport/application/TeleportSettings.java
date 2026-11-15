@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import com.uxplima.uxmessentials.shared.application.permission.RenamedPermissions;
 import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -265,8 +266,8 @@ public final class TeleportSettings {
 
     /** Permission which exempts a player from automatic join-spawn movement. */
     public String joinSpawnExemptPermission() {
-        return config.getString("spawn.exempt-permission", TeleportPermissions.SPAWN_JOIN_EXEMPT)
-                .strip();
+        return RenamedPermissions.current(
+                config.getString("spawn.exempt-permission", TeleportPermissions.SPAWN_JOIN_EXEMPT));
     }
 
     /** Whether deaths are managed by the configured/default respawn chain; default on. */

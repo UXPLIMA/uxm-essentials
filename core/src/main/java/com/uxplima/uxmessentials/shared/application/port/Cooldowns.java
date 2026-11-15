@@ -15,14 +15,14 @@ import org.jspecify.annotations.Nullable;
  * cooldown lasts, whether it can be bypassed) is resolved from numbered permission nodes via the
  * {@link Permissions} port, using the {@code min}-reducer: the lowest matching
  * {@code uxmessentials.<feature>.cooldown.<seconds>} wins, {@code 0} means no wait, and
- * {@code uxmessentials.<feature>.cooldown.bypass} skips the gate entirely.
+ * {@code uxmessentials.bypass.cooldown.<feature>} skips the gate entirely.
  *
  * <p>Two keying styles share these mechanics. A {@link CooldownKind} keys a feature's tiered cooldown
  * (teleport, warp, kit), carrying the feature segment, the config default, and, for teleport, the
  * {@link CooldownStartPhase} that decides when the clock starts. The {@link #checkLabel}/
  * {@link #stampLabel} pair keys the generic per-command cooldown by an operator-chosen command label
- * or rule id, gated by {@code uxmessentials.cooldown.bypass.<label>} with the same min-reducer
- * semantics.
+ * or rule id, sized by {@code uxmessentials.cooldown.<label>.<seconds>} with the same min-reducer
+ * semantics and skipped by {@code uxmessentials.bypass.cooldown.<label>}.
  */
 public interface Cooldowns {
 

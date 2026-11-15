@@ -58,8 +58,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>This use case never moves the player itself: once the gate passes it <em>delegates</em> execution to the
  * teleport context through {@link PlayerWarpTeleporter}, so the shared cooldown, the move-cancellable warmup,
- * and the region-aware async hop stay the teleport context's concern. Bypass nodes live under the
- * {@code uxmessentials.pwarp.bypass.*} prefix, aligned to the {@code /pwarp} command's own node namespace.
+ * and the region-aware async hop stay the teleport context's concern. Its exemptions end in {@code .pwarp}
+ * under the shared {@code uxmessentials.bypass.} head, so every rule a staff member may skip is found in one place.
  *
  * <p>A warp tagged for another backend of the network takes a different post-charge route: rather than the local
  * hop it hands off to the shared cross-server hop through {@link PlayerWarpHops}, which records the intent and

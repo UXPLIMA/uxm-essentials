@@ -50,7 +50,7 @@ final class BoardPlaceholders {
     }
 
     /**
-     * Answer {@code key}, already without the {@code uxmessentials_} prefix and in lower case, or empty when it is
+     * Answer {@code key}, already without the {@code uxm_essentials_} prefix and in lower case, or empty when it is
      * not a board placeholder: {@code rank_next} and the other rank keys of the ranks module fall through to them.
      */
     Optional<String> resolve(PlayerRef reader, String key) {

@@ -1,6 +1,6 @@
 # Permissions: staff, server and item modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The plugin-wide nodes are under [shared](#shared), and the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The plugin-wide nodes are under [shared](#shared), and the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder. Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md) maps the earlier names.
 
 Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [itemworld](#itemworld) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
@@ -16,7 +16,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
 | `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
 | `uxmessentials.cooldown.<feature>.<seconds>` | The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait. | true |
-| `uxmessentials.cooldown.bypass.<feature>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses). | op |
+| `uxmessentials.bypass.cooldown.<feature>` | Skip the cooldown on one rate-limited feature entirely: tp, rtp, kit, poses, skin, customcommand.<id> or a cooldown label a menu names. | op |
 | `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
 | `uxmessentials.help` | /help to list the commands you can use. | true |
 | `uxmessentials.lang.use` | /lang to set or clear your personal language override. | true |
@@ -36,9 +36,9 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 
 | Permission | What it allows | Default |
 |---|---|---|
-| `uxmessentials.commandcontrol.bypass` | Exempt from the command whitelist/blacklist gate and the tab-completion / plugin-hide scrub. | op |
-| `uxmessentials.commandcontrol.channelhide.bypass` | Exempt from the plugin-channel hider - the full channel-registration list is sent to this player. | op |
-| `uxmessentials.commandcontrol.spam.bypass` | Exempt from the command-spam rate limiter - commands are never counted and no spam action fires. | op |
+| `uxmessentials.bypass.commandcontrol` | Exempt from the command whitelist/blacklist gate and the tab-completion / plugin-hide scrub. | op |
+| `uxmessentials.bypass.channel-hide` | Exempt from the plugin-channel hider - the full channel-registration list is sent to this player. | op |
+| `uxmessentials.bypass.command-spam` | Exempt from the command-spam rate limiter - commands are never counted and no spam action fires. | op |
 | `uxmessentials.commandcontrol.viewplugins` | See the plugin-listing / help commands (/plugins, /pl, /help, ...) hidden by the plugin-hide feature. | op |
 | `uxmessentials.commandcontrol.viewproxycommands` | Checked on the Velocity proxy: see and run the proxy commands the proxy plugin-hide removes and blocks. | false |
 | `uxmessentials.module.commandcontrol` | Hot-reload / inspect the commandcontrol module (command whitelist, tab-completion filter, plugin-hide). | op |
@@ -56,10 +56,10 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.communication.broadcast` | /broadcast to send a one-off announcement to all online players. | op |
 | `uxmessentials.communication.broadcasttoggle` | /broadcasttoggle to stop or resume receiving the rotating server announcements. | true |
 | `uxmessentials.communication.broadcastworld` | /broadcastworld (alias /bcw) to send a one-off announcement only to players in your world. | op |
-| `uxmessentials.communication.chat.bypass` | Keep chatting while public chat is locked by /togglechat. | op |
+| `uxmessentials.bypass.chat-lock` | Keep chatting while public chat is locked by /togglechat. | op |
 | `uxmessentials.communication.chat.format` | Use MiniMessage formatting in your own public chat messages (when allow-player-format is on). | false |
 | `uxmessentials.communication.clearchat` | /clearchat (alias /chatclear) to flush the chat for online players. | op |
-| `uxmessentials.communication.clearchat.exempt` | Keep your chat scrollback when staff run /clearchat. | false |
+| `uxmessentials.bypass.clear-chat` | Keep your chat scrollback when staff run /clearchat. | false |
 | `uxmessentials.communication.gui` | Open the communication admin panel (/communication gui and on the /uxmess gui hub). | op |
 | `uxmessentials.communication.info.<page>` | Read one information page, such as /motd or /rules. | true |
 | `uxmessentials.communication.info.info` | /info to read the shipped welcome / quick-start info page. | true |
@@ -76,8 +76,8 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.module.customcommands` | Hot-reload / inspect the customcommands module (operator-defined commands behind /customcmd). | op |
 | `uxmessentials.customcommand.admin` | /customcmd to list, inspect, reload, test and run operator-defined commands. | op |
 | `uxmessentials.customcommand.run.others` | /customcmd run <id> <player>: run an operator-defined command for somebody else. | op |
-| `uxmessentials.customcommand.cooldown.bypass` | Run an operator-defined command without waiting out its cooldown. | op |
-| `uxmessentials.customcommand.cost.bypass` | Run an operator-defined command that costs money without paying for it. | op |
+| `uxmessentials.bypass.cooldown.customcommand` | Run an operator-defined command without waiting out its cooldown. | op |
+| `uxmessentials.bypass.cost.customcommand` | Run an operator-defined command that costs money without paying for it. | op |
 
 ## custommenus
 
@@ -231,7 +231,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.jail` | /jail <player> <jail> [duration] [reason]; /jails lists configured jails; /jailedplayers lists who is jailed; /setjail <name> defines a jail at your location; /jail del <name> removes a defined jail. On a network the target may be on any server, and a jail defined on another server sends them there. | op |
 | `uxmessentials.moderation.kick` | /kick <player> [reason]; /kickall [reason] to clear non-exempt players. | op |
 | `uxmessentials.moderation.lockdown` | /lockdown [on\|off]: refuse every login except holders of the lockdown bypass; the flag survives restart. | op |
-| `uxmessentials.moderation.lockdown.bypass` | Join the server while it is locked down (/lockdown). Held by staff who must stay reachable during a lockdown. | op |
+| `uxmessentials.bypass.lockdown` | Join the server while it is locked down (/lockdown). Held by staff who must stay reachable during a lockdown. | op |
 | `uxmessentials.moderation.mute` | /mute <player> [duration] [reason] (/tempmute is the explicit duration alias); /mutehistory <player> reviews a player's full mute/unmute history. | op |
 | `uxmessentials.moderation.mutelist` | /mutelist to review the players currently muted. | op |
 | `uxmessentials.moderation.sanction` | /sanction <player>: aggregated read-only punishment summary: current mute, jail, ban state and active warning count. | op |
@@ -245,7 +245,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.broadcast.receive` | Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Holders also read the line when a jailed player could not be taken to a jail on another server, which -s does not suppress. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited). | op |
 | `uxmessentials.moderation.check` | /checkban <player> and /checkmute <player>: report whether a player is currently banned or muted. | op |
 | `uxmessentials.moderation.commandspy` | /commandspy (/cspy) to watch the commands other players run. | op |
-| `uxmessentials.moderation.exempt` | Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff. | op |
+| `uxmessentials.bypass.punishment` | Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff. | op |
 | `uxmessentials.moderation.gui` | /mod opens the moderation management GUI (active punishments + per-player history). | op |
 | `uxmessentials.moderation.history` | /history <player>: review a player's full disciplinary record (ban/mute/warn/kick) newest-first. | op |
 | `uxmessentials.moderation.seen` | /seen, /seenip and /alts <player>: last-seen / last-IP lookup, surfaces alts. | op |
@@ -329,7 +329,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.security.admin` | /security: inspect and manage another player's second factors. | op |
 | `uxmessentials.security.alts` | /ipalts: list the accounts that share an IP with a player. | op |
 | `uxmessentials.security.alts.notify` | Receive the staff notice when a join shares an IP with other accounts or reports a flagged client. | op |
-| `uxmessentials.security.bypass` | Exempt from the two-factor join verification and op-command re-auth checks. | op |
+| `uxmessentials.bypass.security` | Exempt from the two-factor join verification and op-command re-auth checks. | op |
 | `uxmessentials.security.clientinfo` | /clientinfo: show the client brand a player reported. | op |
 | `uxmessentials.security.force` | /security force <player>: force a player to re-verify their second factor on their next action or join. | op |
 | `uxmessentials.security.pin` | /pin: set, change or remove a numeric PIN second factor on your own account. | true |

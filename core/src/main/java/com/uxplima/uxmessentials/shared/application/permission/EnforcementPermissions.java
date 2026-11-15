@@ -28,7 +28,7 @@ public final class EnforcementPermissions {
     public static final String MODERATION_JAIL = "uxmessentials.moderation.jail";
     public static final String MODERATION_KICK = "uxmessentials.moderation.kick";
     public static final String MODERATION_LOCKDOWN = "uxmessentials.moderation.lockdown";
-    public static final String MODERATION_LOCKDOWN_BYPASS = "uxmessentials.moderation.lockdown.bypass";
+    public static final String MODERATION_LOCKDOWN_BYPASS = "uxmessentials.bypass.lockdown";
     public static final String MODERATION_MUTE = "uxmessentials.moderation.mute";
     public static final String MODERATION_MUTELIST = "uxmessentials.moderation.mutelist";
     public static final String MODERATION_SANCTION = "uxmessentials.moderation.sanction";
@@ -42,7 +42,7 @@ public final class EnforcementPermissions {
     public static final String MODERATION_BROADCAST_RECEIVE = "uxmessentials.moderation.broadcast.receive";
     public static final String MODERATION_CHECK = "uxmessentials.moderation.check";
     public static final String MODERATION_COMMANDSPY = "uxmessentials.moderation.commandspy";
-    public static final String MODERATION_EXEMPT = "uxmessentials.moderation.exempt";
+    public static final String MODERATION_EXEMPT = "uxmessentials.bypass.punishment";
     public static final String MODERATION_GUI = "uxmessentials.moderation.gui";
     public static final String MODERATION_HISTORY = "uxmessentials.moderation.history";
     public static final String MODERATION_SEEN = "uxmessentials.moderation.seen";
@@ -55,7 +55,7 @@ public final class EnforcementPermissions {
     public static final String SECURITY_ADMIN = "uxmessentials.security.admin";
     public static final String SECURITY_ALTS = "uxmessentials.security.alts";
     public static final String SECURITY_ALTS_NOTIFY = "uxmessentials.security.alts.notify";
-    public static final String SECURITY_BYPASS = "uxmessentials.security.bypass";
+    public static final String SECURITY_BYPASS = "uxmessentials.bypass.security";
     public static final String SECURITY_CLIENTINFO = "uxmessentials.security.clientinfo";
     public static final String SECURITY_FORCE = "uxmessentials.security.force";
     public static final String SECURITY_PIN = "uxmessentials.security.pin";
@@ -76,9 +76,9 @@ public final class EnforcementPermissions {
     public static final String VANISH_SEE = "uxmessentials.vanish.see";
     public static final String VANISH_SILENT = "uxmessentials.vanish.silent";
     public static final String VANISH_USE = "uxmessentials.vanish.use";
-    public static final String COMMANDCONTROL_BYPASS = "uxmessentials.commandcontrol.bypass";
-    public static final String COMMANDCONTROL_CHANNELHIDE_BYPASS = "uxmessentials.commandcontrol.channelhide.bypass";
-    public static final String COMMANDCONTROL_SPAM_BYPASS = "uxmessentials.commandcontrol.spam.bypass";
+    public static final String COMMANDCONTROL_BYPASS = "uxmessentials.bypass.commandcontrol";
+    public static final String COMMANDCONTROL_CHANNELHIDE_BYPASS = "uxmessentials.bypass.channel-hide";
+    public static final String COMMANDCONTROL_SPAM_BYPASS = "uxmessentials.bypass.command-spam";
     public static final String COMMANDCONTROL_VIEWPLUGINS = "uxmessentials.commandcontrol.viewplugins";
     public static final String COMMANDCONTROL_VIEWPROXYCOMMANDS = "uxmessentials.commandcontrol.viewproxycommands";
     public static final String MODULE_COMMANDCONTROL = "uxmessentials.module.commandcontrol";

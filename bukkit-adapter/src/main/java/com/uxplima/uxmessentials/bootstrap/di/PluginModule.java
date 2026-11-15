@@ -1324,7 +1324,7 @@ public final class PluginModule {
         // unconditionally here, after the modules, with the plugin-enable timestamp so its uptime is measured
         // from this enable (a reload restarts it) rather than the whole JVM's age.
         links.placeholders.serverMetrics(new BukkitServerMetrics(plugin.getServer(), Instant.now()));
-        // The name lookup belongs to no context either: it is what turns the name in %uxmessentials_p_<name>_<key>%
+        // The name lookup belongs to no context either: it is what turns the name in %uxm_essentials_p_<name>_<key>%
         // into an account, through the same kernel port every command resolves a name with.
         links.placeholders.players(kernel.playerLookup());
         // The words of the leaderboard placeholders (nobody, none, the time to a reset) come from the reader's own
@@ -1354,7 +1354,7 @@ public final class PluginModule {
         }
         // The menu-engine source seam belongs to no feature context either. It reads the always-present engine's
         // own runtime state (whether the requester is in a menu, which one, its page/rows, and a typed argument) so
-        // scoreboards and tab can read %uxmessentials_menu_*%. Wired unconditionally over the same Menus façade the
+        // scoreboards and tab can read %uxm_essentials_menu_*%. Wired unconditionally over the same Menus façade the
         // modules opened their menus through.
         links.placeholders.menu(new MenusMenuPlaceholders(menus));
         // Whether a module is on is a question about the server, not about any one context, and it is most useful

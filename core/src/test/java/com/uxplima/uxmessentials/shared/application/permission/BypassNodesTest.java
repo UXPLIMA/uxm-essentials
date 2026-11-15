@@ -1,0 +1,109 @@
+package com.uxplima.uxmessentials.shared.application.permission;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.regex.Pattern;
+
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownStartPhase;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
+import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
+import org.junit.jupiter.api.Test;
+
+/**
+ * Every exemption an operator can grant lives under one head, {@code uxmessentials.bypass.}, so a permission plugin
+ * lists them together and the shared conventions hold. A node added later with {@code bypass} or {@code exempt}
+ * somewhere in its middle fails here before an operator learns its name.
+ */
+class BypassNodesTest {
+
+    private static final Pattern EXEMPTION_WORD = Pattern.compile("bypass|(^|[.-])exempt([.-]|$)");
+
+    @Test
+    void everyExemptionInTheCatalogueStartsWithTheBypassHead() {
+        List<String> misplaced = PermissionCatalog.all().stream()
+                .map(PermissionSpec::node)
+                .filter(node -> EXEMPTION_WORD.matcher(node).find())
+                .filter(node -> !node.startsWith(SharedPermissions.BYPASS))
+                .toList();
+
+        assertThat(misplaced).isEmpty();
+    }
+
+    @Test
+    void theCooldownAndWarmupExemptionsAreBuiltUnderTheBypassHead() {
+        assertThat(SharedPermissions.cooldownBypass("customcommand.example"))
+                .isEqualTo("uxmessentials.bypass.cooldown.customcommand.example");
+        assertThat(new CooldownKind("rtp", 30, CooldownStartPhase.TELEPORT).bypassNode())
+                .isEqualTo("uxmessentials.bypass.cooldown.rtp");
+        assertThat(CooldownKind.scoped("kit", "kit.starter", 60, CooldownStartPhase.TELEPORT)
+                        .bypassNode())
+                .isEqualTo(ContentPermissions.KIT_COOLDOWN_BYPASS);
+        assertThat(new WarmupKind("tp", 3).bypassNode()).isEqualTo(TeleportPermissions.TP_WARMUP_BYPASS);
+    }
+
+    @Test
+    void theNodesTheFactoriesBuildAreOnesTheCatalogueDeclares() {
+        assertThat(PermissionCatalog.find(SharedPermissions.featureCooldownBypass("skin")))
+                .map(PermissionSpec::node)
+                .contains(SharedPermissions.cooldownBypass("<feature>"));
+        assertThat(PermissionCatalog.find(SharedPermissions.featureWarmupBypass("tp")))
+                .map(PermissionSpec::node)
+                .contains("uxmessentials.bypass.warmup.tp");
+    }
+
+    @Test
+    void everyEarlierSpellingPointsAtADeclaredExemption() {
+        for (Map.Entry<String, String> renamed : RenamedPermissions.all().entrySet()) {
+            Optional<PermissionSpec> declared = PermissionCatalog.find(renamed.getValue());
+
+            assertThat(renamed.getValue()).as(renamed.getKey()).startsWith(SharedPermissions.BYPASS);
+            assertThat(declared)
+                    .as(renamed.getKey() + " -> " + renamed.getValue())
+                    .isPresent();
+            assertThat(RenamedPermissions.current(renamed.getKey())).isEqualTo(renamed.getValue());
+        }
+    }
+
+    @Test
+    void aConfiguredNodeIsReadUnderItsCurrentSpelling() {
+        assertThat(RenamedPermissions.current(" uxmessentials.economy.tax.bypass "))
+                .isEqualTo(EconomyPermissions.ECONOMY_TAX_BYPASS);
+        assertThat(RenamedPermissions.current("uxmessentials.cooldown.bypass.daily-reward"))
+                .isEqualTo("uxmessentials.bypass.cooldown.daily-reward");
+        assertThat(RenamedPermissions.current("myserver.vip.nospawn")).isEqualTo("myserver.vip.nospawn");
+    }
+
+    @Test
+    void aKeptTeleportFileStillExemptsThroughTheCurrentNode() {
+        TeleportSettings kept =
+                new TeleportSettings(new OneString("spawn.exempt-permission", "uxmessentials.spawn.join.exempt"));
+        TeleportSettings fresh = new TeleportSettings(new OneString("unrelated", ""));
+
+        assertThat(kept.joinSpawnExemptPermission()).isEqualTo(TeleportPermissions.SPAWN_JOIN_EXEMPT);
+        assertThat(fresh.joinSpawnExemptPermission()).isEqualTo("uxmessentials.bypass.join-spawn");
+    }
+
+    /** A config holding one string; every other read answers its fallback. */
+    private record OneString(String path, String value) implements ConfigStore {
+
+        @Override
+        public boolean getBoolean(String key, boolean fallback) {
+            return fallback;
+        }
+
+        @Override
+        public String getString(String key, String fallback) {
+            return key.equals(path) ? value : fallback;
+        }
+
+        @Override
+        public int getInt(String key, int fallback) {
+            return fallback;
+        }
+    }
+}

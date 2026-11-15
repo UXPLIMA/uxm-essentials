@@ -82,14 +82,14 @@ Some limits to know:
 | `/kit editor [name [save]]` | `uxmessentials.kit.edit` | operators | Edits kits in a menu. |
 | `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. |
 
-`uxmessentials.kit.cooldown.bypass` skips cooldowns and lets a one-time kit be claimed again.
+`uxmessentials.bypass.cooldown.kit` skips cooldowns and lets a one-time kit be claimed again.
 `uxmessentials.oversizedstacks` lets a player receive stacks larger than the item normally allows.
 
 ## Placeholders
 
 | Placeholder | Value |
 |---|---|
-| `%uxmessentials_kits_list%` | The kits the player may claim, comma separated. |
+| `%uxm_essentials_kits_list%` | The kits the player may claim, comma separated. |
 
 ## Examples
 

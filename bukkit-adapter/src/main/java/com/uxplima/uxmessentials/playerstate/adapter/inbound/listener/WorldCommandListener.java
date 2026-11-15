@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
  * Enforces the per-world command blocker: when a player runs a command listed under their current world (or
  * under the {@code "*"} wildcard) in {@code world-command-blocks}, the dispatch is cancelled before the
  * command runs and the player is told the command is disabled here. A player holding the bypass node
- * {@code uxmessentials.world.command-bypass} is never blocked.
+ * {@code uxmessentials.bypass.blocked-commands.world} is never blocked.
  *
  * <p>The label is the first token after the slash, case-folded, with any {@code uxmessentials:} namespace
  * prefix stripped so {@code /uxmessentials:tpa} is caught the same as {@code /tpa}. Runs at

@@ -39,7 +39,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but the
  * dispatch is stopped before the vanilla/dispatcher handler. The console is never gated. This listens only to the
- * player-command event, and a {@code .bypass} holder is always allowed (the {@code RuleSet} short-circuits on the
+ * player-command event, and a bypass holder is always allowed (the {@code RuleSet} short-circuits on the
  * bypass node before any group lookup). When the world's rule set is inert (a blacklist with empty lists) the listener
  * short-circuits before any per-command work, so an operator who leaves the lists blank pays nothing.
  *

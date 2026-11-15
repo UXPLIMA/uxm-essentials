@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiFunction;
@@ -11,6 +13,8 @@ import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import me.clip.placeholderapi.PlaceholderAPI;
+import me.clip.placeholderapi.PlaceholderAPIPlugin;
+import me.clip.placeholderapi.expansion.PlaceholderExpansion;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -18,11 +22,11 @@ import org.jspecify.annotations.NullMarked;
  * is reached only through this class and only past {@link #isPresent()}, so a server without PlaceholderAPI
  * never resolves those classes and the plugin runs unchanged.
  *
- * <p>It does two things. {@link #registerExpansion} builds the {@link UxmEssentialsExpansion} over the wired
- * {@link PlaceholderContexts} and registers it, returning a handle whose {@link Registration#close()}
- * unregisters it on plugin disable. {@link #messageBridge} produces the pre-parse transform the {@code
- * BukkitMessageSink} applies before MiniMessage parses, so an operator's catalog line may embed {@code
- * %papi%} placeholders; without PlaceholderAPI the transform is the identity, a no-op.
+ * <p>It does two things. {@link #registerExpansion} builds the {@link UxmEssentialsExpansion}s over the wired
+ * {@link PlaceholderContexts}, one per {@link PlaceholderRoute}, and registers them, returning a handle whose
+ * {@link Registration#close()} unregisters them on plugin disable. {@link #messageBridge} produces the pre-parse
+ * transform the {@code BukkitMessageSink} applies before MiniMessage parses, so an operator's catalog line may embed
+ * {@code %papi%} placeholders; without PlaceholderAPI the transform is the identity, a no-op.
  */
 @NullMarked
 public final class PlaceholderApiSupport {
@@ -37,9 +41,10 @@ public final class PlaceholderApiSupport {
     }
 
     /**
-     * Register the {@code uxmessentials} expansion over {@code contexts} when PlaceholderAPI is present and
-     * at least one context contributed a seam. Returns empty (registering nothing) when PlaceholderAPI is
-     * absent or no context is enabled, so the caller has nothing to close.
+     * Register the {@code %uxm_essentials_<key>%} expansion, and the {@code %uxmessentials_<key>%} one that keeps the
+     * older placeholders answering, over {@code contexts} when PlaceholderAPI is present and at least one context
+     * contributed a seam. Returns empty (registering nothing) when PlaceholderAPI is absent, no context is enabled,
+     * or neither identifier could be taken, so the caller has nothing to close.
      */
     public static Optional<Registration> registerExpansion(PlaceholderContexts contexts, String version, Logger log) {
         Objects.requireNonNull(contexts, "contexts");
@@ -48,13 +53,34 @@ public final class PlaceholderApiSupport {
         if (!isPresent() || contexts.isEmpty()) {
             return Optional.empty();
         }
-        UxmEssentialsExpansion expansion = new UxmEssentialsExpansion(new PlaceholderResolver(contexts), version);
-        if (!expansion.register()) {
-            log.warn("event=papi_expansion_register_failed identifier=uxmessentials");
-            return Optional.empty();
+        PlaceholderResolver resolver = new PlaceholderResolver(contexts);
+        List<UxmEssentialsExpansion> registered = new ArrayList<>();
+        for (PlaceholderRoute route : List.of(PlaceholderRoute.current(), PlaceholderRoute.legacy(log))) {
+            String identifier = route.identifier();
+            Optional<String> holder = foreignHolder(identifier);
+            if (holder.isPresent()) {
+                // PlaceholderAPI keeps one expansion per identifier and a new registration evicts the old one, so
+                // taking an identifier another plugin holds would silently break that plugin's placeholders.
+                log.warn("event=papi_expansion_identifier_taken identifier={} holder={}", identifier, holder.get());
+                continue;
+            }
+            UxmEssentialsExpansion expansion = new UxmEssentialsExpansion(resolver, version, route);
+            if (expansion.register()) {
+                log.info("event=papi_expansion_registered identifier={}", identifier);
+                registered.add(expansion);
+            } else {
+                log.warn("event=papi_expansion_register_failed identifier={}", identifier);
+            }
         }
-        log.info("event=papi_expansion_registered identifier=uxmessentials");
-        return Optional.of(new Registration(expansion, log));
+        return registered.isEmpty() ? Optional.empty() : Optional.of(new Registration(registered, log));
+    }
+
+    /** The author of an expansion that is not ours and already holds {@code identifier}, or empty when none does. */
+    private static Optional<String> foreignHolder(String identifier) {
+        Optional<PlaceholderExpansion> held =
+                PlaceholderAPIPlugin.getInstance().getLocalExpansionManager().findExpansionByIdentifier(identifier);
+        return held.filter(expansion -> !(expansion instanceof UxmEssentialsExpansion))
+                .map(expansion -> expansion.getName() + " by " + expansion.getAuthor());
     }
 
     /**
@@ -137,21 +163,23 @@ public final class PlaceholderApiSupport {
         return open >= 0 && source.indexOf('%', open + 1) > open;
     }
 
-    /** A registered expansion handle; {@link #close()} unregisters it on plugin disable. */
+    /** The registered expansions; {@link #close()} unregisters them on plugin disable. */
     public static final class Registration implements AutoCloseable {
 
-        private final UxmEssentialsExpansion expansion;
+        private final List<UxmEssentialsExpansion> expansions;
         private final Logger log;
 
-        private Registration(UxmEssentialsExpansion expansion, Logger log) {
-            this.expansion = expansion;
+        private Registration(List<UxmEssentialsExpansion> expansions, Logger log) {
+            this.expansions = List.copyOf(expansions);
             this.log = log;
         }
 
         @Override
         public void close() {
-            expansion.unregister();
-            log.info("event=papi_expansion_unregistered identifier=uxmessentials");
+            for (UxmEssentialsExpansion expansion : expansions) {
+                expansion.unregister();
+                log.info("event=papi_expansion_unregistered identifier={}", expansion.getIdentifier());
+            }
         }
     }
 }

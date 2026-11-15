@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * The {@link Cooldowns} implementation: a per-holder "ready-at" epoch-millis stamped in PDC. The
  * duration is resolved from the player's numbered {@code uxmessentials.cooldown.<feature>.<seconds>}
  * nodes via {@link Permissions} (the {@code min}-reducer: the shortest tier wins), and
- * {@code uxmessentials.cooldown.bypass.<feature>} skips the gate entirely. The generic per-command
+ * {@code uxmessentials.bypass.cooldown.<feature>} skips the gate entirely. The generic per-command
  * layer ({@link #checkLabel}/{@link #stampLabel}) keys the same machinery by an operator-chosen label
  * in the same space.
  *

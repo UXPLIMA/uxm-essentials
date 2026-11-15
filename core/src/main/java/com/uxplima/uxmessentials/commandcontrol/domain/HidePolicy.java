@@ -19,7 +19,7 @@ import java.util.Set;
  *
  * <p>Nothing here is Bukkit-aware: the {@code PlayerCommandSendEvent} scrub of the sent command list, the
  * {@code AsyncTabCompleteEvent} suggestion filter, and the scrub-help execution block all live in the adapter and call
- * back into this decision. The {@code .bypass} escape is not modelled here. The adapter short-circuits a bypass holder
+ * back into this decision. The bypass escape is not modelled here. The adapter short-circuits a bypass holder
  * before any hide work, so a bypass holder is never asked about.
  */
 public final class HidePolicy {

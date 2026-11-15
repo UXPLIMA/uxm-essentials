@@ -60,8 +60,8 @@ public final class ContentPermissions {
     public static final String MODULE_CUSTOMCOMMANDS = "uxmessentials.module.customcommands";
     public static final String CUSTOMCOMMAND_ADMIN = "uxmessentials.customcommand.admin";
     public static final String CUSTOMCOMMAND_RUN_OTHERS = "uxmessentials.customcommand.run.others";
-    public static final String CUSTOMCOMMAND_COOLDOWN_BYPASS = "uxmessentials.customcommand.cooldown.bypass";
-    public static final String CUSTOMCOMMAND_COST_BYPASS = "uxmessentials.customcommand.cost.bypass";
+    public static final String CUSTOMCOMMAND_COOLDOWN_BYPASS = "uxmessentials.bypass.cooldown.customcommand";
+    public static final String CUSTOMCOMMAND_COST_BYPASS = "uxmessentials.bypass.cost.customcommand";
     public static final String MODULE_GUARD = "uxmessentials.module.guard";
     public static final String GUARD_USE = "uxmessentials.guard.use";
     public static final String GUARD_HERE = "uxmessentials.guard.here";
@@ -81,8 +81,8 @@ public final class ContentPermissions {
     public static final String GUARD_TEMPLATE = "uxmessentials.guard.template";
     public static final String GUARD_SCOPE = "uxmessentials.guard.scope";
     public static final String GUARD_LOCK = "uxmessentials.guard.lock";
-    public static final String GUARD_BYPASS = "uxmessentials.guard.bypass";
-    public static final String GUARD_BYPASS_GAMEMODE = "uxmessentials.guard.bypass.gamemode";
+    public static final String GUARD_BYPASS = "uxmessentials.bypass.guard";
+    public static final String GUARD_BYPASS_GAMEMODE = "uxmessentials.bypass.gamemode.guard";
     public static final String GUARD_SHOW = "uxmessentials.guard.show";
     public static final String GUARD_NEAR = "uxmessentials.guard.near";
     public static final String GUARD_TEST = "uxmessentials.guard.test";
@@ -121,7 +121,7 @@ public final class ContentPermissions {
     public static final String SURVIVAL_TREEFELLER_TOGGLE = "uxmessentials.survival.treefeller.toggle";
     public static final String SURVIVAL_VEINMINER = "uxmessentials.survival.veinminer";
     public static final String SURVIVAL_VEINMINER_TOGGLE = "uxmessentials.survival.veinminer.toggle";
-    public static final String KIT_COOLDOWN_BYPASS = "uxmessentials.kit.cooldown.bypass";
+    public static final String KIT_COOLDOWN_BYPASS = "uxmessentials.bypass.cooldown.kit";
     public static final String KIT_EDIT = "uxmessentials.kit.edit";
     public static final String KIT_OTHERS = "uxmessentials.kit.others";
     public static final String KIT_PREVIEW = "uxmessentials.kit.preview";
