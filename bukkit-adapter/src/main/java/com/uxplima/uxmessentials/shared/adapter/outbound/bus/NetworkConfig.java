@@ -39,7 +39,8 @@ public record NetworkConfig(
 
     private static final int DEFAULT_QUEUE = 256;
     private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
-    private static final String DEFAULT_SERVER_ID = "server-1";
+    /** The server id a backend runs on when its {@code network} block names none. */
+    public static final String DEFAULT_SERVER_ID = "server-1";
 
     public NetworkConfig {
         Objects.requireNonNull(serverId, "serverId");

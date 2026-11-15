@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.messaging.application.port.StaffAudience;
 import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.staff.StaffStores;
 import com.uxplima.uxmessentials.playerstate.application.OpenContainer;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -87,12 +88,15 @@ public final class StaffWiring {
      * Build the staff adapters from {@code plugin}, {@code ctx}, the {@code persistence} DSL, the {@code seams},
      * and the in-process event bus. The bus is the concrete {@link InProcessDomainEventPublisher} so the
      * enter/exit roster-alert subscriber can be registered here and unsubscribed on stop, the kernel port
-     * exposes only {@code publish}.
+     * exposes only {@code publish}. The {@code serverId} is this backend's id from the root {@code network}
+     * block, the one the bus stamps on its frames; the module's own config is scoped under {@code modules.staff}
+     * and never holds it.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Persistence persistence,
+            String serverId,
             StaffSeams seams,
             InProcessDomainEventPublisher events,
             ManagementGuiRegistry guiRegistry,
@@ -101,6 +105,7 @@ public final class StaffWiring {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(serverId, "serverId");
         Objects.requireNonNull(seams, "seams");
         Objects.requireNonNull(events, "events");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
@@ -115,8 +120,8 @@ public final class StaffWiring {
         // The loadout is per-server state, so it is keyed per (player, server_id): the repository scopes every
         // save/load/delete to THIS backend's network.server-name, so two backends sharing one DB never clobber
         // each other's captured pre-mode inventory. A single-server install runs on the default id unchanged.
-        String serverId = NetworkConfig.from(ctx.config()).serverId();
         StaffLoadoutRepository repository = StaffStores.loadouts(persistence, Clock.systemUTC(), serverId);
+        adoptDefaultIdLoadouts(persistence, serverId, kernel);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
 
         // vanish is built (and the seams bound) before the capture, because the capture reads the pre-mode
@@ -194,6 +199,38 @@ public final class StaffWiring {
         @Nullable Consumer<DomainEvent> alertSubscriber = StaffAlertWiring.subscribe(seams, settings, kernel, events);
         return new Wired(
                 commands, listeners, services, followService, kernel.scheduler(), running, events, alertSubscriber);
+    }
+
+    /**
+     * Move the loadouts held under the default server id onto {@code serverId}, off the tick, so a backend that
+     * names itself still restores a loadout kept under the default id. Nothing records which backend wrote such
+     * a row, so the first named backend to start takes them all.
+     */
+    private static void adoptDefaultIdLoadouts(Persistence persistence, String serverId, KernelPorts kernel) {
+        if (serverId.equals(NetworkConfig.DEFAULT_SERVER_ID)) {
+            return;
+        }
+        kernel.scheduler().async(() -> {
+            try {
+                int moved = StaffStores.adoptLoadouts(persistence, serverId, NetworkConfig.DEFAULT_SERVER_ID);
+                if (moved > 0) {
+                    kernel.log()
+                            .info(
+                                    "event=staff_loadout_adopted from={} to={} rows={}",
+                                    NetworkConfig.DEFAULT_SERVER_ID,
+                                    serverId,
+                                    moved);
+                }
+            } catch (PersistenceException failure) {
+                // A failed move leaves the rows where they were, so the next start tries again.
+                kernel.log()
+                        .warn(
+                                "event=staff_loadout_adopt_failed from={} to={}",
+                                NetworkConfig.DEFAULT_SERVER_ID,
+                                serverId,
+                                failure);
+            }
+        });
     }
 
     private static void bindSeams(

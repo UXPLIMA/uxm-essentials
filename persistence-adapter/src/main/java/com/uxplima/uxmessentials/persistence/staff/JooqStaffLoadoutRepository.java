@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.persistence.staff;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.StaffLoadout.STAFF_LOADOUT;
 
 import java.time.Clock;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.StaffLoadoutRec
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.staff.application.port.StaffLoadoutRepository;
 import com.uxplima.uxmessentials.staff.domain.SavedLoadout;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
 
 /**
@@ -71,6 +73,38 @@ public final class JooqStaffLoadoutRepository extends JooqRepository implements 
                     .and(STAFF_LOADOUT.SERVER_ID.eq(serverId))
                     .execute();
             return null;
+        });
+    }
+
+    /**
+     * Move every row held under {@code fromServerId} to this repository's server id, returning how many moved. A
+     * player who already holds a row under this server id keeps it and their {@code fromServerId} row stays where
+     * it is, since overwriting would drop a loadout that was captured on this backend. Moving onto the same id is
+     * a no-op.
+     *
+     * @param fromServerId the server id the rows were written under
+     * @return the number of rows now held under this repository's server id that were not before
+     */
+    public int adopt(String fromServerId) {
+        Objects.requireNonNull(fromServerId, "fromServerId");
+        if (fromServerId.equals(serverId)) {
+            return 0;
+        }
+        return write(dsl -> {
+            // Read first rather than a NOT EXISTS subquery: MySQL refuses an UPDATE whose subquery reads the
+            // table being updated.
+            List<String> held = dsl.select(STAFF_LOADOUT.PLAYER)
+                    .from(STAFF_LOADOUT)
+                    .where(STAFF_LOADOUT.SERVER_ID.eq(serverId))
+                    .fetch(STAFF_LOADOUT.PLAYER);
+            Condition movable = STAFF_LOADOUT.SERVER_ID.eq(fromServerId);
+            if (!held.isEmpty()) {
+                movable = movable.and(STAFF_LOADOUT.PLAYER.notIn(held));
+            }
+            return dsl.update(STAFF_LOADOUT)
+                    .set(STAFF_LOADOUT.SERVER_ID, serverId)
+                    .where(movable)
+                    .execute();
         });
     }
 
