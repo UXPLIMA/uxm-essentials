@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.playerwarps.domain;
 
+import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -25,6 +26,20 @@ public record WarpTimingOverrides(Optional<Double> warmupSeconds, Optional<Doubl
     /** A warp with no timing overrides, both warmup and cooldown fall back to the configured defaults. */
     public static WarpTimingOverrides none() {
         return new WarpTimingOverrides(Optional.empty(), Optional.empty());
+    }
+
+    /** The warmup override as a duration, when one is set. */
+    public Optional<Duration> warmup() {
+        return warmupSeconds.map(WarpTimingOverrides::toDuration);
+    }
+
+    /** The cooldown override as a duration, when one is set. */
+    public Optional<Duration> cooldown() {
+        return cooldownSeconds.map(WarpTimingOverrides::toDuration);
+    }
+
+    private static Duration toDuration(double seconds) {
+        return Duration.ofMillis((long) (seconds * 1000));
     }
 
     private static void requireNonNegative(Optional<Double> value, String field) {

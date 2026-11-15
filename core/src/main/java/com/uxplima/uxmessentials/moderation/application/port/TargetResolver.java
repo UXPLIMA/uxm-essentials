@@ -11,8 +11,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <player>} against a known-but-offline UUID, a {@code /warn} on a player who has logged off, so the
  * moderation context owns this wider resolution.
  *
- * <p>The adapter resolves an online player first, then falls back to the server's offline-player cache (the
- * has-played-before profile), mapping each to a {@link PlayerRef}. A name that has never been seen resolves
+ * <p>The adapter resolves a player online on any backend of the network first, then falls back to the server's
+ * offline-player cache (the has-played-before profile), mapping each to a {@link PlayerRef}. A name that has never been seen resolves
  * to empty, which a command maps to {@code UNKNOWN_TARGET}.
  */
 public interface TargetResolver {

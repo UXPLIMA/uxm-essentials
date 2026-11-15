@@ -8,9 +8,9 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
-import com.uxplima.uxmessentials.playerwarps.application.CrossServerArrival;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -24,8 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * cheap cached read whose entry expires on its own TTL.
  *
  * <p>When the {@code cross-server} sub-group is on, the same join is also the arrival point for a cross-server
- * teleport: the {@link CrossServerArrival} handler reads the shared pending-teleport row off-tick and, if it
- * targets this backend, completes the local hop. The handler is absent (an empty {@link Optional}) when the
+ * hop: the shared {@link HopArrival} reads the pending-hop row off-tick and, if it targets this backend, completes
+ * the local move. The handler is absent (an empty {@link Optional}) when the
  * sub-group is off, so a disabled sub-group does no arrival work at all, only the cache warm runs.
  */
 @NullMarked
@@ -33,10 +33,9 @@ public final class PlayerwarpsJoinListener implements Listener {
 
     private final PlayerWarpRepository repository;
     private final Scheduler scheduler;
-    private final Optional<CrossServerArrival> arrival;
+    private final Optional<HopArrival> arrival;
 
-    public PlayerwarpsJoinListener(
-            PlayerWarpRepository repository, Scheduler scheduler, Optional<CrossServerArrival> arrival) {
+    public PlayerwarpsJoinListener(PlayerWarpRepository repository, Scheduler scheduler, Optional<HopArrival> arrival) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.arrival = Objects.requireNonNull(arrival, "arrival");

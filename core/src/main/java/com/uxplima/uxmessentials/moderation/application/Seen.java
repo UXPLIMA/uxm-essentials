@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -22,6 +23,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * DB-backed {@link SeenRecord}; {@code /seenip} renders the last address that record holds and the other accounts
  * that have connected from it. The alt half of {@code /seenip} goes through the shared {@link IpAlts} lookup, so
  * it matches by token against the same rows {@code /alts} and {@code /ipalts} answer from.
+ *
+ * <p>A player connected to another backend is reported as online there: the record's last-seen time only knows
+ * their sessions on this backend and would read as if they were gone.
  */
 public final class Seen {
 
@@ -31,6 +35,7 @@ public final class Seen {
     private final Notifier notifier;
     private final boolean censorIp;
     private final Clock clock;
+    private final LiveTargetCheck live;
 
     public Seen(
             ModerationRepository repository,
@@ -38,19 +43,29 @@ public final class Seen {
             PlayerLookup players,
             Notifier notifier,
             boolean censorIp,
-            Clock clock) {
+            Clock clock,
+            NetworkPresence presence) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ipAlts = Objects.requireNonNull(ipAlts, "ipAlts");
         this.players = Objects.requireNonNull(players, "players");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.censorIp = censorIp;
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.live = new LiveTargetCheck(presence, this.notifier);
     }
 
     /** Report {@code target}'s first-join and last-seen to {@code actor}. */
     public void seen(PlayerRef actor, PlayerRef target) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
+        Optional<String> elsewhere = live.elsewhere(target);
+        if (elsewhere.isPresent()) {
+            notifier.send(
+                    actor,
+                    ModerationMessageKey.SEEN_ONLINE_ELSEWHERE,
+                    Map.of("player", target.name(), "server", elsewhere.get()));
+            return;
+        }
         Optional<SeenRecord> record = repository.seen(target);
         if (record.isEmpty()) {
             notifier.send(actor, ModerationMessageKey.SEEN_NEVER, Map.of("player", target.name()));

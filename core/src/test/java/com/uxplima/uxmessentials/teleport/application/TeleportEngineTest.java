@@ -17,7 +17,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -42,6 +41,7 @@ class TeleportEngineTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final List<String> outcomes = new ArrayList<>();
     private boolean jailed;
+    private boolean tagged;
     private final TeleportEngine engine = new TeleportEngine(
             new ClockCooldowns(CLOCK),
             warmups,
@@ -50,7 +50,7 @@ class TeleportEngineTest {
             new RecordingEvents(),
             new TeleportSettings(new CostOf("50")),
             who -> jailed,
-            CombatGate.NEVER,
+            who -> tagged,
             purse,
             shielded::add);
 
@@ -95,6 +95,60 @@ class TeleportEngineTest {
 
         assertThat(hops.arrived).isEmpty();
         assertThat(outcomes).isEmpty();
+    }
+
+    @Test
+    void aCombatTaggedPlayerIsRefusedTheCrossServerArrivalWithoutAHop() {
+        tagged = true;
+
+        assertThat(arrive().asError()).contains(TeleportError.COMBAT_TAGGED);
+
+        assertThat(hops.arrived).isEmpty();
+        assertThat(outcomes).isEmpty();
+    }
+
+    @Test
+    void aCrossServerArrivalStartsTheCooldownTheOriginChecksForTheNextHop() {
+        assertThat(engine.gateHop(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .isOk())
+                .isTrue();
+
+        arrive();
+
+        assertThat(engine.gateHop(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .asError())
+                .contains(TeleportError.ON_COOLDOWN);
+        assertThat(engine.launch(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .asError())
+                .as("a local warp obeys the cooldown the cross-server landing started")
+                .contains(TeleportError.ON_COOLDOWN);
+    }
+
+    @Test
+    void aCrossServerArrivalThatMissesStartsNoCooldown() {
+        hops.outcome = Hop.MISS;
+
+        arrive();
+
+        assertThat(engine.gateHop(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .isOk())
+                .isTrue();
+    }
+
+    @Test
+    void theHopGateRefusesAJailedOrTaggedPlayerWithTheirNotice() {
+        jailed = true;
+        assertThat(engine.gateHop(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .asError())
+                .contains(TeleportError.JAILED);
+
+        jailed = false;
+        tagged = true;
+        assertThat(engine.gateHop(ALEX, Destination.at(LANDING), TeleportKind.WARP)
+                        .asError())
+                .contains(TeleportError.COMBAT_TAGGED);
+
+        assertThat(notifier.keys()).containsExactly("teleport.jailed", "teleport.combat-tagged");
     }
 
     @Test
