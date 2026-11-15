@@ -42,7 +42,6 @@ import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
@@ -50,6 +49,7 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -506,7 +506,7 @@ public final class WorldGuardImporter {
      * behaviours. {@code names} finds the UUID of a player stored by name; anything not converted goes to the report.
      */
     static Region convert(
-            WgRegion wg, String batch, GuardScope scope, Function<String, @Nullable UUID> names, List<String> report) {
+            WgRegion wg, String batch, ServerScope scope, Function<String, @Nullable UUID> names, List<String> report) {
         String where = wg.world() + ":" + wg.id();
         String id = wg.id().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9_-]", "-");
         boolean global = wg.id().equals("__global__") || wg.type().equals("global");

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.holograms.application.SetHologramLeaderboard;
 import com.uxplima.uxmessentials.holograms.application.SetHologramLine;
 import com.uxplima.uxmessentials.holograms.application.SetHologramModel;
 import com.uxplima.uxmessentials.holograms.application.SetHologramRefresh;
+import com.uxplima.uxmessentials.holograms.application.SetHologramScope;
 import com.uxplima.uxmessentials.holograms.application.SetHologramVisibility;
 import com.uxplima.uxmessentials.holograms.application.TeleportToHologram;
 import com.uxplima.uxmessentials.holograms.application.UnlinkHologramFromNpc;
@@ -70,6 +71,7 @@ import org.jspecify.annotations.NullMarked;
  * @param removePage {@code /hologram page <name> remove}
  * @param listPages {@code /hologram page <name> list}
  * @param growUp {@code /hologram growup}
+ * @param scope {@code /hologram scope}
  * @param blacklist {@code /hologram blacklist|unblacklist}
  * @param addAction {@code /hologram action <name> add}
  * @param insertAction {@code /hologram action <name> add_before|add_after}
@@ -115,7 +117,8 @@ public record HologramServices(
         MoveHologramAction moveAction,
         RemoveHologramAction removeAction,
         ClearHologramActions clearActions,
-        ListHologramActions listActions) {
+        ListHologramActions listActions,
+        SetHologramScope scope) {
 
     public HologramServices {
         Objects.requireNonNull(create, "create");
@@ -153,5 +156,6 @@ public record HologramServices(
         Objects.requireNonNull(removeAction, "removeAction");
         Objects.requireNonNull(clearActions, "clearActions");
         Objects.requireNonNull(listActions, "listActions");
+        Objects.requireNonNull(scope, "scope");
     }
 }

@@ -19,4 +19,10 @@ public interface LinkedNpcLocator {
 
     /** The current position of the NPC named {@code npcName}, or empty when no such NPC exists. */
     Optional<Position> locate(String npcName);
+
+    /**
+     * False when the NPC named {@code npcName} exists and its scope leaves this server out, so a hologram riding it
+     * stays off here too. An unknown name answers true: the hologram then floats at its own location.
+     */
+    boolean shownHere(String npcName);
 }

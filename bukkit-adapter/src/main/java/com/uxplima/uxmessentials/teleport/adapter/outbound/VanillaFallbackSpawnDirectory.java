@@ -9,10 +9,12 @@ import org.bukkit.World;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Wraps the durable {@link SpawnDirectory} (the jOOQ store) with the one piece of knowledge only a live server
@@ -52,8 +54,8 @@ public final class VanillaFallbackSpawnDirectory implements SpawnDirectory {
     }
 
     @Override
-    public Optional<Position> mainSpawn() {
-        return durable.mainSpawn();
+    public Optional<Position> mainSpawn(@Nullable ServerScope scope) {
+        return durable.mainSpawn(scope);
     }
 
     @Override
@@ -77,8 +79,8 @@ public final class VanillaFallbackSpawnDirectory implements SpawnDirectory {
     }
 
     @Override
-    public void setMainSpawn(Position position) {
-        durable.setMainSpawn(position);
+    public void setMainSpawn(@Nullable ServerScope scope, Position position) {
+        durable.setMainSpawn(scope, position);
     }
 
     @Override

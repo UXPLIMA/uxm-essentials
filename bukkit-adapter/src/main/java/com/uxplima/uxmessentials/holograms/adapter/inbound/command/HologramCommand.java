@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
@@ -61,6 +62,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
     private static final String ACTION = "uxmessentials.hologram.action";
     private static final String VIEW = "uxmessentials.hologram.view";
     private static final String EDIT = "uxmessentials.hologram.edit";
+    private static final String SCOPE = "uxmessentials.hologram.scope";
 
     /**
      * Which capability each verb belongs to, so the many verbs of {@code /hologram} are grantable in the shapes an
@@ -105,23 +107,27 @@ public final class HologramCommand extends HologramCommandSupport implements Com
             Map.entry("hide", VISIBILITY),
             Map.entry("blacklist", VISIBILITY),
             Map.entry("unblacklist", VISIBILITY),
+            Map.entry("scope", SCOPE),
             Map.entry("action", ACTION),
             Map.entry("clickcommand", ACTION));
 
     private final Supplier<? extends Collection<String>> hologramNames;
     private final Supplier<? extends Collection<String>> npcNames;
     private final HologramListMenu listMenu;
+    private final Scheduler scheduler;
 
     public HologramCommand(
             HologramServices services,
             Messages messages,
             Supplier<? extends Collection<String>> hologramNames,
             Supplier<? extends Collection<String>> npcNames,
-            HologramListMenu listMenu) {
+            HologramListMenu listMenu,
+            Scheduler scheduler) {
         super(services, messages, hologramNames);
         this.hologramNames = hologramNames;
         this.npcNames = Objects.requireNonNull(npcNames, "npcNames");
         this.listMenu = Objects.requireNonNull(listMenu, "listMenu");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
     }
 
     @Override
@@ -148,6 +154,7 @@ public final class HologramCommand extends HologramCommandSupport implements Com
         verbs.addAll(new HologramNpcCommand(services, messages, hologramNames, npcNames).nodes());
         verbs.addAll(new HologramPageCommand(services, messages, hologramNames).nodes());
         verbs.addAll(new HologramActionCommand(services, messages, hologramNames).nodes());
+        verbs.addAll(new HologramScopeCommand(services, messages, hologramNames, scheduler).nodes());
         for (LiteralArgumentBuilder<CommandSourceStack> verb : verbs) {
             root.then(verb.requires(capability(verb.getLiteral())));
         }

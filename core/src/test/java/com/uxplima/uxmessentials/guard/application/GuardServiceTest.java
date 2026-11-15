@@ -18,7 +18,6 @@ import com.uxplima.uxmessentials.guard.application.port.GuardWorlds;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
@@ -30,6 +29,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.junit.jupiter.api.Test;
 
 /** The guard's use cases over in-memory ports: what an operator does, and what the players then meet. */
@@ -274,15 +274,15 @@ class GuardServiceTest {
 
         assertThat(announced).contains(SPAWN);
         assertThat(breakAt(hub, 5, 5, 5)).isEqualTo(Verdict.UNSET);
-        hub.remoteChanged(GuardScope.server("lobby"), SPAWN);
+        hub.remoteChanged(ServerScope.server("lobby"), SPAWN);
         assertThat(breakAt(hub, 5, 5, 5)).isEqualTo(Verdict.DENY);
     }
 
     @Test
     void withoutAnnouncementsAServerCatchesUpByPolling() {
         GuardService lobby = server("lobby");
-        store.writeFromElsewhere(
-                Region.create(SPAWN, GuardScope.server("lobby"), BOX).withRule(rule("break", "everyone", Effect.DENY)));
+        store.writeFromElsewhere(Region.create(SPAWN, ServerScope.server("lobby"), BOX)
+                .withRule(rule("break", "everyone", Effect.DENY)));
 
         lobby.poll();
 
@@ -292,11 +292,11 @@ class GuardServiceTest {
     @Test
     void aServerIgnoresRegionsOfScopesItDoesNotLoad() {
         GuardService lobby = server("lobby");
-        store.writeFromElsewhere(Region.create(SPAWN, GuardScope.server("survival"), BOX)
+        store.writeFromElsewhere(Region.create(SPAWN, ServerScope.server("survival"), BOX)
                 .withRule(rule("break", "everyone", Effect.DENY)));
 
         lobby.poll();
-        lobby.remoteChanged(GuardScope.server("survival"), SPAWN);
+        lobby.remoteChanged(ServerScope.server("survival"), SPAWN);
 
         assertThat(breakAt(lobby, 5, 5, 5)).isEqualTo(Verdict.UNSET);
     }
@@ -322,10 +322,10 @@ class GuardServiceTest {
     void anImportSkipsNamesThatExistAndItsBatchCanBeRemovedAgain() {
         GuardService service = server("lobby");
         done(service.create(SPAWN, BOX, null, STAFF));
-        Region clash = Region.create(SPAWN, GuardScope.server("lobby"), BOX).withImportBatch("wg-1");
+        Region clash = Region.create(SPAWN, ServerScope.server("lobby"), BOX).withImportBatch("wg-1");
         Region fresh = Region.create(
                         new RegionKey(WORLD, RegionId.of("mine")),
-                        GuardScope.server("lobby"),
+                        ServerScope.server("lobby"),
                         new Shape.Cuboid(Bounds.of(200, 0, 0, 210, 10, 10)))
                 .withImportBatch("wg-1")
                 .withRule(rule("break", "everyone", Effect.DENY));

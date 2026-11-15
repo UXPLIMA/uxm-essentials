@@ -42,7 +42,6 @@ import com.uxplima.uxmessentials.guard.application.port.GuardBackups;
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardSync;
 import com.uxplima.uxmessentials.guard.application.port.GuardWorlds;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
@@ -55,6 +54,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.network.GuardChanged;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -168,7 +168,7 @@ public final class GuardWiring {
                     && !changed.originServer().equals(serverId)) {
                 try {
                     service.remoteChanged(
-                            new GuardScope(changed.scope()),
+                            new ServerScope(changed.scope()),
                             new RegionKey(changed.world(), RegionId.of(changed.region())));
                 } catch (IllegalArgumentException malformed) {
                     warn.accept("ignored a malformed guard change from " + changed.originServer());

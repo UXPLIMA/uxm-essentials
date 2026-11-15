@@ -7,13 +7,14 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Write-through spawn cache. The complete durable set is warmed at enable so command, join and respawn region
@@ -30,7 +31,7 @@ public final class CachedSpawnDirectory implements SpawnDirectory {
     private final ConcurrentHashMap<UUID, Optional<Position>> worlds = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Optional<SpawnMirror>> mirrors = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Optional<Position>> named = new ConcurrentHashMap<>();
-    private final AtomicReference<Optional<Position>> main = new AtomicReference<>();
+    private final ConcurrentHashMap<String, Optional<Position>> mains = new ConcurrentHashMap<>();
     private volatile boolean authoritative;
     // Guards publishing to the maps, so a reload checks for overtaking writes and applies in one step.
     private final Object publish = new Object();
@@ -64,7 +65,7 @@ public final class CachedSpawnDirectory implements SpawnDirectory {
             replace(worlds, snapshot.worlds());
             replace(named, snapshot.named());
             replace(mirrors, snapshot.mirrors());
-            main.set(snapshot.main());
+            replace(mains, snapshot.mains());
             authoritative = true;
         }
     }
@@ -84,7 +85,7 @@ public final class CachedSpawnDirectory implements SpawnDirectory {
     /** Warm every spawn fact needed by automatic join and death handling. */
     public void warm(Collection<WorldRef> loadedWorlds) {
         Objects.requireNonNull(loadedWorlds, "loadedWorlds");
-        mainSpawn();
+        mainSpawn(null);
         loadedWorlds.forEach(world -> {
             operatorSpawn(world);
             mirrorFor(world);
@@ -107,13 +108,13 @@ public final class CachedSpawnDirectory implements SpawnDirectory {
     }
 
     @Override
-    public Optional<Position> mainSpawn() {
-        Optional<Position> current = main.get();
-        if (current != null) {
-            return current;
+    public Optional<Position> mainSpawn(@Nullable ServerScope scope) {
+        String key = SpawnDirectorySnapshot.mainKey(scope);
+        Optional<Position> cached = mains.get(key);
+        if (cached != null || authoritative) {
+            return cached == null ? Optional.empty() : cached;
         }
-        Optional<Position> loaded = delegate.mainSpawn();
-        return main.compareAndSet(null, loaded) ? loaded : Objects.requireNonNull(main.get());
+        return mains.computeIfAbsent(key, ignored -> delegate.mainSpawn(scope));
     }
 
     @Override
@@ -150,9 +151,9 @@ public final class CachedSpawnDirectory implements SpawnDirectory {
     }
 
     @Override
-    public void setMainSpawn(Position position) {
-        delegate.setMainSpawn(position);
-        published(() -> main.set(Optional.of(position)));
+    public void setMainSpawn(@Nullable ServerScope scope, Position position) {
+        delegate.setMainSpawn(scope, position);
+        published(() -> mains.put(SpawnDirectorySnapshot.mainKey(scope), Optional.of(position)));
     }
 
     @Override

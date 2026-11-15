@@ -14,13 +14,13 @@ import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
 import com.uxplima.uxmessentials.guard.domain.Verdict;
 import com.uxplima.uxmessentials.guard.domain.engine.Compiler;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -31,7 +31,7 @@ class WorldGuardImporterTest {
     private static final UUID MEMBER = UUID.fromString("6a1f0e46-0000-4000-8000-000000000002");
     private static final UUID BY_NAME = UUID.fromString("6a1f0e46-0000-4000-8000-000000000003");
     private static final UUID STRANGER = UUID.fromString("6a1f0e46-0000-4000-8000-000000000004");
-    private static final GuardScope SCOPE = GuardScope.server("lobby");
+    private static final ServerScope SCOPE = ServerScope.server("lobby");
     private static final ActionTree TREE = ActionTree.builtIn();
 
     private static final String REGIONS = """

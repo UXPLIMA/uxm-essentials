@@ -91,6 +91,11 @@ final class ContentPermissions {
                         PermissionDefault.TRUE,
                         NPC),
                 PermissionSpec.of(
+                        "uxmessentials.npc.scope",
+                        "/npc scope: choose which servers of the network show an NPC.",
+                        PermissionDefault.TRUE,
+                        NPC),
+                PermissionSpec.of(
                         "uxmessentials.npc.edit",
                         "Every remaining /npc setting (data, state, cooldown, mirror, collidable, showintab, view and turn distance).",
                         PermissionDefault.TRUE,
@@ -143,6 +148,11 @@ final class ContentPermissions {
                 PermissionSpec.of(
                         "uxmessentials.hologram.action",
                         "/hologram action and clickcommand: change what a hologram runs when clicked.",
+                        PermissionDefault.TRUE,
+                        HOLOGRAMS),
+                PermissionSpec.of(
+                        "uxmessentials.hologram.scope",
+                        "/hologram scope: choose which servers of the network show a hologram.",
                         PermissionDefault.TRUE,
                         HOLOGRAMS),
                 PermissionSpec.of(

@@ -54,7 +54,6 @@ import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
 import com.uxplima.uxmessentials.guard.domain.Explanation;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
@@ -71,6 +70,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.Nullable;
 
@@ -910,12 +910,12 @@ public final class GuardCommand implements CommandRegistration {
             return;
         }
         GuardConfig config = service.config();
-        GuardScope scope;
+        ServerScope scope;
         String set = args[1].startsWith("set:") ? args[1].substring(4) : args[1];
         if (args[1].equalsIgnoreCase("server")) {
             scope = config.serverScope();
         } else if (config.sharedSets().contains(set)) {
-            scope = GuardScope.set(set);
+            scope = ServerScope.set(set);
         } else {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_SCOPE, Map.of("scope", args[1]));
             return;

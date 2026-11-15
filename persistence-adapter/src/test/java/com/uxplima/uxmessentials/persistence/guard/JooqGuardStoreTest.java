@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
@@ -31,6 +30,7 @@ import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,8 +40,8 @@ import org.sqlite.SQLiteDataSource;
 /** Regions, history and denials through the real migrations on a SQLite file. */
 class JooqGuardStoreTest {
 
-    private static final GuardScope LOBBY = GuardScope.server("lobby");
-    private static final GuardScope HUB = GuardScope.set("hub");
+    private static final ServerScope LOBBY = ServerScope.server("lobby");
+    private static final ServerScope HUB = ServerScope.set("hub");
     private static final RegionKey SPAWN = new RegionKey("world", RegionId.of("spawn"));
     private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
