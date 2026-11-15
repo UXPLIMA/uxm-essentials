@@ -53,6 +53,8 @@ public final class MessageRunFeedback implements RunFeedback {
             case RunOutcome.WarmupStarted started -> warmupStarted(who, started);
             case RunOutcome.WarmupCancelled ignored ->
                 send(who, CustomCommandsMessageKey.CUSTOMCOMMAND_WARMUP_CANCELLED);
+            case RunOutcome.FeeBackendMissing ignored ->
+                send(who, CustomCommandsMessageKey.CUSTOMCOMMAND_COST_UNAVAILABLE);
             case RunOutcome.CannotAfford cannotAfford ->
                 send(
                         who,

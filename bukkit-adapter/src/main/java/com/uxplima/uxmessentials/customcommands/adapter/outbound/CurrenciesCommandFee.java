@@ -13,9 +13,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * rather than captured once, because the economy module wires after this one: a backend that arrives late is picked
  * up without a restart, the same way a world entry fee resolves its provider lazily.
  *
- * <p>A command priced while no backend answers runs for free. Refusing every priced command instead would turn a
- * disabled economy module into a silent outage across the operator's whole command set, which is harder to notice
- * than a price nobody is charged.
+ * <p>A backend that does not answer is reported through {@link #available()} and never waved through here: whether
+ * such a command runs unpaid or is refused is the operator's {@code on-backend-missing} choice, applied by the use
+ * case.
  */
 public final class CurrenciesCommandFee implements CommandFee {
 
@@ -28,13 +28,17 @@ public final class CurrenciesCommandFee implements CommandFee {
     }
 
     @Override
+    public boolean available() {
+        return provider().available();
+    }
+
+    @Override
     public boolean canAfford(PlayerRef who, double amount) {
         Objects.requireNonNull(who, "who");
         if (amount <= 0) {
             return true;
         }
-        CurrencyProvider provider = provider();
-        return !provider.available() || provider.has(who.uuid(), amount);
+        return provider().has(who.uuid(), amount);
     }
 
     @Override
@@ -43,8 +47,7 @@ public final class CurrenciesCommandFee implements CommandFee {
         if (amount <= 0) {
             return true;
         }
-        CurrencyProvider provider = provider();
-        return !provider.available() || provider.withdraw(who.uuid(), amount);
+        return provider().withdraw(who.uuid(), amount);
     }
 
     @Override

@@ -40,6 +40,9 @@ public enum CustomCommandsMessageKey implements MessageKey {
     /** Gate 8: the player cannot pay; {@code {cost}} is the formatted price. */
     CUSTOMCOMMAND_CANNOT_AFFORD("customcommand.cannot-afford"),
 
+    /** Gate 8: the command has a price, its currency backend is missing and the operator chose to refuse it. */
+    CUSTOMCOMMAND_COST_UNAVAILABLE("customcommand.cost-unavailable"),
+
     /** Header for the command listing; {@code {count}} is how many definitions loaded. */
     CUSTOMCOMMAND_LIST_HEADER("customcommand.list.header"),
 
