@@ -15,7 +15,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.admin.placeholders` | /uxmess placeholders [area] [page] and /uxmess placeholders export: read the placeholder catalogue in game or write it to a file. | op |
 | `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
 | `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
-| `uxmessentials.cooldown.<feature>.<seconds>` | The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait. | true |
+| `uxmessentials.cooldown.<label>.<seconds>` | The wait between uses of one label a menu or custom command names, in seconds; the shortest tier held wins and 0 removes the wait. A built-in feature's wait is its own <feature>.cooldown.<seconds> node. | true |
 | `uxmessentials.bypass.cooldown.<feature>` and `uxmessentials.bypass.cooldown.label.<label>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses or skin), or on one label a menu or custom command names, such as customcommand.<id>. | op |
 | `uxmessentials.bypass.warmup.<feature>` | Start one warmup-gated feature at once, immune to move-cancel: tp or customcommand. | op |
 | `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
@@ -77,6 +77,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.module.customcommands` | Hot-reload / inspect the customcommands module (operator-defined commands behind /customcmd). | op |
 | `uxmessentials.customcommand.admin` | /customcmd to list, inspect, reload, test and run operator-defined commands. | op |
 | `uxmessentials.customcommand.run.others` | /customcmd run <id> <player>: run an operator-defined command for somebody else. | op |
+| `uxmessentials.customcommand.warmup.<seconds>` | The stand-still countdown before an operator-defined command runs, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.bypass.cooldown.customcommand` | Run an operator-defined command without waiting out its cooldown. | op |
 | `uxmessentials.bypass.cost.customcommand` | Run an operator-defined command that costs money without paying for it. | op |
 
@@ -357,6 +358,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.skin.info` | /skin info <player>: which skin somebody wears, from where, and when it was set. | op |
 | `uxmessentials.skin.purge` | /skin purge <name>: forget a cached texture so the next lookup goes back to the source. | op |
 | `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | true |
+| `uxmessentials.skin.cooldown.<seconds>` | The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it. | true |
 
 ## staff
 

@@ -66,6 +66,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 |---|---|---|
 | `uxmessentials.kit.<kit>` | Claim a kit whose file sets permission = true. | true |
 | `uxmessentials.kit.cooldown.<group>` | Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins. | false |
+| `uxmessentials.kit.cooldown.<seconds>` | The wait before a kit can be claimed again, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.bypass.cooldown.kit` | Skip kit cooldowns and re-claim one-time kits. | op |
 | `uxmessentials.kit.edit` | /kit create, /kit del, /kit editor to define, remove and edit kit contents. | op |
 | `uxmessentials.kit.others` | /kit <name> <player> to give a kit to another player. | op |
@@ -194,6 +195,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.poses.gui` | /poses (or /poses gui): open your personal poses settings & status panel. | true |
 | `uxmessentials.poses.toggle` | /poses toggle: allow or refuse other players sitting on you. | true |
 | `uxmessentials.poses.reveal` | /poses reveal <player>: give back a body a pose left unseen. | op |
+| `uxmessentials.poses.cooldown.<seconds>` | The wait between starting poses, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.sit.use` | /sit and right-click-to-sit: sit down where you stand or on a sittable block. | true |
 | `uxmessentials.spin.use` | /spin: sit and spin in place. | true |
 
@@ -237,6 +239,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.rtp.biome` | /rtp biome <biome> to random teleport into a specific biome. | true |
 | `uxmessentials.rtp.gui` | /rtp gui to open the random-teleport world picker. | true |
 | `uxmessentials.rtp.others` | /rtp <player> to force another online player to random teleport (staff). | op |
+| `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp may drop you; the largest tier held wins. | true |
 | `uxmessentials.rtp.use` | /rtp random teleport from the pre-warmed safe-location queue. | true |
 | `uxmessentials.bypass.join-spawn` | Exempt the player from automatic first-join/every-join spawn movement. | false |
@@ -251,6 +254,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.tp.position` | /tppos to teleport to raw coordinates. | op |
 | `uxmessentials.tp.use` | /tp, /tphere, /goto, /bring and /tprandomplayer (/tprp) direct staff teleport. | op |
 | `uxmessentials.tp.vertical` | /top, /bottom, /jump, /up, /down, /ascend, /descend, /thru vertical teleports. | op |
+| `uxmessentials.tp.cooldown.<seconds>` | The wait between teleports, per verb when a verb has its own clock, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.tp.warmup.<seconds>` | The stand-still countdown before a teleport runs, in seconds; the shortest tier held wins and 0 removes it. | true |
 | `uxmessentials.bypass.warmup.tp` | Start teleports with no warmup, immune to move-cancel. | op |
 
