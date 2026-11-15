@@ -2394,6 +2394,10 @@ public final class PluginModule {
                 engine,
                 Optional.ofNullable(links.homeEconomy),
                 bus,
+                links.hops,
+                // Off a network, or under the shipped default name, a backend records no server on its homes.
+                links.network.enabled() && !NetworkConfig.isDefaultServerName(links.network.serverId()),
+                links.presence,
                 guiLayouts,
                 resources,
                 textInput,
@@ -2402,10 +2406,11 @@ public final class PluginModule {
                 claimProviders);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        resources.worldPhase().run("home server claim", wired.serverAdoption());
         // Rebind the teleport context's home-respawn seam (built while it still resolved to empty) to the
         // cache-backed locator, so a HOME step in a configured respawn chain now lands on the player's home.
         // When teleport is disabled its holder is absent and this bind is a no-op.
-        bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository()));
+        bindHomeRespawn(links, new RepositoryHomeRespawnLocator(wired.repository(), wired.elsewhere()));
         resources.onClose(links.importTargets.homes(wired.cache()));
         links.placeholders.homes(new RepositoryHomesPlaceholders(wired.repository(), wired.quota()));
         links.queries.register(

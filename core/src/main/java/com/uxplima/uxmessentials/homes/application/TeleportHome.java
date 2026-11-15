@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -20,6 +21,11 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * player itself, so the shared cooldown, the move-cancellable warmup, and the region-aware async hop are all
  * the teleport context's concern. An empty slot is rejected with {@link HomeError#NOT_FOUND}; an optional
  * economy charge is applied after the home is found but before the hop is handed to the teleport context.
+ *
+ * <p>A home set on another backend, while the homes {@code cross-server} block is on, is handed to the shared
+ * cross-server hop through {@link HomeHops} instead: the teleport rules, then the charge, then the hop that carries
+ * it, so a refused hop costs nothing and a hop that never lands is refunded. Every caller runs this use case on the
+ * async lane, since it reads the store, so the hop's own writes to the shared database stay off the tick too.
  */
 public final class TeleportHome {
 
@@ -27,12 +33,15 @@ public final class TeleportHome {
     private final HomeTeleporter teleporter;
     private final Notifier notifier;
     private final HomeCharge charge;
+    private final HomeHops hops;
 
-    public TeleportHome(HomeRepository repository, HomeTeleporter teleporter, Notifier notifier, HomeCharge charge) {
+    public TeleportHome(
+            HomeRepository repository, HomeTeleporter teleporter, Notifier notifier, HomeCharge charge, HomeHops hops) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.teleporter = Objects.requireNonNull(teleporter, "teleporter");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.charge = Objects.requireNonNull(charge, "charge");
+        this.hops = Objects.requireNonNull(hops, "hops");
     }
 
     /** Teleport {@code who} to the home in {@code slot}, or reject when the slot is empty or the player cannot afford the charge. */
@@ -44,14 +53,26 @@ public final class TeleportHome {
             notifier.send(who, HomeError.NOT_FOUND.messageKey(), slotPlaceholder(slot));
             return Result.err(HomeError.NOT_FOUND);
         }
-        Result<Unit, HomeError> charged = charge.charge(who, HomeChargeKind.TELEPORT);
+        if (hops.routes(home.get())) {
+            return hops.travel(who, home.get(), () -> chargeTeleport(who));
+        }
+        Result<Optional<HomeCost>, HomeError> charged = chargeTeleport(who);
         if (charged.isErr()) {
-            notifier.send(who, HomeError.CANNOT_AFFORD.messageKey());
-            return Result.err(HomeError.CANNOT_AFFORD);
+            return Result.err(charged.errorOrThrow());
         }
         notifier.send(who, HomesMessageKey.HOME_TELEPORTING, slotPlaceholder(slot));
         teleporter.teleportTo(who, home.get());
         return Result.ok();
+    }
+
+    /** Take the teleport cost, telling a player who cannot pay; answers exactly what was taken. */
+    private Result<Optional<HomeCost>, HomeError> chargeTeleport(PlayerRef who) {
+        Result<Optional<HomeCost>, HomeError> charged = charge.chargeExactly(who, HomeChargeKind.TELEPORT);
+        if (charged.isErr()) {
+            notifier.send(who, HomeError.CANNOT_AFFORD.messageKey());
+            return Result.err(HomeError.CANNOT_AFFORD);
+        }
+        return charged;
     }
 
     private static Map<String, String> slotPlaceholder(HomeSlot slot) {

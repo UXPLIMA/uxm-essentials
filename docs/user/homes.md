@@ -75,12 +75,44 @@ and their switches are in the `claims` block of the root `config.conf`.
 A GriefPrevention admin claim has no owner, so it counts as foreign: players set homes there only when an
 administrator has trusted them.
 
+### Homes on other servers
+
+A home remembers the server it was set or relocated on, and its tooltip in the grid and in its menu names that
+server. A server records its name on homes only while the `network` block of `config.conf` is on and
+`network.server-name` is not the shipped `server-1`, so a standalone server never ties its homes to a name it drops
+when it joins a network.
+
+With `cross-server.enabled = true`, a teleport to a home of another server (from the grid, `/home visit` or
+`/home admin <player> tp`) sends the player there through the proxy. The jail, combat and cooldown checks run before
+anything is charged, the teleport cost is taken only once they pass, and it is refunded if the player does not arrive.
+When the owner travels to their own home, the claim access check runs on arrival, and so does the unsafe spot check
+while `confirm-unsafe-teleport` is on: there is nobody to confirm with on arrival, so an unsafe home refuses the
+player, with a refund, unless they hold `uxmessentials.home.bypass.unsafe`. A visit or a staff teleport skips those
+checks, as it does on one server. A respawn at home never changes server; it uses the lowest-slot home of the server
+the player respawns on.
+
+This needs a proxy in front, a shared database, and `network.server-name` in `config.conf` set to the name the proxy
+gives each server. The refund is paid on the server the player reaches, so the economy module must be on there too,
+on every server a home hop can land on. The timings are in the `cross-server` block of the root `config.conf`. With
+the switch off, which is the default, every home is used on the server it is opened from, as before.
+
+Homes from before servers were recorded are claimed on start by the server that has their world loaded. Two servers
+that run a copy of the same world folder share its `uid.dat`, so the first to start claims every home in it; give each
+copy its own `uid.dat`. `/home setserver <from> <to>` moves every home recorded on one server to another, after a
+renamed `network.server-name` or to undo a wrong claim. `unscoped` as the new server clears it, so the server that
+has each home's world claims it again at its next start; it is refused as the old server, since those homes are the
+claim's to take. A home relocated on a server that records no server is cleared the same way.
+
+| Key | Default | Meaning |
+|---|---|---|
+| `cross-server.enabled` | `false` | Sends a player to a home of another server through the proxy. |
+
 ## Commands
 
 | Command | Permission | What it does |
 |---|---|---|
 | `/home` | `uxmessentials.home.use` | Opens the grid of your homes. |
-| `/home visit <player> [slot]` | `uxmessentials.home.visit` | Teleports to another player's public home, or one you were invited to. Without a slot, the first home. |
+| `/home visit <player> [slot]` | `uxmessentials.home.visit` | Teleports to another player's public home, or one you were invited to. Without a slot, the first home. Visiting your own home costs the teleport cost, as from the grid. |
 | `/home invite <player> [slot]` | `uxmessentials.home.invite` | Lets a player visit one of your private homes. |
 | `/home uninvite <player> [slot]` | `uxmessentials.home.invite` | Takes that access back. |
 | `/home admin <player> list` | `uxmessentials.home.admin` | Lists a player's homes. |
@@ -89,9 +121,11 @@ administrator has trusted them.
 | `/home admin <player> del <slot>` | `uxmessentials.home.admin` | Deletes one of their homes. |
 | `/home admin <player> clear` | `uxmessentials.home.admin` | Deletes all of their homes. |
 | `/home admin <player> info <slot>` | `uxmessentials.home.admin` | Shows the details of one home. |
+| `/home setserver <from> <to>` | `uxmessentials.home.setserver` | Moves every home recorded on one server to another, without moving any home. |
 
 Slots in commands count from 1, as in the grid. Other nodes: `uxmessentials.home.icon` (pick an icon, everyone),
-`uxmessentials.home.bypass.unsafe` (no warning before an unsafe teleport, operators).
+`uxmessentials.home.bypass.unsafe` (no warning before an unsafe teleport, and landing at an unsafe home on another
+server, operators).
 
 ## Placeholders
 

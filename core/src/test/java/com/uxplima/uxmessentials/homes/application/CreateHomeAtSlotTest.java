@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
+import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeCost;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
@@ -36,6 +37,7 @@ class CreateHomeAtSlotTest {
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final RecordingEvents events = new RecordingEvents();
     private final Wallet wallet = new Wallet(BigDecimal.ZERO);
+    private Optional<String> recordedServer = Optional.of("lobby");
 
     private CreateHomeAtSlot useCase(List<SethomeGuard> guards, DomainGate gate, HomeChargeSettings costs) {
         return new CreateHomeAtSlot(
@@ -48,7 +50,8 @@ class CreateHomeAtSlotTest {
                 gate,
                 new HomeCharge(permissions, Optional.of(wallet), costs),
                 54,
-                CLOCK);
+                CLOCK,
+                recordedServer);
     }
 
     private CreateHomeAtSlot useCase() {
@@ -64,12 +67,22 @@ class CreateHomeAtSlotTest {
         Result<?, HomeError> result = useCase().create(ALEX, HomeSlot.of(0), at(10, 64, 10));
 
         assertThat(result.isOk()).isTrue();
-        assertThat(homes.findSlot(ALEX, HomeSlot.of(0))).isPresent();
+        assertThat(homes.findSlot(ALEX, HomeSlot.of(0)).flatMap(Home::knownServer))
+                .contains("lobby");
         assertThat(events.published()).hasExactlyElementsOfTypes(HomeCreated.class);
         assertThat(notifier.sent()).singleElement().satisfies(line -> {
             assertThat(line.key()).isEqualTo("home.created");
             assertThat(line.placeholders()).containsEntry("slot", "1");
         });
+    }
+
+    @Test
+    void aBackendThatRecordsNoServerLeavesTheNewHomeForTheClaim() {
+        recordedServer = Optional.empty();
+
+        useCase().create(ALEX, HomeSlot.of(0), at(10, 64, 10));
+
+        assertThat(homes.findSlot(ALEX, HomeSlot.of(0)).orElseThrow().server()).isEmpty();
     }
 
     @Test
@@ -201,6 +214,12 @@ class CreateHomeAtSlotTest {
                 return false;
             }
             balance = balance.subtract(amount);
+            return true;
+        }
+
+        @Override
+        public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+            balance = balance.add(amount);
             return true;
         }
     }

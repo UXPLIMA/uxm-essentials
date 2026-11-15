@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.HomesRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 
 /**
  * The jOOQ-backed {@link HomeRepository} over the generated {@code HOMES} table. Reads rebuild an owner's
@@ -21,6 +22,9 @@ import org.jooq.DSLContext;
  * check never materialises the whole set. A {@code save} upserts on the {@code (owner, slot)} primary key
  * (a re-anchor or label/icon change overwrites the same row) and a delete is a keyed {@code DELETE}.
  * Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ *
+ * <p>A save whose home has no known server leaves the stored server as it is. Such a home was read before its row
+ * was claimed (a cached copy, or one an importer built), and writing it back must not undo the claim.
  */
 public final class JooqHomeRepository extends JooqRepository implements HomeRepository {
 
@@ -99,6 +103,7 @@ public final class JooqHomeRepository extends JooqRepository implements HomeRepo
                 .set(HOMES.PITCH, record.getPitch())
                 .set(HOMES.PUBLIC, record.getPublic())
                 .set(HOMES.UPDATED_AT, record.getUpdatedAt())
+                .set(HOMES.SERVER_ID, DSL.coalesce(DSL.val(record.getServerId(), HOMES.SERVER_ID), HOMES.SERVER_ID))
                 .execute();
     }
 }

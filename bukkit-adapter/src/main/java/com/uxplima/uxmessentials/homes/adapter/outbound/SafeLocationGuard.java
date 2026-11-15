@@ -7,6 +7,7 @@ import org.bukkit.Server;
 import org.bukkit.World;
 import org.bukkit.block.Block;
 
+import com.uxplima.uxmessentials.homes.application.port.HomeSafetyChecker;
 import com.uxplima.uxmessentials.homes.application.port.SethomeGuard;
 import com.uxplima.uxmessentials.homes.domain.HomeError;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
@@ -32,7 +33,7 @@ import org.jspecify.annotations.NullMarked;
  * where a Bukkit block read would be illegal on Folia and unsafe on Paper).
  */
 @NullMarked
-public final class SafeLocationGuard implements SethomeGuard {
+public final class SafeLocationGuard implements SethomeGuard, HomeSafetyChecker {
 
     private final Server server;
     private final boolean blockUnsafe;
@@ -73,6 +74,7 @@ public final class SafeLocationGuard implements SethomeGuard {
      * flow) can invoke the detection logic independently. Must be called on the region thread that
      * owns {@code at}: it reads {@code World.getBlockAt(...)}.
      */
+    @Override
     public boolean isUnsafe(Position at) {
         Objects.requireNonNull(at, "at");
         World world = server.getWorld(at.world().uid());

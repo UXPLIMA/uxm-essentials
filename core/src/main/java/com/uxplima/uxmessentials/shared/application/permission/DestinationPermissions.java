@@ -39,7 +39,7 @@ final class DestinationPermissions {
                         HOMES),
                 PermissionSpec.of(
                         "uxmessentials.home.bypass.unsafe",
-                        "Skip the unsafe-destination confirm when teleporting to a home via the GUI.",
+                        "Skip the unsafe-destination confirm when teleporting to a home via the GUI, and land at an unsafe home on another server.",
                         PermissionDefault.OP,
                         HOMES),
                 PermissionSpec.of(
@@ -57,6 +57,11 @@ final class DestinationPermissions {
                         "How many homes you may keep; the largest tier held wins.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
+                        HOMES),
+                PermissionSpec.of(
+                        "uxmessentials.home.setserver",
+                        "/home setserver <from> <to> to move every home recorded on one server to another without moving any.",
+                        PermissionDefault.OP,
                         HOMES),
                 PermissionSpec.of(
                         "uxmessentials.home.use",

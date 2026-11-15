@@ -6,6 +6,7 @@ import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeListMenu;
 import com.uxplima.uxmessentials.homes.adapter.outbound.api.HomeApiWrites;
 import com.uxplima.uxmessentials.homes.application.HomeAdmin;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
+import com.uxplima.uxmessentials.homes.application.SetHomeServer;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.application.VisitHome;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
@@ -29,6 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * @param players name → ref resolution for the admin form and the visit/invite targets (offline-capable)
  * @param repository the home store, held only so the PlaceholderAPI seam can read it without blocking
  * @param apiWrites the free-of-charge use cases the published developer API runs
+ * @param setHomeServer the {@code /home setserver} use case
  */
 @NullMarked
 public record HomeServices(
@@ -39,7 +41,8 @@ public record HomeServices(
         UninviteFromHome uninviteFromHome,
         PlayerLookup players,
         HomeRepository repository,
-        HomeApiWrites apiWrites) {
+        HomeApiWrites apiWrites,
+        SetHomeServer setHomeServer) {
 
     public HomeServices {
         Objects.requireNonNull(homeList, "homeList");
@@ -50,5 +53,6 @@ public record HomeServices(
         Objects.requireNonNull(players, "players");
         Objects.requireNonNull(repository, "repository");
         Objects.requireNonNull(apiWrites, "apiWrites");
+        Objects.requireNonNull(setHomeServer, "setHomeServer");
     }
 }

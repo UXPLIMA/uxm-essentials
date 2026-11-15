@@ -77,6 +77,7 @@ public final class HomeListMenu {
     private final int unlimitedMax;
     private final DateTimeFormatter dateFormat;
     private final OpenAction openAction;
+    private final String localServer;
 
     public HomeListMenu(
             Menus menus,
@@ -92,7 +93,8 @@ public final class HomeListMenu {
             HomeListLayout layout,
             int unlimitedMax,
             DateTimeFormatter dateFormat,
-            OpenAction openAction) {
+            OpenAction openAction,
+            String localServer) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -110,6 +112,7 @@ public final class HomeListMenu {
         this.unlimitedMax = unlimitedMax;
         this.dateFormat = Objects.requireNonNull(dateFormat, "dateFormat");
         this.openAction = Objects.requireNonNull(openAction, "openAction");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
     /** Register the bindings the spec names and the spec itself; called once at homes wiring time. */
@@ -274,6 +277,8 @@ public final class HomeListMenu {
     private Map<String, String> filledLore(Home home) {
         return Map.of(
                 "world", home.location().world().name(),
+                // A home of unknown server is used on this one, so that is the server it shows.
+                "server", home.knownServer().orElse(localServer),
                 "x", Integer.toString(home.location().blockX()),
                 "y", Integer.toString(home.location().blockY()),
                 "z", Integer.toString(home.location().blockZ()),
