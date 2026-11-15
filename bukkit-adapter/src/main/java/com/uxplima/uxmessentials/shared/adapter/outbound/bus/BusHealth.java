@@ -43,8 +43,9 @@ public interface BusHealth {
      * @param registered whether the plugin-messaging channel is registered, false until the bus starts
      * @param lastAnswerMillis when a frame last arrived through the proxy broker, in epoch milliseconds, empty
      *     when none has since the bus started
+     * @param waitingForPlayer whether the last attempt to send found nobody online on this backend to carry frames
      */
-    record ProxyLink(boolean registered, OptionalLong lastAnswerMillis) {
+    record ProxyLink(boolean registered, OptionalLong lastAnswerMillis, boolean waitingForPlayer) {
 
         public ProxyLink {
             Objects.requireNonNull(lastAnswerMillis, "lastAnswerMillis");
