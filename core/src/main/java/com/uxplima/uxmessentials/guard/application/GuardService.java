@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.guard.application.port.GuardWorlds;
 import com.uxplima.uxmessentials.guard.domain.ActionId;
 import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
@@ -34,6 +33,7 @@ import com.uxplima.uxmessentials.guard.domain.engine.GuardSnapshot;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -184,7 +184,7 @@ public final class GuardService {
 
     /** Create a region; refused when the id is taken in that world. */
     public CompletableFuture<Result<Region, GuardError>> create(
-            RegionKey key, Shape shape, @Nullable GuardScope scope, EditContext ctx) {
+            RegionKey key, Shape shape, @Nullable ServerScope scope, EditContext ctx) {
         return run(() -> {
             synchronized (lock) {
                 if (worlds.height(key.world()).isEmpty()) {
@@ -401,7 +401,7 @@ public final class GuardService {
     }
 
     /** A peer changed a region: read it again and recompile its world. */
-    public void remoteChanged(GuardScope scope, RegionKey key) {
+    public void remoteChanged(ServerScope scope, RegionKey key) {
         if (!config.loadedScopes().contains(scope)) {
             return;
         }
@@ -525,7 +525,7 @@ public final class GuardService {
     }
 
     private void loadLocked() {
-        Set<GuardScope> scopes = Set.copyOf(config.loadedScopes());
+        Set<ServerScope> scopes = Set.copyOf(config.loadedScopes());
         try {
             List<Region> loaded = store.load(scopes);
             stamp = store.stamp(scopes);

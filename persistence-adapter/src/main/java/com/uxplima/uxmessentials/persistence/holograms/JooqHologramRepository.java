@@ -349,6 +349,7 @@ public final class JooqHologramRepository extends JooqRepository implements Holo
                 .set(HOLOGRAMS.LEADERBOARD_PROVIDER, record.getLeaderboardProvider())
                 .set(HOLOGRAMS.LEADERBOARD_LIMIT, record.getLeaderboardLimit())
                 .set(HOLOGRAMS.GROW_UP, record.getGrowUp())
+                .set(HOLOGRAMS.SCOPE, record.getScope())
                 .execute();
     }
 

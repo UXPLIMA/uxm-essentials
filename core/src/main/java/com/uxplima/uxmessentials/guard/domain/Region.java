@@ -9,6 +9,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -31,7 +32,7 @@ import org.jspecify.annotations.Nullable;
  */
 public record Region(
         RegionKey key,
-        GuardScope scope,
+        ServerScope scope,
         Shape shape,
         int priority,
         @Nullable RegionId parent,
@@ -58,7 +59,7 @@ public record Region(
     }
 
     /** A new region with nothing set. */
-    public static Region create(RegionKey key, GuardScope scope, Shape shape) {
+    public static Region create(RegionKey key, ServerScope scope, Shape shape) {
         return new Region(
                 key, scope, shape, 0, null, null, null, Set.of(), false, List.of(), Behaviours.empty(), Map.of(), null);
     }
@@ -93,7 +94,7 @@ public record Region(
                 importBatch);
     }
 
-    public Region withScope(GuardScope newScope) {
+    public Region withScope(ServerScope newScope) {
         return new Region(
                 key,
                 newScope,

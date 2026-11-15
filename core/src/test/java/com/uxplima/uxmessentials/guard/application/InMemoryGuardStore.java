@@ -12,10 +12,10 @@ import java.util.Set;
 
 import com.uxplima.uxmessentials.guard.application.port.GuardStore;
 import com.uxplima.uxmessentials.guard.application.port.GuardStoreException;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.HistoryEntry;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionKey;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /** A guard store in memory, shared by the "servers" of a test the way a database would be. */
@@ -29,7 +29,7 @@ final class InMemoryGuardStore implements GuardStore {
     boolean failWrite;
 
     @Override
-    public synchronized List<Region> load(Set<GuardScope> scopes) {
+    public synchronized List<Region> load(Set<ServerScope> scopes) {
         if (failLoad) {
             throw new GuardStoreException("database is down", new IllegalStateException());
         }
@@ -37,7 +37,7 @@ final class InMemoryGuardStore implements GuardStore {
     }
 
     @Override
-    public synchronized Optional<Region> find(GuardScope scope, RegionKey key) {
+    public synchronized Optional<Region> find(ServerScope scope, RegionKey key) {
         return Optional.ofNullable(regions.get(key)).filter(r -> r.scope().equals(scope));
     }
 
@@ -78,7 +78,7 @@ final class InMemoryGuardStore implements GuardStore {
     }
 
     @Override
-    public synchronized long stamp(Set<GuardScope> scopes) {
+    public synchronized long stamp(Set<ServerScope> scopes) {
         return stamp;
     }
 

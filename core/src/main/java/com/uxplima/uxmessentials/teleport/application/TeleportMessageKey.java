@@ -73,6 +73,8 @@ public enum TeleportMessageKey implements MessageKey {
     SPAWN_SET("teleport.spawn.set"),
     SPAWN_UNRESOLVED("teleport.spawn.unresolved"),
     SPAWN_MAIN_SET("teleport.spawn.main-set"),
+    SPAWN_MAIN_SET_SCOPED("teleport.spawn.main-set-scoped"),
+    SPAWN_SCOPE_INVALID("teleport.spawn.scope-invalid"),
     SPAWN_REMOVED("teleport.spawn.removed"),
     SPAWN_REMOVE_NONE("teleport.spawn.remove-none"),
     SPAWN_MIRRORED("teleport.spawn.mirrored"),
