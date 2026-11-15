@@ -109,6 +109,17 @@ class OpenVaultTest {
     }
 
     @Test
+    void aCreateThatThrowsAfterStoringTheVaultKeepsTheMoneyAndOpensIt() {
+        store.failNextCreateAfterWriting();
+
+        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow();
+
+        assertThat(purse.moves()).containsExactly("-12");
+        assertThat(opened.id()).isEqualTo(VaultId.of(ALEX, 1));
+        assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().paid()).isPresent();
+    }
+
+    @Test
     void aResizingOpenOfAVaultDeletedMeanwhileFailsAndGivesTheOpenFeeBack() {
         vaults.put(Vault.allocate(VaultId.of(ALEX, 1), new VaultSize(1), NOW));
         store.beforeNextUpdate(() -> store.delete(VaultId.of(ALEX, 1), Optional.empty()));

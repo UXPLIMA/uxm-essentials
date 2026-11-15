@@ -48,10 +48,9 @@ public final class SaveVault {
     }
 
     /**
-     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a window whose items
-     * have nowhere else to go: a staff window (the staff member is not the owner the items belong to) and a
-     * window still open when the module stops (there is no player to hand them to). A vault this brings back
-     * records no payment, so deleting it again refunds nothing.
+     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window: the
+     * staff member is not the owner the items belong to, and it is how staff fill a vault the owner has not opened
+     * yet. A vault this brings back records no payment, so deleting it again refunds nothing.
      */
     public void keep(PlayerRef owner, Vault vault, VaultContents newContents) {
         Objects.requireNonNull(owner, "owner");

@@ -5,7 +5,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -206,5 +208,34 @@ class VaultPaymentStoreTest {
                 Vault.allocate(vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("1.23459"), "coins")));
 
         assertThat(stored(1).paid().orElseThrow().amount()).isEqualByComparingTo("1.2345");
+    }
+
+    @Test
+    void aFractionalPaymentReadBackFromTheStoreDeletesTheRow() {
+        upgrade();
+        vaults.create(
+                Vault.allocate(vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("1.2345"), "coins")));
+
+        Optional<VaultPayment> read = vaults.find(vault(1)).orElseThrow().paid();
+
+        assertThat(read.orElseThrow().amount()).isEqualByComparingTo("1.2345");
+        assertThat(vaults.delete(vault(1), read)).isTrue();
+        assertThat(vaults.find(vault(1))).isEmpty();
+    }
+
+    @Test
+    void keptItemsAreHandedOutOnceInTheOrderTheyWereKept() {
+        upgrade();
+        JooqVaultItemReturns earlier = new JooqVaultItemReturns(dsl, Clock.fixed(NOW, ZoneOffset.UTC));
+        JooqVaultItemReturns returns = new JooqVaultItemReturns(dsl, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC));
+        VaultContents first = VaultContents.of(new byte[] {1, 2});
+        VaultContents second = VaultContents.of(new byte[] {3});
+        returns.keep(ALEX.uuid(), second);
+        earlier.keep(ALEX.uuid(), first);
+        returns.keep(ALEX.uuid(), VaultContents.empty());
+
+        assertThat(returns.takeAll(UUID.randomUUID())).isEmpty();
+        assertThat(returns.takeAll(ALEX.uuid())).containsExactly(first, second);
+        assertThat(returns.takeAll(ALEX.uuid())).isEmpty();
     }
 }

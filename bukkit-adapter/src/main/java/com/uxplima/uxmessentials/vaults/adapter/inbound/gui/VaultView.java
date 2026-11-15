@@ -3,8 +3,7 @@ package com.uxplima.uxmessentials.vaults.adapter.inbound.gui;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.Optional;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
@@ -21,7 +20,9 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
+import com.uxplima.uxmessentials.vaults.application.CloseVaultWindow;
 import com.uxplima.uxmessentials.vaults.application.SaveVault;
+import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.application.VaultsMessageKey;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
@@ -48,8 +49,8 @@ import org.jspecify.annotations.Nullable;
  * same stored row and write its own snapshot back on close, and the later close would restore whatever the
  * earlier viewer had already taken out, duplicating it. The second opener is refused with
  * {@code VAULT_ALREADY_OPEN} and the slot frees again the moment the first window closes or is flushed. The
- * viewer already holding the vault is not a second viewer: they may re-open it, and their outgoing window is
- * written back first.
+ * viewer already holding the vault is not a second viewer: they may re-open it, and the new window takes over the
+ * outgoing window's live items instead of the stored row, so only one copy of them exists ({@link VaultWindows}).
  *
  * <p>The {@link VaultItemPolicy} blacklist is enforced on close: an item whose material is blocked is removed
  * from the vault and returned to the closer (added to their inventory, overflow dropped at their feet), so a
@@ -68,14 +69,10 @@ import org.jspecify.annotations.Nullable;
  * safely with the player, no loss, no dupe. When staff open another player's vault the overflow returns to the
  * staff opener, consistent with the blacklist's admin semantics.
  *
- * <p>A vault deleted while its window is open stays deleted. The owner's own window writes back with an update
- * only, and when the row is gone the items still in the window go back to the player who closed it (inventory
- * first, the rest dropped at their feet) with one {@code VAULT_DELETED_RETURNED} notice. Bringing the row back
- * would hand the player a vault they had already been refunded for, or undo a staff delete. Two windows keep
- * the upsert instead, because the items have nowhere else to go: a staff window (the staff member is not the
- * owner the items belong to, and it is how staff fill a vault the owner has not opened yet) and a window still
- * open when the module stops, or whose closer left before the items could be handed back. A vault brought back
- * that way records no payment, so deleting it again refunds nothing.
+ * <p>A vault deleted while its window is open stays deleted. Closing the window goes through
+ * {@link CloseVaultWindow}: the owner's own window writes back with an update only, and when the row is gone the
+ * items still in the window go back to the owner through the {@code VaultItemHandBack} (their live inventory, or kept
+ * for their next join), never into a recreated row. Only a staff window keeps the upsert.
  *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
@@ -91,16 +88,18 @@ public final class VaultView {
     private final Messages messages;
     private final MessageSink sink;
     private final SaveVault saveVault;
+    private final CloseVaultWindow closeWindow;
     private final Scheduler scheduler;
     private final Permissions permissions;
     private final VaultItemPolicy itemPolicy;
     private final @Nullable Sound openSound;
-    private final Map<VaultKey, OpenWindow> open = new ConcurrentHashMap<>();
+    private final VaultWindows<StorageGui> windows = new VaultWindows<>();
 
     public VaultView(
             Messages messages,
             MessageSink sink,
             SaveVault saveVault,
+            CloseVaultWindow closeWindow,
             Scheduler scheduler,
             Permissions permissions,
             VaultItemPolicy itemPolicy,
@@ -108,6 +107,7 @@ public final class VaultView {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
         this.saveVault = Objects.requireNonNull(saveVault, "saveVault");
+        this.closeWindow = Objects.requireNonNull(closeWindow, "closeWindow");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.itemPolicy = Objects.requireNonNull(itemPolicy, "itemPolicy");
@@ -129,50 +129,30 @@ public final class VaultView {
                 .title(title(viewer, owner, vault.index()))
                 .rows(size / 9)
                 .build();
-        VaultKey key = new VaultKey(owner.uuid(), vault.index());
-        OpenWindow window = new OpenWindow(viewer.uuid(), owner, vault, gui);
         // Claim the vault before anything is shown or written. A vault open twice at once would be seeded twice
         // from the same row and written back twice on close, so the later close would restore what the earlier
-        // viewer had already taken out: an item dupe. Only the viewer already holding it may re-open it.
-        OpenWindow[] displaced = new OpenWindow[1];
-        // The mapping function only swaps references, so no I/O runs while the map's bin is held.
-        OpenWindow holder = open.compute(key, (ignored, current) -> {
-            if (current == null) {
-                return window;
-            }
-            if (!current.viewer().equals(viewer.uuid())) {
-                return current;
-            }
-            displaced[0] = current;
-            return window;
-        });
-        if (holder != window) {
+        // viewer had already taken out: an item dupe. Only the viewer already holding it may re-open it, and then
+        // the new window starts from their old window's live items, which is never written back on its own.
+        Optional<VaultContents> seed =
+                windows.claim(viewer, owner, vault, gui, retired -> takeOver(player, viewer, retired));
+        if (seed.isEmpty()) {
             notifyAlreadyOpen(viewer, vault.index());
             return;
         }
-        OpenWindow retired = displaced[0];
-        if (retired != null) {
-            // The same viewer re-opening: write their outgoing window back (blacklist and all) before the new
-            // one takes over, exactly as its close handler would have.
-            returnBlockedItems(player, viewer, retired.gui());
-            persistClosed(retired, player);
-        }
-        // Decode the full stored contents so a slot beyond the (possibly shrunken) live size is visible: the
-        // first `size` slots seed the GUI, any occupied overflow slot is rescued back to the opener.
-        ItemStack[] stored = VaultItemCodec.decodeAll(vault.contents());
+        // Decode the full contents so a slot beyond the (possibly shrunken) live size is visible: the first `size`
+        // slots seed the GUI, any occupied overflow slot is rescued back to the opener.
+        ItemStack[] stored = VaultItemCodec.decodeAll(seed.get());
         gui.setContents(stored);
         int rescued = rescueOverflow(player, viewer, stored, size);
         if (rescued > 0) {
             // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
             // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
-            persistOpen(window);
+            persistOpen(owner, vault, gui);
         }
-        gui.onClose(event -> {
-            if (open.remove(key, window)) {
-                returnBlockedItems(event.getPlayer(), viewer, gui);
-                persistClosed(window, event.getPlayer() instanceof Player closer ? closer : null);
-            }
-        });
+        gui.onClose(event -> windows.release(vault.id(), gui).ifPresent(window -> {
+            returnBlockedItems(event.getPlayer(), viewer, gui);
+            persistClosed(window);
+        }));
         gui.open(player);
         playOpenSound(player);
     }
@@ -213,16 +193,24 @@ public final class VaultView {
 
     /** Save every still-open vault and forget it; called on module stop so none is lost on disable. */
     public void flushAll() {
-        for (Map.Entry<VaultKey, OpenWindow> entry : Map.copyOf(open).entrySet()) {
-            if (open.remove(entry.getKey(), entry.getValue())) {
-                persistClosed(entry.getValue(), null);
-            }
-        }
+        windows.releaseAll().forEach(this::persistClosed);
     }
 
     /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
     public int openCount() {
-        return open.size();
+        return windows.count();
+    }
+
+    /**
+     * Take over the viewer's outgoing window {@code retired}: its blacklisted items go back to the player as its
+     * close would have done, the rest become the new window's items, and the old window is emptied so no copy of them
+     * stays behind in it.
+     */
+    private VaultContents takeOver(Player player, PlayerRef viewer, StorageGui retired) {
+        returnBlockedItems(player, viewer, retired);
+        VaultContents live = VaultItemCodec.encode(retired.contents());
+        retired.getInventory().clear();
+        return live;
     }
 
     /**
@@ -289,54 +277,15 @@ public final class VaultView {
      * Write back a window that is still open. A vault deleted meanwhile is left deleted and nothing else happens:
      * the items are still in the window, and its close hands them back.
      */
-    private void persistOpen(OpenWindow window) {
-        VaultContents contents = VaultItemCodec.encode(window.gui().contents());
-        scheduler.async(() -> saveVault.save(window.owner(), window.vault(), contents));
+    private void persistOpen(PlayerRef owner, Vault vault, StorageGui gui) {
+        VaultContents contents = VaultItemCodec.encode(gui.contents());
+        scheduler.async(() -> saveVault.save(owner, vault, contents));
     }
 
-    /**
-     * Write back a window that has closed, {@code closer} being the live player who closed it, or {@code null}
-     * when there is none (module stop). See the class doc for when a deleted vault is kept instead.
-     */
-    private void persistClosed(OpenWindow window, @Nullable Player closer) {
-        VaultContents contents = VaultItemCodec.encode(window.gui().contents());
-        PlayerRef owner = window.owner();
-        Vault vault = window.vault();
-        if (closer == null || !window.viewer().equals(owner.uuid())) {
-            scheduler.async(() -> saveVault.keep(owner, vault, contents));
-            return;
-        }
-        scheduler.async(() -> {
-            if (saveVault.save(owner, vault, contents)) {
-                return;
-            }
-            // The closer may have left by now; then there is no one to hand the items to, so they are kept in
-            // the vault rather than lost.
-            scheduler.onEntity(
-                    owner,
-                    () -> returnDeletedVault(closer, owner, vault.index(), contents),
-                    () -> scheduler.async(() -> saveVault.keep(owner, vault, contents)));
-        });
-    }
-
-    /** Hand the items of a window whose vault was deleted while it was open back to {@code closer}. */
-    private void returnDeletedVault(Player closer, PlayerRef owner, int index, VaultContents contents) {
-        int returned = 0;
-        for (ItemStack stack : VaultItemCodec.decodeAll(contents)) {
-            if (stack == null || stack.getType().isAir()) {
-                continue;
-            }
-            returnToPlayer(closer, stack);
-            returned += stack.getAmount();
-        }
-        if (returned > 0) {
-            sink.deliver(
-                    owner,
-                    messages.resolve(
-                            owner,
-                            VaultsMessageKey.VAULT_DELETED_RETURNED,
-                            Map.of("index", Integer.toString(index), "count", Integer.toString(returned))));
-        }
+    /** Write back a window that has closed, or that is still open when the module stops. */
+    private void persistClosed(VaultWindows.Window<StorageGui> window) {
+        VaultContents contents = VaultItemCodec.encode(window.window().contents());
+        scheduler.async(() -> closeWindow.close(window.viewer(), window.owner(), window.vault(), contents));
     }
 
     private Component title(PlayerRef viewer, PlayerRef owner, int index) {
@@ -348,21 +297,5 @@ public final class VaultView {
         // Centred and bare, like every other window title: a vault is a real container, so it does not pass through
         // the menu engine that would otherwise do it.
         return StyledText.title(messages.resolve(viewer, key, placeholders));
-    }
-
-    /** The identity of a vault as a window slot: one owner's numbered vault, open in at most one window. */
-    private record VaultKey(UUID owner, int index) {
-        VaultKey {
-            Objects.requireNonNull(owner, "owner");
-        }
-    }
-
-    private record OpenWindow(UUID viewer, PlayerRef owner, Vault vault, StorageGui gui) {
-        OpenWindow {
-            Objects.requireNonNull(viewer, "viewer");
-            Objects.requireNonNull(owner, "owner");
-            Objects.requireNonNull(vault, "vault");
-            Objects.requireNonNull(gui, "gui");
-        }
     }
 }

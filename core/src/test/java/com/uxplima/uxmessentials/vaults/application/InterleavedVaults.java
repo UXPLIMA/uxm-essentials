@@ -23,6 +23,7 @@ final class InterleavedVaults implements VaultRepository {
     private @Nullable Runnable beforeCreate;
     private @Nullable Runnable beforeUpdate;
     private boolean createFails;
+    private boolean createFailsAfterWriting;
 
     InterleavedVaults(InMemoryVaults rows) {
         this.rows = rows;
@@ -46,6 +47,11 @@ final class InterleavedVaults implements VaultRepository {
     /** Make the next create throw, as a lost database connection does. */
     void failNextCreate() {
         createFails = true;
+    }
+
+    /** Make the next create store its row and then throw, as a connection lost while the commit was answered does. */
+    void failNextCreateAfterWriting() {
+        createFailsAfterWriting = true;
     }
 
     @Override
@@ -94,7 +100,12 @@ final class InterleavedVaults implements VaultRepository {
             createFails = false;
             throw new IllegalStateException("the database went away");
         }
-        return rows.create(vault);
+        boolean created = rows.create(vault);
+        if (createFailsAfterWriting) {
+            createFailsAfterWriting = false;
+            throw new IllegalStateException("the database went away after the commit");
+        }
+        return created;
     }
 
     @Override

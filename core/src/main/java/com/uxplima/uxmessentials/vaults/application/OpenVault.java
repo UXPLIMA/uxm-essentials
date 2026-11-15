@@ -101,9 +101,7 @@ public final class OpenVault {
         try {
             created = repository.create(allocated);
         } catch (RuntimeException failure) {
-            // The money left but no vault was stored: give it back before the failure goes up.
-            charge.giveBack(owner, paid.taken());
-            throw failure;
+            return afterFailedCreate(owner, allocated, paid, size, failure);
         }
         if (created) {
             return Result.ok(allocated);
@@ -115,5 +113,30 @@ public final class OpenVault {
                 .find(id)
                 .map(stored -> Result.<Vault, VaultError>ok(stored.openedAt(size)))
                 .orElseGet(() -> Result.err(VaultError.VAULT_UNKNOWN));
+    }
+
+    /**
+     * A create that threw may still have committed. Give the money back only when no row exists at the vault's id:
+     * refunding a vault that was stored with its payment would let its delete refund it a second time. A row that is
+     * there is opened instead. It cannot be told apart from this open's own row by its payment (the column rounds an
+     * amount finer than four places), and both are the same owner's vault at the same index, so treating it as paid
+     * for by this open can at worst cost this owner the second fee, never create money. When even the check fails,
+     * nothing is refunded for the same reason, and the original failure goes up.
+     */
+    private Result<Vault, VaultError> afterFailedCreate(
+            PlayerRef owner, Vault allocated, VaultCharge.Allocation paid, VaultSize size, RuntimeException failure) {
+        Optional<Vault> stored;
+        try {
+            stored = repository.find(allocated.id());
+        } catch (RuntimeException unreadable) {
+            failure.addSuppressed(unreadable);
+            throw failure;
+        }
+        if (stored.isPresent()) {
+            return Result.ok(stored.get().openedAt(size));
+        }
+        // The money left but no vault was stored: give it back before the failure goes up.
+        charge.giveBack(owner, paid.taken());
+        throw failure;
     }
 }
