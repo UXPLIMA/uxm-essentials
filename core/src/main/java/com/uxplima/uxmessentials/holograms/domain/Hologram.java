@@ -4,7 +4,9 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import org.jspecify.annotations.Nullable;
 
@@ -51,6 +53,7 @@ import org.jspecify.annotations.Nullable;
  *     downward (the anchor is the top)
  * @param actions the ordered click-action chain a click runs (parity with the NPC action list), copied defensively
  *     and defaulting to empty; never null
+ * @param scope the servers that show the hologram, or null when every server of the network shows it
  */
 public record Hologram(
         HologramName name,
@@ -66,7 +69,8 @@ public record Hologram(
         @Nullable LeaderboardSpec leaderboard,
         @Nullable List<HologramPage> pages,
         boolean growUp,
-        List<ClickAction> actions) {
+        List<ClickAction> actions,
+        @Nullable ServerScope scope) {
 
     /** A refresh interval of 0 means "static": render once on enable, never re-render. */
     public static final int STATIC = 0;
@@ -140,7 +144,8 @@ public record Hologram(
                 null,
                 null,
                 false,
-                List.of());
+                List.of(),
+                null);
     }
 
     /**
@@ -186,7 +191,8 @@ public record Hologram(
                 null,
                 null,
                 false,
-                List.of());
+                List.of(),
+                null);
     }
 
     // --- Content accessors (delegated, so existing call sites are unchanged) ---
@@ -223,6 +229,11 @@ public record Hologram(
     /** Whether this hologram re-renders on a cadence (a positive interval), rather than rendering once. */
     public boolean refreshes() {
         return refreshIntervalTicks > STATIC;
+    }
+
+    /** Whether the hologram is shown on the server {@code local}; a hologram with no scope shows everywhere. */
+    public boolean shownOn(LocalServer local) {
+        return local.covers(scope);
     }
 
     /** Whether this hologram follows an NPC rather than anchoring to its own stored location. */
@@ -331,6 +342,14 @@ public record Hologram(
      */
     public Hologram withGrowUp(boolean grow) {
         return toBuilder().growUp(grow).build();
+    }
+
+    /**
+     * A copy shown only on the servers {@code newScope} names, or on every server when it is {@code null}. Backs
+     * {@code /hologram scope}.
+     */
+    public Hologram withScope(@Nullable ServerScope newScope) {
+        return toBuilder().scope(newScope).build();
     }
 
     /** A copy with {@code action} appended to the end of the click-action chain, keeping everything else. */

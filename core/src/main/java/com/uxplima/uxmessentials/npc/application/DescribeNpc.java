@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
@@ -56,6 +57,10 @@ public final class DescribeNpc {
         notifier.send(viewer, NpcMessageKey.NPC_INFO_FLAGS, flags(npc));
         notifier.send(viewer, NpcMessageKey.NPC_INFO_RANGES, ranges(npc));
         notifier.send(viewer, NpcMessageKey.NPC_INFO_BEHAVIOR, behavior(npc));
+        ServerScope scope = npc.scope();
+        if (scope != null) {
+            notifier.send(viewer, NpcMessageKey.NPC_INFO_SCOPE, Map.of("scope", scope.value()));
+        }
     }
 
     private static Map<String, String> location(Position at) {

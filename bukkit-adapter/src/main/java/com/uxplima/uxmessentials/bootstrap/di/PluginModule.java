@@ -1220,7 +1220,9 @@ public final class PluginModule {
         CrossServerHops hops = HopWiring.wire(
                 plugin, config, kernel, persistence, bus.publisher().serverId());
         resources.addListener(hops.arrivalListener());
-        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets);
+        NetworkConfig network =
+                NetworkConfig.from(config, problem -> kernel.log().warn("event=network_config_problem {}", problem));
+        ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets, network);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
         links.livePeers = livePeers;
@@ -2232,6 +2234,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 guiLayouts,
                 guiRegistry,
                 menus,
@@ -3200,6 +3203,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 leaderboards,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
@@ -3218,7 +3222,7 @@ public final class PluginModule {
         // The holograms PAPI seam reads the same cached repository /hologram list shows, so the count placeholder
         // matches the registered hologram total (a server-wide value resolved per request).
         links.placeholders.holograms(new RepositoryHologramsPlaceholders(wired.repository()));
-        resources.onClose(links.importTargets.holograms(wired.cache(), wired.renderer()));
+        resources.onClose(links.importTargets.holograms(wired.cache(), wired.view()));
         // Register the holograms management GUI on the /uxmess gui hub, gated by the holograms GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(
                 "holograms",
@@ -3503,6 +3507,7 @@ public final class PluginModule {
                 ctx,
                 persistence,
                 bus,
+                links.network,
                 Optional.ofNullable(links.npcEconomy),
                 guiText,
                 engineTheme(resources),
@@ -3780,6 +3785,8 @@ public final class PluginModule {
         // module's resources, so a module that fails part way leaves its slot empty and the importer falls back
         // to the database for that kind.
         private final ImportTargets importTargets;
+        // The root network block, read once: a module's own config is scoped to its subtree, where it is absent.
+        private final NetworkConfig network;
 
         private ContextLinks(
                 AuditChannel auditChannel,
@@ -3787,13 +3794,15 @@ public final class PluginModule {
                 com.uxplima.uxmessentials.shared.adapter.outbound.api.ActionContexts actions,
                 NetworkPresence presence,
                 CrossServerHops hops,
-                ImportTargets importTargets) {
+                ImportTargets importTargets,
+                NetworkConfig network) {
             this.auditChannel = auditChannel;
             this.queries = queries;
             this.actions = actions;
             this.presence = presence;
             this.hops = hops;
             this.importTargets = importTargets;
+            this.network = network;
         }
         // Built once for packet-backed nametag presenters. Inert until a nametag hide call marks a player.
         private final PlayerTeamCoordinator teams = new PlayerTeamCoordinator();

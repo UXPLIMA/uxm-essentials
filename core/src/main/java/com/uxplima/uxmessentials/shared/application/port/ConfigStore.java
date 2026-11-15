@@ -64,6 +64,14 @@ public interface ConfigStore {
     }
 
     /**
+     * True for a view {@link #scoped} returned, so a reader of plugin-wide settings (the {@code network} block) can
+     * refuse a module's subtree, where those keys never are.
+     */
+    default boolean isScoped() {
+        return false;
+    }
+
+    /**
      * A view of this store rooted at {@code prefix}, so a module reads {@code default-warmup} against
      * its own subtree rather than the absolute {@code modules.teleport.default-warmup}. This is how
      * {@link com.uxplima.uxmessentials.shared.application.module.ModuleContext#config()} is scoped to

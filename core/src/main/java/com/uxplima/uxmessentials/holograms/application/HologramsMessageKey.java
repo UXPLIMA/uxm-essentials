@@ -51,6 +51,7 @@ public enum HologramsMessageKey implements MessageKey {
     HOLOGRAM_INFO_TRANSLATION("hologram.info.translation"),
     HOLOGRAM_INFO_SHADOW("hologram.info.shadow"),
     HOLOGRAM_INFO_LINKED_NPC("hologram.info.linked-npc"),
+    HOLOGRAM_INFO_SCOPE("hologram.info.scope"),
 
     // nearby listing
     HOLOGRAM_NEARBY_HEADER("hologram.nearby.header"),
@@ -109,6 +110,9 @@ public enum HologramsMessageKey implements MessageKey {
     // grow direction feedback
     HOLOGRAM_GROWUP_ENABLED("hologram.growup.enabled"),
     HOLOGRAM_GROWUP_DISABLED("hologram.growup.disabled"),
+    HOLOGRAM_SCOPE_SET("hologram.scope.set"),
+    HOLOGRAM_SCOPE_CLEARED("hologram.scope.cleared"),
+    HOLOGRAM_SCOPE_INVALID("hologram.scope.invalid"),
 
     // viewer blacklist feedback
     HOLOGRAM_BLACKLISTED("hologram.blacklist.added"),

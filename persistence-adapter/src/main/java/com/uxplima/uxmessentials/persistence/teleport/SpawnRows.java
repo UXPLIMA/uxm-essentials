@@ -6,9 +6,12 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportMainSpa
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportNamedSpawnsRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnMirrorsRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportSpawnsRecord;
+import com.uxplima.uxmessentials.persistence.runtime.StoredScope;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.teleport.domain.SpawnMirror;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The anti-corruption mapping between a spawn row and a domain {@link Position} (or {@link SpawnMirror}). The
@@ -59,9 +62,18 @@ final class SpawnRows {
                 .setCreatedAt(savedAtEpochMillis);
     }
 
-    /** Populate the singleton main-spawn record (id 0) for an upsert, stamping the save metadata. */
-    static void applyMain(TeleportMainSpawnRecord record, Position spawn, long savedAtEpochMillis) {
-        record.setId(0)
+    /**
+     * Populate a main-spawn record for a write, stamping the save metadata: id 0 with no scope is the network-wide
+     * main spawn, any other id carries the scope it belongs to.
+     */
+    static void applyMain(
+            TeleportMainSpawnRecord record,
+            int id,
+            @Nullable ServerScope scope,
+            Position spawn,
+            long savedAtEpochMillis) {
+        record.setId(id)
+                .setScope(StoredScope.write(scope))
                 .setWorld(spawn.world().uid().toString())
                 .setWorldName(spawn.world().name())
                 .setX(spawn.x())

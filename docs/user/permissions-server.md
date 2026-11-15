@@ -104,6 +104,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.hologram.appearance` | /hologram billboard, background, glow, opacity, shadow, linewidth, viewrange, alignment, seethrough, growup, item, block, head and entity: change how a hologram looks. | true |
 | `uxmessentials.hologram.visibility` | /hologram visibility, visibilitydistance, show, hide, blacklist and unblacklist: change who sees a hologram. | true |
 | `uxmessentials.hologram.action` | /hologram action and clickcommand: change what a hologram runs when clicked. | true |
+| `uxmessentials.hologram.scope` | /hologram scope: choose which servers of the network show a hologram. | true |
 | `uxmessentials.hologram.view` | /hologram list, info and nearby: read-only inspection. | true |
 | `uxmessentials.hologram.edit` | The line and page content of a hologram (addline, setline, insertline, removeline, page, leaderboard, linknpc, unlinknpc). | true |
 | `uxmessentials.holograms.gui` | /hologram (no args) opens the holograms management GUI. | op |
@@ -271,6 +272,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.npc.appearance` | /npc skin, skinslim, type, equip, glow, pose, scale and displayname: change how an NPC looks. | true |
 | `uxmessentials.npc.action` | /npc command and /npc action: change what an NPC runs when clicked. | true |
 | `uxmessentials.npc.view` | /npc list, info, nearby and help: read-only inspection. | true |
+| `uxmessentials.npc.scope` | /npc scope: choose which servers of the network show an NPC. | true |
 | `uxmessentials.npc.edit` | Every remaining /npc setting (data, state, cooldown, mirror, collidable, showintab, view and turn distance). | true |
 | `uxmessentials.npc.gui` | /npc (no args) opens the NPC management GUI. | op |
 | `uxmessentials.npc.limit.<n>` | How many NPCs you may own; the largest tier held wins. | op |

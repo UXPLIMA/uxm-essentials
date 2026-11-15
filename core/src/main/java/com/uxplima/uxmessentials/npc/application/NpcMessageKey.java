@@ -68,6 +68,9 @@ public enum NpcMessageKey implements MessageKey {
     NPC_MIRROR_DISABLED("npc.mirror.disabled"),
     NPC_COLLIDABLE_ENABLED("npc.collidable.enabled"),
     NPC_COLLIDABLE_DISABLED("npc.collidable.disabled"),
+    NPC_SCOPE_SET("npc.scope.set"),
+    NPC_SCOPE_CLEARED("npc.scope.cleared"),
+    NPC_SCOPE_INVALID("npc.scope.invalid"),
     NPC_SHOW_IN_TAB_ENABLED("npc.show-in-tab.enabled"),
     NPC_SHOW_IN_TAB_DISABLED("npc.show-in-tab.disabled"),
     NPC_VIEW_DISTANCE_SET("npc.view-distance.set"),
@@ -99,6 +102,7 @@ public enum NpcMessageKey implements MessageKey {
     NPC_INFO_FLAGS("npc.info.flags"),
     NPC_INFO_RANGES("npc.info.ranges"),
     NPC_INFO_BEHAVIOR("npc.info.behavior"),
+    NPC_INFO_SCOPE("npc.info.scope"),
 
     // action-chain feedback
     NPC_ACTION_ADDED("npc.action.added"),

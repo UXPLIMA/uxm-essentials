@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.npc.application.SetNpcMirrorSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcPose;
 import com.uxplima.uxmessentials.npc.application.SetNpcRange;
 import com.uxplima.uxmessentials.npc.application.SetNpcScale;
+import com.uxplima.uxmessentials.npc.application.SetNpcScope;
 import com.uxplima.uxmessentials.npc.application.SetNpcShowInTab;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkin;
 import com.uxplima.uxmessentials.npc.application.SetNpcSkinSlim;
@@ -84,6 +85,7 @@ import org.jspecify.annotations.NullMarked;
  * @param range {@code /npc viewdistance} / {@code /npc turndistance}
  * @param state {@code /npc state}
  * @param skinSlim {@code /npc skinslim}
+ * @param scope {@code /npc scope}
  */
 @NullMarked
 public record NpcServices(
@@ -123,7 +125,8 @@ public record NpcServices(
         SetNpcShowInTab showInTab,
         SetNpcRange range,
         SetNpcState state,
-        SetNpcSkinSlim skinSlim) {
+        SetNpcSkinSlim skinSlim,
+        SetNpcScope scope) {
 
     public NpcServices {
         Objects.requireNonNull(create, "create");
@@ -163,5 +166,6 @@ public record NpcServices(
         Objects.requireNonNull(range, "range");
         Objects.requireNonNull(state, "state");
         Objects.requireNonNull(skinSlim, "skinSlim");
+        Objects.requireNonNull(scope, "scope");
     }
 }

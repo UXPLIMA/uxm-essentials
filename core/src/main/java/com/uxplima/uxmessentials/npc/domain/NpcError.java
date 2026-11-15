@@ -22,7 +22,10 @@ public enum NpcError {
     ACTION_INDEX_INVALID(NpcMessageKey.NPC_ACTION_INDEX_INVALID),
 
     /** {@code /npc skin} against a non-player NPC: only a fake player carries a skin. */
-    SKIN_ONLY_PLAYER(NpcMessageKey.NPC_SKIN_ONLY_PLAYER);
+    SKIN_ONLY_PLAYER(NpcMessageKey.NPC_SKIN_ONLY_PLAYER),
+
+    /** A scope word {@code /npc scope} does not read as a server, a shared set or every server. */
+    INVALID_SCOPE(NpcMessageKey.NPC_SCOPE_INVALID);
 
     private final NpcMessageKey messageKey;
 

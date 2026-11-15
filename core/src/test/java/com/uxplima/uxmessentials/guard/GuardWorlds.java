@@ -11,7 +11,6 @@ import com.uxplima.uxmessentials.guard.domain.ActionTree;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Effect;
-import com.uxplima.uxmessentials.guard.domain.GuardScope;
 import com.uxplima.uxmessentials.guard.domain.GuardSubject;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.RegionId;
@@ -22,13 +21,14 @@ import com.uxplima.uxmessentials.guard.domain.Target;
 import com.uxplima.uxmessentials.guard.domain.Template;
 import com.uxplima.uxmessentials.guard.domain.engine.Compiler;
 import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jspecify.annotations.Nullable;
 
 /** Small builders for guard tests: regions, rules, subjects and compiled worlds. */
 public final class GuardWorlds {
 
     public static final String WORLD = "world";
-    public static final GuardScope SCOPE = GuardScope.server("test");
+    public static final ServerScope SCOPE = ServerScope.server("test");
     public static final ActionTree TREE = ActionTree.builtIn();
     public static final int MIN_Y = -64;
     public static final int MAX_Y = 319;

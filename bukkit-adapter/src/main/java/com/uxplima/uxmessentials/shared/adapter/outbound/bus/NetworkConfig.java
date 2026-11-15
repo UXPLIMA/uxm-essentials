@@ -1,9 +1,14 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.domain.LocalServer;
+import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import org.jspecify.annotations.NullMarked;
 
@@ -27,6 +32,8 @@ import org.jspecify.annotations.NullMarked;
  * @param redis the canonical Redis connection block the Redis transport consumes
  * @param cacheRefreshSeconds how often the caches a peer can change are reloaded from the shared database as a
  *     safety net for frames the transport lost; {@code 0} turns the timer off
+ * @param sharedSets the shared sets this backend belongs to, which decide where a hologram, an NPC or a main spawn
+ *     scoped to {@code set:<name>} applies
  */
 @NullMarked
 public record NetworkConfig(
@@ -38,7 +45,8 @@ public record NetworkConfig(
         Transport transport,
         boolean transportRecognized,
         Redis redis,
-        int cacheRefreshSeconds) {
+        int cacheRefreshSeconds,
+        List<String> sharedSets) {
 
     private static final int DEFAULT_QUEUE = 256;
     private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
@@ -63,6 +71,12 @@ public record NetworkConfig(
         if (cacheRefreshSeconds < 0) {
             throw new IllegalArgumentException("cache-refresh-seconds must not be negative: " + cacheRefreshSeconds);
         }
+        sharedSets = List.copyOf(sharedSets);
+    }
+
+    /** This backend as scopes see it: its server name and the shared sets it belongs to. */
+    public LocalServer localServer() {
+        return new LocalServer(serverId, sharedSets);
     }
 
     /**
@@ -163,7 +177,21 @@ public record NetworkConfig(
      * backend opens no Redis connection unless asked.
      */
     public static NetworkConfig from(ConfigStore config) {
+        return from(config, problem -> {});
+    }
+
+    /**
+     * As {@link #from(ConfigStore)}, reporting to {@code problems} each shared set name dropped because a scope
+     * cannot hold it, and a server name no scope can hold. The store must be the root {@code config.conf}: a
+     * module's subtree has no {@code network} block, and reading one there would quietly run every backend as
+     * {@code server-1} with the network off.
+     */
+    public static NetworkConfig from(ConfigStore config, Consumer<String> problems) {
         Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(problems, "problems");
+        if (config.isScoped()) {
+            throw new IllegalArgumentException("the network block is read from the root config.conf, not a module's");
+        }
         boolean enabled = config.getBoolean("network.enabled", false);
         // server-name is what every plugin of ours calls it; a file an earlier release wrote says server-id.
         String serverId =
@@ -176,6 +204,24 @@ public record NetworkConfig(
         java.util.Optional<Transport> parsed = Transport.parse(rawTransport);
         // A negative value reads as off, the same as 0, rather than failing the enable.
         int cacheRefresh = Math.max(0, config.getInt("network.cache-refresh-seconds", DEFAULT_CACHE_REFRESH_SECONDS));
+        // A name that is not a valid set name could never match a scope, so it is dropped rather than kept.
+        List<String> sets = new ArrayList<>();
+        for (String written : config.getStringList("network.shared-sets", List.of())) {
+            String set = written.strip();
+            if (!ServerScope.isScope("set:" + set)) {
+                problems.accept(
+                        "network.shared-sets: " + written
+                                + " is not a set name (letters A to Z, digits, _ . - and at most 64 characters); it is ignored");
+            } else if (!sets.contains(set)) {
+                sets.add(set);
+            }
+        }
+        String name = serverId.isBlank() ? DEFAULT_SERVER_ID : serverId;
+        if (!ServerScope.isScope("server:" + name)) {
+            problems.accept("network.server-name: " + name
+                    + " cannot be a scope (letters A to Z, digits, _ . - and at most 64 characters), so nothing can be"
+                    + " scoped to this server alone; its shared sets and the whole network still apply");
+        }
         return new NetworkConfig(
                 enabled,
                 serverId.isBlank() ? DEFAULT_SERVER_ID : serverId,
@@ -185,6 +231,7 @@ public record NetworkConfig(
                 parsed.orElse(Transport.VELOCITY),
                 parsed.isPresent(),
                 Redis.from(config),
-                cacheRefresh);
+                cacheRefresh,
+                sets);
     }
 }
