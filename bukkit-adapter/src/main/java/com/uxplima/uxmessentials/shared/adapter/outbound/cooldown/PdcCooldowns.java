@@ -27,11 +27,15 @@ import org.jspecify.annotations.NullMarked;
  * in the same space.
  *
  * <p>Stamps are transient per-holder state that may safely die with a world rollback, which is why
- * they live in PDC rather than the database. An offline player has no PDC to
+ * a single server keeps them in PDC rather than the database. A network keeps them in the database instead
+ * ({@code NetworkCooldowns}), since each backend has its own PDC. An offline player has no PDC to
  * read, so a check passes and a stamp is a no-op.
  */
 @NullMarked
 public final class PdcCooldowns implements Cooldowns {
+
+    /** The start of every cooldown stamp's PDC key; the rest is the normalized stamp name. */
+    public static final String KEY_PREFIX = "cooldown-";
 
     private static final String LABEL_FEATURE_PREFIX = "cooldown.";
 
@@ -41,7 +45,7 @@ public final class PdcCooldowns implements Cooldowns {
 
     public PdcCooldowns(Plugin plugin, Permissions permissions, Clock clock) {
         Objects.requireNonNull(plugin, "plugin");
-        this.keys = new PdcKeys(plugin, "cooldown-");
+        this.keys = new PdcKeys(plugin, KEY_PREFIX);
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.clock = Objects.requireNonNull(clock, "clock");
     }

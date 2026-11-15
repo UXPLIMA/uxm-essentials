@@ -69,6 +69,10 @@ public enum TradeMessageKey implements MessageKey {
     // Cross-server trade: the bus rendezvous and the escrow-backed two-phase commit.
     TRADE_CROSS_SERVER_REQUEST_SENT("trade.cross-server-request-sent"),
     TRADE_CROSS_SERVER_INCOMING("trade.cross-server-incoming"),
+    TRADE_CROSS_SERVER_NOT_FOUND("trade.cross-server-not-found"),
+    TRADE_CROSS_SERVER_DENIED("trade.cross-server-denied"),
+    TRADE_CROSS_SERVER_TIMEOUT("trade.cross-server-timeout"),
+    TRADE_CROSS_SERVER_ACCEPTED_BUSY("trade.cross-server-accepted-busy"),
     TRADE_CROSS_SERVER_ESCROWED("trade.cross-server-escrowed"),
     TRADE_CROSS_SERVER_COMPLETED("trade.cross-server-completed"),
 

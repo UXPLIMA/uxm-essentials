@@ -72,6 +72,11 @@ public final class ReceiptedPlayerWarpEconomy implements PlayerWarpEconomy {
     }
 
     @Override
+    public boolean canPayOutOffline(PlayerWarpId warp) {
+        return delegate.canPayOutOffline(warp);
+    }
+
+    @Override
     public Result<Unit, ChargeError> collectRent(
             PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
         Result<Unit, ChargeError> collected = delegate.collectRent(warp, owner, amount, currencyId);

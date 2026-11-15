@@ -183,6 +183,15 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     }
 
     @Override
+    public boolean canPayOutOffline(PlayerWarpId warp) {
+        Objects.requireNonNull(warp, "warp");
+        // The same rule auto-payout applies: only a backend that can write an offline wallet is credited unattended.
+        return snapshot(warp)
+                .map(bank -> bank.amount().signum() <= 0 || worksOffline(resolve(bank.currencyId())))
+                .orElse(false);
+    }
+
+    @Override
     public Result<Unit, ChargeError> collectRent(
             PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(warp, "warp");

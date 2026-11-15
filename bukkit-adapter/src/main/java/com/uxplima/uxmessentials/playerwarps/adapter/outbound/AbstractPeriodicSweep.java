@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 abstract class AbstractPeriodicSweep {
 
-    /** Hard cap on the rows any one pass touches: keeps each sweep a bounded index scan, never a full-table read. */
+    /** Hard cap on the rows any one query of a pass returns, so a backlog drains over passes, not in one burst. */
     protected static final int BATCH_LIMIT = 500;
 
     private final Scheduler scheduler;
@@ -61,8 +61,14 @@ abstract class AbstractPeriodicSweep {
             return;
         }
         scheduler.async(() -> {
-            sweepOnce();
-            scheduleNext();
+            // A pass that throws must not end the sweep: the next one is queued whatever happens to this one.
+            try {
+                sweepOnce();
+            } catch (RuntimeException failure) {
+                log.error("event=playerwarp_sweep_failed sweep=" + getClass().getSimpleName(), failure);
+            } finally {
+                scheduleNext();
+            }
         });
     }
 

@@ -5,6 +5,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
@@ -39,6 +40,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.sink.BukkitMessageSink;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.HttpClientFetcher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.skin.MojangSkins;
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
 import com.uxplima.uxmessentials.shared.application.message.CatalogLines;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.MessageKeyCatalog;
@@ -47,10 +50,12 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.LocaleCatalog;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.text.language.FilePlayerLanguages;
 import com.uxplima.uxmlib.text.language.LanguageSettings;
@@ -103,6 +108,7 @@ final class KernelWiring {
      * @param resolver the per-viewer locale resolver
      * @param serverDefault the configured server-default locale (client fallback at the boundary)
      * @param nameIndex the player-name index behind the lookup port, still to be backed by the database
+     * @param networkClaims the shared kit claims and cooldowns on a network, empty on a single server
      */
     record Kernel(
             KernelPorts ports,
@@ -110,7 +116,8 @@ final class KernelWiring {
             LocaleCatalog catalog,
             LocaleResolver resolver,
             java.util.Locale serverDefault,
-            CachingPlayerNameIndex nameIndex) {
+            CachingPlayerNameIndex nameIndex,
+            Optional<NetworkClaims> networkClaims) {
         Kernel {
             Objects.requireNonNull(ports, "ports");
             Objects.requireNonNull(localeStore, "localeStore");
@@ -118,6 +125,7 @@ final class KernelWiring {
             Objects.requireNonNull(resolver, "resolver");
             Objects.requireNonNull(serverDefault, "serverDefault");
             Objects.requireNonNull(nameIndex, "nameIndex");
+            Objects.requireNonNull(networkClaims, "networkClaims");
         }
     }
 
@@ -162,15 +170,31 @@ final class KernelWiring {
         return locations;
     }
 
-    /** Build every shared outbound port plus the i18n collaborators, and bundle them for wiring. */
-    static Kernel wire(Plugin plugin, ConfigStore config, Logger log, Supplier<Theme> theme) {
+    /**
+     * Build every shared outbound port plus the i18n collaborators, and bundle them for wiring. With a
+     * {@code sharedLedger} (the network is on) the cooldowns are the database-backed ones every backend shares;
+     * without one they stay in each player's PDC.
+     */
+    static Kernel wire(
+            Plugin plugin,
+            ConfigStore config,
+            Logger log,
+            Supplier<Theme> theme,
+            Optional<PlayerClaimLedger> sharedLedger) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(config, "config");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(theme, "theme");
+        Objects.requireNonNull(sharedLedger, "sharedLedger");
 
         Scheduler scheduler = new FoliaScheduler(plugin);
         Permissions permissions = new BukkitPermissions(metaSource(log));
+        Clock clock = Clock.systemUTC();
+        Optional<NetworkClaims> networkClaims =
+                sharedLedger.map(ledger -> new NetworkClaims(ledger, scheduler, clock, log));
+        Cooldowns cooldowns = networkClaims
+                .<Cooldowns>map(claims -> new NetworkCooldowns(claims, permissions, clock))
+                .orElseGet(() -> new PdcCooldowns(plugin, permissions, clock));
         Path messagesDir = plugin.getDataFolder().toPath().resolve("messages");
         LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir, theme);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
@@ -217,7 +241,7 @@ final class KernelWiring {
         KernelPorts ports = new KernelPorts(
                 scheduler,
                 permissions,
-                new PdcCooldowns(plugin, permissions, Clock.systemUTC()),
+                cooldowns,
                 new SchedulerWarmups(scheduler, permissions),
                 messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
@@ -228,7 +252,7 @@ final class KernelWiring {
                 log,
                 mojangSkins,
                 new BukkitDomainGate(vetoes, plugin.getServer().getPluginManager(), log));
-        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex);
+        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex, networkClaims);
     }
 
     /**

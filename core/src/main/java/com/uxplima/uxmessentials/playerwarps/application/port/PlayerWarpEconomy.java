@@ -66,6 +66,17 @@ public interface PlayerWarpEconomy {
     Result<Unit, ChargeError> withdraw(PlayerWarpId warp, PlayerRef to);
 
     /**
+     * True when {@link #withdraw} on {@code warp} could deliver its bank whether or not the owner is online: the bank
+     * is empty, or its currency's backend can credit an offline player. A backend that cannot (experience, or a
+     * placeholder currency whose give command needs the player online) would fail or lose the payout for an absent
+     * owner, so an unattended payout asks this first. The default answers {@code false}, so a store that cannot tell
+     * pays nothing out unattended.
+     */
+    default boolean canPayOutOffline(PlayerWarpId warp) {
+        return false;
+    }
+
+    /**
      * Collect one {@code amount} of rent for {@code warp}, spending the warp's own bank first and the
      * {@code owner}'s wallet for the shortfall: a warp that earns pays its own rent. The bank is deducted by up to
      * {@code amount} in one guarded {@code UPDATE}; only the part the bank could not cover is then debited from the
