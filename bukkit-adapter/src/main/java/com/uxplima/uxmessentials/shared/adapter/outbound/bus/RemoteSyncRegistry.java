@@ -42,9 +42,10 @@ public final class RemoteSyncRegistry {
     }
 
     /**
-     * Add a drop of a per-player cache a peer can change (wallets, homes, vaults). It runs only on the first join
-     * after an empty spell, on the joining player's thread before the join handlers warm that player, so it must be
-     * an in-memory drop with no database read. The timer leaves these caches to their own expiry.
+     * Add a reset of a per-player cache a peer can change (wallets, homes, vaults, ranks). It runs only on the first
+     * join after an empty spell, on the joining player's thread before the join handlers warm that player, so it must
+     * not read the database there: an in-memory drop, or a refresh that hands its read to the async lane. The timer
+     * leaves these caches to their own expiry.
      */
     public void registerPlayerCacheDrop(Runnable drop) {
         playerCacheDrops.add(Objects.requireNonNull(drop, "drop"));
