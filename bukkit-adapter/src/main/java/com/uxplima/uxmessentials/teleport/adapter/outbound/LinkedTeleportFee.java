@@ -3,17 +3,25 @@ package com.uxplima.uxmessentials.teleport.adapter.outbound;
 import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
+import com.uxplima.uxmessentials.economy.application.MoneyFormat;
+import com.uxplima.uxmessentials.economy.application.UncountedMoney;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFee;
+import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -22,14 +30,15 @@ import org.jspecify.annotations.Nullable;
  * currency lazily on each call. The economy module is enabled after teleport, so at teleport-wire time the
  * provider and currency are not yet available; the composition root captures them onto its cross-context
  * links and hands their suppliers here. While economy is disabled (the supplier stays null) every request is
- * free ({@link #canAfford} is always {@code true} and {@link #charge} does nothing) so the teleport context
- * never branches on economy presence and the wiring stays order-independent.
+ * free: {@link #canAfford} is always {@code true} and {@link #charge} and {@link #refund} succeed without moving
+ * money, so the teleport context never branches on economy presence and the wiring stays order-independent.
  *
- * <p>{@code canAfford} is a plain balance read taken on the command thread before the search. {@code charge}
- * is the guarded single-sided debit, and because it is reached only once a teleport has landed (on the
- * player's region thread), it is dispatched to the async scheduler so no DB write ever runs on a tick thread;
- * the affordability was already gated up front, so a rare debit failure (the balance changed between check and
- * landing) is logged rather than surfaced.
+ * <p>{@code canAfford} is a plain balance read taken on the command thread before the search. {@code charge} is
+ * the guarded single-sided debit and {@code refund} the matching credit; both are reached from a region thread
+ * (the end of the warmup, a missed hop), so they run on the async scheduler and complete their stage from there,
+ * keeping the database write off the tick. A charge or refund that does not go through is logged, since the
+ * player sees only the refusal line and an operator may need to settle a balance by hand. Both stages always
+ * complete normally: a provider that throws answers {@code RTP_CHARGE_FAILED} or {@code RTP_REFUND_FAILED}.
  */
 @NullMarked
 public final class LinkedTeleportFee implements TeleportFee {
@@ -66,25 +75,91 @@ public final class LinkedTeleportFee implements TeleportFee {
     }
 
     @Override
-    public void charge(PlayerRef who, BigDecimal amount) {
+    public CompletionStage<Result<Unit, TeleportError>> charge(PlayerRef who, BigDecimal amount) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         EconomyProvider live = provider.get();
         Currency unit = currency.get();
         if (live == null || unit == null) {
-            return; // economy disabled: nothing to withdraw
+            return CompletableFuture.completedFuture(Result.ok()); // economy disabled: nothing to withdraw
         }
-        scheduler.async(() -> debit(live, unit, who, amount));
+        CompletableFuture<Result<Unit, TeleportError>> outcome = new CompletableFuture<>();
+        try {
+            scheduler.async(() -> outcome.complete(debit(live, unit, who, amount)));
+        } catch (RuntimeException refused) {
+            // The async lane refuses work once the plugin is disabling; nothing was taken, so the teleport is simply
+            // off.
+            log.warn("rtp charge for {} not taken: {}", who.name(), String.valueOf(refused.getMessage()));
+            outcome.complete(Result.err(TeleportError.RTP_CHARGE_FAILED));
+        }
+        return outcome;
     }
 
-    private void debit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
-        Money charge = Money.of(unit, amount);
-        if (live.debit(who, charge).isErr()) {
-            log.warn("rtp charge of {} failed for {} after landing", amount.toPlainString(), who.name());
-            return;
+    @Override
+    public CompletionStage<Result<Unit, TeleportError>> refund(PlayerRef who, BigDecimal amount) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        EconomyProvider live = provider.get();
+        Currency unit = currency.get();
+        if (live == null || unit == null) {
+            return CompletableFuture.completedFuture(Result.ok()); // economy disabled: nothing was taken
         }
-        // The fee is taken after the teleport has landed, when the player is looking at the new place and not at
-        // their balance, so the receipt is the only thing that connects the two.
-        receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_TELEPORT));
+        CompletableFuture<Result<Unit, TeleportError>> outcome = new CompletableFuture<>();
+        try {
+            scheduler.async(() -> outcome.complete(credit(live, unit, who, amount)));
+        } catch (RuntimeException refused) {
+            // The async lane refuses work once the plugin is disabling, but the money is still owed, and the server
+            // has stopped ticking by then, so the credit runs here rather than being dropped.
+            outcome.complete(credit(live, unit, who, amount));
+        }
+        return outcome;
+    }
+
+    @Override
+    public String format(BigDecimal amount) {
+        Objects.requireNonNull(amount, "amount");
+        Currency unit = currency.get();
+        return unit == null ? amount.toPlainString() : MoneyFormat.withSymbol(Money.of(unit, amount));
+    }
+
+    private Result<Unit, TeleportError> debit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
+        Money charge = Money.of(unit, amount);
+        try {
+            Result<Unit, TransferError> debited = live.debit(who, charge);
+            if (debited.isErr()) {
+                TransferError reason = debited.errorOrThrow();
+                log.warn("rtp charge of {} refused for {}: {}", amount.toPlainString(), who.name(), reason);
+                return Result.err(
+                        reason == TransferError.INSUFFICIENT_FUNDS || reason == TransferError.BELOW_MINIMUM
+                                ? TeleportError.RTP_CANT_AFFORD
+                                : TeleportError.RTP_CHARGE_FAILED);
+            }
+        } catch (RuntimeException debitFailure) {
+            // The stage must complete either way, or the player is left standing with no teleport and no answer.
+            log.error("rtp charge of " + amount.toPlainString() + " failed for " + who.name(), debitFailure);
+            return Result.err(TeleportError.RTP_CHARGE_FAILED);
+        }
+        try {
+            receipts.ifPresent(receipt -> receipt.charged(who, charge, EconomyMessageKey.CHARGE_TELEPORT));
+        } catch (RuntimeException receiptFailure) {
+            // The money has left, so the charge stands; only the notice about it was lost.
+            log.error("rtp charge receipt for " + who.name() + " could not be sent", receiptFailure);
+        }
+        return Result.ok();
+    }
+
+    private Result<Unit, TeleportError> credit(EconomyProvider live, Currency unit, PlayerRef who, BigDecimal amount) {
+        try {
+            // A refund gives back what was spent, so it is not counted as earned.
+            Result<Unit, TransferError> credited = UncountedMoney.call(() -> live.credit(who, Money.of(unit, amount)));
+            if (credited.isOk()) {
+                return Result.ok();
+            }
+            log.warn(
+                    "rtp refund of {} refused for {}: {}", amount.toPlainString(), who.name(), credited.errorOrThrow());
+        } catch (RuntimeException creditFailure) {
+            log.error("rtp refund of " + amount.toPlainString() + " failed for " + who.name(), creditFailure);
+        }
+        return Result.err(TeleportError.RTP_REFUND_FAILED);
     }
 }

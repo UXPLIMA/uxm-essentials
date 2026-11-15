@@ -5,12 +5,15 @@ import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
@@ -31,6 +34,7 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelReason;
 import com.uxplima.uxmessentials.teleport.domain.event.PlayerTeleporting;
 import com.uxplima.uxmessentials.teleport.domain.event.WarmupCancelled;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The cooldown/warmup machinery every cooldowned teleport flows through. It owns three steps in order:
@@ -64,6 +68,7 @@ public final class TeleportEngine {
     private final CombatGate combat;
     private final TeleportFee fee;
     private final ArrivalGrace grace;
+    private final Logger log;
 
     public TeleportEngine(
             Cooldowns cooldowns,
@@ -123,7 +128,19 @@ public final class TeleportEngine {
             CombatGate combat,
             TeleportFee fee,
             ArrivalGrace grace) {
-        this(cooldowns, warmups, executor, notifier, events, settings, jail, combat, fee, grace, DomainGate.allowAll());
+        this(
+                cooldowns,
+                warmups,
+                executor,
+                notifier,
+                events,
+                settings,
+                jail,
+                combat,
+                fee,
+                grace,
+                DomainGate.allowAll(),
+                new SilentLog());
     }
 
     public TeleportEngine(
@@ -137,7 +154,8 @@ public final class TeleportEngine {
             CombatGate combat,
             TeleportFee fee,
             ArrivalGrace grace,
-            DomainGate gate) {
+            DomainGate gate,
+            Logger log) {
         this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
         this.warmups = Objects.requireNonNull(warmups, "warmups");
         this.executor = Objects.requireNonNull(executor, "executor");
@@ -149,6 +167,7 @@ public final class TeleportEngine {
         this.fee = Objects.requireNonNull(fee, "fee");
         this.grace = Objects.requireNonNull(grace, "grace");
         this.gate = Objects.requireNonNull(gate, "gate");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /**
@@ -192,12 +211,20 @@ public final class TeleportEngine {
      * gate (an accepted {@code tpa}) reuses the warmup wiring without re-checking.
      */
     public WarmupHandle beginGatedWarmup(PlayerRef mover, Destination destination, TeleportKind kind) {
-        return beginWarmup(mover, destination, kind, TeleportEngine::noPostArrival);
+        return beginWarmup(
+                mover,
+                destination,
+                kind,
+                () -> hop(mover, destination, kind, TeleportEngine::noPostArrival, TeleportEngine::nothingToUndo));
+    }
+
+    private static void nothingToUndo() {
+        // A hop that cost nothing has nothing to undo when it misses.
     }
 
     private static void noPostArrival() {
         // The default gated teleport (home/warp/spawn/back) has no per-arrival side effect beyond the cooldown
-        // stamp the engine always folds in; only RTP adds a charge and a grace window on top.
+        // stamp the engine always folds in; only RTP adds a grace window on top.
     }
 
     /**
@@ -223,21 +250,22 @@ public final class TeleportEngine {
         }
         BigDecimal cost = settings.rtpCost();
         if (cost.signum() > 0 && !fee.canAfford(who, cost)) {
-            notifier.send(who, TeleportMessageKey.RTP_CANT_AFFORD, Map.of("cost", cost.toPlainString()));
+            notifier.send(who, TeleportMessageKey.RTP_CANT_AFFORD, price(cost));
             return Result.err(TeleportError.RTP_CANT_AFFORD);
         }
         return Result.ok();
     }
 
     /**
-     * Begin the move-cancellable warmup for an already-gated {@code /rtp}; on a successful landing the cooldown
-     * is stamped, the cost (if any) is withdrawn, and the arrival grace window is applied, all only after the
-     * player has truly arrived, never for a warmup that is move-cancelled or a teleport Paper refuses.
+     * Begin the move-cancellable warmup for an already-gated {@code /rtp}. When the warmup ends the cost (if any)
+     * is withdrawn before the hop, so a player who spent their balance while standing still is refused with the
+     * same line the gate uses and does not move. A hop that then misses gives the money back. The cooldown stamp
+     * and the arrival grace wait for a real landing, so a move-cancelled warmup costs nothing at all.
      */
     public void launchRandom(PlayerRef who, Destination destination) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(destination, "destination");
-        beginWarmup(who, destination, TeleportKind.RANDOM, () -> onRandomArrived(who));
+        beginWarmup(who, destination, TeleportKind.RANDOM, () -> chargeThenHop(who, destination));
     }
 
     /**
@@ -262,16 +290,153 @@ public final class TeleportEngine {
         executor.relocate(who, destination, TeleportKind.RESPAWN, () -> grace.applyOnArrival(who));
     }
 
-    private void onRandomArrived(PlayerRef who) {
+    private void chargeThenHop(PlayerRef who, Destination destination) {
         BigDecimal cost = settings.rtpCost();
-        if (cost.signum() > 0) {
-            fee.charge(who, cost);
+        if (cost.signum() <= 0) {
+            hop(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who), TeleportEngine::nothingToUndo);
+            return;
         }
-        grace.applyOnArrival(who);
+        PaidHop paid = new PaidHop(who, destination, cost);
+        CompletionStage<Result<Unit, TeleportError>> charge;
+        try {
+            charge = fee.charge(who, cost);
+        } catch (RuntimeException chargeFailure) {
+            paid.afterCharge(null, chargeFailure);
+            return;
+        }
+        var ignored = charge.whenComplete(paid::afterCharge);
     }
 
-    private WarmupHandle beginWarmup(
-            PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
+    private Map<String, String> price(BigDecimal cost) {
+        return Map.of("cost", fee.format(cost));
+    }
+
+    private void refund(PlayerRef who, BigDecimal cost) {
+        CompletionStage<Result<Unit, TeleportError>> refund;
+        try {
+            refund = fee.refund(who, cost);
+        } catch (RuntimeException refundFailure) {
+            afterRefund(who, cost, null, refundFailure);
+            return;
+        }
+        var ignored = refund.whenComplete((refunded, refundFailure) -> afterRefund(who, cost, refunded, refundFailure));
+    }
+
+    private void afterRefund(
+            PlayerRef who,
+            BigDecimal cost,
+            @Nullable Result<Unit, TeleportError> refunded,
+            @Nullable Throwable refundFailure) {
+        try {
+            if (refunded == null) {
+                log.error(
+                        "rtp refund of " + cost.toPlainString() + " for " + who.name() + " did not complete",
+                        orUnknown(refundFailure));
+                notifier.send(who, TeleportError.RTP_REFUND_FAILED.messageKey(), price(cost));
+                return;
+            }
+            notifier.send(
+                    who,
+                    refunded.isOk()
+                            ? TeleportMessageKey.RTP_REFUNDED
+                            : refunded.errorOrThrow().messageKey(),
+                    price(cost));
+        } catch (RuntimeException noticeFailure) {
+            log.error("rtp refund notice for " + who.name() + " could not be sent", noticeFailure);
+        }
+    }
+
+    private static Throwable orUnknown(@Nullable Throwable failure) {
+        return failure != null ? failure : new IllegalStateException("the fee port completed without an outcome");
+    }
+
+    /**
+     * One paid {@code /rtp} after its warmup: the charge, then the hop, then at most one refund. The money is owed
+     * back only once the charge has gone through and only until the player lands, so a miss reported twice, or a
+     * failure thrown after the executor already reported one, never refunds twice.
+     */
+    private final class PaidHop {
+
+        private enum State {
+            UNCHARGED,
+            OWED,
+            SETTLED
+        }
+
+        private final PlayerRef who;
+        private final Destination destination;
+        private final BigDecimal cost;
+        private final AtomicReference<State> state = new AtomicReference<>(State.UNCHARGED);
+
+        PaidHop(PlayerRef who, Destination destination, BigDecimal cost) {
+            this.who = who;
+            this.destination = destination;
+            this.cost = cost;
+        }
+
+        void afterCharge(@Nullable Result<Unit, TeleportError> charged, @Nullable Throwable chargeFailure) {
+            try {
+                if (charged == null) {
+                    // The port broke its promise to always answer, so whether money left is unknown: no hop, no
+                    // refund, and the operator gets the trace to settle it.
+                    log.error(
+                            "rtp charge of " + cost.toPlainString() + " for " + who.name() + " did not complete",
+                            orUnknown(chargeFailure));
+                    notifier.send(who, TeleportError.RTP_CHARGE_FAILED.messageKey(), price(cost));
+                    return;
+                }
+                if (charged.isErr()) {
+                    notifier.send(who, charged.errorOrThrow().messageKey(), price(cost));
+                    return;
+                }
+                state.set(State.OWED);
+                executor.teleport(
+                        who,
+                        destination,
+                        TeleportKind.RANDOM,
+                        () -> {
+                            state.set(State.SETTLED);
+                            onLanded(who, destination, TeleportKind.RANDOM, () -> grace.applyOnArrival(who));
+                        },
+                        this::missed);
+            } catch (RuntimeException failure) {
+                log.error("rtp for " + who.name() + " failed after the charge", failure);
+                missed();
+            }
+        }
+
+        void missed() {
+            if (state.compareAndSet(State.OWED, State.SETTLED)) {
+                refund(who, cost);
+            }
+        }
+    }
+
+    /** The logger behind the pure-test constructor, which has no operator to tell. */
+    private static final class SilentLog implements Logger {
+
+        @Override
+        public void info(String message, Object... args) {
+            // Nobody reads a pure test's log.
+        }
+
+        @Override
+        public void warn(String message, Object... args) {
+            // Nobody reads a pure test's log.
+        }
+
+        @Override
+        public void error(String message, Throwable cause) {
+            // Nobody reads a pure test's log.
+        }
+
+        @Override
+        public void debug(String message, Object... args) {
+            // Nobody reads a pure test's log.
+        }
+    }
+
+    private WarmupHandle beginWarmup(PlayerRef mover, Destination destination, TeleportKind kind, Runnable onComplete) {
         // The one choke point every voluntary teleport passes through, which is why the veto question lives here
         // rather than at each of the half-dozen entry points. Before the warmup, so a refused teleport does not
         // make the player stand still first.
@@ -282,15 +447,12 @@ public final class TeleportEngine {
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
-        return warmups.begin(
-                mover,
-                warmupKind,
-                () -> onWarmupComplete(mover, destination, kind, postArrival),
-                () -> onWarmupCancelled(mover, kind));
+        return warmups.begin(mover, warmupKind, onComplete, () -> onWarmupCancelled(mover, kind));
     }
 
-    private void onWarmupComplete(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {
-        executor.teleport(mover, destination, kind, () -> onLanded(mover, destination, kind, postArrival));
+    private void hop(
+            PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival, Runnable onFailed) {
+        executor.teleport(mover, destination, kind, () -> onLanded(mover, destination, kind, postArrival), onFailed);
     }
 
     private void onLanded(PlayerRef mover, Destination destination, TeleportKind kind, Runnable postArrival) {

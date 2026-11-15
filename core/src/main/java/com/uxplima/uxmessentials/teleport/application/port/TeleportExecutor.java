@@ -25,9 +25,8 @@ public interface TeleportExecutor {
 
     /**
      * The same hop, but run {@code onLanded} on the player's region thread once the async teleport resolves
-     * to an actual landing: never on a refusal (Paper returning {@code false}) or an error. This is the
-     * single seam the gated flow uses so the cooldown stamp, the RTP charge, and the arrival grace fire only
-     * after the player truly arrives.
+     * to an actual landing: never on a refusal (Paper returning {@code false}) or an error. For a caller that
+     * has nothing to undo when the hop misses; the gated flow uses the five-argument form below.
      *
      * <p>The default treats a dispatched teleport as landed, which suits executors that cannot report an
      * arrival (test fakes, simple positional hops); the real async executor overrides it to invoke
@@ -36,6 +35,21 @@ public interface TeleportExecutor {
     default void teleport(PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded) {
         teleport(who, destination, kind);
         onLanded.run();
+    }
+
+    /**
+     * The same hop, running {@code onFailed} instead of {@code onLanded} when the player does not arrive: they
+     * went offline before the hop, the server is shutting down, the target world is gone, Paper refused the
+     * teleport, or the hop threw. This is the seam the gated flow uses: the cooldown stamp and the arrival grace
+     * hang off {@code onLanded}, and a paid {@code /rtp} hangs its refund off {@code onFailed}, so exactly one of
+     * the two callbacks runs for a hop that was issued.
+     *
+     * <p>The default never fails, matching the four-argument form it delegates to; the real async executor
+     * overrides it to report every way the hop can miss.
+     */
+    default void teleport(
+            PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
+        teleport(who, destination, kind, onLanded);
     }
 
     /**

@@ -47,6 +47,9 @@ public enum TeleportMessageKey implements MessageKey {
     RTP_DISALLOWED("teleport.rtp.disallowed"),
     RTP_NO_LOCATION("teleport.rtp.no-location"),
     RTP_CANT_AFFORD("teleport.rtp.cant-afford"),
+    RTP_CHARGE_FAILED("teleport.rtp.charge-failed"),
+    RTP_REFUNDED("teleport.rtp.refunded"),
+    RTP_REFUND_FAILED("teleport.rtp.refund-failed"),
     RTP_BIOME_UNKNOWN("teleport.rtp.biome-unknown"),
     RTP_BIOME_NOT_FOUND("teleport.rtp.biome-not-found"),
     // /rtp <player> and /rtp <world>. The argument names neither an online player nor a loaded world
