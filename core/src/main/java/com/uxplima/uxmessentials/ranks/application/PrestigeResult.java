@@ -37,7 +37,10 @@ public record PrestigeResult(Status status, Optional<Prestige> newPrestige, doub
         REQUIREMENTS_NOT_MET,
 
         /** The prestige cost could not be charged; nothing was charged and the level did not move. */
-        CANNOT_AFFORD
+        CANNOT_AFFORD,
+
+        /** The player's rank pointer is not loaded yet; nothing happened and trying again a moment later will work. */
+        BUSY
     }
 
     public PrestigeResult {
@@ -71,6 +74,11 @@ public record PrestigeResult(Status status, Optional<Prestige> newPrestige, doub
     /** The prestige cost could not be paid. */
     public static PrestigeResult cannotAfford() {
         return new PrestigeResult(Status.CANNOT_AFFORD, Optional.empty(), 1.0);
+    }
+
+    /** The player's rank pointer is still loading. */
+    public static PrestigeResult busy() {
+        return new PrestigeResult(Status.BUSY, Optional.empty(), 1.0);
     }
 
     /** The new prestige level as a plain number, or {@code 0} when the attempt did not prestige. */

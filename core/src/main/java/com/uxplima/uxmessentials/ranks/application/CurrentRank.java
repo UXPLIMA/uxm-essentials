@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.domain.PlayerRank;
 import com.uxplima.uxmessentials.ranks.domain.Prestige;
 import com.uxplima.uxmessentials.ranks.domain.Rank;
@@ -18,23 +17,39 @@ import com.uxplima.uxmessentials.ranks.domain.RankStanding;
  * <p>The rules are deliberately forgiving so the read never fails on operator config drift: a player with no
  * stored pointer stands on the ladder's first rank at prestige zero; a player whose stored id is still on the
  * ladder resolves to that rank; a player whose stored id was removed from the ladder falls back to the first
- * rank but keeps their prestige. The only case that yields no standing is an empty ladder. There is no rank to
- * stand on, which callers surface as "ranks not configured" rather than a crash.
+ * rank but keeps their prestige. An empty ladder yields no standing. There is no rank to stand on, which callers
+ * surface as "ranks not configured" rather than a crash.
+ *
+ * <p>Two reads, split by thread. {@link #of} answers from memory only, so it is safe on a tick thread; it is empty
+ * while the player's pointer is not loaded yet. {@link #load} may read the database and is for callers already on
+ * the async lane, such as the published API asking about an offline player.
  */
 public final class CurrentRank {
 
-    private final PlayerRankRepository repository;
+    private final CachedPlayerRankRepository pointers;
     private final RankLadder ladder;
 
-    public CurrentRank(PlayerRankRepository repository, RankLadder ladder) {
-        this.repository = Objects.requireNonNull(repository, "repository");
+    public CurrentRank(CachedPlayerRankRepository pointers, RankLadder ladder) {
+        this.pointers = Objects.requireNonNull(pointers, "pointers");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
     }
 
-    /** The player's resolved standing, or empty only when the ladder holds no ranks. */
+    /**
+     * The player's standing from memory, never blocking. Empty when the ladder holds no ranks, and also when the
+     * pointer is not in memory, in which case a background load is started for an online player.
+     */
     public Optional<RankStanding> of(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
-        Optional<PlayerRank> stored = repository.find(playerId);
+        return pointers.cached(playerId).flatMap(this::resolve);
+    }
+
+    /** The player's standing, reading the database on a miss. Blocks; call it off the tick thread. */
+    public Optional<RankStanding> load(UUID playerId) {
+        Objects.requireNonNull(playerId, "playerId");
+        return resolve(pointers.find(playerId));
+    }
+
+    private Optional<RankStanding> resolve(Optional<PlayerRank> stored) {
         if (stored.isEmpty()) {
             return ladder.first().map(rank -> new RankStanding(rank, Prestige.INITIAL));
         }

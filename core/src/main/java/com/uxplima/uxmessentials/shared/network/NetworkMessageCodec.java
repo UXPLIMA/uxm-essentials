@@ -118,6 +118,7 @@ public final class NetworkMessageCodec {
                 out.writeUTF(guard.region());
             }
             case IpBanChanged ipBan -> out.writeUTF(ipBan.ip());
+            case RankChanged rank -> writeUuid(out, rank.player());
         }
     }
 
@@ -144,6 +145,7 @@ public final class NetworkMessageCodec {
                 new VanishStateChanged(origin, readUuid(in), in.readUTF(), in.readBoolean(), in.readInt());
             case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
             case IP_BAN_CHANGED -> new IpBanChanged(origin, in.readUTF());
+            case RANK_CHANGED -> new RankChanged(origin, readUuid(in));
         };
     }
 

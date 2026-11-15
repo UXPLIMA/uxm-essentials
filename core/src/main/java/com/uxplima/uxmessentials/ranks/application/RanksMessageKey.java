@@ -19,11 +19,14 @@ public enum RanksMessageKey implements MessageKey {
     // Current standing: the line shown when a player reads their own rank and prestige.
     RANKS_CURRENT("ranks.current"),
 
-    // Rankup outcomes: success, and the three refusals: already at the top, requirements unmet, cost unaffordable.
+    // Rankup outcomes: success, the three refusals (already at the top, requirements unmet, cost unaffordable),
+    // the try-again line while the pointer loads or another rankup saves, and the storage failure line.
     RANKS_RANKUP_SUCCESS("ranks.rankup-success"),
     RANKS_RANKUP_MAX("ranks.rankup-max"),
     RANKS_RANKUP_REQUIREMENTS("ranks.rankup-requirements"),
     RANKS_RANKUP_COST("ranks.rankup-cost"),
+    RANKS_RANKUP_BUSY("ranks.rankup-busy"),
+    RANKS_RANKUP_FAILED("ranks.rankup-failed"),
 
     // Admin setrank outcomes, the confirmation of a direct set, and the refusal when the named rank is not a rung.
     RANKS_SETRANK_SUCCESS("ranks.setrank-success"),

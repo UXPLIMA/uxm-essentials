@@ -42,8 +42,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *       one {@code save}.</li>
  *   <li><b>Actions.</b> The configured prestige actions run last, only after the reset is durable.</li>
  * </ol>
- * Charging strictly before the reset is what guarantees a failed charge never prestiges, the same rollback stance
- * (and the same residual save-fault gap) {@link Rankup} documents.
+ * Charging strictly before the reset is what guarantees a failed charge never prestiges. The standing comes from
+ * memory through {@link CurrentRank#of}, so a player whose pointer has not loaded yet gets
+ * {@link PrestigeResult#busy()}.
+ *
+ * <p>Unlike {@link Rankup}, a prestige still evaluates every requirement, charges and saves on the calling thread,
+ * and there is a residual save-fault gap: when the guarded debit succeeds but the {@code save} then throws a genuine
+ * database fault, the charge is not refunded and the fault surfaces to the command boundary.
  */
 public final class Prestige {
 
@@ -82,6 +87,10 @@ public final class Prestige {
     public PrestigeResult prestige(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         Optional<RankStanding> standing = currentRank.of(who.uuid());
+        if (standing.isEmpty() && !ladder.isEmpty()) {
+            // With a non-empty ladder an empty standing only means the pointer has not loaded yet.
+            return PrestigeResult.busy();
+        }
         if (standing.isEmpty() || ladder.next(standing.get().rank().id()).isPresent()) {
             return PrestigeResult.notAtTop();
         }

@@ -14,9 +14,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The {@link RanksPlaceholders} read seam over the ranks read use case: {@link CurrentRank} resolves the player's
- * held rank and prestige from the DB-backed pointer (the same read the {@code /rankup} pipeline and the ladder GUI
- * use), and the parsed {@link RankLadder} answers the next rank up. Both are cheap lookups on the placeholder path:
- * the current standing is one repository read, the next rank a scan of the in-memory ladder.
+ * held rank and prestige from the in-memory pointer cache (the same read the {@code /rankup} pipeline and the ladder
+ * GUI use), and the parsed {@link RankLadder} answers the next rank up. Neither touches the database, so a
+ * scoreboard refreshing on a region thread stays cheap; a pointer not loaded yet answers empty and loads in the
+ * background.
  */
 @NullMarked
 public final class StoreRanksPlaceholders implements RanksPlaceholders {
