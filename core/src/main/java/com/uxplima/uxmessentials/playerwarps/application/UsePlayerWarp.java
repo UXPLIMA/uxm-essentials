@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -69,11 +70,11 @@ import org.jspecify.annotations.Nullable;
  */
 public final class UsePlayerWarp {
 
-    private static final String BYPASS_BAN = "uxmessentials.pwarp.bypass.ban";
-    private static final String BYPASS_PASSWORD = "uxmessentials.pwarp.bypass.password";
-    private static final String BYPASS_WHITELIST = "uxmessentials.pwarp.bypass.whitelist";
-    private static final String BYPASS_SAFETY = "uxmessentials.pwarp.bypass.safety";
-    private static final String BYPASS_COST = "uxmessentials.pwarp.bypass.cost";
+    private static final String BYPASS_BAN = DestinationPermissions.PWARP_BYPASS_BAN;
+    private static final String BYPASS_PASSWORD = DestinationPermissions.PWARP_BYPASS_PASSWORD;
+    private static final String BYPASS_WHITELIST = DestinationPermissions.PWARP_BYPASS_WHITELIST;
+    private static final String BYPASS_SAFETY = DestinationPermissions.PWARP_BYPASS_SAFETY;
+    private static final String BYPASS_COST = DestinationPermissions.PWARP_BYPASS_COST;
 
     private final PlayerWarpRepository repository;
     private final PlayerWarpTeleporter teleporter;

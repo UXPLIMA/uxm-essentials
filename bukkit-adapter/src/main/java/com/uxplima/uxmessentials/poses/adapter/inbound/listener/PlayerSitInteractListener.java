@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit.PlayerSitOutcome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PlayerSitInteractListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.playersit.use";
+    private static final String PERMISSION = SocialPermissions.PLAYERSIT_USE;
 
     private final StartPlayerSit startPlayerSit;
     private final CommandFeedback feedback;

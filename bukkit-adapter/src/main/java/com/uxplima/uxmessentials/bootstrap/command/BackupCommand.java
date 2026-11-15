@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -40,7 +41,7 @@ import org.jspecify.annotations.NullMarked;
 public final class BackupCommand implements CommandRegistration {
 
     private static final String LITERAL = "backup";
-    private static final String PERMISSION = "uxmessentials.admin.backup";
+    private static final String PERMISSION = SharedPermissions.ADMIN_BACKUP;
     private static final String DESCRIPTION = "Snapshot the plugin's data directory on demand.";
 
     /** Escapes a path, which is data and may hold any character, before it is placed in a catalogue line. */

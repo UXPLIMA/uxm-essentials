@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 
 /**
  * The economy context's command surface as platform-neutral {@link CommandSpec}s: each pairs a literal with its base
@@ -27,67 +28,67 @@ final class EconomyCommandSurface {
         return List.of(
                 spec(
                         "balance",
-                        "uxmessentials.economy.balance",
+                        EconomyPermissions.ECONOMY_BALANCE,
                         EconomyCommand.of("balance", List.of("bal", "money"), "Show a wallet balance")),
                 spec(
                         "pay",
-                        "uxmessentials.economy.pay",
+                        EconomyPermissions.ECONOMY_PAY,
                         EconomyCommand.of("pay", List.of(), "Transfer funds to another player")),
                 spec(
                         "payconfirm",
-                        "uxmessentials.economy.pay",
+                        EconomyPermissions.ECONOMY_PAY,
                         EconomyCommand.of("payconfirm", List.of(), "Confirm a large pending pay")),
                 spec(
                         "paytoggle",
-                        "uxmessentials.economy.pay.toggle",
+                        EconomyPermissions.ECONOMY_PAY_TOGGLE,
                         EconomyCommand.of("paytoggle", List.of(), "Toggle accepting incoming pay")),
                 spec(
                         "payall",
-                        "uxmessentials.economy.payall",
+                        EconomyPermissions.ECONOMY_PAYALL,
                         EconomyCommand.of("payall", List.of(), "Pay every online player")),
                 spec(
                         "baltop",
-                        "uxmessentials.economy.baltop",
+                        EconomyPermissions.ECONOMY_BALTOP,
                         EconomyCommand.of("baltop", List.of("balancetop"), "View the top balances")),
                 spec(
                         "worth",
-                        "uxmessentials.economy.worth",
+                        EconomyPermissions.ECONOMY_WORTH,
                         EconomyCommand.of("worth", List.of(), "Report a held item's configured sell value")),
                 spec(
                         "sell",
-                        "uxmessentials.economy.sell",
+                        EconomyPermissions.ECONOMY_SELL,
                         EconomyCommand.of("sell", List.of(), "Sell held items at their configured worth")),
                 spec(
                         "sellall",
-                        "uxmessentials.economy.sell",
+                        EconomyPermissions.ECONOMY_SELL,
                         EconomyCommand.of("sellall", List.of(), "Sell every sellable item in your inventory")),
                 spec(
                         "withdraw",
-                        "uxmessentials.economy.withdraw",
+                        EconomyPermissions.ECONOMY_WITHDRAW,
                         EconomyCommand.of("withdraw", List.of(), "Withdraw virtual balance into a physical check")),
                 spec(
                         "deposit",
-                        "uxmessentials.economy.deposit",
+                        EconomyPermissions.ECONOMY_DEPOSIT,
                         EconomyCommand.of("deposit", List.of(), "Deposit physical banknotes into virtual balance")),
                 spec(
                         "bank",
-                        "uxmessentials.economy.bank",
+                        EconomyPermissions.ECONOMY_BANK,
                         EconomyCommand.of("bank", List.of(), "Shared bank accounts management")),
                 spec(
                         "loan",
-                        "uxmessentials.economy.loan",
+                        EconomyPermissions.ECONOMY_LOAN,
                         EconomyCommand.of("loan", List.of(), "Debtor loans and credit rating")),
                 spec(
                         "wallet",
-                        "uxmessentials.economy.wallet",
+                        EconomyPermissions.ECONOMY_WALLET,
                         EconomyCommand.of("wallet", List.of(), "Show balances across all currencies")),
                 spec(
                         "setworth",
-                        "uxmessentials.economy.setworth",
+                        EconomyPermissions.ECONOMY_SETWORTH,
                         EconomyCommand.of("setworth", List.of(), "Set an item's sell worth")),
                 spec(
                         "eco",
-                        "uxmessentials.economy.admin",
+                        EconomyPermissions.ECONOMY_ADMIN,
                         EconomyCommand.of("eco", List.of("economy"), "Eco-admin balance mutations")));
     }
 

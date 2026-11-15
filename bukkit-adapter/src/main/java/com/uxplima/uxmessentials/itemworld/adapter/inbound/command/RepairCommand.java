@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class RepairCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.repair.itemworld";
+    private static final String PERMISSION = ItemworldPermissions.REPAIR_ITEMWORLD;
 
     public RepairCommand(ItemworldServices services) {
         super(services, "repair", SubFeatureGroup.ITEM_UTILS, "Repair the held item.");

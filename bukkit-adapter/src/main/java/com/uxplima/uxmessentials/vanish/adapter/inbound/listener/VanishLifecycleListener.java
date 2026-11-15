@@ -14,6 +14,7 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -49,8 +50,8 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class VanishLifecycleListener implements Listener {
 
-    private static final String PERSIST_PERMISSION = "uxmessentials.vanish.persist";
-    private static final String USE_PERMISSION = "uxmessentials.vanish.use";
+    private static final String PERSIST_PERMISSION = EnforcementPermissions.VANISH_PERSIST;
+    private static final String USE_PERMISSION = EnforcementPermissions.VANISH_USE;
 
     /** Reads after the first one that failed; with the delay below a database outage of a few seconds is ridden out. */
     private static final int READ_RETRIES = 3;

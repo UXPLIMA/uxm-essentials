@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SocialSpyCommand extends MessagingCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.msg.socialspy";
+    private static final String PERMISSION = SocialPermissions.MSG_SOCIALSPY;
 
     public SocialSpyCommand(MessagingServices services, Messages messages, MessageSink sink) {
         super(services, messages, sink);

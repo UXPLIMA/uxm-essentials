@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.BurnDuration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -30,7 +31,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BurnCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.burn.use";
+    private static final String PERMISSION = PlayerstatePermissions.BURN_USE;
 
     public BurnCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -39,7 +40,7 @@ public final class BurnCommand extends PlayerstateCommandSupport implements Comm
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.burn.others";
+        return PlayerstatePermissions.BURN_OTHERS;
     }
 
     @Override

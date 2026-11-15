@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -35,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class CompassCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.compass.use";
+    private static final String PERMISSION = PlayerstatePermissions.COMPASS_USE;
 
     /** Direction keys in yaw order, eighths clockwise from south, so {@code DIRECTIONS[0]} is south. */
     private static final MessageKey[] DIRECTIONS = {

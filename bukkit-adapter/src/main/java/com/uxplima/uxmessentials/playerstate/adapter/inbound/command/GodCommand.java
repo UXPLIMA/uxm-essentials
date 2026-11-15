@@ -19,6 +19,8 @@ import com.uxplima.uxmessentials.playerstate.application.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -34,8 +36,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GodCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.god.use";
-    private static final String GUARD_BYPASS = "uxmessentials.guard.bypass";
+    private static final String PERMISSION = PlayerstatePermissions.GOD_USE;
+    private static final String GUARD_BYPASS = ContentPermissions.GUARD_BYPASS;
 
     private final PlayerStateStore store;
     private final RegionBehaviourGate regions;
@@ -50,7 +52,7 @@ public final class GodCommand extends PlayerstateCommandSupport implements Comma
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.god.others";
+        return PlayerstatePermissions.GOD_OTHERS;
     }
 
     @Override

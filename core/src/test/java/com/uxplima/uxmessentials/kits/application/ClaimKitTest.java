@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.kits.domain.KitSchedule;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaimed;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -130,7 +131,7 @@ class ClaimKitTest {
         define(starter().permission(true).build());
 
         assertThat(claimKit().claim(ALEX, STARTER).join().asError()).contains(KitError.NO_PERMISSION);
-        permissions.grant(ALEX, "uxmessentials.kit.starter");
+        permissions.grant(ALEX, ContentPermissions.kit("starter"));
         assertThat(claimKit().claim(ALEX, STARTER).join().isOk()).isTrue();
     }
 
@@ -151,7 +152,7 @@ class ClaimKitTest {
                 .cooldown(Duration.ofHours(24))
                 .permissionCooldowns(Map.of("vip", Duration.ofHours(1)))
                 .build());
-        permissions.grant(ALEX, "uxmessentials.kit.cooldown.vip");
+        permissions.grant(ALEX, ContentPermissions.kitCooldown("vip"));
         ClaimKit claim = claimKit();
         claim.claim(ALEX, STARTER).join();
         claim.claim(SAM, STARTER).join();

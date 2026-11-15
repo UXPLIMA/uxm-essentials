@@ -12,6 +12,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.communication.application.BroadcastOptOut;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -26,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class BroadcastToggleCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.communication.broadcasttoggle";
+    private static final String PERMISSION = SocialPermissions.COMMUNICATION_BROADCASTTOGGLE;
 
     private final BroadcastOptOut optOut;
 

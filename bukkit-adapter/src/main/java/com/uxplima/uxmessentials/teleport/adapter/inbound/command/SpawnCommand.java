@@ -10,6 +10,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -27,8 +28,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class SpawnCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.spawn.use";
-    private static final String NAMED_PERMISSION = "uxmessentials.spawn.named";
+    private static final String PERMISSION = TeleportPermissions.SPAWN_USE;
+    private static final String NAMED_PERMISSION = TeleportPermissions.SPAWN_NAMED;
 
     public SpawnCommand(TeleportServices services, Messages messages) {
         super(services, messages);

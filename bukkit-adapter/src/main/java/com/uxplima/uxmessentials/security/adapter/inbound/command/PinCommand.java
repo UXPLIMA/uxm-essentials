@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.security.application.port.TwoFactorRegistration
 import com.uxplima.uxmessentials.security.application.port.TwoFactorRepository;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -51,7 +52,7 @@ import org.jspecify.annotations.Nullable;
 public final class PinCommand extends SecurityCommandSupport implements CommandRegistration {
 
     /** The self-service permission every player holds to manage their own PIN. */
-    public static final String PERMISSION = "uxmessentials.security.pin";
+    public static final String PERMISSION = EnforcementPermissions.SECURITY_PIN;
 
     private final SetPin setPin;
     private final ChangePin changePin;

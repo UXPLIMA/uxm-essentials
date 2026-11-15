@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ExchangeCommand extends EconomyCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.economy.exchange";
+    private static final String PERMISSION = EconomyPermissions.ECONOMY_EXCHANGE;
     private final Messages messages;
 
     public ExchangeCommand(EconomyServices services, Messages messages) {

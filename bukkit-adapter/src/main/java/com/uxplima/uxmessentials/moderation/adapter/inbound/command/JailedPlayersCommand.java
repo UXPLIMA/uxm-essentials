@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class JailedPlayersCommand extends ModerationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.moderation.jail";
+    private static final String PERMISSION = EnforcementPermissions.MODERATION_JAIL;
 
     private final Scheduler scheduler;
     private final @Nullable JailGuiViews jailGui;

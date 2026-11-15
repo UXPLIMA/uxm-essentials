@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 
 /**
  * The warps context's command surface as platform-neutral
@@ -31,7 +32,8 @@ final class WarpCommandSurface {
     private WarpCommandSurface() {}
 
     static List<CommandSpec> all() {
-        return List.of(spec("warp", "uxmessentials.warp.use", WarpCommand.of("warp", "Teleport to a server warp")));
+        return List.of(
+                spec("warp", DestinationPermissions.WARP_USE, WarpCommand.of("warp", "Teleport to a server warp")));
     }
 
     private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {

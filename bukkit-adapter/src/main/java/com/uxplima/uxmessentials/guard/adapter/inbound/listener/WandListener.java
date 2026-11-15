@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
 import com.uxplima.uxmessentials.guard.adapter.Selections;
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardWand;
 import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The selection wand: left click marks the first corner (and starts a polygon), right click the second corner,
@@ -38,7 +39,7 @@ public final class WandListener implements Listener {
         }
         Player player = event.getPlayer();
         Block block = event.getClickedBlock();
-        if (block == null || !player.hasPermission("uxmessentials.guard.define")) {
+        if (block == null || !player.hasPermission(ContentPermissions.GUARD_DEFINE)) {
             return;
         }
         event.setCancelled(true);

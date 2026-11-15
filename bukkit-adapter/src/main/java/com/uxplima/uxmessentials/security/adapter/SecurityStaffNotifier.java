@@ -7,6 +7,7 @@ import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -28,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
 public final class SecurityStaffNotifier {
 
     /** The node a player must hold to receive the alt/flagged-client staff notice. */
-    public static final String NOTIFY_NODE = "uxmessentials.security.alts.notify";
+    public static final String NOTIFY_NODE = EnforcementPermissions.SECURITY_ALTS_NOTIFY;
 
     private final Server server;
     private final Scheduler scheduler;

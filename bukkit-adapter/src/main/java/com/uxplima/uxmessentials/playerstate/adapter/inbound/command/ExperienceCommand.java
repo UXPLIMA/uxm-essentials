@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlayerStateServices;
 import com.uxplima.uxmessentials.playerstate.domain.ExperienceChange;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -34,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ExperienceCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.exp.use";
+    private static final String PERMISSION = PlayerstatePermissions.EXP_USE;
 
     public ExperienceCommand(PlayerStateServices services, Messages messages) {
         super(services, messages);
@@ -43,7 +44,7 @@ public final class ExperienceCommand extends PlayerstateCommandSupport implement
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.exp.others";
+        return PlayerstatePermissions.EXP_OTHERS;
     }
 
     @Override

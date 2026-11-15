@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.economy.application.EconomyNotifier;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -60,7 +61,7 @@ public final class SalaryTask {
         this.enabled = enabled;
         this.interval = Objects.requireNonNull(interval, "interval");
         this.defaultAmount = defaultAmount;
-        this.salaryQuotaFamily = QuotaFamily.quota("uxmessentials.economy.salary.amount");
+        this.salaryQuotaFamily = QuotaFamily.quota(EconomyPermissions.ECONOMY_SALARY_AMOUNT);
     }
 
     public void start() {

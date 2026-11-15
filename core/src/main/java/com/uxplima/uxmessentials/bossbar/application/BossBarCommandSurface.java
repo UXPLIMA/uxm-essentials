@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 
 /**
  * The boss bar context's one command. It is {@code /bossbars} and not {@code /bossbar}: the vanilla command of that
@@ -13,7 +14,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
  */
 final class BossBarCommandSurface {
 
-    private static final String USE_PERMISSION = "uxmessentials.bossbar.use";
+    private static final String USE_PERMISSION = ContentPermissions.BOSSBAR_USE;
 
     private BossBarCommandSurface() {}
 

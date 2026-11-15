@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.communication.adapter.ChatLock;
 import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ToggleChatCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.communication.togglechat";
+    private static final String PERMISSION = SocialPermissions.COMMUNICATION_TOGGLECHAT;
 
     private final ChatLock lock;
     private final Notifier notifier;

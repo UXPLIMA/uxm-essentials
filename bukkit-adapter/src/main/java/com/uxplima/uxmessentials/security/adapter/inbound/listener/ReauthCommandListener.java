@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.security.adapter.ReauthController;
 import com.uxplima.uxmessentials.security.adapter.ReauthState;
 import com.uxplima.uxmessentials.security.domain.ReauthPolicy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,7 +34,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ReauthCommandListener implements Listener {
 
-    private static final String BYPASS_PERMISSION = "uxmessentials.security.bypass";
+    private static final String BYPASS_PERMISSION = EnforcementPermissions.SECURITY_BYPASS;
 
     private final boolean enabled;
     private final ReauthPolicy policy;

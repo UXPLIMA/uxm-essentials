@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEv
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.display.BroadcastChannel;
@@ -120,7 +121,7 @@ public final class VoteWiring {
     private static final int DEFAULT_THRESHOLD = 25;
 
     /** The node that gates {@code /vote} itself, reused for the hub entry that opens the same board. */
-    private static final String VOTE_GUI_PERMISSION = "uxmessentials.vote.use";
+    private static final String VOTE_GUI_PERMISSION = EconomyPermissions.VOTE_USE;
 
     private VoteWiring() {}
 

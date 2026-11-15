@@ -11,6 +11,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
@@ -31,7 +32,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class TpOfflineCommand extends TeleportCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.tp.offline";
+    private static final String PERMISSION = TeleportPermissions.TP_OFFLINE;
 
     private final String literal;
     private final String description;

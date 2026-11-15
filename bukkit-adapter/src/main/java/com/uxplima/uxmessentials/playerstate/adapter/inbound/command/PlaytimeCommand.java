@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.PlaytimeAdmin;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -58,10 +59,10 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class PlaytimeCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.playtime.use";
-    private static final String RESET_PERMISSION = "uxmessentials.playtime.reset";
-    private static final String SET_PERMISSION = "uxmessentials.playtime.set";
-    private static final String IMPORT_PERMISSION = "uxmessentials.playtime.import";
+    private static final String PERMISSION = PlayerstatePermissions.PLAYTIME_USE;
+    private static final String RESET_PERMISSION = PlayerstatePermissions.PLAYTIME_RESET;
+    private static final String SET_PERMISSION = PlayerstatePermissions.PLAYTIME_SET;
+    private static final String IMPORT_PERMISSION = PlayerstatePermissions.PLAYTIME_IMPORT;
     private static final String TIME = "time";
 
     private final @Nullable PlaytimeView view;
@@ -77,7 +78,7 @@ public final class PlaytimeCommand extends PlayerstateCommandSupport implements 
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.playtime.others";
+        return PlayerstatePermissions.PLAYTIME_OTHERS;
     }
 
     @Override

@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import org.jspecify.annotations.NullMarked;
@@ -60,9 +61,6 @@ public final class CreateWizard {
 
     /** The answer that writes the file. */
     private static final String SAVE = "save";
-
-    /** The prefix every suggested permission node is built from. */
-    private static final String NODE_PREFIX = "uxmessentials.customcommand.";
 
     /** Answers that list several values are separated by runs of whitespace. */
     private static final Splitter WHITESPACE = Splitter.on(Pattern.compile("\\s+"));
@@ -173,7 +171,7 @@ public final class CreateWizard {
     }
 
     private void askPermission(Draft draft) {
-        String suggested = NODE_PREFIX + draft.id.value();
+        String suggested = ContentPermissions.customCommand(draft.id.value());
         ask(
                 draft,
                 "customcommand.wizard.permission",

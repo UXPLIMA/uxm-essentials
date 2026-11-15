@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -57,9 +58,9 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class BossBarCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.bossbar.use";
-    private static final String OTHERS = "uxmessentials.bossbar.others";
-    private static final String ANNOUNCE = "uxmessentials.bossbar.announce";
+    private static final String PERMISSION = ContentPermissions.BOSSBAR_USE;
+    private static final String OTHERS = ContentPermissions.BOSSBAR_OTHERS;
+    private static final String ANNOUNCE = ContentPermissions.BOSSBAR_ANNOUNCE;
     private static final String PLAYER = "player";
     private static final String BAR = "bar";
     private static final String TIME = "time";

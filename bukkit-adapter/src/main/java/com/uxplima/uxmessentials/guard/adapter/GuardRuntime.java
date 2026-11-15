@@ -39,6 +39,7 @@ import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.Nullable;
@@ -85,11 +86,11 @@ public final class GuardRuntime {
     };
 
     /** Lets staff toggle bypass. */
-    public static final String BYPASS_PERMISSION = "uxmessentials.guard.bypass";
+    public static final String BYPASS_PERMISSION = ContentPermissions.GUARD_BYPASS;
     /** Lets staff change locked regions and build in them. */
-    public static final String LOCK_PERMISSION = "uxmessentials.guard.lock";
+    public static final String LOCK_PERMISSION = ContentPermissions.GUARD_LOCK;
     /** Gets alerts and locked world notices. */
-    public static final String NOTIFY_PERMISSION = "uxmessentials.guard.notify";
+    public static final String NOTIFY_PERMISSION = ContentPermissions.GUARD_NOTIFY;
 
     private final GuardService service;
     private final Messages messages;

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.playerwarps.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpLimit;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
@@ -21,7 +22,7 @@ import org.jspecify.annotations.Nullable;
 public final class PlayerWarpQuota {
 
     /** The quota family for player-warp limits: the {@code MAX}-direction reducer over the numbered nodes. */
-    public static final QuotaFamily FAMILY = QuotaFamily.quota("uxmessentials.pwarp.limit");
+    public static final QuotaFamily FAMILY = QuotaFamily.quota(DestinationPermissions.PWARP_LIMIT);
 
     private final Permissions permissions;
     private final int configDefault;

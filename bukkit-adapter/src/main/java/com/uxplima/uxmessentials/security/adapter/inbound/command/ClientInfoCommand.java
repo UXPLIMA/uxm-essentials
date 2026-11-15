@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.security.application.SecurityMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -37,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
 public final class ClientInfoCommand extends SecurityCommandSupport implements CommandRegistration {
 
     /** The staff permission to inspect a player's reported client brand. */
-    public static final String PERMISSION = "uxmessentials.security.clientinfo";
+    public static final String PERMISSION = EnforcementPermissions.SECURITY_CLIENTINFO;
 
     private final ClientBrandRegistry registry;
     private final PlayerLookup lookup;

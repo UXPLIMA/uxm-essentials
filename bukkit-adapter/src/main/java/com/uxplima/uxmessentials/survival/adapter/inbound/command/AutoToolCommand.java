@@ -14,6 +14,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.application.SurvivalMessageKey;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AutoToolCommand implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.survival.autotool.toggle";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_AUTOTOOL_TOGGLE;
 
     private final PdcSurvivalToggles toggles;
     private final CommandFeedback feedback;

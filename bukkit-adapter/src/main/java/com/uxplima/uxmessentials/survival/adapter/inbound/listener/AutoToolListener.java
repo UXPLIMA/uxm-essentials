@@ -12,6 +12,7 @@ import org.bukkit.event.block.BlockDamageEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.survival.adapter.outbound.PdcSurvivalToggles;
 import com.uxplima.uxmessentials.survival.domain.AutoToolSelector;
 import com.uxplima.uxmessentials.survival.domain.AutoToolSelector.HeldTool;
@@ -36,7 +37,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class AutoToolListener implements Listener {
 
-    private static final String PERMISSION = "uxmessentials.survival.autotool";
+    private static final String PERMISSION = ContentPermissions.SURVIVAL_AUTOTOOL;
     private static final int HOTBAR_SIZE = 9;
 
     private final AutoToolSelector selector;

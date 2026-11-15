@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -38,7 +39,7 @@ import org.jspecify.annotations.NullMarked;
 public final class RankupCommand implements CommandRegistration {
 
     /** The permission every player holds by default so they can climb their own ladder. */
-    public static final String PERMISSION = "uxmessentials.ranks.rankup";
+    public static final String PERMISSION = EconomyPermissions.RANKS_RANKUP;
 
     private final Rankup rankup;
     private final CommandFeedback feedback;

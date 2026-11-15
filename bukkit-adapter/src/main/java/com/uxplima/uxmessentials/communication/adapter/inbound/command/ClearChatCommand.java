@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.communication.application.CommunicationMessageK
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -41,8 +42,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ClearChatCommand extends CommunicationCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.communication.clearchat";
-    private static final String EXEMPT_PERMISSION = "uxmessentials.communication.clearchat.exempt";
+    private static final String PERMISSION = SocialPermissions.COMMUNICATION_CLEARCHAT;
+    private static final String EXEMPT_PERMISSION = SocialPermissions.COMMUNICATION_CLEARCHAT_EXEMPT;
     private static final int BLANK_LINES = 100;
     private static final String BLANK_LINE = "";
 

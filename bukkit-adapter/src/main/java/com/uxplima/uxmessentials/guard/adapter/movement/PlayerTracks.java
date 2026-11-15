@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValue
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ClickActionRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.domain.action.ClickAction;
 import com.uxplima.uxmessentials.shared.domain.action.ClickTrigger;
 import me.clip.placeholderapi.PlaceholderAPI;
@@ -378,7 +379,7 @@ public final class PlayerTracks {
         }
         Optional<GameMode> mode =
                 after.get(BehaviourKey.GAME_MODE).map(v -> GameMode.valueOf(v.toUpperCase(Locale.ROOT)));
-        if (mode.isPresent() && !player.hasPermission("uxmessentials.guard.bypass.gamemode")) {
+        if (mode.isPresent() && !player.hasPermission(ContentPermissions.GUARD_BYPASS_GAMEMODE)) {
             if (track.gameMode == null) {
                 track.gameMode = player.getGameMode();
             }

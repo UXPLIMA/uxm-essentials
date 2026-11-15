@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.itemworld.domain.ItemWorldError;
 import com.uxplima.uxmessentials.itemworld.domain.PowertoolBinding;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -39,7 +40,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PowertoolCommand extends ItemworldCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.powertool.use";
+    private static final String PERMISSION = ItemworldPermissions.POWERTOOL_USE;
 
     private final PowertoolPolicy policy;
     private final PdcPowertoolStore store;

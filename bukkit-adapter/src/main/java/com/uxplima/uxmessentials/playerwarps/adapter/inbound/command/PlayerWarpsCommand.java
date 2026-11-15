@@ -13,6 +13,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerWarpServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Gate;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class PlayerWarpsCommand extends PlayerWarpCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.pwarp.list";
+    private static final String PERMISSION = DestinationPermissions.PWARP_LIST;
 
     public PlayerWarpsCommand(PlayerWarpServices services, Messages messages) {
         super(services, messages);

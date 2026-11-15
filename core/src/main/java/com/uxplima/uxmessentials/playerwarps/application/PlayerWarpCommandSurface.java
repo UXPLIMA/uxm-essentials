@@ -6,6 +6,7 @@ import java.util.function.Function;
 import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
 import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 
 /**
  * The player-warps context's command surface as platform-neutral
@@ -24,14 +25,17 @@ final class PlayerWarpCommandSurface {
 
     static List<CommandSpec> all() {
         return List.of(
-                spec("pwarp", "uxmessentials.pwarp.use", PlayerWarpCommand.of("pwarp", "Teleport to a player warp")),
+                spec(
+                        "pwarp",
+                        DestinationPermissions.PWARP_USE,
+                        PlayerWarpCommand.of("pwarp", "Teleport to a player warp")),
                 spec(
                         "setpwarp",
-                        "uxmessentials.pwarp.set",
+                        DestinationPermissions.PWARP_SET,
                         PlayerWarpCommand.of("setpwarp", "Create or move a player warp")),
                 spec(
                         "pwarps",
-                        "uxmessentials.pwarp.list",
+                        DestinationPermissions.PWARP_LIST,
                         PlayerWarpCommand.of("pwarps", "List your or a player's public warps")));
     }
 

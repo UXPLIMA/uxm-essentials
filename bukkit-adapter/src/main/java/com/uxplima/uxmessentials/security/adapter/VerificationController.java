@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.security.domain.event.VerificationPassed;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
+import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -59,7 +60,7 @@ public final class VerificationController implements KeypadActions {
      * Holding this node means the server requires a PIN of you: joining without one holds you at the create pad
      * rather than letting you through. It ships denied, so nothing changes until an operator grants it.
      */
-    public static final String PIN_REQUIRED_PERMISSION = "uxmessentials.security.pin.required";
+    public static final String PIN_REQUIRED_PERMISSION = EnforcementPermissions.SECURITY_PIN_REQUIRED;
 
     private final TwoFactorRepository repository;
     private final VerifyTwoFactor verify;

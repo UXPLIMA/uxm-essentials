@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.PlayerTargets;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
@@ -42,8 +43,8 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class GlowCommand extends PlayerstateCommandSupport implements CommandRegistration {
 
-    private static final String PERMISSION = "uxmessentials.glow.use";
-    private static final String COLOUR_PERMISSION = "uxmessentials.glow.color";
+    private static final String PERMISSION = PlayerstatePermissions.GLOW_USE;
+    private static final String COLOUR_PERMISSION = PlayerstatePermissions.GLOW_COLOR;
 
     /** The colour ids offered in completion, in the enum's own order (dark to light, as vanilla lists them). */
     private static final List<String> COLOUR_IDS =
@@ -56,7 +57,7 @@ public final class GlowCommand extends PlayerstateCommandSupport implements Comm
     /** Targeting somebody else takes this node, or the cross-cutting playerstate one. */
     @Override
     String othersNode() {
-        return "uxmessentials.glow.others";
+        return PlayerstatePermissions.GLOW_OTHERS;
     }
 
     @Override

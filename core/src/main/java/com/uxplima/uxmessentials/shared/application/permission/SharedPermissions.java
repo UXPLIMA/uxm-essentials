@@ -6,8 +6,67 @@ import java.util.stream.Stream;
 /**
  * The permission table for the cross-cutting surfaces no single module owns. Data, not logic: one row per node, read
  * by {@link PermissionCatalog} and through it by the server registration, the in-game listing and its export.
+ *
+ * <p>Every node is also a constant here, or a factory for a family named at runtime, and the code checks it through
+ * that constant, so the code holds no second copy of the string for a rename to miss.
  */
-final class SharedPermissions {
+public final class SharedPermissions {
+
+    public static final String ADMIN = "uxmessentials.admin";
+    public static final String ADMIN_BACKUP = "uxmessentials.admin.backup";
+    public static final String ADMIN_IMPORT = "uxmessentials.admin.import";
+    public static final String ADMIN_PERMISSIONS = "uxmessentials.admin.permissions";
+    public static final String ADMIN_PLACEHOLDERS = "uxmessentials.admin.placeholders";
+    public static final String ADMIN_RELOAD = "uxmessentials.admin.reload";
+    public static final String ADMIN_DOCTOR_REPAIR = "uxmessentials.admin.doctor.repair";
+    public static final String GUI = "uxmessentials.gui";
+    public static final String HELP = "uxmessentials.help";
+    public static final String LANG_USE = "uxmessentials.lang.use";
+    public static final String LANG_OTHERS = "uxmessentials.lang.others";
+    public static final String REST_ADMIN = "uxmessentials.rest.admin";
+    public static final String UPDATE_NOTIFY = "uxmessentials.update.notify";
+
+    /** The space every node of the plugin lives in, separator included. */
+    public static final String NAMESPACE = "uxmessentials.";
+
+    private static final String COOLDOWN_PREFIX = "uxmessentials.cooldown.";
+    private static final String COOLDOWN_BYPASS_PREFIX = "uxmessentials.cooldown.bypass.";
+    private static final String MODULE_PREFIX = "uxmessentials.module.";
+
+    /** The head of the cooldown tiers for one labelled feature; the seconds held are appended to it. */
+    public static String cooldown(String label) {
+        return COOLDOWN_PREFIX + label;
+    }
+
+    /** The node that skips the cooldown of one labelled feature. */
+    public static String cooldownBypass(String label) {
+        return COOLDOWN_BYPASS_PREFIX + label;
+    }
+
+    /** The head of the cooldown tiers a feature resolves through its own segment, as {@code tp} does. */
+    public static String featureCooldown(String feature) {
+        return NAMESPACE + feature + ".cooldown";
+    }
+
+    /** The node that skips the cooldown a feature resolves through its own segment. */
+    public static String featureCooldownBypass(String feature) {
+        return featureCooldown(feature) + ".bypass";
+    }
+
+    /** The head of the warmup tiers a feature resolves through its own segment, as {@code tp} does. */
+    public static String featureWarmup(String feature) {
+        return NAMESPACE + feature + ".warmup";
+    }
+
+    /** The node that starts a feature's teleport with no warmup. */
+    public static String featureWarmupBypass(String feature) {
+        return featureWarmup(feature) + ".bypass";
+    }
+
+    /** The operator node that reloads and inspects one module. */
+    public static String module(String id) {
+        return MODULE_PREFIX + id;
+    }
 
     private SharedPermissions() {}
 
@@ -17,58 +76,50 @@ final class SharedPermissions {
 
     private static List<PermissionSpec> shared() {
         return List.of(
+                PermissionSpec.shared(ADMIN, "Access to the /uxmess administration root.", PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.admin", "Access to the /uxmess administration root.", PermissionDefault.OP),
+                        ADMIN_BACKUP, "/backup to snapshot the plugin data directory on demand.", PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.admin.backup",
-                        "/backup to snapshot the plugin data directory on demand.",
-                        PermissionDefault.OP),
-                PermissionSpec.shared(
-                        "uxmessentials.admin.import",
+                        ADMIN_IMPORT,
                         "/uxmess import <plugin>: run the one-shot data import from another essentials plugin.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.admin.permissions",
+                        ADMIN_PERMISSIONS,
                         "/uxmess permissions [area] [page] and /uxmess permissions export: read the permission catalogue in game or write it to a file.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.admin.placeholders",
+                        ADMIN_PLACEHOLDERS,
                         "/uxmess placeholders [area] [page] and /uxmess placeholders export: read the placeholder catalogue in game or write it to a file.",
                         PermissionDefault.OP),
+                PermissionSpec.shared(ADMIN_RELOAD, "Reload all modules via /uxmess reload.", PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.admin.reload", "Reload all modules via /uxmess reload.", PermissionDefault.OP),
-                PermissionSpec.shared(
-                        "uxmessentials.admin.doctor.repair",
+                        ADMIN_DOCTOR_REPAIR,
                         "/uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows.",
                         PermissionDefault.OP),
                 PermissionSpec.sharedFamily(
-                        "uxmessentials.cooldown.<feature>.<seconds>",
+                        cooldown("<feature>") + ".<seconds>",
                         "The wait between uses of one rate-limited feature, in seconds; the shortest tier held wins and 0 removes the wait.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER),
                 PermissionSpec.sharedFamily(
-                        "uxmessentials.cooldown.bypass.<feature>",
+                        cooldownBypass("<feature>"),
                         "Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses).",
                         PermissionDefault.OP,
                         PermissionShape.LABEL),
+                PermissionSpec.shared(GUI, "/uxmess gui to open the module management hub.", PermissionDefault.OP),
+                PermissionSpec.shared(HELP, "/help to list the commands you can use.", PermissionDefault.TRUE),
                 PermissionSpec.shared(
-                        "uxmessentials.gui", "/uxmess gui to open the module management hub.", PermissionDefault.OP),
+                        LANG_USE, "/lang to set or clear your personal language override.", PermissionDefault.TRUE),
                 PermissionSpec.shared(
-                        "uxmessentials.help", "/help to list the commands you can use.", PermissionDefault.TRUE),
-                PermissionSpec.shared(
-                        "uxmessentials.lang.use",
-                        "/lang to set or clear your personal language override.",
-                        PermissionDefault.TRUE),
-                PermissionSpec.shared(
-                        "uxmessentials.lang.others",
+                        LANG_OTHERS,
                         "/lang set <player> <language> and /lang reset <player>: set or clear another player's language, online or away.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.rest.admin",
+                        REST_ADMIN,
                         "Checked by the optional uxmEssentials-rest add-on: /uxmapi token create|list|revoke and /uxmapi status to manage API tokens.",
                         PermissionDefault.OP),
                 PermissionSpec.shared(
-                        "uxmessentials.update.notify",
+                        UPDATE_NOTIFY,
                         "Receive the join-time notice when a newer plugin version is available.",
                         PermissionDefault.OP));
     }

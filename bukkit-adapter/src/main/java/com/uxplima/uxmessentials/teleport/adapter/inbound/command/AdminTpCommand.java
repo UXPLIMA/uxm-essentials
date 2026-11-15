@@ -20,6 +20,7 @@ import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -72,7 +73,7 @@ public final class AdminTpCommand extends TeleportCommandSupport implements Comm
     }
 
     /** The node for the coordinate form of {@code /tp x y z [world]}, gated by the position node. */
-    private static final String POSITION_PERMISSION = "uxmessentials.tp.position";
+    private static final String POSITION_PERMISSION = TeleportPermissions.TP_POSITION;
 
     @Override
     public LiteralCommandNode<CommandSourceStack> build() {

@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -61,7 +62,7 @@ public final class HomeListMenu {
     public static final String SPEC_ID = "home-list";
 
     private static final String SPEC_RESOURCE = "modules/homes/gui/home-list.conf";
-    private static final String BYPASS_UNSAFE_PERMISSION = "uxmessentials.home.bypass.unsafe";
+    private static final String BYPASS_UNSAFE_PERMISSION = DestinationPermissions.HOME_BYPASS_UNSAFE;
 
     private final Menus menus;
     private final Messages messages;

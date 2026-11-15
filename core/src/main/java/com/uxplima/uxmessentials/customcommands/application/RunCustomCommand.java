@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
@@ -41,10 +42,10 @@ import org.jspecify.annotations.Nullable;
 public final class RunCustomCommand {
 
     /** Holding this node skips the cooldown gate outright. */
-    public static final String COOLDOWN_BYPASS = "uxmessentials.customcommand.cooldown.bypass";
+    public static final String COOLDOWN_BYPASS = ContentPermissions.CUSTOMCOMMAND_COOLDOWN_BYPASS;
 
     /** Holding this node runs a priced command without paying for it. */
-    public static final String COST_BYPASS = "uxmessentials.customcommand.cost.bypass";
+    public static final String COST_BYPASS = ContentPermissions.CUSTOMCOMMAND_COST_BYPASS;
 
     /** The feature segment the shared warmup port builds its permission nodes from. */
     public static final String WARMUP_FEATURE = "customcommand";

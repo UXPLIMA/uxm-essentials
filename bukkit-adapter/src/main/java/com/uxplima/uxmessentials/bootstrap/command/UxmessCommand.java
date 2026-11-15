@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.module.ModuleRegistry;
+import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -66,9 +67,9 @@ public final class UxmessCommand implements CommandRegistration, AutoCloseable {
     private static final List<String> ALIASES = List.of("uxmessentials", "uxe");
     private static final String DESCRIPTION = "uxmEssentials administration root.";
 
-    private static final String PERMISSION_ADMIN = "uxmessentials.admin";
-    private static final String PERMISSION_RELOAD = "uxmessentials.admin.reload";
-    private static final String PERMISSION_DOCTOR_REPAIR = "uxmessentials.admin.doctor.repair";
+    private static final String PERMISSION_ADMIN = SharedPermissions.ADMIN;
+    private static final String PERMISSION_RELOAD = SharedPermissions.ADMIN_RELOAD;
+    private static final String PERMISSION_DOCTOR_REPAIR = SharedPermissions.ADMIN_DOCTOR_REPAIR;
 
     /** The arguments of the import line, which are command syntax and the same in every language. */
     private static final String IMPORT_ARGUMENTS = "<source> [--dry-run]";

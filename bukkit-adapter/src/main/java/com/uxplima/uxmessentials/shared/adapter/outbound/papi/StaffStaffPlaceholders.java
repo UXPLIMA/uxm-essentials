@@ -5,6 +5,7 @@ import java.util.Objects;
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.staff.application.port.StaffModeStore;
 import org.jspecify.annotations.NullMarked;
@@ -22,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class StaffStaffPlaceholders implements StaffPlaceholders {
 
-    private static final String STAFF_MEMBER_NODE = "uxmessentials.staff.member";
+    private static final String STAFF_MEMBER_NODE = SocialPermissions.STAFF_MEMBER;
 
     private final StaffModeStore store;
     private final Server server;

@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestio
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Sender;
@@ -46,7 +47,7 @@ import org.jspecify.annotations.Nullable;
 abstract class PlayerstateCommandSupport {
 
     /** The cross-cutting node that lets a command target a player other than the sender. */
-    static final String OTHERS_PERMISSION = "uxmessentials.playerstate.others";
+    static final String OTHERS_PERMISSION = PlayerstatePermissions.PLAYERSTATE_OTHERS;
 
     private static final MessageKey PLAYERS_ONLY = SharedMessageKey.COMMAND_PLAYERS_ONLY;
     private static final MessageKey UNKNOWN_PLAYER = SharedMessageKey.COMMAND_UNKNOWN_PLAYER;

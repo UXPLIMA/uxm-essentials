@@ -5,6 +5,7 @@ import java.util.List;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.MenuType;
 
+import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -23,15 +24,15 @@ import org.jspecify.annotations.Nullable;
  */
 @NullMarked
 public enum Workstation {
-    ANVIL("anvil", null, "uxmessentials.workstation.anvil", "anvil"),
-    WORKBENCH("workbench", "craft", "uxmessentials.workstation.workbench", "crafting table"),
-    ENDERCHEST("enderchest", "echest", "uxmessentials.workstation.enderchest", "ender chest"),
-    GRINDSTONE("grindstone", null, "uxmessentials.workstation.grindstone", "grindstone"),
-    CARTOGRAPHY("cartography", null, "uxmessentials.workstation.cartography", "cartography table"),
-    LOOM("loom", null, "uxmessentials.workstation.loom", "loom"),
-    SMITHINGTABLE("smithingtable", null, "uxmessentials.workstation.smithingtable", "smithing table"),
-    STONECUTTER("stonecutter", null, "uxmessentials.workstation.stonecutter", "stonecutter"),
-    FURNACE("furnace", null, "uxmessentials.workstation.furnace", "furnace");
+    ANVIL("anvil", null, ItemworldPermissions.WORKSTATION_ANVIL, "anvil"),
+    WORKBENCH("workbench", "craft", ItemworldPermissions.WORKSTATION_WORKBENCH, "crafting table"),
+    ENDERCHEST("enderchest", "echest", ItemworldPermissions.WORKSTATION_ENDERCHEST, "ender chest"),
+    GRINDSTONE("grindstone", null, ItemworldPermissions.WORKSTATION_GRINDSTONE, "grindstone"),
+    CARTOGRAPHY("cartography", null, ItemworldPermissions.WORKSTATION_CARTOGRAPHY, "cartography table"),
+    LOOM("loom", null, ItemworldPermissions.WORKSTATION_LOOM, "loom"),
+    SMITHINGTABLE("smithingtable", null, ItemworldPermissions.WORKSTATION_SMITHINGTABLE, "smithing table"),
+    STONECUTTER("stonecutter", null, ItemworldPermissions.WORKSTATION_STONECUTTER, "stonecutter"),
+    FURNACE("furnace", null, ItemworldPermissions.WORKSTATION_FURNACE, "furnace");
 
     private final String literal;
     private final @Nullable String alias;

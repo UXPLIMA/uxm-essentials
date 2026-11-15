@@ -32,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -238,7 +239,7 @@ public final class TeleportWiring {
                 "teleport",
                 TeleportMessageKey.GUI_SETTINGS_TITLE,
                 org.bukkit.Material.ENDER_PEARL,
-                "uxmessentials.teleport.gui",
+                TeleportPermissions.TELEPORT_GUI,
                 settingsView::open));
         // The /rtp menu-engine world picker (opened by /rtp gui). Registered with the shared menu bindings, its
         // list source, tile placeholders, and world-click action, so the shipped rtp.conf spec resolves cleanly.

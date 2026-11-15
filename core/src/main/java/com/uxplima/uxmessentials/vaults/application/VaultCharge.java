@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -24,7 +25,7 @@ import com.uxplima.uxmessentials.vaults.domain.VaultError;
  */
 public final class VaultCharge {
 
-    private static final String BYPASS_NODE = "uxmessentials.vault.free";
+    private static final String BYPASS_NODE = DestinationPermissions.VAULT_FREE;
 
     private final Permissions permissions;
     private final Optional<VaultEconomy> economy;

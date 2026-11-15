@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.vaults.application.port.VaultAudit;
@@ -80,7 +81,7 @@ class DeleteVaultTest {
     @Test
     void theBypassHolderWasNeverChargedSoGetsNoRefund() {
         own(ALEX, 1);
-        permissions.grant(ALEX, "uxmessentials.vault.free");
+        permissions.grant(ALEX, DestinationPermissions.VAULT_FREE);
 
         deleteVault().delete(ALEX, 1);
 

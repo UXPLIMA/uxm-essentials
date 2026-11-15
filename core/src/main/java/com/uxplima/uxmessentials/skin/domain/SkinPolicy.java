@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -26,9 +27,6 @@ public record SkinPolicy(
         List<String> restrictedSkins,
         List<String> allowedUrlHosts,
         List<String> defaultPool) {
-
-    /** The prefix every per-skin permission node is built on. */
-    private static final String NAME_NODE = "uxmessentials.skin.name.";
 
     public SkinPolicy {
         blockedSkins = lowerCased(blockedSkins, "blockedSkins");
@@ -65,7 +63,7 @@ public record SkinPolicy(
      */
     public String permissionFor(String skinName) {
         Objects.requireNonNull(skinName, "skinName");
-        return NAME_NODE + skinName.toLowerCase(Locale.ROOT);
+        return ContentPermissions.skinName(skinName.toLowerCase(Locale.ROOT));
     }
 
     /**
