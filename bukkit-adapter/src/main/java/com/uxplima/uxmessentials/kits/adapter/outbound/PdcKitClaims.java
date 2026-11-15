@@ -38,6 +38,7 @@ import org.jspecify.annotations.NullMarked;
 public final class PdcKitClaims implements KitClaimStore {
 
     private static final String CLAIM_PREFIX = "kit-claimed-";
+    private static final String INDEX_KEY = "kit-claimed-index";
 
     private final Plugin plugin;
     private final NamespacedKey indexKey;
@@ -45,7 +46,17 @@ public final class PdcKitClaims implements KitClaimStore {
 
     public PdcKitClaims(Plugin plugin) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
-        this.indexKey = new NamespacedKey(plugin, "kit-claimed-index");
+        this.indexKey = new NamespacedKey(plugin, INDEX_KEY);
+    }
+
+    /**
+     * The ids of every one-time kit {@code pdc} marks as claimed, read without an instance: the network carries them
+     * into the database the first time a player joins with it on.
+     */
+    public static Set<String> claimedIds(Plugin plugin, PersistentDataContainer pdc) {
+        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(pdc, "pdc");
+        return readIndex(pdc, new NamespacedKey(plugin, INDEX_KEY));
     }
 
     @Override
@@ -104,6 +115,10 @@ public final class PdcKitClaims implements KitClaimStore {
     }
 
     private Set<String> readIndex(PersistentDataContainer pdc) {
+        return readIndex(pdc, indexKey);
+    }
+
+    private static Set<String> readIndex(PersistentDataContainer pdc, NamespacedKey indexKey) {
         String raw = pdc.getOrDefault(indexKey, PersistentDataType.STRING, "");
         if (raw.isEmpty()) {
             return new LinkedHashSet<>();

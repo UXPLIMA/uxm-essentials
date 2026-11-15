@@ -8,29 +8,21 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 
-import com.uxplima.uxmessentials.kits.application.KitAccess;
-import com.uxplima.uxmessentials.kits.application.port.KitGranter;
-import com.uxplima.uxmessentials.kits.application.port.KitRepository;
-import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.application.GrantFirstJoinKits;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Listens for {@link PlayerJoinEvent} to automatically grant any kit configured with
- * {@code firstJoin = true} to players joining the server for the first time.
+ * Listens for {@link PlayerJoinEvent} to hand a player who joins this server for the first time every kit configured
+ * with {@code firstJoin = true}, through {@link GrantFirstJoinKits}.
  */
 @NullMarked
 public final class KitsJoinListener implements Listener {
 
-    private final KitRepository repository;
-    private final KitGranter granter;
-    private final KitAccess access;
+    private final GrantFirstJoinKits firstJoinKits;
 
-    public KitsJoinListener(KitRepository repository, KitGranter granter, KitAccess access) {
-        this.repository = Objects.requireNonNull(repository, "repository");
-        this.granter = Objects.requireNonNull(granter, "granter");
-        this.access = Objects.requireNonNull(access, "access");
+    public KitsJoinListener(GrantFirstJoinKits firstJoinKits) {
+        this.firstJoinKits = Objects.requireNonNull(firstJoinKits, "firstJoinKits");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -39,14 +31,6 @@ public final class KitsJoinListener implements Listener {
         if (player.hasPlayedBefore()) {
             return;
         }
-        PlayerRef who = BukkitRefs.toRef(player);
-        for (KitDefinition kit : repository.all()) {
-            if (kit.firstJoin()) {
-                granter.grant(who, access.resolveVariant(who, kit));
-                if (kit.isOneTime()) {
-                    access.recordClaim(who, kit);
-                }
-            }
-        }
+        firstJoinKits.grant(BukkitRefs.toRef(player));
     }
 }

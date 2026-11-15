@@ -154,7 +154,8 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         if (sender == null) {
             return 0;
         }
-        services.claimKit().claim(ref(sender), KitId.of(ctx.getArgument("name", String.class)));
+        // The use case answers the player itself, now or once a shared claim comes back.
+        var unused = services.claimKit().claim(ref(sender), KitId.of(ctx.getArgument("name", String.class)));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -170,7 +171,9 @@ public final class KitCommand extends KitCommandSupport implements CommandRegist
         // The grant mutates the RECIPIENT's inventory/world (BukkitKitGranter) and spawns effects in their world,
         // so it must run on the recipient's region thread, not the giving sender's. Hop onto the recipient's
         // entity thread. A self-claim goes through claimSelf and stays on the player's own thread.
-        scheduler.onEntity(recipient, () -> services.claimKit().claimFor(actor, recipient, kit));
+        scheduler.onEntity(recipient, () -> {
+            var unused = services.claimKit().claimFor(actor, recipient, kit);
+        });
         return Command.SINGLE_SUCCESS;
     }
 

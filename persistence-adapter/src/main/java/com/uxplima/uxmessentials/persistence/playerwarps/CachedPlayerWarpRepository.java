@@ -12,6 +12,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.ReadThroughCache;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.application.port.RentReminderCandidate;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -156,6 +157,22 @@ public final class CachedPlayerWarpRepository implements PlayerWarpRepository {
     @Override
     public List<PlayerWarp> suspendedForRent(int limit) {
         return delegate.suspendedForRent(limit);
+    }
+
+    @Override
+    public List<PlayerWarp> archivedForRent(Instant cutoff, Optional<RentArchiveCursor> after, int limit) {
+        return delegate.archivedForRent(cutoff, after, limit);
+    }
+
+    @Override
+    public boolean deleteIfArchivedForRent(PlayerWarpId id, Instant cutoff) {
+        // Resolved first for the owner to drop, as deleteById does; only a delete that happened reaches the owner.
+        Optional<PlayerWarp> existing = delegate.findById(id);
+        boolean deleted = delegate.deleteIfArchivedForRent(id, cutoff);
+        if (deleted) {
+            existing.ifPresent(warp -> cache.invalidate(warp.owner().uuid()));
+        }
+        return deleted;
     }
 
     @Override
