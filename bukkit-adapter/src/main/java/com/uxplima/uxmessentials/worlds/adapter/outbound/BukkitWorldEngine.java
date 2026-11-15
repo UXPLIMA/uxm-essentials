@@ -239,22 +239,20 @@ public final class BukkitWorldEngine implements WorldEngine {
     }
 
     /**
-     * The uid of every world with files on disk whose folder records one, read from the folder by
-     * {@link WorldUidFiles}. Disk reads only, for the async lane: a loaded world's uid comes from {@link #uidOf}.
+     * Every world with files on disk, loaded or not, with the uid its folder records, read by {@link WorldUidFiles}.
+     * Disk reads only, for the async lane: a loaded world's live uid comes from {@link #uidOf}. Unlike
+     * {@link #onDiskWorldNames}, a folder that cannot be listed is thrown, not logged and skipped, so the start-up
+     * claim does not mistake a failed scan for a disk without worlds.
+     *
+     * @throws UncheckedIOException if a world folder cannot be listed
      */
-    public Map<WorldName, UUID> onDiskWorldUids() {
-        Map<WorldName, UUID> uids = new HashMap<>();
-        try {
-            for (Map.Entry<String, Path> folder : folders.onDiskFolders().entrySet()) {
-                // A folder whose name is no world name is skipped, and logged by onDiskWorldNames.
-                validName(folder.getKey())
-                        .ifPresent(
-                                world -> WorldUidFiles.read(folder.getValue()).ifPresent(uid -> uids.put(world, uid)));
-            }
-        } catch (UncheckedIOException e) {
-            log.error("Failed to scan the world folders", e);
+    public Map<WorldName, Optional<UUID>> scanWorldFolders() {
+        Map<WorldName, Optional<UUID>> worlds = new HashMap<>();
+        for (Map.Entry<String, Path> folder : folders.onDiskFolders().entrySet()) {
+            // A folder whose name is no world name is skipped, and logged by onDiskWorldNames.
+            validName(folder.getKey()).ifPresent(world -> worlds.put(world, WorldUidFiles.read(folder.getValue())));
         }
-        return uids;
+        return worlds;
     }
 
     private static Optional<WorldName> validName(String name) {

@@ -292,7 +292,16 @@ public final class WorldsWiring {
         BiConsumer<Player, PlayerRef> reopenList = (player, viewer) -> listHolder[0].open(player, viewer);
         WorldMainMenu mainMenu = new WorldMainMenu(menus, tracked, repository, engine, reopenList);
         WorldServerAdoption adoption = new WorldServerAdoption(
-                persistence, tracked, kernel.log(), scope, networkEnabled, localName, engine, cache, bus.publisher());
+                persistence,
+                tracked,
+                kernel.log(),
+                scope,
+                networkEnabled,
+                localName,
+                engine,
+                cache,
+                bus.publisher(),
+                settings::autoAdoptLoaded);
         boolean showRemote = worldHops.enabled();
         WorldsServices services = assemble(
                 kernel,
@@ -311,7 +320,7 @@ public final class WorldsWiring {
                 restoreWorld,
                 reopenList,
                 mainMenu::open,
-                new ClaimWorld(adoption, notifier, tracked),
+                new ClaimWorld(adoption, notifier, tracked, kernel.log()),
                 new SetWorldServer(
                         adoption, notifier, presence, tracked, kernel.log(), NetworkConfig.DEFAULT_SERVER_ID),
                 scope,

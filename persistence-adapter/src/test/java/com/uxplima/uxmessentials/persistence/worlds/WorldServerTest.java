@@ -320,16 +320,50 @@ class WorldServerTest {
     }
 
     @Test
-    void aRenamedServerKeepsHavingRunItsClaimUnderTheNewName() {
+    void aRenameMovesTheClaimMarkerSoTheNewNameSkipsItAndTheOldNameIsFree() {
         oldReleaseRegisters(ARENA, Optional.empty(), "false");
         upgrade();
         claimer().claimPresent(LOBBY, Set.of("world"), Map.of());
 
         claimer().rename(LOBBY, "hub");
         WorldServerClaimer.Claims hubStart = claimer().claimPresent("hub", Set.of("arena"), Map.of());
+        WorldServerClaimer.Claims newLobbyStart = claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
 
         assertThat(hubStart.ran()).isFalse();
         assertThat(on("hub").exists(ARENA)).isFalse();
+        assertThat(newLobbyStart.ran()).isTrue();
+        assertThat(newLobbyStart.claimed()).containsExactly("arena");
+    }
+
+    @Test
+    void aServerWhoseWorldsAreHandedBackToTheClaimClaimsThemAgainAtItsNextStart() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
+        upgrade();
+        claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
+
+        claimer().rename(LOBBY, NetworkWorld.UNSCOPED);
+        WorldServerClaimer.Claims nextStart = claimer().claimPresent(LOBBY, Set.of("arena"), Map.of());
+
+        assertThat(nextStart.ran()).isTrue();
+        assertThat(nextStart.claimed()).containsExactly("arena");
+        assertThat(on(LOBBY).find(ARENA).orElseThrow().autoLoad()).isTrue();
+    }
+
+    @Test
+    void aWorldLoadedAfterTheFirstStartIsAdoptedFromItsTemplateWithItsSettings() {
+        oldReleaseRegisters(ARENA, Optional.of(SURVIVAL_WORLD_UID), "false");
+        upgrade();
+        claimer().claimPresent(LOBBY, Set.of("world"), Map.of("world", LOBBY_WORLD_UID));
+
+        List<String> adopted = claimer().adoptLoaded(LOBBY, Map.of("world", LOBBY_WORLD_UID, "arena", LOBBY_WORLD_UID));
+        List<String> again = claimer().adoptLoaded(LOBBY, Map.of("arena", LOBBY_WORLD_UID));
+
+        assertThat(adopted).containsExactly("arena");
+        assertThat(again).isEmpty();
+        ManagedWorld arena = on(LOBBY).find(ARENA).orElseThrow();
+        assertThat(arena.settings().get(WorldProperties.PVP)).isFalse();
+        assertThat(arena.knownUid()).contains(UUID.fromString(LOBBY_WORLD_UID));
+        assertThat(on(LOBBY).exists(WORLD)).isFalse();
     }
 
     @Test

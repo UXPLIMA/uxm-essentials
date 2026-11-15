@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.persistence.jooq.tables.records.WorldRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.WorldSettingRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import org.jooq.DSLContext;
 import org.jooq.Record2;
@@ -39,7 +40,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>The start-up claim runs once per server name: the first run records the name in {@code world_claim} in the same
  * transaction as the copies, and every later start skips it. So a world a backend unregisters is not copied back from
  * its template at the next start, and the template stays for a backend that has not started since the upgrade. A
- * world that arrives later is taken with {@link #claimNamed}. Templates are removed only by an operator: handing a
+ * world that arrives later is taken with {@link #claimNamed}, and one that is loaded here later is adopted from its
+ * template by {@link #adoptLoaded}. Templates are removed only by an operator: handing a
  * server's worlds back with {@link #rename} to {@value NetworkWorld#UNSCOPED} replaces them, and one nobody needs is
  * deleted by hand from {@code world} and {@code world_setting}.
  */
@@ -88,6 +90,12 @@ public final class WorldServerClaimer extends JooqRepository {
             Persistence persistence, String serverId, Collection<String> present, Map<String, String> uids) {
         Objects.requireNonNull(persistence, "persistence");
         return new WorldServerClaimer(persistence.dsl()).claimPresent(serverId, present, uids);
+    }
+
+    /** {@link #adoptLoaded} over the shared {@link Persistence} handle. */
+    public static List<String> adoptLoaded(Persistence persistence, String serverId, Map<String, String> loadedUids) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new WorldServerClaimer(persistence.dsl()).adoptLoaded(serverId, loadedUids);
     }
 
     /** {@link #claimNamed} over the shared {@link Persistence} handle. */
@@ -160,7 +168,47 @@ public final class WorldServerClaimer extends JooqRepository {
     public boolean claimNamed(String serverId, String name) {
         requireClaimable(serverId);
         Objects.requireNonNull(name, "name");
-        return write(dsl -> !keptBy(dsl, serverId).contains(name) && copy(dsl, serverId, name, Optional.empty()));
+        try {
+            return write(dsl -> !keptBy(dsl, serverId).contains(name) && copy(dsl, serverId, name, Optional.empty()));
+        } catch (PersistenceException raced) {
+            // Two claims of one name on this backend at once: the other one inserted the row first. Any other failure
+            // leaves the name unkept and is rethrown.
+            if (read(dsl -> keptBy(dsl, serverId).contains(name))) {
+                return false;
+            }
+            throw raced;
+        }
+    }
+
+    /**
+     * Copy onto {@code serverId} the template of each world loaded here that this backend does not keep yet, under the
+     * loaded world's uid, returning the names copied. This is the adopt of a loaded world that has a template: a world
+     * that came to this backend after its first start (bukkit.yml, another plugin) keeps the template's settings
+     * instead of being adopted with defaults beside it, which would also make {@link #claimNamed} refuse it.
+     *
+     * @param loadedUids the uid of every world loaded here, by world name
+     */
+    public List<String> adoptLoaded(String serverId, Map<String, String> loadedUids) {
+        requireClaimable(serverId);
+        Objects.requireNonNull(loadedUids, "loadedUids");
+        if (loadedUids.isEmpty()) {
+            return List.of();
+        }
+        return write(dsl -> {
+            Set<String> kept = keptBy(dsl, serverId);
+            List<String> adopted = new ArrayList<>();
+            for (String name : dsl.select(WORLD.NAME)
+                    .from(WORLD)
+                    .where(WORLD.SERVER_ID.eq(NetworkWorld.UNSCOPED))
+                    .and(WORLD.NAME.in(loadedUids.keySet()))
+                    .orderBy(WORLD.NAME)
+                    .fetch(WORLD.NAME)) {
+                if (!kept.contains(name) && copy(dsl, serverId, name, Optional.ofNullable(loadedUids.get(name)))) {
+                    adopted.add(name);
+                }
+            }
+            return adopted;
+        });
     }
 
     /**
@@ -188,10 +236,17 @@ public final class WorldServerClaimer extends JooqRepository {
             if (to.equals(NetworkWorld.UNSCOPED) && !names.isEmpty()) {
                 dropTemplates(dsl, names);
             }
-            // The worlds of the old name were claimed already; a claim under the new name would copy back the
-            // templates of worlds that server has since unregistered.
-            if (!to.equals(NetworkWorld.UNSCOPED) && hasRun(dsl, from) && !hasRun(dsl, to)) {
-                markRun(dsl, to);
+            // The claim marker follows the worlds. Moved to a new name, the claim was done already, and a claim under
+            // that name would copy back the templates of worlds the server has since unregistered; the old name is
+            // free for a backend that never claimed. Handed back to the claim, the server claims again at its next
+            // start, so its worlds are copied and auto-loaded again.
+            if (hasRun(dsl, from)) {
+                if (!to.equals(NetworkWorld.UNSCOPED) && !hasRun(dsl, to)) {
+                    markRun(dsl, to);
+                }
+                dsl.deleteFrom(WORLD_CLAIM)
+                        .where(WORLD_CLAIM.SERVER_ID.eq(from))
+                        .execute();
             }
             return move(dsl, from, to, names).size();
         });

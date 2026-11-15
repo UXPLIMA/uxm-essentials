@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.worlds.application.port.WorldClaims;
@@ -19,20 +20,29 @@ public final class ClaimWorld {
     private final WorldClaims claims;
     private final Notifier notifier;
     private final Scheduler scheduler;
+    private final Logger log;
 
-    public ClaimWorld(WorldClaims claims, Notifier notifier, Scheduler scheduler) {
+    public ClaimWorld(WorldClaims claims, Notifier notifier, Scheduler scheduler, Logger log) {
         this.claims = Objects.requireNonNull(claims, "claims");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     public void claim(PlayerRef who, WorldName name) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(name, "name");
         scheduler.async(() -> {
-            WorldsMessageKey answer =
-                    claims.claim(name) ? WorldsMessageKey.WORLD_CLAIMED : WorldsMessageKey.WORLD_CLAIM_NONE;
-            scheduler.onEntity(who, () -> notifier.send(who, answer, Map.of("world", name.value())));
+            WorldsMessageKey answer;
+            try {
+                answer = claims.claim(name) ? WorldsMessageKey.WORLD_CLAIMED : WorldsMessageKey.WORLD_CLAIM_NONE;
+            } catch (RuntimeException failed) {
+                // The write rolled back, so nothing was claimed; the requester still hears back.
+                log.error("event=world_server_claim_failed by=command world=" + name.value(), failed);
+                answer = WorldsMessageKey.WORLD_IO_ERROR;
+            }
+            WorldsMessageKey reply = answer;
+            scheduler.onEntity(who, () -> notifier.send(who, reply, Map.of("world", name.value())));
         });
     }
 }
