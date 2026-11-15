@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -15,9 +16,11 @@ import org.jspecify.annotations.NullMarked;
  *
  * @param publisher the outbound seam contexts announce mutations through
  * @param registry the inbound seam contexts register their remote-change listeners with
+ * @param bootNonce the random number this run of the backend draws and sends with its heartbeats, so a context can
+ *     stamp its frames with the run they belong to; {@link ServerPing#NO_NONCE} for a disabled cluster
  */
 @NullMarked
-public record Bus(BusPublisher publisher, RemoteSyncRegistry registry) {
+public record Bus(BusPublisher publisher, RemoteSyncRegistry registry, long bootNonce) {
 
     public Bus {
         Objects.requireNonNull(publisher, "publisher");
@@ -26,7 +29,7 @@ public record Bus(BusPublisher publisher, RemoteSyncRegistry registry) {
 
     /** A bus whose publisher discards every frame and whose registry is never read: for a disabled cluster. */
     public static Bus disabled(String serverId) {
-        return new Bus(new NoOpBusPublisher(serverId), new RemoteSyncRegistry());
+        return new Bus(new NoOpBusPublisher(serverId), new RemoteSyncRegistry(), ServerPing.NO_NONCE);
     }
 
     /** The publisher that drops every frame; used when the backend opts out of network sync. */

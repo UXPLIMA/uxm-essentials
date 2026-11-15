@@ -29,7 +29,7 @@ public final class MigrationImportService {
 
     private final SourceRegistry registry;
     private final ImportData importData;
-    private final RecordWriter liveWriter;
+    private final AnnouncingRecordWriter liveWriter;
     private final RecordWriter dryRunWriter;
     private final ImportOptions baseOptions;
     private final Scheduler scheduler;
@@ -39,7 +39,7 @@ public final class MigrationImportService {
     public MigrationImportService(
             SourceRegistry registry,
             ImportData importData,
-            RecordWriter liveWriter,
+            AnnouncingRecordWriter liveWriter,
             RecordWriter dryRunWriter,
             ImportOptions baseOptions,
             Scheduler scheduler,
@@ -99,6 +99,19 @@ public final class MigrationImportService {
             importData.run(actor, source, options, writer);
         } catch (RuntimeException failure) {
             log.error("migration import failed for source " + source.id(), failure);
+        } finally {
+            if (!mode.isDryRun()) {
+                announce(source);
+            }
+        }
+    }
+
+    /** Tell peers what the run stored, even when it stopped part way: those rows are in the database already. */
+    private void announce(Convert source) {
+        try {
+            liveWriter.announce();
+        } catch (RuntimeException failure) {
+            log.error("migration import from " + source.id() + " could not tell other servers what changed", failure);
         }
     }
 }
