@@ -91,6 +91,13 @@ public enum PlayerWarpError {
 
     /** {@code /pwarp sponsor} refused because every sponsor slot is currently taken. */
     SPONSOR_FULL(PlayerwarpsMessageKey.PWARP_SPONSOR_FULL),
+    /**
+     * The teleport rules refused a use of a warp on another backend before its charge (the player is jailed,
+     * combat-tagged or on cooldown). The teleport gate has already told the player which, so the use case does not
+     * send this key; it names the refusal for callers that read the outcome.
+     */
+    TELEPORT_REFUSED(SharedMessageKey.COMMON_ACTION_VETOED),
+
     /** Another plugin refused the action through the developer API. Nothing was written. */
     VETOED(SharedMessageKey.COMMON_ACTION_VETOED);
 
