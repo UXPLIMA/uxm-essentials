@@ -8,9 +8,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailDirectory;
+import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
-import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -26,16 +26,18 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * jail is permanent; with one it is timed. Online-only by default (the countdown advances only while the
  * player is connected in the jail), or wall-clock when the operator opts that jail into {@code jail-countdown
  * = wall-clock} in {@code moderation.conf}. The exempt target, an unknown jail and a malformed duration are
- * refused (audit-logged). On success the jail row is upserted, an online target is teleported into the jail
- * via {@link Sanctions}, {@code PlayerJailed} is published, and the teleport context's {@code JailGate} starts
- * blocking their self-teleports on its next read. An offline target is a DB write only, the join listener
- * re-applies it on reconnect (offline jail).
+ * refused (audit-logged). On success the jail row is upserted, a target connected here is put into the jail
+ * through {@link JailTransfer} (across the proxy when the jail is on another backend), the change is announced to
+ * the peers so the backend holding a target connected there applies it at once, {@code PlayerJailed} is
+ * published, and the teleport context's {@code JailGate} starts blocking their self-teleports on its next read. A
+ * target online nowhere is a DB write only, the join listener re-applies it on reconnect (offline jail).
  */
 public final class Jail {
 
     private final ModerationRepository repository;
     private final JailDirectory jails;
-    private final Sanctions sanctions;
+    private final JailTransfer transfer;
+    private final JailSync sync;
     private final ModerationGuard guard;
     private final Notifier notifier;
     private final ModerationAudit audit;
@@ -45,7 +47,8 @@ public final class Jail {
     public Jail(
             ModerationRepository repository,
             JailDirectory jails,
-            Sanctions sanctions,
+            JailTransfer transfer,
+            JailSync sync,
             ModerationGuard guard,
             Notifier notifier,
             ModerationAudit audit,
@@ -53,7 +56,8 @@ public final class Jail {
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.jails = Objects.requireNonNull(jails, "jails");
-        this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.transfer = Objects.requireNonNull(transfer, "transfer");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
@@ -103,7 +107,8 @@ public final class Jail {
         JailState.Active sentence = sentence(jail, parsed, Issuer.of(actor), reason, now);
         repository.ensureUserExists(target, now);
         repository.saveJail(target, sentence);
-        sanctions.sendToJail(target, jail);
+        transfer.send(target, jail);
+        sync.jailChanged(target, true);
         notifyTarget(target, jail, parsed, reason);
         confirmToActor(actor, target, jail, parsed);
         events.publish(new PlayerJailed(target, sentence, now));

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.domain;
 
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.Position;
 
@@ -17,17 +18,29 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * plain lower-cased strings; blank or overlong input is rejected at construction so it can never reach the
  * store. The width mirrors the {@code moderation_jails.jail} column.
  *
+ * <p>{@code server} is the network name of the backend the jail was set on, so a player held on another backend is
+ * sent there. It is empty for a jail whose backend is not known: one set before servers were recorded and not yet
+ * claimed by the backend holding its world.
+ *
  * @param name the canonical lowercase jail name
  * @param location where a jailed player is teleported
+ * @param server the backend the jail lives on, when known
  */
-public record StoredJail(String name, Position location) {
+public record StoredJail(String name, Position location, Optional<String> server) {
 
     /** Mirrors the {@code moderation_jails.jail} and {@code moderation_jail_locations.name} column width. */
     public static final int MAX_NAME_LENGTH = 64;
 
+    /** The server of a jail whose backend is not known; never the name of a running backend. */
+    public static final String UNSCOPED = "unscoped";
+
     public StoredJail {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(location, "location");
+        Objects.requireNonNull(server, "server");
+        if (server.filter(String::isBlank).isPresent()) {
+            throw new IllegalArgumentException("a jail's server must not be blank");
+        }
     }
 
     /**
@@ -37,7 +50,24 @@ public record StoredJail(String name, Position location) {
     public static StoredJail of(String rawName, Position location) {
         Objects.requireNonNull(rawName, "rawName");
         Objects.requireNonNull(location, "location");
-        return new StoredJail(normalise(rawName), location);
+        return new StoredJail(normalise(rawName), location, Optional.empty());
+    }
+
+    /** A jail set at {@code location} on the backend named {@code server}, which is where its world is. */
+    public static StoredJail of(String rawName, Position location, String server) {
+        Objects.requireNonNull(server, "server");
+        return new StoredJail(normalise(rawName), location, Optional.of(server));
+    }
+
+    /** The backend the jail lives on, when it is known; {@value #UNSCOPED} reads as unknown. */
+    public Optional<String> knownServer() {
+        return server.filter(name -> !name.equals(UNSCOPED));
+    }
+
+    /** True when the jail is known to live on a backend other than {@code localServer}. */
+    public boolean livesElsewhere(String localServer) {
+        Objects.requireNonNull(localServer, "localServer");
+        return knownServer().filter(name -> !name.equals(localServer)).isPresent();
     }
 
     /** The canonical lowercase form of a raw jail name, validated for blank/overlong. */

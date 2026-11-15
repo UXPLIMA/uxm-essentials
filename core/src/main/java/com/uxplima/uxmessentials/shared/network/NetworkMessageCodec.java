@@ -223,6 +223,17 @@ public final class NetworkMessageCodec {
                 out.writeUTF(staffChat.senderName());
                 out.writeUTF(staffChat.message());
             }
+            case JailChanged jail -> {
+                writeUuid(out, jail.frameId());
+                writeUuid(out, jail.target());
+                out.writeBoolean(jail.jailed());
+            }
+            case JailHopFailed failed -> {
+                writeUuid(out, failed.frameId());
+                writeUuid(out, failed.target());
+                out.writeUTF(failed.targetName());
+                out.writeUTF(failed.jail());
+            }
             case TeleportRequestFrame request -> {
                 writeUuid(out, request.requestId());
                 writeUuid(out, request.requesterUuid());
@@ -315,6 +326,8 @@ public final class NetworkMessageCodec {
                         in.readUTF());
             case HELP_OP -> new HelpOpFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case STAFF_CHAT -> new StaffChatFrame(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
+            case JAIL_CHANGED -> new JailChanged(origin, readUuid(in), readUuid(in), in.readBoolean());
+            case JAIL_HOP_FAILED -> new JailHopFailed(origin, readUuid(in), readUuid(in), in.readUTF(), in.readUTF());
             case TELEPORT_REQUEST ->
                 new TeleportRequestFrame(
                         origin,

@@ -43,6 +43,8 @@ public sealed interface NetworkMessage
                 PrivateMessageAnswerFrame,
                 HelpOpFrame,
                 StaffChatFrame,
+                JailChanged,
+                JailHopFailed,
                 TeleportRequestFrame,
                 TeleportAnswerFrame,
                 StaffTeleportFrame {
@@ -85,7 +87,9 @@ public sealed interface NetworkMessage
         STAFF_CHAT(24),
         TELEPORT_REQUEST(25),
         TELEPORT_ANSWER(26),
-        STAFF_TELEPORT(27);
+        STAFF_TELEPORT(27),
+        JAIL_CHANGED(28),
+        JAIL_HOP_FAILED(29);
 
         private final byte wireTag;
 

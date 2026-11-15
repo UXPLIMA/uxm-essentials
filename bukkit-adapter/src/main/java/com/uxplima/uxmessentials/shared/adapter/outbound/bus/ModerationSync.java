@@ -4,10 +4,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.BanChanged;
 import com.uxplima.uxmessentials.shared.network.IpBanChanged;
+import com.uxplima.uxmessentials.shared.network.JailChanged;
+import com.uxplima.uxmessentials.shared.network.JailHopFailed;
 import com.uxplima.uxmessentials.shared.network.MuteChanged;
 import org.jspecify.annotations.NullMarked;
 
@@ -28,6 +31,11 @@ import org.jspecify.annotations.NullMarked;
  *       {@code EnforceRemoteIpBan}, which kicks everyone here on it. A {@code MuteChanged} is a no-op: the messaging mute gate re-reads the
  *       shared DB on the next chat attempt, so there is no in-memory mute state to refresh.
  * </ul>
+ *
+ * <p>A jail is live too: {@link #jailPublisher(BusPublisher)} announces a jail or release and a jail hop that
+ * failed, and {@link #jailListener} hands them to the use cases that apply the change to a player connected here
+ * and tell this backend's staff. Each jail frame carries an id, so a copy delivered twice (the proxy and Redis both
+ * carry it) is acted on once.
  *
  * <p>Self-origin frames never reach the listener. The {@link BusCore} drops any frame whose origin equals
  * this backend's id before dispatch, so the player the local {@code /ban} already kicked is never kicked
@@ -63,6 +71,47 @@ public final class ModerationSync {
             }
             // MuteChanged: no in-memory mute cache to refresh: the mute gate re-reads the shared DB on next chat.
         };
+    }
+
+    /** A {@link JailSync} that announces jail changes and failed jail hops on the bus, each under a fresh id. */
+    public static JailSync jailPublisher(BusPublisher bus) {
+        Objects.requireNonNull(bus, "bus");
+        return new JailPublishing(bus);
+    }
+
+    /** How a backend reacts to a peer's jail frames: the two use case entry points, kept as plain callbacks. */
+    public interface JailFrames {
+
+        /** A peer jailed ({@code jailed}) or released {@code target}. */
+        void jailChanged(UUID frameId, UUID target, boolean jailed);
+
+        /** A peer could not take {@code target}, named {@code targetName}, to {@code jail}. */
+        void hopFailed(UUID frameId, UUID target, String targetName, String jail);
+    }
+
+    /** A listener that hands a peer's {@link JailChanged} and {@link JailHopFailed} frames to {@code frames}. */
+    public static RemoteSyncListener jailListener(JailFrames frames) {
+        Objects.requireNonNull(frames, "frames");
+        return message -> {
+            if (message instanceof JailChanged changed) {
+                frames.jailChanged(changed.frameId(), changed.target(), changed.jailed());
+            } else if (message instanceof JailHopFailed failed) {
+                frames.hopFailed(failed.frameId(), failed.target(), failed.targetName(), failed.jail());
+            }
+        };
+    }
+
+    private record JailPublishing(BusPublisher bus) implements JailSync {
+
+        @Override
+        public void jailChanged(PlayerRef target, boolean jailed) {
+            bus.publish(new JailChanged(bus.serverId(), UUID.randomUUID(), target.uuid(), jailed));
+        }
+
+        @Override
+        public void hopFailed(PlayerRef target, String jail) {
+            bus.publish(new JailHopFailed(bus.serverId(), UUID.randomUUID(), target.uuid(), target.name(), jail));
+        }
     }
 
     /** Stamps each sanction with this backend's origin and routes the matching frame to peers. */
