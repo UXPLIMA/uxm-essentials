@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.teleport.domain;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
-import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The modelled, expected failures of a teleport flow, the {@code E} arm of a {@code Result} a use case

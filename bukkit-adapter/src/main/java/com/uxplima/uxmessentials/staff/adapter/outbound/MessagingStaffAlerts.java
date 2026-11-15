@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.staff.application.StaffMessageKey;
+import com.uxplima.uxmessentials.staff.domain.StaffMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

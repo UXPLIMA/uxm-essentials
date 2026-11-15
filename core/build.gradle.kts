@@ -7,9 +7,17 @@ dependencies {
 }
 
 // The permission literal guard reads the main sources of every module, so it needs the repository root, and a
-// change in any module's sources has to rerun it rather than leave the test task up to date.
+// change in any module's sources has to rerun it rather than leave the test task up to date. The root reaches the
+// test JVM through an argument provider whose path is internal, so the result stays cacheable across checkouts in
+// different places.
+class RepositoryRootArgument(
+    @get:Internal val root: File,
+) : CommandLineArgumentProvider {
+    override fun asArguments(): Iterable<String> = listOf("-Duxm.repositoryRoot=${root.absolutePath}")
+}
+
 tasks.test {
-    systemProperty("uxm.repositoryRoot", rootDir.absolutePath)
+    jvmArgumentProviders.add(RepositoryRootArgument(rootDir))
     inputs
         .files(fileTree(rootDir) { include("*/src/main/java/**/*.java") })
         .withPropertyName("allMainSources")

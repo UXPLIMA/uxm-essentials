@@ -12,21 +12,21 @@ import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.worlds.adapter.outbound.ForcedWorldEntryMarker;
 import com.uxplima.uxmessentials.worlds.application.WorldAccessPolicy;
 import com.uxplima.uxmessentials.worlds.application.WorldTeleportService;
-import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import com.uxplima.uxmessentials.worlds.domain.AccessDecision;
 import com.uxplima.uxmessentials.worlds.domain.ManagedWorld;
 import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import com.uxplima.uxmessentials.worlds.domain.WorldProperties;
+import com.uxplima.uxmessentials.worlds.domain.WorldsMessageKey;
 import com.uxplima.uxmessentials.worlds.domain.event.WorldEntryDenied;
 import org.jspecify.annotations.NullMarked;
 

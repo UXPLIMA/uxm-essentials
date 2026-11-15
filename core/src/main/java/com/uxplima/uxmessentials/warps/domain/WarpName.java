@@ -3,8 +3,6 @@ package com.uxplima.uxmessentials.warps.domain;
 import java.util.Locale;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
-
 /**
  * A warp's name, normalised to its canonical lowercase form so uniqueness and lookup are
  * case-insensitive: {@code /setwarp Shop} and {@code /warp shop} address the same warp.
@@ -37,11 +35,6 @@ public record WarpName(String value) {
             throw new IllegalArgumentException("warp name must be at most " + MAX_LENGTH + " characters");
         }
         return new WarpName(normalised);
-    }
-
-    /** The per-warp permission node segment for this warp: {@code uxmessentials.warp.use.<warp>}. */
-    public String useNode() {
-        return DestinationPermissions.warpUse(value);
     }
 
     @Override

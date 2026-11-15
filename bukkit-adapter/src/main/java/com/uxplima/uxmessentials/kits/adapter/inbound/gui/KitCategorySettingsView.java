@@ -8,9 +8,9 @@ import java.util.function.BiConsumer;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.application.port.KitCategoryRepository;
 import com.uxplima.uxmessentials.kits.domain.KitCategory;
+import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;

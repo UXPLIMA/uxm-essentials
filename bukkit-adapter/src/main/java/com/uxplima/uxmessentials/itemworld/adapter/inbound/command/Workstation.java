@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The nine virtual workstations the itemworld surface opens as a single
  * enum, each carrying its command literal, an optional alias, its permission node, and the display name
- * rendered into {@link com.uxplima.uxmessentials.itemworld.application.ItemworldMessageKey#WORKSTATION_OPENED}.
+ * rendered into {@link com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey#WORKSTATION_OPENED}.
  * Modelling them as one enum keeps the nine commands one parameterised {@link WorkstationCommand} class rather
  * than nine near-identical files; the enum holds only immutable scalar data so the open behaviour lives in
  * {@link #open} as a {@code switch}, keeping the constants Error-Prone-clean.

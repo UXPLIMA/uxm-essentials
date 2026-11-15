@@ -1,7 +1,7 @@
 /**
  * Application layer of the communication context: the use cases that turn the operator's configured policies into
- * rendered output through outbound ports, the {@code CommunicationModule} {@code FeatureModule}, and the
- * {@code CommunicationMessageKey} catalog of the plugin's own strings. {@code ResolveJoinMessage} /
+ * rendered output through outbound ports, and the {@code CommunicationModule} {@code FeatureModule}.
+ * {@code ResolveJoinMessage} /
  * {@code ResolveQuitMessage} / {@code ResolveDeathMessage} apply a channel's {@code MessagePolicy} and substitute
  * placeholders; {@code NextAnnouncement} advances the announcer cursor honouring no-immediate-repeat and the
  * min-players gate; {@code InfoRegistry} maps a command name to its {@code InfoPage}; {@code BroadcastOptOut}

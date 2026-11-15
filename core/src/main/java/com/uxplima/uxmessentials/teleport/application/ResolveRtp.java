@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.teleport.application.port.SafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.RtpSafeLocation;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 
 /**
  * The {@code /rtp} use case: serve a pre-validated safe location O(1) from the per-world queue, redirect

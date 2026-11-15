@@ -24,7 +24,7 @@ import net.kyori.adventure.text.Component;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.VillagerBucketItem;
-import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
+import com.uxplima.uxmessentials.villagers.domain.VillagersMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

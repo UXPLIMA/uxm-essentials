@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
 import com.uxplima.uxmessentials.messaging.domain.MessagingError;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.messaging.domain.event.PrivateMessageSent;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;

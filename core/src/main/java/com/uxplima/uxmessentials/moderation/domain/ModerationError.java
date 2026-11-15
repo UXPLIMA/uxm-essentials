@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.moderation.domain;
 
-import com.uxplima.uxmessentials.moderation.application.ModerationMessageKey;
-
 /**
  * The modelled, expected failures of a moderation action, the {@code E} arm of a {@code Result} a use case
  * returns instead of throwing. Each value carries the {@link ModerationMessageKey} the adapter renders to the

@@ -19,17 +19,17 @@ import org.bukkit.entity.Player;
 
 import com.google.common.base.Splitter;
 import com.uxplima.uxmessentials.customcommands.adapter.CustomCommandWriter;
-import com.uxplima.uxmessentials.customcommands.application.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.customcommands.domain.ActionChain;
 import com.uxplima.uxmessentials.customcommands.domain.ArgumentKind;
 import com.uxplima.uxmessentials.customcommands.domain.CommandArgument;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
+import com.uxplima.uxmessentials.customcommands.domain.CustomCommandsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import org.jspecify.annotations.NullMarked;
 

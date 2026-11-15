@@ -9,9 +9,9 @@ import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.inventory.EquipmentSlot;
 
 import com.uxplima.uxmessentials.poses.adapter.inbound.command.PoseCooldownNotice;
-import com.uxplima.uxmessentials.poses.application.PosesMessageKey;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit;
 import com.uxplima.uxmessentials.poses.application.StartPlayerSit.PlayerSitOutcome;
+import com.uxplima.uxmessentials.poses.domain.PosesMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;

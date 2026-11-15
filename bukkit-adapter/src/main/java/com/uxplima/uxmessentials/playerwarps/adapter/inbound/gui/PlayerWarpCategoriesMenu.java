@@ -11,10 +11,10 @@ import java.util.function.BiConsumer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.SponsorConfig;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpCard;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;

@@ -9,9 +9,9 @@ import java.util.UUID;
 
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Logger;

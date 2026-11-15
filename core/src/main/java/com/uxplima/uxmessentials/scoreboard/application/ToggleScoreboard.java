@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.scoreboard.application;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.scoreboard.application.port.ScoreboardVisibilityStore;
+import com.uxplima.uxmessentials.scoreboard.domain.ScoreboardMessageKey;
 import com.uxplima.uxmessentials.scoreboard.domain.event.ScoreboardVisibilityToggled;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;

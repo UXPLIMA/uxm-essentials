@@ -10,7 +10,7 @@ import org.bukkit.event.Listener;
 import io.papermc.paper.event.player.AsyncChatEvent;
 
 import com.uxplima.uxmessentials.communication.adapter.ChatLock;
-import com.uxplima.uxmessentials.communication.application.CommunicationMessageKey;
+import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;

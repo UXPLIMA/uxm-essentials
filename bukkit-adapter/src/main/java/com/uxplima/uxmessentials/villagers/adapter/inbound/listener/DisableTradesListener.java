@@ -11,7 +11,7 @@ import org.bukkit.inventory.EquipmentSlot;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.villagers.adapter.outbound.PdcVillagerFlags;
-import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
+import com.uxplima.uxmessentials.villagers.domain.VillagersMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

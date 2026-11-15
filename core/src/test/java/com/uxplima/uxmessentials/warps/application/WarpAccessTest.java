@@ -86,7 +86,7 @@ class WarpAccessTest {
     @Test
     void aWarpWithAnExtraPermissionNeedsBothNodes() {
         warps.put(vault(Optional.of(VIP)));
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp().use(ALEX, VAULT).asError()).contains(WarpError.NO_PERMISSION);
         assertThat(purse.charges).isZero();
@@ -99,7 +99,7 @@ class WarpAccessTest {
     @Test
     void aLockedWarpIsRefusedFreeOfChargeUnlessThePlayerMayBypassTheLock() {
         warps.put(vault(Optional.empty()).withLocked(true));
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp().use(ALEX, VAULT).asError()).contains(WarpError.LOCKED);
         assertThat(purse.wallet).isEqualByComparingTo("100");
@@ -112,7 +112,7 @@ class WarpAccessTest {
     @Test
     void theRightPasswordOrThePasswordBypassLetsThePlayerThroughForOneCharge() {
         warps.put(vault(Optional.empty()).withPassword(Optional.of("open")));
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp().use(ALEX, VAULT).asError()).contains(WarpError.WRONG_PASSWORD);
         assertThat(useWarp().use(ALEX, VAULT, "open").isOk()).isTrue();
@@ -126,7 +126,7 @@ class WarpAccessTest {
 
     @Test
     void aPlayerWhoCannotAffordTheWarpStaysPutAndKeepsTheirMoney() {
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
         purse.wallet = new BigDecimal("24.99");
 
         Result<Unit, WarpError> used = useWarp().use(ALEX, VAULT);
@@ -140,7 +140,7 @@ class WarpAccessTest {
 
     @Test
     void withNoEconomyAPricedWarpIsFree() {
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp(Optional.empty()).use(ALEX, VAULT).isOk()).isTrue();
 
@@ -150,7 +150,7 @@ class WarpAccessTest {
 
     @Test
     void aStaffSendChargesTheTravellerNotTheStaffMember() {
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
         List<String> payers = new ArrayList<>();
         WarpEconomy recording = new WarpEconomy() {
             @Override
@@ -180,7 +180,7 @@ class WarpAccessTest {
 
     @Test
     void aStaffMemberCannotSendAPlayerToAWarpThatPlayerMayNotUse() {
-        permissions.grant(SAM, VAULT.useNode());
+        permissions.grant(SAM, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp().useFor(SAM, ALEX, VAULT).asError()).contains(WarpError.NO_PERMISSION);
 
@@ -199,7 +199,7 @@ class WarpAccessTest {
     void aFreeWarpNeverTouchesTheEconomy() {
         warps.put(Warp.create(VAULT, at(5, 64, 5), SAM, NOW, WarpCost.free(), Optional.empty())
                 .onServer(LOBBY));
-        permissions.grant(ALEX, VAULT.useNode());
+        permissions.grant(ALEX, WarpAccess.useNode(VAULT));
 
         assertThat(useWarp().use(ALEX, VAULT).isOk()).isTrue();
 

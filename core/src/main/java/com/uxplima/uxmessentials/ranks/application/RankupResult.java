@@ -4,6 +4,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.ranks.domain.Rank;
+import com.uxplima.uxmessentials.ranks.domain.RanksMessageKey;
 
 /**
  * The typed outcome of a {@link Rankup} attempt: which of its terminal states it reached and, on a

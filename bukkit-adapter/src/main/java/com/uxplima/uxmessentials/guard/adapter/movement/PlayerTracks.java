@@ -28,10 +28,10 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.title.Title;
 
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.BehaviourKey;
 import com.uxplima.uxmessentials.guard.domain.Behaviours;
 import com.uxplima.uxmessentials.guard.domain.BuiltInActions;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.Region;
 import com.uxplima.uxmessentials.guard.domain.engine.RegionSet;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ClickActionValueCheck;

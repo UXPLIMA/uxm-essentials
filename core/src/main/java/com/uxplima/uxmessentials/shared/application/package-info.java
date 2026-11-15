@@ -5,8 +5,8 @@
  * {@code command}, {@code permission}, {@code placeholder}, {@code module}, {@code health}, {@code claim},
  * {@code mapmarker}); what sits directly here is the small remainder that belongs to no single one of them.
  *
- * <p>Pure Java, like the rest of {@code core}: no Bukkit, Paper, Kyori or SLF4J type appears in this tree, and the
- * ArchUnit fences {@code applicationHasNoBukkit} and the kernel's own import rules hold that line.
+ * <p>Pure Java, like the rest of {@code core}: no Bukkit, Paper, Kyori or SLF4J type appears in this tree, and
+ * {@code LayerDependenciesTest} holds that line.
  */
 @org.jspecify.annotations.NullMarked
 package com.uxplima.uxmessentials.shared.application;

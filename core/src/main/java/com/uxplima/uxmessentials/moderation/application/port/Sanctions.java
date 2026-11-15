@@ -4,8 +4,8 @@ import java.util.Collection;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Outbound port for the live-player side of a sanction. The things a use case must do to a connected player

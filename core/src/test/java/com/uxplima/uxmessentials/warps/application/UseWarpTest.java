@@ -56,7 +56,7 @@ class UseWarpTest {
     private final RecordingLogger log = new RecordingLogger();
     private final ManualWarmups warmups = new ManualWarmups();
     private boolean hopMisses;
-    private final FakePermissions permissions = new FakePermissions().grant(ALEX, SHOP.useNode());
+    private final FakePermissions permissions = new FakePermissions().grant(ALEX, WarpAccess.useNode(SHOP));
     private boolean tagged;
     private boolean unsafe;
 

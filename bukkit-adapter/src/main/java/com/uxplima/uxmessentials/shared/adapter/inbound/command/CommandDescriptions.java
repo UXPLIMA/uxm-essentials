@@ -3,9 +3,9 @@ package com.uxplima.uxmessentials.shared.adapter.inbound.command;
 import java.util.Map;
 import java.util.Objects;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

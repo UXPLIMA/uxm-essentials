@@ -15,8 +15,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
-import com.uxplima.uxmessentials.vanish.application.VanishMessageKey;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
+import com.uxplima.uxmessentials.vanish.domain.VanishMessageKey;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 

@@ -17,10 +17,10 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
-import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.PendingTeleport;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelToggles;
 import org.jspecify.annotations.NullMarked;
 

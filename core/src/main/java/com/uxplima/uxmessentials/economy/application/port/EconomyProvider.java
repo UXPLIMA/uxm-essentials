@@ -24,10 +24,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * baltop ordering, and concurrent-debit double-spend safety. A provider that fails any of them is unfit to register through
  * the {@code ServicesManager}.
  *
- * <p>The economy {@code domain}/{@code application} layers (this port included) are ArchUnit-fenced from
- * importing any Vault ({@code net.milkbowl.vault..}) or Treasury ({@code me.lokka30.treasury..}) type, the
- * port is the only seam, and the SDK types live solely in the outbound adapters
- * ({@code economyDomainHasNoProviderSdk}).
+ * <p>The economy {@code domain}/{@code application} layers (this port included) never import a Vault
+ * ({@code net.milkbowl.vault..}) or Treasury ({@code me.lokka30.treasury..}) type, the port is the only seam, and
+ * the SDK types live in the outbound adapters ({@code economyDomainHasNoProviderSdk} in
+ * {@code LayerDependenciesTest}).
  */
 public interface EconomyProvider {
 

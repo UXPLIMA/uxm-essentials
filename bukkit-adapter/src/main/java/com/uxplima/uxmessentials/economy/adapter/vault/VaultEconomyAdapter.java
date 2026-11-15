@@ -15,20 +15,19 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.Transaction;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import net.milkbowl.vault.economy.Economy;
 import net.milkbowl.vault.economy.EconomyResponse;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Bridges a legacy Vault economy into this plugin's {@link EconomyProvider} port, the compatibility bridge
- * for the large installed base of Vault-only economies. One
- * of only two classes (with {@code TreasuryEconomyAdapter}) allowed to import a provider SDK; the ArchUnit
- * fence {@code economyDomainHasNoProviderSdk} forbids {@code net.milkbowl.vault..} anywhere above this
- * adapter.
+ * for the large installed base of Vault-only economies. {@code economyDomainHasNoProviderSdk} in
+ * {@code LayerDependenciesTest} keeps {@code net.milkbowl.vault..} out of the economy domain and application, so
+ * the SDK stops at this adapter.
  *
  * <p>Vault's {@code Economy} API has no notion of multiple currencies, so this adapter is
  * <strong>single-currency</strong>: it exposes exactly the configured default {@link Currency} from

@@ -18,8 +18,8 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.villagers.application.VillagersMessageKey;
 import com.uxplima.uxmessentials.villagers.domain.FollowRange;
+import com.uxplima.uxmessentials.villagers.domain.VillagersMessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

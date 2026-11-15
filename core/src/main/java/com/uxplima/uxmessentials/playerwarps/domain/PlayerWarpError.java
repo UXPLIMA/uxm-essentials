@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.playerwarps.domain;
 
-import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The modelled failures a player-warp operation can produce. Each value carries the

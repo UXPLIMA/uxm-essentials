@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.economy.domain;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
-
 /**
  * The modelled failures an atomic two-sided move (a {@code /pay}, a {@code WarpCost} charge) can produce.
  * Distinct from {@link EconomyError} because a transfer has policy gates a single-sided credit/debit does

@@ -51,7 +51,7 @@ public final class PoseCooldown {
 
     /**
      * How long {@code who} must still wait before starting a pose, or empty when they are ready now. A present
-     * value is the amount of the {@link com.uxplima.uxmessentials.shared.application.message.SharedMessageKey#COOLDOWN_ACTIVE}
+     * value is the amount of the {@link com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey#COOLDOWN_ACTIVE}
      * message the adapter renders.
      */
     public Optional<Duration> remaining(PlayerRef who) {

@@ -11,19 +11,19 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
-import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.application.RestoreSnapshot;
+import com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
 import com.uxplima.uxmessentials.invrollback.domain.SnapshotId;
 import com.uxplima.uxmessentials.invrollback.domain.event.SnapshotRestored;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**

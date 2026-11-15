@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
 import com.uxplima.uxmessentials.teleport.domain.RequestId;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest.Transition;
 

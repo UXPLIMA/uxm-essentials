@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.presence.application.port.PresenceAudience;
 import com.uxplima.uxmessentials.presence.application.port.PresenceStore;
+import com.uxplima.uxmessentials.presence.domain.PresenceMessageKey;
 import com.uxplima.uxmessentials.presence.domain.event.ReturnedFromAfk;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;

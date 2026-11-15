@@ -3,8 +3,8 @@
  * surface, and the wrappers that adapt the menu engine's runtime contexts onto the published view interfaces.
  *
  * <p>The dependency direction is one-way. Classes here import the published API and the engine; nothing in the
- * published API imports anything here, which is what an architecture fence enforces so a published signature can
- * never name an internal type.
+ * published API imports anything here, which {@code publishedApiNamesNoInternalType} in
+ * {@code LayerDependenciesTest} enforces so a published signature can never name an internal type.
  */
 @org.jspecify.annotations.NullMarked
 package com.uxplima.uxmessentials.shared.adapter.inbound.api;

@@ -12,8 +12,8 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextDecoration;
 
 import com.uxplima.uxmessentials.economy.application.BankService;
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.BankError;
+import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.SharedBank;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankAction;
 import com.uxplima.uxmessentials.economy.domain.SharedBank.BankMember;

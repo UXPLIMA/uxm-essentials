@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 
 /**

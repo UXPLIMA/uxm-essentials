@@ -15,8 +15,8 @@ import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
 import com.uxplima.uxmessentials.guard.adapter.GuardRuntime;
 import com.uxplima.uxmessentials.guard.adapter.Selections;
-import com.uxplima.uxmessentials.guard.application.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.Bounds;
+import com.uxplima.uxmessentials.guard.domain.GuardMessageKey;
 import com.uxplima.uxmessentials.guard.domain.Region;
 
 /**

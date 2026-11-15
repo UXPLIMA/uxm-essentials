@@ -5,7 +5,7 @@ import java.util.function.BiConsumer;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.menu.property.AbstractActionButton;
 import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.NullMarked;

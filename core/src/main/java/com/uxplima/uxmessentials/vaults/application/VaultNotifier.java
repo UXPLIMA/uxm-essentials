@@ -4,13 +4,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
+import com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey;
 
 /**
  * Names the vaults context's player-facing feedback: one method per thing the player can be told (the vault

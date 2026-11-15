@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.economy.domain;
 
-import com.uxplima.uxmessentials.economy.application.EconomyMessageKey;
-
 /**
  * The modelled reasons a raw {@code /pay} or {@code /eco} amount fails to parse into a usable {@link Money}.
  * Each value carries the {@link EconomyMessageKey} the command adapter renders, mirroring {@link EconomyError}

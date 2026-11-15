@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 
 /**
  * Serves the {@code /vote} display: the operator-configured list of vote-site links. The links are

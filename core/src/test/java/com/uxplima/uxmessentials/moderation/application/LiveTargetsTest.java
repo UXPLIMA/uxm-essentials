@@ -25,7 +25,6 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.networkpresence.NetworkRoster;
 import com.uxplima.uxmessentials.shared.application.networkpresence.RosterStamp;
 import com.uxplima.uxmessentials.shared.application.networkpresence.TrackNetworkPresence;
@@ -33,6 +32,7 @@ import com.uxplima.uxmessentials.shared.application.port.NetworkPresenceBroadcas
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;

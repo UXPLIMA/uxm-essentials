@@ -7,6 +7,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.playerstate.application.port.PlayerStateStore;
 import com.uxplima.uxmessentials.playerstate.application.port.StateReconciler;
 import com.uxplima.uxmessentials.playerstate.domain.PlayerStateSnapshot;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerstate.domain.SpeedValue;
 import com.uxplima.uxmessentials.playerstate.domain.event.SpeedChanged;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;

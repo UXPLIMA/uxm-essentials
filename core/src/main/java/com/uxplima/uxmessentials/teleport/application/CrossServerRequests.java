@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.teleport.domain.RequestId;
 import com.uxplima.uxmessentials.teleport.domain.RequestState;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.domain.TeleportRequest;
 
 /**

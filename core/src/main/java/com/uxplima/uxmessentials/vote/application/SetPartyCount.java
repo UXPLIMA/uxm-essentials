@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.VoteMessageKey;
 
 /**
  * Admin use case: set the global vote-party counter to a specific value. Does not fire a party even

@@ -2,8 +2,8 @@ package com.uxplima.uxmessentials.shared.application.port;
 
 import java.util.Map;
 
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * Outbound port that resolves a {@link MessageKey} to a final rendered string in the viewer's locale.

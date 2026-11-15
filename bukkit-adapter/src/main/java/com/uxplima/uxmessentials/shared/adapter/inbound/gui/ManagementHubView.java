@@ -7,9 +7,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.Tiles;
-import com.uxplima.uxmessentials.shared.application.message.GuiMessageKey;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.GuiMessageKey;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;

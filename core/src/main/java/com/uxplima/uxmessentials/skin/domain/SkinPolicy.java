@@ -7,7 +7,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -55,15 +54,6 @@ public record SkinPolicy(
         }
         String host = hostOf(url);
         return host != null && allowedUrlHosts.contains(host);
-    }
-
-    /**
-     * The permission node {@code skinName} sits behind once the operator {@linkplain #restricted restricted} it, so a
-     * skin can be reserved for a rank. A skin nobody restricted is open to everyone, node or not.
-     */
-    public String permissionFor(String skinName) {
-        Objects.requireNonNull(skinName, "skinName");
-        return ContentPermissions.skinName(skinName.toLowerCase(Locale.ROOT));
     }
 
     /**

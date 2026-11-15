@@ -1,7 +1,5 @@
 package com.uxplima.uxmessentials.worlds.domain;
 
-import com.uxplima.uxmessentials.worlds.application.WorldsMessageKey;
-
 /** A world-operation failure, each carrying the message key shown to the operator. */
 public enum WorldError {
     NAME_INVALID(WorldsMessageKey.WORLD_NAME_INVALID),

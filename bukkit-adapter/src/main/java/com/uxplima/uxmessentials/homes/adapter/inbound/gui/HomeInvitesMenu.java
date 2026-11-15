@@ -12,11 +12,11 @@ import java.util.UUID;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.homes.adapter.inbound.gui.HomeMenus.ActionMenuOpener;
-import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
 import com.uxplima.uxmessentials.homes.application.InviteToHome;
 import com.uxplima.uxmessentials.homes.application.ListHomeInvites;
 import com.uxplima.uxmessentials.homes.application.UninviteFromHome;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.homes.domain.HomesMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;

@@ -17,14 +17,14 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.invrollback.adapter.outbound.InventorySnapshotCodec;
-import com.uxplima.uxmessentials.invrollback.application.InvrollbackMessageKey;
+import com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey;
 import com.uxplima.uxmessentials.invrollback.domain.Snapshot;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.item.ItemBuilder;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;

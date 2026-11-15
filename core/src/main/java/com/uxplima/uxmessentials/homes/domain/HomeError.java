@@ -1,8 +1,7 @@
 package com.uxplima.uxmessentials.homes.domain;
 
-import com.uxplima.uxmessentials.homes.application.HomesMessageKey;
-import com.uxplima.uxmessentials.shared.application.message.MessageKey;
-import com.uxplima.uxmessentials.shared.application.message.SharedMessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The modelled failures a home operation can produce. Each value carries the {@link HomesMessageKey} the

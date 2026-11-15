@@ -9,8 +9,8 @@ import org.bukkit.inventory.Inventory;
 
 import net.kyori.adventure.text.Component;
 
-import com.uxplima.uxmessentials.kits.application.KitsMessageKey;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayout;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -28,7 +28,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>{@link #open} touches the live player (it builds and opens an inventory in their screen), so the caller
  * schedules it on the viewer's entity thread through the kernel {@link Scheduler}. The title is a
- * {@link com.uxplima.uxmessentials.shared.application.message.MessageKey} rendered in the viewer's locale and
+ * {@link com.uxplima.uxmessentials.shared.domain.message.MessageKey} rendered in the viewer's locale and
  * parsed into a {@code Component}, never an inline literal.
  */
 @NullMarked
