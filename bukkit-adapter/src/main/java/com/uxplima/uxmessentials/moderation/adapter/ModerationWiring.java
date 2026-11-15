@@ -4,6 +4,7 @@ import java.nio.file.Path;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
@@ -27,10 +28,12 @@ import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirecto
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.DiscordPunishmentAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.InMemoryCommandSpyStore;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.JailServerAdoption;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.LoggingModerationAudit;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PermissionSanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.PlayerLookupTargetResolver;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.api.ModerationApiWrites;
+import com.uxplima.uxmessentials.moderation.application.ApplyRemoteJail;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.BanIp;
 import com.uxplima.uxmessentials.moderation.application.CheckBan;
@@ -44,6 +47,9 @@ import com.uxplima.uxmessentials.moderation.application.Freeze;
 import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.JailCountdown;
+import com.uxplima.uxmessentials.moderation.application.JailHopAlerts;
+import com.uxplima.uxmessentials.moderation.application.JailHopResolver;
+import com.uxplima.uxmessentials.moderation.application.JailTransfer;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
 import com.uxplima.uxmessentials.moderation.application.ListAlts;
@@ -83,6 +89,7 @@ import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
+import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
@@ -99,8 +106,12 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ModerationSync;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
+import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -154,6 +165,8 @@ public final class ModerationWiring {
             Persistence persistence,
             GateSinks gates,
             Bus bus,
+            CrossServerHops hops,
+            boolean networked,
             GuiText guiText,
             GuiLayouts guiLayouts,
             TextInput textInput,
@@ -170,6 +183,7 @@ public final class ModerationWiring {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(gates, "gates");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(hops, "hops");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -193,6 +207,8 @@ public final class ModerationWiring {
         ModerationGuard guard = new ModerationGuard(kernel.permissions());
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
+        JailNetwork jailNetwork = jailNetwork(
+                plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
         ModerationServices services = assemble(
                 plugin,
                 auditChannel,
@@ -206,6 +222,7 @@ public final class ModerationWiring {
                 guard,
                 commandSpyStore,
                 sync,
+                jailNetwork,
                 ipHistory,
                 ipTokens,
                 presence,
@@ -219,6 +236,26 @@ public final class ModerationWiring {
         EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
                 repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         bus.registry().register(ModerationSync.listener(enforce::onRemoteBan, enforceIp::onRemoteIpBan));
+        // The live jail: a peer's jail or release is applied to a player connected here, and a jail hop a peer saw
+        // fail is told to the staff here. With the network off this listener is never invoked.
+        ApplyRemoteJail applyJail = new ApplyRemoteJail(
+                repository,
+                jailNetwork.transfer(),
+                sanctions,
+                presence,
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                clock);
+        bus.registry().register(ModerationSync.jailListener(new ModerationSync.JailFrames() {
+            @Override
+            public void jailChanged(java.util.UUID frameId, java.util.UUID target, boolean jailed) {
+                applyJail.onJailChanged(frameId, target, jailed);
+            }
+
+            @Override
+            public void hopFailed(java.util.UUID frameId, java.util.UUID target, String targetName, String jail) {
+                jailNetwork.alerts().failedOnPeer(frameId, target, targetName, jail);
+            }
+        }));
         RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
@@ -302,6 +339,7 @@ public final class ModerationWiring {
         return new Wired(
                 commands,
                 listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
+                new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
                 commandSpyStore,
                 mutePolicy,
@@ -324,6 +362,71 @@ public final class ModerationWiring {
                         services.unjail()));
     }
 
+    /**
+     * The jail's network half: the frames that carry a jail to the backend holding the player, the hop that takes
+     * a player to a jail on another backend, and the staff line when that hop fails. Only on a network is the jail
+     * hop registered, so with the network off every jail is applied on this backend as before and a join does no
+     * hop work for it.
+     */
+    private static JailNetwork jailNetwork(
+            Plugin plugin,
+            KernelPorts kernel,
+            Bus bus,
+            ModerationRepository repository,
+            JailLocationStore jailLocations,
+            BukkitSanctions sanctions,
+            CrossServerHops hops,
+            boolean networked,
+            NetworkPresence presence,
+            Clock clock) {
+        JailSync sync = networked ? ModerationSync.jailPublisher(bus.publisher()) : JailSync.NONE;
+        SanctionBroadcast staff = new PermissionSanctionBroadcast(
+                plugin.getServer(),
+                kernel.scheduler(),
+                kernel.messages(),
+                kernel.messageSink(),
+                broadcastPrefix(kernel));
+        JailHopAlerts alerts = new JailHopAlerts(staff, sync, clock);
+        // No gate: the player did not choose a jail hop, and being jailed is exactly what must not stop it.
+        Optional<HopDepartures> departures = networked ? Optional.of(hops.departures(HopGate.OPEN)) : Optional.empty();
+        JailTransfer transfer = new JailTransfer(
+                repository,
+                jailLocations,
+                sanctions,
+                sanctions,
+                presence,
+                departures,
+                alerts,
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                kernel.scheduler(),
+                kernel.log(),
+                clock);
+        if (networked) {
+            // Registered before the module's listeners run, so the first join already finds it.
+            hops.register(
+                    new JailHopResolver(repository, jailLocations, sanctions, alerts, transfer, hops.server(), clock));
+        }
+        // A standalone server, or one still on the shipped default name, records no server on a jail: the name is
+        // not the one it will be known by on a network, and a stamped row would then point at a server that does
+        // not exist. Its jails stay unscoped for the first networked start under a real name to claim.
+        Optional<String> recordedServer = networked && !NetworkConfig.isDefaultServerName(hops.server())
+                ? Optional.of(hops.server())
+                : Optional.empty();
+        return new JailNetwork(sync, transfer, alerts, recordedServer);
+    }
+
+    /**
+     * The jail's network collaborators, built once and shared by the jail use cases and the frame listener.
+     *
+     * @param sync announces jail changes and failed jail hops to the peers
+     * @param transfer puts a player connected here into their jail, here or on the jail's backend
+     * @param alerts tells staff about a jail hop that failed
+     * @param recordedServer the network name recorded on the jails set or claimed here; empty off the network or
+     *     under the shipped default name
+     */
+    private record JailNetwork(
+            JailSync sync, JailTransfer transfer, JailHopAlerts alerts, Optional<String> recordedServer) {}
+
     private static ModerationServices assemble(
             Plugin plugin,
             AuditChannel auditChannel,
@@ -337,6 +440,7 @@ public final class ModerationWiring {
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             SanctionSync sync,
+            JailNetwork jailNetwork,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
             NetworkPresence presence,
@@ -352,8 +456,18 @@ public final class ModerationWiring {
                 new LoggingModerationAudit(auditChannel.logger()), auditChannel.logger(), settings.discordNotify());
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
         Sanctions sanctionPort = sanctions;
-        Jail jail = new Jail(repository, jails, sanctionPort, guard, notifier, audit, kernel.events(), clock);
-        Unjail unjail = new Unjail(repository, sanctionPort, notifier, audit, kernel.events(), clock);
+        Jail jail = new Jail(
+                repository,
+                jails,
+                jailNetwork.transfer(),
+                jailNetwork.sync(),
+                guard,
+                notifier,
+                audit,
+                kernel.events(),
+                clock);
+        Unjail unjail =
+                new Unjail(repository, sanctionPort, jailNetwork.sync(), notifier, audit, kernel.events(), clock);
         SanctionBroadcast broadcast = new PermissionSanctionBroadcast(
                 plugin.getServer(),
                 kernel.scheduler(),
@@ -424,7 +538,8 @@ public final class ModerationWiring {
                 .sanctionSummary(new SanctionSummary(repository, notifier, clock))
                 .listJails(new ListJails(jails, notifier))
                 .listJailed(new ListJailed(repository, kernel.playerLookup(), notifier, clock))
-                .setJail(new SetJail(jailLocations, notifier, audit, kernel.events(), clock))
+                .setJail(new SetJail(
+                        jailLocations, notifier, audit, kernel.events(), clock, jailNetwork.recordedServer()))
                 .delJail(new DelJail(jailLocations, notifier, audit, kernel.events(), clock))
                 .listBans(new ListBans(repository, kernel.playerLookup(), notifier, clock))
                 .listMutes(new ListMutes(repository, kernel.playerLookup(), notifier, clock))
@@ -472,7 +587,8 @@ public final class ModerationWiring {
                 .listAlts(new ListAlts(ipHistory, kernel.playerLookup(), notifier))
                 .commandSpy(new CommandSpy(commandSpyStore, notifier))
                 .staffRollback(staffRollback)
-                .jailCountdown(new JailCountdown(repository, sanctionPort, audit, kernel.events(), clock))
+                .jailCountdown(new JailCountdown(
+                        repository, sanctionPort, jailNetwork.transfer(), audit, kernel.events(), clock))
                 .loginEnforcement(new LoginEnforcement(repository, ipAlts, notifier, audit, clock))
                 .lockdown(new Lockdown(repository, notifier, broadcast, audit))
                 .repository(repository)
@@ -554,6 +670,8 @@ public final class ModerationWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the login/join/freeze/commandspy listeners to register
+     * @param jailServerAdoption records this backend as the server of the jails of unknown server in its worlds;
+     *     run once the worlds have loaded
      * @param sanctions the live-player sanction adapter, for the stop-time freeze drain
      * @param commandSpyStore the session-scoped commandspy set, for the stop-time drain
      * @param mutePolicy the mute read side the {@code muted} placeholder queries
@@ -570,6 +688,7 @@ public final class ModerationWiring {
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
+            Runnable jailServerAdoption,
             BukkitSanctions sanctions,
             InMemoryCommandSpyStore commandSpyStore,
             RepositoryMutePolicy mutePolicy,
@@ -585,6 +704,7 @@ public final class ModerationWiring {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
+            Objects.requireNonNull(jailServerAdoption, "jailServerAdoption");
             Objects.requireNonNull(sanctions, "sanctions");
             Objects.requireNonNull(commandSpyStore, "commandSpyStore");
             Objects.requireNonNull(mutePolicy, "mutePolicy");

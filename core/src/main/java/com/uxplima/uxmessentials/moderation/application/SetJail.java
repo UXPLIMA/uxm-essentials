@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.application;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
@@ -19,7 +20,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * name, so this is an upsert and always succeeds, a brand-new name and a redefinition both publish
  * {@code JailLocationDefined} and confirm with {@code SETJAIL_SAVED}. The stored jail then merges with the
  * config jails behind the combined directory, so {@code /jail <player> <name>} accepts it and the sanction
- * adapter resolves its location. The operator-only permission is enforced at the command gate.
+ * adapter resolves its location. On a network the jail records the backend it was set on, since that is where its
+ * world is, so a player held on another backend is sent there. A standalone server records nothing: the name it runs
+ * under is not the one it may later join a network with, so its jails stay unscoped until a networked start claims
+ * them. The operator-only permission is enforced at the command gate.
  */
 public final class SetJail {
 
@@ -28,18 +32,21 @@ public final class SetJail {
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final Clock clock;
+    private final Optional<String> localServer;
 
     public SetJail(
             JailLocationStore store,
             Notifier notifier,
             ModerationAudit audit,
             DomainEventPublisher events,
-            Clock clock) {
+            Clock clock,
+            Optional<String> localServer) {
         this.store = Objects.requireNonNull(store, "store");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.localServer = Objects.requireNonNull(localServer, "localServer");
     }
 
     /** Save (or re-anchor) the jail {@code rawName} at {@code at}, attributing it to {@code actor}. */
@@ -47,7 +54,9 @@ public final class SetJail {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(rawName, "rawName");
         Objects.requireNonNull(at, "at");
-        StoredJail jail = StoredJail.of(rawName, at);
+        StoredJail jail = localServer
+                .map(server -> StoredJail.of(rawName, at, server))
+                .orElseGet(() -> StoredJail.of(rawName, at));
         store.save(jail);
         events.publish(new JailLocationDefined(jail.name(), actor, clock.instant()));
         audit.jailLocationDefined(actor, jail.name());

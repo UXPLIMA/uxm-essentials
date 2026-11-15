@@ -113,6 +113,10 @@ public final class HopArrival {
         }
         Optional<HopLanding> landing = resolution.landing();
         String label = resolution.label();
+        if (resolution.withdrawn()) {
+            charges.refund(resolver, who, pending.charge(), label);
+            return;
+        }
         if (landing.isEmpty()) {
             charges.fail(resolver, who, pending.charge(), HopNotice.FAILED, Map.of(), label);
             return;
