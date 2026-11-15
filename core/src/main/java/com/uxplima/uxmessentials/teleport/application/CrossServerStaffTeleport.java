@@ -43,6 +43,31 @@ public final class CrossServerStaffTeleport {
     /** A staff move this backend sent, waiting for the subject's backend to say how it went. */
     private record Pending(PlayerRef actor, PlayerRef subject, PlayerRef destination) {}
 
+    /**
+     * A player named in a staff teleport: either one the command's selector found on this backend, or a plain name it
+     * found nobody for here. A name the selector missed is never taken to mean a player here, since the selector may
+     * have hidden them (a vanished player) and the network lookup must not reveal them.
+     *
+     * @param name the player's name
+     * @param here true when the selector resolved the player on this backend
+     */
+    public record Named(String name, boolean here) {
+
+        public Named {
+            Objects.requireNonNull(name, "name");
+        }
+
+        /** A player the selector found on this backend. */
+        public static Named here(String name) {
+            return new Named(name, true);
+        }
+
+        /** A plain name the selector found nobody for on this backend. */
+        public static Named elsewhere(String name) {
+            return new Named(name, false);
+        }
+    }
+
     private final TeleportNetwork network;
     private final NetworkPresence presence;
     private final PlayerLookup players;
@@ -54,6 +79,7 @@ public final class CrossServerStaffTeleport {
     private final Logger log;
 
     private final Map<UUID, Pending> pending = new ConcurrentHashMap<>();
+    private final Map<UUID, Pending> unanswered = new ConcurrentHashMap<>();
     private final Set<UUID> actedOn = ConcurrentHashMap.newKeySet();
 
     public CrossServerStaffTeleport(
@@ -85,7 +111,7 @@ public final class CrossServerStaffTeleport {
     /** {@code /tp <player>}: move {@code actor}, a player on this backend, to the named player on another one. */
     public void goTo(PlayerRef actor, String destinationName) {
         Objects.requireNonNull(actor, "actor");
-        move(actor, actor.name(), destinationName);
+        move(actor, Named.here(actor.name()), Named.elsewhere(destinationName));
     }
 
     /**
@@ -93,18 +119,18 @@ public final class CrossServerStaffTeleport {
      * of the two is on another backend. Each name is looked up across the network; one nobody has online reads as
      * offline to the actor.
      */
-    public void move(PlayerRef actor, String subjectName, String destinationName) {
+    public void move(PlayerRef actor, Named subjectName, Named destinationName) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(subjectName, "subjectName");
         Objects.requireNonNull(destinationName, "destinationName");
         Optional<OnlinePlayer> subject = locate(subjectName);
         Optional<OnlinePlayer> destination = locate(destinationName);
         if (subject.isEmpty() || !enabled()) {
-            offline(actor, subjectName);
+            offline(actor, subjectName.name());
             return;
         }
         if (destination.isEmpty()) {
-            offline(actor, destinationName);
+            offline(actor, destinationName.name());
             return;
         }
         PlayerRef mover = subject.get().player();
@@ -136,12 +162,15 @@ public final class CrossServerStaffTeleport {
         network.send(new RemoteTeleport.StaffMove(
                 network.localServer(), id, actor, mover, anchor, subject.get().server()));
         later(CrossServerRequests.ANSWER_GRACE, () -> {
-            Pending unanswered = pending.remove(id);
-            if (unanswered != null) {
+            Pending waited = pending.remove(id);
+            if (waited != null) {
                 notifier.send(
-                        unanswered.actor(),
+                        waited.actor(),
                         TeleportMessageKey.TP_CROSS_SERVER_NO_ANSWER,
-                        Map.of("player", unanswered.subject().name()));
+                        Map.of("player", waited.subject().name()));
+                // An answer may still be on its way; it then tells the staff member what really happened.
+                unanswered.put(id, waited);
+                later(REMEMBERED, () -> unanswered.remove(id));
             }
         });
     }
@@ -188,6 +217,9 @@ public final class CrossServerStaffTeleport {
             return;
         }
         Pending sent = pending.remove(answer.id());
+        if (sent == null) {
+            sent = unanswered.remove(answer.id());
+        }
         if (sent == null) {
             return;
         }
@@ -262,8 +294,9 @@ public final class CrossServerStaffTeleport {
         }
     }
 
-    private Optional<OnlinePlayer> locate(String name) {
-        return presence.findByName(name).filter(where -> isHere(where) || presence.isLive(where.server()));
+    private Optional<OnlinePlayer> locate(Named named) {
+        return presence.findByName(named.name())
+                .filter(where -> named.here() ? isHere(where) : !isHere(where) && presence.isLive(where.server()));
     }
 
     private boolean isHere(OnlinePlayer where) {

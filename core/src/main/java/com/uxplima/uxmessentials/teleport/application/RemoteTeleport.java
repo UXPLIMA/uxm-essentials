@@ -111,6 +111,8 @@ public sealed interface RemoteTeleport {
         /** A staff teleport's subject is not online on the backend it was sent to. */
         SUBJECT_OFFLINE,
         /** A staff teleport's destination player is not online anywhere the subject's backend knows. */
-        DESTINATION_OFFLINE
+        DESTINATION_OFFLINE,
+        /** The requester's backend confirms an accepted {@code /tpahere} still stands; the detail is their server. */
+        PROCEED
     }
 }

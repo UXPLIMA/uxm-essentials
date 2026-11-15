@@ -40,7 +40,7 @@ public interface RemoteRequests {
         }
     };
 
-    /** True when the request with {@code id} was sent from another backend. */
+    /** True when the request with {@code id} was sent from another backend, whatever has happened to it since. */
     boolean isRemote(RequestId id);
 
     /** The target accepted the remote {@code request}; it is already out of the registry. */

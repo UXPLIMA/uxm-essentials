@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport.Named;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
@@ -52,6 +53,7 @@ import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import com.uxplima.uxmessentials.testing.SteppedScheduler;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -370,15 +372,112 @@ class CrossServerTeleportTest {
     }
 
     @Test
-    void aMoverOnCooldownWhenTheAcceptArrivesIsToldAndNotSent() {
+    void aMoverOnCooldownIsStillMovedSinceAnAcceptedRequestNeverChecksTheCooldown() {
         lobby.engine.arriveImmediately(ALEX, Destination.at(ALEX_AT), TeleportKind.REQUEST, () -> {}, () -> {});
+        moves.clear();
+        acceptAlexToSam();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).containsExactly("Alex@survival->10,64,10 REQUEST");
+        assertThat(keys(ALEX)).doesNotContain("teleport.cooldown.active");
+    }
+
+    // Either player may switch servers between the request and the move.
+
+    @Test
+    void aTpahereRequesterWhoSwitchedServersBeforeTheAcceptIsJoinedWhereTheyAreNow() {
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_REQUESTER);
+        bus.deliver();
+        join(creative, ALEX, at(4, 5, 6));
+
+        survival.accept.accept(SAM, SAM_AT_ACCEPT);
+        bus.deliver();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).containsExactly("Sam@creative->4,5,6 REQUEST");
+        assertThat(keys(SAM)).endsWith("teleport.cross-server.sending", "teleport.cross-server.arrived");
+    }
+
+    @Test
+    void aTpaTargetWhoSwitchedServersDuringTheWarmupIsFollowedThere() {
+        holdWarmups = true;
+        acceptAlexToSam();
+        join(creative, SAM, at(8, 9, 10));
+
+        heldWarmups.get(0)[0].run();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).containsExactly("Alex@creative->8,9,10 REQUEST");
+    }
+
+    @Test
+    void aTpaTargetWhoCameToTheMoversServerIsReachedWithoutAHop() {
+        holdWarmups = true;
+        acceptAlexToSam();
+        join(lobby, SAM, at(1, 1, 1));
+
+        heldWarmups.get(0)[0].run();
+
+        assertThat(moves).containsExactly("Alex@lobby->1,1,1 REQUEST");
+        assertThat(hopTable.rows()).isEmpty();
+    }
+
+    @Test
+    void aTpaTargetWhoLeftDuringTheWarmupLeavesTheMoverWhereTheyAreWithALine() {
+        holdWarmups = true;
+        acceptAlexToSam();
+        leave(survival, SAM);
+
+        heldWarmups.get(0)[0].run();
+
+        assertThat(moves).isEmpty();
+        assertThat(hopTable.rows()).isEmpty();
+        assertThat(keys(ALEX)).endsWith("teleport.tpa.accepted", "teleport.cross-server.failed");
+    }
+
+    @Test
+    void aTpahereCancelledWhileTheAcceptWasOnItsWayMovesNobody() {
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_REQUESTER);
+        bus.deliver();
+
+        survival.accept.accept(SAM, SAM_AT_ACCEPT);
+        lobby.accept.cancel(ALEX);
+        bus.deliver();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).isEmpty();
+        assertThat(hopTable.rows()).isEmpty();
+        assertThat(keys(ALEX)).containsExactly("teleport.tpa.sent", "teleport.tpa.cancelled");
+        assertThat(keys(SAM)).containsExactly("teleport.tpa.here-received", "teleport.cross-server.failed");
+    }
+
+    @Test
+    void aWithdrawalThatRacesTheAcceptNeverRunsTheLocalAcceptForARemoteRequest() {
         lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
         bus.deliver();
+        lobby.accept.cancel(ALEX);
+        // The withdrawal lands between the accept's read of the request and its outcome.
+        survival.registry.afterNextPending = bus::deliver;
+
         survival.accept.accept(SAM, SAM_AT_ACCEPT);
         bus.deliver();
 
-        assertThat(hopTable.rows()).isEmpty();
-        assertThat(keys(ALEX)).endsWith("teleport.tpa.accepted", "teleport.cooldown.active");
+        assertThat(keys(ALEX)).containsExactly("teleport.tpa.sent", "teleport.tpa.cancelled");
+        assertThat(moves).isEmpty();
+        assertThat(heldWarmups).isEmpty();
+    }
+
+    @Test
+    void aNewRequestReplacingOneToAPlayerWhoSwitchedServersWithdrawsTheOldOne() {
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
+        bus.deliver();
+        join(creative, SAM, at(2, 2, 2));
+
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
+        bus.deliver();
+
+        assertThat(survival.registry.pendingFor(SAM)).isEmpty();
+        assertThat(creative.registry.pendingFor(SAM)).hasSize(1);
     }
 
     // Staff teleports.
@@ -390,23 +489,39 @@ class CrossServerTeleportTest {
         scheduler.advance(SETTLE);
 
         assertThat(moves).containsExactly("Mod@survival->250,70,-40 ADMIN");
-        assertThat(vetoAsked).containsExactly(TeleportKind.ADMIN);
+        // A local staff /tp asks no veto and stamps no cooldown; neither does this one.
+        assertThat(vetoAsked).isEmpty();
+        assertThat(cooldowns.checkLabel(MOD, "tp").isOk()).isTrue();
         assertThat(keys(MOD)).containsExactly("teleport.cross-server.sending", "teleport.cross-server.arrived");
     }
 
     @Test
-    void aJailedStaffMemberIsRefusedByTheStaffGateBeforeTheHop() {
-        jailed.add(MOD.uuid());
+    void staffMoveAJailedPlayerAcrossServersAsALocalStaffTeleportWould() {
+        jailed.add(SAM.uuid());
 
-        creative.staff.goTo(MOD, "Sam");
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.here("Mod"));
+        bus.deliver();
+        scheduler.advance(SETTLE);
 
+        assertThat(moves).containsExactly("Sam@creative->0,100,0 ADMIN");
+        assertThat(keys(SAM)).doesNotContain("teleport.jailed");
+        assertThat(keys(MOD)).containsExactly("teleport.tp.cross-server.sent");
+    }
+
+    @Test
+    void aNameTheSelectorFoundNobodyForHereIsNotTakenForAHiddenPlayerHere() {
+        PlayerRef console = PlayerRef.system("Console");
+
+        lobby.staff.move(console, Named.elsewhere("Alex"), Named.elsewhere("Sam"));
+
+        assertThat(keys(console)).containsExactly("teleport.tpa.target-offline");
+        assertThat(bus.sent).isEmpty();
         assertThat(hopTable.rows()).isEmpty();
-        assertThat(keys(MOD)).containsExactly("teleport.jailed");
     }
 
     @Test
     void staffTeleportOfAPlayerOnAnotherServerToAThirdServerSendsThemAndReportsOnce() {
-        creative.staff.move(MOD, "Sam", "Alex");
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
         bus.deliver();
         scheduler.advance(SETTLE);
 
@@ -427,7 +542,7 @@ class CrossServerTeleportTest {
     void staffTeleportOfAPlayerToSomeoneOnTheirOwnServerMovesThemThereAndReportsDone() {
         join(survival, ALEX, at(7, 7, 7));
 
-        creative.staff.move(MOD, "Sam", "Alex");
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
         bus.deliver();
 
         assertThat(moves).containsExactly("Sam@survival->7,7,7 ADMIN");
@@ -436,11 +551,15 @@ class CrossServerTeleportTest {
     }
 
     @Test
-    void staffTeleportOfASubjectWhoseServerNeverAnswersReadsNoAnswer() {
-        creative.staff.move(MOD, "Sam", "Alex");
+    void staffTeleportOfASubjectWhoseServerAnswersLateReadsNoAnswerThenWhatHappened() {
+        creative.staff.move(MOD, Named.elsewhere("Sam"), Named.elsewhere("Alex"));
         scheduler.advance(CrossServerRequests.ANSWER_GRACE);
 
         assertThat(keys(MOD)).containsExactly("teleport.tp.cross-server.no-answer");
+
+        bus.deliver();
+
+        assertThat(keys(MOD)).containsExactly("teleport.tp.cross-server.no-answer", "teleport.tp.cross-server.sent");
     }
 
     // The scaffolding.
@@ -522,7 +641,7 @@ class CrossServerTeleportTest {
                     log);
             HopResolvers resolvers = new HopResolvers();
             for (HopKind kind : List.of(HopKind.PLAYER_REQUEST, HopKind.PLAYER_STAFF)) {
-                resolvers.register(new PlayerHopResolver(kind, engine, players, this::locate, scheduler));
+                resolvers.register(new PlayerHopResolver(kind, engine, executor, players, this::locate, scheduler));
             }
             HopCharges charges = new HopCharges(notifier.notifier(), log);
             HopWatchdog watchdog = new HopWatchdog(hopTable, resolvers, charges, scheduler, log, HOP_TTL, clock);
@@ -545,6 +664,7 @@ class CrossServerTeleportTest {
                     network,
                     new Presence(name),
                     players,
+                    this::locate,
                     registry,
                     requestTeleport,
                     visibility,
@@ -841,6 +961,8 @@ class CrossServerTeleportTest {
 
         private final Map<RequestId, TeleportRequest> byId = new LinkedHashMap<>();
 
+        @Nullable Runnable afterNextPending;
+
         @Override
         public void store(TeleportRequest request) {
             byId.values().removeIf(earlier -> earlier.target().equals(request.target()));
@@ -854,10 +976,16 @@ class CrossServerTeleportTest {
 
         @Override
         public List<TeleportRequest> pendingFor(PlayerRef target) {
-            return byId.values().stream()
+            List<TeleportRequest> pending = byId.values().stream()
                     .filter(request -> request.target().equals(target))
                     .sorted(Comparator.comparing(TeleportRequest::expiresAt))
                     .toList();
+            Runnable racer = afterNextPending;
+            afterNextPending = null;
+            if (racer != null) {
+                racer.run();
+            }
+            return pending;
         }
 
         @Override

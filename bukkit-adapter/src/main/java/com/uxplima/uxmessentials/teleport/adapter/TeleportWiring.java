@@ -343,7 +343,12 @@ public final class TeleportWiring {
                 crossServer
                         .hops()
                         .register(new PlayerHopResolver(
-                                kind, engine, kernel.playerLookup(), kernel.playerLocator(), kernel.scheduler()));
+                                kind,
+                                engine,
+                                executor,
+                                kernel.playerLookup(),
+                                kernel.playerLocator(),
+                                kernel.scheduler()));
             }
             playerHops = new PlayerHops(Optional.of(crossServer.hops().departures(new TeleportHopGate(engine))));
         }
@@ -356,6 +361,7 @@ public final class TeleportWiring {
                 teleportNetwork,
                 crossServer.presence(),
                 kernel.playerLookup(),
+                kernel.playerLocator(),
                 requests,
                 requestTeleport,
                 crossServer.visibility(),

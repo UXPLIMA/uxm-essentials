@@ -205,6 +205,23 @@ public final class TeleportEngine {
         return preGate(mover, destination, kind);
     }
 
+    /**
+     * The checks an accepted request's mover passes before a hop to another backend: jail and combat tag, each told to
+     * the player. No cooldown, since a local accepted request never checks one either; it only stamps.
+     */
+    public Result<Unit, TeleportError> gateAcceptedRequest(PlayerRef mover) {
+        Objects.requireNonNull(mover, "mover");
+        if (jail.isJailed(mover)) {
+            notifier.send(mover, TeleportMessageKey.JAILED);
+            return Result.err(TeleportError.JAILED);
+        }
+        if (combat.isTagged(mover)) {
+            notifier.send(mover, TeleportMessageKey.COMBAT_TAGGED);
+            return Result.err(TeleportError.COMBAT_TAGGED);
+        }
+        return Result.ok();
+    }
+
     private Result<Unit, TeleportError> preGate(PlayerRef mover, Destination destination, TeleportKind kind) {
         if (jail.isJailed(mover)) {
             // A jailed player cannot self-teleport, /home, /warp, /spawn, /back, /rtp all funnel through here.
