@@ -279,7 +279,7 @@ class OpenVaultTest {
         Clock later = Clock.offset(CLOCK, Duration.ofMinutes(5));
         VaultContents items = VaultContents.of(new byte[] {4, 5});
 
-        new SaveVault(vaults, events, later).save(ALEX, opened, items);
+        new SaveVault(vaults, events).save(ALEX, opened, items, later.instant(), "close", null);
 
         Vault stored = vaults.find(VaultId.of(ALEX, 1)).orElseThrow();
         assertThat(stored.contents()).isEqualTo(items);

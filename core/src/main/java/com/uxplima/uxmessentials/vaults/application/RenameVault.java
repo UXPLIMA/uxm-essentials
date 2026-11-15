@@ -38,7 +38,7 @@ public final class RenameVault {
         VaultId id = VaultId.of(owner, index);
         Vault vault = repository.find(id).orElse(null);
         // An update rather than an upsert: a vault deleted since it was read must stay deleted, items and all.
-        if (vault == null || !repository.update(vault.renamedTo(name))) {
+        if (vault == null || !repository.update(vault.renamedTo(name), VaultRepository.Columns.PRESENTATION)) {
             notifier.renameUnknown(owner, index);
             return Result.err(VaultError.VAULT_UNKNOWN);
         }

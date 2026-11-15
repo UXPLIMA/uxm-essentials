@@ -1,13 +1,16 @@
 package com.uxplima.uxmessentials.vaults.application;
 
-import java.time.Clock;
+import java.time.Instant;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The write-through that runs when an open vault GUI closes ({@code InventoryCloseEvent}). The adapter resolves
@@ -21,43 +24,56 @@ public final class SaveVault {
 
     private final VaultRepository repository;
     private final DomainEventPublisher events;
-    private final Clock clock;
 
-    public SaveVault(VaultRepository repository, DomainEventPublisher events, Clock clock) {
+    public SaveVault(VaultRepository repository, DomainEventPublisher events) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.events = Objects.requireNonNull(events, "events");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /**
-     * Write {@code newContents} into {@code vault} as {@code owner}'s save and publish the change, returning
-     * whether the vault was still there. A vault deleted while its window was open is not brought back: nothing
-     * is written and the result is {@code false}, so the caller hands the window's items to the player instead.
-     * Bringing it back would give the player a vault they had already been refunded for, or undo a staff delete.
+     * Write {@code newContents} into {@code vault} as {@code owner}'s save, with {@code at} as the vault's last-touched
+     * instant and {@code writer} recorded as the row's writer, and publish the change. Returns the row's stamp after
+     * the write, or empty when nothing was written. A vault deleted while its window was open is not brought back:
+     * that would give the player a vault they had already been refunded for, or undo a staff delete. With
+     * {@code onlyAt} the write applies only while the row is still at that stamp or already carries {@code writer}
+     * (see {@link VaultRepository#writeContents(Vault, String, VaultStamp)}), so it never writes over what another
+     * server wrote.
      */
-    public boolean save(PlayerRef owner, Vault vault, VaultContents newContents) {
+    public Optional<VaultStamp> save(
+            PlayerRef owner,
+            Vault vault,
+            VaultContents newContents,
+            Instant at,
+            String writer,
+            @Nullable VaultStamp onlyAt) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
-        Vault.Change change = vault.withContents(owner, newContents, clock.instant());
-        if (!repository.update(change.result())) {
-            return false;
+        Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(writer, "writer");
+        Vault.Change change = vault.withContents(owner, newContents, at);
+        Optional<VaultStamp> written = repository.writeContents(change.result(), writer, onlyAt);
+        if (written.isPresent()) {
+            events.publish(change.event());
         }
-        events.publish(change.event());
-        return true;
+        return written;
     }
 
     /**
-     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window: the
-     * staff member is not the owner the items belong to, and it is how staff fill a vault the owner has not opened
-     * yet. A vault this brings back records no payment, so deleting it again refunds nothing.
+     * Write {@code newContents} into {@code vault} whether or not its row still exists, for a staff window that found
+     * the row missing: the staff member is not the owner the items belong to, and it is how staff fill a vault the
+     * owner has not opened yet. Records {@code writer} as the row's writer and returns the row's stamp after the write.
+     * A vault this brings back records no payment, so deleting it again refunds nothing.
      */
-    public void keep(PlayerRef owner, Vault vault, VaultContents newContents) {
+    public VaultStamp keep(PlayerRef owner, Vault vault, VaultContents newContents, Instant at, String writer) {
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(newContents, "newContents");
-        Vault.Change change = vault.withContents(owner, newContents, clock.instant());
-        repository.save(change.result());
+        Objects.requireNonNull(at, "at");
+        Objects.requireNonNull(writer, "writer");
+        Vault.Change change = vault.withContents(owner, newContents, at);
+        VaultStamp written = repository.save(change.result(), writer);
         events.publish(change.event());
+        return written;
     }
 }

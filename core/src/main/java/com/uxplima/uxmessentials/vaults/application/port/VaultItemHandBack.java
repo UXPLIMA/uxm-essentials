@@ -4,9 +4,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 
 /**
- * Gives the items of a vault window back to the vault's owner when the vault they belong to is gone. The adapter puts
- * them into the owner's live inventory (overflow dropped at their feet) when the owner is online, and otherwise keeps
- * them in {@link VaultItemReturns} for their next join. It never writes them back into a vault row.
+ * Gives the items of a vault window back to the vault's owner when the vault they belong to is gone: into the owner's
+ * live inventory as far as it has room, and the rest, or all of it while the owner is away, into
+ * {@link VaultItemReturns} for their next join. It never writes them back into a vault row.
  */
 @FunctionalInterface
 public interface VaultItemHandBack {

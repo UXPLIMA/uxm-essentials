@@ -14,6 +14,8 @@ import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
+import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A Caffeine read-cache decorator over a delegate {@link VaultRepository}, keyed by {@link VaultId}. An open
@@ -72,16 +74,50 @@ public final class CachedVaultRepository implements VaultRepository {
     }
 
     @Override
-    public void save(Vault vault) {
+    public VaultStamp save(Vault vault, String writer) {
         Objects.requireNonNull(vault, "vault");
-        delegate.save(vault);
-        cache.invalidate(vault.id());
+        try {
+            return delegate.save(vault, writer);
+        } finally {
+            cache.invalidate(vault.id());
+        }
     }
 
     @Override
-    public boolean update(Vault vault) {
+    public Optional<VaultStamp> writeContents(Vault vault, String writer, @Nullable VaultStamp onlyAt) {
         Objects.requireNonNull(vault, "vault");
-        boolean updated = delegate.update(vault);
+        Optional<VaultStamp> written;
+        try {
+            written = delegate.writeContents(vault, writer, onlyAt);
+        } catch (RuntimeException failure) {
+            // The write may have applied without an answer, so the cached copy can no longer be trusted.
+            cache.invalidate(vault.id());
+            throw failure;
+        }
+        if (written.isPresent()) {
+            // The cached copy takes exactly what was written and the row's new stamp, so the next open sees the items
+            // the window closed with. The name and icon stay as cached, since the write left them as they were.
+            VaultStamp stamp = written.get();
+            cache.asMap()
+                    .computeIfPresent(
+                            vault.id(), (id, cached) -> cached.map(stale -> stale.withContentsOf(vault, stamp)));
+        } else {
+            cache.invalidate(vault.id());
+        }
+        return written;
+    }
+
+    @Override
+    public Optional<LastWrite> lastWrite(VaultId id) {
+        // Never cached: it is read to learn what a failed write did, which a copy from before the write cannot tell.
+        return delegate.lastWrite(id);
+    }
+
+    @Override
+    public boolean update(Vault vault, Columns columns) {
+        Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(columns, "columns");
+        boolean updated = delegate.update(vault, columns);
         cache.invalidate(vault.id());
         return updated;
     }

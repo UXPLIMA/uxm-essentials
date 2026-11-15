@@ -74,7 +74,7 @@ public final class OpenVault {
         // The size quota changed since this vault was last saved; persist the new height so the row matches the
         // GUI the player now sees. An update rather than an upsert: a vault deleted since it was read must not
         // come back, so the open fails and the open fee goes back.
-        if (opened != existing && !repository.update(opened)) {
+        if (opened != existing && !repository.update(opened, VaultRepository.Columns.SIZE)) {
             charge.giveBack(owner, charged.orElseThrow());
             return Result.err(VaultError.VAULT_UNKNOWN);
         }
