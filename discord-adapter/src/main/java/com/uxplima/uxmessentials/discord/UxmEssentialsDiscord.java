@@ -5,11 +5,12 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongSupplier;
 
-import org.bukkit.Bukkit;
 import org.bukkit.plugin.RegisteredServiceProvider;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.api.audit.AuditFeed;
+import com.uxplima.uxmlib.scheduler.PaperScheduler;
+import com.uxplima.uxmlib.scheduler.Scheduler;
 import org.jspecify.annotations.Nullable;
 import org.spongepowered.configurate.ConfigurateException;
 
@@ -29,9 +30,10 @@ import org.spongepowered.configurate.ConfigurateException;
  * absent those classes do not exist here, so nothing that names one runs until the host is known to be enabled.
  *
  * <h2>Threading</h2>
- * The JDA login blocks, so it runs on Paper's async scheduler ({@code getAsyncScheduler().runNow}), never on
- * the enable (main) thread. The live forwarder is published into an {@link AtomicReference} so a disable that
- * races the async connect either sees the whole forwarder or none.
+ * The JDA login blocks, so it runs on the uxmLib scheduler's async lane, never on the enable (main) thread. Looking up
+ * the host and its audit feed is Bukkit work, so once the login returns the bridge hops to the global thread for it.
+ * The live forwarder is published into an {@link AtomicReference} so a disable that races the async connect either
+ * sees the whole forwarder or none.
  */
 public final class UxmEssentialsDiscord extends JavaPlugin {
 
@@ -59,7 +61,8 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
             getLogger().info("discord bridge dormant. No token configured (edit config/discord.conf)");
             return;
         }
-        Bukkit.getAsyncScheduler().runNow(this, ignored -> connect(config));
+        Scheduler scheduler = new PaperScheduler(this);
+        var unused = scheduler.async(() -> connect(config, scheduler));
     }
 
     @Override
@@ -81,24 +84,35 @@ public final class UxmEssentialsDiscord extends JavaPlugin {
         }
     }
 
-    private void connect(DiscordConfig config) {
+    private void connect(DiscordConfig config, Scheduler scheduler) {
+        NotificationForwarder live;
         try {
             gateway.connect(config.token());
-            NotificationForwarder live = new NotificationForwarder(gateway, config);
+            live = new NotificationForwarder(gateway, config);
             forwarder.set(live);
-            if (!getServer().getPluginManager().isPluginEnabled(HOST)) {
-                getLogger()
-                        .warning("discord bridge connected but uxmEssentials is not enabled on this server: nothing "
-                                + "will be forwarded");
-                return;
-            }
-            startSubscription(config, live);
-            getLogger()
-                    .info("discord bridge connected; mirroring "
-                            + config.channels().size() + " channel(s)");
         } catch (DiscordConnectException failure) {
             getLogger().warning("discord bridge self-disabled. Connection failed: " + failure.getMessage());
+            return;
         }
+        if (isEnabled()) {
+            var unused = scheduler.global(() -> subscribe(config, live));
+        }
+    }
+
+    /** Find the host and open the subscription; runs on the global thread, since both lookups are Bukkit work. */
+    private void subscribe(DiscordConfig config, NotificationForwarder live) {
+        if (forwarder.get() != live) {
+            return; // the bridge was disabled while the login ran
+        }
+        if (!getServer().getPluginManager().isPluginEnabled(HOST)) {
+            getLogger()
+                    .warning("discord bridge connected but uxmEssentials is not enabled on this server: nothing "
+                            + "will be forwarded");
+            return;
+        }
+        startSubscription(config, live);
+        getLogger()
+                .info("discord bridge connected; mirroring " + config.channels().size() + " channel(s)");
     }
 
     /**
