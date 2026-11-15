@@ -314,7 +314,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.warp.sign.create` | Create a [warp] sign that teleports players to a warp on click. | op |
 | `uxmessentials.warp.sign.use` | Use a [warp] sign to teleport to its warp. | true |
 | `uxmessentials.warp.use` | /warp <name> to teleport to a server warp. | true |
-| `uxmessentials.warp.use.<warp>` | Use one warp, when that warp is configured to require a permission. | true |
+| `uxmessentials.warp.use.<warp>` | Use one server warp; asked for every warp, before any permission the warp itself requires. | true |
 
 ## worlds
 

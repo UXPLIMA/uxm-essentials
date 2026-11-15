@@ -34,6 +34,12 @@ import java.util.stream.Collectors;
  * default says the tier system applies to everyone, not that everyone holds every tier; they are read by listing the
  * nodes a player holds, and a default that answered yes for any probed number would hand out every tier.
  *
+ * <p>Two families can share one shape. {@code uxmessentials.kit.cooldown.<seconds>} (a tier) and
+ * {@code uxmessentials.kit.cooldown.<group>} (a name, default {@code false}) are both a word after the same prefix, so
+ * a check of {@code uxmessentials.kit.cooldown.0} is answered as a group nobody was given. That is harmless: no code
+ * asks for a tier node by name, the tier is read by {@code resolveQuota} from the nodes a player actually holds, and a
+ * tier node somebody granted is set and answered by its setting before any default is looked at.
+ *
  * <p>The catalogue is fixed at class load, so the lookup is built once: the fixed nodes as a set, and each name family
  * filed under its prefix up to the last dot before the placeholder. A check walks the dots of the node from the
  * right, which finds the most specific family first and costs a few map lookups.
@@ -55,11 +61,10 @@ public final class CatalogDefaults {
     public static boolean holds(PermissionHolder holder, String node) {
         Objects.requireNonNull(holder, "holder");
         Objects.requireNonNull(node, "node");
-        if (holder.isPermissionSet(node)) {
-            return holder.hasPermission(node);
-        }
+        // The family lookup comes first because most checks are for fixed or foreign nodes, which the server answers
+        // whole, setting and default together, in one call.
         Optional<PermissionDefault> fallback = familyDefault(node);
-        if (fallback.isEmpty()) {
+        if (fallback.isEmpty() || holder.isPermissionSet(node)) {
             return holder.hasPermission(node);
         }
         for (int dot = node.lastIndexOf('.'); dot > 0; dot = node.lastIndexOf('.', dot - 1)) {
@@ -85,7 +90,7 @@ public final class CatalogDefaults {
      */
     public static Optional<PermissionDefault> familyDefault(String node) {
         Objects.requireNonNull(node, "node");
-        if (FIXED.contains(node)) {
+        if (!node.startsWith(SharedPermissions.NAMESPACE) || FIXED.contains(node)) {
             return Optional.empty();
         }
         for (int dot = node.lastIndexOf('.'); dot > 0; dot = node.lastIndexOf('.', dot - 1)) {

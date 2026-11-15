@@ -17,12 +17,13 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ArgumentNodes;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogGate;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
-import com.uxplima.uxmlib.command.Gate;
 import com.uxplima.uxmlib.command.Sender;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
@@ -66,8 +67,9 @@ public final class MenuOpenCommand implements CommandRegistration {
     public LiteralCommandNode<CommandSourceStack> build() {
         LiteralArgumentBuilder<CommandSourceStack> literal = Commands.literal(spec.name());
         // Gate visibility on the menu's permission when it declares one, so the node is hidden from a sender who
-        // cannot use it (its execution still re-checks). A permissionless menu stays open to everyone.
-        spec.permission().ifPresent(permission -> literal.requires(Gate.permission(permission)));
+        // cannot use it (its execution still re-checks). A permissionless menu stays open to everyone. The node may
+        // be a catalogue family member the server was never told about, so the catalogue rule decides.
+        spec.permission().ifPresent(permission -> literal.requires(CatalogGate.permission(permission)));
         if (spec.arguments().isEmpty()) {
             return literal.executes(this::open).build();
         }
@@ -92,7 +94,7 @@ public final class MenuOpenCommand implements CommandRegistration {
             return 0;
         }
         if (spec.permission().isPresent()
-                && !sender.hasPermission(spec.permission().get())) {
+                && !CatalogPermissionCheck.has(sender, spec.permission().get())) {
             denyPermission(sender);
             return 0;
         }

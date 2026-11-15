@@ -19,13 +19,12 @@ import com.uxplima.uxmessentials.communication.application.InfoRegistry;
 import com.uxplima.uxmessentials.communication.application.ShowInfoPage;
 import com.uxplima.uxmessentials.communication.domain.CommunicationMessageKey;
 import com.uxplima.uxmessentials.communication.domain.InfoPage;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogGate;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
-import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -67,10 +66,8 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
     public LiteralCommandNode<CommandSourceStack> build() {
         String permission = SocialPermissions.infoPage(command);
         return Commands.literal(command)
-                // A page's node is a family member the server was never told about, so its own check would close
-                // the page to everyone but operators; the permission gate stays for the node it names on refusal.
-                .requires(Gate.when(sender -> CatalogPermissionCheck.has(sender, permission))
-                        .or(Gate.permission(permission)))
+                // A page an operator added has a family node the server was never told about.
+                .requires(CatalogGate.permission(permission))
                 .executes(ctx -> show(ctx, 1))
                 .then(Commands.argument("page", IntegerArgumentType.integer(1))
                         .executes(ctx -> show(ctx, ctx.getArgument("page", Integer.class))))

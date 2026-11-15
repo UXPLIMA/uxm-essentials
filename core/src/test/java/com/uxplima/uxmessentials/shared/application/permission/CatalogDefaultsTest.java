@@ -23,9 +23,21 @@ class CatalogDefaultsTest {
     }
 
     @Test
-    void anUnsetNodeForAnOperatorAddedInfoPageIsOpenToAPlayer() {
-        assertThat(CatalogDefaults.holds(FakeHolder.player(), SocialPermissions.infoPage("discord")))
+    void anInfoPageAnOperatorAddedStaysClosedToAPlayerUntilGranted() {
+        String staffPage = SocialPermissions.infoPage("staff");
+
+        assertThat(CatalogDefaults.holds(FakeHolder.player(), staffPage)).isFalse();
+        assertThat(CatalogDefaults.holds(FakeHolder.operator(), staffPage)).isTrue();
+        assertThat(CatalogDefaults.holds(FakeHolder.player().set(staffPage, true), staffPage))
                 .isTrue();
+    }
+
+    @Test
+    void aShippedInfoPageIsLeftToItsRegisteredDefaultOfEveryone() {
+        String rules = SocialPermissions.COMMUNICATION_INFO_RULES;
+
+        assertThat(CatalogDefaults.familyDefault(rules)).isEmpty();
+        assertThat(PermissionCatalog.find(rules)).map(PermissionSpec::fallback).contains(PermissionDefault.TRUE);
     }
 
     @Test
@@ -112,6 +124,26 @@ class CatalogDefaultsTest {
     void aFamilyWhosePlaceholderSitsInTheMiddleCoversOnlyItsOwnShape() {
         assertThat(CatalogDefaults.familyDefault(NETHER_ENTRY)).contains(PermissionDefault.OP);
         assertThat(CatalogDefaults.familyDefault("uxmessentials.world.nether")).isEmpty();
+    }
+
+    @Test
+    void aNodeThatRunsPastAFamilysShapeMatchesNothing() {
+        assertThat(CatalogDefaults.familyDefault("uxmessentials.world.foo.enter.bar"))
+                .isEmpty();
+        assertThat(CatalogDefaults.holds(FakeHolder.player(), "uxmessentials.world.foo.enter.bar"))
+                .isFalse();
+    }
+
+    @Test
+    void aKitCooldownTierProbedByNameReadsAsAGroupNobodyWasGiven() {
+        // The tier family and the group family share the shape uxmessentials.kit.cooldown.<word>; the group's
+        // default answers a probe, while the tier itself is only ever read from the nodes a player holds.
+        String noKitWait = SharedPermissions.featureCooldown("kit") + ".0";
+
+        assertThat(CatalogDefaults.familyDefault(noKitWait)).contains(PermissionDefault.FALSE);
+        assertThat(CatalogDefaults.holds(FakeHolder.operator(), noKitWait)).isFalse();
+        assertThat(CatalogDefaults.holds(FakeHolder.player().set(noKitWait, true), noKitWait))
+                .isTrue();
     }
 
     @Test

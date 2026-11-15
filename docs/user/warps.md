@@ -61,7 +61,8 @@ The checks run in this order, and the first that fails stops the use with its ow
 1. The player holds `uxmessentials.warp.use.<warp>`, and the warp's required permission when it has one. The
    per-warp node defaults to every player, so nothing needs granting. Set it to false for a group to keep that group
    out of one warp, or set `uxmessentials.warp.use.*` to false and grant single warps back to close them all by
-   default.
+   default. Do not use a node under `uxmessentials.warp.use.` as a warp's required permission: every player holds
+   that namespace unless it is denied, so the requirement would keep nobody out. Name a node of your own instead.
 2. The warp is not locked, unless the player holds `uxmessentials.bypass.lock.warp`.
 3. The right password was given, unless the warp has none or the player holds `uxmessentials.bypass.password.warp`.
 4. The destination is safe: solid ground, and no solid block, lava or fire at the feet or head. A warp in a world

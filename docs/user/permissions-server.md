@@ -62,7 +62,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.communication.clearchat` | /clearchat (alias /chatclear) to flush the chat for online players. | op |
 | `uxmessentials.bypass.clear-chat` | Keep your chat scrollback when staff run /clearchat. | false |
 | `uxmessentials.communication.gui` | Open the communication admin panel (/communication gui and on the /uxmess gui hub). | op |
-| `uxmessentials.communication.info.<page>` | Read one information page, such as /motd or /rules. | true |
+| `uxmessentials.communication.info.<page>` | Read one information page an operator added, such as /discord; the shipped info, motd and rules pages have nodes of their own that every player holds. | op |
 | `uxmessentials.communication.info.info` | /info to read the shipped welcome / quick-start info page. | true |
 | `uxmessentials.communication.info.motd` | /motd to read the shipped message-of-the-day info page. | true |
 | `uxmessentials.communication.info.rules` | /rules to read the shipped server-rules info page. | true |

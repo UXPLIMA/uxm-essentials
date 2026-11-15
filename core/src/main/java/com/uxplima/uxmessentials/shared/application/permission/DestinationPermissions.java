@@ -269,7 +269,7 @@ public final class DestinationPermissions {
                         WARP_USE, "/warp <name> to teleport to a server warp.", PermissionDefault.TRUE, WARPS),
                 PermissionSpec.family(
                         warpUse("<warp>"),
-                        "Use one warp, when that warp is configured to require a permission.",
+                        "Use one server warp; asked for every warp, before any permission the warp itself requires.",
                         PermissionDefault.TRUE,
                         PermissionShape.LABEL,
                         WARPS));
