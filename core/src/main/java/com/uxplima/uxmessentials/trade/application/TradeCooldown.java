@@ -45,10 +45,22 @@ public final class TradeCooldown {
         return remainingMillis <= 0 ? 0 : (remainingMillis + 999) / 1000;
     }
 
-    /** Record that {@code player} has just sent a request, starting their cooldown. */
-    public void stamp(UUID player) {
+    /** Record that {@code player} has just sent a request, starting their cooldown; returns the stamp it set. */
+    public Instant stamp(UUID player) {
         Objects.requireNonNull(player, "player");
-        lastRequest.put(player, clock.instant());
+        Instant now = clock.instant();
+        lastRequest.put(player, now);
+        return now;
+    }
+
+    /**
+     * Take back the stamp {@code stampedAt} because the request it started never reached anyone, so a failed request
+     * costs no wait. A newer stamp is left alone: it belongs to a later request.
+     */
+    public void release(UUID player, Instant stampedAt) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(stampedAt, "stampedAt");
+        lastRequest.remove(player, stampedAt);
     }
 
     /** Forget a player's stamp on disconnect so the map does not grow without bound. */

@@ -106,16 +106,16 @@ public final class BusWiring {
                     network.transport().name().toLowerCase(java.util.Locale.ROOT));
         }
         return switch (network.transport()) {
-            case VELOCITY -> pluginMessaging(plugin, network, scheduler);
+            case VELOCITY -> pluginMessaging(plugin, network, scheduler, log);
             case REDIS -> redis(plugin, network, scheduler, log);
             case BOTH ->
                 new CompositeBusTransport(
-                        pluginMessaging(plugin, network, scheduler), redis(plugin, network, scheduler, log));
+                        pluginMessaging(plugin, network, scheduler, log), redis(plugin, network, scheduler, log));
         };
     }
 
-    private static BusTransport pluginMessaging(Plugin plugin, NetworkConfig network, Scheduler scheduler) {
-        return new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize());
+    private static BusTransport pluginMessaging(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+        return new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize(), log);
     }
 
     /**

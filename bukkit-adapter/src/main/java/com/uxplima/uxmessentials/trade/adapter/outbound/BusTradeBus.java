@@ -30,6 +30,9 @@ public final class BusTradeBus implements TradeBus {
     private final Logger log;
     private @Nullable Consumer<TradeSignal> handler;
 
+    /** Kinds already reported as unknown: a peer on a newer build sends them with every invite during an upgrade. */
+    private final java.util.Set<String> reportedUnknown = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     public BusTradeBus(BusPublisher publisher, boolean enabled, Logger log) {
         this.publisher = Objects.requireNonNull(publisher, "publisher");
         this.enabled = enabled;
@@ -73,7 +76,9 @@ public final class BusTradeBus implements TradeBus {
         try {
             type = TradeSignalType.valueOf(frame.signal());
         } catch (IllegalArgumentException unknown) {
-            log.warn("dropping cross-server trade frame with unknown signal {}", frame.signal());
+            if (reportedUnknown.add(frame.signal())) {
+                log.warn("dropping cross-server trade frames with unknown signal {}", frame.signal());
+            }
             return;
         }
         handler.accept(new TradeSignal(

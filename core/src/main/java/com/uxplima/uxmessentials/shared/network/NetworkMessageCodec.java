@@ -6,7 +6,9 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
@@ -29,6 +31,15 @@ public final class NetworkMessageCodec {
 
     /** The protocol version written as the first wire byte; bump only on an incompatible format change. */
     public static final byte VERSION = 1;
+
+    /**
+     * The most players one presence snapshot part may name. Far above what fits in a part, it only stops a corrupt
+     * count from allocating an enormous list before the truncated body is noticed.
+     */
+    static final int MAX_SNAPSHOT_PLAYERS = 100_000;
+
+    /** The most parts one presence roster may be split into; a corrupt count beyond it is refused. */
+    static final int MAX_SNAPSHOT_PARTS = 10_000;
 
     private NetworkMessageCodec() {}
 
@@ -68,6 +79,43 @@ public final class NetworkMessageCodec {
         } catch (IOException truncated) {
             throw new IllegalArgumentException("network frame was truncated or malformed", truncated);
         }
+    }
+
+    /**
+     * The origin server of {@code frame}, read from the header alone. The proxy routes on this, so it relays a frame
+     * whose type it does not know yet instead of dropping it: the origin sits right after the version and type
+     * bytes in every frame, whatever its type.
+     *
+     * @throws IllegalArgumentException if the frame is truncated or carries an unknown version
+     */
+    public static String readOrigin(byte[] frame) {
+        Objects.requireNonNull(frame, "frame");
+        try (DataInputStream in = new DataInputStream(new ByteArrayInputStream(frame))) {
+            byte version = in.readByte();
+            if (version != VERSION) {
+                throw new IllegalArgumentException("unsupported network frame version: " + version);
+            }
+            in.readByte();
+            return in.readUTF();
+        } catch (IOException truncated) {
+            throw new IllegalArgumentException("network frame header was truncated or malformed", truncated);
+        }
+    }
+
+    /** How many bytes {@link DataOutputStream#writeUTF} spends on {@code text}, its two-byte length included. */
+    static int utfBytes(String text) {
+        int bytes = 2;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c >= 0x0001 && c <= 0x007F) {
+                bytes += 1;
+            } else if (c <= 0x07FF) {
+                bytes += 2;
+            } else {
+                bytes += 3;
+            }
+        }
+        return bytes;
     }
 
     private static void writeBody(DataOutputStream out, NetworkMessage message) throws IOException {
@@ -119,6 +167,25 @@ public final class NetworkMessageCodec {
             }
             case IpBanChanged ipBan -> out.writeUTF(ipBan.ip());
             case RankChanged rank -> writeUuid(out, rank.player());
+            case PresenceChanged presence -> {
+                out.writeLong(presence.session());
+                out.writeLong(presence.sequence());
+                writeUuid(out, presence.player());
+                out.writeUTF(presence.playerName());
+                out.writeBoolean(presence.online());
+            }
+            case PresenceSnapshot snapshot -> {
+                out.writeLong(snapshot.session());
+                out.writeLong(snapshot.sequence());
+                out.writeBoolean(snapshot.replyRequested());
+                out.writeInt(snapshot.part());
+                out.writeInt(snapshot.parts());
+                out.writeInt(snapshot.players().size());
+                for (PresenceSnapshot.Member member : snapshot.players()) {
+                    writeUuid(out, member.player());
+                    out.writeUTF(member.name());
+                }
+            }
         }
     }
 
@@ -146,6 +213,9 @@ public final class NetworkMessageCodec {
             case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
             case IP_BAN_CHANGED -> new IpBanChanged(origin, in.readUTF());
             case RANK_CHANGED -> new RankChanged(origin, readUuid(in));
+            case PRESENCE_CHANGED ->
+                new PresenceChanged(origin, in.readLong(), in.readLong(), readUuid(in), in.readUTF(), in.readBoolean());
+            case PRESENCE_SNAPSHOT -> readSnapshot(in, origin);
         };
     }
 
@@ -192,6 +262,26 @@ public final class NetworkMessageCodec {
             voters.add(readUuid(in));
         }
         return new VotePartyFired(origin, threshold, reach, voters);
+    }
+
+    private static PresenceSnapshot readSnapshot(DataInputStream in, String origin) throws IOException {
+        long session = in.readLong();
+        long sequence = in.readLong();
+        boolean replyRequested = in.readBoolean();
+        int part = in.readInt();
+        int parts = in.readInt();
+        if (parts < 1 || parts > MAX_SNAPSHOT_PARTS || part < 0 || part >= parts) {
+            throw new IllegalArgumentException("presence snapshot names an impossible part: " + part + "/" + parts);
+        }
+        int count = in.readInt();
+        if (count < 0 || count > MAX_SNAPSHOT_PLAYERS) {
+            throw new IllegalArgumentException("presence snapshot names an impossible player count: " + count);
+        }
+        List<PresenceSnapshot.Member> players = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            players.add(new PresenceSnapshot.Member(readUuid(in), in.readUTF()));
+        }
+        return new PresenceSnapshot(origin, session, sequence, replyRequested, part, parts, players);
     }
 
     private static void writeUuid(DataOutputStream out, UUID uuid) throws IOException {

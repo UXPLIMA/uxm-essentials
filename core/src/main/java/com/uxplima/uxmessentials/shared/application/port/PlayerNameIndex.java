@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * modes one lookup path.
  *
  * <p>{@link #byName} is memory-only and safe to call on a tick thread. {@link #record} mutates memory
- * synchronously and persists off-thread.
+ * synchronously and persists off-thread. {@link #learn} is memory-only.
  */
 public interface PlayerNameIndex {
 
@@ -22,4 +22,10 @@ public interface PlayerNameIndex {
 
     /** Note that {@code uuid} is joining under {@code name}. */
     void record(UUID uuid, String name);
+
+    /**
+     * Note that {@code uuid} is online under {@code name} on another backend. Memory only: the backend the player
+     * joined records the name itself, so persisting it here again would only repeat that write once per backend.
+     */
+    void learn(UUID uuid, String name);
 }

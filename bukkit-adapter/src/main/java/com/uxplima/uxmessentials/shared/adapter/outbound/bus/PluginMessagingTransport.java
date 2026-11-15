@@ -10,7 +10,9 @@ import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
 import org.jspecify.annotations.NullMarked;
 
@@ -45,11 +47,14 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     private final String channel;
     private final int outboundQueueSize;
     private final Deque<byte[]> outbound = new ArrayDeque<>();
+    private final OversizeFrameReport oversize;
 
     private volatile boolean running;
     private @org.jspecify.annotations.Nullable Consumer<byte[]> onFrame;
 
-    public PluginMessagingTransport(Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize) {
+    public PluginMessagingTransport(
+            Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize, Logger log) {
+        this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), System::currentTimeMillis);
         this.plugin = Objects.requireNonNull(plugin, "plugin");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.channel = Objects.requireNonNull(channel, "channel");
@@ -91,6 +96,11 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     public void send(byte[] frame) {
         Objects.requireNonNull(frame, "frame");
         if (!running) {
+            return;
+        }
+        if (frame.length > BusChannel.MAX_FRAME_BYTES) {
+            // The proxy relays the frame serverbound, and a backend disconnects the carrier for a payload this large.
+            oversize.dropped(frame.length);
             return;
         }
         synchronized (outbound) {
