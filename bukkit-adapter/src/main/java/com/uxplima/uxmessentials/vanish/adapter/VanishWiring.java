@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.vanish.adapter;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
@@ -11,15 +12,18 @@ import org.bukkit.Server;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.vanish.VanishRecordStores;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ClusterPeers;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.command.VanishCommand;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLifecycleListener;
+import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishLoginListener;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishProtectionListener;
 import com.uxplima.uxmessentials.vanish.adapter.inbound.listener.VanishSilentContainerListener;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishBuffs;
@@ -27,18 +31,22 @@ import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishLevelResolv
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BukkitVanishView;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.BusVanishBus;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.ForeignVanishStore;
-import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryNetworkVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.InMemoryVanishStore;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.PdcVanishPickup;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishActionBar;
 import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishConnectionMessenger;
-import com.uxplima.uxmessentials.vanish.adapter.outbound.VanishNetworkApplier;
+import com.uxplima.uxmessentials.vanish.application.ApplyVanishOnJoin;
+import com.uxplima.uxmessentials.vanish.application.DepartVanished;
 import com.uxplima.uxmessentials.vanish.application.JoinVanishReconciler;
 import com.uxplima.uxmessentials.vanish.application.ListVanished;
+import com.uxplima.uxmessentials.vanish.application.NetworkVanishRoster;
+import com.uxplima.uxmessentials.vanish.application.RememberVanish;
 import com.uxplima.uxmessentials.vanish.application.SetVanishLevel;
 import com.uxplima.uxmessentials.vanish.application.ToggleVanish;
 import com.uxplima.uxmessentials.vanish.application.VanishConfig;
+import com.uxplima.uxmessentials.vanish.application.VanishNetworkSync;
 import com.uxplima.uxmessentials.vanish.application.port.NetworkVanishStore;
+import com.uxplima.uxmessentials.vanish.application.port.PeerLiveness;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBuffs;
 import com.uxplima.uxmessentials.vanish.application.port.VanishBus;
 import com.uxplima.uxmessentials.vanish.application.port.VanishLevelResolver;
@@ -54,8 +62,10 @@ import org.jspecify.annotations.Nullable;
  * /vanish} command plus the join/quit listener the plugin registers. This is the one place the vanish context is
  * wired: nothing else news up its classes.
  *
- * <p>The context persists nothing: the vanish state is the transient in-memory {@link InMemoryVanishStore}, the single
- * authority every consumer (messaging, nametags, staff) reads. Its outbound adapters are the store, the level-aware
+ * <p>Who this backend is hiding is the in-memory {@link InMemoryVanishStore}, the single authority every consumer
+ * (messaging, nametags, staff) reads. Each player's vanish is also kept in the database through {@link RememberVanish}
+ * and read at login by the {@link VanishLoginListener}, so it follows the player to another backend and through a
+ * restart. Its outbound adapters are the store, the level-aware
  * {@link BukkitVanishView}, and the {@link BukkitVanishLevelResolver} that reads a player's see/use levels from their
  * permissions. The store, the toggle, and the resolver are exposed on {@link Wired} so bootstrap can hand them to the
  * consumers' vanish gates (which now read the layered see level) and to staff-mode vanish. On stop the store is cleared
@@ -76,11 +86,17 @@ public final class VanishWiring {
 
     private VanishWiring() {}
 
-    /** Build the vanish adapters and use cases from {@code plugin}, {@code ctx}, and the cross-server {@code bus}. */
-    public static Wired wire(Plugin plugin, ModuleContext ctx, Bus bus) {
+    /**
+     * Build the vanish adapters and use cases from {@code plugin}, {@code ctx}, the shared {@code persistence}, the
+     * cross-server {@code bus}, and the heartbeat roster of the peer backends ({@code peers}, empty when the bus is off).
+     */
+    public static Wired wire(
+            Plugin plugin, ModuleContext ctx, Persistence persistence, Bus bus, Optional<ClusterPeers> peers) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(peers, "peers");
         KernelPorts kernel = ctx.kernel();
         VanishConfig config = VanishConfig.from(ctx.config());
 
@@ -92,13 +108,20 @@ public final class VanishWiring {
                 plugin.getServer(), kernel.scheduler(), config.nightVision(), config.allowFlight());
         VanishPickupPreferences pickup = new PdcVanishPickup(plugin.getServer(), config.pickupItems());
 
-        CrossServer cross = crossServer(config, bus, store, view, kernel.scheduler());
+        RememberVanish remember = new RememberVanish(
+                VanishRecordStores.jooq(persistence), kernel.scheduler(), Clock.systemUTC(), kernel.log());
+        CrossServer cross = crossServer(config, bus, peers, store, view, kernel);
         NetworkVanishStore network = cross.network();
         ToggleVanish toggleVanish =
-                new ToggleVanish(store, view, levels, notifier, buffs, cross.bus(), kernel.events());
-        SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs, cross.bus());
+                new ToggleVanish(store, view, levels, notifier, buffs, cross.bus(), kernel.events(), remember);
+        SetVanishLevel setVanishLevel = new SetVanishLevel(store, view, levels, buffs, cross.bus(), remember);
         ListVanished listVanished = new ListVanished(store, levels, network);
         JoinVanishReconciler reconciler = new JoinVanishReconciler(network, store);
+        ApplyVanishOnJoin applyOnJoin =
+                new ApplyVanishOnJoin(reconciler, toggleVanish, setVanishLevel, remember, store);
+        DepartVanished departVanished = new DepartVanished(store, cross.bus(), remember);
+        VanishLoginListener login =
+                new VanishLoginListener(remember, kernel.scheduler(), kernel.log(), config.loadTimeout());
         Function<UUID, Optional<String>> networkName = network::nameOf;
         VanishConnectionMessenger messenger =
                 new VanishConnectionMessenger(kernel.scheduler(), kernel.messageSink(), levels, config);
@@ -115,8 +138,18 @@ public final class VanishWiring {
                 kernel.messages(),
                 networkName));
         List<Listener> listeners = List.of(
+                login,
                 new VanishLifecycleListener(
-                        store, view, setVanishLevel, toggleVanish, reconciler, config, plugin.getServer()),
+                        store,
+                        view,
+                        applyOnJoin,
+                        departVanished,
+                        remember,
+                        login,
+                        kernel.scheduler(),
+                        kernel.log(),
+                        config,
+                        plugin.getServer()),
                 new VanishProtectionListener(store, config, pickup),
                 new VanishSilentContainerListener(
                         store, kernel.scheduler(), plugin.getServer(), config.silentChests()));
@@ -133,6 +166,7 @@ public final class VanishWiring {
                 toggleVanish,
                 levels,
                 network,
+                login,
                 actionBarTask,
                 foreign.poll());
     }
@@ -163,21 +197,30 @@ public final class VanishWiring {
     private record Foreign(VanishStore store, @Nullable AutoCloseable poll) {}
 
     /**
-     * Wire the cross-server vanish sync, or the inert shape when it is off. With {@code cross-server=true} it builds
-     * the network-wide view, the bus bridge that publishes/receives vanish frames, and the applier that reconciles an
-     * inbound frame onto the target's region, registering the applier as a {@code RemoteSyncListener}. With it off (or
-     * the network bus absent, in which case the publisher is a no-op) it returns the disabled bus and empty view, so
-     * every cross-server seam is a harmless no-op and same-server vanish is unchanged.
+     * Wire the cross-server vanish sync, or the inert shape when it is off. With {@code cross-server=true} it builds the
+     * network-wide view, which drops a peer's entries once the heartbeat roster stops hearing from it, the bus bridge
+     * that publishes and receives vanish frames, and the sync that applies what the peers send. With it off it returns
+     * the disabled bus and empty view, so every cross-server seam is a harmless no-op and same-server vanish is
+     * unchanged. With the network bus itself off nothing ever arrives, so the missing roster only means no peer is live.
      */
     private static CrossServer crossServer(
-            VanishConfig config, Bus bus, VanishStore store, VanishView view, Scheduler scheduler) {
+            VanishConfig config,
+            Bus bus,
+            Optional<ClusterPeers> peers,
+            VanishStore store,
+            VanishView view,
+            KernelPorts kernel) {
         if (!config.crossServer()) {
             return new CrossServer(VanishBus.disabled(), NetworkVanishStore.empty());
         }
-        InMemoryNetworkVanishStore network = new InMemoryNetworkVanishStore();
+        PeerLiveness liveness = peers.<PeerLiveness>map(
+                        roster -> origin -> roster.isLive(origin, System.currentTimeMillis()))
+                .orElse(origin -> false);
+        Duration grace = peers.map(ClusterPeers::livenessWindow).orElse(Duration.ZERO);
+        NetworkVanishRoster network = new NetworkVanishRoster(liveness, Clock.systemUTC(), grace);
         BusVanishBus vanishBus = new BusVanishBus(bus.publisher(), true);
-        VanishNetworkApplier applier = new VanishNetworkApplier(network, store, view, scheduler);
-        vanishBus.subscribe(applier);
+        vanishBus.subscribe(
+                new VanishNetworkSync(network, store, view, vanishBus, kernel.playerLookup(), kernel.scheduler()));
         bus.registry().register(vanishBus::onFrame);
         return new CrossServer(vanishBus, network);
     }
@@ -199,6 +242,7 @@ public final class VanishWiring {
      * @param toggleVanish the vanish use case, exposed for staff-mode vanish
      * @param levels the see/use level resolver, exposed for the messaging/nametags vanish gates
      * @param network the network-wide vanish view, cleared on stop; the empty view when cross-server is off
+     * @param login the pre-login read of each player's kept vanish, whose held answers are dropped on stop
      * @param actionBarTask the repeating action-bar refresh handle, cancelled on stop; {@code null} when the indicator
      *     is disabled and no timer was armed
      * @param foreignVanishPoll the repeating global-region read of a foreign vanish plugin's hidden players, cancelled
@@ -212,6 +256,7 @@ public final class VanishWiring {
             ToggleVanish toggleVanish,
             VanishLevelResolver levels,
             NetworkVanishStore network,
+            VanishLoginListener login,
             @Nullable AutoCloseable actionBarTask,
             @Nullable AutoCloseable foreignVanishPoll) {
 
@@ -223,6 +268,7 @@ public final class VanishWiring {
             Objects.requireNonNull(toggleVanish, "toggleVanish");
             Objects.requireNonNull(levels, "levels");
             Objects.requireNonNull(network, "network");
+            Objects.requireNonNull(login, "login");
         }
 
         /** Expose the shared {@link VanishStore} authority the consumers' vanish gates read. */
@@ -234,6 +280,7 @@ public final class VanishWiring {
         public void stop() {
             store.clear();
             network.clear();
+            login.clear();
             cancel(actionBarTask, "action-bar");
             cancel(foreignVanishPoll, "foreign-vanish poll");
         }

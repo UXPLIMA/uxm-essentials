@@ -314,7 +314,7 @@ final class EnforcementPermissions {
                         VANISH),
                 PermissionSpec.of(
                         "uxmessentials.vanish.persist",
-                        "Remain vanished across a relog instead of reappearing on join.",
+                        "Rejoin already vanished every time, even after leaving visible; a vanish itself always lasts across a relog.",
                         PermissionDefault.OP,
                         VANISH),
                 PermissionSpec.of(

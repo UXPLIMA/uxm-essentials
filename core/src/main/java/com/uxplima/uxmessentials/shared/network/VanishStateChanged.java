@@ -20,9 +20,15 @@ import java.util.UUID;
  * @param player the player whose vanish state changed
  * @param playerName the player's name at the moment of the change, for a network-wide roster render
  * @param vanished {@code true} when the player is now vanished, {@code false} when they reappeared
+ * <p>A departure says the player left the origin backend while still vanished, so a peer drops the entry that backend
+ * reported and nothing else. It still carries {@code vanished = true}: a peer that predates the flag then keeps the
+ * player hidden instead of reading the departure as a reveal.
+ *
  * @param level the player's resolved use level (always {@code >= 1}); meaningful only when {@code vanished} is true
+ * @param departed {@code true} when the player left the origin backend rather than changed their vanish
  */
-public record VanishStateChanged(String originServer, UUID player, String playerName, boolean vanished, int level)
+public record VanishStateChanged(
+        String originServer, UUID player, String playerName, boolean vanished, int level, boolean departed)
         implements NetworkMessage {
 
     public VanishStateChanged {
@@ -35,6 +41,14 @@ public record VanishStateChanged(String originServer, UUID player, String player
         if (level < 1) {
             throw new IllegalArgumentException("level must be >= 1: " + level);
         }
+        if (departed && !vanished) {
+            throw new IllegalArgumentException("a departure is sent only for a vanished player");
+        }
+    }
+
+    /** A change of the player's vanish, not a departure. */
+    public VanishStateChanged(String originServer, UUID player, String playerName, boolean vanished, int level) {
+        this(originServer, player, playerName, vanished, level, false);
     }
 
     @Override

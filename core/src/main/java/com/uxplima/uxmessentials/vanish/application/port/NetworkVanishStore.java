@@ -8,23 +8,30 @@ import com.uxplima.uxmessentials.vanish.application.VanishSync;
 import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
 
 /**
- * The network-wide vanish view a backend keeps of who is vanished across the <em>whole cluster</em>, not just those
- * hidden on this server. It is fed only by the cross-server bus, a peer's {@link VanishSync}, and is separate from
- * the local {@link VanishStore} (which holds who this backend is actively hiding, and is dropped on quit). Keeping the
- * two apart is what lets a player hop {@code survival-1 -> survival-2} without the quit on the origin erasing the
- * network-wide fact that they are still vanished: the origin's local store drops them, but every backend's network
- * view still knows, so the destination re-hides them on arrival ({@code JoinVanishReconciler}).
+ * The network-wide vanish view a backend keeps of who is vanished on its <em>peers</em>, separate from the local
+ * {@link VanishStore} of who this backend is hiding. It is fed only by the cross-server bus and read by the join
+ * reconcile and the network-wide {@code /vanish list}.
  *
- * <p>The name rides along so a network-wide {@code /vanish list} can render a hidden player who is not online on the
- * reading backend. A reveal removes the player entirely. When {@code cross-server} is off the module wires
- * {@link #empty()}, so the reconcile and list paths read an always-empty view and cross-server stays inert.
+ * <p>Every entry remembers the backend that reported it. A player who leaves that backend is dropped when it says so,
+ * and every entry of a backend that stops sending heartbeats or starts again is dropped too, so the view never keeps a
+ * player nobody is hiding any more. A departure from a backend other than the one the entry came from is ignored: on
+ * a server hop the destination may already have reported the player before the origin's departure arrives.
+ *
+ * <p>The name rides along so the list can render a hidden player who is not online on the reading backend. When
+ * {@code cross-server} is off the module wires {@link #empty()}, so the reconcile and list paths stay inert.
  */
 public interface NetworkVanishStore {
 
-    /** Apply a peer's change: mark the player vanished at their level, or drop them from the view on a reveal. */
-    void apply(VanishSync change);
+    /** Apply a change reported by peer {@code origin}: record the player vanished, or drop them on a reveal. */
+    void apply(String origin, VanishSync change);
 
-    /** The network-wide use level {@code who} is vanished at, or empty when no backend reports them vanished. */
+    /** Peer {@code origin} says {@code player} left it; drop them unless another backend reported them since. */
+    void depart(String origin, UUID player);
+
+    /** Peer {@code origin} started again, so every player it reported belongs to a run that is over. */
+    void forgetServer(String origin);
+
+    /** The network-wide use level {@code who} is vanished at, or empty when no live peer reports them vanished. */
     Optional<VanishLevel> levelOf(UUID who);
 
     /** The last-known name of a network-vanished {@code who}, for a roster render; empty when not tracked. */
@@ -41,13 +48,23 @@ public interface NetworkVanishStore {
         return Empty.INSTANCE;
     }
 
-    /** The inert view: apply is dropped and every query is empty. */
+    /** The inert view: every change is dropped and every query is empty. */
     enum Empty implements NetworkVanishStore {
         INSTANCE;
 
         @Override
-        public void apply(VanishSync change) {
+        public void apply(String origin, VanishSync change) {
             // Nothing to track with cross-server off.
+        }
+
+        @Override
+        public void depart(String origin, UUID player) {
+            // Nothing tracked, so nothing to drop.
+        }
+
+        @Override
+        public void forgetServer(String origin) {
+            // Nothing tracked, so nothing to drop.
         }
 
         @Override

@@ -217,6 +217,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.QueryContexts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusWiring;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.ClusterPeers;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkPresenceWiring;
 import com.uxplima.uxmessentials.shared.adapter.outbound.chat.UxmChatStepBack;
@@ -852,6 +853,7 @@ public final class PluginModule {
                 resources,
                 log,
                 bus.bus(),
+                bus.peers(),
                 hooks,
                 guiRegistry,
                 menus,
@@ -1150,6 +1152,7 @@ public final class PluginModule {
             CloseableResources resources,
             Logger log,
             Bus bus,
+            Optional<ClusterPeers> peers,
             Integrations hooks,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -1161,6 +1164,7 @@ public final class PluginModule {
         // teleport is wired before homes/warps (registry order is dependency-first), so its engine is
         // captured and handed to the contexts that delegate teleport execution to it.
         ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence);
+        links.clusterPeers = peers;
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
         // and tear it down on disable so a reload re-installs cleanly (the static install state is reset).
         Guis.install(plugin);
@@ -1475,7 +1479,7 @@ public final class PluginModule {
                     menus,
                     menuBindings);
         } else if (module.id().equals(ModuleId.of("vanish"))) {
-            wireVanish(plugin, ctx, resources, links, bus);
+            wireVanish(plugin, ctx, persistence, resources, links, bus);
         } else if (module.id().equals(ModuleId.of("presence"))) {
             wirePresence(plugin, ctx, resources, links, guiLayouts, guiRegistry, menus);
         } else if (module.id().equals(ModuleId.of("moderation"))) {
@@ -2917,14 +2921,21 @@ public final class PluginModule {
     }
 
     private static void wireVanish(
-            JavaPlugin plugin, ModuleContext ctx, CloseableResources resources, ContextLinks links, Bus bus) {
+            JavaPlugin plugin,
+            ModuleContext ctx,
+            Persistence persistence,
+            CloseableResources resources,
+            ContextLinks links,
+            Bus bus) {
         // vanish is the single vanish authority: an in-memory ConcurrentHashMap of who is vanished, the /vanish
         // command, the Bukkit hide-show view (which drops both the player entity and their tab entry for ineligible
-        // viewers), and the join/quit listener. It persists nothing. It wires before the contexts it informs
+        // viewers), and the login/join/quit listeners. Each player's vanish is kept in the player_vanish table so it
+        // follows them across backends and restarts, and the peer heartbeat roster ages out the network entries of a
+        // backend that stopped. It wires before the contexts it informs
         // (messaging, presence, nametags, staff), so its store and toggle are captured here and threaded into their
         // vanish gates during their own wiring; a disabled vanish module leaves those handles null and each consumer
         // degrades to "no one is hidden". On stop the store is cleared so a disable/reload leaves no residual state.
-        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, bus);
+        VanishWiring.Wired wired = VanishWiring.wire(plugin, ctx, persistence, bus, links.clusterPeers);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
@@ -3609,6 +3620,9 @@ public final class PluginModule {
         // staff chat to a no-op rather than failing.
         private com.uxplima.uxmessentials.staff.adapter.StaffWiring.@org.jspecify.annotations.Nullable VanishSeam
                 staffVanishSeam;
+        // The heartbeat roster of the peer backends, present only while the network bus is enabled. Vanish reads it
+        // to drop the network entries of a backend that stopped answering.
+        private Optional<ClusterPeers> clusterPeers = Optional.empty();
         private com.uxplima.uxmessentials.playerstate.application.@org.jspecify.annotations.Nullable OpenContainer
                 staffOpenContainer;
         private com.uxplima.uxmessentials.messaging.application.port.@org.jspecify.annotations.Nullable StaffAudience
