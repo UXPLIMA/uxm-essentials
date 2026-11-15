@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.application.port.KitEconomy;
@@ -29,12 +30,18 @@ import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.kits.domain.KitSchedule;
 import com.uxplima.uxmessentials.kits.domain.event.KitClaimed;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
+import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
 import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
@@ -53,7 +60,21 @@ class ClaimKitTest {
 
     private ClaimKit claimKit() {
         KitAccess access = new KitAccess(permissions, new ClockCooldowns(clock), claims, Optional.of(purse));
-        return new ClaimKit(kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse));
+        return new ClaimKit(
+                kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), new RecordingLogger());
+    }
+
+    /** A claim path on one backend of a network, sharing {@code ledger} with the others, with Alex logging in. */
+    private ClaimKit networkClaimKit(MemoryClaimLedger ledger, QueuedScheduler scheduler) {
+        NetworkClaims shared = new NetworkClaims(ledger, scheduler, clock, new RecordingLogger());
+        shared.joined(ALEX.uuid());
+        KitAccess access = new KitAccess(
+                permissions,
+                new NetworkCooldowns(shared, permissions, clock),
+                new NetworkKitClaims(shared),
+                Optional.of(purse));
+        return new ClaimKit(
+                kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), new RecordingLogger());
     }
 
     private void define(KitDefinition kit) {
@@ -69,14 +90,14 @@ class ClaimKitTest {
         define(starter().cooldown(Duration.ofHours(1)).build());
         ClaimKit claim = claimKit();
 
-        assertThat(claim.claim(ALEX, STARTER).isOk()).isTrue();
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
         assertThat(inventory.received).containsExactly("Alex:starter");
         assertThat(events.published()).hasExactlyElementsOfTypes(KitClaimed.class);
         assertThat(notifier.keys()).containsExactly("kit.claimed");
 
-        assertThat(claim.claim(ALEX, STARTER).asError()).contains(KitError.ON_COOLDOWN);
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.ON_COOLDOWN);
         clock.advance(Duration.ofHours(1));
-        assertThat(claim.claim(ALEX, STARTER).isOk()).isTrue();
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
         assertThat(inventory.received).hasSize(2);
     }
 
@@ -84,10 +105,10 @@ class ClaimKitTest {
     void aRefusalOnCooldownSaysHowLongIsLeft() {
         define(starter().cooldown(Duration.ofHours(1)).build());
         ClaimKit claim = claimKit();
-        claim.claim(ALEX, STARTER);
+        claim.claim(ALEX, STARTER).join();
         clock.advance(Duration.ofMinutes(15));
 
-        claim.claim(ALEX, STARTER);
+        claim.claim(ALEX, STARTER).join();
 
         assertThat(notifier.sent())
                 .last()
@@ -98,7 +119,7 @@ class ClaimKitTest {
 
     @Test
     void anUnknownKitIsNotFound() {
-        assertThat(claimKit().claim(ALEX, KitId.of("missing")).asError()).contains(KitError.NOT_FOUND);
+        assertThat(claimKit().claim(ALEX, KitId.of("missing")).join().asError()).contains(KitError.NOT_FOUND);
         assertThat(notifier.sent())
                 .singleElement()
                 .satisfies(line -> assertThat(line.placeholders()).containsEntry("kit", "missing"));
@@ -108,9 +129,9 @@ class ClaimKitTest {
     void aPermissionKitNeedsItsNode() {
         define(starter().permission(true).build());
 
-        assertThat(claimKit().claim(ALEX, STARTER).asError()).contains(KitError.NO_PERMISSION);
+        assertThat(claimKit().claim(ALEX, STARTER).join().asError()).contains(KitError.NO_PERMISSION);
         permissions.grant(ALEX, "uxmessentials.kit.starter");
-        assertThat(claimKit().claim(ALEX, STARTER).isOk()).isTrue();
+        assertThat(claimKit().claim(ALEX, STARTER).join().isOk()).isTrue();
     }
 
     @Test
@@ -118,10 +139,10 @@ class ClaimKitTest {
         define(starter().oneTime(true).build());
         ClaimKit claim = claimKit();
 
-        claim.claim(ALEX, STARTER);
+        claim.claim(ALEX, STARTER).join();
 
-        assertThat(claim.claim(ALEX, STARTER).asError()).contains(KitError.ALREADY_CLAIMED);
-        assertThat(claim.claim(SAM, STARTER).isOk()).isTrue();
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.ALREADY_CLAIMED);
+        assertThat(claim.claim(SAM, STARTER).join().isOk()).isTrue();
     }
 
     @Test
@@ -132,13 +153,13 @@ class ClaimKitTest {
                 .build());
         permissions.grant(ALEX, "uxmessentials.kit.cooldown.vip");
         ClaimKit claim = claimKit();
-        claim.claim(ALEX, STARTER);
-        claim.claim(SAM, STARTER);
+        claim.claim(ALEX, STARTER).join();
+        claim.claim(SAM, STARTER).join();
 
         clock.advance(Duration.ofHours(1));
 
-        assertThat(claim.claim(ALEX, STARTER).isOk()).isTrue();
-        assertThat(claim.claim(SAM, STARTER).asError()).contains(KitError.ON_COOLDOWN);
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
+        assertThat(claim.claim(SAM, STARTER).join().asError()).contains(KitError.ON_COOLDOWN);
     }
 
     @Test
@@ -147,8 +168,8 @@ class ClaimKitTest {
         purse.balance = new BigDecimal("70");
         ClaimKit claim = claimKit();
 
-        assertThat(claim.claim(ALEX, STARTER).isOk()).isTrue();
-        assertThat(claim.claim(ALEX, STARTER).asError()).contains(KitError.CANNOT_AFFORD);
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.CANNOT_AFFORD);
         assertThat(purse.balance).isEqualByComparingTo("20");
         assertThat(inventory.received).hasSize(1);
     }
@@ -161,16 +182,16 @@ class ClaimKitTest {
                 .build());
         ClaimKit claim = claimKit();
 
-        assertThat(claim.claim(ALEX, STARTER).asError()).contains(KitError.CANNOT_AFFORD);
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.CANNOT_AFFORD);
         purse.balance = BigDecimal.TEN;
-        assertThat(claim.claim(ALEX, STARTER).isOk()).isTrue();
+        assertThat(claim.claim(ALEX, STARTER).join().isOk()).isTrue();
     }
 
     @Test
     void claimMoneyIsPaidOut() {
         define(starter().claimMoney(new BigDecimal("25")).build());
 
-        claimKit().claim(ALEX, STARTER);
+        claimKit().claim(ALEX, STARTER).join();
 
         assertThat(purse.balance).isEqualByComparingTo("25");
     }
@@ -180,7 +201,7 @@ class ClaimKitTest {
         define(starter().onFull(KitFullPolicy.DENY).build());
         inventory.full = true;
 
-        assertThat(claimKit().claim(ALEX, STARTER).asError()).contains(KitError.INVENTORY_FULL);
+        assertThat(claimKit().claim(ALEX, STARTER).join().asError()).contains(KitError.INVENTORY_FULL);
         assertThat(inventory.received).isEmpty();
     }
 
@@ -196,17 +217,111 @@ class ClaimKitTest {
                         Optional.empty()))
                 .build());
 
-        assertThat(claimKit().claim(ALEX, STARTER).asError()).contains(KitError.UNAVAILABLE);
+        assertThat(claimKit().claim(ALEX, STARTER).join().asError()).contains(KitError.UNAVAILABLE);
     }
 
     @Test
     void anAdminCanGiveAKitToAnotherPlayer() {
         define(starter().build());
 
-        Result<?, KitError> result = claimKit().claimFor(SAM, ALEX, STARTER);
+        Result<?, KitError> result = claimKit().claimFor(SAM, ALEX, STARTER).join();
 
         assertThat(result.isOk()).isTrue();
         assertThat(inventory.received).containsExactly("Alex:starter");
+    }
+
+    @Test
+    void twoServersRacingForAOneTimeKitGrantItOnce() {
+        define(starter().oneTime(true).build());
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler first = new QueuedScheduler();
+        QueuedScheduler second = new QueuedScheduler();
+        ClaimKit onFirst = networkClaimKit(ledger, first);
+        ClaimKit onSecond = networkClaimKit(ledger, second);
+        first.runAll();
+        second.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> fromFirst = onFirst.claim(ALEX, STARTER);
+        CompletableFuture<Result<Unit, KitError>> fromSecond = onSecond.claim(ALEX, STARTER);
+        first.runAll();
+        second.runAll();
+
+        assertThat(fromFirst.join().isOk()).isTrue();
+        assertThat(fromSecond.join().asError()).contains(KitError.ALREADY_CLAIMED);
+        assertThat(inventory.received).containsExactly("Alex:starter");
+    }
+
+    @Test
+    void aOneTimeKitClaimedBeforeThePlayersClaimsAreReadIsNotGranted() {
+        define(starter().oneTime(true).build());
+        ClaimKit claim = networkClaimKit(new MemoryClaimLedger(), new QueuedScheduler());
+
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.LOADING);
+        assertThat(inventory.received).isEmpty();
+        assertThat(notifier.keys()).containsExactly("kit.loading");
+    }
+
+    @Test
+    void aOneTimeClaimThatCannotBePaidIsGivenBack() {
+        define(starter().oneTime(true).cost(KitCost.of(BigDecimal.TEN)).build());
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(ledger, scheduler);
+        scheduler.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> refused = claim.claim(ALEX, STARTER);
+        scheduler.runAll();
+
+        assertThat(refused.join().asError()).contains(KitError.CANNOT_AFFORD);
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
+    }
+
+    @Test
+    void aFaultDuringAOneTimeClaimIsReportedAndLeavesTheKitClaimable() {
+        define(starter().oneTime(true).cost(KitCost.of(BigDecimal.TEN)).build());
+        purse.broken = true;
+        RecordingLogger log = new RecordingLogger();
+        KitAccess access = new KitAccess(permissions, new ClockCooldowns(clock), claims, Optional.of(purse));
+        ClaimKit claim =
+                new ClaimKit(kits, access, inventory, notifier.notifier(), events, clock, Optional.of(purse), log);
+
+        assertThat(claim.claim(ALEX, STARTER).join().asError()).contains(KitError.FAILED);
+        assertThat(notifier.keys()).containsExactly("command.error");
+        assertThat(log.errors()).hasSize(1);
+        assertThat(claims.hasClaimed(ALEX, STARTER)).isFalse();
+    }
+
+    @Test
+    void aFaultAfterTheSharedClaimWasTakenGivesItBack() {
+        define(starter().oneTime(true).cost(KitCost.of(BigDecimal.TEN)).build());
+        purse.broken = true;
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(ledger, scheduler);
+        scheduler.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> failed = claim.claim(ALEX, STARTER);
+        scheduler.runAll();
+
+        assertThat(failed.join().asError()).contains(KitError.FAILED);
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
+    }
+
+    @Test
+    void aPlayerWhoLeavesBeforeTheSharedClaimAnswersGetsNothingAndTheClaimGoesBack() {
+        define(starter().oneTime(true).build());
+        MemoryClaimLedger ledger = new MemoryClaimLedger();
+        QueuedScheduler scheduler = new QueuedScheduler();
+        ClaimKit claim = networkClaimKit(ledger, scheduler);
+        scheduler.runAll();
+
+        CompletableFuture<Result<Unit, KitError>> abandoned = claim.claim(ALEX, STARTER);
+        scheduler.leave(ALEX);
+        scheduler.runAll();
+
+        assertThat(abandoned.join().asError()).contains(KitError.PLAYER_LEFT);
+        assertThat(inventory.received).isEmpty();
+        assertThat(ledger.hasKit(ALEX.uuid(), "starter")).isFalse();
     }
 
     private static final class Kits implements KitRepository {
@@ -267,6 +382,7 @@ class ClaimKitTest {
     private static final class Purse implements KitEconomy {
 
         private BigDecimal balance = BigDecimal.ZERO;
+        private boolean broken;
 
         @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
@@ -275,6 +391,9 @@ class ClaimKitTest {
 
         @Override
         public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (broken) {
+                throw new IllegalStateException("the economy is unreachable");
+            }
             if (!canAfford(who, amount, currencyId)) {
                 return false;
             }

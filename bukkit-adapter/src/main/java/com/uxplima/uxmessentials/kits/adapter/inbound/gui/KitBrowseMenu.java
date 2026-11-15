@@ -252,7 +252,8 @@ public final class KitBrowseMenu {
      */
     private void claim(Player player, PlayerRef viewer, KitDefinition kit) {
         scheduler.onEntity(viewer, () -> {
-            claimKit.claim(viewer, kit.id());
+            // The use case answers the player itself, now or once a shared claim comes back.
+            var unused = claimKit.claim(viewer, kit.id());
             if (kit.closeOnClaim()) {
                 player.closeInventory();
             }

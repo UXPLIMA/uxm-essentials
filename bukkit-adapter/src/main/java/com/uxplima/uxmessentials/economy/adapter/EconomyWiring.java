@@ -137,7 +137,8 @@ public final class EconomyWiring {
                     picker,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(auditChannel, "auditChannel");
@@ -147,6 +148,7 @@ public final class EconomyWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         Objects.requireNonNull(dataFolder, "dataFolder");
+        Objects.requireNonNull(dailyRewards, "dailyRewards");
         KernelPorts kernel = ctx.kernel();
         EconomyConfig settings = new EconomyConfig(ctx.config());
         CurrencyRegistry currencies = settings.currencies();
@@ -201,7 +203,10 @@ public final class EconomyWiring {
                 picker,
                 menus,
                 menuBindings,
-                dataFolder);
+                dataFolder,
+                // On a network the stamp is taken in the shared database, so a backend switch pays nothing twice.
+                dailyRewards.map(stamps -> new com.uxplima.uxmessentials.economy.application.ClaimDailyReward(
+                        stamps, clock, settings.dailyRewardCooldown())));
     }
 
     /**
@@ -297,7 +302,8 @@ public final class EconomyWiring {
                     picker,
             Menus menus,
             MenuBindings menuBindings,
-            Path dataFolder) {
+            Path dataFolder,
+            Optional<com.uxplima.uxmessentials.economy.application.ClaimDailyReward> networkDailyReward) {
         KernelPorts kernel = ctx.kernel();
         BaltopExemption exemption = new PermissionBaltopExemption(kernel.permissions(), settings.baltopExemptNode());
         BaltopSnapshots snapshots = new BaltopSnapshots(
@@ -394,7 +400,8 @@ public final class EconomyWiring {
                     settings.dailyRewardCurrency(currencies),
                     true,
                     settings.dailyRewardAmount(),
-                    settings.dailyRewardCooldown()));
+                    settings.dailyRewardCooldown(),
+                    networkDailyReward));
         }
         List<org.bukkit.event.Listener> listeners = List.copyOf(listenersList);
 
