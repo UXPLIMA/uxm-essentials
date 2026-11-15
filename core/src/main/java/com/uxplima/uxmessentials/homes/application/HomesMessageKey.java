@@ -35,6 +35,7 @@ public enum HomesMessageKey implements MessageKey {
     HOME_SERVER_SET("home.server-set"),
     HOME_SERVER_INVALID("home.server-invalid"),
     HOME_SERVER_NOT_RUNNING("home.server-not-running"),
+    HOME_SERVER_FROM_UNSCOPED("home.server-from-unscoped"),
 
     // public/private visibility + invites/visit
     HOME_VISIBILITY_PUBLIC("home.visibility.public"),

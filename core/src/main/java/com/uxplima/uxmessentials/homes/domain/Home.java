@@ -76,13 +76,15 @@ public record Home(
     /**
      * A copy re-anchored to {@code newLocation} on the backend {@code onServer}, keeping slot, label, icon, and
      * visibility; bumps {@code updatedAt}. The server moves with the position: a home lives where its world is. An
-     * empty {@code onServer} (a backend that records no server) leaves the stored server to the store.
+     * empty {@code onServer} (a backend that records no server) records {@value #UNSCOPED}, never the old server, which
+     * no longer holds the new position; the backend holding its world claims it at its next start.
      */
     public Home relocatedTo(Position newLocation, Optional<String> onServer, Instant now) {
         Objects.requireNonNull(newLocation, "newLocation");
         Objects.requireNonNull(onServer, "onServer");
         Objects.requireNonNull(now, "now");
-        return new Home(owner, slot, newLocation, label, icon, isPublic, createdAt, now, onServer);
+        Optional<String> server = onServer.isPresent() ? onServer : Optional.of(UNSCOPED);
+        return new Home(owner, slot, newLocation, label, icon, isPublic, createdAt, now, server);
     }
 
     /** A copy recorded as set on the backend {@code onServer}. */

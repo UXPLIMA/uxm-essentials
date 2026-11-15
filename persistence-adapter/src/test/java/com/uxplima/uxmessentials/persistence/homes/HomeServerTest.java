@@ -170,6 +170,21 @@ class HomeServerTest {
     }
 
     @Test
+    void aHomeRelocatedOnABackendThatRecordsNoServerIsLeftForTheClaimNotForItsOldServer() {
+        upgrade();
+        homes.save(Home.create(ALEX, FIRST, in(SURVIVAL_WORLD), "survival", Instant.ofEpochMilli(1L)));
+
+        homes.save(homes.findSlot(ALEX, FIRST)
+                .orElseThrow()
+                .relocatedTo(in(CREATIVE_WORLD), Optional.empty(), Instant.ofEpochMilli(2L)));
+
+        assertThat(serverOf(ALEX)).isEmpty();
+        assertThat(claimer.claim("creative", List.of(CREATIVE_WORLD.uid().toString())))
+                .isOne();
+        assertThat(serverOf(ALEX)).contains("creative");
+    }
+
+    @Test
     void aRenamedServerTakesEveryHomeRecordedUnderTheOldName() {
         upgrade();
         homes.save(Home.create(ALEX, FIRST, in(SURVIVAL_WORLD), "server-1", Instant.ofEpochMilli(1L)));

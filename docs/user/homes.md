@@ -100,7 +100,8 @@ Homes from before servers were recorded are claimed on start by the server that 
 that run a copy of the same world folder share its `uid.dat`, so the first to start claims every home in it; give each
 copy its own `uid.dat`. `/home setserver <from> <to>` moves every home recorded on one server to another, after a
 renamed `network.server-name` or to undo a wrong claim. `unscoped` as the new server clears it, so the server that
-has each home's world claims it again at its next start.
+has each home's world claims it again at its next start; it is refused as the old server, since those homes are the
+claim's to take. A home relocated on a server that records no server is cleared the same way.
 
 | Key | Default | Meaning |
 |---|---|---|
@@ -111,7 +112,7 @@ has each home's world claims it again at its next start.
 | Command | Permission | What it does |
 |---|---|---|
 | `/home` | `uxmessentials.home.use` | Opens the grid of your homes. |
-| `/home visit <player> [slot]` | `uxmessentials.home.visit` | Teleports to another player's public home, or one you were invited to. Without a slot, the first home. |
+| `/home visit <player> [slot]` | `uxmessentials.home.visit` | Teleports to another player's public home, or one you were invited to. Without a slot, the first home. Visiting your own home costs the teleport cost, as from the grid. |
 | `/home invite <player> [slot]` | `uxmessentials.home.invite` | Lets a player visit one of your private homes. |
 | `/home uninvite <player> [slot]` | `uxmessentials.home.invite` | Takes that access back. |
 | `/home admin <player> list` | `uxmessentials.home.admin` | Lists a player's homes. |

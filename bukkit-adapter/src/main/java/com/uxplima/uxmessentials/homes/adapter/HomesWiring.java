@@ -175,11 +175,15 @@ public final class HomesWiring {
                     recordsServer);
         }
         // Writes every owner's rows at once, so it drops this backend's cache and tells the peers with one frame.
-        SetHomeServer setHomeServer =
-                new SetHomeServer(HomeRepositories.servers(persistence), notifier, presence, () -> {
+        SetHomeServer setHomeServer = new SetHomeServer(
+                HomeRepositories.servers(persistence),
+                notifier,
+                presence,
+                () -> {
                     cached.invalidateAll();
                     bus.publisher().publish(HomeSync.everyOwnerChanged(localServer));
-                });
+                },
+                kernel.log());
         HomeServices services = assemble(
                 plugin,
                 ctx,
