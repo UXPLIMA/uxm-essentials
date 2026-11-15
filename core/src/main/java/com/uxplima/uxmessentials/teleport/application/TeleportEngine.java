@@ -180,9 +180,35 @@ public final class TeleportEngine {
         Objects.requireNonNull(mover, "mover");
         Objects.requireNonNull(destination, "destination");
         Objects.requireNonNull(kind, "kind");
+        Result<Unit, TeleportError> admitted = preGate(mover, destination, kind);
+        if (admitted.isErr()) {
+            return admitted;
+        }
+        if (beginGatedWarmup(mover, destination, kind).isCancelled()) {
+            // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
+            // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
+            return Result.err(TeleportError.VETOED);
+        }
+        return Result.ok();
+    }
+
+    /**
+     * The checks {@link #launch} runs before a warmup, for a hop that leaves this backend: the origin asks them
+     * before it charges and connects the player, so a cross-server teleport is refused for the same jail, combat
+     * tag and cooldown as a local one, and a refusal costs nothing. Each refusal is told to the player. The veto
+     * gate is left to the target's {@link #arriveImmediately}, the backend where the destination exists.
+     */
+    public Result<Unit, TeleportError> gateHop(PlayerRef mover, Destination destination, TeleportKind kind) {
+        Objects.requireNonNull(mover, "mover");
+        Objects.requireNonNull(destination, "destination");
+        Objects.requireNonNull(kind, "kind");
+        return preGate(mover, destination, kind);
+    }
+
+    private Result<Unit, TeleportError> preGate(PlayerRef mover, Destination destination, TeleportKind kind) {
         if (jail.isJailed(mover)) {
-            // A jailed player cannot self-teleport, /home, /warp, /spawn, /back, /rtp all funnel through here
-            // . The moderation context owns the gate; without moderation it is NEVER.
+            // A jailed player cannot self-teleport, /home, /warp, /spawn, /back, /rtp all funnel through here.
+            // The moderation context owns the gate; without moderation it is NEVER.
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
         }
@@ -196,11 +222,6 @@ public final class TeleportEngine {
         if (waiting.isErr()) {
             notifyCooldown(mover, waiting.errorOrThrow());
             return Result.err(TeleportError.ON_COOLDOWN);
-        }
-        if (beginGatedWarmup(mover, destination, kind).isCancelled()) {
-            // The only thing that refuses a warmup before it has begun is the gate, and it has already told the
-            // player. Reported as an error so a caller that acts on the outcome (staff /tp, world entry) sees it.
-            return Result.err(TeleportError.VETOED);
         }
         return Result.ok();
     }
@@ -292,10 +313,12 @@ public final class TeleportEngine {
 
     /**
      * Finish a hop the player already paid for and waited out on another backend: the cross-server arrival. No
-     * warmup and no cooldown gate, since both belong to the use on the origin and the player has just joined. A
-     * jailed player is still refused, and so is a hop the veto gate stops, each with its notice. Exactly one of
-     * {@code onLanded} and {@code onFailed} runs for a hop that was issued; a refusal runs neither and returns the
-     * error, so the caller can give the money back.
+     * warmup and no cooldown check, since the origin ran {@link #gateHop} before it charged and the player has
+     * just joined. A jailed or combat-tagged player is still refused, and so is a hop the veto gate stops, each with
+     * its notice. The landing goes through the same path as a local teleport's, so a {@code teleport}-phase
+     * cooldown is stamped once the player stands at the destination. Exactly one of {@code onLanded} and
+     * {@code onFailed} runs for a hop that was issued; a refusal runs neither and returns the error, so the caller
+     * can give the money back.
      */
     public Result<Unit, TeleportError> arriveImmediately(
             PlayerRef mover, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
@@ -308,12 +331,29 @@ public final class TeleportEngine {
             notifier.send(mover, TeleportMessageKey.JAILED);
             return Result.err(TeleportError.JAILED);
         }
+        if (combat.isTagged(mover)) {
+            notifier.send(mover, TeleportMessageKey.COMBAT_TAGGED);
+            return Result.err(TeleportError.COMBAT_TAGGED);
+        }
         if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
             notifier.send(mover, TeleportError.VETOED.messageKey());
             return Result.err(TeleportError.VETOED);
         }
-        executor.teleport(mover, destination, kind, onLanded, onFailed);
+        executor.teleport(mover, destination, kind, () -> landArrival(mover, destination, kind, onLanded), onFailed);
         return Result.ok();
+    }
+
+    /**
+     * Stamp the landing's cooldown, then report the landing. The caller settles money on {@code onLanded}, so a
+     * stamp that fails is logged and the landing still reported: the player has moved either way.
+     */
+    private void landArrival(PlayerRef mover, Destination destination, TeleportKind kind, Runnable onLanded) {
+        try {
+            onLanded(mover, destination, kind, TeleportEngine::noPostArrival);
+        } catch (RuntimeException stampFailure) {
+            log.error("cooldown stamp for the cross-server arrival of " + mover.name() + " failed", stampFailure);
+        }
+        onLanded.run();
     }
 
     private void chargeThenHop(PlayerRef who, Destination destination) {

@@ -21,8 +21,6 @@ import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingSettings;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
-import com.uxplima.uxmessentials.migration.BalancePolicy;
-import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportData;
 import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
@@ -87,7 +85,7 @@ public final class MigrationWiring {
      *
      * @param plugin the plugin (for the server world list, data folder, and plugins directory)
      * @param persistence the shared persistence DSL the writers upsert through
-     * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict policy)
+     * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict and balance policies)
      * @param economyConfig the {@code modules.economy} config subtree (the default currency)
      * @param scheduler the off-tick dispatch port
      * @param log operator diagnostics
@@ -114,7 +112,7 @@ public final class MigrationWiring {
         SourceRegistry registry = sourceRegistry(plugin, migrationConfig, economyConfig, log);
         ImportData importData = new ImportData(audit(auditChannel), backup(plugin, log), log);
         Writers writers = writers(plugin, persistence, economyConfig, log, messagingConfig);
-        ImportOptions options = options(plugin, migrationConfig);
+        ImportOptions options = options(plugin, migrationConfig, log);
         return new MigrationImportService(
                 registry, importData, writers.live(), writers.dryRun(), options, scheduler, log, enabled);
     }
@@ -278,13 +276,12 @@ public final class MigrationWiring {
         return new DataDirBackupSnapshot(plugin.getDataFolder().toPath(), log);
     }
 
-    private static ImportOptions options(Plugin plugin, ConfigStore config) {
+    private static ImportOptions options(Plugin plugin, ConfigStore config, Logger log) {
         Path pluginsDir = plugin.getDataFolder().toPath().getParent();
         String configured = config.getString("source-path", DEFAULT_SOURCE_PATH);
         Path sourcePath = pluginsDir == null ? Path.of(configured) : pluginsDir.resolve(configured);
-        ConflictPolicy onConflict = ConflictPolicy.parse(config.getString("on-conflict", "skip"));
-        BalancePolicy balancePolicy = BalancePolicy.parse(config.getString("balance-policy", "skip-if-present"));
-        return new ImportOptions(sourcePath, ImportMode.LIVE, onConflict, balancePolicy);
+        ImportPolicies policies = ImportPolicies.read(config, log);
+        return new ImportOptions(sourcePath, ImportMode.LIVE, policies.onConflict(), policies.balancePolicy());
     }
 
     /** Bundles the live and dry-run writers built over the persistence repositories. */

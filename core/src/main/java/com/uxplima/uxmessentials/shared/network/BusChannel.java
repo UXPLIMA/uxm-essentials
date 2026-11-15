@@ -19,5 +19,11 @@ public final class BusChannel {
     /** The full channel key {@code uxmessentials:bus_v1} as registered on both sides. */
     public static final String FULL = NAMESPACE + ":" + NAME;
 
+    /**
+     * The largest frame the plugin-messaging path may carry. The proxy relays a frame to the other backends as a
+     * serverbound custom payload, and a backend disconnects the carrying player for one larger than this.
+     */
+    public static final int MAX_FRAME_BYTES = 32_767;
+
     private BusChannel() {}
 }

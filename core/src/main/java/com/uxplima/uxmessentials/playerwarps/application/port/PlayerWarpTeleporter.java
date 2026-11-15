@@ -18,9 +18,10 @@ public interface PlayerWarpTeleporter {
 
     /**
      * Finish a cross-server use on the target backend: move {@code who} to {@code warp} at once, with no warmup and
-     * no cooldown gate, since the player paid and waited on the origin. Exactly one of {@code onLanded} and
-     * {@code onMissed} runs: {@code onLanded} only once the player actually stands at the warp, {@code onMissed}
-     * when the hop is refused (a jailed player, a vetoed teleport) or does not arrive. The arrival pays the owner
+     * no cooldown check, since the origin checked the cooldown before it charged. The landing starts the warp's
+     * cooldown as a local use would. Exactly one of {@code onLanded} and {@code onMissed} runs: {@code onLanded}
+     * only once the player actually stands at the warp, {@code onMissed} when the hop is refused (a jailed or
+     * combat-tagged player, a vetoed teleport) or does not arrive. The arrival pays the owner
      * on the first and refunds the visitor on the second, so neither may be guessed from a call that returned.
      */
     void arrive(PlayerRef who, PlayerWarp warp, Runnable onLanded, Runnable onMissed);

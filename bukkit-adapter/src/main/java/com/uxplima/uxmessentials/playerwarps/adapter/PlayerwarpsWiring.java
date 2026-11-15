@@ -31,7 +31,6 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpManag
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpPeopleMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.gui.PlayerWarpViewMenu;
 import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.PlayerwarpsJoinListener;
-import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitCrossServerTeleport;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.PlayerWarpLegacyMigration;
@@ -41,15 +40,14 @@ import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.TeleportPlayerWarpAdapter;
 import com.uxplima.uxmessentials.playerwarps.application.ArchivePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.BuySponsorship;
-import com.uxplima.uxmessentials.playerwarps.application.CrossServerArrival;
-import com.uxplima.uxmessentials.playerwarps.application.CrossServerCharges;
-import com.uxplima.uxmessentials.playerwarps.application.CrossServerWatchdog;
 import com.uxplima.uxmessentials.playerwarps.application.EditPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.FavouritePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
@@ -67,8 +65,6 @@ import com.uxplima.uxmessentials.playerwarps.application.TransferPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.UsePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.WarpAuthorization;
 import com.uxplima.uxmessentials.playerwarps.application.WithdrawEarnings;
-import com.uxplima.uxmessentials.playerwarps.application.port.CrossServerTeleport;
-import com.uxplima.uxmessentials.playerwarps.application.port.PendingTeleportStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
@@ -89,13 +85,21 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
+import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitHopConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
+import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
+import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
+import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
+import com.uxplima.uxmessentials.shared.application.hop.HopResolvers;
+import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
+import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
@@ -211,9 +215,10 @@ public final class PlayerwarpsWiring {
         // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop. localServerId is
         // this backend's network.server-name, the same source the P3 server-id claim used.
         String localServerId = bus.publisher().serverId();
-        CrossServerCharges crossServerCharges = new CrossServerCharges(economy, notifier, kernel.log());
+        HopCharges hopCharges = new HopCharges(notifier, kernel.log());
+        PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(repository, teleporter, economy, localServerId);
         CrossServerParts crossServer = buildCrossServer(
-                ctx, plugin, kernel, persistence, repository, teleporter, notifier, crossServerCharges, localServerId);
+                ctx, plugin, kernel, persistence, teleportEngine, hopResolver, hopCharges, localServerId);
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -227,8 +232,7 @@ public final class PlayerwarpsWiring {
                 kernel.cooldowns(),
                 economy,
                 localServerId,
-                crossServer.seam(),
-                crossServerCharges,
+                new PlayerWarpHops(crossServer.departures(), hopCharges, hopResolver),
                 Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
@@ -550,56 +554,61 @@ public final class PlayerwarpsWiring {
     }
 
     /**
-     * Build the cross-server sub-group's send seam and arrival handler when {@code cross-server.enabled} is on,
-     * else two empty {@link Optional}s. The two share one {@link PendingTeleportStore} over the network-shared
-     * {@code player_warp_pending_teleports} table. The send half writes the row and connects the player, the
-     * arrival half reads it on join and completes the local hop (or refunds), and the origin's watchdog refunds a
-     * row no backend claimed within the request TTL. The {@link ServerConnector} is built fresh over the standard
-     * proxy channel, exactly as the {@code npc}/{@code holograms} connectors are. Disabled, nothing is instantiated
-     * and the gate fails a remote warp closed.
+     * Build the shared cross-server hop for player warps when {@code cross-server.enabled} is on, else two empty
+     * {@link Optional}s. The send half and the arrival half share one {@link PendingHopStore} over the
+     * network-shared {@code player_warp_pending_teleports} table and one resolver registry, in which the
+     * player-warp resolver is the only kind so far. The send half asks the teleport engine's jail, combat and
+     * cooldown gate, writes the row and connects the player; the arrival half reads it on join and completes the
+     * local move (or refunds); the origin's watchdog refunds a row no backend claimed within the request TTL. The
+     * {@link ServerConnector} is built fresh over the standard proxy channel, exactly as the {@code npc}/
+     * {@code holograms} connectors are. Disabled, nothing is instantiated and the gate fails a remote warp closed.
      */
     private static CrossServerParts buildCrossServer(
             ModuleContext ctx,
             Plugin plugin,
             KernelPorts kernel,
             Persistence persistence,
-            PlayerWarpRepository repository,
-            PlayerWarpTeleporter teleporter,
-            Notifier notifier,
-            CrossServerCharges charges,
+            TeleportEngine teleportEngine,
+            PlayerWarpHopResolver resolver,
+            HopCharges charges,
             String localServerId) {
         if (!ctx.config().getBoolean("cross-server.enabled", false)) {
             return new CrossServerParts(Optional.empty(), Optional.empty());
         }
         Clock clock = Clock.systemUTC();
-        PendingTeleportStore store = PlayerWarpRepositories.pendingTeleportStore(persistence);
+        PendingHopStore store = PlayerWarpRepositories.pendingHopStore(persistence);
         ServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
         Duration arrivalDelay =
                 Duration.ofMillis(Math.max(0, ctx.config().getInt("cross-server.arrival-delay-ticks", 20)) * 50L);
         Duration requestTtl =
                 Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
-        CrossServerWatchdog watchdog =
-                new CrossServerWatchdog(store, repository, charges, kernel.scheduler(), kernel.log(), requestTtl);
-        CrossServerTeleport seam = new BukkitCrossServerTeleport(
-                connector, watchdog, charges, kernel.scheduler(), notifier, localServerId, clock);
-        CrossServerArrival arrival = new CrossServerArrival(
-                store,
-                repository,
-                teleporter,
+        HopResolvers resolvers = new HopResolvers();
+        resolvers.register(resolver);
+        HopWatchdog watchdog = new HopWatchdog(store, resolvers, charges, kernel.scheduler(), kernel.log(), requestTtl);
+        HopDepartures departures = new HopDepartures(
+                new TeleportHopGate(teleportEngine),
+                new BukkitHopConnector(connector),
+                watchdog,
                 charges,
-                notifier,
+                resolvers,
+                kernel.scheduler(),
+                localServerId,
+                clock);
+        HopArrival arrival = new HopArrival(
+                store,
+                resolvers,
+                charges,
                 kernel.scheduler(),
                 kernel.log(),
                 localServerId,
                 arrivalDelay,
                 requestTtl,
                 clock);
-        return new CrossServerParts(Optional.of(seam), Optional.of(arrival));
+        return new CrossServerParts(Optional.of(departures), Optional.of(arrival));
     }
 
-    /** The cross-server sub-group's two wired seams: both empty when the sub-group is off. */
-    private record CrossServerParts(Optional<CrossServerTeleport> seam, Optional<CrossServerArrival> arrival) {}
-
+    /** The cross-server sub-group's two wired halves: both empty when the sub-group is off. */
+    private record CrossServerParts(Optional<HopDepartures> departures, Optional<HopArrival> arrival) {}
     /**
      * Read the {@code sponsor} config block into the immutable {@link SponsorConfig}. When the sub-group is enabled but
      * no economy provider is present it is forced off with an operator warning. A paid pinned slot cannot be sold for
