@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -50,13 +51,13 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
         Objects.requireNonNull(warp, "warp");
         registry.register(who.uuid(), warp);
         // The use case runs on the async lane, but the launch reads where the player stands and what they may do,
-        // which only their own region thread may ask; so it starts there, after a hop when the caller is elsewhere.
-        Runnable launch = () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP);
-        if (scheduler.ownsEntity(who)) {
-            launch.run();
-        } else {
-            scheduler.onEntity(who, launch);
-        }
+        // which only their own region thread may ask. A player who left before the hop lands hears nothing and their
+        // arrival notice is dropped, so it cannot play on a later, unrelated teleport.
+        PlayerThread.run(
+                scheduler,
+                who,
+                () -> engine.launch(who, destinationOf(warp), TeleportKind.WARP),
+                () -> registry.getAndRemove(who.uuid()));
     }
 
     @Override

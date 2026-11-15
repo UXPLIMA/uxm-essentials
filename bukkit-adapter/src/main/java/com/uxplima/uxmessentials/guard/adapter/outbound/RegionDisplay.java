@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.guard.domain.Bounds;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
-import com.uxplima.uxmessentials.shared.domain.Position;
 import org.joml.AxisAngle4f;
 import org.joml.Vector3f;
 
@@ -49,7 +48,7 @@ public final class RegionDisplay {
     }
 
     /** The displays drawn for one viewer and the block they all stand on. */
-    private record Drawn(Position anchor, List<BlockDisplay> entities) {}
+    private record Drawn(Location anchor, List<BlockDisplay> entities) {}
 
     /** One straight edge between two points. */
     private record Edge(double x1, double y1, double z1, double x2, double y2, double z2) {}
@@ -93,7 +92,7 @@ public final class RegionDisplay {
             viewer.showEntity(plugin, display);
             entities.add(display);
         }
-        shown.put(viewer.getUniqueId(), new Drawn(BukkitRefs.toPosition(anchor), entities));
+        shown.put(viewer.getUniqueId(), new Drawn(anchor.clone(), entities));
     }
 
     /** Draw the particle edges again; called every second while a particle display lasts. */
@@ -106,7 +105,7 @@ public final class RegionDisplay {
         particles(viewer, world, edges, color);
     }
 
-    /** Remove what was drawn for {@code viewer}. */
+    /** Remove what was drawn for {@code viewer}; also called when they quit, so nothing they were shown stays. */
     public void hide(Player viewer) {
         Drawn drawn = shown.remove(viewer.getUniqueId());
         if (drawn != null) {
@@ -119,14 +118,22 @@ public final class RegionDisplay {
         return shown.containsKey(viewer.getUniqueId());
     }
 
-    /** Remove everything, for a disable. */
+    /**
+     * Remove everything, for a disable. Displays whose block the calling thread owns go at once, which on Paper is
+     * every one of them, since the disable runs on the one main thread; the rest go on their region thread.
+     */
     public void clear() {
         shown.values().forEach(this::remove);
         shown.clear();
     }
 
     private void remove(Drawn drawn) {
-        scheduler.onRegion(drawn.anchor(), () -> drawn.entities().forEach(BlockDisplay::remove));
+        Runnable removal = () -> drawn.entities().forEach(BlockDisplay::remove);
+        if (plugin.getServer().isOwnedByCurrentRegion(drawn.anchor())) {
+            removal.run();
+        } else {
+            scheduler.onRegion(BukkitRefs.toPosition(drawn.anchor()), removal);
+        }
     }
 
     private static void particles(Player viewer, World world, List<Edge> edges, Color color) {

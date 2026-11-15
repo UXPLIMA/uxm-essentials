@@ -24,6 +24,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 
 import com.uxplima.uxmessentials.guard.adapter.inbound.command.GuardCommand;
 import com.uxplima.uxmessentials.guard.adapter.inbound.gui.GuardMenus;
+import com.uxplima.uxmessentials.guard.adapter.inbound.listener.DisplayQuitListener;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.InspectListener;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.ListenerRegistry;
 import com.uxplima.uxmessentials.guard.adapter.inbound.listener.LockListener;
@@ -147,6 +148,7 @@ public final class GuardWiring {
         fixed.add(new BehaviourListener(runtime, tracks));
         fixed.add(new WandListener(runtime, selections));
         fixed.add(new InspectListener(runtime));
+        fixed.add(new DisplayQuitListener(display));
         if (plugin.getServer().getPluginManager().getPlugin("WorldEdit") != null
                 || plugin.getServer().getPluginManager().getPlugin("FastAsyncWorldEdit") != null) {
             fixed.add(new LockListener(runtime, selections));

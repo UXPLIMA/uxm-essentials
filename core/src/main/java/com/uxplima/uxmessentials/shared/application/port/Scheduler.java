@@ -90,6 +90,11 @@ public interface Scheduler {
      * <p>The default waits on the global thread and then hops to the entity, which is correct for any scheduler that
      * implements {@link #laterGlobal}; the Folia adapter overrides it with the entity's own delayed task so the work
      * takes one hop instead of two.
+     *
+     * <p>The two differ for a player who logs off and back on before the delay ends. The default finds the player by
+     * id when the delay ends, so the task runs on the new entity. The Folia adapter binds the task to the entity that
+     * was online when it was scheduled, and that entity is retired on logout, so the task is dropped. A caller must
+     * not rely on either: work that belongs to one session should check it is still current when it runs.
      */
     default void laterEntity(PlayerRef player, Duration delay, Runnable task) {
         laterGlobal(delay, () -> onEntity(player, task));

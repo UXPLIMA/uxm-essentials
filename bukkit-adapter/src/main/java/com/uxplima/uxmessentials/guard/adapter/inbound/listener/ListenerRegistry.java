@@ -23,9 +23,10 @@ import com.uxplima.uxmessentials.guard.domain.engine.WorldIndex;
  * rule or is locked, because the border test protects every region with rules, not only those naming
  * {@code world.*}.
  *
- * <p>Registering and unregistering a listener is Bukkit work, so {@link #sync} and {@link #close} run on the global
- * thread only, and the map of registered families belongs to that thread. Other threads read {@link #active} from an
- * immutable copy published after every change.
+ * <p>Registering and unregistering a listener is Bukkit work, so it is never done under a lock. {@link #sync} runs on
+ * the global thread, which owns the map of registered families; {@link #close} runs once, when the module stops, and
+ * a sync that arrives after it does nothing. Other threads read {@link #active} from an immutable copy published
+ * after every change.
  */
 public final class ListenerRegistry {
 
@@ -95,6 +96,7 @@ public final class ListenerRegistry {
     private final GuardRuntime guard;
     private final Map<String, Listener> registered = new java.util.LinkedHashMap<>();
     private volatile List<String> active = List.of();
+    private volatile boolean closed;
 
     public ListenerRegistry(Plugin plugin, GuardRuntime guard) {
         this.plugin = Objects.requireNonNull(plugin, "plugin");
@@ -103,6 +105,9 @@ public final class ListenerRegistry {
 
     /** Bring the registered families in line with a snapshot. Call on the global thread. */
     public void sync(GuardSnapshot snapshot) {
+        if (closed) {
+            return;
+        }
         for (Family family : FAMILIES) {
             boolean needed = family.needed(snapshot);
             Listener current = registered.get(family.name());
@@ -123,10 +128,15 @@ public final class ListenerRegistry {
         return active;
     }
 
-    /** Unregister everything. Call on the global thread. */
+    /**
+     * Unregister everything for good. Runs on the thread that stops the module: the plugin's disable, or a reload's
+     * module stop on the global thread. A sync queued before the stop and run after it finds the registry closed and
+     * registers nothing.
+     */
     public void close() {
         registered.values().forEach(HandlerList::unregisterAll);
         registered.clear();
         active = List.of();
+        closed = true;
     }
 }

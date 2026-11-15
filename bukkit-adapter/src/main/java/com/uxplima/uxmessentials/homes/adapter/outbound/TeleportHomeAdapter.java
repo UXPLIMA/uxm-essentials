@@ -4,6 +4,7 @@ import java.util.Objects;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeTeleporter;
 import com.uxplima.uxmessentials.homes.domain.Home;
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -42,12 +43,9 @@ public final class TeleportHomeAdapter implements HomeTeleporter {
     public void teleportTo(PlayerRef who, Home home) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(home, "home");
-        Runnable launch = () -> engine.launch(who, Destination.at(home.location()), TeleportKind.HOME);
-        if (scheduler.ownsEntity(who)) {
-            launch.run();
-        } else {
-            scheduler.onEntity(who, launch);
-        }
+        // A player who left before the hop lands hears nothing; there is nothing of theirs here to undo.
+        PlayerThread.run(
+                scheduler, who, () -> engine.launch(who, Destination.at(home.location()), TeleportKind.HOME), () -> {});
     }
 
     @Override

@@ -184,7 +184,15 @@ public final class WorldGuardImporter {
         this.service = Objects.requireNonNull(service, "service");
         this.backups = Objects.requireNonNull(backups, "backups");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
-        this.offTick = scheduler::async;
+        this.offTick = task -> {
+            try {
+                scheduler.async(task);
+            } catch (RuntimeException refused) {
+                // The lane refuses work while the plugin stops. The stage then runs on the service's own async
+                // thread that completed it, so the run still ends and releases the guard.
+                task.run();
+            }
+        };
         this.warn = Objects.requireNonNull(warn, "warn");
     }
 
@@ -222,7 +230,9 @@ public final class WorldGuardImporter {
                 CompletableFuture<ImportOutcome> work;
                 try {
                     work = start(mode, source, ctx);
-                } catch (IOException | SQLException | RuntimeException e) {
+                } catch (Throwable e) {
+                    // Whatever start throws, an Error included, ends this run; otherwise the guard stays taken and
+                    // every later import is refused as busy until a restart.
                     work = CompletableFuture.failedFuture(e);
                 }
                 var unused = work.whenComplete((outcome, error) -> finish(future, outcome, error));
@@ -339,14 +349,19 @@ public final class WorldGuardImporter {
         CompletableFuture<Map<String, UUID>> resolved = new CompletableFuture<>();
         scheduler.onGlobal(
                 () -> {
-                    Map<String, UUID> found = new HashMap<>();
-                    for (String name : wanted) {
-                        OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
-                        if (player != null) {
-                            found.put(name, player.getUniqueId());
+                    try {
+                        Map<String, UUID> found = new HashMap<>();
+                        for (String name : wanted) {
+                            OfflinePlayer player = Bukkit.getOfflinePlayerIfCached(name);
+                            if (player != null) {
+                                found.put(name, player.getUniqueId());
+                            }
                         }
+                        resolved.complete(found);
+                    } catch (Throwable e) {
+                        // The import waits on this answer; a throw has to end it rather than leave it running.
+                        resolved.completeExceptionally(e);
                     }
-                    resolved.complete(found);
                 },
                 () -> resolved.completeExceptionally(new IllegalStateException("the server is stopping")));
         return resolved;
