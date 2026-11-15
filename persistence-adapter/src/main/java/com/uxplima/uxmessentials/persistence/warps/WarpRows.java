@@ -61,7 +61,16 @@ final class WarpRows {
                 Optional.ofNullable(row.get(WARPS.WARMUP_SECONDS)),
                 Optional.ofNullable(row.get(WARPS.COOLDOWN_SECONDS)),
                 Optional.ofNullable(row.get(WARPS.ICON_MATERIAL)),
-                Optional.ofNullable(row.get(WARPS.CATEGORY_ID)));
+                Optional.ofNullable(row.get(WARPS.CATEGORY_ID)),
+                serverOf(row.get(WARPS.SERVER_ID)));
+    }
+
+    /** A NULL and the unscoped sentinel both mean the warp's backend is not known yet. */
+    private static Optional<String> serverOf(@org.jspecify.annotations.Nullable String stored) {
+        if (stored == null || stored.isBlank() || stored.equals(WarpServerClaimer.UNSCOPED)) {
+            return Optional.empty();
+        }
+        return Optional.of(stored);
     }
 
     /** Populate a {@link WarpsRecord} from a domain {@link Warp} for an upsert. */
@@ -92,7 +101,8 @@ final class WarpRows {
                 .setWarmupSeconds(warp.warmupOverrideSeconds().orElse(null))
                 .setCooldownSeconds(warp.cooldownOverrideSeconds().orElse(null))
                 .setIconMaterial(warp.iconMaterial().orElse(null))
-                .setCategoryId(warp.categoryId().orElse(null));
+                .setCategoryId(warp.categoryId().orElse(null))
+                .setServerId(warp.server().orElse(null));
     }
 
     private static WarpCost cost(BigDecimal stored, String currencyId) {

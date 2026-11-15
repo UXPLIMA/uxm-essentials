@@ -13,12 +13,16 @@ import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import org.jooq.DSLContext;
+import org.jooq.impl.DSL;
 
 /**
  * The jOOQ-backed {@link WarpRepository} over the generated {@code WARPS} table. Warps are server-wide and
  * keyed by name alone, so a lookup is a single-row {@code SELECT} on the {@code name} primary key, the list
  * reads every row in stored creation order, and a {@code save} upserts on that key: a re-anchor overwrites
  * the same row. Every statement is typed jOOQ DSL; no SQL is ever string-concatenated.
+ *
+ * <p>A save whose warp has no known server leaves the stored server as it is. Such a warp was read before its
+ * backend adopted it, and writing that stale read back (a visitor count, an edit) must not undo the adoption.
  */
 public final class JooqWarpRepository extends JooqRepository implements WarpRepository {
 
@@ -132,6 +136,7 @@ public final class JooqWarpRepository extends JooqRepository implements WarpRepo
                 .set(WARPS.COOLDOWN_SECONDS, record.getCooldownSeconds())
                 .set(WARPS.ICON_MATERIAL, record.getIconMaterial())
                 .set(WARPS.CATEGORY_ID, record.getCategoryId())
+                .set(WARPS.SERVER_ID, DSL.coalesce(DSL.val(record.getServerId(), WARPS.SERVER_ID), WARPS.SERVER_ID))
                 .execute();
     }
 }

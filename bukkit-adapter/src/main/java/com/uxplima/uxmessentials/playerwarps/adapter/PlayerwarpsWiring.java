@@ -85,15 +85,8 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitHopConnector;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitServerConnector;
-import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
-import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
-import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
-import com.uxplima.uxmessentials.shared.application.hop.HopResolvers;
-import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
-import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -139,6 +132,7 @@ public final class PlayerwarpsWiring {
             Persistence persistence,
             TeleportEngine teleportEngine,
             com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus bus,
+            CrossServerHops hops,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable WarpEditorView
                     editorView,
             com.uxplima.uxmessentials.warps.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerWarpRepositoryHandle
@@ -162,6 +156,7 @@ public final class PlayerwarpsWiring {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(teleportEngine, "teleportEngine");
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(hops, "hops");
         Objects.requireNonNull(guiText, "guiText");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
@@ -211,15 +206,17 @@ public final class PlayerwarpsWiring {
         // and the edit verbs' set/clear-password writes, so it is built once here and shared with both.
         PlayerWarpPasswordStore passwordStore = PlayerWarpRepositories.passwordStore(persistence);
         // The cross-server sub-group: when cross-server.enabled is on, a warp tagged for another backend is routed
-        // across the proxy instead of hopped locally. The gate charges here, records the pending row, connects the
-        // player, and the target backend completes the hop on join (or refunds). Off, both seams are empty and the
-        // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop. localServerId is
-        // this backend's network.server-name, the same source the P3 server-id claim used.
+        // across the proxy instead of hopped locally, through the hop the bootstrap shares between every kind. The
+        // gate charges here, the hop records the pending row and connects the player, and the target backend
+        // completes it on join (or refunds). Off, the resolver is not registered, the departures are empty and the
+        // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop.
         String localServerId = bus.publisher().serverId();
-        HopCharges hopCharges = new HopCharges(notifier, kernel.log());
         PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(repository, teleporter, economy, localServerId);
-        CrossServerParts crossServer = buildCrossServer(
-                ctx, plugin, kernel, persistence, teleportEngine, hopResolver, hopCharges, localServerId);
+        Optional<HopDepartures> departures = Optional.empty();
+        if (ctx.config().getBoolean("cross-server.enabled", false)) {
+            hops.register(hopResolver);
+            departures = Optional.of(hops.departures(new TeleportHopGate(teleportEngine)));
+        }
         UsePlayerWarp usePlayerWarp = new UsePlayerWarp(
                 repository,
                 teleporter,
@@ -233,7 +230,7 @@ public final class PlayerwarpsWiring {
                 kernel.cooldowns(),
                 economy,
                 localServerId,
-                new PlayerWarpHops(crossServer.departures(), hopCharges, hopResolver),
+                new PlayerWarpHops(departures, hops.charges(), hopResolver),
                 Clock.systemUTC());
         if (playerWarpHandle != null) {
             playerWarpHandle.bind(repository);
@@ -462,8 +459,7 @@ public final class PlayerwarpsWiring {
         // sponsorship and stamps its post-expiry cooldown. Disabled (the sub-group off, or economy absent so it was
         // forced off) it is null and nothing is scheduled.
         SponsorExpirySweep sponsorSweep = buildSponsorSweep(ctx, kernel, repository, sponsorConfig);
-        PlayerwarpsJoinListener joinWarmer =
-                new PlayerwarpsJoinListener(repository, kernel.scheduler(), crossServer.arrival());
+        PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(
                 PlayerWarpCommands.all(services, kernel.messages()),
                 List.of(joinWarmer),
@@ -555,62 +551,6 @@ public final class PlayerwarpsWiring {
                 repository, config, kernel.scheduler(), interval, Clock.systemUTC(), kernel.log());
     }
 
-    /**
-     * Build the shared cross-server hop for player warps when {@code cross-server.enabled} is on, else two empty
-     * {@link Optional}s. The send half and the arrival half share one {@link PendingHopStore} over the
-     * network-shared {@code player_warp_pending_teleports} table and one resolver registry, in which the
-     * player-warp resolver is the only kind so far. The send half asks the teleport engine's jail, combat and
-     * cooldown gate, writes the row and connects the player; the arrival half reads it on join and completes the
-     * local move (or refunds); the origin's watchdog refunds a row no backend claimed within the request TTL. The
-     * {@link ServerConnector} is built fresh over the standard proxy channel, exactly as the {@code npc}/
-     * {@code holograms} connectors are. Disabled, nothing is instantiated and the gate fails a remote warp closed.
-     */
-    private static CrossServerParts buildCrossServer(
-            ModuleContext ctx,
-            Plugin plugin,
-            KernelPorts kernel,
-            Persistence persistence,
-            TeleportEngine teleportEngine,
-            PlayerWarpHopResolver resolver,
-            HopCharges charges,
-            String localServerId) {
-        if (!ctx.config().getBoolean("cross-server.enabled", false)) {
-            return new CrossServerParts(Optional.empty(), Optional.empty());
-        }
-        Clock clock = Clock.systemUTC();
-        PendingHopStore store = PlayerWarpRepositories.pendingHopStore(persistence);
-        ServerConnector connector = new BukkitServerConnector(plugin, kernel.log());
-        Duration arrivalDelay =
-                Duration.ofMillis(Math.max(0, ctx.config().getInt("cross-server.arrival-delay-ticks", 20)) * 50L);
-        Duration requestTtl =
-                Duration.ofSeconds(Math.max(1L, ctx.config().getLong("cross-server.request-ttl-seconds", 30L)));
-        HopResolvers resolvers = new HopResolvers();
-        resolvers.register(resolver);
-        HopWatchdog watchdog = new HopWatchdog(store, resolvers, charges, kernel.scheduler(), kernel.log(), requestTtl);
-        HopDepartures departures = new HopDepartures(
-                new TeleportHopGate(teleportEngine),
-                new BukkitHopConnector(connector),
-                watchdog,
-                charges,
-                resolvers,
-                kernel.scheduler(),
-                localServerId,
-                clock);
-        HopArrival arrival = new HopArrival(
-                store,
-                resolvers,
-                charges,
-                kernel.scheduler(),
-                kernel.log(),
-                localServerId,
-                arrivalDelay,
-                requestTtl,
-                clock);
-        return new CrossServerParts(Optional.of(departures), Optional.of(arrival));
-    }
-
-    /** The cross-server sub-group's two wired halves: both empty when the sub-group is off. */
-    private record CrossServerParts(Optional<HopDepartures> departures, Optional<HopArrival> arrival) {}
     /**
      * Read the {@code sponsor} config block into the immutable {@link SponsorConfig}. When the sub-group is enabled but
      * no economy provider is present it is forced off with an operator warning. A paid pinned slot cannot be sold for

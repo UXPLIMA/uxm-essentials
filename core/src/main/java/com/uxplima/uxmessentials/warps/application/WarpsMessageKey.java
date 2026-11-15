@@ -21,6 +21,20 @@ public enum WarpsMessageKey implements MessageKey {
     // teleport
     WARP_TELEPORTING("warp.teleporting"),
     WARP_SENT("warp.sent"),
+    WARP_SENT_REFUSED("warp.sent-refused"),
+
+    // a warp on another backend of the network
+    WARP_CROSS_SERVER_SENDING("warp.cross-server.sending"),
+    WARP_CROSS_SERVER_UNAVAILABLE("warp.cross-server.unavailable"),
+    WARP_CROSS_SERVER_ARRIVED("warp.cross-server.arrived"),
+    WARP_CROSS_SERVER_FAILED("warp.cross-server.failed"),
+    WARP_CROSS_SERVER_TIMED_OUT("warp.cross-server.timed-out"),
+    WARP_CROSS_SERVER_MISROUTED("warp.cross-server.misrouted"),
+    WARP_CROSS_SERVER_REFUNDED("warp.cross-server.refunded"),
+    WARP_SERVER_SET("warp.server-set"),
+    WARP_SERVER_SET_ALL("warp.server-set-all"),
+    WARP_SERVER_INVALID("warp.server-invalid"),
+    WARP_SERVER_NOT_RUNNING("warp.server-not-running"),
 
     // listing
     WARP_LIST_HEADER("warp.list.header"),

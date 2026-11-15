@@ -38,6 +38,11 @@ public final class InFlightScheduler implements Scheduler {
     }
 
     @Override
+    public void onRegion(Position position, Runnable task, Runnable retired) {
+        inner.onRegion(position, task, retired);
+    }
+
+    @Override
     public void onEntity(PlayerRef player, Runnable task) {
         inner.onEntity(player, task);
     }

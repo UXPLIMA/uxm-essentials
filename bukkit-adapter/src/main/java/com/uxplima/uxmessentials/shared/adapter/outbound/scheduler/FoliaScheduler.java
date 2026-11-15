@@ -68,6 +68,20 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
     }
 
     @Override
+    public void onRegion(Position position, Runnable task, Runnable retired) {
+        Objects.requireNonNull(position, "position");
+        Objects.requireNonNull(task, "task");
+        Objects.requireNonNull(retired, "retired");
+        World world = disabled() ? null : Bukkit.getWorld(position.world().uid());
+        if (world == null) {
+            // The task can never run: the caller gets its fallback rather than silence.
+            retired.run();
+            return;
+        }
+        Bukkit.getRegionScheduler().execute(plugin, world, position.blockX() >> 4, position.blockZ() >> 4, task);
+    }
+
+    @Override
     public void onEntity(PlayerRef player, Runnable task) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(task, "task");

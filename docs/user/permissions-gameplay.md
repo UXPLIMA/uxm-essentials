@@ -305,6 +305,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.warp.others` | /warp <name> <player> to send another player to a warp. | op |
 | `uxmessentials.warp.password` | /warp password <name> to set or clear a warp's access password. | op |
 | `uxmessentials.warp.set` | /setwarp <name> to create or move a server-wide warp. | op |
+| `uxmessentials.warp.setserver` | /warp setserver <name\|all> [server] to record which server a warp lives on without moving it. | op |
 | `uxmessentials.warp.sign.create` | Create a [warp] sign that teleports players to a warp on click. | op |
 | `uxmessentials.warp.sign.use` | Use a [warp] sign to teleport to its warp. | true |
 | `uxmessentials.warp.use` | /warp <name> to teleport to a server warp. | true |

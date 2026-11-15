@@ -17,6 +17,9 @@ public final class HopResolvers {
     /** Register {@code resolver} for its kind; a second resolver for the same kind is a wiring fault. */
     public void register(HopResolver resolver) {
         Objects.requireNonNull(resolver, "resolver");
+        if (resolver.kind() == HopKind.UNKNOWN) {
+            throw new IllegalArgumentException("no resolver may serve the unknown kind");
+        }
         HopResolver earlier = byKind.putIfAbsent(resolver.kind(), resolver);
         if (earlier != null && earlier != resolver) {
             throw new IllegalStateException("a resolver for " + resolver.kind() + " is already registered");
@@ -27,5 +30,10 @@ public final class HopResolvers {
     public Optional<HopResolver> find(HopKind kind) {
         Objects.requireNonNull(kind, "kind");
         return Optional.ofNullable(byKind.get(kind));
+    }
+
+    /** True while no kind has registered, so a join has no hop to look for on this backend. */
+    public boolean isEmpty() {
+        return byKind.isEmpty();
     }
 }

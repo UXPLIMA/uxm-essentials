@@ -12,7 +12,6 @@ import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingRewardStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpRatingStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
-import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.jspecify.annotations.NullMarked;
 
@@ -116,15 +115,5 @@ public final class PlayerWarpRepositories {
     public static PlayerWarpPasswordStore passwordStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqPlayerWarpPasswordStore(persistence.dsl(), new Pbkdf2PasswordHasher());
-    }
-
-    /**
-     * The jOOQ {@link PendingHopStore}. One row per player over the network-shared
-     * {@code player_warp_pending_teleports} table, the handoff between a cross-server hop's origin and target
-     * backends. Every operation is a single indexed statement on the {@code player_uuid} primary key.
-     */
-    public static PendingHopStore pendingHopStore(Persistence persistence) {
-        Objects.requireNonNull(persistence, "persistence");
-        return new JooqPendingHopStore(persistence.dsl());
     }
 }

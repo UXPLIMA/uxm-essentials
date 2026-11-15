@@ -11,6 +11,10 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * One server-wide warp: a {@link WarpName}, the {@link Position} it points at, the owner who created it,
  * the moment it was created, and optional gates/custom settings (cost, permission, password, locked state,
  * welcome message, custom sound and particle effects, cooldown/warmup overrides, and a custom icon).
+ *
+ * <p>{@code server} is the network name of the backend the warp was set on, so a use on another backend can send
+ * the player there. It is empty for a warp whose backend is not known: one set before servers were recorded, or
+ * imported, until the backend that holds its world adopts it. Such a warp is used on whichever backend asks.
  */
 public record Warp(
         WarpName name,
@@ -30,7 +34,11 @@ public record Warp(
         Optional<Double> warmupOverrideSeconds,
         Optional<Double> cooldownOverrideSeconds,
         Optional<String> iconMaterial,
-        Optional<String> categoryId) {
+        Optional<String> categoryId,
+        Optional<String> server) {
+
+    /** The server of a warp whose backend is not known; never the name of a running backend. */
+    public static final String UNSCOPED = "unscoped";
 
     public Warp {
         Objects.requireNonNull(name, "name");
@@ -49,6 +57,10 @@ public record Warp(
         Objects.requireNonNull(cooldownOverrideSeconds, "cooldownOverrideSeconds");
         Objects.requireNonNull(iconMaterial, "iconMaterial");
         Objects.requireNonNull(categoryId, "categoryId");
+        Objects.requireNonNull(server, "server");
+        if (server.filter(String::isBlank).isPresent()) {
+            throw new IllegalArgumentException("a warp's server must not be blank");
+        }
     }
 
     public Warp(
@@ -69,6 +81,7 @@ public record Warp(
                 Optional.empty(),
                 false,
                 java.util.List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -107,6 +120,7 @@ public record Warp(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -123,6 +137,7 @@ public record Warp(
                 Optional.empty(),
                 false,
                 java.util.List.of(),
+                Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
@@ -162,6 +177,7 @@ public record Warp(
                 Optional.empty(),
                 Optional.empty(),
                 Optional.empty(),
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -170,11 +186,36 @@ public record Warp(
         return new WarpBuilder(this);
     }
 
-    /** A copy re-anchored to {@code newLocation}, keeping the name, owner, gates, and original creation time. */
-    public Warp movedTo(Position newLocation) {
+    /**
+     * A copy re-anchored to {@code newLocation} on the backend {@code onServer}, keeping the name, owner, gates, and
+     * original creation time. The server moves with the position: a warp lives where its world is.
+     */
+    public Warp movedTo(Position newLocation, String onServer) {
         return toBuilder()
                 .location(Objects.requireNonNull(newLocation, "newLocation"))
+                .server(Optional.of(Objects.requireNonNull(onServer, "onServer")))
                 .build();
+    }
+
+    /** A copy recorded as set on the backend {@code onServer}. */
+    public Warp onServer(String onServer) {
+        return toBuilder()
+                .server(Optional.of(Objects.requireNonNull(onServer, "onServer")))
+                .build();
+    }
+
+    /** True when the warp is known to live on a backend other than {@code localServer}. */
+    public boolean livesElsewhere(String localServer) {
+        Objects.requireNonNull(localServer, "localServer");
+        return knownServer().filter(name -> !name.equals(localServer)).isPresent();
+    }
+
+    /**
+     * The backend the warp lives on, when it is known. {@value #UNSCOPED} is stored to clear a warp's server, so the
+     * backend that holds its world claims it again, and reads as not known.
+     */
+    public Optional<String> knownServer() {
+        return server.filter(name -> !name.equals(UNSCOPED));
     }
 
     public Warp withCost(WarpCost newCost) {
