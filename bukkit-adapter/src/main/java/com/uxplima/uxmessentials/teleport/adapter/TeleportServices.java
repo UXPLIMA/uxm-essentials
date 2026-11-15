@@ -13,6 +13,8 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.PdcTeleportFlags;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.PrewarmedSafeLocationQueue;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
+import com.uxplima.uxmessentials.teleport.application.CrossServerRequests;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
@@ -54,6 +56,8 @@ public final class TeleportServices {
     private final PlayerLookup players;
     private final WorldLookup worlds;
     private final Scheduler scheduler;
+    private final CrossServerRequests crossServerRequests;
+    private final CrossServerStaffTeleport crossServerStaff;
 
     public TeleportServices(Builder builder) {
         this.requestTeleport = Objects.requireNonNull(builder.requestTeleport, "requestTeleport");
@@ -76,6 +80,8 @@ public final class TeleportServices {
         this.players = Objects.requireNonNull(builder.players, "players");
         this.worlds = Objects.requireNonNull(builder.worlds, "worlds");
         this.scheduler = Objects.requireNonNull(builder.scheduler, "scheduler");
+        this.crossServerRequests = Objects.requireNonNull(builder.crossServerRequests, "crossServerRequests");
+        this.crossServerStaff = Objects.requireNonNull(builder.crossServerStaff, "crossServerStaff");
     }
 
     public RequestTeleport requestTeleport() {
@@ -161,6 +167,16 @@ public final class TeleportServices {
         return scheduler;
     }
 
+    /** Teleport requests to players on other backends. */
+    public CrossServerRequests crossServerRequests() {
+        return crossServerRequests;
+    }
+
+    /** Staff teleports where a player is on another backend. */
+    public CrossServerStaffTeleport crossServerStaff() {
+        return crossServerStaff;
+    }
+
     /** Release every in-memory store and queue this context holds. Called on module stop. */
     public void drain() {
         warmupTracker.clear();
@@ -192,6 +208,8 @@ public final class TeleportServices {
         private @org.jspecify.annotations.Nullable PlayerLookup players;
         private @org.jspecify.annotations.Nullable WorldLookup worlds;
         private @org.jspecify.annotations.Nullable Scheduler scheduler;
+        private @org.jspecify.annotations.Nullable CrossServerRequests crossServerRequests;
+        private @org.jspecify.annotations.Nullable CrossServerStaffTeleport crossServerStaff;
 
         public Builder requestTeleport(RequestTeleport value) {
             this.requestTeleport = value;
@@ -290,6 +308,16 @@ public final class TeleportServices {
 
         public Builder scheduler(Scheduler value) {
             this.scheduler = value;
+            return this;
+        }
+
+        public Builder crossServerRequests(CrossServerRequests value) {
+            this.crossServerRequests = value;
+            return this;
+        }
+
+        public Builder crossServerStaff(CrossServerStaffTeleport value) {
+            this.crossServerStaff = value;
             return this;
         }
 

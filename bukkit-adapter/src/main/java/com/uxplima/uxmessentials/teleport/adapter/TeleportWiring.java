@@ -4,7 +4,9 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.Server;
 import org.bukkit.event.Listener;
@@ -22,15 +24,19 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.LibraryClaims;
+import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.claim.AlwaysAllowClaimService;
 import com.uxplima.uxmessentials.shared.application.claim.ClaimPolicySettings;
+import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.RtpCommand;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TeleportCommands;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.command.TpSettingsCommand;
@@ -47,6 +53,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.AsyncTeleportExecutor
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitBiomeCatalog;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitChunkAccess;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.BukkitRtpAreaSource;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.BusTeleportNetwork;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.ForeignCombatGate;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryBackLocationStore;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.InMemoryRequestRegistry;
@@ -68,8 +75,12 @@ import com.uxplima.uxmessentials.teleport.application.BudgetedSafeSearch;
 import com.uxplima.uxmessentials.teleport.application.CappedBiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.ClaimAwareProtectedLand;
+import com.uxplima.uxmessentials.teleport.application.CrossServerRequests;
+import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.HotspotBiasedSampler;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
+import com.uxplima.uxmessentials.teleport.application.PlayerHopResolver;
+import com.uxplima.uxmessentials.teleport.application.PlayerHops;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRespawn;
@@ -80,6 +91,7 @@ import com.uxplima.uxmessentials.teleport.application.RtpPoolSink;
 import com.uxplima.uxmessentials.teleport.application.RtpPoolWriter;
 import com.uxplima.uxmessentials.teleport.application.RtpRadiusTier;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
+import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.teleport.application.TeleportMessageKey;
 import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
@@ -141,7 +153,9 @@ public final class TeleportWiring {
             MenuBindings menuBindings,
             TeleportFee fee,
             ClaimProvidersConfig claimProviders,
-            ProtectedLand guardRegions) {
+            ProtectedLand guardRegions,
+            CrossServerHops hops,
+            NetworkPresence presence) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -153,6 +167,8 @@ public final class TeleportWiring {
         Objects.requireNonNull(fee, "fee");
         Objects.requireNonNull(claimProviders, "claimProviders");
         Objects.requireNonNull(guardRegions, "guardRegions");
+        Objects.requireNonNull(hops, "hops");
+        Objects.requireNonNull(presence, "presence");
         ConfigStore config = ctx.config();
         KernelPorts kernel = ctx.kernel();
         Clock clock = Clock.systemUTC();
@@ -177,6 +193,9 @@ public final class TeleportWiring {
         // it is both the engine's ArrivalGrace port and the fall-damage listener, so it is registered below.
         ArrivalGraceGuard graceGuard =
                 new ArrivalGraceGuard(plugin.getServer(), kernel.scheduler(), settings::arrivalGrace, clock);
+        MutableRequestVisibility visibility = new MutableRequestVisibility();
+        CrossServer crossServer =
+                new CrossServer(config.getBoolean("cross-server.enabled", false), hops, presence, bus, visibility);
         TeleportServices services = assemble(
                 plugin,
                 kernel,
@@ -189,7 +208,8 @@ public final class TeleportWiring {
                 clock,
                 rtp,
                 fee,
-                graceGuard);
+                graceGuard,
+                crossServer);
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
@@ -237,8 +257,21 @@ public final class TeleportWiring {
                 warpRespawnLocator,
                 running,
                 rtp.warmup(),
-                graceGuard);
+                graceGuard,
+                visibility);
     }
+
+    /**
+     * What the cross-server requests and staff teleports are built over. With {@code enabled} off, the teleport
+     * {@code cross-server} block's default, no resolver is registered and no frame is listened to, so a player on
+     * another backend is reached by no teleport, as before.
+     */
+    private record CrossServer(
+            boolean enabled,
+            CrossServerHops hops,
+            NetworkPresence presence,
+            Bus bus,
+            MutableRequestVisibility visibility) {}
 
     private static TeleportServices assemble(
             Plugin plugin,
@@ -252,7 +285,8 @@ public final class TeleportWiring {
             Clock clock,
             RtpBundle rtp,
             TeleportFee fee,
-            ArrivalGrace grace) {
+            ArrivalGrace grace,
+            CrossServer crossServer) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
@@ -296,7 +330,60 @@ public final class TeleportWiring {
                 notifier,
                 kernel.scheduler(),
                 new RtpRadiusTier(kernel.permissions()));
+        RequestTeleport requestTeleport =
+                new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, clock);
+        PlayerHops playerHops = PlayerHops.off();
+        if (crossServer.enabled()) {
+            for (HopKind kind : List.of(HopKind.PLAYER_REQUEST, HopKind.PLAYER_STAFF)) {
+                crossServer
+                        .hops()
+                        .register(new PlayerHopResolver(
+                                kind, engine, kernel.playerLookup(), kernel.playerLocator(), kernel.scheduler()));
+            }
+            playerHops = new PlayerHops(Optional.of(crossServer.hops().departures(new TeleportHopGate(engine))));
+        }
+        BusTeleportNetwork network = new BusTeleportNetwork(crossServer.bus().publisher(), kernel.log());
+        // The accept use case and the remote side refer to each other: a remote request is accepted with the usual
+        // verb, and a remote request a target auto-accepts is accepted through it.
+        AtomicReference<@Nullable AcceptTeleport> acceptHolder = new AtomicReference<>();
+        CrossServerRequests crossServerRequests = new CrossServerRequests(
+                network,
+                crossServer.presence(),
+                kernel.playerLookup(),
+                requests,
+                requestTeleport,
+                crossServer.visibility(),
+                playerHops,
+                engine,
+                notifier,
+                kernel.events(),
+                settings,
+                kernel.scheduler(),
+                target -> autoAccept(target, flags, kernel, acceptHolder.get()),
+                kernel.log());
+        AcceptTeleport acceptTeleport =
+                new AcceptTeleport(requests, engine, notifier, kernel.events(), clock, crossServerRequests);
+        acceptHolder.set(acceptTeleport);
+        CrossServerStaffTeleport crossServerStaff = new CrossServerStaffTeleport(
+                network,
+                crossServer.presence(),
+                kernel.playerLookup(),
+                kernel.playerLocator(),
+                playerHops,
+                executor,
+                notifier,
+                kernel.scheduler(),
+                kernel.log());
+        if (crossServer.enabled()) {
+            network.subscribe(message -> {
+                crossServerRequests.onMessage(message);
+                crossServerStaff.onMessage(message);
+            });
+            crossServer.bus().registry().register(network::onFrame);
+        }
         return new TeleportServices.Builder()
+                .crossServerRequests(crossServerRequests)
+                .crossServerStaff(crossServerStaff)
                 .engine(engine)
                 .notifier(notifier)
                 .settings(settings)
@@ -309,9 +396,8 @@ public final class TeleportWiring {
                 .players(kernel.playerLookup())
                 .worlds(kernel.worldLookup())
                 .scheduler(kernel.scheduler())
-                .requestTeleport(new RequestTeleport(
-                        requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, clock))
-                .acceptTeleport(new AcceptTeleport(requests, engine, notifier, kernel.events(), clock))
+                .requestTeleport(requestTeleport)
+                .acceptTeleport(acceptTeleport)
                 .listPendingRequests(new ListPendingRequests(requests, notifier))
                 .captureBack(new CaptureBack(backStore, engine, notifier, kernel.events(), clock))
                 .resolveRtp(new ResolveRtp(rtp.queue(), kernel.worldLookup(), engine, notifier, settings))
@@ -319,6 +405,18 @@ public final class TeleportWiring {
                 .biomeCatalog(rtp.biomeCatalog())
                 .resolveSpawn(new ResolveSpawn(spawns, kernel.worldLookup(), engine, notifier))
                 .build();
+    }
+
+    /**
+     * A remote request held for {@code target} is accepted at once when their {@code /tpauto} is on, the same step a
+     * local request takes. Called on the target's own thread, so their flag and position are read where they live.
+     */
+    private static void autoAccept(
+            PlayerRef target, PdcTeleportFlags flags, KernelPorts kernel, @Nullable AcceptTeleport accept) {
+        if (accept == null || !flags.autoAccepts(target)) {
+            return;
+        }
+        kernel.playerLocator().locate(target).ifPresent(standing -> accept.accept(target, standing));
     }
 
     /**
@@ -515,6 +613,7 @@ public final class TeleportWiring {
      * @param running the flag flipped false on stop so the sweep and refill loops exit
      * @param poolWarmup the enable-time RTP pool pre-warm, or {@code null} when the persisted pool is disabled
      * @param graceGuard the post-arrival grace / fall-damage guard, cleared on stop
+     * @param requestVisibility the vanish seam cross-server requests are judged with, rebound when vanish wires
      */
     public record Wired(
             TeleportServices services,
@@ -526,7 +625,8 @@ public final class TeleportWiring {
             MutableWarpRespawnLocator warpRespawnLocator,
             AtomicBoolean running,
             @Nullable RtpPoolWarmup poolWarmup,
-            ArrivalGraceGuard graceGuard) {
+            ArrivalGraceGuard graceGuard,
+            MutableRequestVisibility requestVisibility) {
 
         public Wired {
             Objects.requireNonNull(services, "services");
@@ -538,6 +638,7 @@ public final class TeleportWiring {
             Objects.requireNonNull(warpRespawnLocator, "warpRespawnLocator");
             Objects.requireNonNull(running, "running");
             Objects.requireNonNull(graceGuard, "graceGuard");
+            Objects.requireNonNull(requestVisibility, "requestVisibility");
         }
 
         /**

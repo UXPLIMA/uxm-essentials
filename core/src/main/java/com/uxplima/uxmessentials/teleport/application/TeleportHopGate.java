@@ -44,7 +44,9 @@ public final class TeleportHopGate implements HopGate {
             case WARP, PLAYER_WARP -> Optional.of(TeleportKind.WARP);
             case HOME -> Optional.of(TeleportKind.HOME);
             case WORLD -> Optional.of(TeleportKind.SPAWN);
-            case PLAYER -> Optional.of(TeleportKind.REQUEST);
+            case PLAYER_REQUEST -> Optional.of(TeleportKind.REQUEST);
+            // Staff move by the same rules and cooldown key as a local staff /tp, not as a request.
+            case PLAYER_STAFF -> Optional.of(TeleportKind.ADMIN);
             case JAIL -> Optional.empty();
             // Never sent by this release; read only from a row a newer one wrote.
             case UNKNOWN -> Optional.empty();

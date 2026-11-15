@@ -239,6 +239,19 @@ public final class TeleportEngine {
                 () -> hop(mover, destination, kind, TeleportEngine::noPostArrival, TeleportEngine::nothingToUndo));
     }
 
+    /**
+     * Begin the move-cancellable warmup of a hop that leaves this backend, running {@code onComplete} when it ends
+     * instead of a local teleport. The veto gate is not asked here: the destination lives on the target backend,
+     * whose {@link #arriveImmediately} asks it on landing. Returns the handle the move listener cancels.
+     */
+    public WarmupHandle beginHopWarmup(PlayerRef mover, TeleportKind kind, Runnable onComplete) {
+        Objects.requireNonNull(mover, "mover");
+        Objects.requireNonNull(kind, "kind");
+        Objects.requireNonNull(onComplete, "onComplete");
+        WarmupKind warmupKind = new WarmupKind(FEATURE, settings.defaultWarmupSeconds());
+        return warmups.begin(mover, warmupKind, onComplete, () -> onWarmupCancelled(mover, kind));
+    }
+
     private static void nothingToUndo() {
         // A hop that cost nothing has nothing to undo when it misses.
     }
