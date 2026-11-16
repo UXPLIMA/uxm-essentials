@@ -382,7 +382,9 @@ public final class EconomyWiring {
 
         java.util.List<org.bukkit.event.Listener> listenersList = new java.util.ArrayList<>();
         listenersList.add(new com.uxplima.uxmessentials.economy.adapter.inbound.listener.PendingTransactionListener(
-                resolved, pendingRepo, services.notifier(), kernel.scheduler()));
+                new com.uxplima.uxmessentials.economy.application.DeliverPendingCredits(
+                        resolved, pendingRepo, services.notifier(), kernel.log()),
+                kernel.scheduler()));
         // Always on, like the pending credits above: items kept for a seller who left must reach them even after the
         // operator turned selling off.
         listenersList.add(new ItemReturnListener(services.returnUnsoldItems(), kernel.scheduler()));
