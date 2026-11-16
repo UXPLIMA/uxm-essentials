@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.convert.DeluxeMenusConvertS
 import com.uxplima.uxmessentials.custommenus.adapter.convert.GuiPlusConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.OguiConvertService;
 import com.uxplima.uxmessentials.custommenus.adapter.convert.ZMenuConvertService;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenedListener;
 import com.uxplima.uxmessentials.custommenus.adapter.spec.MenuSpecPersistence;
 import com.uxplima.uxmessentials.custommenus.domain.CustomMenusMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
@@ -94,6 +95,7 @@ public final class MenuCommand implements CommandRegistration {
     private final Path menusDir;
     private final Scheduler scheduler;
     private final CommandFeedback feedback;
+    private final MenuOpenedListener opened;
 
     public MenuCommand(
             Menus menus,
@@ -110,7 +112,8 @@ public final class MenuCommand implements CommandRegistration {
             ObjIntConsumer<Player> captureItem,
             Path menusDir,
             Scheduler scheduler,
-            Messages messages) {
+            Messages messages,
+            MenuOpenedListener opened) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.menuNames = Objects.requireNonNull(menuNames, "menuNames");
         this.reload = Objects.requireNonNull(reload, "reload");
@@ -126,6 +129,7 @@ public final class MenuCommand implements CommandRegistration {
         this.menusDir = Objects.requireNonNull(menusDir, "menusDir");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.feedback = new CommandFeedback(Objects.requireNonNull(messages, "messages"));
+        this.opened = Objects.requireNonNull(opened, "opened");
     }
 
     @Override
@@ -242,7 +246,8 @@ public final class MenuCommand implements CommandRegistration {
      * the executor so the opened menu can show {@code %executor%} distinct from {@code %player%} (the target): a player
      * sender becomes that executor, and a console sender, which carries no {@link PlayerRef}, falls back to the
      * target, so {@code %executor%} still resolves to a real name rather than an empty token. The menu itself opens on
-     * the target's own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe.
+     * the target's own region thread through the {@link Menus} facade, so cross-region opens stay Folia-safe. The
+     * sender hears that it opened only once it has, through {@link MenuOpenedListener}.
      */
     private int openForOther(CommandContext<CommandSourceStack> ctx) throws CommandSyntaxException {
         CommandSender sender = Sender.audience(ctx.getSource());
@@ -257,8 +262,12 @@ public final class MenuCommand implements CommandRegistration {
             return 0;
         }
         PlayerRef executor = sender instanceof Player p ? BukkitRefs.toRef(p) : BukkitRefs.toRef(target);
+        String targetName = target.getName();
+        opened.expect(
+                target,
+                name,
+                () -> feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", targetName)));
         menus.open(target, name, null, 0, Map.of(), MenuExecutor.attach(executor));
-        feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", target.getName()));
         return Command.SINGLE_SUCCESS;
     }
 

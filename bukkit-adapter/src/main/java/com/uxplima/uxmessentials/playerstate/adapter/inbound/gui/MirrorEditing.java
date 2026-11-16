@@ -142,7 +142,8 @@ public final class MirrorEditing implements Listener {
             if (!edits.opening(mirror.edit())) {
                 event.setCancelled(true);
             }
-        } else if (edits.holding(event.getPlayer().getUniqueId())) {
+        } else if (edits.refusesOpen(
+                new PlayerRef(event.getPlayer().getUniqueId(), event.getPlayer().getName()))) {
             event.setCancelled(true);
         }
     }

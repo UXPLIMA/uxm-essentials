@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.itemworld.adapter.ItemworldServices;
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -29,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * discarded. The window is a fresh uxmLib {@link StorageGui} backed by nothing: items dropped into it are
  * never written to a real container and the menu has no close handler, so closing the view silently drops
  * them. Opening is entity-bound, so it is scheduled on the player's region thread through the kernel
- * {@code Scheduler}, then reported through {@link ItemworldMessageKey#DISPOSAL_OPENED}.
+ * {@code Scheduler}, then reported through {@link ItemworldMessageKey#DISPOSAL_OPENED} once it is showing.
  */
 @NullMarked
 public final class DisposalCommand extends ItemworldCommandSupport implements CommandRegistration {
@@ -72,8 +73,12 @@ public final class DisposalCommand extends ItemworldCommandSupport implements Co
                     .title(title(viewer))
                     .rows(services.disposalLayout().rows())
                     .build();
+            WindowShown.confirm(
+                    disposal,
+                    player,
+                    services.kernel().scheduler(),
+                    () -> reply(ctx, ItemworldMessageKey.DISPOSAL_OPENED));
             disposal.open(player);
-            reply(ctx, ItemworldMessageKey.DISPOSAL_OPENED);
         });
         return Command.SINGLE_SUCCESS;
     }

@@ -189,6 +189,7 @@ final class MirrorEdits<I> {
         private final List<@Nullable I> base;
         private final @Nullable OfflineSnapshot<I> stored;
         private final @Nullable Lease lease;
+        private final Runnable shown;
         private final AtomicReference<State> state = new AtomicReference<>(State.PENDING);
         private final AtomicBoolean started = new AtomicBoolean();
         private final CompletableFuture<SaveResult> result = new CompletableFuture<>();
@@ -203,13 +204,15 @@ final class MirrorEdits<I> {
                 MirrorKind kind,
                 List<@Nullable I> base,
                 @Nullable OfflineSnapshot<I> stored,
-                @Nullable Lease lease) {
+                @Nullable Lease lease,
+                Runnable shown) {
             this.viewer = viewer;
             this.target = target;
             this.kind = kind;
             this.base = copyOf(base);
             this.stored = stored;
             this.lease = lease;
+            this.shown = shown;
         }
 
         PlayerRef viewer() {
@@ -241,7 +244,7 @@ final class MirrorEdits<I> {
         }
 
         private Edit<I> viewOnly() {
-            return new Edit<>(viewer, target, kind, base, stored, null);
+            return new Edit<>(viewer, target, kind, base, stored, null, shown);
         }
     }
 
@@ -275,8 +278,11 @@ final class MirrorEdits<I> {
 
     // ---- opening ----------------------------------------------------------------------------------------------
 
-    /** Open an online target's container: the editor slot and the snapshot are taken on the target's thread. */
-    void openOnline(PlayerRef viewer, PlayerRef target, MirrorKind kind, boolean wantsEdit) {
+    /**
+     * Open an online target's container: the editor slot and the snapshot are taken on the target's thread.
+     * {@code shown} runs once the window appears, and never for one that is refused or does not come.
+     */
+    void openOnline(PlayerRef viewer, PlayerRef target, MirrorKind kind, boolean wantsEdit, Runnable shown) {
         Container container = new Container(target.uuid(), kind);
         scheduler.onEntity(target, () -> {
             if (!targets.online(target)) {
@@ -285,12 +291,15 @@ final class MirrorEdits<I> {
             Lease lease = wantsEdit ? lease(container, viewer) : null;
             PlayerRef heldBy = wantsEdit && lease == null ? editorOf(container) : null;
             List<@Nullable I> contents = targets.contents(target, kind);
-            show(new Edit<>(viewer, target, kind, contents, null, lease), container, heldBy);
+            show(new Edit<>(viewer, target, kind, contents, null, lease, shown), container, heldBy);
         });
     }
 
-    /** Open an offline target's container: the editor slot is taken before the file is read, on the async lane. */
-    void openOffline(PlayerRef viewer, PlayerRef target, MirrorKind kind, boolean wantsEdit) {
+    /**
+     * Open an offline target's container: the editor slot is taken before the file is read, on the async lane.
+     * {@code shown} as for {@link #openOnline}.
+     */
+    void openOffline(PlayerRef viewer, PlayerRef target, MirrorKind kind, boolean wantsEdit, Runnable shown) {
         Container container = new Container(target.uuid(), kind);
         scheduler.async(() -> {
             Lease lease = wantsEdit ? leaseAfterSave(container, viewer) : null;
@@ -307,7 +316,10 @@ final class MirrorEdits<I> {
                 lease = null;
                 notifier.send(viewer, PlayerstateMessageKey.OFFLINE_VIEW_ONLY_OLD, Map.of("player", target.name()));
             }
-            show(new Edit<>(viewer, target, kind, Arrays.asList(snapshot.items()), snapshot, lease), container, heldBy);
+            show(
+                    new Edit<>(viewer, target, kind, Arrays.asList(snapshot.items()), snapshot, lease, shown),
+                    container,
+                    heldBy);
         });
     }
 
@@ -354,9 +366,11 @@ final class MirrorEdits<I> {
         return now == State.PENDING || now == State.OPEN;
     }
 
-    /** The window of {@code edit} appeared. */
+    /** The window of {@code edit} appeared: the opener hears it once. */
     void shown(Edit<I> edit) {
-        edit.state.compareAndSet(State.PENDING, State.OPEN);
+        if (edit.state.compareAndSet(State.PENDING, State.OPEN)) {
+            edit.shown.run();
+        }
     }
 
     /** The window of {@code edit} was refused, by another plugin or by {@link #opening}: nothing was edited. */
@@ -815,6 +829,19 @@ final class MirrorEdits<I> {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether an inventory other than a mirror window is refused for {@code viewer}: while an edit is open or being
+     * saved nothing may be put away into another container. A refused open is told to the viewer, since the command
+     * that asked for it cannot know why its window did not come.
+     */
+    boolean refusesOpen(PlayerRef viewer) {
+        if (!holding(viewer.uuid())) {
+            return false;
+        }
+        notifier.send(viewer, PlayerstateMessageKey.MIRROR_OPEN_REFUSED, Map.of());
+        return true;
     }
 
     /**
