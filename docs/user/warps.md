@@ -249,6 +249,11 @@ Categories come from the warp categories made in `/warp editor`. While none exis
 number of ratings, favourites or distance. Ratings rank by a Bayesian score: `ratings.confidence` votes at the
 server's average are added to each warp, so a single five-star vote does not top the list.
 
+A random sort is offered once `"random"` is added to the `sorts` list in `modules/playerwarps/gui/pwarp-browse.conf`.
+Its order is dealt again every `random-sort.reshuffle-minutes`, counted from midnight UTC, and stays the same in
+between, so turning the page shows the next warps instead of a fresh draw. A player who turns the page just as a new
+order is dealt may see a warp again or miss one, as with any sort whose numbers change while the menu is open.
+
 ### Configuration
 
 | Key | Default | Meaning |
@@ -262,6 +267,7 @@ server's average are added to each warp, so a single five-star vote does not top
 | `payout.auto-payout` | `false` | Pays the owner at once instead of banking for `/pwarp withdraw`. |
 | `ratings.confidence` | `10` | How strongly few votes are pulled toward the average. |
 | `ratings.rewards.*` | off | Money or a console command for the rater (once per warp) and the owner (once per new rater). |
+| `random-sort.reshuffle-minutes` | `60` | How often the random sort deals a new order, 0 to 525600; 0 keeps the order as it is. |
 | `rent.*` | off | Charges `amount` every `period-days`, from the warp's bank first, then the owner. An unpaid warp is suspended for `grace-days`, then archived; `hard-delete-after-days` above 0 deletes it later. Owners get mail `reminder-hours` before a term ends. `exempt` lists players, categories and worlds that never pay. |
 | `sponsor.*` | off | Sells `slots` pinned browser slots at `price` for up to `duration-days`, `max-concurrent-per-player` each, with `cooldown-days` before the same warp is sponsored again. |
 | `cross-server.enabled` | `false` | Sends a visitor to a player warp of another server. |
@@ -273,6 +279,10 @@ Rent and sponsorship need an economy. An archived warp comes back with `/pwarp a
 A player warp records its server the same way as a server warp, and an unrecorded one is claimed at start by the
 named server that has its world (`event=playerwarp_server_claim`). There is no `setserver` command: the owner moves
 the warp with `/pwarp move` on the right server.
+
+Every server deals the random sort's order at the same moment and deals the same one, so players see one order across
+the network. Give `random-sort.reshuffle-minutes` the same value on every server that shares the database: servers
+with different values deal different orders and each one overwrites the others.
 
 With `cross-server.enabled = true`, a visit to a warp of another server runs the checks above here, except the
 safety check, takes the fee and sends the visitor through the proxy, with no warmup. Only the warp's server has its

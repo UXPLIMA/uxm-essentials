@@ -6,6 +6,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
+import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpShuffle;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpFavouriteStore;
 import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
@@ -69,6 +70,12 @@ public final class PlayerWarpRepositories {
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(names, "names");
         return new JooqPlayerWarpBrowse(persistence.dsl(), clock, names);
+    }
+
+    /** The jOOQ {@link PlayerWarpShuffle}: deals the random browse order for a round. */
+    public static PlayerWarpShuffle shuffle(Persistence persistence) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqPlayerWarpShuffle(persistence.dsl());
     }
 
     /** The jOOQ {@link WarpBanStore}, one row per {@code (warp, player)}, active-at expiry evaluated in-store. */

@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.playerwarps.adapter.inbound.listener.Playerwarp
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.BukkitRatingRewardGranter;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.MailRentMailer;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.PlayerWarpLegacyMigration;
+import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RandomOrderSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.ReceiptedPlayerWarpEconomy;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.RentSweep;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.SponsorExpirySweep;
@@ -124,6 +125,7 @@ public final class PlayerwarpsWiring {
     private static final int DEFAULT_LIMIT = 3;
     private static final int DEFAULT_CONFIDENCE = 10;
     private static final long MAX_HARD_DELETE_DAYS = 36_500L;
+    private static final long MAX_RESHUFFLE_MINUTES = 525_600L;
 
     private PlayerwarpsWiring() {}
 
@@ -496,6 +498,13 @@ public final class PlayerwarpsWiring {
         // sponsorship and stamps its post-expiry cooldown. Disabled (the sub-group off, or economy absent so it was
         // forced off) it is null and nothing is scheduled.
         SponsorExpirySweep sponsorSweep = buildSponsorSweep(ctx, kernel, repository, sponsorConfig);
+        // The random browse order is dealt again every round, off the tick; a round of 0 minutes keeps it where it is.
+        RandomOrderSweep randomOrderSweep = new RandomOrderSweep(
+                PlayerWarpRepositories.shuffle(persistence),
+                kernel.scheduler(),
+                randomSortRound(ctx),
+                Clock.systemUTC(),
+                kernel.log());
         PlayerwarpsJoinListener joinWarmer = new PlayerwarpsJoinListener(repository, kernel.scheduler());
         return new Wired(
                 PlayerWarpCommands.all(services, kernel.messages()),
@@ -508,6 +517,7 @@ public final class PlayerwarpsWiring {
                 archivePlayerWarp,
                 rentSweep,
                 sponsorSweep,
+                randomOrderSweep,
                 legacyMigration,
                 cached);
     }
@@ -570,6 +580,15 @@ public final class PlayerwarpsWiring {
             log.error("event=playerwarp_rent_refused currency=" + currencyId + " detail=sweep_off", refused);
             return false;
         }
+    }
+
+    /**
+     * The {@code random-sort.reshuffle-minutes} round length: 0 (or less) turns the reshuffle off, and a value past
+     * a year is held at a year.
+     */
+    private static Duration randomSortRound(ModuleContext ctx) {
+        long minutes = ctx.config().getLong("random-sort.reshuffle-minutes", 60L);
+        return Duration.ofMinutes(Math.clamp(minutes, 0L, MAX_RESHUFFLE_MINUTES));
     }
 
     /**
@@ -855,9 +874,10 @@ public final class PlayerwarpsWiring {
 
     /**
      * Everything the player-warps module contributes once wired: the Brigadier commands, the join cache-warmer,
-     * the read ports the PAPI seam queries, and the optional rent sweep. The only repeating scheduled work is the
-     * rent sweep, and it is present only when the {@code rent} sub-group is on with an economy to charge against;
-     * {@link #startBackgroundWork()} arms it and {@link #stop()} halts it on module disable/reload.
+     * the read ports the PAPI seam queries, and the background sweeps. The rent sweep is present only when the
+     * {@code rent} sub-group is on with an economy to charge against, the sponsor sweep only when sponsorship is on,
+     * and the random order sweep always, idle when its round is 0; {@link #startBackgroundWork()} arms them and
+     * {@link #stop()} halts them on module disable/reload.
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the join cache-warmer the plugin registers
@@ -868,6 +888,7 @@ public final class PlayerwarpsWiring {
      * @param archivePlayerWarp the removal use case, handed on for the published archive, restore and delete
      * @param rentSweep the off-tick rent lifecycle sweep, or {@code null} when the rent sub-group is disabled
      * @param sponsorSweep the off-tick sponsor expiry sweep, or {@code null} when the sponsor sub-group is disabled
+     * @param randomOrderSweep the off-tick sweep that deals the random browse order every round
      * @param cache the cache under the broadcasting repository, which the importer writes through so a large
      *     import updates this server without one cross-server frame per row
      */
@@ -882,6 +903,7 @@ public final class PlayerwarpsWiring {
             ArchivePlayerWarp archivePlayerWarp,
             @org.jspecify.annotations.Nullable RentSweep rentSweep,
             @org.jspecify.annotations.Nullable SponsorExpirySweep sponsorSweep,
+            RandomOrderSweep randomOrderSweep,
             Runnable legacyMigration,
             com.uxplima.uxmessentials.persistence.playerwarps.CachedPlayerWarpRepository cache) {
 
@@ -894,11 +916,13 @@ public final class PlayerwarpsWiring {
             Objects.requireNonNull(setPlayerWarp, "setPlayerWarp");
             Objects.requireNonNull(editPlayerWarp, "editPlayerWarp");
             Objects.requireNonNull(archivePlayerWarp, "archivePlayerWarp");
+            Objects.requireNonNull(randomOrderSweep, "randomOrderSweep");
             Objects.requireNonNull(legacyMigration, "legacyMigration");
         }
 
-        /** Arm the rent and sponsor sweeps, when they were wired; a no-op for a sub-group that is off. */
+        /** Arm the rent, sponsor and random order sweeps; a no-op for a sweep that is off. */
         public void startBackgroundWork() {
+            randomOrderSweep.start();
             if (rentSweep != null) {
                 rentSweep.start();
             }
@@ -907,8 +931,9 @@ public final class PlayerwarpsWiring {
             }
         }
 
-        /** Halt the rent and sponsor sweeps on module disable/reload so no orphaned off-tick task survives. */
+        /** Halt the sweeps on module disable/reload so no orphaned off-tick task survives. */
         public void stop() {
+            randomOrderSweep.stop();
             if (rentSweep != null) {
                 rentSweep.stop();
             }
