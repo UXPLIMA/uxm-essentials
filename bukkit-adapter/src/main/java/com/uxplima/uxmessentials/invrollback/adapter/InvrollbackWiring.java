@@ -118,6 +118,7 @@ public final class InvrollbackWiring {
                 List.of(command),
                 repository,
                 restorer,
+                listView,
                 () -> close(sweepHandle, kernel),
                 new ListenerInvrollbackPlaceholders(captureListener));
     }
@@ -139,6 +140,7 @@ public final class InvrollbackWiring {
      * @param commands the Brigadier commands to register
      * @param repository the snapshot store the published query lists from
      * @param restorer the three-hop restore flow the published action runs, safety copy and all
+     * @param listView the snapshot list {@code /invrestore} opens, which the {@code /uxmess gui} hub opens too
      * @param stop the teardown run on module stop
      */
     public record Wired(
@@ -146,6 +148,7 @@ public final class InvrollbackWiring {
             List<CommandRegistration> commands,
             SnapshotRepository repository,
             SnapshotRestorer restorer,
+            SnapshotListView listView,
             Runnable stop,
             InvrollbackPlaceholders placeholders) {
         public Wired {
@@ -153,6 +156,7 @@ public final class InvrollbackWiring {
             commands = List.copyOf(commands);
             Objects.requireNonNull(repository, "repository");
             Objects.requireNonNull(restorer, "restorer");
+            Objects.requireNonNull(listView, "listView");
             Objects.requireNonNull(stop, "stop");
             Objects.requireNonNull(placeholders, "placeholders");
         }
