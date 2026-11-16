@@ -208,7 +208,10 @@ Both keys are in the root `config.conf` and read on start.
   the spot is unsafe), the server they reached gives it back, in the currency it was taken in; keep the economy module
   on wherever a move can land. A server that stops after taking the player in but before moving them gives the money
   back as it stops. A player warp's fee goes to its owner only when the visitor arrives.
-- **Money at shutdown.** That refund can only reach an economy that is still running. A currency kept by another
+- **Money at shutdown.** A stopping server waits up to 10 seconds for refunds and payments already under way. What
+  is still running after that is not waited for: the log has `event=cross_server_hop_drain_incomplete`, and a refund
+  or payment that then fails is logged as `event=cross_server_hop_refund_failed` or `cross_server_hop_settle_failed`
+  and is not paid. A refund can only reach an economy that is still running. A currency kept by another
   plugin, through Vault or Treasury, is given back only if that plugin stops after uxmEssentials; if it stopped
   first, the log has `event=cross_server_hop_refund_failed` with the player and the amount. A refund for a move the
   server had already started logs `outcome=refunded_after_move_started`: the server may still finish that move, so

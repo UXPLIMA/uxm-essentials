@@ -243,7 +243,12 @@ public final class HopArrival {
      * throws as well.
      */
     private void move(Claimed hop, HopLanding landing) {
+        // Marked before the check, so a stop that ends the hop from here on logs it as possibly moved.
         hop.moving = true;
+        if (hop.ended.get()) {
+            // A stop or a retired branch already gave the money back; moving now would be a free teleport.
+            return;
+        }
         Runnable landed = () -> {
             if (hop.end()) {
                 if (hop.pending.settlement().isPresent()) {
@@ -349,11 +354,18 @@ public final class HopArrival {
                 leave();
             }
         };
+        boolean handed = false;
         try {
             scheduler.async(counted);
+            handed = true;
         } catch (RuntimeException rejected) {
             log.warn("event=cross_server_hop_async_rejected reason={}", rejected.toString());
+            handed = true;
             counted.run();
+        } finally {
+            if (!handed) {
+                leave(); // the submit threw an Error: the work will never run, so a stop must not wait for it
+            }
         }
     }
 }

@@ -34,6 +34,8 @@ public final class SteppedScheduler implements Scheduler {
     private boolean rejectsAsync;
     private boolean rejectsDelayed;
     private @Nullable Executor asyncLane;
+    private boolean holdsEntityWork;
+    private final List<Runnable> heldEntityWork = new ArrayList<>();
 
     public SteppedScheduler(MutableClock clock) {
         this.clock = clock;
@@ -54,6 +56,19 @@ public final class SteppedScheduler implements Scheduler {
 
     public void rejectAsync(boolean rejects) {
         this.rejectsAsync = rejects;
+    }
+
+    /** Queue entity work with a fallback until {@link #releaseEntityWork}, as a busy region thread would. */
+    public void holdEntityWork() {
+        this.holdsEntityWork = true;
+    }
+
+    /** Run the entity work held so far, in order, and stop holding. */
+    public void releaseEntityWork() {
+        holdsEntityWork = false;
+        List<Runnable> held = List.copyOf(heldEntityWork);
+        heldEntityWork.clear();
+        held.forEach(Runnable::run);
     }
 
     /** Hand async work to {@code lane} instead of running it at once, as a real thread pool that is busy would. */
@@ -117,6 +132,10 @@ public final class SteppedScheduler implements Scheduler {
 
     @Override
     public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+        if (holdsEntityWork) {
+            heldEntityWork.add(task);
+            return;
+        }
         if (online.contains(player.uuid())) {
             task.run();
         } else {

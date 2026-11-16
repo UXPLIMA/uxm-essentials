@@ -233,6 +233,21 @@ class CrossServerHopTest {
     }
 
     @Test
+    void aMoveTaskThatRunsAfterTheStopRefundedItDoesNotMoveThePlayer() {
+        goHome();
+        scheduler.holdEntityWork();
+        join(survival);
+
+        survival.stop(DRAIN);
+        scheduler.releaseEntityWork();
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.refunds).isOne();
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(log.warnings()).noneMatch(line -> line.contains("refunded_after_move_started"));
+    }
+
+    @Test
     void aStopWaitsForARefundAlreadyOnTheAsyncLane() {
         goHome();
         survival.onArrival(ALEX);
