@@ -209,7 +209,8 @@ public record NetworkConfig(
         String serverId =
                 config.getString("network.server-name", config.getString("network.server-id", DEFAULT_SERVER_ID));
         String channel = config.getString("network.bus-channel", BusChannel.FULL);
-        int queue = config.getInt("network.bus.outbound-queue-size", DEFAULT_QUEUE);
+        // Floored like the heartbeat below: a zero or negative size must not fail the enable.
+        int queue = Math.max(1, config.getInt("network.bus.outbound-queue-size", DEFAULT_QUEUE));
         // Floor at one second so a fat-fingered zero/negative cannot trip the constructor's positivity check.
         int heartbeat = Math.max(1, config.getInt("network.heartbeat-seconds", DEFAULT_HEARTBEAT_SECONDS));
         String rawTransport = config.getString("network.transport", Transport.VELOCITY.name());

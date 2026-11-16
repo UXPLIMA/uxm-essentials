@@ -36,6 +36,8 @@ final class InMemoryPlayerWarps {
     final Map<PlayerWarpName, PlayerWarpId> ids = new LinkedHashMap<>();
     final Map<PlayerWarpId, String> passwords = new LinkedHashMap<>();
     final List<String> sideRows = new ArrayList<>();
+    /** The players the server has seen, by uuid, as its profile cache names them. */
+    final Map<UUID, String> knownNames = new LinkedHashMap<>();
 
     PlayerWarpRecordWriter writer() {
         return new PlayerWarpRecordWriter(
@@ -45,7 +47,8 @@ final class InMemoryPlayerWarps {
                 new Whitelist(),
                 new Bans(),
                 new Favourites(),
-                new Ratings());
+                new Ratings(),
+                uuid -> Optional.ofNullable(knownNames.get(uuid)));
     }
 
     /** The stored warp named {@code name}; fails when there is none. */

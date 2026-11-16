@@ -30,6 +30,10 @@ public interface BusTransport {
     /** Send one already-encoded frame to all peers (fire-and-forget). */
     void send(byte[] frame);
 
-    /** True when the transport is currently able to deliver frames. */
+    /**
+     * True when the transport has current evidence that it reaches peers: a broker connection that is up, or a frame
+     * that recently came back through the relay. Being started is not enough, since a frame can leave with nothing on
+     * the other side to carry it on.
+     */
     boolean healthy();
 }

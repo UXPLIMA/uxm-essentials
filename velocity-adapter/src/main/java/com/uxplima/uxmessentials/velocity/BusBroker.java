@@ -1,11 +1,12 @@
 package com.uxplima.uxmessentials.velocity;
 
+import java.util.Collection;
 import java.util.Objects;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
-import com.velocitypowered.api.proxy.ProxyServer;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.server.RegisteredServer;
@@ -28,6 +29,10 @@ import org.slf4j.Logger;
  *       origin equals its own id, belt and suspenders, so a mutation reaches each peer exactly once.
  * </ol>
  *
+ * <p>A heartbeat ({@code ServerPing}) is also sent back to the backend it came from. The backend drops it as its
+ * own frame, but its transport counts it as an answer from the broker, which is how {@code /uxmess doctor} on a
+ * backend tells a proxy running this plugin from one without it, where frames leave and nothing relays them.
+ *
  * <p>Every relayed frame is marked {@link PluginMessageEvent.ForwardResult#handled() handled} so the proxy
  * does not also forward it onward through its default plugin-message routing. A frame that fails to decode
  * (a truncated or version-incompatible payload) is dropped with a logged warning rather than relayed blind.
@@ -35,12 +40,13 @@ import org.slf4j.Logger;
 @NullMarked
 final class BusBroker {
 
-    private final ProxyServer proxy;
+    private final Supplier<? extends Collection<RegisteredServer>> servers;
     private final Logger logger;
     private final MinecraftChannelIdentifier channel;
 
-    BusBroker(ProxyServer proxy, Logger logger) {
-        this.proxy = Objects.requireNonNull(proxy, "proxy");
+    /** A broker relaying to the backends {@code servers} lists at each frame, the proxy's registered servers. */
+    BusBroker(Supplier<? extends Collection<RegisteredServer>> servers, Logger logger) {
+        this.servers = Objects.requireNonNull(servers, "servers");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.channel = MinecraftChannelIdentifier.create(BusChannel.NAMESPACE, BusChannel.NAME);
     }
@@ -58,11 +64,18 @@ final class BusBroker {
             return;
         }
         fanOut(event.getData(), origin, sourceConnection.getServerInfo().getName());
+        if (NetworkMessageCodec.isServerPing(event.getData())) {
+            // The heartbeat goes back to its sender as proof that this broker is there: a backend alone behind the
+            // proxy has no peer to hear from, and without this answer it could not tell the broker from no broker.
+            // Through the server, not the connection: the player may have left or switched servers since the ping,
+            // and the server picks whoever is still on it, or sends nothing.
+            sourceConnection.getServer().sendPluginMessage(channel, event.getData());
+        }
     }
 
     private void fanOut(byte[] frame, String origin, String sourceServerName) {
         int delivered = 0;
-        for (RegisteredServer server : proxy.getAllServers()) {
+        for (RegisteredServer server : servers.get()) {
             String name = server.getServerInfo().getName();
             // The loop sentinel: never echo a frame back to the backend that produced it. We skip both the
             // declared origin id and the physical source server (in case the two names diverge in config).

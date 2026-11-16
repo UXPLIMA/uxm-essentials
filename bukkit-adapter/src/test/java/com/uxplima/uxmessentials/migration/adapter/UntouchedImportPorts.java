@@ -62,7 +62,8 @@ final class UntouchedImportPorts {
                 new Whitelist(),
                 new Bans(),
                 new Favourites(),
-                new Ratings());
+                new Ratings(),
+                uuid -> java.util.Optional.empty());
     }
 
     static final class Homes implements HomeRepository {

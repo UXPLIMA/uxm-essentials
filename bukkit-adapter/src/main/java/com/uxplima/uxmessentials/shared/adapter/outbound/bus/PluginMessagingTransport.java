@@ -1,10 +1,13 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.Objects;
+import java.util.OptionalLong;
 import java.util.function.Consumer;
+import java.util.function.LongSupplier;
 
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
@@ -15,6 +18,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.BusTransport;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The plugin-messaging {@link BusTransport}: it moves opaque frame bytes over a carrier player's connection
@@ -36,55 +40,98 @@ import org.jspecify.annotations.NullMarked;
  * With no proxy, no peers, or no online players the buffered frames simply never drain and the bus is a no-op,
  * the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
  * nothing about the single-server happy path depends on the transport.
+ *
+ * <h2>Proxy contact</h2>
+ * A registered channel proves nothing about the proxy: without the {@code uxmEssentials-velocity} broker every frame
+ * leaves and none comes back from another backend. With the broker, a frame arrives as a peer's frame or as this
+ * backend's own heartbeat, which the broker returns to its sender. {@link #link()} reports when a frame last arrived,
+ * which {@code /uxmess doctor} reads as the proxy answering. It is a diagnostic: without the broker Velocity passes a
+ * client's plugin messages on to the backend, so a frame on the channel is evidence of the broker, not proof.
+ * {@link #link()} also says whether the last flush found nobody online to carry the queue, the other reason frames
+ * stop.
  */
 @NullMarked
 public final class PluginMessagingTransport implements PluginMessageListener, BusTransport {
 
     private static final byte[] EMPTY = new byte[0];
+    private static final long NEVER = Long.MIN_VALUE;
 
-    private final Plugin plugin;
+    private final PluginChannel pluginChannel;
     private final Scheduler scheduler;
     private final String channel;
     private final int outboundQueueSize;
     private final Deque<byte[]> outbound = new ArrayDeque<>();
     private final OversizeFrameReport oversize;
+    private final LongSupplier clock;
+    private final Duration answerWindow;
 
     private volatile boolean running;
-    private @org.jspecify.annotations.Nullable Consumer<byte[]> onFrame;
+    private volatile long lastHeardMillis = NEVER;
+    private volatile boolean waitingForPlayer;
+    private @Nullable Consumer<byte[]> onFrame;
 
+    /**
+     * A transport on {@code channel} that counts the proxy as answering while a frame came back within
+     * {@code answerWindow}, a few heartbeats, so one late frame does not flip it.
+     */
     public PluginMessagingTransport(
-            Plugin plugin, Scheduler scheduler, String channel, int outboundQueueSize, Logger log) {
-        this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), System::currentTimeMillis);
-        this.plugin = Objects.requireNonNull(plugin, "plugin");
+            Plugin plugin,
+            Scheduler scheduler,
+            String channel,
+            int outboundQueueSize,
+            Duration answerWindow,
+            Logger log) {
+        this(
+                new BukkitChannel(plugin, channel),
+                scheduler,
+                channel,
+                outboundQueueSize,
+                answerWindow,
+                log,
+                System::currentTimeMillis);
+    }
+
+    PluginMessagingTransport(
+            PluginChannel pluginChannel,
+            Scheduler scheduler,
+            String channel,
+            int outboundQueueSize,
+            Duration answerWindow,
+            Logger log,
+            LongSupplier clock) {
+        this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), clock);
+        this.pluginChannel = Objects.requireNonNull(pluginChannel, "pluginChannel");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.channel = Objects.requireNonNull(channel, "channel");
         if (outboundQueueSize < 1) {
             throw new IllegalArgumentException("outboundQueueSize must be positive: " + outboundQueueSize);
         }
         this.outboundQueueSize = outboundQueueSize;
+        this.clock = Objects.requireNonNull(clock, "clock");
+        this.answerWindow = Objects.requireNonNull(answerWindow, "answerWindow");
     }
 
     /** Register the plugin-messaging channel and route every inbound frame's bytes to {@code onFrame}. */
     @Override
     public void start(Consumer<byte[]> onFrame) {
         this.onFrame = Objects.requireNonNull(onFrame, "onFrame");
-        plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, channel);
-        plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, channel, this);
+        pluginChannel.open(this);
         running = true;
     }
 
-    /** Unregister the channel and drop any buffered frames. Idempotent. */
+    /** Unregister the channel and drop any buffered frames and what the proxy last said. Idempotent. */
     @Override
     public void stop() {
         if (!running) {
             return;
         }
         running = false;
-        plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, channel, this);
-        plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, channel);
+        pluginChannel.close(this);
         synchronized (outbound) {
             outbound.clear();
         }
+        lastHeardMillis = NEVER;
+        waitingForPlayer = false;
     }
 
     /**
@@ -112,18 +159,37 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         scheduler.onGlobal(this::flush);
     }
 
-    /** True when the channel is registered and a frame can be carried as soon as a player is online. */
+    /**
+     * True when the channel is registered and a frame came back through the proxy within the answer window. A
+     * registered channel alone is not enough, since frames leave whether or not anything on the proxy relays them.
+     */
     @Override
     public boolean healthy() {
-        return running;
+        return link().answeredWithin(clock.getAsLong(), answerWindow);
+    }
+
+    /**
+     * What the doctor reports for this carrier: whether the channel is up, when the proxy last answered, and whether
+     * the last flush found nobody online to carry the queue.
+     */
+    BusHealth.ProxyLink link() {
+        long heard = lastHeardMillis;
+        return new BusHealth.ProxyLink(
+                running, heard == NEVER ? OptionalLong.empty() : OptionalLong.of(heard), waitingForPlayer);
     }
 
     @Override
     public void onPluginMessageReceived(String inboundChannel, Player carrier, byte[] frame) {
+        received(inboundChannel, frame);
+    }
+
+    /** Take one inbound frame: note that the proxy answered, then hand the bytes to the core off the tick thread. */
+    void received(String inboundChannel, byte[] frame) {
         Consumer<byte[]> sink = onFrame;
         if (!running || sink == null || !channel.equals(inboundChannel)) {
             return;
         }
+        lastHeardMillis = clock.getAsLong();
         // Hand the bytes off the tick thread: this handler may run on the carrier's region thread and the core's
         // decode + dispatch does cache work, not Bukkit work.
         byte[] copy = frame.clone();
@@ -131,14 +197,16 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     }
 
     private void flush() {
-        Player carrier = anyCarrier();
+        Consumer<byte[]> carrier = pluginChannel.carrier();
+        // Read on the global thread, where the online list may be asked; the doctor only reads the flag.
+        waitingForPlayer = carrier == null;
         if (carrier == null) {
             return;
         }
         // Drain the buffer through one carrier. The proxy routes by channel, not by the carrier identity, so any
         // online player can carry a server-wide frame.
         for (byte[] frame = drainOne(); frame.length > 0; frame = drainOne()) {
-            carrier.sendPluginMessage(plugin, channel, frame);
+            carrier.accept(frame);
         }
     }
 
@@ -150,8 +218,47 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         }
     }
 
-    private @org.jspecify.annotations.Nullable Player anyCarrier() {
-        Collection<? extends Player> online = plugin.getServer().getOnlinePlayers();
-        return online.isEmpty() ? null : online.iterator().next();
+    /** The server side of the channel: registering it, and a player a frame can ride on. */
+    interface PluginChannel {
+
+        /** Register the channel both ways, delivering inbound frames to {@code listener}. */
+        void open(PluginMessageListener listener);
+
+        /** Unregister what {@link #open} registered. */
+        void close(PluginMessageListener listener);
+
+        /** A sender bound to one online player, or null with nobody online. Called on the global thread. */
+        @Nullable Consumer<byte[]> carrier();
+    }
+
+    /** The {@link PluginChannel} over Bukkit's {@code Messenger} and online players. */
+    private record BukkitChannel(Plugin plugin, String channel) implements PluginChannel {
+
+        private BukkitChannel {
+            Objects.requireNonNull(plugin, "plugin");
+            Objects.requireNonNull(channel, "channel");
+        }
+
+        @Override
+        public void open(PluginMessageListener listener) {
+            plugin.getServer().getMessenger().registerOutgoingPluginChannel(plugin, channel);
+            plugin.getServer().getMessenger().registerIncomingPluginChannel(plugin, channel, listener);
+        }
+
+        @Override
+        public void close(PluginMessageListener listener) {
+            plugin.getServer().getMessenger().unregisterIncomingPluginChannel(plugin, channel, listener);
+            plugin.getServer().getMessenger().unregisterOutgoingPluginChannel(plugin, channel);
+        }
+
+        @Override
+        public @Nullable Consumer<byte[]> carrier() {
+            Collection<? extends Player> online = plugin.getServer().getOnlinePlayers();
+            if (online.isEmpty()) {
+                return null;
+            }
+            Player player = online.iterator().next();
+            return frame -> player.sendPluginMessage(plugin, channel, frame);
+        }
     }
 }

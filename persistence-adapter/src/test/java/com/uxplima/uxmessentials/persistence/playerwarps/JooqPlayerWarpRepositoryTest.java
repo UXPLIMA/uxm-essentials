@@ -137,4 +137,38 @@ class JooqPlayerWarpRepositoryTest {
         assertThat(favourites(restored)).isEqualTo(1);
         assertThat(repository.findById(rich)).isPresent();
     }
+
+    @Test
+    void anOwnerKnownOnlyByUuidIsStoredWithoutANameAndNamedOnEveryRead() {
+        PlayerRef stranger = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000007"), "");
+        String uuid = stranger.uuid().toString();
+        PlayerWarp unnamed = PlayerWarp.create(
+                new PlayerRef(stranger.uuid(), uuid),
+                uuid,
+                PlayerWarpName.of("farm"),
+                Position.of(WORLD, 0, 64, 0),
+                NOW);
+
+        PlayerWarpId id = repository.save(unnamed);
+
+        String stored = dsl.select(PLAYER_WARPS.OWNER_NAME)
+                .from(PLAYER_WARPS)
+                .where(PLAYER_WARPS.ID.eq(id.value()))
+                .fetchOne(PLAYER_WARPS.OWNER_NAME);
+        assertThat(stored).isNull();
+        JooqPlayerWarpRepository named = new JooqPlayerWarpRepository(dsl, owner -> "Stranger");
+        assertThat(named.findById(id))
+                .hasValueSatisfying(warp -> assertThat(warp.ownerName()).isEqualTo("Stranger"));
+    }
+
+    @Test
+    void aRealOwnerNameIsKept() {
+        PlayerWarpId id = repository.save(warp("shop"));
+
+        assertThat(dsl.select(PLAYER_WARPS.OWNER_NAME)
+                        .from(PLAYER_WARPS)
+                        .where(PLAYER_WARPS.ID.eq(id.value()))
+                        .fetchOne(PLAYER_WARPS.OWNER_NAME))
+                .isEqualTo("Sam");
+    }
 }
