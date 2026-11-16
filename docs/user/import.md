@@ -104,6 +104,9 @@ the import only operators can claim the kits until the new nodes are granted.
 | `essentials.kit` | `uxmessentials.kit.use` (everyone by default) |
 | `essentials.kits.<name>` | `uxmessentials.kit.<name>` (operators by default) |
 
+A kit whose name is also one of the plugin's own kit nodes (`use`, `edit`, `others`, `preview` or `reset`) would sit
+behind that node, so it keeps `essentials.kits.<name>` as its `permission-node` instead, and the import log names it.
+
 Grant each kit to the groups that held its EssentialsX node, with LuckPerms for example:
 
 ```
@@ -112,20 +115,30 @@ Grant each kit to the groups that held its EssentialsX node, with LuckPerms for 
 ```
 
 To move the existing grants of one kit in a single step, contexts and expiry included, rename the node with a bulk
-update and confirm it with the command LuckPerms prints. It renames rather than copies, so do it once EssentialsX is
-gone, and once per kit:
+update from the server console (LuckPerms takes bulk updates from the console only) and confirm it with the command
+LuckPerms prints. Back up first with `/lp export`. The update renames rather than copies, so run it only once
+EssentialsX is gone from every server that shares this LuckPerms storage, and once per kit:
 
 ```
+/lp export before-kit-nodes
 /lp bulkupdate all update permission uxmessentials.kit.vip "permission == essentials.kits.vip"
 ```
 
 Do not replace `essentials.kits.*` with `uxmessentials.kit.*`: that wildcard also grants the staff nodes under it,
-such as `uxmessentials.kit.edit`, `uxmessentials.kit.others` and `uxmessentials.kit.reset`. Grant the kits one by one.
-To keep using the EssentialsX nodes instead, set `permission-node = "essentials.kits.<name>"` in the kit's file.
+such as `uxmessentials.kit.edit`, `uxmessentials.kit.others` and `uxmessentials.kit.reset`, and every
+`uxmessentials.kit.cooldown.<group>` wait. Grant the kits one by one. To keep using the EssentialsX node for a kit
+instead, set `permission-node = "essentials.kits.<name>"` in its file.
 
-A kit that was imported before kits kept their gate stays open to everyone, and a new import with
-`on-conflict = "skip"` leaves it as it is. Set `permission = true` in its file, or import again with `overwrite`,
-which replaces the kit and any change made to it since.
+A kit file with `permission = false` is open to every player with `uxmessentials.kit.use`. With
+`on-conflict = "skip"` an import keeps such a kit as it is and names it in the log. To find these kits:
+
+```
+grep -lE 'permission\s*=\s*false' plugins/uxmEssentials/modules/kits/kits/*.conf
+```
+
+Set `permission = true` in each file and restart the server: kit files are read at startup, and `/uxmess reload` does
+not read them again. The permission button in `/kit editor` changes the flag without a restart. Importing again with
+`overwrite` also gates them, but replaces each kit and any change made to it since.
 
 ## LiteBans
 

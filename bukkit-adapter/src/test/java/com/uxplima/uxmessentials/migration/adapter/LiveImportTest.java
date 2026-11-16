@@ -32,6 +32,8 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportMode;
@@ -39,6 +41,7 @@ import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWorld;
@@ -112,7 +115,8 @@ class LiveImportTest {
                         Optional.empty(),
                         Duration.ZERO,
                         COINS,
-                        CLOCK),
+                        CLOCK,
+                        log),
                 bus,
                 scheduler);
     }
@@ -139,6 +143,28 @@ class LiveImportTest {
 
     private static ImportRecord hologramRecord(Hologram hologram) {
         return new ImportRecord.HologramRecord(new ImportedHologram(hologram));
+    }
+
+    @Test
+    void underSkipAKitKeptOpenToEveryPlayerIsNamedToTheOperator() {
+        MemoryKits live = new MemoryKits();
+        live.save(KitDefinition.repeatable(KitId.of("vip"), List.of(), Duration.ZERO));
+        live.save(KitDefinition.repeatable(KitId.of("starter"), List.of(), Duration.ZERO)
+                .withPermission(true));
+        targets.kits(live);
+        ImportedKit vip = new ImportedKit(KitDefinition.repeatable(KitId.of("vip"), List.of(), Duration.ZERO)
+                .withPermission(true));
+        ImportedKit starter = new ImportedKit(KitDefinition.repeatable(KitId.of("starter"), List.of(), Duration.ZERO)
+                .withPermission(true));
+
+        RecordOutcome outcome =
+                writers().live().write(new ImportRecord.KitRecord(vip), SKIP).outcome();
+        writers().live().write(new ImportRecord.KitRecord(starter), SKIP);
+
+        assertThat(outcome).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(live.find(KitId.of("vip")).orElseThrow().requiresPermission())
+                .isFalse();
+        assertThat(log.warnings).hasSize(1).first().asString().contains("vip", "permission = true");
     }
 
     @Test
@@ -433,6 +459,37 @@ class LiveImportTest {
         public void asyncAfter(Duration delay, Runnable task) {
             delays.add(delay);
             delayed.add(task);
+        }
+    }
+
+    /** The kits module's catalog in memory. */
+    private static final class MemoryKits implements KitRepository {
+
+        private final Map<KitId, KitDefinition> kits = new LinkedHashMap<>();
+
+        @Override
+        public Optional<KitDefinition> find(KitId id) {
+            return Optional.ofNullable(kits.get(id));
+        }
+
+        @Override
+        public List<KitDefinition> all() {
+            return List.copyOf(kits.values());
+        }
+
+        @Override
+        public boolean exists(KitId id) {
+            return kits.containsKey(id);
+        }
+
+        @Override
+        public void save(KitDefinition definition) {
+            kits.put(definition.id(), definition);
+        }
+
+        @Override
+        public void delete(KitId id) {
+            kits.remove(id);
         }
     }
 
