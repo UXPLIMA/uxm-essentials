@@ -68,6 +68,9 @@ public enum ModerationMessageKey implements MessageKey {
     BAN_KICK("moderation.ban.kick"),
     BAN_LIFTED("moderation.unban.applied"),
     BAN_NOT_BANNED("moderation.unban.not-banned"),
+    // a /ban, /tempban or template that would cut short the ban already in force is refused, naming that ban
+    BAN_ALREADY_PERMANENT("moderation.ban.already-permanent"),
+    BAN_ALREADY_LONGER("moderation.ban.already-longer"),
 
     // /banlist. Review of currently banned players
     BANLIST_HEADER("moderation.banlist-header"),

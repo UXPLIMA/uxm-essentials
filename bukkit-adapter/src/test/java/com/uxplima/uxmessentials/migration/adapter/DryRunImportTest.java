@@ -507,6 +507,11 @@ class DryRunImportTest {
             }
 
             @Override
+            public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+                throw new UnsupportedOperationException("an import overwrites bans with saveTempban");
+            }
+
+            @Override
             public int appendWarn(PlayerRef target, Warn warn) {
                 write("warn " + target.uuid());
                 List<Warn> history = warns.computeIfAbsent(target.uuid(), ignored -> new ArrayList<>());

@@ -48,6 +48,12 @@ public enum ModerationError {
     /** The {@code /unban} target was not banned. */
     NOT_BANNED(ModerationMessageKey.BAN_NOT_BANNED),
 
+    /**
+     * A ban already in force lasts longer than the requested one, which would cut it short. The refusal names the
+     * running ban, so the use case sends it with its placeholders itself.
+     */
+    LONGER_BAN_RUNNING(ModerationMessageKey.BAN_ALREADY_LONGER),
+
     /** The {@code /punish} template name is not configured under {@code moderation.conf} {@code templates}. */
     UNKNOWN_TEMPLATE(ModerationMessageKey.TEMPLATE_UNKNOWN);
 

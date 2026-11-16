@@ -135,6 +135,14 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        return write(dsl -> ModerationWrites.replaceTempban(dsl, target, expected, replacement));
+    }
+
+    @Override
     public int appendWarn(PlayerRef target, Warn warn) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(warn, "warn");

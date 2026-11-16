@@ -71,6 +71,14 @@ public interface ModerationRepository {
     void saveTempban(PlayerRef target, TempbanState tempban);
 
     /**
+     * Store {@code replacement} as {@code target}'s ban only while their row is still {@code expected}, the state
+     * the caller read and decided on ({@link TempbanState.None} meaning no row at all). Returns false and writes
+     * nothing when another write changed the row in between, so a decision taken on a stale read never lands: two
+     * servers banning the same player at once cannot have the weaker ban overwrite the stronger one.
+     */
+    boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement);
+
+    /**
      * Append one warning to {@code target}'s history and return the count of warnings still in effect at the
      * appended warning's issue instant: a standing warning and any timed warning not yet lapsed. The history
      * itself stays append-only; the count simply excludes already-lapsed timed warnings.

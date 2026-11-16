@@ -34,8 +34,9 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * listener's {@code isActiveAt} check stays true for any realistic reconnection, so the existing login
  * enforcement bars the player unchanged. The expiry is a far-future sentinel computed from the clock rather
  * than {@code Instant.MAX} so the value still fits the epoch-milli column the tempban row stores. An exempt
- * target is refused; on success an online target is kicked immediately, {@code PlayerTempbanned} is published
- * and the action is audit-logged with the {@code permanent} label.
+ * target is refused, and so is one whose running ban would outlast this one; on success an online target is kicked
+ * immediately, {@code PlayerTempbanned} is published and the action is audit-logged with the {@code permanent}
+ * label.
  *
  * <p>A permanent ban requires the unlimited duration tier: the requested span is the far-future
  * {@link #PERMANENT_SPAN}, so an actor whose {@code ban.maxduration} cap is finite has the ban reduced to that
@@ -104,7 +105,11 @@ public final class Ban {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Permanently ban {@code target}, or refuse when the target is exempt. */
+    /**
+     * Permanently ban {@code target}, or refuse when the target is exempt. A capped actor's ban is timed, and a ban
+     * already in force that would outlast it is never cut short: the request is refused with
+     * {@link ModerationError#LONGER_BAN_RUNNING} and the actor is told which ban is running.
+     */
     public Result<TempbanState.Active, ModerationError> ban(
             PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
@@ -113,7 +118,23 @@ public final class Ban {
         if (guard.isExempt(target)) {
             return refuseExempt(actor, target, reason);
         }
-        return apply(actor, target, reason, silent, clock.instant());
+        Instant now = clock.instant();
+        TempbanState.Active ban = proposal(actor, reason, now);
+        return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.outlasting(ban))) {
+            case GuardedBanWrite.Kept kept -> {
+                audit.tempbanned(actor, target, label(ban), false, SanctionStrength.HELD);
+                // A capped permanent ban became a timed one; say so, or the refusal reads as a request to shorten.
+                if (capped(ban)) {
+                    notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(spanOf(ban)));
+                }
+                GuardedBanWrite.tellKept(notifier, actor, target, kept.running(), now);
+                yield Result.err(ModerationError.LONGER_BAN_RUNNING);
+            }
+            case GuardedBanWrite.Stored stored -> {
+                announce(actor, target, ban, reason, silent, now);
+                yield Result.ok(ban);
+            }
+        };
     }
 
     /**
@@ -132,18 +153,17 @@ public final class Ban {
             return refuseExempt(actor, target, reason);
         }
         Instant now = clock.instant();
-        Duration effective = limit.cap(actor, "ban", PERMANENT_SPAN);
-        boolean capped = effective.compareTo(PERMANENT_SPAN) < 0;
-        if (repository.loadTempban(target) instanceof TempbanState.Active running && running.isActiveAt(now)) {
-            Optional<Instant> proposed = capped ? Optional.of(now.plus(effective)) : Optional.empty();
-            if (!SanctionStrength.outlasts(proposed, SanctionStrength.endOf(running))) {
-                String label = capped ? SanctionDuration.format(effective) : PERMANENT_LABEL;
-                audit.tempbanned(actor, target, label, false, SanctionStrength.HELD);
-                return Result.ok(EscalationOutcome.ALREADY_STRONGER);
+        TempbanState.Active ban = proposal(actor, reason, now);
+        return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.notOutlastedBy(ban))) {
+            case GuardedBanWrite.Kept kept -> {
+                audit.tempbanned(actor, target, label(ban), false, SanctionStrength.HELD);
+                yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
-            return apply(actor, target, reason, silent, now).map(ban -> EscalationOutcome.EXTENDED);
-        }
-        return apply(actor, target, reason, silent, now).map(ban -> EscalationOutcome.APPLIED);
+            case GuardedBanWrite.Stored stored -> {
+                announce(actor, target, ban, reason, silent, now);
+                yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
+            }
+        };
     }
 
     private <T> Result<T, ModerationError> refuseExempt(PlayerRef actor, PlayerRef target, Optional<String> reason) {
@@ -152,19 +172,39 @@ public final class Ban {
         return Result.err(ModerationError.TARGET_EXEMPT);
     }
 
-    private Result<TempbanState.Active, ModerationError> apply(
-            PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent, Instant now) {
-        // A permanent ban is the far-future span; an actor whose tier caps it lands a timed ban instead.
+    /** The ban {@code actor} may issue: permanent, or a timed ban of their tier's length when it caps bans. */
+    private TempbanState.Active proposal(PlayerRef actor, Optional<String> reason, Instant now) {
         Duration effective = limit.cap(actor, "ban", PERMANENT_SPAN);
-        boolean capped = effective.compareTo(PERMANENT_SPAN) < 0;
-        Instant expiry = now.plus(effective);
-        TempbanState.Active ban = (TempbanState.Active) TempbanState.active(expiry, Issuer.of(actor), reason, now);
-        repository.ensureUserExists(target, now);
-        repository.saveTempban(target, ban);
+        return (TempbanState.Active) TempbanState.active(now.plus(effective), Issuer.of(actor), reason, now);
+    }
+
+    private static Duration spanOf(TempbanState.Active ban) {
+        return Duration.between(ban.issuedAt(), ban.until());
+    }
+
+    private static boolean capped(TempbanState.Active ban) {
+        return spanOf(ban).compareTo(PERMANENT_SPAN) < 0;
+    }
+
+    private static String label(TempbanState.Active ban) {
+        return capped(ban) ? SanctionDuration.format(spanOf(ban)) : PERMANENT_LABEL;
+    }
+
+    /** Everything a stored ban sets off: the history row, the kick, the event, the notices and the IP fan-out. */
+    private void announce(
+            PlayerRef actor,
+            PlayerRef target,
+            TempbanState.Active ban,
+            Optional<String> reason,
+            boolean silent,
+            Instant now) {
+        boolean capped = capped(ban);
+        Duration effective = spanOf(ban);
+        Instant expiry = ban.until();
         history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty());
         kickNow(target, capped, effective, reason);
         events.publish(new PlayerTempbanned(target, ban, now));
-        audit.tempbanned(actor, target, capped ? SanctionDuration.format(effective) : PERMANENT_LABEL, true, reason);
+        audit.tempbanned(actor, target, label(ban), true, reason);
         notifier.send(actor, ModerationMessageKey.BAN_APPLIED, Map.of("player", target.name()));
         if (capped) {
             notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(effective));
@@ -178,7 +218,6 @@ public final class Ban {
         if (!silent) {
             broadcast.announce(broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective));
         }
-        return Result.ok(ban);
     }
 
     /**

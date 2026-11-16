@@ -225,6 +225,8 @@ public final class ModerationActions implements UxmModerationActions {
             case TARGET_ELSEWHERE -> UxmFailure.of(UxmFailure.REFUSED, "that player is connected to another server");
             case ALREADY_MUTED -> UxmFailure.of(UxmFailure.ALREADY_IN_STATE, "that player is already muted");
             case ALREADY_JAILED -> UxmFailure.of(UxmFailure.ALREADY_IN_STATE, "that player is already jailed");
+            case LONGER_BAN_RUNNING ->
+                UxmFailure.of(UxmFailure.ALREADY_IN_STATE, "that player is already banned for longer");
             case UNKNOWN_JAIL -> UxmFailure.of(UxmFailure.NOT_FOUND, "no jail by that name");
             case NOT_MUTED -> UxmFailure.of(UxmFailure.NOT_FOUND, "that player is not muted");
             case NOT_BANNED -> UxmFailure.of(UxmFailure.NOT_FOUND, "that player is not banned");
