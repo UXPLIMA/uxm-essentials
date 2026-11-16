@@ -133,6 +133,8 @@ public final class WarpSoundSelectorView {
         editorView.edit(
                 name,
                 owner,
+                player,
+                viewer,
                 warp -> {
                     if (isDeparture) {
                         warp.setDepartureSound(sound);

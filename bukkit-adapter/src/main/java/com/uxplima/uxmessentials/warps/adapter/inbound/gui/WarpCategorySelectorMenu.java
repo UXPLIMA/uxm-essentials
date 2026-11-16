@@ -16,10 +16,7 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
-import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
-import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
-import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -51,7 +48,6 @@ public final class WarpCategorySelectorMenu {
     private final Messages messages;
     private final Scheduler scheduler;
     private final WarpCategoryRepository categoryRepository;
-    private final WarpRepository warpRepository;
     private final WarpEditorView editorView;
 
     public WarpCategorySelectorMenu(
@@ -59,13 +55,11 @@ public final class WarpCategorySelectorMenu {
             Messages messages,
             Scheduler scheduler,
             WarpCategoryRepository categoryRepository,
-            WarpRepository warpRepository,
             WarpEditorView editorView) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
-        this.warpRepository = Objects.requireNonNull(warpRepository, "warpRepository");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
     }
 
@@ -130,12 +124,20 @@ public final class WarpCategorySelectorMenu {
         editorView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), warpNameOf(ctx), null);
     }
 
-    /** Save the warp under {@code categoryId} through the repository, then reopen its editor. */
+    /**
+     * File the warp under {@code categoryId}, then reopen its editor. The save goes through the editor's queue for the
+     * warp, off the tick and after any other edit of it, so neither overwrites the other.
+     */
     private void assign(MenuActionContext ctx, Optional<String> categoryId) {
         String warpName = warpNameOf(ctx);
-        Optional<Warp> warp = warpRepository.find(WarpName.of(warpName));
-        warp.ifPresent(value -> warpRepository.save(value.withCategoryId(categoryId)));
-        editorView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), warpName, null);
+        Player player = ctx.player();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        editorView.editServerWarp(
+                warpName,
+                player,
+                viewer,
+                warp -> warp.withCategoryId(categoryId),
+                () -> editorView.open(player, viewer, warpName, null));
     }
 
     private static WarpCategory categoryOf(MenuContext ctx) {
