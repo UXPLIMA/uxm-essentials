@@ -257,8 +257,7 @@ public final class VaultSelectorMenu {
             Vault vault = resolved.orElseThrow();
             scheduler.onEntity(viewer, () -> {
                 player.closeInventory();
-                view.open(player, viewer, viewer, vault);
-                notifier.opened(viewer, index);
+                view.open(player, viewer, viewer, vault, () -> notifier.opened(viewer, index));
             });
         });
     }

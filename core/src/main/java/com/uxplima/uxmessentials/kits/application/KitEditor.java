@@ -37,7 +37,11 @@ public final class KitEditor {
         this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
-    /** Open the editor for {@code id}: confirm the kit exists and return it for the adapter to present. */
+    /**
+     * Find the kit {@code id} to edit and return it for the adapter to present. An unknown id is told to the actor.
+     * Nothing confirms the edit yet: the window can still be refused, so the adapter calls {@link #opened} once it
+     * is showing.
+     */
     public Result<KitDefinition, KitError> open(PlayerRef actor, KitId id) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(id, "id");
@@ -46,8 +50,14 @@ public final class KitEditor {
             notifier.send(actor, KitError.NOT_FOUND.messageKey(), Map.of("kit", id.value()));
             return Result.err(KitError.NOT_FOUND);
         }
-        notifier.send(actor, KitsMessageKey.KIT_EDIT_OPENED, Map.of("kit", id.value()));
         return Result.ok(kit.get());
+    }
+
+    /** Tell {@code actor} the editor window for {@code id} is showing. */
+    public void opened(PlayerRef actor, KitId id) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(id, "id");
+        notifier.send(actor, KitsMessageKey.KIT_EDIT_OPENED, Map.of("kit", id.value()));
     }
 
     /**

@@ -3,8 +3,10 @@ package com.uxplima.uxmessentials.itemworld.adapter.inbound.command;
 import java.util.List;
 
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.MenuType;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -65,18 +67,29 @@ public enum Workstation {
         return alias == null ? List.of() : List.of(alias);
     }
 
-    /** Open this station's inventory view for {@code player}. Must run on the player's region thread. */
-    public void open(Player player) {
-        switch (this) {
-            case ANVIL -> player.openInventory(MenuType.ANVIL.create(player));
-            case WORKBENCH -> player.openInventory(MenuType.CRAFTING.create(player));
-            case ENDERCHEST -> player.openInventory(player.getEnderChest());
-            case GRINDSTONE -> player.openInventory(MenuType.GRINDSTONE.create(player));
-            case CARTOGRAPHY -> player.openInventory(MenuType.CARTOGRAPHY_TABLE.create(player));
-            case LOOM -> player.openInventory(MenuType.LOOM.create(player));
-            case SMITHINGTABLE -> player.openInventory(MenuType.SMITHING.create(player));
-            case STONECUTTER -> player.openInventory(MenuType.STONECUTTER.create(player));
-            case FURNACE -> player.openInventory(MenuType.FURNACE.create(player));
+    /**
+     * Open this station's inventory view for {@code player} and say whether it is showing. Another plugin, or the
+     * invsee edit guard, may cancel the open, and then the player is left on their own inventory, so a caller
+     * reports the station only on {@code true}. Must run on the player's region thread.
+     */
+    public boolean open(Player player) {
+        if (this == ENDERCHEST) {
+            player.openInventory(player.getEnderChest());
+            return WindowShown.showing(player, player.getEnderChest());
         }
+        InventoryView view =
+                switch (this) {
+                    case ANVIL -> MenuType.ANVIL.create(player);
+                    case WORKBENCH -> MenuType.CRAFTING.create(player);
+                    case GRINDSTONE -> MenuType.GRINDSTONE.create(player);
+                    case CARTOGRAPHY -> MenuType.CARTOGRAPHY_TABLE.create(player);
+                    case LOOM -> MenuType.LOOM.create(player);
+                    case SMITHINGTABLE -> MenuType.SMITHING.create(player);
+                    case STONECUTTER -> MenuType.STONECUTTER.create(player);
+                    case FURNACE -> MenuType.FURNACE.create(player);
+                    case ENDERCHEST -> throw new IllegalStateException("the ender chest opens its own inventory");
+                };
+        player.openInventory(view);
+        return WindowShown.showing(player, view.getTopInventory());
     }
 }

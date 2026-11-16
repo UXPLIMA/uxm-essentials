@@ -110,11 +110,12 @@ public final class ItemworldHubMenu {
 
     /** Open the clicked station for the viewer and reply, mirroring the old launcher's workstation button. */
     private void openStation(MenuActionContext ctx, Workstation station) {
-        station.open(ctx.player());
-        reply(
-                BukkitRefs.toRef(ctx.viewer()),
-                ItemworldMessageKey.WORKSTATION_OPENED,
-                Map.of("station", station.displayName()));
+        if (station.open(ctx.player())) {
+            reply(
+                    BukkitRefs.toRef(ctx.viewer()),
+                    ItemworldMessageKey.WORKSTATION_OPENED,
+                    Map.of("station", station.displayName()));
+        }
     }
 
     /** Set the world time on the global region, then reply, exactly as the old time button did. */

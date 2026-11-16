@@ -47,6 +47,7 @@ class MirrorEditsTest {
     private final Files files = new Files();
     private final List<String> told = new ArrayList<>();
     private final List<String> warnings = new ArrayList<>();
+    private final List<String> confirmed = new ArrayList<>();
     private final MirrorEdits<Stack> edits = new MirrorEdits<>(
             scheduler,
             new StackRules(),
@@ -95,8 +96,8 @@ class MirrorEditsTest {
     @Test
     void theEditorSlotIsTakenBeforeTheReadAndASecondOpenIsViewOnly() {
         files.put(SAM, slots(DIAMONDS));
-        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true);
-        edits.openOffline(BEN, SAM, MirrorKind.INVENTORY, true);
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
+        edits.openOffline(BEN, SAM, MirrorKind.INVENTORY, true, confirmTo(BEN));
 
         scheduler.runAsync();
 
@@ -268,7 +269,7 @@ class MirrorEditsTest {
         takeOut(ann, 0);
         close(ann, MirrorEdits.Cause.CLOSED);
 
-        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true);
+        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true, confirmTo(ANN));
         scheduler.runLastAsync();
 
         assertThat(world.opened(ANN).target()).isEqualTo(BEN);
@@ -277,7 +278,7 @@ class MirrorEditsTest {
 
         scheduler.runAsync();
         assertThat(files.slots(SAM)).containsExactly((Stack) null);
-        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true);
+        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true, confirmTo(ANN));
         scheduler.runAsync();
         assertThat(world.opened(ANN).editable())
                 .as("the view-only window took no editor slot")
@@ -290,7 +291,7 @@ class MirrorEditsTest {
     void aWindowAnotherPluginRefusedFreesItsEditorSlot() {
         files.put(SAM, slots(DIAMONDS));
         world.showing = false;
-        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true);
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
         scheduler.runAsync();
 
         edits.notShown(world.opened(ANN));
@@ -304,7 +305,7 @@ class MirrorEditsTest {
     void aWindowThatNeverAppearsIsGivenUpAndRefusedIfItTurnsUpLate() {
         files.put(SAM, slots(DIAMONDS));
         world.showing = false;
-        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true);
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
         scheduler.runAsync();
         MirrorEdits.Edit<Stack> ann = world.opened(ANN);
         assertThat(edits.opening(ann)).isTrue();
@@ -328,6 +329,82 @@ class MirrorEditsTest {
 
         assertThat(edits.holding(ANN.uuid())).isTrue();
         assertThat(ann.accepting()).isTrue();
+    }
+
+    // ---- the opener hears of a window only once it shows -------------------------------------------------------
+
+    @Test
+    void theOpenerIsToldOnceWhenTheWindowAppears() {
+        files.put(SAM, slots(DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+
+        edits.shown(ann);
+        scheduler.runLater();
+
+        assertThat(confirmed).containsExactly("Ann");
+    }
+
+    @Test
+    void aRefusedWindowIsNeverConfirmed() {
+        files.put(SAM, slots(DIAMONDS));
+        world.showing = false;
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
+        scheduler.runAsync();
+
+        edits.notShown(world.opened(ANN));
+        scheduler.runLater();
+
+        assertThat(confirmed).isEmpty();
+    }
+
+    @Test
+    void aWindowThatNeverAppearsIsNeverConfirmed() {
+        world.join(SAM, slots(DIAMONDS));
+        world.showing = false;
+        edits.openOnline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
+
+        scheduler.runLater();
+
+        assertThat(confirmed).isEmpty();
+    }
+
+    @Test
+    void aViewOnlyWindowIsConfirmedWhenItAppears() {
+        world.join(SAM, slots(DIAMONDS));
+        openOnline(ANN, true);
+
+        openOnline(BEN, true);
+
+        assertThat(confirmed).containsExactly("Ann", "Ben");
+        assertThat(told).containsExactly("Ben: playerstate.mirror.view-only-edited");
+    }
+
+    @Test
+    void aWindowThatShowedWithoutItsEventIsConfirmedWhenTheWaitIsOver() {
+        world.join(SAM, slots(DIAMONDS));
+        edits.openOnline(ANN, SAM, MirrorKind.INVENTORY, true, confirmTo(ANN));
+        assertThat(confirmed).isEmpty();
+
+        scheduler.runLater();
+
+        assertThat(confirmed).containsExactly("Ann");
+    }
+
+    @Test
+    void anotherWindowIsRefusedWithAReasonWhileAnEditIsBeingSaved() {
+        files.put(SAM, slots(DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+        takeOut(ann, 0);
+        close(ann, MirrorEdits.Cause.CLOSED);
+
+        boolean refused = edits.refusesOpen(ANN);
+
+        assertThat(refused).isTrue();
+        assertThat(told).containsExactly("Ann: playerstate.mirror.open-refused");
+        scheduler.runAsync();
+        assertThat(edits.refusesOpen(ANN)).as("the save came back").isFalse();
+        assertThat(edits.refusesOpen(BEN)).isFalse();
+        assertThat(told).hasSize(1);
     }
 
     // ---- a save that throws ------------------------------------------------------------------------------------
@@ -469,13 +546,13 @@ class MirrorEditsTest {
     // ---- driving it --------------------------------------------------------------------------------------------
 
     private MirrorEdits.Edit<Stack> openOffline(PlayerRef viewer, boolean wantsEdit) {
-        edits.openOffline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit);
+        edits.openOffline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit, confirmTo(viewer));
         scheduler.runAsync();
         return appeared(world.opened(viewer));
     }
 
     private MirrorEdits.Edit<Stack> openOnline(PlayerRef viewer, boolean wantsEdit) {
-        edits.openOnline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit);
+        edits.openOnline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit, confirmTo(viewer));
         return appeared(world.opened(viewer));
     }
 
@@ -505,6 +582,11 @@ class MirrorEditsTest {
 
     private void close(MirrorEdits.Edit<Stack> edit, MirrorEdits.Cause cause) {
         edits.closed(edit, world.windows.remove(edit), cause);
+    }
+
+    /** What the window's opener is told once it shows: recorded by name. */
+    private Runnable confirmTo(PlayerRef viewer) {
+        return () -> confirmed.add(viewer.name());
     }
 
     private static List<@Nullable Stack> slots(@Nullable Stack... items) {

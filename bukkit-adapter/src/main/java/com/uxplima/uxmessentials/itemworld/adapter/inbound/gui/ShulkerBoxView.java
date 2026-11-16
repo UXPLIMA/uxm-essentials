@@ -15,6 +15,7 @@ import org.bukkit.inventory.meta.BlockStateMeta;
 import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.itemworld.domain.ItemworldMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -83,6 +84,11 @@ public final class ShulkerBoxView {
         view.setContents(box.getInventory().getContents());
         open.put(owner.uuid(), holder);
         player.openInventory(view);
+        if (!WindowShown.showing(player, view)) {
+            // Refused: nothing was shown, so a later write-back of this copy could only overwrite the box with
+            // stale contents, and the held slot would stay locked for a window that is not there.
+            open.remove(owner.uuid(), holder);
+        }
     }
 
     /** Claim {@code holder}'s view on close and write its edits back into the source box. Called by the listener. */

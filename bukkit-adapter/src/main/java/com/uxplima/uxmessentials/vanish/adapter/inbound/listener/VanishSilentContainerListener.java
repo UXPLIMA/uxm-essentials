@@ -14,6 +14,7 @@ import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.inventory.Inventory;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.vanish.application.port.VanishStore;
@@ -99,6 +100,11 @@ public final class VanishSilentContainerListener implements Listener {
         Player player = server.getPlayer(who);
         if (player != null && player.isOnline()) {
             player.openInventory(copy);
+            if (!WindowShown.showing(player, copy)) {
+                // Refused: no close will come to write the copy back, and nothing in it could have changed. Only this
+                // copy's entry goes, so a newer open's mirror keeps its write-back.
+                mirrors.computeIfPresent(who, (uuid, mirror) -> mirror.copy() == copy ? null : mirror);
+            }
         } else {
             mirrors.remove(who);
         }

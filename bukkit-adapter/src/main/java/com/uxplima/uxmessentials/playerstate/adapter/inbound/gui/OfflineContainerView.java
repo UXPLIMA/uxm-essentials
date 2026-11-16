@@ -19,17 +19,17 @@ public final class OfflineContainerView {
         this.editing = Objects.requireNonNull(editing, "editing");
     }
 
-    /** Open {@code subject}'s stored inventory for {@code viewer}. Called on the viewer's thread. */
-    public void openInventory(PlayerRef viewer, PlayerRef subject) {
+    /** Open {@code subject}'s stored inventory for {@code viewer}, running {@code shown} once it is showing. */
+    public void openInventory(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
-        editing.edits().openOffline(viewer, subject, MirrorKind.INVENTORY, InvseeView.mayModify(viewer));
+        editing.edits().openOffline(viewer, subject, MirrorKind.INVENTORY, InvseeView.mayModify(viewer), shown);
     }
 
-    /** Open {@code subject}'s stored ender chest for {@code viewer}. */
-    public void openEnderChest(PlayerRef viewer, PlayerRef subject) {
+    /** Open {@code subject}'s stored ender chest for {@code viewer}, running {@code shown} once it is showing. */
+    public void openEnderChest(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
-        editing.edits().openOffline(viewer, subject, MirrorKind.ENDER, true);
+        editing.edits().openOffline(viewer, subject, MirrorKind.ENDER, true, shown);
     }
 }

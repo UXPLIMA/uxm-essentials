@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuPropertiesV
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRefListEditor;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.gui.MenuRequirementsView;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuEditLockListener;
+import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenedListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerInteractListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuOpenerJoinListener;
 import com.uxplima.uxmessentials.custommenus.adapter.inbound.listener.MenuSwapListener;
@@ -304,6 +305,7 @@ public final class CustomMenusWiring {
                 org.bukkit.Material.CHEST,
                 ContentPermissions.MENU_EDITOR,
                 editorView::open));
+        MenuOpenedListener openedListener = new MenuOpenedListener();
         MenuCommand command = new MenuCommand(
                 menus,
                 nameSupplier,
@@ -319,7 +321,8 @@ public final class CustomMenusWiring {
                 (player, slot) -> gridView.captureHeldItem(player, BukkitRefs.toRef(player), slot),
                 menusDir,
                 scheduler,
-                messages);
+                messages,
+                openedListener);
 
         // The open commands a menu declares in its `command {}` block are built once here, from this first load,
         // and handed back for the bootstrap to register at the LifecycleEvents.COMMANDS event. Brigadier only
@@ -337,7 +340,8 @@ public final class CustomMenusWiring {
                 new MenuOpenerInteractListener(menus, nameSupplier, openerItems),
                 new MenuOpenerJoinListener(openerSupplier, openerItems),
                 new MenuSwapListener(menus, swapMenuSupplier, nameSupplier),
-                new MenuEditLockListener(editLocks));
+                new MenuEditLockListener(editLocks),
+                openedListener);
         return new Wired(commands, nameSupplier, listeners, reload);
     }
 
