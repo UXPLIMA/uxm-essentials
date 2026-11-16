@@ -47,6 +47,7 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 configurate-yaml = { module = "org.spongepowered:configurate-yaml", version.ref = "configurate" }
 gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
 slf4j-api = { module = "org.slf4j:slf4j-api", version.ref = "slf4j" }
+slf4j-jdk14 = { module = "org.slf4j:slf4j-jdk14", version.ref = "slf4j" }
 velocity-api = { module = "com.velocitypowered:velocity-api", version.ref = "velocity" }
 luckperms-api = { module = "net.luckperms:api", version.ref = "luckperms" }
 jda = { module = "net.dv8tion:JDA", version.ref = "jda" }
