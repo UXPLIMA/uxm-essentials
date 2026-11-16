@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -990,8 +991,19 @@ class CrossServerTeleportTest {
 
         @Override
         public WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel) {
+            return begin(who, kind, onComplete, (CancelCause cause) -> onCancel.run(), onCancel);
+        }
+
+        @Override
+        public WarmupHandle begin(
+                PlayerRef who,
+                WarmupKind kind,
+                Runnable onComplete,
+                Consumer<CancelCause> onCancel,
+                Runnable onSuperseded) {
             if (holdWarmups) {
-                heldWarmups.add(new Runnable[] {onComplete, onCancel});
+                // The held cancel is a step off the origin block.
+                heldWarmups.add(new Runnable[] {onComplete, () -> onCancel.accept(CancelCause.MOVED)});
                 return new RefusedWarmup();
             }
             onComplete.run();

@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * return. They own the <b>move-cancels-warmup</b> invariant ({@link PlayerMoveEvent} compares block
  * coordinates and flips the pending warmup), the optional damage- and interact-cancel axes, the
  * {@code /back} capture for both deaths and vanilla teleports (gated by the {@link BackCapturePolicy} so
- * an ender pearl does not clobber the return point), and the per-player cleanup on quit. Each handler is
+ * an ender pearl does not clobber the return point), and cancelling a warmup on quit. Each handler is
  * cheap-rejection-first: a move by a player with no warmup, or within the same block without a turn that
  * rotate-cancel would act on, never reaches the tracker.
  *
@@ -107,7 +107,7 @@ public final class TeleportListeners implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        warmupTracker.forget(event.getPlayer().getUniqueId());
+        warmupTracker.quit(event.getPlayer().getUniqueId());
     }
 
     private static TeleportCauseCategory categoryOf(PlayerTeleportEvent.TeleportCause cause) {
