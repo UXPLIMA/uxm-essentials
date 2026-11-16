@@ -10,6 +10,7 @@ import java.util.stream.Collectors;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -63,6 +64,7 @@ public final class WorldTeleportService {
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final WorldHops hops;
+    private final Logger log;
 
     public WorldTeleportService(
             WorldRepository repository,
@@ -75,7 +77,8 @@ public final class WorldTeleportService {
             Notifier notifier,
             Scheduler scheduler,
             PlayerLookup players,
-            WorldHops hops) {
+            WorldHops hops,
+            Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.engine = Objects.requireNonNull(engine, "engine");
         this.policy = Objects.requireNonNull(policy, "policy");
@@ -87,6 +90,7 @@ public final class WorldTeleportService {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.players = Objects.requireNonNull(players, "players");
         this.hops = Objects.requireNonNull(hops, "hops");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Self-service entry to a world of this backend, or of the one backend that runs a world of that name. */
@@ -116,11 +120,9 @@ public final class WorldTeleportService {
             return Result.err(denied.get());
         }
         BigDecimal fee = world.settings().get(WorldProperties.ENTRY_FEE);
+        // Whether the player can pay is answered by the debit itself, off the tick, since reading a balance can reach
+        // the database.
         boolean charged = fee.signum() > 0 && !permissions.has(who, WorldAccessPolicy.BYPASS_NODE);
-        if (charged && !entryFee.canAfford(who, fee)) {
-            notify(who, WorldsMessageKey.WORLD_ENTER_FEE_INSUFFICIENT, feePlaceholders(target, fee));
-            return Result.err(WorldError.ENTRY_FEE_UNAFFORDABLE);
-        }
         return handOff(who, target, fee, charged);
     }
 
@@ -169,10 +171,16 @@ public final class WorldTeleportService {
                     actor, target, WorldError.DESTINATION_UNRESOLVED, WorldsMessageKey.WORLD_TP_DESTINATION_UNRESOLVED);
         }
         Position spawn = pos.get();
-        onPlayerThread(subject, () -> teleporter.teleport(subject, spawn, WorldTeleportCause.ADMIN));
-        if (!actor.equals(subject)) {
-            notify(actor, WorldsMessageKey.WORLD_TP_OTHER, Map.of("player", subject.name(), "world", target.value()));
-        }
+        onPlayerThread(subject, () -> {
+            teleporter.teleport(subject, spawn, WorldTeleportCause.ADMIN);
+            // Told only once the subject was there to send, not for a player who left before the hop.
+            if (!actor.equals(subject)) {
+                notify(
+                        actor,
+                        WorldsMessageKey.WORLD_TP_OTHER,
+                        Map.of("player", subject.name(), "world", target.value()));
+            }
+        });
         return Result.ok();
     }
 
@@ -199,11 +207,9 @@ public final class WorldTeleportService {
             return Result.err(denied.get());
         }
         BigDecimal fee = world.world().settings().get(WorldProperties.ENTRY_FEE);
+        // Whether the player can pay is answered by the debit itself, off the tick, since reading a balance can reach
+        // the database.
         boolean charged = fee.signum() > 0 && !permissions.has(who, WorldAccessPolicy.BYPASS_NODE);
-        if (charged && !entryFee.canAfford(who, fee)) {
-            notify(who, WorldsMessageKey.WORLD_ENTER_FEE_INSUFFICIENT, feePlaceholders(target, fee));
-            return Result.err(WorldError.ENTRY_FEE_UNAFFORDABLE);
-        }
         return dispatch(who, world, () -> sendRemote(who, who, world, false, fee, charged));
     }
 
@@ -282,20 +288,73 @@ public final class WorldTeleportService {
                     who, target, WorldError.DESTINATION_UNRESOLVED, WorldsMessageKey.WORLD_TP_DESTINATION_UNRESOLVED);
         }
         Position spawn = pos.get();
-        onPlayerThread(who, () -> {
-            boolean accepted = teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN);
-            if (accepted && charged) {
-                entryFee.charge(who, fee);
-                notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
-            }
-        });
+        if (!charged) {
+            onPlayerThread(who, () -> teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN));
+            return Result.ok();
+        }
+        try {
+            scheduler.async(() -> chargeThenLaunch(who, target, spawn, fee));
+        } catch (RuntimeException refused) {
+            // The lane refuses work while the plugin stops; nothing has been charged and nobody is moved.
+            return Result.err(WorldError.UNREACHABLE);
+        }
         return Result.ok();
+    }
+
+    /**
+     * Off the tick: take the entry fee, then launch on the player's thread. The debit writes the balance, so it never
+     * runs on a tick thread, and it comes first so a player who cannot pay is never moved. A launch that is refused,
+     * or a player who left before it, gets the fee back.
+     */
+    private void chargeThenLaunch(PlayerRef who, WorldName target, Position spawn, BigDecimal fee) {
+        if (!entryFee.charge(who, fee)) {
+            notify(who, WorldsMessageKey.WORLD_ENTER_FEE_INSUFFICIENT, feePlaceholders(target, fee));
+            return;
+        }
+        String currency = entryFee.currencyId();
+        Runnable refund = () -> refundOffTick(who, target, fee, currency);
+        scheduler.onEntity(
+                who,
+                () -> {
+                    boolean accepted;
+                    try {
+                        accepted = teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN);
+                    } catch (RuntimeException failure) {
+                        refund.run();
+                        throw failure;
+                    }
+                    if (accepted) {
+                        notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
+                    } else {
+                        refund.run();
+                    }
+                },
+                refund);
+    }
+
+    private void refundOffTick(PlayerRef who, WorldName target, BigDecimal fee, String currency) {
+        Runnable credit = () -> {
+            if (!entryFee.refund(who, fee, currency)) {
+                log.warn(
+                        "event=world_entry_fee_not_refunded player={} world={} amount={} currency={}",
+                        who.uuid(),
+                        target.value(),
+                        fee.toPlainString(),
+                        currency);
+            }
+        };
+        try {
+            scheduler.async(credit);
+        } catch (RuntimeException refused) {
+            // A stopping plugin still owes the player the fee; crediting here is better than losing it.
+            credit.run();
+        }
     }
 
     /**
      * Run a launch on {@code who}'s own thread. The world is resolved and loaded on the global thread, but the
      * launch reads where the player stands and what they may do, which only their thread may ask. A player who left
-     * before the hop lands is neither moved nor charged.
+     * before the hop lands is not moved.
      */
     private void onPlayerThread(PlayerRef who, Runnable launch) {
         if (scheduler.ownsEntity(who)) {

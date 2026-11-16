@@ -149,7 +149,8 @@ class CrossServerWorldTest {
                 notifier.notifier(),
                 scheduler,
                 online,
-                hops);
+                hops,
+                log);
     }
 
     private Result<Unit, WorldError> spawnInArena() {
@@ -339,18 +340,50 @@ class CrossServerWorldTest {
     }
 
     @Test
-    void aLocalEntryMovesThePlayerAndThenTakesTheFee() {
+    void aLocalEntryTakesTheFeeOffTheTickAndThenMovesThePlayer() {
         table.put(LOBBY, arena(FEE));
         lobbyEngine.onDisk(ARENA, true, SPAWN);
+        List<Runnable> lane = new ArrayList<>();
+        scheduler.asyncOn(lane::add);
 
         lobby(true).spawn(ALEX, ARENA);
+        assertThat(purse.charges).isZero();
+        assertThat(moves.teleported).isEmpty();
 
-        assertThat(moves.teleported).containsExactly("Alex->arena as SPAWN");
+        List.copyOf(lane).forEach(Runnable::run);
         assertThat(purse.wallet).isEqualByComparingTo("90");
+        assertThat(moves.teleported).containsExactly("Alex->arena as SPAWN");
+        assertThat(notifier.keys()).contains("world.enter.fee-charged");
     }
 
     @Test
-    void aPlayerWhoLeftBeforeTheirLocalEntryReachedThemIsNeitherMovedNorCharged() {
+    void aPlayerWhoCannotPayIsToldSoAndNotMoved() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        purse.wallet = new BigDecimal("5");
+
+        lobby(true).spawn(ALEX, ARENA);
+
+        assertThat(moves.teleported).isEmpty();
+        assertThat(purse.wallet).isEqualByComparingTo("5");
+        assertThat(notifier.keys()).contains("world.enter.fee-insufficient").doesNotContain("world.enter.fee-charged");
+    }
+
+    @Test
+    void aRefusedLaunchGivesTheFeeBack() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        moves.refusesLaunch = true;
+
+        lobby(true).spawn(ALEX, ARENA);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).doesNotContain("world.enter.fee-charged");
+    }
+
+    @Test
+    void aPlayerWhoLeftBeforeTheirLocalEntryReachedThemIsNotMovedAndGetsTheFeeBack() {
         table.put(LOBBY, arena(FEE));
         lobbyEngine.onDisk(ARENA, true, SPAWN);
         scheduler.offline(ALEX);
@@ -358,19 +391,24 @@ class CrossServerWorldTest {
         lobby(true).spawn(ALEX, ARENA);
 
         assertThat(moves.teleported).isEmpty();
-        assertThat(purse.charges).isZero();
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(notifier.keys()).doesNotContain("world.enter.fee-charged");
     }
 
     @Test
-    void aStaffSendToAWorldHereReachesAPlayerOnlyWhileTheyAreOnline() {
+    void aStaffSendReachesAndIsReportedOnlyForAPlayerStillOnline() {
         table.put(LOBBY, arena(BigDecimal.ZERO));
         lobbyEngine.onDisk(ARENA, true, SPAWN);
         scheduler.offline(SAM);
 
         lobby(true).forcedHere(ALEX, SAM, ARENA);
-        lobby(true).forcedHere(ALEX, ALEX, ARENA);
+        assertThat(moves.teleported).isEmpty();
+        assertThat(notifier.keys()).doesNotContain("world.tp.other");
 
-        assertThat(moves.teleported).containsExactly("Alex->arena as ADMIN");
+        scheduler.online(SAM);
+        lobby(true).forcedHere(ALEX, SAM, ARENA);
+        assertThat(moves.teleported).containsExactly("Sam->arena as ADMIN");
+        assertThat(notifier.keys()).contains("world.tp.other");
     }
 
     @Test
@@ -451,9 +489,13 @@ class CrossServerWorldTest {
         final List<String> made = new ArrayList<>();
         final List<String> teleported = new ArrayList<>();
         boolean refuses;
+        boolean refusesLaunch;
 
         @Override
         public boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause) {
+            if (refusesLaunch) {
+                return false;
+            }
             teleported.add(who.name() + "->" + to.world().name() + " as " + cause);
             return true;
         }

@@ -38,6 +38,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
@@ -279,6 +280,8 @@ public final class TeleportWiring {
                 warpRespawnLocator,
                 running,
                 rtp.warmup(),
+                rtp.areaSource(),
+                kernel.scheduler(),
                 graceGuard,
                 visibility);
     }
@@ -707,6 +710,8 @@ public final class TeleportWiring {
             MutableWarpRespawnLocator warpRespawnLocator,
             AtomicBoolean running,
             @Nullable RtpPoolWarmup poolWarmup,
+            BukkitRtpAreaSource rtpAreas,
+            Scheduler scheduler,
             ArrivalGraceGuard graceGuard,
             MutableRequestVisibility requestVisibility) {
 
@@ -719,16 +724,20 @@ public final class TeleportWiring {
             Objects.requireNonNull(homeRespawnLocator, "homeRespawnLocator");
             Objects.requireNonNull(warpRespawnLocator, "warpRespawnLocator");
             Objects.requireNonNull(running, "running");
+            Objects.requireNonNull(rtpAreas, "rtpAreas");
+            Objects.requireNonNull(scheduler, "scheduler");
             Objects.requireNonNull(graceGuard, "graceGuard");
             Objects.requireNonNull(requestVisibility, "requestVisibility");
         }
 
         /**
-         * Arm the expiry sweep; call after the listeners and commands are registered. Touches no world, so it is
-         * safe on the enable thread even though the plugin enables before the worlds exist.
+         * Arm the expiry sweep and the RTP border reads; call after the listeners and commands are registered. Neither
+         * touches a world here, so it is safe on the enable thread even though the plugin enables before the worlds
+         * exist: the border reads run on the global thread and pick each world up once it is loaded.
          */
         public void startBackgroundWork() {
             expirySweep.start();
+            rtpAreas.startBorderRefresh(scheduler);
         }
 
         /**
@@ -748,6 +757,7 @@ public final class TeleportWiring {
         /** Flip the running flag and drain the in-memory stores. Called on module stop. */
         public void stop() {
             running.set(false);
+            rtpAreas.stopBorderRefresh();
             services.drain();
             graceGuard.clear();
         }

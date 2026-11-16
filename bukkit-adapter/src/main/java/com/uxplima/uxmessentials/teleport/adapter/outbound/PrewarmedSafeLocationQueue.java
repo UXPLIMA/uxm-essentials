@@ -139,24 +139,14 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         AtomicBoolean guard = refilling.computeIfAbsent(world.uid(), id -> new AtomicBoolean());
         if (guard.compareAndSet(false, true)) {
-            // The area is bounded by the world border, which only the global thread may read; the searches then run
-            // off the tick against the area read here, and each served location is checked against a fresh one.
-            scheduler.onGlobal(
-                    () -> {
-                        Optional<SafeSearchArea> area = area(world);
-                        scheduler.async(() -> launchSearch(world, area, queue, guard, 0));
-                    },
-                    () -> guard.set(false));
+            scheduler.async(() -> guarded(world, guard, () -> launchSearch(world, queue, guard, 0)));
         }
     }
 
     private void launchSearch(
-            WorldRef world,
-            Optional<SafeSearchArea> area,
-            ConcurrentLinkedQueue<RtpSafeLocation> queue,
-            AtomicBoolean guard,
-            int launched) {
+            WorldRef world, ConcurrentLinkedQueue<RtpSafeLocation> queue, AtomicBoolean guard, int launched) {
         RtpWorldSettings current = settings();
+        Optional<SafeSearchArea> area = area(world);
         if (!running.getAsBoolean()
                 || queue.size() >= current.targetSize()
                 || launched >= current.targetSize()
@@ -166,7 +156,8 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         try {
             var ignored = search.search(area.get(), current.searchBudget())
-                    .thenAccept(found -> afterSearch(world, area, queue, guard, launched, found));
+                    .thenAccept(
+                            found -> guarded(world, guard, () -> afterSearch(world, queue, guard, launched, found)));
         } catch (RuntimeException failure) {
             log.warn(
                     "rtp refill search failed to start for world {}: {}",
@@ -178,7 +169,6 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     private void afterSearch(
             WorldRef world,
-            Optional<SafeSearchArea> area,
             ConcurrentLinkedQueue<RtpSafeLocation> queue,
             AtomicBoolean guard,
             int launched,
@@ -189,7 +179,20 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             // batch is flushed off-tick when this refill cycle ends (finishRefill), never one row per candidate.
             poolSink.record(RtpColumn.of(location));
         });
-        launchSearch(world, area, queue, guard, launched + 1);
+        launchSearch(world, queue, guard, launched + 1);
+    }
+
+    /**
+     * Run one step of a refill cycle, releasing the world's refill guard if it throws: the guard is otherwise only
+     * released at the end of the cycle, and a guard left set would stop that world from ever refilling again.
+     */
+    private void guarded(WorldRef world, AtomicBoolean guard, Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException failure) {
+            guard.set(false);
+            log.warn("rtp refill failed for world {}: {}", world.name(), String.valueOf(failure.getMessage()));
+        }
     }
 
     private void finishRefill(
