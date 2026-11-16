@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.OptionalLong;
+import java.util.UUID;
 import java.util.function.Consumer;
+import java.util.stream.IntStream;
 
 import org.bukkit.plugin.messaging.PluginMessageListener;
 
@@ -15,7 +17,11 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.network.BalanceChanged;
+import com.uxplima.uxmessentials.shared.network.BanChanged;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.HomeChanged;
+import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +38,7 @@ class PluginMessagingTransportTest {
     private static final long START = 1_700_000_000_000L;
     private static final String SECRET = "0123456789abcdef0123456789abcdef-network";
     private static final byte[] FRAME = NetworkMessageCodec.encode(new ServerPing("survival-1", START, 7L));
+    private static final int QUEUE = 16;
 
     private long now = START;
     private final RecordingLogger log = new RecordingLogger();
@@ -40,8 +47,30 @@ class PluginMessagingTransportTest {
     private final PluginMessagingTransport transport = transport(pluginChannel, SECRET);
 
     private PluginMessagingTransport transport(FakeChannel channel, String secret) {
+        return transport(channel, secret, new ImmediateScheduler());
+    }
+
+    private PluginMessagingTransport transport(FakeChannel channel, String secret, Scheduler scheduler) {
         return new PluginMessagingTransport(
-                channel, new ImmediateScheduler(), CHANNEL, 16, WINDOW, BusSecret.of(secret), log, () -> now);
+                channel, scheduler, CHANNEL, QUEUE, WINDOW, BusSecret.of(secret), log, () -> now);
+    }
+
+    /** What the frames the carrier sent say, as a peer decodes them. */
+    private List<NetworkMessage> sentMessages() {
+        FakeChannel peerChannel = new FakeChannel();
+        PluginMessagingTransport peer = transport(peerChannel, SECRET);
+        List<byte[]> peerDelivered = new ArrayList<>();
+        peer.start(peerDelivered::add);
+        pluginChannel.sent.forEach(bytes -> peer.received(CHANNEL, bytes));
+        return peerDelivered.stream().map(NetworkMessageCodec::decode).toList();
+    }
+
+    private static byte[] home(int index) {
+        return NetworkMessageCodec.encode(new HomeChanged("survival-1", new UUID(0L, index)));
+    }
+
+    private static byte[] ping(long sentAt) {
+        return NetworkMessageCodec.encode(new ServerPing("survival-1", sentAt, 7L));
     }
 
     /** What another backend with {@code secret} puts on the wire for {@code frame}. */
@@ -158,7 +187,8 @@ class PluginMessagingTransportTest {
     void aSendWithNobodyOnlineIsReportedAndTheNextPlayerCarriesTheQueue() {
         transport.start(delivered::add);
 
-        transport.send(FRAME);
+        byte[] first = home(0);
+        transport.send(first);
         assertThat(transport.link().waitingForPlayer()).isTrue();
 
         pluginChannel.online = true;
@@ -172,7 +202,7 @@ class PluginMessagingTransportTest {
         List<byte[]> peerDelivered = new ArrayList<>();
         peer.start(peerDelivered::add);
         pluginChannel.sent.forEach(bytes -> peer.received(CHANNEL, bytes));
-        assertThat(peerDelivered).containsExactly(FRAME, second);
+        assertThat(peerDelivered).containsExactly(first, second);
     }
 
     @Test
@@ -189,6 +219,91 @@ class PluginMessagingTransportTest {
                 .singleElement()
                 .satisfies(sent -> assertThat(sent).hasSize(BusChannel.MAX_FRAME_BYTES));
         assertThat(log.lines).singleElement().asString().contains(String.valueOf(BusChannel.MAX_FRAME_BYTES + 1));
+    }
+
+    @Test
+    void aBurstOverTheQueueDropsOrdinaryFramesKeepsBansAndBalancesAndIsReportedOncePerMinute() {
+        transport.start(delivered::add);
+        BanChanged ban = new BanChanged("survival-1", new UUID(1L, 1L));
+        BalanceChanged balance = new BalanceChanged("survival-1", new UUID(1L, 2L), "coins");
+        transport.send(NetworkMessageCodec.encode(ban));
+        transport.send(NetworkMessageCodec.encode(balance));
+        for (int index = 0; index < 20; index++) {
+            transport.send(home(index));
+        }
+
+        assertThat(log.lines)
+                .singleElement()
+                .asString()
+                .contains("HOME_CHANGED", "of " + QUEUE + " frames", "1 dropped so far");
+
+        now = START + DroppedFrameReport.INTERVAL_MILLIS;
+        pluginChannel.online = true;
+        transport.send(home(20));
+
+        assertThat(log.lines).hasSize(2).last().asString().contains("7 dropped so far");
+        List<NetworkMessage> sent = sentMessages();
+        assertThat(sent).hasSize(QUEUE).startsWith(ban, balance);
+        assertThat(sent.subList(2, QUEUE))
+                .extracting(message -> ((HomeChanged) message).owner())
+                .containsExactly(IntStream.rangeClosed(7, 20)
+                        .mapToObj(index -> new UUID(0L, index))
+                        .toArray(UUID[]::new));
+    }
+
+    @Test
+    void aChangeArrivingAtAQueueFullOfProtectedFramesIsTheOneDropped() {
+        transport.start(delivered::add);
+        for (int index = 0; index < QUEUE; index++) {
+            transport.send(NetworkMessageCodec.encode(new BanChanged("survival-1", new UUID(1L, index))));
+        }
+
+        transport.send(home(0));
+        pluginChannel.online = true;
+        transport.send(NetworkMessageCodec.encode(new BanChanged("survival-1", new UUID(1L, QUEUE))));
+
+        List<NetworkMessage> sent = sentMessages();
+        assertThat(sent).hasSize(QUEUE).allMatch(BanChanged.class::isInstance);
+        assertThat(((BanChanged) sent.getLast()).target()).isEqualTo(new UUID(1L, QUEUE));
+        assertThat(log.lines).hasSize(1).first().asString().contains("HOME_CHANGED");
+    }
+
+    @Test
+    void onlyTheNewestHeartbeatWaitsAndAHeartbeatIsNeverReportedAsDropped() {
+        transport.start(delivered::add);
+        transport.send(ping(START));
+        transport.send(home(0));
+        for (int index = 1; index < QUEUE + 4; index++) {
+            transport.send(ping(START + index));
+        }
+
+        pluginChannel.online = true;
+        transport.send(ping(START + 100));
+
+        assertThat(sentMessages())
+                .containsExactly(
+                        new HomeChanged("survival-1", new UUID(0L, 0)), new ServerPing("survival-1", START + 100, 7L));
+        assertThat(log.lines).isEmpty();
+    }
+
+    @Test
+    void framesSentBeforeTheFlushRunsShareOneFlush() {
+        ManualScheduler scheduler = new ManualScheduler();
+        PluginMessagingTransport batched = transport(pluginChannel, SECRET, scheduler);
+        batched.start(delivered::add);
+        pluginChannel.online = true;
+
+        for (int index = 0; index < 5; index++) {
+            batched.send(home(index));
+        }
+        assertThat(scheduler.global).hasSize(1);
+        scheduler.runGlobal();
+        assertThat(pluginChannel.sent).hasSize(5);
+
+        batched.send(home(5));
+        assertThat(scheduler.global).hasSize(1);
+        scheduler.runGlobal();
+        assertThat(pluginChannel.sent).hasSize(6);
     }
 
     /** The server side of the channel: whether it is registered, and an online player when one is set. */
@@ -224,6 +339,43 @@ class PluginMessagingTransportTest {
         @Override
         public void onGlobal(Runnable task) {
             task.run();
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void async(Runnable task) {
+            task.run();
+        }
+    }
+
+    /** Keeps global tasks until the test runs them, as a busy global thread would. */
+    private static final class ManualScheduler implements Scheduler {
+
+        final List<Runnable> global = new ArrayList<>();
+
+        void runGlobal() {
+            List<Runnable> due = List.copyOf(global);
+            global.clear();
+            due.forEach(Runnable::run);
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            task.run();
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            global.add(task);
         }
 
         @Override
