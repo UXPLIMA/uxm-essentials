@@ -12,6 +12,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.BukkitDomainGate;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridges;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.VetoRegistry;
@@ -188,7 +189,9 @@ final class KernelWiring {
         Objects.requireNonNull(sharedLedger, "sharedLedger");
 
         Scheduler scheduler = new FoliaScheduler(plugin);
-        Permissions permissions = new BukkitPermissions(metaSource(log));
+        // Read on the player's own thread: most permission questions come from use cases on the async lane.
+        Permissions permissions = new BukkitPermissions(
+                metaSource(log), OwningThreadReads.onServer(scheduler, Bukkit::isPrimaryThread, log));
         Clock clock = Clock.systemUTC();
         Optional<NetworkClaims> networkClaims =
                 sharedLedger.map(ledger -> new NetworkClaims(ledger, scheduler, clock, log));

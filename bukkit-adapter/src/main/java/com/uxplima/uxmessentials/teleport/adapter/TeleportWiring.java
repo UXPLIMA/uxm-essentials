@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.claim.ClaimServiceImpl;
@@ -38,6 +39,7 @@ import com.uxplima.uxmessentials.shared.application.port.ClaimService;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
@@ -194,7 +196,7 @@ public final class TeleportWiring {
         // Reads an installed combat plugin's tag so a losing fight cannot be escaped with /home or /tpa. We own
         // no combat timer: with the switch off or with no supported plugin installed this is NEVER, and every
         // teleport route behaves exactly as it did before.
-        CombatGate combatGate = combatGate(config, plugin.getServer(), kernel.log());
+        CombatGate combatGate = combatGate(config, plugin.getServer(), kernel.scheduler(), kernel.log());
         // The home-respawn seam resolves to empty until the homes context lands and rebinds it (soft couple),
         // so a HOME step in a configured respawn chain falls through whenever homes is disabled.
         MutableHomeRespawnLocator homeRespawnLocator = new MutableHomeRespawnLocator();
@@ -646,7 +648,7 @@ public final class TeleportWiring {
      * with no combat plugin would only add a plugin-manager lookup to every teleport for an answer that can
      * never be anything but false, so the decision is made once here rather than on each call.
      */
-    private static CombatGate combatGate(ConfigStore config, Server server, Logger log) {
+    private static CombatGate combatGate(ConfigStore config, Server server, Scheduler scheduler, Logger log) {
         if (!config.getBoolean("combat.block-teleport", true)) {
             return CombatGate.NEVER;
         }
@@ -654,7 +656,7 @@ public final class TeleportWiring {
             return CombatGate.NEVER;
         }
         log.info("event=combat_gate_bound providers={}", ForeignCombatGate.supportedPlugins());
-        return new ForeignCombatGate(server, log);
+        return new ForeignCombatGate(server, OwningThreadReads.onServer(scheduler, server::isPrimaryThread, log), log);
     }
 
     private static List<Listener> listeners(

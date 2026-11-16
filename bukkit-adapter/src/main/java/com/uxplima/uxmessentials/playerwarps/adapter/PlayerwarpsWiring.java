@@ -85,6 +85,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
@@ -221,7 +222,12 @@ public final class PlayerwarpsWiring {
         // gate refuses a remote warp before the charge rather than starting a broken local hop.
         String localServerId = bus.publisher().serverId();
         // The use gate judges a local warp's landing and the hop resolver a remote one's, on the backend holding it.
-        WarpSafetyChecker safety = new BukkitWarpSafetyChecker();
+        // The gate runs on the async lane after its database reads, so the blocks are read on the landing's own
+        // region thread.
+        BukkitWarpSafetyChecker blocks = new BukkitWarpSafetyChecker();
+        OwningThreadReads reads =
+                OwningThreadReads.onServer(kernel.scheduler(), plugin.getServer()::isPrimaryThread, kernel.log());
+        WarpSafetyChecker safety = position -> reads.at(position, () -> blocks.isSafe(position), false);
         PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(
                 repository,
                 teleporter,

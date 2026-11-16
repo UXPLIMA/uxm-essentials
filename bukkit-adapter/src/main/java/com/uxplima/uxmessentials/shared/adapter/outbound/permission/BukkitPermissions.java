@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.bukkit.permissions.PermissionAttachmentInfo;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
@@ -25,26 +26,31 @@ import org.jspecify.annotations.Nullable;
  * value, when present, is one more input to the same fold. An offline player cannot be
  * permission-checked, so {@code has} returns {@code false} and {@code resolveQuota} returns the config
  * default, the canonical conservative behaviour.
+ *
+ * <p>Both are read on the player's own thread through {@link OwningThreadReads}: a use case on the async lane asks
+ * them after its database reads, and the player's permissions are theirs to read. A read that cannot reach the player
+ * in time answers as for an offline player.
  */
 @NullMarked
 public final class BukkitPermissions implements Permissions {
 
     private final MetaSource meta;
-
-    /** Build with no meta source, pure Bukkit-permission resolution. */
-    public BukkitPermissions() {
-        this(MetaSource.none());
-    }
+    private final OwningThreadReads reads;
 
     /** Build with a meta source (the LuckPerms-backed one when LuckPerms is present). */
-    public BukkitPermissions(MetaSource meta) {
+    public BukkitPermissions(MetaSource meta, OwningThreadReads reads) {
         this.meta = Objects.requireNonNull(meta, "meta");
+        this.reads = Objects.requireNonNull(reads, "reads");
     }
 
     @Override
     public boolean has(PlayerRef who, String node) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
+        return reads.forPlayer(who, () -> hasNow(who, node), false);
+    }
+
+    private static boolean hasNow(PlayerRef who, String node) {
         Player player = Bukkit.getPlayer(who.uuid());
         return player != null && CatalogPermissionCheck.has(player, node);
     }
@@ -53,8 +59,12 @@ public final class BukkitPermissions implements Permissions {
     public QuotaResult resolveQuota(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(family, "family");
-        QuotaNodeReducer reducer = new QuotaNodeReducer(family, world == null ? null : world.name());
-        reducer.seedDefault(configDefault);
+        return reads.forPlayer(
+                who, () -> resolveNow(who, family, world, configDefault), offlineQuota(family, world, configDefault));
+    }
+
+    private QuotaResult resolveNow(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+        QuotaNodeReducer reducer = reducer(family, world, configDefault);
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null) {
             return reducer.result();
@@ -62,6 +72,16 @@ public final class BukkitPermissions implements Permissions {
         foldEffectiveNodes(player, reducer);
         foldMeta(who, family, world, reducer);
         return reducer.result();
+    }
+
+    private static QuotaResult offlineQuota(QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+        return reducer(family, world, configDefault).result();
+    }
+
+    private static QuotaNodeReducer reducer(QuotaFamily family, @Nullable WorldRef world, long configDefault) {
+        QuotaNodeReducer reducer = new QuotaNodeReducer(family, world == null ? null : world.name());
+        reducer.seedDefault(configDefault);
+        return reducer;
     }
 
     private static void foldEffectiveNodes(Player player, QuotaNodeReducer reducer) {
