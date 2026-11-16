@@ -3,9 +3,11 @@ package com.uxplima.uxmessentials.persistence.economy;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.EconomyPendingPhysicalTransactions.ECONOMY_PENDING_PHYSICAL_TRANSACTIONS;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.function.ToIntFunction;
 
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -15,8 +17,12 @@ import org.jspecify.annotations.NullMarked;
 /**
  * jOOQ-backed {@link PendingTransactionRepository} over the generated
  * {@code ECONOMY_PENDING_PHYSICAL_TRANSACTIONS} table. Every statement is typed jOOQ DSL, no
- * string-concatenated SQL. The take-and-clear runs as one transaction so a credit replayed on join is read
- * and deleted atomically and cannot be applied twice.
+ * string-concatenated SQL.
+ *
+ * <p>The take reads the player's rows first, then deletes them one by one by id and hands over only the rows whose
+ * own delete removed them. Two takes running at once (a quick rejoin, or two servers on one database) can both read
+ * the same rows, but each row is deleted by exactly one of them, so no credit is paid twice on any backend's
+ * isolation level. A credit queued after the read has a new id, so the take leaves it for the next one.
  */
 @NullMarked
 public final class JooqPendingTransactionRepository extends JooqRepository implements PendingTransactionRepository {
@@ -48,28 +54,37 @@ public final class JooqPendingTransactionRepository extends JooqRepository imple
     @Override
     public List<PendingTransaction> getAndClearPending(UUID playerUuid) {
         Objects.requireNonNull(playerUuid, "playerUuid");
+        List<PendingTransaction> read = read(dsl -> dsl.select(
+                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID,
+                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID,
+                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY,
+                        ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT)
+                .from(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
+                .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.eq(playerUuid.toString()))
+                .orderBy(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CREATED_AT, ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID)
+                .fetch(row -> new PendingTransaction(
+                        row.value1(), UUID.fromString(row.value2()), row.value3(), row.value4())));
+        if (read.isEmpty()) {
+            return List.of();
+        }
+        return write(dsl -> claim(
+                read,
+                id -> dsl.deleteFrom(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
+                        .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID.eq(id))
+                        .execute()));
+    }
 
-        return write(dsl -> {
-            List<PendingTransaction> pending = dsl.select(
-                            ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID,
-                            ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID,
-                            ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY,
-                            ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT)
-                    .from(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
-                    .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.eq(playerUuid.toString()))
-                    .fetch()
-                    .map(row -> new PendingTransaction(
-                            row.get(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.ID),
-                            UUID.fromString(row.get(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID)),
-                            row.get(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.CURRENCY),
-                            row.get(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.AMOUNT)));
-
-            if (!pending.isEmpty()) {
-                dsl.deleteFrom(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS)
-                        .where(ECONOMY_PENDING_PHYSICAL_TRANSACTIONS.PLAYER_UUID.eq(playerUuid.toString()))
-                        .execute();
+    /**
+     * Keep the rows whose own delete removed exactly one row. A row another take deleted first answers zero and is
+     * left out, because that take is the one paying it.
+     */
+    static List<PendingTransaction> claim(List<PendingTransaction> rows, ToIntFunction<String> deleteById) {
+        List<PendingTransaction> claimed = new ArrayList<>(rows.size());
+        for (PendingTransaction row : rows) {
+            if (deleteById.applyAsInt(row.id()) == 1) {
+                claimed.add(row);
             }
-            return pending;
-        });
+        }
+        return List.copyOf(claimed);
     }
 }

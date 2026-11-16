@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -22,8 +23,10 @@ import org.jspecify.annotations.NullMarked;
  * offline inventory, so its credits wait in the pending queue).
  *
  * <p>Runs on the async lane: the queue is a database table, and the provider marshals a physical credit onto the
- * player's own thread by itself. The rows leave the queue in one atomic take, so a credit that does not land is put
- * back for the next join rather than dropped, and each queued amount is paid at most once.
+ * player's own thread by itself. Each queued row is handed to exactly one take, so two deliveries at once (a quick
+ * rejoin, two servers on one database) never pay the same row twice. A credit that does not land is put back for
+ * the next join rather than dropped. A player who already left by the time delivery runs is skipped and their rows
+ * stay queued, since a physical credit could not reach them and the notice would go nowhere.
  */
 @NullMarked
 public final class DeliverPendingCredits {
@@ -31,24 +34,33 @@ public final class DeliverPendingCredits {
     private final EconomyProvider economy;
     private final PendingTransactionRepository pending;
     private final EconomyNotifier notifier;
+    private final PlayerLookup players;
     private final Logger log;
 
     public DeliverPendingCredits(
-            EconomyProvider economy, PendingTransactionRepository pending, EconomyNotifier notifier, Logger log) {
+            EconomyProvider economy,
+            PendingTransactionRepository pending,
+            EconomyNotifier notifier,
+            PlayerLookup players,
+            Logger log) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.pending = Objects.requireNonNull(pending, "pending");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
+        this.players = Objects.requireNonNull(players, "players");
         this.log = Objects.requireNonNull(log, "log");
     }
 
     /** Take {@code player}'s queued credits and pay each currency's total; off the tick. */
     public void deliver(PlayerRef player) {
         Objects.requireNonNull(player, "player");
+        if (!players.isOnline(player.uuid())) {
+            return;
+        }
         List<PendingTransaction> queued;
         try {
             queued = pending.getAndClearPending(player.uuid());
         } catch (RuntimeException failure) {
-            // The take is atomic, so the rows are still queued and the next join tries again.
+            // Only rows this take deleted are handed over, so a failed take leaves them queued for the next join.
             log.error("event=pending_credit_read_failed player=" + player.uuid(), failure);
             return;
         }

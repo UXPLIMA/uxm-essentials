@@ -5,21 +5,25 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import org.junit.jupiter.api.Test;
 
 /**
- * Queued credits leave the queue in one take, so every amount must end up either paid exactly once or back on the
- * queue for the next join, in the currency it was queued in.
+ * Every queued amount must end up either paid exactly once or back on the queue for the next join, in the currency
+ * it was queued in.
  */
 class DeliverPendingCreditsTest {
 
@@ -40,7 +44,9 @@ class DeliverPendingCreditsTest {
                         return key.key();
                     },
                     (viewer, text) -> {}),
+            new Online(),
             log);
+    private final Set<UUID> online = new HashSet<>(Set.of(ALEX.uuid()));
 
     @Test
     void queuedCreditsArePaidOncePerCurrencyAndLeaveTheQueue() {
@@ -106,7 +112,37 @@ class DeliverPendingCreditsTest {
         assertThat(log.errors()).hasSize(1);
     }
 
-    /** One player's queue as {@code currency=amount} rows, taken whole the way the table's atomic delete does. */
+    @Test
+    void aPlayerWhoLeftBeforeDeliveryKeepsTheirRowsAndIsToldNothing() {
+        queue.queueCredit(ALEX.uuid(), "coins", new BigDecimal("10"));
+        online.remove(ALEX.uuid());
+
+        credits.deliver(ALEX);
+
+        assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("0");
+        assertThat(queue.rows).containsExactly("coins=10");
+        assertThat(notices).isEmpty();
+    }
+
+    private final class Online implements PlayerLookup {
+
+        @Override
+        public Optional<PlayerRef> findOnlineByName(String name) {
+            return Optional.empty();
+        }
+
+        @Override
+        public Optional<PlayerRef> findByUuid(UUID uuid) {
+            return Optional.empty();
+        }
+
+        @Override
+        public boolean isOnline(UUID uuid) {
+            return online.contains(uuid);
+        }
+    }
+
+    /** One player's queue as {@code currency=amount} rows, all taken by one take. */
     private static final class Queue implements PendingTransactionRepository {
 
         final List<String> rows = new ArrayList<>();
