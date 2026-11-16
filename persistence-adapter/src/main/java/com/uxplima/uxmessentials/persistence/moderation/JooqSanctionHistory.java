@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.moderation;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSanctionHistory.MODERATION_SANCTION_HISTORY;
 import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSanctionHistory;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationSanctionHistoryRecord;
+import com.uxplima.uxmessentials.persistence.runtime.IntegrityViolation;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import org.jooq.Condition;
@@ -25,8 +25,6 @@ import org.jooq.Field;
 import org.jooq.Record6;
 import org.jooq.ResultQuery;
 import org.jooq.TableField;
-import org.jooq.exception.DataAccessException;
-import org.jooq.exception.SQLStateClass;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
@@ -48,7 +46,6 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
     /** How often a write whose key another writer took first is tried again with fresh keys. */
     static final int WRITE_ATTEMPTS = 3;
 
-    private static final String INTEGRITY_VIOLATION_SQL_STATE_CLASS = "23";
     private static final String ACTION_BAN = SanctionAction.BAN.name();
     private static final String ACTION_KICK = SanctionAction.KICK.name();
 
@@ -88,7 +85,7 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
                 write(dsl -> insert(dsl, entries));
                 return;
             } catch (PersistenceException collision) {
-                if (!isIntegrityViolation(collision) || attempt >= WRITE_ATTEMPTS) {
+                if (!IntegrityViolation.causedBy(collision) || attempt >= WRITE_ATTEMPTS) {
                     throw collision;
                 }
             }
@@ -236,23 +233,6 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
                 .from(MODERATION_SANCTION_HISTORY)
                 .fetchOne(0, Long.class);
         return (maxId == null ? 0L : maxId) + 1L;
-    }
-
-    /** A key or other constraint clash, by SQL state class 23, or as jOOQ reads SQLite's vendor code. */
-    private static boolean isIntegrityViolation(Throwable failure) {
-        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof DataAccessException access
-                    && access.sqlStateClass() == SQLStateClass.C23_INTEGRITY_CONSTRAINT_VIOLATION) {
-                return true;
-            }
-            if (cause instanceof SQLException sql) {
-                String state = sql.getSQLState();
-                if (state != null && state.startsWith(INTEGRITY_VIOLATION_SQL_STATE_CLASS)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static @org.jspecify.annotations.Nullable String actorUuid(SanctionHistoryEntry entry) {

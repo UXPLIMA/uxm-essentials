@@ -6,7 +6,6 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteQueue.VOTE_Q
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteSiteCooldown.VOTE_SITE_COOLDOWN;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.VoteTotals.VOTE_TOTALS;
 
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -18,6 +17,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.VoteTotalsRecord;
+import com.uxplima.uxmessentials.persistence.runtime.IntegrityViolation;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -49,7 +49,6 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
 
     private static final int PARTY_ROW_ID = 1;
     private static final int ENQUEUE_ATTEMPTS = 3;
-    private static final String INTEGRITY_VIOLATION_SQL_STATE_CLASS = "23";
 
     public JooqVoteRepository(DSLContext dsl) {
         super(dsl);
@@ -108,7 +107,7 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                 });
                 return;
             } catch (PersistenceException collision) {
-                if (!isIntegrityViolation(collision) || attempt == ENQUEUE_ATTEMPTS) {
+                if (!IntegrityViolation.causedBy(collision) || attempt == ENQUEUE_ATTEMPTS) {
                     throw collision;
                 }
             }
@@ -403,19 +402,6 @@ public final class JooqVoteRepository extends JooqRepository implements VoteRepo
                             .where(VOTE_QUEUE.PLAYER.eq(player)))
                     .execute();
         }
-    }
-
-    /** True when {@code failure} (or a cause) is a SQL integrity-constraint violation (SQLState class 23). */
-    private static boolean isIntegrityViolation(Throwable failure) {
-        for (Throwable cause = failure; cause != null; cause = cause.getCause()) {
-            if (cause instanceof SQLException sql) {
-                String state = sql.getSQLState();
-                if (state != null && state.startsWith(INTEGRITY_VIOLATION_SQL_STATE_CLASS)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static QueuedReward selectBatch(DSLContext dsl, PlayerRef player) {
