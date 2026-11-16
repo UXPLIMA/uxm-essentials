@@ -139,14 +139,24 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         AtomicBoolean guard = refilling.computeIfAbsent(world.uid(), id -> new AtomicBoolean());
         if (guard.compareAndSet(false, true)) {
-            scheduler.async(() -> launchSearch(world, queue, guard, 0));
+            // The area is bounded by the world border, which only the global thread may read; the searches then run
+            // off the tick against the area read here, and each served location is checked against a fresh one.
+            scheduler.onGlobal(
+                    () -> {
+                        Optional<SafeSearchArea> area = area(world);
+                        scheduler.async(() -> launchSearch(world, area, queue, guard, 0));
+                    },
+                    () -> guard.set(false));
         }
     }
 
     private void launchSearch(
-            WorldRef world, ConcurrentLinkedQueue<RtpSafeLocation> queue, AtomicBoolean guard, int launched) {
+            WorldRef world,
+            Optional<SafeSearchArea> area,
+            ConcurrentLinkedQueue<RtpSafeLocation> queue,
+            AtomicBoolean guard,
+            int launched) {
         RtpWorldSettings current = settings();
-        Optional<SafeSearchArea> area = area(world);
         if (!running.getAsBoolean()
                 || queue.size() >= current.targetSize()
                 || launched >= current.targetSize()
@@ -156,7 +166,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         try {
             var ignored = search.search(area.get(), current.searchBudget())
-                    .thenAccept(found -> afterSearch(world, queue, guard, launched, found));
+                    .thenAccept(found -> afterSearch(world, area, queue, guard, launched, found));
         } catch (RuntimeException failure) {
             log.warn(
                     "rtp refill search failed to start for world {}: {}",
@@ -168,6 +178,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
 
     private void afterSearch(
             WorldRef world,
+            Optional<SafeSearchArea> area,
             ConcurrentLinkedQueue<RtpSafeLocation> queue,
             AtomicBoolean guard,
             int launched,
@@ -178,7 +189,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             // batch is flushed off-tick when this refill cycle ends (finishRefill), never one row per candidate.
             poolSink.record(RtpColumn.of(location));
         });
-        launchSearch(world, queue, guard, launched + 1);
+        launchSearch(world, area, queue, guard, launched + 1);
     }
 
     private void finishRefill(

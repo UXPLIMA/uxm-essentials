@@ -339,6 +339,41 @@ class CrossServerWorldTest {
     }
 
     @Test
+    void aLocalEntryMovesThePlayerAndThenTakesTheFee() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+
+        lobby(true).spawn(ALEX, ARENA);
+
+        assertThat(moves.teleported).containsExactly("Alex->arena as SPAWN");
+        assertThat(purse.wallet).isEqualByComparingTo("90");
+    }
+
+    @Test
+    void aPlayerWhoLeftBeforeTheirLocalEntryReachedThemIsNeitherMovedNorCharged() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        scheduler.offline(ALEX);
+
+        lobby(true).spawn(ALEX, ARENA);
+
+        assertThat(moves.teleported).isEmpty();
+        assertThat(purse.charges).isZero();
+    }
+
+    @Test
+    void aStaffSendToAWorldHereReachesAPlayerOnlyWhileTheyAreOnline() {
+        table.put(LOBBY, arena(BigDecimal.ZERO));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        scheduler.offline(SAM);
+
+        lobby(true).forcedHere(ALEX, SAM, ARENA);
+        lobby(true).forcedHere(ALEX, ALEX, ARENA);
+
+        assertThat(moves.teleported).containsExactly("Alex->arena as ADMIN");
+    }
+
+    @Test
     void anUnclaimedWorldCannotBeReached() {
         table.put(NetworkWorld.UNSCOPED, arena(BigDecimal.ZERO));
         new InMemoryWorlds(table, SURVIVAL).delete(ARENA);

@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
+import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -92,18 +93,25 @@ public final class WalletPanelMenu {
 
     /**
      * Open the dashboard for {@code viewer}, ranging the balance and the carried-banknote total for {@code currency}.
-     * The balance read and the inventory scan run off the tick thread (the old view's threading), then the panel is
-     * opened through the engine, which renders it on the viewer's entity thread.
+     * The inventory scan runs on the viewer's own thread, the only one allowed to read their inventory, and the
+     * balance read off the tick thread, then the panel is opened through the engine, which renders it on the viewer's
+     * entity thread. A viewer who left before the scan gets no panel.
      */
     public void open(Player viewer, Currency currency) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(currency, "currency");
         PlayerRef viewerRef = new PlayerRef(viewer.getUniqueId(), viewer.getName());
-        scheduler.async(() -> {
-            Money balance = economyProvider.balance(viewerRef, currency);
-            Money banknotes = Money.of(currency, calculateBanknotesValue(viewer, currency));
-            menus.open(viewer, SPEC_ID, new WalletSubject(currency, balance, banknotes));
-        });
+        PlayerThread.run(
+                scheduler,
+                viewerRef,
+                () -> {
+                    Money banknotes = Money.of(currency, calculateBanknotesValue(viewer, currency));
+                    scheduler.async(() -> {
+                        Money balance = economyProvider.balance(viewerRef, currency);
+                        menus.open(viewer, SPEC_ID, new WalletSubject(currency, balance, banknotes));
+                    });
+                },
+                () -> {});
     }
 
     /** Open the read-only transaction-history list for the viewer, exactly as the old history button did. */

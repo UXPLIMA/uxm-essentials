@@ -168,7 +168,8 @@ public final class WorldTeleportService {
             return fail(
                     actor, target, WorldError.DESTINATION_UNRESOLVED, WorldsMessageKey.WORLD_TP_DESTINATION_UNRESOLVED);
         }
-        teleporter.teleport(subject, pos.get(), WorldTeleportCause.ADMIN);
+        Position spawn = pos.get();
+        onPlayerThread(subject, () -> teleporter.teleport(subject, spawn, WorldTeleportCause.ADMIN));
         if (!actor.equals(subject)) {
             notify(actor, WorldsMessageKey.WORLD_TP_OTHER, Map.of("player", subject.name(), "world", target.value()));
         }
@@ -280,12 +281,28 @@ public final class WorldTeleportService {
             return fail(
                     who, target, WorldError.DESTINATION_UNRESOLVED, WorldsMessageKey.WORLD_TP_DESTINATION_UNRESOLVED);
         }
-        boolean accepted = teleporter.teleport(who, pos.get(), WorldTeleportCause.SPAWN);
-        if (accepted && charged) {
-            entryFee.charge(who, fee);
-            notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
-        }
+        Position spawn = pos.get();
+        onPlayerThread(who, () -> {
+            boolean accepted = teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN);
+            if (accepted && charged) {
+                entryFee.charge(who, fee);
+                notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
+            }
+        });
         return Result.ok();
+    }
+
+    /**
+     * Run a launch on {@code who}'s own thread. The world is resolved and loaded on the global thread, but the
+     * launch reads where the player stands and what they may do, which only their thread may ask. A player who left
+     * before the hop lands is neither moved nor charged.
+     */
+    private void onPlayerThread(PlayerRef who, Runnable launch) {
+        if (scheduler.ownsEntity(who)) {
+            launch.run();
+        } else {
+            scheduler.onEntity(who, launch);
+        }
     }
 
     /** Load the world if the engine has not yet, surfacing the engine's error when the load fails. */
