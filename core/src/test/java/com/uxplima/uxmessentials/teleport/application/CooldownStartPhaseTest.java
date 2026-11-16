@@ -9,10 +9,12 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -215,6 +217,22 @@ class CooldownStartPhaseTest {
                 .isTrue();
 
         assertThat(onCooldown(origin, TeleportKind.WARP)).isTrue();
+    }
+
+    @Test
+    void underTheRequestPhaseAHopToAWarpWithItsOwnCooldownStartsThatWarpsClockOnly() {
+        TeleportEngine origin = engine("request");
+        TeleportEngine target = engine("request");
+        Destination shop = Destination.at(
+                THERE, Optional.empty(), Optional.of(new OwnCooldown("warp.shop", Duration.ofSeconds(60))));
+        Destination mine = Destination.at(
+                THERE, Optional.empty(), Optional.of(new OwnCooldown("warp.mine", Duration.ofSeconds(60))));
+
+        target.arriveImmediately(ALEX, shop, TeleportKind.WARP, () -> {}, () -> {});
+
+        assertThat(origin.gateHop(ALEX, shop, TeleportKind.WARP).asError()).contains(TeleportError.ON_COOLDOWN);
+        assertThat(origin.gateHop(ALEX, mine, TeleportKind.WARP).isOk()).isTrue();
+        assertThat(onCooldown(origin, TeleportKind.HOME)).isFalse();
     }
 
     @ParameterizedTest
