@@ -15,8 +15,7 @@ class CommandWarmupTrackerTest {
 
     private static final PlayerRef ALEX =
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000a1e5"), "Alex");
-    private static final PlayerRef SAM =
-            new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000005a77"), "Sam");
+    private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000005a77"), "Sam");
     private static final WorldRef WORLD =
             new WorldRef(UUID.fromString("00000000-0000-0000-0000-0000000000f1"), "world");
     private static final Position STANDING = new Position(WORLD, 10.5, 64, 10.5, 0f, 0f);
