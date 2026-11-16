@@ -137,11 +137,19 @@ public record NetworkConfig(
         if (!enabled || !relaysThroughProxy() || busSecret.usable()) {
             return java.util.Optional.empty();
         }
-        String state = busSecret.blank() ? "is not set" : "is shorter than " + BusSecret.MIN_LENGTH + " characters";
+        String state =
+                switch (busSecret.state()) {
+                    case BLANK -> "is not set";
+                    case SHORT -> "is shorter than " + BusSecret.MIN_LENGTH + " characters";
+                    case PLACEHOLDER -> "is the example from the documentation, not a secret of your own";
+                    case WEAK -> "repeats too few different characters to be hard to guess";
+                    case USABLE -> "is usable";
+                };
         return java.util.Optional.of("network.bus.secret in config.conf " + state + ", so this backend neither sends"
                 + " nor accepts bus frames through the proxy: a player's client can write on that channel too, and"
-                + " only a signature tells the two apart. Put the same secret of " + BusSecret.MIN_LENGTH
-                + " or more characters on every backend (the proxy needs none) and restart");
+                + " only a signature tells the two apart. Put the same " + BusSecret.MIN_LENGTH
+                + " or more random characters (openssl rand -hex 32) on every backend (the proxy needs none) and"
+                + " restart");
     }
 
     /** The carrier(s) the bus rides. {@link #VELOCITY} is the proxy default: no Redis connection is opened. */

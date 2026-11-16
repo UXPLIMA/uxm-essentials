@@ -88,9 +88,9 @@ public final class BusTransportHealthCheck implements HealthCheck {
 
     private String proxyLine(BusHealth.ProxyLink link, long now) {
         if (!link.signing()) {
-            return "proxy OFF: network.bus.secret is not set or shorter than " + BusSecret.MIN_LENGTH
-                    + " characters, so no frame is sent or accepted through the proxy. Put the same secret on every"
-                    + " backend and restart";
+            return "proxy OFF: network.bus.secret is not set, shorter than " + BusSecret.MIN_LENGTH
+                    + " characters, the documentation's example or too easy to guess, so no frame is sent or accepted"
+                    + " through the proxy. Put the same random secret on every backend and restart";
         }
         if (!link.registered()) {
             return "proxy channel not registered yet (the bus starts on the first tick)";

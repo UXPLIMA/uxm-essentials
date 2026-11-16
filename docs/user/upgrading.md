@@ -10,7 +10,8 @@ player's client cannot write one. Until `network.bus.secret` is set, those carri
 the proxy: cross-server messages, presence, teleport requests and cache updates stop on that carrier. The start log
 names the key and `/uxmess doctor` reads `proxy OFF`. Redis is not affected.
 
-1. Make one secret of 32 or more random characters, for example with `openssl rand -hex 32`.
+1. Make one secret of 32 or more random characters, for example with `openssl rand -hex 32`. An example value from
+   the documentation, or a few characters repeated, is refused like an empty one.
 2. Put it in `config.conf` of every backend, under `network.bus.secret`. The update adds the empty key to your file.
    The proxy needs nothing new.
 3. Upgrade every backend and the proxy jar together, then restart. A backend still on the old release sends unsigned

@@ -21,14 +21,16 @@ import org.jspecify.annotations.NullMarked;
  * message on.
  *
  * <p>A sealed frame is the frame unchanged, then the time it was sealed (eight bytes, epoch milliseconds) and an
- * HMAC-SHA-256 over both. The trailer goes after the frame so the header the broker reads (version, type, origin) stays
+ * HMAC-SHA-256 over {@link #DOMAIN}, the frame and the time. The tag keeps a signature made for this purpose from
+ * passing for one made with the same key anywhere else. The trailer goes after the frame so the header the broker reads (version, type, origin) stays
  * where it was, and the broker relays sealed frames without knowing the secret. A decoder that does not know about the
  * trailer stops after the fields it reads and never sees it.
  *
  * <p>The signed time limits replay. Behind the broker a client never sees a backend's frames, but a client connected
  * straight to a backend, or behind a proxy without the broker, receives what that backend sends and could hand it to
- * another backend later. A frame sealed more than {@link #CLOCK_TOLERANCE} from this backend's clock is refused, and
- * the frames that act carry ids their listeners remember, so a copy within the tolerance acts once.
+ * another backend later. A frame sealed more than {@link #CLOCK_TOLERANCE} from this backend's clock is refused. Within
+ * the tolerance, a frame with an id its listener remembers acts once; a vanish change carries no sequence, so such a
+ * client could still hold one back or repeat it inside the tolerance.
  *
  * <p>Stateless apart from the key: a {@link Mac} is made per call because one is not safe to share between the threads
  * that send and receive.
@@ -38,6 +40,9 @@ final class FrameSeal {
 
     private static final String ALGORITHM = "HmacSHA256";
     private static final int MAC_BYTES = 32;
+
+    /** Signed ahead of every frame, so the signature means "a bus frame" and nothing else. */
+    private static final byte[] DOMAIN = "uxm-bus-v1".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
 
     /** What sealing adds to a frame: the signed time and the signature. */
     static final int TRAILER_BYTES = Long.BYTES + MAC_BYTES;
@@ -99,6 +104,7 @@ final class FrameSeal {
         try {
             Mac mac = Mac.getInstance(ALGORITHM);
             mac.init(key);
+            mac.update(DOMAIN);
             mac.update(bytes, 0, length);
             return mac.doFinal();
         } catch (NoSuchAlgorithmException | InvalidKeyException e) {

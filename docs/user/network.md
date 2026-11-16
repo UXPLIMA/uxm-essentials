@@ -102,20 +102,26 @@ through the proxy with `network.bus.secret` and acts only on frames signed with 
 ```hocon
 network {
   bus {
-    secret = "paste 32 or more random characters here"
+    secret = "<output of openssl rand -hex 32>"
   }
 }
 ```
 
 - Use 32 or more random characters, for example the output of `openssl rand -hex 32`, and the same value on every
   backend. The proxy needs none: it relays signed frames unchanged. Keep it out of anything you share.
-- While it is empty or shorter, `transport = "velocity"` and `"both"` send and accept nothing through the proxy. The
-  start log says so, and `/uxmess doctor` reads `proxy OFF`. Redis needs no secret: only the backends reach it.
+- While it is empty, shorter, the example above, or a few characters repeated, `transport = "velocity"` and `"both"`
+  send and accept nothing through the proxy. The start log says so, and `/uxmess doctor` reads `proxy OFF`. Redis
+  needs no secret: only the backends reach it.
 - A frame signed with another secret, or more than 60 seconds away from this backend's clock, is refused and logged
   at most once a minute, and the doctor reads `REFUSED`. Keep every backend on the same secret and release, and their
   clocks in time. A client sending forged frames shows the same way.
-- The signed time also stops a captured frame from being replayed later. Within the 60 seconds, a frame that acts
-  carries an id and acts once, and a repeated cache update is harmless.
+- The signed time also stops a captured frame from being replayed later. Within the 60 seconds, private messages,
+  staff chat, helpop, teleport requests, jails, presence, world changes, trade signals and vote parties carry an id
+  and act once, and a repeated cache update is harmless. A vanish change carries no order, so without the proxy plugin
+  a client could hold one back or repeat it within that time.
+- Signing proves who sent a frame; it does not hide what a frame says. Without the proxy plugin, or on a backend
+  players can join directly, the client carrying the frames can read them: private messages, staff chat, helpop and
+  IP bans among them. Install the proxy plugin to keep them private.
 
 ### Redis (`transport = "redis"`)
 

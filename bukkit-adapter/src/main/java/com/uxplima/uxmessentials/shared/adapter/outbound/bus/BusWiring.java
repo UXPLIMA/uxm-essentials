@@ -290,7 +290,11 @@ public final class BusWiring {
             core.start();
             // The heartbeat starts after the channel is up so the first ping rides a live transport.
             heartbeat.start();
-            log.info("network sync enabled on channel {} as server-id {}", network.channel(), network.serverId());
+            log.info(
+                    "network sync enabled on channel {} as server-id {}{}",
+                    network.channel(),
+                    network.serverId(),
+                    network.busSecretProblem().isPresent() ? "; proxy carrier OFF (set network.bus.secret)" : "");
         }
 
         void stop() {
