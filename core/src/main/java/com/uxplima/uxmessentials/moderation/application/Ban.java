@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -110,6 +111,12 @@ public final class Ban {
      */
     public static Optional<Instant> endOf(TempbanState.Active ban) {
         return SanctionStrength.endOf(ban);
+    }
+
+    /** {@link #endOf(TempbanState.Active)} for a row of the active-ban list. */
+    public static Optional<Instant> endOf(BanEntry ban) {
+        Objects.requireNonNull(ban, "ban");
+        return SanctionStrength.endOf(ban.issuedAt(), ban.until());
     }
 
     /**

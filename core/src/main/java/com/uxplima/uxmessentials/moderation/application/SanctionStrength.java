@@ -41,7 +41,14 @@ final class SanctionStrength {
      */
     static Optional<Instant> endOf(TempbanState.Active ban) {
         Objects.requireNonNull(ban, "ban");
-        boolean permanent = !ban.until().isBefore(ban.issuedAt().plus(Ban.PERMANENT_SPAN));
-        return permanent ? Optional.empty() : Optional.of(ban.until());
+        return endOf(ban.issuedAt(), ban.until());
+    }
+
+    /** {@link #endOf(TempbanState.Active)} for a ban row read as its issue and expiry instants. */
+    static Optional<Instant> endOf(Instant issuedAt, Instant until) {
+        Objects.requireNonNull(issuedAt, "issuedAt");
+        Objects.requireNonNull(until, "until");
+        boolean permanent = !until.isBefore(issuedAt.plus(Ban.PERMANENT_SPAN));
+        return permanent ? Optional.empty() : Optional.of(until);
     }
 }

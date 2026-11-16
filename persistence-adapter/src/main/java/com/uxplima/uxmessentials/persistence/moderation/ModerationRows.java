@@ -76,7 +76,8 @@ final class ModerationRows {
                 UUID.fromString(row.getTarget()),
                 issuer(row.getBannedBy(), row.getBannedByName()),
                 Optional.ofNullable(row.getReason()),
-                Instant.ofEpochMilli(row.getUntil()));
+                Instant.ofEpochMilli(row.getUntil()),
+                Instant.ofEpochMilli(row.getCreatedAt()));
     }
 
     static JailEntry toJailEntry(ModerationJailsRecord row) {

@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
@@ -53,7 +54,7 @@ public record ActivePunishment(
         Objects.requireNonNull(remaining, "remaining");
     }
 
-    /** Project an active ban row, resolving its display name through the supplied resolver. */
+    /** Project an active ban row; a permanent ban, stored with a far-future expiry, gets an empty {@code until}. */
     public static ActivePunishment ofBan(BanEntry ban, String targetName) {
         Objects.requireNonNull(ban, "ban");
         return new ActivePunishment(
@@ -62,7 +63,7 @@ public record ActivePunishment(
                 targetName,
                 ban.issuer(),
                 ban.reason(),
-                Optional.of(ban.until()),
+                Ban.endOf(ban),
                 Optional.empty());
     }
 

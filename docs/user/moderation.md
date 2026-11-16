@@ -92,7 +92,9 @@ servers of a network ban the same player at the same moment, the longer ban is t
 
 A permanently banned player sees the `moderation.ban.kick` screen, with no time left on it, when the ban kicks them,
 when they are kicked on another server of a network and every time they try to log in again. A timed ban, including
-a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left.
+a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
+lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
+permanent.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
