@@ -18,9 +18,9 @@ import org.jspecify.annotations.NullMarked;
  *   <li>the language the server forces, {@code language.force}, which nobody's choice overrides;</li>
  *   <li>the player's own choice, made with {@code /lang} here or in any other plugin of ours, which the
  *       {@link LocaleStore} reads from the player's own data;</li>
- *   <li>when the server follows the client, {@code language.follow-client}: the locale bound for this request
- *       at the command boundary ({@link LocaleScope#CURRENT}), carried across async hops so a deferred
- *       message resolves in the requester's language on a worker thread;</li>
+ *   <li>when the server follows the client, {@code language.follow-client}, and the viewer is the player whose
+ *       command is running: the locale bound for that request at the command boundary ({@link LocaleScope}).
+ *       Anyone else the command writes to is not the requester, so the sender's language never reaches them;</li>
  *   <li>when the server follows the client: the language the viewer's own client reads, which
  *       {@link ClientLocales} knows for every online player on any thread. A line written after a hop off the
  *       command's thread, or with no command behind it at all, finds its reader's language here; before this
@@ -79,7 +79,7 @@ public final class LocaleResolver {
         if (!settings.followClient()) {
             return settings.defaultLocale();
         }
-        return LocaleScope.orElse(clients.of(viewer.uuid()).orElse(settings.defaultLocale()));
+        return LocaleScope.forViewer(viewer.uuid(), clients.of(viewer.uuid()).orElse(settings.defaultLocale()));
     }
 
     /** Whether this viewer's language follows their client: nothing forced, nothing chosen, the client followed. */

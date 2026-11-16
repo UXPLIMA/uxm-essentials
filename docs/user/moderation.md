@@ -168,8 +168,8 @@ by the same rule.
 
 The sanction a step applies is stored with a reason that names the warning count that tripped it and the reason of
 that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The reason is written once,
-when the step fires, and cut to 256 characters. Its language is the punished player's `/lang` choice when they made
-one, otherwise usually the language of the staff member who gave the warning. The staff member reads what the
+when the step fires, and cut to 256 characters. Its language is the punished player's: their `/lang` choice, else
+their client's language while they are online, else the server default. The staff member reads what the
 sanction itself reports, such as the mute confirmation or why it could not be applied, followed by a line on how the
 step landed.
 

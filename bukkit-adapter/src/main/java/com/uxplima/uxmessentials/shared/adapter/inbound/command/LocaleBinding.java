@@ -28,17 +28,14 @@ import com.uxplima.uxmlib.command.Sender;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Binds the requesting player's resolved locale into {@link LocaleScope#CURRENT} at the inbound command
- * boundary.
+ * Binds the requesting player's resolved locale into {@link LocaleScope} at the inbound command boundary.
  *
  * <p>A command runs on the player's region thread, where {@code Player.locale()} is a legal call. This
  * decorator captures that client locale once at dispatch, folds in any persisted {@code /lang} override,
- * and binds the result as a {@link ScopedValue} for the duration of the handler, so every synchronous
- * {@code messages.resolve(...)} the handler makes renders in the right language without threading a
- * {@code Locale} through any signature. Work the handler defers off-tick through the {@code Scheduler}
- * port re-binds the captured locale with {@link LocaleScope#runWith} (the {@code ScopedValue} does not
- * cross an executor hop on its own); the binding here covers the on-thread portion and is the single
- * place client-locale capture touches the Bukkit API.
+ * and binds the result for the requesting player for the duration of the handler, so every synchronous
+ * {@code messages.resolve(...)} the handler makes for that player renders in their language without threading a
+ * {@code Locale} through any signature. A line for any other player resolves in that player's own language. The
+ * binding does not cross an executor hop; after one, the resolver reads the reader's client locale.
  *
  * <p>It wraps a built Brigadier tree by rebuilding each node with the same requirement and a
  * scope-binding {@link Command}, so the binding applies uniformly to every executor in the command
@@ -129,7 +126,7 @@ public final class LocaleBinding {
         int[] result = new int[1];
         CommandSyntaxException[] syntax = new CommandSyntaxException[1];
         RuntimeException[] bug = new RuntimeException[1];
-        LocaleScope.runWith(resolved, () -> {
+        LocaleScope.runWith(player.getUniqueId(), resolved, () -> {
             try {
                 result[0] = delegate.run(ctx);
             } catch (CommandSyntaxException control) {

@@ -234,7 +234,9 @@ public final class LangCommand implements CommandRegistration {
     private void tell(PlayerRef who, SharedMessageKey key, Map<String, String> placeholders) {
         Locale client = resolver.clients().of(who.uuid()).orElse(Locale.ROOT);
         LocaleScope.runWith(
-                resolver.resolveAt(who, client), () -> sink.deliver(who, messages.resolve(who, key, placeholders)));
+                who.uuid(),
+                resolver.resolveAt(who, client),
+                () -> sink.deliver(who, messages.resolve(who, key, placeholders)));
         scheduler.onEntity(who, () -> {
             Player online = Bukkit.getPlayer(who.uuid());
             if (online != null) {
