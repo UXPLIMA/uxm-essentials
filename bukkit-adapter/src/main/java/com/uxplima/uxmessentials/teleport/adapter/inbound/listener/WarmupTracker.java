@@ -40,10 +40,13 @@ import org.jspecify.annotations.Nullable;
  * returns null hands it to exactly one caller) and cancelled after, outside the map's lock, so its callback can
  * start another teleport, which re-enters the map for the same player, without corrupting it.
  *
- * <p>A warmup being set up when its player quits is caught by a ticket: {@link #beginning} hands one out before
+ * <p>A warmup belongs to the session that began it, which a ticket tracks: {@link #beginning} hands one out before
  * the setup, {@link #quit} voids every ticket of the player before it drops their entry, and {@link #stillHere}
  * spends the ticket after the warmup is armed. Whichever order the two threads take, either the quit finds the
- * armed entry or the setup finds its ticket voided.
+ * armed entry or the setup finds its ticket voided. A quit also leaves a tombstone that only the player's next
+ * {@link #joined} clears, so a setup that starts while the quit is still being handled (later quit listeners run with
+ * the player still listed online) is handed a ticket that is void from the start. A setup holding a voided ticket
+ * neither supersedes nor arms anything, so one that outlives a fast relog cannot stop the new session's warmup.
  * Completion forgets only its own handle, so an earlier warmup that fires just as it is replaced cannot drop
  * the entry of the warmup that replaced it.
  */
@@ -52,20 +55,38 @@ public final class WarmupTracker {
 
     private final ConcurrentHashMap<UUID, Entry> pending = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<UUID, Set<Object>> beginning = new ConcurrentHashMap<>();
+    private final Set<UUID> gone = ConcurrentHashMap.newKeySet();
 
     /**
      * Arm a warmup for {@code who} anchored at {@code origin}, holding {@code handle} for cancellation and
-     * {@code completesAt} for the {@code teleport_warmup_remaining} placeholder read.
+     * {@code completesAt} for the {@code teleport_warmup_remaining} placeholder read. Only while {@code ticket} still
+     * holds: a warmup whose player quit since its setup began is not armed, so it cannot replace a warmup the player
+     * started after a relog. The check and the arm are one step against {@link #quit}, which voids the ticket under the
+     * same key. Answers whether the warmup was armed.
      */
-    public void arm(PlayerRef who, PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {
+    public boolean arm(PlayerRef who, Object ticket, PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {
         Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(ticket, "ticket");
         Objects.requireNonNull(warmup, "warmup");
         Objects.requireNonNull(handle, "handle");
         Objects.requireNonNull(completesAt, "completesAt");
         if (handle.isComplete()) {
-            return; // a zero-duration warmup already fired; nothing to track or cancel
+            return false; // a zero-duration warmup already fired; nothing to track or cancel
         }
-        Entry previous = pending.put(who.uuid(), new Entry(warmup, handle, completesAt));
+        AtomicBoolean armed = new AtomicBoolean();
+        AtomicReference<@Nullable Entry> previous = new AtomicReference<>();
+        beginning.computeIfPresent(who.uuid(), (id, tickets) -> {
+            if (tickets.contains(ticket)) {
+                armed.set(true);
+                previous.set(pending.put(id, new Entry(warmup, handle, completesAt)));
+            }
+            return tickets;
+        });
+        replace(previous.get(), handle);
+        return armed.get();
+    }
+
+    private static void replace(@Nullable Entry previous, WarmupHandle handle) {
         if (previous != null && previous.handle() != handle) {
             // Two warmups begun at once on different threads: whichever arms last supersedes the other here.
             previous.handle().supersede();
@@ -80,6 +101,26 @@ public final class WarmupTracker {
         Entry previous = pending.remove(Objects.requireNonNull(who, "who"));
         if (previous != null) {
             previous.handle().supersede();
+        }
+    }
+
+    /**
+     * {@link #supersede}, only while {@code ticket} still holds, so a setup from a session that has ended leaves the
+     * warmup of the session after it alone.
+     */
+    public void supersede(UUID who, Object ticket) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(ticket, "ticket");
+        AtomicReference<@Nullable Entry> previous = new AtomicReference<>();
+        beginning.computeIfPresent(who, (id, tickets) -> {
+            if (tickets.contains(ticket)) {
+                previous.set(pending.remove(id));
+            }
+            return tickets;
+        });
+        Entry stopped = previous.get();
+        if (stopped != null) {
+            stopped.handle().supersede();
         }
     }
 
@@ -119,7 +160,9 @@ public final class WarmupTracker {
      */
     public void quit(UUID who) {
         Objects.requireNonNull(who, "who");
-        // Tickets first, so a setup that arms after the entry is dropped below still sees it was voided.
+        // The tombstone and the voided tickets come first, so a setup that arms after the entry is dropped below, or
+        // starts only now, still sees that its session ended.
+        gone.add(who);
         beginning.remove(who);
         Entry previous = pending.remove(who);
         if (previous != null) {
@@ -135,11 +178,20 @@ public final class WarmupTracker {
         Objects.requireNonNull(who, "who");
         Object ticket = new Object();
         beginning.compute(who, (id, tickets) -> {
+            if (gone.contains(id)) {
+                // The player quit and has not joined again: the ticket is never held, so it is void from the start.
+                return tickets;
+            }
             Set<Object> held = tickets != null ? tickets : new HashSet<>();
             held.add(ticket);
             return held;
         });
         return ticket;
+    }
+
+    /** Clear the tombstone {@link #quit} left, as {@code who} joins: warmups they begin from now on are theirs. */
+    public void joined(UUID who) {
+        gone.remove(Objects.requireNonNull(who, "who"));
     }
 
     /**
@@ -168,6 +220,7 @@ public final class WarmupTracker {
     public void clear() {
         pending.clear();
         beginning.clear();
+        gone.clear();
     }
 
     private void reconcile(UUID who, Function<Entry, PendingTeleport.Outcome> step) {

@@ -52,9 +52,10 @@ import org.jspecify.annotations.NullMarked;
  * rather than only when the tracker is armed also covers a new teleport that skips its warmup: it lands at once and
  * is never armed, and the earlier warmup must not land after it.
  *
- * <p>A warmup begun for a player who is not online, or who quits while it is being set up (a command run off the
- * player's thread can race the quit), is cancelled as a quit here: the quit listener cannot reach a warmup that was
- * not armed yet, and the countdown would otherwise land the player after a fast relog.
+ * <p>A warmup begun for a player who is not online, who quits while it is being set up (a command run off the
+ * player's thread can race the quit), or whose quit is still being handled, is cancelled as a quit here: the quit
+ * listener cannot reach a warmup that was not armed yet, and the countdown would otherwise land the player after a
+ * fast relog. Such a setup neither replaces nor arms anything, so the session after the relog keeps its own warmup.
  */
 @NullMarked
 public final class TrackingWarmups implements Warmups {
@@ -111,7 +112,7 @@ public final class TrackingWarmups implements Warmups {
         Object ticket = tracker.beginning(who.uuid());
         WarmupHandle handle;
         try {
-            handle = beginArmed(who, kind, onComplete, onCancel, onSuperseded);
+            handle = beginArmed(who, ticket, kind, onComplete, onCancel, onSuperseded);
         } catch (RuntimeException failure) {
             var ignored = tracker.stillHere(who.uuid(), ticket);
             throw failure;
@@ -127,12 +128,14 @@ public final class TrackingWarmups implements Warmups {
 
     private WarmupHandle beginArmed(
             PlayerRef who,
+            Object ticket,
             WarmupKind kind,
             Runnable onComplete,
             Consumer<CancelCause> onCancel,
             Runnable onSuperseded) {
         Optional<Position> origin = locator.locate(who);
-        tracker.supersede(who.uuid());
+        // Bound to the ticket, so a setup whose session ended leaves the next session's warmup running.
+        tracker.supersede(who.uuid(), ticket);
         AtomicReference<WarmupHandle> started = new AtomicReference<>();
         WarmupHandle handle = delegate.begin(who, kind, wrapComplete(who, started, onComplete), onCancel, onSuperseded);
         started.set(handle);
@@ -142,7 +145,7 @@ public final class TrackingWarmups implements Warmups {
             handle.cancel(CancelCause.QUIT);
             return handle;
         }
-        arm(who, kind, origin.get(), handle);
+        arm(who, ticket, kind, origin.get(), handle);
         return handle;
     }
 
@@ -157,7 +160,7 @@ public final class TrackingWarmups implements Warmups {
         };
     }
 
-    private void arm(PlayerRef who, WarmupKind kind, Position origin, WarmupHandle handle) {
+    private void arm(PlayerRef who, Object ticket, WarmupKind kind, Position origin, WarmupHandle handle) {
         if (handle.isComplete()) {
             return;
         }
@@ -167,7 +170,9 @@ public final class TrackingWarmups implements Warmups {
         PendingTeleport warmup =
                 PendingTeleport.arm(who, TeleportKind.ADMIN, origin, Destination.at(origin), toggles.get());
         Duration waiting = resolveDuration(who, kind);
-        tracker.arm(who, warmup, handle, clock.instant().plus(waiting));
+        if (!tracker.arm(who, ticket, warmup, handle, clock.instant().plus(waiting))) {
+            return; // the player's session ended during the setup, which cancels this warmup right after
+        }
         // The warmup is already counting down here, so a notice that cannot be sent must not throw out of begin:
         // the caller would take the teleport for one that never started while it still lands.
         try {

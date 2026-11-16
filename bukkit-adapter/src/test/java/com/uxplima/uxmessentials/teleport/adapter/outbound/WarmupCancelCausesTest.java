@@ -261,14 +261,50 @@ class WarmupCancelCausesTest {
     }
 
     @Test
-    void aWarmupStartedAfterAnEarlierQuitIsNotTouchedByIt() {
+    void aWarmupStartedAfterAnEarlierQuitAndAJoinIsNotTouchedByIt() {
         tracker.quit(ALEX.uuid());
+        tracker.joined(ALEX.uuid());
 
         teleportTo(HOME);
         scheduler.elapse();
 
         assertThat(landed).containsExactly(HOME);
         assertThat(cancelReasons()).isEmpty();
+    }
+
+    @Test
+    void aWarmupSetUpWhileTheQuitIsStillBeingHandledIsCancelledAsAQuitAndRefunded() {
+        // The quit listener has run, but the player is still listed online while later quit listeners run.
+        tracker.quit(ALEX.uuid());
+
+        List<TeleportOutcome> outcomes = paidTeleportTo(HOME);
+        tracker.joined(ALEX.uuid());
+        scheduler.elapse();
+
+        assertThat(landed).isEmpty();
+        assertThat(outcomes).containsExactly(TeleportOutcome.CANCELLED);
+        assertThat(refunds).isEqualTo(1);
+        assertThat(cancelReasons()).containsExactly(WarmupCancelReason.QUIT);
+    }
+
+    @Test
+    void aSetupFromTheOldSessionThatOutlivesAFastRelogLeavesTheNewSessionsWarmupRunning() {
+        // The old setup locates the player while they quit, relog and start another teleport in the new session.
+        whereAlexStands = () -> {
+            whereAlexStands = () -> Optional.of(STANDING);
+            tracker.quit(ALEX.uuid());
+            tracker.joined(ALEX.uuid());
+            teleportTo(MARKET);
+            return Optional.of(STANDING);
+        };
+
+        var oldSession = engine.launch(ALEX, Destination.at(HOME), TeleportKind.HOME);
+        scheduler.elapse();
+
+        assertThat(oldSession.isErr()).as("the old setup never got going").isTrue();
+        assertThat(landed).containsExactly(MARKET);
+        assertThat(cancelReasons()).containsExactly(WarmupCancelReason.QUIT);
+        assertThat(told).containsExactly(STARTED, "teleport.warmup.quit");
     }
 
     @Test
