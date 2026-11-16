@@ -67,7 +67,9 @@ class TrackingCommandWarmupsTest {
     private final Actions actions = new Actions();
     private final Feedback feedback = new Feedback();
     private final CommandWarmupTracker tracker = new CommandWarmupTracker();
-    private final ChainDepth depth = new ChainDepth(2);
+    private final Warnings log = new Warnings();
+    // The tightest ceiling an operator can set, so a repeat that counted against depth would be refused.
+    private final ChainDepth depth = new ChainDepth(1);
     private final RunCustomCommand runner = new RunCustomCommand(
             nodes,
             new NoCooldowns(),
@@ -78,7 +80,7 @@ class TrackingCommandWarmupsTest {
             FeeBackendPolicy.DENY,
             feedback,
             depth,
-            new QuietLog());
+            log);
 
     private static CustomCommand paidWithWarmup(String id, double price) {
         return new CustomCommand(
@@ -186,11 +188,13 @@ class TrackingCommandWarmupsTest {
                 .as("the earlier warmup does not run after the instant one")
                 .isEqualTo(1);
         assertThat(purse.charged).isEqualTo(REWARD_PRICE);
-        assertThat(feedback.reported).contains(REPLACED);
+        assertThat(feedback.reported)
+                .as("the instant run is reported as run, not as a countdown")
+                .containsExactly(STARTED, REPLACED, RAN);
     }
 
     @Test
-    void aReplacedWarmupGivesBackItsChainDepth() {
+    void aRepeatAtTheDepthCeilingReplacesTheEarlierWarmupInsteadOfBeingRefused() {
         assertThat(run(REWARD)).isInstanceOf(RunOutcome.WarmupStarted.class);
         assertThat(run(REWARD)).isInstanceOf(RunOutcome.WarmupStarted.class);
         assertThat(run(REWARD))
@@ -199,6 +203,21 @@ class TrackingCommandWarmupsTest {
 
         scheduler.elapse();
 
+        assertRan("reward");
+        assertThat(purse.charged).isEqualTo(REWARD_PRICE);
+        assertThat(feedback.reported).containsExactly(STARTED, REPLACED, STARTED, REPLACED, STARTED, RAN);
+        assertThat(log.warnings).as("nothing is logged as a runaway chain").isEmpty();
+        assertThat(depth.tracked()).isZero();
+    }
+
+    @Test
+    void aPlayerWhoSkipsTheWarmupIsNotToldToStandStillAfterTheCommandRan() {
+        nodes.held.add("uxmessentials.bypass.warmup.customcommand");
+
+        RunOutcome outcome = run(REWARD);
+
+        assertThat(outcome).isInstanceOf(RunOutcome.Ok.class);
+        assertThat(feedback.reported).containsExactly(RAN);
         assertRan("reward");
         assertThat(depth.tracked()).isZero();
     }
@@ -349,14 +368,18 @@ class TrackingCommandWarmupsTest {
         }
     }
 
-    /** A logger nobody reads. */
-    private static final class QuietLog implements Logger {
+    /** A logger that keeps only its warnings. */
+    private static final class Warnings implements Logger {
+
+        private final List<String> warnings = new ArrayList<>();
 
         @Override
         public void info(String message, Object... args) {}
 
         @Override
-        public void warn(String message, Object... args) {}
+        public void warn(String message, Object... args) {
+            warnings.add(message);
+        }
 
         @Override
         public void error(String message, Throwable cause) {}
