@@ -238,6 +238,21 @@ final class UntouchedImportPorts {
         }
 
         @Override
+        public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+            throw touched();
+        }
+
+        @Override
+        public Optional<IpBan> loadIpBan(String ip) {
+            throw touched();
+        }
+
+        @Override
+        public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+            throw touched();
+        }
+
+        @Override
         public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
             throw touched();
         }

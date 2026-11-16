@@ -121,6 +121,17 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        if (replacement instanceof MuteState.None) {
+            throw new IllegalArgumentException("a guarded mute write stores a mute, it does not lift one");
+        }
+        return write(dsl -> ModerationWrites.replaceMute(dsl, target, expected, replacement));
+    }
+
+    @Override
     public void saveJail(PlayerRef target, JailState jail) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(jail, "jail");
@@ -179,6 +190,25 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     public void saveIpBan(IpBan ban) {
         Objects.requireNonNull(ban, "ban");
         write(dsl -> ModerationWrites.saveIpBan(dsl, ban));
+    }
+
+    @Override
+    public Optional<IpBan> loadIpBan(String ip) {
+        Objects.requireNonNull(ip, "ip");
+        return read(dsl -> Optional.ofNullable(dsl.selectFrom(MODERATION_IP_BANS)
+                        .where(MODERATION_IP_BANS.IP.eq(ip))
+                        .fetchOne())
+                .map(ModerationRows.IpBanMapper::toIpBan));
+    }
+
+    @Override
+    public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        if (expected.isPresent() && !expected.get().ip().equals(replacement.ip())) {
+            throw new IllegalArgumentException("a guarded ip ban write replaces the row of its own address");
+        }
+        return write(dsl -> ModerationWrites.replaceIpBan(dsl, expected, replacement));
     }
 
     @Override
