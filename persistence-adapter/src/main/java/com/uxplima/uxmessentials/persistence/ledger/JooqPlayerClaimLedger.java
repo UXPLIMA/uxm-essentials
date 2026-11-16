@@ -58,6 +58,15 @@ public final class JooqPlayerClaimLedger extends JooqRepository implements Playe
     }
 
     @Override
+    public Set<String> kits(UUID player) {
+        Objects.requireNonNull(player, "player");
+        return new HashSet<>(read(dsl -> dsl.select(PLAYER_KIT_CLAIMS.KIT)
+                .from(PLAYER_KIT_CLAIMS)
+                .where(PLAYER_KIT_CLAIMS.PLAYER.eq(player.toString()))
+                .fetch(PLAYER_KIT_CLAIMS.KIT)));
+    }
+
+    @Override
     public boolean claimKit(UUID player, String kit, long claimedAt) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(kit, "kit");

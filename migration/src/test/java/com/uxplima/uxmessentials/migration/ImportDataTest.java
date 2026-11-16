@@ -46,10 +46,12 @@ class ImportDataTest {
         InMemoryHomes homes = new InMemoryHomes();
         InMemoryWallets wallets = new InMemoryWallets();
         InMemoryMail mail = new InMemoryMail();
+        InMemoryKitClaims kitClaims = new InMemoryKitClaims();
         UserRecordWriter users = new UserRecordWriter(
                 homes,
                 wallets,
                 Optional.of(mail),
+                kitClaims,
                 Duration.ZERO,
                 text -> text,
                 COINS,
@@ -67,6 +69,8 @@ class ImportDataTest {
         assertThat(homes.all()).isEmpty();
         assertThat(mail.all()).isEmpty();
         assertThat(wallets.findByOwner(new PlayerRef(EssentialsXFixture.STEVE, "Steve")))
+                .isEmpty();
+        assertThat(kitClaims.of(new PlayerRef(EssentialsXFixture.STEVE, "Steve")))
                 .isEmpty();
         assertSummaryOfTheFixture(summary);
     }

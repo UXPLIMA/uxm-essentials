@@ -2,6 +2,14 @@
 
 What an operator edits when a release renames something an operator's own files or permission grants depend on.
 
+## Database kit claims apply on a single server
+
+On a single server (`network.enabled = false`), the one-time kit claims the database holds for a player are now
+copied into the player's data when they join. Such rows come from an EssentialsX import, or are left from a time the
+server ran with the network on: a one-time kit claimed then now stays claimed after the network is turned off,
+where it could be claimed again before. On a single server `/kit reset` now also deletes those rows, so a reset claim
+does not come back on the next join. See [kits.md](kits.md#on-a-network).
+
 ## Staff teleports stop at /tptoggle
 
 `/tp`, `/tphere`, `/goto` and `/bring` no longer reach a player who refuses teleports with `/tptoggle`. The staff

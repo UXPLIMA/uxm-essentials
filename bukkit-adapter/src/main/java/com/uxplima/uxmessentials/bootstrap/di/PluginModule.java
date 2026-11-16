@@ -1261,6 +1261,7 @@ public final class PluginModule {
         ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets, network);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
+        links.claimLedger = ClaimLedgers.claims(persistence);
         links.livePeers = livePeers;
         links.networked = NetworkConfig.from(config).enabled();
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
@@ -2673,6 +2674,7 @@ public final class PluginModule {
                 ctx,
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
+                Objects.requireNonNull(links.claimLedger, "claimLedger"),
                 guiLayouts,
                 textInput,
                 menus,
@@ -2681,6 +2683,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.onClose(links.importTargets.kits(wired.repository()));
+        wired.localClaims().ifPresent(local -> resources.onClose(links.importTargets.kitClaims(local)));
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
         links.queries.register(
                 UxmKitsQuery.class,
@@ -3785,6 +3788,10 @@ public final class PluginModule {
                 Optional.empty();
         private Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards =
                 Optional.empty();
+        // The database record of one-time kit claims. On a single server the kits module stamps the claims it holds
+        // for a player (an import's) into their PDC as they join.
+        private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerClaimLedger
+                claimLedger;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;
