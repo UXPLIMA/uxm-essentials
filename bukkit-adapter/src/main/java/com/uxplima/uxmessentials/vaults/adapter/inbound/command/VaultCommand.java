@@ -380,7 +380,7 @@ public final class VaultCommand implements CommandRegistration {
                                         notifier.adminOpened(viewer, owner, vault.index());
                                     }
                                 },
-                                () -> {}),
+                                why -> {}),
                 () -> services.view().notOpened(fee));
     }
 

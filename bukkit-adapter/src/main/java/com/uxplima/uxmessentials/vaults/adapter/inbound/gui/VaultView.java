@@ -10,6 +10,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.vaults.application.VaultOpenFee;
 import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
+import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultItemPolicy;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey;
@@ -60,8 +62,9 @@ import org.jspecify.annotations.Nullable;
  * same stored row and write its own snapshot back on close, and the later close would restore whatever the
  * earlier viewer had already taken out, duplicating it. The second opener is refused with
  * {@code VAULT_ALREADY_OPEN} and the slot frees again the moment the first window closes or is flushed. The
- * viewer already holding the vault is not a second viewer: they may re-open it, and the new window takes over the
- * outgoing window's live items instead of the stored row, so only one copy of them exists ({@link VaultWindows}).
+ * viewer already holding the vault may open it again: their older window is closed first, which writes it with the
+ * same stamped write as any close, and the new window is filled from that write, so the row is never in two live
+ * windows and nothing put into the old window is lost ({@link VaultWindows}).
  *
  * <p>The {@link VaultItemPolicy} blacklist is enforced on close: an item whose material is blocked is removed
  * from the vault and returned to the closer (added to their inventory, overflow dropped at their feet), so a
@@ -146,8 +149,8 @@ public final class VaultView {
      * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened.
      *
      * <p>The open is decided exactly once. When the window is in front of the player, {@code fee} is spent and
-     * {@code shown} runs; when it is refused or never comes, {@code fee} is given back and {@code refused} runs. A
-     * deferred open may be decided a few ticks later, or when the player leaves.
+     * {@code shown} runs; when it is refused or never comes, {@code fee} is given back and {@code notShown} is told
+     * why. A deferred open may be decided a few ticks later, or when the player leaves.
      */
     public void open(
             Player player,
@@ -156,14 +159,14 @@ public final class VaultView {
             Vault vault,
             VaultOpenFee fee,
             Runnable shown,
-            Runnable refused) {
+            Consumer<NotShown> notShown) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(fee, "fee");
         Objects.requireNonNull(shown, "shown");
-        Objects.requireNonNull(refused, "refused");
+        Objects.requireNonNull(notShown, "notShown");
         int size = vault.size().slots();
         StorageGui gui = Guis.storage()
                 .title(title(viewer, owner, vault.index()))
@@ -171,13 +174,13 @@ public final class VaultView {
                 .build();
         // Claim the vault before anything is shown or written. A vault open twice at once would be seeded twice
         // from the same row and written back twice on close, so the later close would restore what the earlier
-        // viewer had already taken out: an item dupe. Only the viewer already holding it may re-open it, and then
-        // the new window starts from their old window's live items, which is never written back on its own.
-        Optional<VaultContents> seed =
-                windows.claim(viewer, owner, vault, gui, retired -> takeOver(player, viewer, retired));
+        // viewer had already taken out: an item dupe. The viewer's own older window of it is closed first, so its
+        // close writes it and the claim below fills the new window from that write.
+        closeOwnOlder(player, viewer, vault.id());
+        Optional<VaultContents> seed = windows.claim(viewer, owner, vault, gui);
         if (seed.isEmpty()) {
             giveBack(fee);
-            refused.run();
+            notShown.accept(NotShown.REFUSED);
             notifyAlreadyOpen(viewer, vault.index());
             return;
         }
@@ -192,7 +195,7 @@ public final class VaultView {
             windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
                     .ifPresent(this::offTick);
         }
-        AtomicBoolean releasedUnseen = new AtomicBoolean();
+        AtomicBoolean replaced = new AtomicBoolean();
         WindowOutcome outcome = FeeOutcome.of(
                 fee,
                 () -> {
@@ -201,25 +204,26 @@ public final class VaultView {
                 },
                 () -> {
                     pending.remove(gui);
-                    releasedUnseen.set(true);
                     releaseUnseen(player, viewer, vault, gui);
-                    refused.run();
+                    notShown.accept(replaced.get() ? NotShown.REPLACED : NotShown.REFUSED);
                 },
                 credit -> refund(fee, credit));
-        pending.put(gui, new Pending(viewer, outcome));
+        pending.put(gui, new Pending(viewer, outcome, replaced));
         gui.onClose(event -> {
             // Only a window that was showing raises a close, so this also settles an open whose check had not run.
             outcome.shown();
             if (!windows.holds(vault.id(), gui)) {
-                if (releasedUnseen.get()) {
-                    // Emptied when it was released, so whatever is in it now was put there since: it goes back.
-                    handBackStray(event.getPlayer(), gui);
-                }
-                return; // otherwise taken over by a newer window of the same viewer, which writes these items
+                // Every way a window lets go of its vault writes it and empties it, so whatever is in it now was put
+                // there since: it goes back to the player rather than being lost with the window.
+                handBackStray(event.getPlayer(), gui);
+                return;
             }
             returnBlockedItems(event.getPlayer(), viewer, gui);
             windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
-                    .ifPresent(this::offTick);
+                    .ifPresent(write -> {
+                        gui.getInventory().clear();
+                        offTick(write);
+                    });
         });
         WindowShown.open(gui, player, scheduler, outcome);
         if (outcome.mayOpen()) {
@@ -251,10 +255,14 @@ public final class VaultView {
                 decide(gui, open.outcome());
             }
         });
-        windows.releaseLeft(viewer, VaultView::seen, gui -> {
-                    returnBlockedItems(player, ref, gui);
-                    return VaultItemCodec.encode(gui.contents());
-                })
+        windows.releaseLeft(
+                        viewer,
+                        VaultView::seen,
+                        gui -> {
+                            returnBlockedItems(player, ref, gui);
+                            return VaultItemCodec.encode(gui.contents());
+                        },
+                        gui -> gui.getInventory().clear())
                 .forEach(this::offTick);
     }
 
@@ -273,15 +281,51 @@ public final class VaultView {
         gui.getInventory().clear();
     }
 
-    /** Give whatever is in {@code gui} back to {@code closer}, and empty it. */
-    private void handBackStray(HumanEntity closer, StorageGui gui) {
-        if (!(closer instanceof Player player)) {
+    /**
+     * Close {@code viewer}'s own window of {@code id}, if one holds it, so a new window of it can be claimed. A pending
+     * open is decided first, which releases a refused one. A window still on screen is closed, and its close writes it
+     * the way every close does, blacklisted items first. One that holds the vault without being on screen is written
+     * here the same way, and emptied, so nothing in it is ever counted twice. An older open still undecided is
+     * replaced rather than refused: its fee goes back, since its window never showed, but the player opened again.
+     *
+     * <p>On Folia another viewer, on another region's thread, can claim the vault between this release and the claim
+     * that follows it. Nothing is lost or doubled then, since the old window was written and emptied first: the
+     * reopen is refused as {@code VAULT_ALREADY_OPEN} and its fee given back, the same as any open of a vault held
+     * elsewhere. Holding the claim across the close instead would need the claim to change hands inside the close.
+     */
+    private void closeOwnOlder(Player player, PlayerRef viewer, VaultId id) {
+        Optional<VaultWindows.Window<StorageGui>> held =
+                windows.holder(id).filter(window -> window.viewer().uuid().equals(viewer.uuid()));
+        if (held.isEmpty()) {
             return;
         }
+        StorageGui old = held.get().window();
+        Pending open = pending.get(old);
+        if (open != null) {
+            open.replaced().set(true);
+            decide(old, open.outcome());
+        }
+        List.copyOf(old.getInventory().getViewers()).forEach(HumanEntity::closeInventory);
+        if (windows.holds(id, old)) {
+            returnBlockedItems(player, viewer, old);
+            writeNow(held.get());
+        }
+    }
+
+    /**
+     * Give whatever is in {@code gui} back to {@code closer}, or drop it at their feet when the closer has no
+     * inventory to take it, and empty the window either way.
+     */
+    private void handBackStray(HumanEntity closer, StorageGui gui) {
         org.bukkit.inventory.Inventory contents = gui.getInventory();
         for (ItemStack stack : contents.getContents()) {
-            if (stack != null && !stack.getType().isAir()) {
+            if (stack == null || stack.getType().isAir()) {
+                continue;
+            }
+            if (closer instanceof Player player) {
                 returnToPlayer(player, stack);
+            } else {
+                closer.getWorld().dropItemNaturally(closer.getLocation(), stack);
             }
         }
         contents.clear();
@@ -428,28 +472,22 @@ public final class VaultView {
         writeNow(window);
     }
 
-    /** Release and write {@code window} if it still holds its vault, with whatever it holds now. */
+    /**
+     * Release and write {@code window} if it still holds its vault, with whatever it holds now, and empty it: what is
+     * written is no longer in the window, so a close after this hands back only what was put in since.
+     */
     private void writeNow(VaultWindows.Window<StorageGui> window) {
         StorageGui gui = window.window();
         windows.release(window.vault().id(), gui, VaultItemCodec.encode(gui.contents()))
-                .ifPresent(this::offTick);
+                .ifPresent(write -> {
+                    gui.getInventory().clear();
+                    offTick(write);
+                });
     }
 
     /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
     public int openCount() {
         return windows.count();
-    }
-
-    /**
-     * Take over the viewer's outgoing window {@code retired}: its blacklisted items go back to the player as its
-     * close would have done, the rest become the new window's items, and the old window is emptied so no copy of them
-     * stays behind in it.
-     */
-    private VaultContents takeOver(Player player, PlayerRef viewer, StorageGui retired) {
-        returnBlockedItems(player, viewer, retired);
-        VaultContents live = VaultItemCodec.encode(retired.contents());
-        retired.getInventory().clear();
-        return live;
     }
 
     /**
@@ -536,5 +574,13 @@ public final class VaultView {
     }
 
     /** An open not decided yet: whose it is and its outcome. */
-    private record Pending(PlayerRef viewer, WindowOutcome outcome) {}
+    private record Pending(PlayerRef viewer, WindowOutcome outcome, AtomicBoolean replaced) {}
+
+    /** Why a window did not come up. */
+    public enum NotShown {
+        /** The open was refused or never happened: another plugin, a vault open elsewhere, sleep, or leaving. */
+        REFUSED,
+        /** The player opened the same vault again before this window came up, and the newer window replaced it. */
+        REPLACED
+    }
 }
