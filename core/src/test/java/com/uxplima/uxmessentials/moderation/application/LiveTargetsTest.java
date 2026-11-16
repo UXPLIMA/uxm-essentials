@@ -17,6 +17,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
+import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
@@ -76,8 +77,12 @@ class LiveTargetsTest {
             new SanctionHistoryRecorder(history, CLOCK),
             (key, placeholders) -> broadcasts.add(key),
             presence);
-    private final Freeze freeze =
-            new Freeze(sanctions, new ModerationGuard(new FakePermissions()), notifier.notifier(), audit, presence);
+    private final Freeze freeze = new Freeze(
+            new NetworkFreeze(sanctions, FreezeSync.NONE, presence, notifier.notifier(), CLOCK),
+            new ModerationGuard(new FakePermissions()),
+            notifier.notifier(),
+            audit,
+            presence);
 
     LiveTargetsTest() {
         TrackNetworkPresence track = new TrackNetworkPresence(presence, NetworkPresenceBroadcast.NONE, NO_NAMES, CLOCK);

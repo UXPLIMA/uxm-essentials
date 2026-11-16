@@ -37,6 +37,9 @@ import org.slf4j.Logger;
  * signature trails the frame, so the header read here is where it always was, and the broker relays the bytes unchanged
  * without holding the secret.
  *
+ * <p>A freeze or release it relays is also noted in {@link ProxyFreezes}, which keeps a frozen player on the server
+ * that froze them.
+ *
  * <p>Every relayed frame is marked {@link PluginMessageEvent.ForwardResult#handled() handled} so the proxy
  * does not also forward it onward through its default plugin-message routing. A frame that fails to decode
  * (a truncated or version-incompatible payload) is dropped with a logged warning rather than relayed blind.
@@ -45,12 +48,17 @@ import org.slf4j.Logger;
 final class BusBroker {
 
     private final Supplier<? extends Collection<RegisteredServer>> servers;
+    private final ProxyFreezes freezes;
     private final Logger logger;
     private final MinecraftChannelIdentifier channel;
 
-    /** A broker relaying to the backends {@code servers} lists at each frame, the proxy's registered servers. */
-    BusBroker(Supplier<? extends Collection<RegisteredServer>> servers, Logger logger) {
+    /**
+     * A broker relaying to the backends {@code servers} lists at each frame, the proxy's registered servers, and
+     * telling {@code freezes} about each freeze or release it relays.
+     */
+    BusBroker(Supplier<? extends Collection<RegisteredServer>> servers, ProxyFreezes freezes, Logger logger) {
         this.servers = Objects.requireNonNull(servers, "servers");
+        this.freezes = Objects.requireNonNull(freezes, "freezes");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.channel = MinecraftChannelIdentifier.create(BusChannel.NAMESPACE, BusChannel.NAME);
     }
@@ -67,7 +75,9 @@ final class BusBroker {
         if (origin == null) {
             return;
         }
-        fanOut(event.getData(), origin, sourceConnection.getServerInfo().getName());
+        String sourceServer = sourceConnection.getServerInfo().getName();
+        fanOut(event.getData(), origin, sourceServer);
+        freezes.observe(event.getData(), sourceServer);
         if (NetworkMessageCodec.isServerPing(event.getData())) {
             // The heartbeat goes back to its sender as proof that this broker is there: a backend alone behind the
             // proxy has no peer to hear from, and without this answer it could not tell the broker from no broker.

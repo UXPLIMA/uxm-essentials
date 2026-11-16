@@ -111,6 +111,16 @@ public final class NetworkMessageCodec {
         return frame.length >= 2 && frame[0] == VERSION && frame[1] == NetworkMessage.MessageType.SERVER_PING.wireTag();
     }
 
+    /**
+     * Whether {@code frame} is of {@code type}, read from the header alone, so the proxy can pick out the frames it
+     * reads without decoding the rest. A frame of another version, or too short to carry a type, is of none.
+     */
+    public static boolean isType(byte[] frame, NetworkMessage.MessageType type) {
+        Objects.requireNonNull(frame, "frame");
+        Objects.requireNonNull(type, "type");
+        return frame.length >= 2 && frame[0] == VERSION && frame[1] == type.wireTag();
+    }
+
     /** How many bytes {@link DataOutputStream#writeUTF} spends on {@code text}, its two-byte length included. */
     static int utfBytes(String text) {
         int bytes = 2;
@@ -278,6 +288,14 @@ public final class NetworkMessageCodec {
                 out.writeUTF(world.server());
                 out.writeUTF(world.world());
             }
+            case FreezeChanged freeze -> {
+                writeUuid(out, freeze.frameId());
+                writeUuid(out, freeze.target());
+                out.writeUTF(freeze.targetName());
+                out.writeBoolean(freeze.frozen());
+                out.writeLong(freeze.changedAtMillis());
+            }
+            case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
         }
     }
 
@@ -371,6 +389,9 @@ public final class NetworkMessageCodec {
                         in.readUTF(),
                         in.readInt());
             case WORLD_CHANGED -> new WorldChanged(origin, readUuid(in), in.readUTF(), in.readUTF());
+            case FREEZE_CHANGED ->
+                new FreezeChanged(origin, readUuid(in), readUuid(in), in.readUTF(), in.readBoolean(), in.readLong());
+            case FREEZE_RESET -> new FreezeReset(origin, in.readLong());
         };
     }
 
