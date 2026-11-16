@@ -3576,7 +3576,7 @@ public final class PluginModule {
                         ctx.kernel().playerLookup(),
                         ctx.kernel().worldLookup(),
                         ctx.kernel().scheduler()));
-        // Arm the rent sweep when the rent sub-group is on (a no-op otherwise), and halt it on disable/reload so no
+        // Arm the background sweeps (each a no-op when its sub-group is off), and halt them on disable/reload so no
         // orphaned off-tick task survives.
         wired.startBackgroundWork();
         resources.onClose(wired::stop);
