@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.warps.application.MoveWarp;
 import com.uxplima.uxmessentials.warps.application.SetWarp;
@@ -179,9 +180,9 @@ class WarpServerTest {
                 quiet,
                 event -> {},
                 Clock.fixed(Instant.ofEpochMilli(1L), ZoneOffset.UTC),
-                List.of(),
+                WorldBlacklist.none(),
                 Optional.empty());
-        MoveWarp moveWarp = new MoveWarp(warps, quiet, Optional.empty());
+        MoveWarp moveWarp = new MoveWarp(warps, quiet, WorldBlacklist.none(), Optional.empty());
 
         setWarp.set(SAM, MARKET, new Position(SURVIVAL_WORLD, 0, 64, 0, 0f, 0f));
         warps.save(warpIn(PLOTS, SURVIVAL_WORLD).onServer("survival"));

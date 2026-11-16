@@ -177,14 +177,16 @@ public final class EditPlayerWarp {
     }
 
     /**
-     * Re-anchor {@code name} at {@code at}. Gate {@link WarpCapability#MOVE}. A move into another world is refused
-     * ({@link PlayerWarpError#LIMIT_REACHED}) when the owner's warps there have reached that world's limit.
+     * Re-anchor {@code name} at {@code at}. Gate {@link WarpCapability#MOVE}. A move into a world on
+     * {@code world-blacklist} is refused ({@link PlayerWarpError#WORLD_BLACKLISTED}), and so is a move into another
+     * world when the owner's warps there have reached that world's limit ({@link PlayerWarpError#LIMIT_REACHED}).
      */
     public Result<Unit, PlayerWarpError> moveHere(PlayerRef actor, PlayerWarpName name, Position at) {
         Objects.requireNonNull(at, "at");
         return gate(actor, name, WarpCapability.MOVE, warp -> {
-            if (!worldLimit.admitsMove(actor, warp, at.world())) {
-                return Result.err(PlayerWarpError.LIMIT_REACHED);
+            Optional<PlayerWarpError> refused = worldLimit.refusesMove(actor, warp, at.world());
+            if (refused.isPresent()) {
+                return Result.err(refused.get());
             }
             repository.save(warp.movedTo(at, recordedServer, clock.instant()));
             notifier.send(actor, PlayerwarpsMessageKey.PWARP_MOVED, Map.of("warp", name.value()));

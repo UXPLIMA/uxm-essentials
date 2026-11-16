@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
@@ -42,7 +43,7 @@ public final class SetWarp {
     private final DomainEventPublisher events;
     private final DomainGate gate;
     private final Clock clock;
-    private final java.util.List<String> worldBlacklist;
+    private final WorldBlacklist worldBlacklist;
     private final Optional<String> recordedServer;
 
     /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
@@ -51,7 +52,7 @@ public final class SetWarp {
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
-            java.util.List<String> worldBlacklist,
+            WorldBlacklist worldBlacklist,
             Optional<String> recordedServer) {
         this(repository, notifier, events, DomainGate.allowAll(), clock, worldBlacklist, recordedServer);
     }
@@ -62,14 +63,14 @@ public final class SetWarp {
             DomainEventPublisher events,
             DomainGate gate,
             Clock clock,
-            java.util.List<String> worldBlacklist,
+            WorldBlacklist worldBlacklist,
             Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
+        this.worldBlacklist = Objects.requireNonNull(worldBlacklist, "worldBlacklist");
         this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
@@ -87,7 +88,7 @@ public final class SetWarp {
         Objects.requireNonNull(cost, "cost");
         Objects.requireNonNull(requiredPermission, "requiredPermission");
 
-        if (worldBlacklist.contains(at.world().name())) {
+        if (worldBlacklist.bars(at.world())) {
             notifier.send(
                     owner,
                     WarpError.WORLD_BLACKLISTED.messageKey(),
