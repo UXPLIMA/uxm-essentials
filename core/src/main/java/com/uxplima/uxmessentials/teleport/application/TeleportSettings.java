@@ -72,8 +72,8 @@ public final class TeleportSettings {
     /**
      * The per-verb cooldown override in seconds for {@code kind}, or {@code -1} to inherit. Read from
      * {@code cooldowns.<verb>} (e.g. {@code cooldowns.back}); a verb the config never names returns {@code -1}.
-     * A non-negative value is that verb's fallback cooldown. The numbered {@code uxmessentials.tp.cooldown.<n>}
-     * tier still refines it via the min-reducer; {@code -1} keeps the shared {@link #defaultCooldownSeconds()}.
+     * A non-negative value is that verb's own cooldown, a ceiling the numbered {@code uxmessentials.tp.cooldown.<n>}
+     * tier can only lower; {@code -1} keeps the shared {@link #defaultCooldownSeconds()}.
      */
     public long verbCooldownOverrideSeconds(TeleportKind kind) {
         Objects.requireNonNull(kind, "kind");

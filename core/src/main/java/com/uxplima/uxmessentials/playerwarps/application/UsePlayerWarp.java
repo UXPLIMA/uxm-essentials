@@ -76,9 +76,10 @@ import org.jspecify.annotations.Nullable;
  * <p>A warp tagged for another backend of the network takes a different post-charge route: rather than the local
  * hop it hands off to the shared cross-server hop through {@link PlayerWarpHops}, which records the intent and
  * connects the player across the proxy. Such a use first passes the teleport context's jail, combat and cooldown checks,
- * ahead of the cost step, since the engine's own launch gate never runs for it. The charge stays the gate's concern
- * and is passed through so a route that never leaves (the sub-group off, or the proxy unreachable) refunds exactly
- * what was debited.
+ * ahead of the cost step, since the engine's own launch gate never runs for it. Its safe-landing step is left to the
+ * target, the only backend holding the warp's world, which refuses an unsafe landing and refunds through the hop. The
+ * charge stays the gate's concern and is passed through so a route that never leaves (the sub-group off, or the proxy
+ * unreachable) refunds exactly what was debited.
  */
 public final class UsePlayerWarp {
 
@@ -364,9 +365,13 @@ public final class UsePlayerWarp {
         return allowed ? null : PlayerWarpError.NOT_WHITELISTED;
     }
 
-    /** Step 5: an unsafe destination refuses unless the actor holds the safety bypass (applies to members too). */
+    /**
+     * Step 5: an unsafe destination refuses unless the actor holds the safety bypass (applies to members too). A warp
+     * on another backend points into a world this one does not hold, so only the target can judge it, when the player
+     * lands there.
+     */
     private @Nullable PlayerWarpError checkSafety(PlayerRef actor, PlayerWarp warp) {
-        if (safetyChecker.isSafe(warp.location()) || permissions.has(actor, BYPASS_SAFETY)) {
+        if (isRemote(warp) || safetyChecker.isSafe(warp.location()) || permissions.has(actor, BYPASS_SAFETY)) {
             return null;
         }
         return PlayerWarpError.UNSAFE_LOCATION;

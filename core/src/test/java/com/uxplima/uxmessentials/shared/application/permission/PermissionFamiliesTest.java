@@ -69,7 +69,7 @@ class PermissionFamiliesTest {
      * Those heads come from the kinds and the label factory, which the other tests here cover.
      */
     private static final Set<String> PASS_THROUGH =
-            Set.of("PdcCooldowns.java", "NetworkCooldowns.java", "SchedulerWarmups.java", "TrackingWarmups.java");
+            Set.of("CooldownTiers.java", "SchedulerWarmups.java", "TrackingWarmups.java");
 
     /**
      * The node every family's check builds for one sample, with the sample values in the order the row's

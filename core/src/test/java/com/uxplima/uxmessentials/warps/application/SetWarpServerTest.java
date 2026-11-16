@@ -45,7 +45,8 @@ class SetWarpServerTest {
                 new Live(Set.of("lobby", "survival")),
                 () -> announcements++,
                 audit,
-                recordedServer);
+                recordedServer,
+                "server-1");
     }
 
     private Optional<String> serverOf(WarpName name) {
@@ -84,6 +85,18 @@ class SetWarpServerTest {
         assertThat(serverOf(MARKET)).contains("lobby");
         assertThat(announcements).isZero();
         assertThat(notifier.keys()).containsExactly("warp.server-invalid", "warp.server-invalid");
+        assertThat(audit.lines).isEmpty();
+    }
+
+    @Test
+    void theShippedServerNameIsRefusedSinceNoBackendRecordsItAndNothingIsWritten() {
+        assertThat(setServer.set(ALEX, MARKET, "server-1").asError()).contains(WarpError.INVALID_SERVER);
+        assertThat(setServer.setAll(ALEX, "server-1").asError()).contains(WarpError.INVALID_SERVER);
+
+        assertThat(serverOf(MARKET)).contains("lobby");
+        assertThat(serverOf(PLOTS)).contains("lobby");
+        assertThat(announcements).isZero();
+        assertThat(notifier.keys()).containsExactly("warp.server-default", "warp.server-default");
         assertThat(audit.lines).isEmpty();
     }
 

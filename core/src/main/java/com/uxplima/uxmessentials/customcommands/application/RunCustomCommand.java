@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.customcommands.application.port.RunFeedback;
 import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -179,7 +180,7 @@ public final class RunCustomCommand {
             }
             return new RunOutcome.RequirementsFailed();
         }
-        if (command.cooldown().isZero() || permissions.has(actor, COOLDOWN_BYPASS)) {
+        if (!waits(command, actor)) {
             return null;
         }
         return cooldowns
@@ -187,6 +188,19 @@ public final class RunCustomCommand {
                 .asError()
                 .<RunOutcome>map(RunOutcome.OnCooldown::new)
                 .orElse(null);
+    }
+
+    /**
+     * Whether a run of {@code command} by {@code actor} waits for anything: the command's own cooldown, or a label
+     * tier the actor holds, which sets the wait even on a command declared without one. A command nobody waits for
+     * skips the gate and the stamp, so it runs at once on a network too, before the actor's cooldowns are read.
+     */
+    private boolean waits(CustomCommand command, PlayerRef actor) {
+        if (permissions.has(actor, COOLDOWN_BYPASS)) {
+            return false;
+        }
+        return !command.cooldown().isZero()
+                || CooldownTiers.labelWaitSeconds(permissions, actor, cooldownLabel(command.id()), 0L) > 0;
     }
 
     /** Start the shared warmup, deferring the charge and the chain to the moment it completes. */
@@ -215,7 +229,7 @@ public final class RunCustomCommand {
         if (unpaid != null) {
             return unpaid;
         }
-        if (!command.cooldown().isZero() && !permissions.has(actor, COOLDOWN_BYPASS)) {
+        if (waits(command, actor)) {
             cooldowns.stampLabel(actor, cooldownLabel(command.id()), command.cooldown());
         }
         actions.run(actor, command.actions(), arguments);

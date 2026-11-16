@@ -28,7 +28,8 @@ class SetHomeServerTest {
     private int announcements;
 
     private SetHomeServer use(String... live) {
-        return new SetHomeServer(servers, notifier.notifier(), new Live(Set.of(live)), () -> announcements++, audit);
+        return new SetHomeServer(
+                servers, notifier.notifier(), new Live(Set.of(live)), () -> announcements++, audit, "server-1");
     }
 
     @Test
@@ -54,6 +55,17 @@ class SetHomeServerTest {
         assertThat(servers.rows).containsExactly("server-1", "server-1", "survival");
         assertThat(announcements).isZero();
         assertThat(notifier.keys()).containsExactly("home.server-invalid");
+    }
+
+    @Test
+    void theShippedServerNameIsRefusedAsTheNewOneSinceNoBackendRecordsItAndNothingIsWritten() {
+        Result<Integer, HomeError> moved = use("server-1").rename(SAM, "survival", "server-1");
+
+        assertThat(moved.asError()).contains(HomeError.INVALID_SERVER);
+        assertThat(servers.rows).containsExactly("server-1", "server-1", "survival");
+        assertThat(announcements).isZero();
+        assertThat(audit.lines).isEmpty();
+        assertThat(notifier.keys()).containsExactly("home.server-default");
     }
 
     @Test

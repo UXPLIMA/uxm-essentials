@@ -363,7 +363,7 @@ public final class SocialPermissions {
                         POSES),
                 PermissionSpec.family(
                         SharedPermissions.featureCooldown("poses") + ".<seconds>",
-                        "The wait between starting poses, in seconds; the shortest tier held wins and 0 removes it.",
+                        "The wait between starting poses, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held there is no wait.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         POSES),

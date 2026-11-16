@@ -64,10 +64,11 @@ Renaming `network.server-name` leaves every row on the old name. Move them with:
 | `/worlds setserver <from> <to>` | Every managed world of one server, settings included. See [worlds](worlds.md#worlds-on-a-network). |
 
 Naming `unscoped` as the new server clears the record, so the backend that has the world loaded claims it again at
-its next start. Two backends running copies of one world folder share its `uid.dat`, and the first to start claims
-every warp and home in it: give each copy its own `uid.dat`, or set the server afterwards. A world loaded after the
-server finished starting is claimed at the next restart. The log names each claim (`event=warp_server_claim`,
-`event=home_server_claim`).
+its next start. `server-1` cannot be the new server: a backend still under that name records no server, so no backend
+would reach the rows. Two backends running copies of one world folder share its `uid.dat`, and the first to start
+claims every warp and home in it: give each copy its own `uid.dat`, or set the server afterwards. A world loaded
+after the server finished starting is claimed at the next restart. The log names each claim
+(`event=warp_server_claim`, `event=home_server_claim`).
 
 ## Carriers
 
@@ -197,9 +198,8 @@ Both keys are in the root `config.conf` and read on start.
   money back. If the target refuses them on arrival (the warp or home is gone, the world is full or will not load,
   the spot is unsafe), the server they reached gives it back, in the currency it was taken in; keep the economy module
   on wherever a move can land. A player warp's fee goes to its owner only when the visitor arrives.
-- **Safety.** Warps, homes and worlds check the spot on the server the player lands on. A player warp is checked on
-  the origin before the player leaves, against the origin's copy of the world, so a player warp whose world is not
-  loaded on the origin is refused as unsafe.
+- **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
+  that has its world.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with
   no warmup. An accepted teleport request runs the usual warmup on the mover's server first.
 - **Switches.** Turn each module's `cross-server` switch on on every backend. With it off, a warp or home is used on

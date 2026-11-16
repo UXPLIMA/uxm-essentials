@@ -128,9 +128,17 @@ public final class ConfigurateKitRepository implements KitRepository {
         Path target = fileFor(definition.id().value());
         Path temp = dir.resolve(definition.id().value() + SUFFIX + ".tmp");
         CommentedConfigurationNode root = CommentedConfigurationNode.root();
-        KitCodec.write(root, definition);
+        KitCodec.write(root, definition, previousFile(target));
         HoconConfigurationLoader.builder().path(temp).build().save(root);
         atomicMove(temp, target);
+    }
+
+    /** The kit as its file holds it now, or an empty node when there is no file yet. */
+    private static ConfigurationNode previousFile(Path file) throws IOException {
+        if (!Files.isRegularFile(file)) {
+            return CommentedConfigurationNode.root();
+        }
+        return HoconConfigurationLoader.builder().path(file).build().load();
     }
 
     private static void atomicMove(Path temp, Path target) throws IOException {
@@ -209,7 +217,7 @@ public final class ConfigurateKitRepository implements KitRepository {
             Optional<KitDefinition> kit = KitCodec.read(id, entry.getValue(), log);
             if (kit.isPresent()) {
                 CommentedConfigurationNode root = CommentedConfigurationNode.root();
-                KitCodec.write(root, kit.get());
+                KitCodec.write(root, kit.get(), entry.getValue());
                 HoconConfigurationLoader.builder()
                         .path(dir.resolve(kit.get().id().value() + SUFFIX))
                         .build()

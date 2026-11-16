@@ -238,6 +238,11 @@ final class UntouchedImportPorts {
         }
 
         @Override
+        public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+            throw touched();
+        }
+
+        @Override
         public int appendWarn(PlayerRef target, Warn warn) {
             throw touched();
         }
