@@ -20,6 +20,7 @@ import io.papermc.paper.event.player.AsyncChatEvent;
 import net.kyori.adventure.chat.SignedMessage;
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -112,6 +113,24 @@ class ModerationScenarioTest {
         assertThat(fromMuted.isCancelled()).isTrue();
         assertThat(RunningPlugin.said(muted)).as("why the line went nowhere").hasSize(1);
         assertThat(fromTalker.isCancelled()).isFalse();
+        assertThat(running.problems()).isEmpty();
+    }
+
+    @Test
+    void aMutedPlayerWhoIsExemptStillTalks() {
+        ScenarioPlayer exempt = running.join("Ezra");
+        running.run(moderator, "mute Ezra 10m spam");
+        assertThat(chat(exempt, "first").isCancelled()).as("muted").isTrue();
+        // Granted after the mute, which a moderator could not place on an exempt player.
+        exempt.addAttachment(watcher, ModerationGuard.EXEMPT_NODE, true);
+        RunningPlugin.said(exempt);
+
+        AsyncChatEvent line = chat(exempt, "hello");
+
+        assertThat(line.isCancelled()).isFalse();
+        assertThat(RunningPlugin.said(exempt))
+                .as("nothing tells them the line was stopped")
+                .isEmpty();
         assertThat(running.problems()).isEmpty();
     }
 
