@@ -15,6 +15,15 @@ public enum UxmWarmupCancelReason {
     /** The player interacted with something. */
     INTERACTED,
 
-    /** The warmup was called off outright, by a command or by the plugin shutting down. */
-    ABORTED
+    /**
+     * No more specific reason is known. The plugin names one of the other reasons for every warmup it cuts short, so
+     * a listener does not see this from it; the constant stays so code written against it keeps compiling.
+     */
+    ABORTED,
+
+    /** The player left the server. */
+    QUIT,
+
+    /** The player started another teleport, here or to another server, which replaced this one. */
+    SUPERSEDED
 }

@@ -19,6 +19,12 @@ public enum WarmupCancelReason {
     /** The player interacted (used an item or block) and interact-cancel is enabled. */
     INTERACTED,
 
-    /** The player issued {@code /tpcancel} or logged out mid-warmup. */
-    ABORTED
+    /** The warmup was called off with no more specific cause. */
+    ABORTED,
+
+    /** The player left the server mid-warmup. */
+    QUIT,
+
+    /** The same player started another teleport, which replaced this one. */
+    SUPERSEDED
 }

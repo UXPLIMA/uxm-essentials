@@ -8,9 +8,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
@@ -30,10 +32,20 @@ final class TeleportFakes {
 
         private final List<Held> pending = new ArrayList<>();
 
-        private record Held(Runnable onComplete, Runnable onCancel) {}
+        private record Held(Runnable onComplete, Consumer<CancelCause> onCancel) {}
 
         @Override
         public WarmupHandle begin(PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel) {
+            return begin(who, kind, onComplete, (CancelCause cause) -> onCancel.run(), onCancel);
+        }
+
+        @Override
+        public WarmupHandle begin(
+                PlayerRef who,
+                WarmupKind kind,
+                Runnable onComplete,
+                Consumer<CancelCause> onCancel,
+                Runnable onSuperseded) {
             pending.add(new Held(onComplete, onCancel));
             return new Warmups.CompletedWarmup(who);
         }
@@ -51,7 +63,7 @@ final class TeleportFakes {
         void moveAway() {
             List<Held> due = List.copyOf(pending);
             pending.clear();
-            due.forEach(held -> held.onCancel().run());
+            due.forEach(held -> held.onCancel().accept(CancelCause.MOVED));
         }
     }
 
