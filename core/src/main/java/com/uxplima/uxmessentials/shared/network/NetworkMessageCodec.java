@@ -6,6 +6,7 @@ import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -425,6 +426,8 @@ public final class NetworkMessageCodec {
             }
         }
         writeUuid(out, party.partyId());
+        out.writeLong(party.firedAt().toEpochMilli());
+        out.writeBoolean(party.bothCarriers());
     }
 
     private static VotePartyFired readParty(DataInputStream in, String origin) throws IOException {
@@ -435,7 +438,13 @@ public final class NetworkMessageCodec {
         }
         VotePartyFired.Reach reach = VotePartyFired.Reach.fromWireTag(in.readByte());
         Set<UUID> voters = reach == VotePartyFired.Reach.VOTERS ? readVoters(in) : Set.of();
-        return new VotePartyFired(origin, readOptionalUuid(in), threshold, reach, voters);
+        UUID partyId = readOptionalUuid(in);
+        if (in.available() < Long.BYTES + 1) {
+            // A sender that predates the fire time: the party is never taken for a late copy.
+            return new VotePartyFired(origin, partyId, threshold, reach, voters);
+        }
+        Instant firedAt = Instant.ofEpochMilli(in.readLong());
+        return new VotePartyFired(origin, partyId, threshold, reach, voters, firedAt, in.readBoolean());
     }
 
     private static Set<UUID> readVoters(DataInputStream in) throws IOException {

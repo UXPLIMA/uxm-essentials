@@ -2,6 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -34,6 +37,8 @@ class VoteSyncTest {
             100, Optional.empty(), List.of("give {player} diamond"), List.of(), List.of(), List.of(), Set.of());
 
     private static final UUID PARTY = new UUID(0L, 0xf1L);
+    private static final Instant STARTED = Instant.parse("2030-01-01T12:00:00Z");
+    private static final Clock NOW = Clock.fixed(STARTED.plusSeconds(60), ZoneOffset.UTC);
 
     private final List<PlayerRef> paid = new ArrayList<>();
     private int announcements;
@@ -44,7 +49,8 @@ class VoteSyncTest {
             new RewardNetworkParty(
                     (voter, online, grant) -> paid.add(voter),
                     () -> List.of(ALEX, SAM),
-                    new PartyConfig(REWARD, 25, false, 0, PartyResetSchedule.NONE, List.of(), true)));
+                    new PartyConfig(REWARD, 25, false, 0, PartyResetSchedule.NONE, List.of(), true)),
+            STARTED);
 
     private final List<NetworkMessage> published = new ArrayList<>();
     private final BusPublisher bus = new BusPublisher() {
@@ -63,23 +69,26 @@ class VoteSyncTest {
     void aVoterListThatFitsTheFrameIsSent() {
         Set<UUID> voters = voters(VoteSync.MAX_VOTERS_ON_WIRE);
 
-        VoteSync.partyPublisher(bus).accept(new VotePartyTriggered(25, true, voters));
+        VoteSync.partyPublisher(bus, NOW, true).accept(new VotePartyTriggered(25, true, voters));
 
         assertThat(published)
-                .containsExactly(new VotePartyFired("survival-1", partyId(0), 25, VotePartyFired.Reach.VOTERS, voters));
+                .containsExactly(new VotePartyFired(
+                        "survival-1", partyId(0), 25, VotePartyFired.Reach.VOTERS, voters, NOW.instant(), true));
     }
 
     @Test
     void aVoterListTooLongForTheFrameNamesNobody() {
-        VoteSync.partyPublisher(bus).accept(new VotePartyTriggered(25, true, voters(VoteSync.MAX_VOTERS_ON_WIRE + 1)));
+        VoteSync.partyPublisher(bus, NOW, false)
+                .accept(new VotePartyTriggered(25, true, voters(VoteSync.MAX_VOTERS_ON_WIRE + 1)));
 
         assertThat(published)
-                .containsExactly(new VotePartyFired("survival-1", partyId(0), 25, VotePartyFired.Reach.NONE, Set.of()));
+                .containsExactly(new VotePartyFired(
+                        "survival-1", partyId(0), 25, VotePartyFired.Reach.NONE, Set.of(), NOW.instant(), false));
     }
 
     @Test
     void everyPartyIsSentUnderItsOwnId() {
-        Consumer<DomainEvent> publisher = VoteSync.partyPublisher(bus);
+        Consumer<DomainEvent> publisher = VoteSync.partyPublisher(bus, NOW, true);
 
         publisher.accept(new VotePartyTriggered(25, false, Set.of()));
         publisher.accept(new VotePartyTriggered(25, false, Set.of()));
@@ -104,6 +113,72 @@ class VoteSyncTest {
 
         assertThat(paid).containsExactly(ALEX, SAM);
         assertThat(announcements).isEqualTo(1);
+    }
+
+    @Test
+    void aBothCarrierCopyOfAPartyThatFiredBeforeThisServerStartedListeningIsNotPaidAgain() {
+        listener.onRemoteChange(new VotePartyFired(
+                "vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), STARTED.minusSeconds(3600), true));
+
+        assertThat(paid).isEmpty();
+        assertThat(announcements).isZero();
+    }
+
+    @Test
+    void aBothCarrierPartyThatFiredJustBeforeThisServerStartedListeningIsStillPaid() {
+        Instant withinGrace = STARTED.minus(VoteSync.LATE_COPY_GRACE).plusSeconds(1);
+
+        listener.onRemoteChange(
+                new VotePartyFired("vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), withinGrace, true));
+
+        assertThat(paid).containsExactly(ALEX, SAM);
+    }
+
+    @Test
+    void aBothCarrierPartyThatFiredJustPastTheGraceIsNotPaid() {
+        Instant pastGrace = STARTED.minus(VoteSync.LATE_COPY_GRACE).minusSeconds(1);
+
+        listener.onRemoteChange(
+                new VotePartyFired("vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), pastGrace, true));
+
+        assertThat(paid).isEmpty();
+    }
+
+    @Test
+    void aProxyOnlyPartyThatArrivesLateIsStillPaid() {
+        listener.onRemoteChange(new VotePartyFired(
+                "vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), STARTED.minusSeconds(3600), false));
+
+        assertThat(paid).containsExactly(ALEX, SAM);
+    }
+
+    @Test
+    void aServerOnTheProxyAlonePaysABothCarrierPartyHoweverLateItArrives() {
+        RemoteSyncListener proxyOnly = VoteSync.listener(
+                () -> {},
+                (key, placeholders, channels) -> announcements++,
+                Set.of(),
+                new RewardNetworkParty(
+                        (voter, online, grant) -> paid.add(voter),
+                        () -> List.of(ALEX, SAM),
+                        new PartyConfig(REWARD, 25, false, 0, PartyResetSchedule.NONE, List.of(), true)),
+                Instant.MIN);
+
+        proxyOnly.onRemoteChange(new VotePartyFired(
+                "vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), STARTED.minusSeconds(3600), true));
+
+        assertThat(paid).containsExactly(ALEX, SAM);
+    }
+
+    @Test
+    void aBothCarrierPartyThatFiredWhileThisServerListensIsPaidOnce() {
+        VotePartyFired party = new VotePartyFired(
+                "vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), STARTED.plusSeconds(5), true);
+
+        listener.onRemoteChange(party);
+        listener.onRemoteChange(party);
+
+        assertThat(paid).containsExactly(ALEX, SAM);
     }
 
     @Test

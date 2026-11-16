@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.Set;
 import java.util.UUID;
@@ -30,6 +31,42 @@ class VotePartyFiredTest {
         NetworkMessage received = NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
 
         assertThat(received).isEqualTo(sent);
+    }
+
+    @Test
+    void theFireTimeAndCarriersCrossTheWireUnchanged() {
+        VotePartyFired sent = new VotePartyFired(
+                "survival-1",
+                PARTY,
+                25,
+                VotePartyFired.Reach.EVERYONE,
+                Set.of(),
+                Instant.parse("2030-01-01T12:00:00.123Z"),
+                true);
+
+        NetworkMessage received = NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent));
+
+        assertThat(received).isEqualTo(sent);
+    }
+
+    @Test
+    void aPartyFromAServerThatSendsNoFireTimeIsNeverTakenForALateCopy() {
+        VotePartyFired sent = new VotePartyFired(
+                "survival-1",
+                PARTY,
+                25,
+                VotePartyFired.Reach.EVERYONE,
+                Set.of(),
+                Instant.parse("2030-01-01T12:00:00Z"),
+                true);
+        byte[] frame = NetworkMessageCodec.encode(sent);
+
+        VotePartyFired received =
+                (VotePartyFired) NetworkMessageCodec.decode(Arrays.copyOf(frame, frame.length - Long.BYTES - 1));
+
+        assertThat(received)
+                .isEqualTo(new VotePartyFired("survival-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of()));
+        assertThat(received.firedBefore(Instant.parse("2031-01-01T00:00:00Z"))).isFalse();
     }
 
     @Test
@@ -90,7 +127,7 @@ class VotePartyFiredTest {
         VotePartyFired sent = new VotePartyFired("survival-1", PARTY, 25, VotePartyFired.Reach.VOTERS, Set.of(ALEX));
         byte[] frame = NetworkMessageCodec.encode(sent);
 
-        NetworkMessage received = NetworkMessageCodec.decode(Arrays.copyOf(frame, frame.length - 16));
+        NetworkMessage received = NetworkMessageCodec.decode(Arrays.copyOf(frame, frame.length - 16 - Long.BYTES - 1));
 
         assertThat(received)
                 .isEqualTo(new VotePartyFired(

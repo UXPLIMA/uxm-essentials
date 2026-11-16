@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.vote.adapter;
 
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Objects;
@@ -144,7 +146,8 @@ public final class VoteWiring {
             ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings,
-            ObjLongConsumer<UUID> board) {
+            ObjLongConsumer<UUID> board,
+            boolean bothCarriers) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
@@ -229,9 +232,16 @@ public final class VoteWiring {
         RewardNetworkParty networkRewards = new RewardNetworkParty(applier, audience, party);
         bus.registry()
                 .register(VoteSync.listener(
-                        cachedRepository::invalidate, broadcaster, broadcastChannels, networkRewards));
+                        cachedRepository::invalidate,
+                        broadcaster,
+                        broadcastChannels,
+                        networkRewards,
+                        // Only a backend on both carriers got the Redis copy a late proxy copy duplicates; one on the
+                        // proxy alone may be hearing of the party for the first time, so it never drops one.
+                        bothCarriers ? Clock.systemUTC().instant() : Instant.MIN));
         bus.registry().registerResync(cachedRepository::reloadCount);
-        Consumer<DomainEvent> partyPublisher = VoteSync.partyPublisher(bus.publisher());
+        Consumer<DomainEvent> partyPublisher =
+                VoteSync.partyPublisher(bus.publisher(), Clock.systemUTC(), bothCarriers);
         events.subscribe(partyPublisher);
 
         // Reminder interval task (only when reminders.enabled && interval-minutes > 0).
