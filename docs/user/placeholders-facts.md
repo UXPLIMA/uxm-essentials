@@ -67,7 +67,7 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `player_health_rounded` | shared | The player's health rounded to a whole number. | `"18"` | session |
 | `player_ip` | shared | The address the player is connected from, without the port. | `"203.0.113.7"` | session |
 | `player_kills` | shared | How many players the account has killed. | `"4"` | player |
-| `player_language` | shared | The language the player reads in, as tr or pt_br: the forced one, else their /lang choice, else their client's. | `"tr"` | session |
+| `player_language` | shared | The language the player reads in, as tr or pt_br: the forced one, else their /lang choice, else their client's when the server has messages in it, else the default. | `"tr"` | session |
 | `player_last_seen` | shared | When the account was last connected; empty while it is connected now. | `"2024-06-12 21:05"` | player |
 | `player_last_seen_date` | shared | The same last-seen stamp, under the spelling a config may prefer. | `"2024-06-12 21:05"` | player |
 | `player_level` | shared | The player's experience level. | `"30"` | session |

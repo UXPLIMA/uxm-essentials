@@ -38,6 +38,17 @@ public interface LocaleCatalog {
     }
 
     /**
+     * Whether a catalogue is written in {@code locale}'s language, bundled or the operator's own. A reader whose
+     * language has none would be answered key by key from English, so the server's default serves them instead.
+     */
+    default boolean covers(Locale locale) {
+        String language = locale.getLanguage();
+        return !language.isEmpty()
+                && availableLocales().stream()
+                        .anyMatch(available -> available.getLanguage().equals(language));
+    }
+
+    /**
      * Drop every loaded table and re-read the catalogs from disk, so an operator's edit to a
      * {@code messages_<lang>.conf} takes effect without a restart. The swap is atomic per locale: a concurrent
      * lookup sees either the old table or the new one. The default is a no-op for a catalog with nothing to
