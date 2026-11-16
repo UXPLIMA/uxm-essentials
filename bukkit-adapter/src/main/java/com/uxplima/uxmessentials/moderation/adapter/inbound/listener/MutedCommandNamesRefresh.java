@@ -9,12 +9,16 @@ import org.bukkit.event.server.PluginDisableEvent;
 import org.bukkit.event.server.PluginEnableEvent;
 import org.bukkit.event.server.ServerLoadEvent;
 
+import io.papermc.paper.event.server.ServerResourcesReloadedEvent;
+
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import org.jspecify.annotations.NullMarked;
 
 /**
  * Makes the muted-command policy read the names of its listed commands again whenever the server's command list can
- * have changed: once every plugin has loaded, and whenever a plugin is enabled or disabled while the server runs.
+ * have changed: once every plugin has loaded, whenever a plugin is enabled or disabled while the server runs, and
+ * after {@code /minecraft:reload} registers the game's commands again. A command registered at runtime without any of
+ * these (a script reload, a direct command map registration) is seen after {@code /uxmess reload}.
  */
 @NullMarked
 public final class MutedCommandNamesRefresh implements Listener {
@@ -37,6 +41,11 @@ public final class MutedCommandNamesRefresh implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPluginDisable(PluginDisableEvent event) {
+        policy.forgetCommandNames();
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onResourcesReloaded(ServerResourcesReloadedEvent event) {
         policy.forgetCommandNames();
     }
 }

@@ -45,8 +45,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * far back the history read reaches (newest-first), so an operator can scope a rollback to a staff member's recent
  * activity. A limit above {@link #MAX_LIMIT} is lowered to it so the history scan stays bounded, and the actor is
  * told, so a rollback that read fewer rows than asked never passes for a complete one. The result is a
- * {@link RollbackSummary} of the counts undone, reported to the
- * actor; when nothing was in effect the actor is told so instead.
+ * {@link RollbackSummary} of the counts undone, reported to the actor; when nothing was in effect the actor is told
+ * so instead.
  */
 public final class StaffRollback {
 

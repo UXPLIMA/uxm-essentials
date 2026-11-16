@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.moderation.application.port.CommandNames;
@@ -40,7 +41,8 @@ public final class MutedCommandPolicy {
     private final Set<String> blocked;
     private final Set<String> allowed;
     private final CommandNames names;
-    private volatile @Nullable Set<String> listedNames;
+    private final AtomicLong generation = new AtomicLong();
+    private volatile @Nullable Resolved listedNames;
 
     /**
      * @param blockedCommands the configured command words a muted player may not run, in any case; a leading
@@ -76,22 +78,31 @@ public final class MutedCommandPolicy {
 
     /** Drop the resolved names of the listed entries, so the next check reads them from the server again. */
     public void forgetCommandNames() {
-        listedNames = null;
+        generation.incrementAndGet();
     }
 
-    /** Every name of every listed entry's command; resolved on first use and kept until forgotten. */
+    /**
+     * Every name of every listed entry's command; resolved on first use and kept until forgotten. A set is tagged with
+     * the generation it was resolved in, and one from before the latest forget is never used, even when a slow
+     * resolve stores it after the forget.
+     */
     private Set<String> listedNames() {
-        Set<String> known = listedNames;
-        if (known == null) {
-            Set<String> resolved = new HashSet<>();
-            for (String entry : blocked) {
-                resolved.addAll(names.namesOf(entry));
-            }
-            known = Set.copyOf(resolved);
-            listedNames = known;
+        long current = generation.get();
+        Resolved known = listedNames;
+        if (known != null && known.generation() == current) {
+            return known.names();
         }
-        return known;
+        Set<String> resolved = new HashSet<>();
+        for (String entry : blocked) {
+            resolved.addAll(names.namesOf(entry));
+        }
+        Set<String> fresh = Set.copyOf(resolved);
+        listedNames = new Resolved(current, fresh);
+        return fresh;
     }
+
+    /** The listed entries' names as resolved in one generation. */
+    private record Resolved(long generation, Set<String> names) {}
 
     private static Set<String> words(Set<String> entries) {
         return entries.stream()

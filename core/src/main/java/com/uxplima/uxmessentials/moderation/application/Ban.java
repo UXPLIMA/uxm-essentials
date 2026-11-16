@@ -223,7 +223,7 @@ public final class Ban {
         boolean capped = capped(ban);
         Duration effective = spanOf(ban);
         Instant expiry = ban.until();
-        history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty());
+        history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
         BanScreen.of(ban, now).kick(sanctions, notifier, target);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, label(ban), true, reason);
@@ -283,7 +283,7 @@ public final class Ban {
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, false, SanctionStrength.HELD);
                 case GuardedWrite.Stored<IpBan> stored -> {
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, true, reason);
-                    history.banIp(actor, Optional.of(target.uuid()), ip, reason, until);
+                    history.banIp(actor, Optional.of(target.uuid()), ip, reason, until, now);
                     banned++;
                 }
             }

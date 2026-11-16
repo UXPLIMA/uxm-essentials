@@ -115,6 +115,25 @@ class MutedCommandPolicyTest {
     }
 
     @Test
+    void namesForgottenWhileTheyWereBeingReadAreReadAgain() {
+        // A plugin enables while the first check is reading the listed commands: chat gains pm right after its read.
+        List<MutedCommandPolicy> made = new ArrayList<>();
+        CommandNames racing = word -> {
+            Set<String> found = server.getOrDefault(word, Set.of());
+            if (word.equals("chat") && !found.contains("pm")) {
+                server.put("chat", Set.of("chat", "dm", "pm"));
+                made.getFirst().forgetCommandNames();
+            }
+            return found;
+        };
+        made.add(new MutedCommandPolicy(Set.of("chat"), Set.of(), racing));
+        MutedCommandPolicy policy = made.getFirst();
+
+        assertThat(policy.isBlocked("pm")).isFalse();
+        assertThat(policy.isBlocked("pm")).isTrue();
+    }
+
+    @Test
     void anEmptyListBlocksNothingAndLooksNothingUp() {
         MutedCommandPolicy policy = blocking(" ", "/");
 

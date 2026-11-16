@@ -37,16 +37,36 @@ public final class SanctionHistoryRecorder {
 
     /** Record a UUID ban of {@code target} ({@code expiry} present for a tempban, empty for a permanent ban). */
     public void ban(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> expiry) {
+        ban(actor, target, reason, expiry, clock.instant());
+    }
+
+    /**
+     * Record a UUID ban of {@code target} applied at {@code at}. A STRICT {@code /ban} stamps the player's row and the
+     * rows of the addresses it reached with one instant, which is how {@code /modstats} tells those addresses from a
+     * {@code /banip} and counts the ban once.
+     */
+    public void ban(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> expiry, Instant at) {
         Objects.requireNonNull(target, "target");
-        append(SanctionAction.BAN, target.uuid(), actor, reason, expiry, Optional.empty());
+        append(SanctionAction.BAN, target.uuid(), actor, reason, expiry, Optional.empty(), at);
     }
 
     /** Record an IP ban ({@code target} the resolved player or empty for {@code /banip <ip>}). */
     public void banIp(
             PlayerRef actor, Optional<UUID> target, String ip, Optional<String> reason, Optional<Instant> expiry) {
+        banIp(actor, target, ip, reason, expiry, clock.instant());
+    }
+
+    /** Record an IP ban applied at {@code at}; see {@link #ban(PlayerRef, PlayerRef, Optional, Optional, Instant)}. */
+    public void banIp(
+            PlayerRef actor,
+            Optional<UUID> target,
+            String ip,
+            Optional<String> reason,
+            Optional<Instant> expiry,
+            Instant at) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(ip, "ip");
-        append(SanctionAction.BAN, target.orElse(NO_UUID), actor, reason, expiry, Optional.of(ip));
+        append(SanctionAction.BAN, target.orElse(NO_UUID), actor, reason, expiry, Optional.of(ip), at);
     }
 
     /** Record a UUID unban of {@code target}. */
@@ -108,9 +128,21 @@ public final class SanctionHistoryRecorder {
             Optional<String> reason,
             Optional<Instant> expiry,
             Optional<String> ip) {
+        append(action, target, actor, reason, expiry, ip, clock.instant());
+    }
+
+    private void append(
+            SanctionAction action,
+            UUID target,
+            PlayerRef actor,
+            Optional<String> reason,
+            Optional<Instant> expiry,
+            Optional<String> ip,
+            Instant at) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(expiry, "expiry");
-        store.append(new SanctionHistoryEntry(action, target, Issuer.of(actor), reason, clock.instant(), expiry, ip));
+        Objects.requireNonNull(at, "at");
+        store.append(new SanctionHistoryEntry(action, target, Issuer.of(actor), reason, at, expiry, ip));
     }
 }

@@ -79,6 +79,8 @@ class StrictBanHistoryTest {
             assertThat(row.reason()).contains("cheating");
             assertThat(row.expiry()).isEmpty();
         });
+        // One instant for the player's row and its addresses, which is how /modstats counts the ban once.
+        assertThat(history.entries()).extracting(SanctionHistoryEntry::at).containsOnly(NOW);
     }
 
     @Test

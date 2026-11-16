@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 
 /**
@@ -51,11 +54,35 @@ public interface SanctionHistory {
     List<SanctionHistoryEntry> revocableByActor(UUID actor, int limit);
 
     /**
-     * Every row (any kind, any target, any actor) applied at or after {@code threshold}, newest-first, capped at
-     * {@code limit}. The read side of the server-wide punishment analytics ({@code /modstats}): the bounded scan
-     * the pure {@code PunishmentStats} aggregation folds into a per-staff leaderboard. Pass {@link Instant#EPOCH}
-     * for the whole recorded history. Like every other read it is capped so the query stays within budget; the
-     * command hops it off the tick thread.
+     * How many punishments each staff member issued at or after {@code threshold}, counted by the store so no row is
+     * left out by a read limit: the read side of {@code /modstats}. One {@link Tally} per issuer name and action;
+     * {@code actor} narrows it to one staff member. Only bans, mutes, warnings and kicks are counted, and as actions
+     * rather than rows:
+     *
+     * <ul>
+     *   <li>the kicks of one {@code /kickall} share one instant and count once;
+     *   <li>an IP ban row counts unless the same staff member's player ban of the same player was written at the same
+     *       instant, so a {@code /banip} counts and the addresses a STRICT {@code /ban} reached do not.
+     * </ul>
      */
-    List<SanctionHistoryEntry> allSince(Instant threshold, int limit);
+    List<Tally> countsSince(Instant threshold, Optional<UUID> actor);
+
+    /**
+     * One staff member's count of one action.
+     *
+     * @param actor the issuer's UUID, or empty for the console
+     * @param actorName the name the issuer had on these rows
+     * @param action the action counted
+     * @param count how many times it was issued
+     * @param latest when the newest of these rows was written, to tell a renamed issuer's current name
+     */
+    record Tally(Optional<UUID> actor, String actorName, SanctionAction action, int count, Instant latest) {
+
+        public Tally {
+            Objects.requireNonNull(actor, "actor");
+            Objects.requireNonNull(actorName, "actorName");
+            Objects.requireNonNull(action, "action");
+            Objects.requireNonNull(latest, "latest");
+        }
+    }
 }

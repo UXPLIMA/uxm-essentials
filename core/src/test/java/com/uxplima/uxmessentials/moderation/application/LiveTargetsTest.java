@@ -308,8 +308,8 @@ class LiveTargetsTest {
         }
 
         @Override
-        public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
-            return List.copyOf(entries);
+        public List<SanctionHistory.Tally> countsSince(Instant threshold, Optional<UUID> actor) {
+            return List.of();
         }
     }
 

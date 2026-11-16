@@ -122,7 +122,9 @@ muted-allowed-commands = ["ticketreply"]
 ```
 
 With that, a muted player can run `/ticketreply` but not `/reply`. The names of the listed commands are read from
-the server once and again after a plugin is enabled or disabled, the server finishes starting, or `/uxmess reload`.
+the server once and again after a plugin is enabled or disabled, the server finishes starting, `/minecraft:reload`
+or `/uxmess reload`. A command another plugin adds while the server runs without being enabled again (a script
+reload, for example) is only seen after `/uxmess reload`.
 
 `/mute` refuses a player who is already muted and says how long that mute still runs; `/unmute` first to change a
 mute. When two servers of a network mute the same player at the same moment, the first mute stays and the second is
@@ -331,7 +333,7 @@ it banned, naming the player; an address that kept its own longer ban gets no ro
 | `/banlist`, `/mutelist` | `uxmessentials.moderation.banlist`, `uxmessentials.moderation.mutelist` | Bans and mutes in effect (up to 50). |
 | `/staffhistory <staff>` | `uxmessentials.moderation.staffhistory` | What one staff member has issued. |
 | `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 player bans, mutes and warnings unless a limit is given (kicks, lifts and IP bans are not read and do not count), at most 500; a larger limit is lowered to 500 and the command says so. A sanction since replaced by another staff member's is left alone. |
-| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. Bans are player bans (IP bans are not counted), and a `/kickall` counts as one kick. |
+| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown, counted over the whole window. A `/banip` or `/tempbanip` counts as a ban, the addresses a STRICT `/ban` adds do not (the ban counts once), and a `/kickall` counts as one kick. |
 | `/seen <player>` | `uxmessentials.moderation.seen` | First join and last seen, or the server the player is on now. |
 | `/seenip <player>`, `/alts <player>` | `uxmessentials.moderation.seen` | The last address and the accounts that share it; every account that shared any of the player's addresses. |
 | `/commandspy` (`/cspy`) | `uxmessentials.moderation.commandspy` | Shows you the commands other players run. |
