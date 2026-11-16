@@ -60,6 +60,21 @@ public final class ReadThroughCache<K, V> {
         return Optional.ofNullable(cache.getIfPresent(Objects.requireNonNull(key, "key")));
     }
 
+    /**
+     * Put {@code fresh} in place of {@code expected} for {@code key}, only while the entry still holds
+     * {@code expected}. A write that invalidated the key, or a read that reloaded it, since {@code expected} was read
+     * makes this a no-op, so a value loaded before that write never overwrites what it wrote. For a refresh off the
+     * tick that must leave no gap where a reader would load on its own thread.
+     *
+     * @return whether the entry now holds {@code fresh}
+     */
+    public boolean replace(K key, V expected, V fresh) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(fresh, "fresh");
+        return cache.asMap().replace(key, expected, fresh);
+    }
+
     /** Drop {@code key} so the next read reloads it; call after a write that changed it. */
     public void invalidate(K key) {
         cache.invalidate(Objects.requireNonNull(key, "key"));

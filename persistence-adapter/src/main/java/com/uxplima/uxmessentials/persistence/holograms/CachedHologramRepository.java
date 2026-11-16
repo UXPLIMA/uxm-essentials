@@ -7,9 +7,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.domain.Hologram;
@@ -162,6 +164,41 @@ public final class CachedHologramRepository implements HologramRepository {
             blacklists.invalidate(name);
         }));
         return swap;
+    }
+
+    /**
+     * Read every viewer and blacklist set held in memory again and swap in the ones that changed, for a show, hide or
+     * blacklist edit another server made whose frame was lost: such an edit leaves the hologram row as it was, so
+     * {@link #reloadAll()} cannot see it. A set not held in memory is skipped, since its next read loads the current
+     * rows anyway. The old set is served until the new one is in, so no render loads on the tick meanwhile, and a
+     * local edit made during the read wins over it. Blocks on the database, so call it off the tick.
+     *
+     * @return the names whose viewer or blacklist set changed, which a caller re-renders
+     */
+    public Set<String> refreshViewerLists() {
+        Map<String, Hologram> current = loaded.get();
+        if (current == null) {
+            return Set.of();
+        }
+        Set<String> changed = new TreeSet<>();
+        for (String name : current.keySet()) {
+            boolean viewersChanged = refresh(viewers, name, delegate::manualViewers);
+            boolean blacklistChanged = refresh(blacklists, name, delegate::blacklisted);
+            if (viewersChanged || blacklistChanged) {
+                changed.add(name);
+            }
+        }
+        return changed;
+    }
+
+    private static boolean refresh(
+            ReadThroughCache<String, Set<UUID>> cache, String name, Function<HologramName, Set<UUID>> load) {
+        Optional<Set<UUID>> cached = cache.getIfPresent(name);
+        if (cached.isEmpty()) {
+            return false;
+        }
+        Set<UUID> fresh = load.apply(HologramName.of(name));
+        return !fresh.equals(cached.get()) && cache.replace(name, cached.get(), fresh);
     }
 
     /** Drop the loaded set and the viewer/blacklist caches; call on a module reload. */

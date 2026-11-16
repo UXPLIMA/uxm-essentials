@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Records this backend as the server of the warps of unknown server whose world it has loaded, once the worlds are
  * up. The world list is read on the global region, the update runs on the async lane, and a claim that took any row
- * drops this backend's cached warp set and tells the peers to drop theirs, so every backend routes those warps here
+ * reloads this backend's cached warp set and tells the peers to reload theirs, so every backend routes those warps here
  * from then on.
  *
  * <p>It runs only on a network under a real server name ({@code server} present). A standalone server's name is not
@@ -83,7 +83,8 @@ public final class WarpServerAdoption implements Runnable {
                             server,
                             claimed.size(),
                             String.join(",", claimed));
-            cache.invalidateAll();
+            // On the async lane already, so the set is reloaded here rather than dropped for a tick reader to load.
+            cache.reloadAll();
             bus.publish(new WarpChanged(server, "*"));
         } catch (RuntimeException unclaimed) {
             // The warps keep reading as unknown and are used locally, as before; the next start tries again.
