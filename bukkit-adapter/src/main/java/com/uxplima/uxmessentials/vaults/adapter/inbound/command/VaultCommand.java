@@ -224,7 +224,6 @@ public final class VaultCommand implements CommandRegistration {
         scheduler.async(() -> {
             Vault vault = services.openAdminVault().open(actor, owner, index);
             openWindow(staff, actor, owner, vault);
-            notifier.adminOpened(actor, owner, index);
         });
         return Command.SINGLE_SUCCESS;
     }
@@ -361,12 +360,15 @@ public final class VaultCommand implements CommandRegistration {
     }
 
     private void openWindow(Player player, PlayerRef viewer, PlayerRef owner, Vault vault) {
-        scheduler.onEntity(viewer, () -> {
-            services.view().open(player, viewer, owner, vault);
-            if (viewer.uuid().equals(owner.uuid())) {
-                notifier.opened(viewer, vault.index());
-            }
-        });
+        scheduler.onEntity(
+                viewer,
+                () -> services.view().open(player, viewer, owner, vault, () -> {
+                    if (viewer.uuid().equals(owner.uuid())) {
+                        notifier.opened(viewer, vault.index());
+                    } else {
+                        notifier.adminOpened(viewer, owner, vault.index());
+                    }
+                }));
     }
 
     private void rejectOwn(PlayerRef viewer, int index, VaultError error) {

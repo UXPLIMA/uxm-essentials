@@ -19,10 +19,10 @@ public final class EnderseeView {
         this.editing = Objects.requireNonNull(editing, "editing");
     }
 
-    /** Open {@code subject}'s ender chest for {@code viewer}. */
-    public void open(PlayerRef viewer, PlayerRef subject) {
+    /** Open {@code subject}'s ender chest for {@code viewer}, running {@code shown} once it is showing. */
+    public void open(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
-        editing.edits().openOnline(viewer, subject, MirrorKind.ENDER, true);
+        editing.edits().openOnline(viewer, subject, MirrorKind.ENDER, true, shown);
     }
 }

@@ -15,6 +15,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
@@ -129,13 +130,20 @@ public final class VaultView {
     /**
      * Open {@code owner}'s {@code vault} for {@code player} (the live viewer behind {@code viewer}). Use the
      * owner title when the viewer is the owner and the admin title when staff is auditing someone else. A vault
-     * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened.
+     * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened. {@code shown}
+     * runs once the window is in front of the player, never for a refused open, so the caller confirms only a vault
+     * that really opened.
+     *
+     * <p>A window another plugin refused keeps its claim until the same viewer opens that vault again, which
+     * takes it over. Releasing it here instead would be wrong for a sleeping player, whose window opens a tick late:
+     * a second viewer could then claim the same row while the first window was still on its way.
      */
-    public void open(Player player, PlayerRef viewer, PlayerRef owner, Vault vault) {
+    public void open(Player player, PlayerRef viewer, PlayerRef owner, Vault vault, Runnable shown) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(shown, "shown");
         int size = vault.size().slots();
         StorageGui gui = Guis.storage()
                 .title(title(viewer, owner, vault.index()))
@@ -170,6 +178,7 @@ public final class VaultView {
             windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
                     .ifPresent(this::write);
         });
+        WindowShown.confirm(gui, player, scheduler, shown);
         gui.open(player);
         playOpenSound(player);
     }

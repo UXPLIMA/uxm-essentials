@@ -23,6 +23,18 @@ line, so staff read it in their own language. Sanctions already stored keep the 
 still on the previous release reads the same rows and shows that text. See
 [moderation.md](moderation.md#warnings-and-the-escalation-ladder).
 
+## Item columns hold more on MySQL and MariaDB
+
+On MySQL and MariaDB the columns that hold serialized items are widened from `TEXT`, which stops at 64 KB, to
+`LONGTEXT`: vaults, the items kept from a deleted vault or a trade, the cross-server trade escrow, inventory
+rollback snapshots, the staff mode loadout and NPC equipment. A full vault, an inventory snapshot with an ender chest,
+or a kept batch of filled shulker boxes could be larger than 64 KB, and was then refused, or cut short on a server
+with strict mode off. SQLite and PostgreSQL had no such limit and are not changed.
+
+Nothing needs editing. Back up the database first: the first server to start on the new release alters those tables,
+and MySQL and MariaDB rebuild a table to change a column, so the start takes longer while a large `inv_snapshots`
+table is copied. A row that was cut short before the upgrade stays cut short; the update cannot restore it.
+
 ## Trades keep items for a player who left
 
 The update adds one table, `trade_item_returns`. The first server to start on the new release creates it in the

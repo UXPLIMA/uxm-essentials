@@ -96,6 +96,7 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /invsee and /endersee windows, online or offline, that could not save all of an edit
     MIRROR_VIEW_ONLY_EDITED("playerstate.mirror.view-only-edited"),
     MIRROR_VIEW_ONLY_SAVING("playerstate.mirror.view-only-saving"),
+    MIRROR_OPEN_REFUSED("playerstate.mirror.open-refused"),
     MIRROR_UNDONE_PRESENT("playerstate.mirror.undone-present"),
     MIRROR_UNDONE_CHANGED("playerstate.mirror.undone-changed"),
     MIRROR_UNDONE_FAILED("playerstate.mirror.undone-failed"),

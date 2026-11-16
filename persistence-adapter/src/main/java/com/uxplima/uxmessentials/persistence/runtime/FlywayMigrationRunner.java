@@ -3,11 +3,13 @@ package com.uxplima.uxmessentials.persistence.runtime;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 import javax.sql.DataSource;
@@ -28,7 +30,9 @@ import org.jspecify.annotations.NullMarked;
  * cosmetic edit to an already-applied script (e.g. a reworded comment) self-heals on the next start
  * instead of failing validation and blocking enable on a server that ran the old script. The same scripts
  * run on every backend. The portable DDL means SQLite, MySQL and PostgreSQL converge on the same schema
- * (the backend-parity invariant). A migration failure is fatal and surfaced, never swallowed.
+ * (the backend-parity invariant). A backend may add scripts of its own from {@link #vendorLocation}, for a limit the
+ * portable DDL cannot lift there; they only change storage, never the names and columns the shared scripts define.
+ * A migration failure is fatal and surfaced, never swallowed.
  */
 @NullMarked
 public final class FlywayMigrationRunner {
@@ -71,7 +75,7 @@ public final class FlywayMigrationRunner {
     public void migrate(List<String> locations) {
         Objects.requireNonNull(locations, "locations");
         refuseAPrefixOverBareTables();
-        String[] resolved = locations.isEmpty() ? new String[] {"classpath:db/migration"} : prefix(locations);
+        String[] resolved = resolvedLocations(backend, locations).toArray(String[]::new);
         FluentConfiguration configuration = Flyway.configure(getClass().getClassLoader())
                 .dataSource(dataSource)
                 .locations(resolved)
@@ -97,6 +101,27 @@ public final class FlywayMigrationRunner {
         } catch (FlywayException cause) {
             throw new PersistenceException("database migration failed for locations " + locations, cause);
         }
+    }
+
+    /**
+     * The classpath locations Flyway reads for {@code backend}: the shared ones the modules contribute, then the
+     * backend's own, when it has one.
+     */
+    public static List<String> resolvedLocations(DatabaseBackend backend, List<String> locations) {
+        List<String> resolved =
+                new ArrayList<>(locations.isEmpty() ? List.of("classpath:db/migration") : prefix(locations));
+        vendorLocation(backend).ifPresent(resolved::add);
+        return List.copyOf(resolved);
+    }
+
+    /**
+     * Scripts only one backend runs, numbered in the same sequence as the shared ones. MySQL and MariaDB cap a TEXT
+     * column at 64 KB, and widening one needs their own MODIFY, which SQLite cannot parse. The folder sits outside
+     * {@code db/migration} because Flyway reads a location's subfolders too, and the jOOQ classes are generated from
+     * {@code db/migration} alone, so the shared schema stays the one every backend agrees on.
+     */
+    public static Optional<String> vendorLocation(DatabaseBackend backend) {
+        return backend == DatabaseBackend.MARIADB ? Optional.of("classpath:db/vendor/mariadb") : Optional.empty();
     }
 
     /**
@@ -132,9 +157,9 @@ public final class FlywayMigrationRunner {
         return names;
     }
 
-    private static String[] prefix(List<String> locations) {
+    private static List<String> prefix(List<String> locations) {
         return locations.stream()
                 .map(location -> location.startsWith("classpath:") ? location : "classpath:" + location)
-                .toArray(String[]::new);
+                .toList();
     }
 }

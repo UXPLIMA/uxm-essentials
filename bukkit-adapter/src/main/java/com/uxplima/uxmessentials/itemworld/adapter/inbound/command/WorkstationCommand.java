@@ -30,7 +30,8 @@ import org.jspecify.annotations.NullMarked;
  * ({@code /echest}), {@code /grindstone}, {@code /cartography}, {@code /loom}, {@code /smithingtable},
  * {@code /stonecutter}, {@code /furnace}, parameterised by its {@link Workstation}. Opening an inventory view
  * is an entity-bound operation, so the open is scheduled on the opener's region thread through the kernel
- * {@code Scheduler} and reported through {@link ItemworldMessageKey#WORKSTATION_OPENED}. The whole group is
+ * {@code Scheduler} and reported through {@link ItemworldMessageKey#WORKSTATION_OPENED} once it is showing; an open
+ * another plugin refused is not reported. The whole group is
  * gated by the {@code workstations} sub-feature flag and each command by its own per-command disable.
  *
  * <p>An optional {@code <player>} target forces the workstation open on another player, gated by the single
@@ -95,8 +96,9 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
 
     private void openForSelf(CommandContext<CommandSourceStack> ctx, Player sender) {
         services.kernel().scheduler().onEntity(ref(sender), () -> {
-            station.open(sender);
-            reply(ctx, ItemworldMessageKey.WORKSTATION_OPENED, Map.of("station", station.displayName()));
+            if (station.open(sender)) {
+                reply(ctx, ItemworldMessageKey.WORKSTATION_OPENED, Map.of("station", station.displayName()));
+            }
         });
     }
 
@@ -113,11 +115,12 @@ public final class WorkstationCommand extends ItemworldCommandSupport implements
         }
         Player other = target.get();
         services.kernel().scheduler().onEntity(ref(other), () -> {
-            station.open(other);
-            reply(
-                    ctx,
-                    ItemworldMessageKey.WORKSTATION_OPENED_FOR,
-                    Map.of("station", station.displayName(), "player", other.getName()));
+            if (station.open(other)) {
+                reply(
+                        ctx,
+                        ItemworldMessageKey.WORKSTATION_OPENED_FOR,
+                        Map.of("station", station.displayName(), "player", other.getName()));
+            }
         });
     }
 

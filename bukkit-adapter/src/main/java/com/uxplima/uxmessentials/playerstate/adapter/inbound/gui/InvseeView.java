@@ -25,11 +25,11 @@ public final class InvseeView {
         this.editing = Objects.requireNonNull(editing, "editing");
     }
 
-    /** Open {@code subject}'s inventory for {@code viewer}. Called on the viewer's thread. */
-    public void open(PlayerRef viewer, PlayerRef subject) {
+    /** Open {@code subject}'s inventory for {@code viewer}, running {@code shown} once it is showing. */
+    public void open(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
-        editing.edits().openOnline(viewer, subject, MirrorKind.INVENTORY, mayModify(viewer));
+        editing.edits().openOnline(viewer, subject, MirrorKind.INVENTORY, mayModify(viewer), shown);
     }
 
     /** Whether {@code viewer} holds the node that makes an inventory window editable. */

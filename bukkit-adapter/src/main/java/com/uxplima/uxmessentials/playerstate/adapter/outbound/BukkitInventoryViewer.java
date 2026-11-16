@@ -41,24 +41,26 @@ public final class BukkitInventoryViewer implements InventoryViewer {
     }
 
     @Override
-    public void viewInventory(PlayerRef viewer, PlayerRef subject) {
+    public void viewInventory(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
+        Objects.requireNonNull(shown, "shown");
         if (isOnline(subject)) {
-            invseeView.open(viewer, subject);
+            invseeView.open(viewer, subject, shown);
         } else {
-            offlineView.openInventory(viewer, subject);
+            offlineView.openInventory(viewer, subject, shown);
         }
     }
 
     @Override
-    public void viewEnderChest(PlayerRef viewer, PlayerRef subject) {
+    public void viewEnderChest(PlayerRef viewer, PlayerRef subject, Runnable shown) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(subject, "subject");
+        Objects.requireNonNull(shown, "shown");
         if (isOnline(subject)) {
-            enderseeView.open(viewer, subject);
+            enderseeView.open(viewer, subject, shown);
         } else {
-            offlineView.openEnderChest(viewer, subject);
+            offlineView.openEnderChest(viewer, subject, shown);
         }
     }
 

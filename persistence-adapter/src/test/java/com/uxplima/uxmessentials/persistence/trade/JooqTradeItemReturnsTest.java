@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Random;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
@@ -147,6 +148,20 @@ class JooqTradeItemReturnsTest {
                 .containsExactly(SWORD);
         assertThat(rows(dsl)).isEqualTo(2);
         assertThat(errors).singleElement().asString().contains("id=broken");
+    }
+
+    @Test
+    void aBatchFarLargerThanAMysqlTextColumnComesBackWhole() {
+        DSLContext dsl = openDsl();
+        byte[] bytes = new byte[1 << 20];
+        new Random(7).nextBytes(bytes);
+        VaultContents shulkers = VaultContents.of(bytes);
+
+        store(dsl).keep(ALEX, shulkers);
+
+        assertThat(store(dsl).claimable(ALEX))
+                .extracting(TradeItemReturns.Kept::items)
+                .containsExactly(shulkers);
     }
 
     @Test

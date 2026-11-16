@@ -135,7 +135,7 @@ public final class VaultActions implements UxmVaultsActions {
                     if (live == null) {
                         return gone();
                     }
-                    view.open(live, owner, owner, vault);
+                    view.open(live, owner, owner, vault, () -> {});
                     return UxmOutcome.ok();
                 },
                 gone());
