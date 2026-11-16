@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.staff.adapter;
 
 import java.util.Objects;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -19,7 +20,7 @@ public final class MutableStaffTeleport implements StaffTeleport {
     private final AtomicReference<StaffTeleport> delegate = new AtomicReference<>(StaffTeleport.NONE);
 
     @Override
-    public boolean teleportTo(PlayerRef staff, PlayerRef target) {
+    public CompletionStage<Boolean> teleportTo(PlayerRef staff, PlayerRef target) {
         return Objects.requireNonNull(delegate.get(), "delegate").teleportTo(staff, target);
     }
 
