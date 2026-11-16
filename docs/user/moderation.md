@@ -126,9 +126,10 @@ the server once and again after a plugin is enabled or disabled, the server fini
 or `/uxmess reload`. A command another plugin adds while the server runs without being enabled again (a script
 reload, for example) is only seen after `/uxmess reload`.
 
-`/mute` refuses a player who is already muted and says how long that mute still runs; `/unmute` first to change a
-mute. When two servers of a network mute the same player at the same moment, the first mute stays and the second is
-refused the same way. A timed mute ends on its own.
+A mute follows the ban rule. A `/mute` or `/tempmute` that ends later than the running mute, or a second permanent
+mute, replaces it; one that would end sooner is refused, and the staff member is told how long the running mute still
+runs. To shorten a mute, `/unmute` first. When two servers of a network mute the same player at the same moment, the
+longer mute is the one kept. A timed mute ends on its own.
 
 ## Warnings and the escalation ladder
 
