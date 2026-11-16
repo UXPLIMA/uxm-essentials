@@ -14,11 +14,17 @@ public final class MemoryHopStore implements PendingHopStore {
 
     private final Map<UUID, PendingHop> rows = new HashMap<>();
     private @Nullable Runnable afterNextFind;
+    private @Nullable Runnable afterNextClear;
     private boolean recordFails;
 
     /** Run {@code racer} once right after the next read, so a second caller can act between a read and its delete. */
     public void afterNextFind(Runnable racer) {
         this.afterNextFind = racer;
+    }
+
+    /** Run {@code racer} once right after the next delete that removes a row, between a claim and what follows it. */
+    public void afterNextClear(Runnable racer) {
+        this.afterNextClear = racer;
     }
 
     public void failRecords(boolean fails) {
@@ -55,6 +61,11 @@ public final class MemoryHopStore implements PendingHopStore {
             return 0;
         }
         rows.remove(pending.player());
+        Runnable racer = afterNextClear;
+        afterNextClear = null;
+        if (racer != null) {
+            racer.run();
+        }
         return 1;
     }
 

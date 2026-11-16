@@ -39,6 +39,7 @@ class CrossServerHopTest {
     private static final Duration SETTLE = Duration.ofSeconds(1);
     private static final HopCharge FEE = new HopCharge(new BigDecimal("10"), "coins");
     private static final BigDecimal START = new BigDecimal("100");
+    private static final Duration DRAIN = Duration.ofSeconds(5);
 
     private final MutableClock clock = new MutableClock(NOW);
     private final SteppedScheduler scheduler = new SteppedScheduler(clock);
@@ -53,6 +54,8 @@ class CrossServerHopTest {
     private final HopWatchdog watchdog = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL, homesOn(SURVIVAL));
     private Landing landing = Landing.LAND;
+    private Runnable heldLanding = () -> {};
+    private Runnable heldMiss = () -> {};
     private boolean gateRefuses;
     private boolean proxyAvailable = true;
 
@@ -154,8 +157,8 @@ class CrossServerHopTest {
                 .as("claimed, so no other backend can refund it")
                 .isEmpty();
 
-        survival.stop();
-        survival.stop();
+        survival.stop(DRAIN);
+        survival.stop(DRAIN);
         scheduler.advance(TTL);
 
         assertThat(moved).isEmpty();
@@ -170,7 +173,7 @@ class CrossServerHopTest {
         goHome();
         join(survival);
 
-        survival.stop();
+        survival.stop(DRAIN);
 
         assertThat(moved).containsExactly("Alex->base");
         assertThat(ledger.refunds).isZero();
@@ -182,12 +185,73 @@ class CrossServerHopTest {
         goHome();
         survival.onArrival(ALEX);
 
-        survival.stop();
+        survival.stop(DRAIN);
         scheduler.advance(SETTLE);
         assertThat(store.rows()).containsKey(ALEX.uuid());
         scheduler.advance(TTL);
 
         assertThat(moved).isEmpty();
+        assertThat(ledger.refunds).isOne();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+    }
+
+    @Test
+    void aStopThatBeginsRightAfterTheClaimIsRefundedOnceAndNeverMoves() {
+        goHome();
+        // The stop lands between the row's delete and the hop being held: it must not wait on the claiming join,
+        // which runs on this thread here, so it is given no time to wait at all.
+        store.afterNextClear(() -> survival.stop(Duration.ZERO));
+
+        join(survival);
+        survival.stop(DRAIN);
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(ledger.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.refunded");
+    }
+
+    @Test
+    void aMoveThatFinishesAfterTheStopRefundedItPaysNothingMore() {
+        landing = Landing.HELD;
+        goHome();
+        join(survival);
+
+        survival.stop(DRAIN);
+        assertThat(log.warnings()).anyMatch(line -> line.contains("refunded_after_move_started"));
+        // The server finishes the move it had already started, then a late miss arrives as well.
+        heldLanding.run();
+        heldMiss.run();
+
+        assertThat(moved).containsExactly("Alex->base");
+        assertThat(ledger.refunds).isOne();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.refunded");
+    }
+
+    @Test
+    void aStopWaitsForARefundAlreadyOnTheAsyncLane() {
+        goHome();
+        survival.onArrival(ALEX);
+        // The player left before the move, so the refund is handed to an async lane that is slow to run it.
+        scheduler.offline(ALEX);
+        scheduler.asyncOn(task -> new Thread(() -> {
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                    }
+                    task.run();
+                })
+                .start());
+        scheduler.advance(SETTLE);
+        assertThat(ledger.refunds).as("still on the slow lane").isZero();
+
+        survival.stop(DRAIN);
+
         assertThat(ledger.refunds).isOne();
         assertThat(ledger.wallet).isEqualByComparingTo(START);
     }
@@ -445,7 +509,9 @@ class CrossServerHopTest {
         // Reports the miss and then throws as well, the worst case for refunding exactly once.
         MISS_THEN_THROW,
         // Its region task is dropped by a stopping server, so it never reports anything.
-        DROPPED
+        DROPPED,
+        // Started, and finished only when the test says so, as a move the server completes after the stop.
+        HELD
     }
 
     /** The player's wallet, the keeper's account and the homes that exist, with where each lives. */
@@ -499,6 +565,14 @@ class CrossServerHopTest {
             }
             return HopResolution.landsAt(hop.target(), (who, onLanded, onMissed) -> {
                 if (landing == Landing.DROPPED) {
+                    return;
+                }
+                if (landing == Landing.HELD) {
+                    heldLanding = () -> {
+                        moved.add(who.name() + "->" + hop.target());
+                        onLanded.run();
+                    };
+                    heldMiss = onMissed;
                     return;
                 }
                 if (landing == Landing.MISS_THEN_THROW) {
