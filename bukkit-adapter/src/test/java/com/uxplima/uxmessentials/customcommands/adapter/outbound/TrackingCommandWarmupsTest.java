@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.customcommands.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -12,6 +13,11 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+
+import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.entity.Player;
+import org.bukkit.event.player.PlayerMoveEvent;
 
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.listener.CommandWarmupTracker;
 import com.uxplima.uxmessentials.customcommands.application.FeeBackendPolicy;
@@ -46,6 +52,7 @@ class TrackingCommandWarmupsTest {
 
     private static final PlayerRef ALEX =
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000a1e5"), "Alex");
+    private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000005a77"), "Sam");
     private static final WorldRef WORLD =
             new WorldRef(UUID.fromString("00000000-0000-0000-0000-0000000000f1"), "world");
     private static final Position STANDING = new Position(WORLD, 10.5, 64, 10.5, 0f, 0f);
@@ -101,7 +108,44 @@ class TrackingCommandWarmupsTest {
     }
 
     private RunOutcome run(CustomCommand command) {
-        return runner.run(command, ALEX, false, Map.of());
+        return run(command, ALEX);
+    }
+
+    private RunOutcome run(CustomCommand command, PlayerRef who) {
+        return runner.run(command, who, false, Map.of());
+    }
+
+    /** The server's move event for {@code who} walking from {@link #STANDING} to {@code to}. */
+    private static PlayerMoveEvent moveEvent(PlayerRef who, Position to) {
+        World world = fake(World.class, method -> switch (method) {
+            case "getUID" -> WORLD.uid();
+            case "getName" -> WORLD.name();
+            default -> throw new UnsupportedOperationException(method);
+        });
+        Player player = fake(Player.class, method -> switch (method) {
+            case "getUniqueId" -> who.uuid();
+            default -> throw new UnsupportedOperationException(method);
+        });
+        return new PlayerMoveEvent(
+                player,
+                new Location(world, STANDING.x(), STANDING.y(), STANDING.z()),
+                new Location(world, to.x(), to.y(), to.z()));
+    }
+
+    private interface Answer {
+        Object answer(String method);
+    }
+
+    private static <T> T fake(Class<T> type, Answer answer) {
+        return type.cast(Proxy.newProxyInstance(
+                TrackingCommandWarmupsTest.class.getClassLoader(),
+                new Class<?>[] {type},
+                (self, method, args) -> switch (method.getName()) {
+                    case "hashCode" -> System.identityHashCode(self);
+                    case "equals" -> self == args[0];
+                    case "toString" -> type.getSimpleName();
+                    default -> answer.answer(method.getName());
+                }));
     }
 
     /** Exactly one chain ran, and it was {@code id}'s. */
@@ -137,6 +181,34 @@ class TrackingCommandWarmupsTest {
                 .isZero();
         assertThat(purse.charged).isZero();
         assertThat(feedback.reported).containsExactly(STARTED, REPLACED, STARTED, MOVED);
+    }
+
+    @Test
+    void aMoveCancelLeavesTheMoveListenerWatchingTheNextPlayer() {
+        run(REWARD, ALEX);
+        tracker.onMove(ALEX.uuid(), WALKED_OFF);
+
+        run(REWARD, SAM);
+        tracker.onMove(moveEvent(SAM, WALKED_OFF));
+        scheduler.elapse();
+
+        assertThat(actions.runs)
+                .as("the second player's move still reached their warmup after the first player's cancel")
+                .isZero();
+        assertThat(purse.charged).isZero();
+        assertThat(feedback.reported).containsExactly(STARTED, MOVED, STARTED, MOVED);
+    }
+
+    @Test
+    void aPlayerWhoQuitsBeforeTheCountdownEndsIsNotChargedWhenTheyComeBack() {
+        run(REWARD);
+
+        tracker.quit(ALEX.uuid());
+        scheduler.elapse();
+
+        assertThat(actions.runs).isZero();
+        assertThat(purse.charged).isZero();
+        assertThat(depth.tracked()).isZero();
     }
 
     @Test

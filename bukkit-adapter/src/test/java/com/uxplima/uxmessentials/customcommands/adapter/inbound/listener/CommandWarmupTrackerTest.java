@@ -15,6 +15,8 @@ class CommandWarmupTrackerTest {
 
     private static final PlayerRef ALEX =
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000a1e5"), "Alex");
+    private static final PlayerRef SAM =
+            new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000005a77"), "Sam");
     private static final WorldRef WORLD =
             new WorldRef(UUID.fromString("00000000-0000-0000-0000-0000000000f1"), "world");
     private static final Position STANDING = new Position(WORLD, 10.5, 64, 10.5, 0f, 0f);
@@ -80,6 +82,45 @@ class CommandWarmupTrackerTest {
     }
 
     @Test
+    void quittingCancelsTheArmedWarmupOnce() {
+        Counted waiting = new Counted();
+        tracker.arm(ALEX, STANDING, waiting);
+
+        tracker.quit(ALEX.uuid());
+        tracker.quit(ALEX.uuid());
+
+        assertThat(waiting.cancelled)
+                .as("a fast relog finds nothing left to run or charge")
+                .isEqualTo(1);
+        assertThat(tracker.tracked()).isZero();
+    }
+
+    @Test
+    void aHandleThatAlreadyEndedIsNotArmed() {
+        Counted cancelled = new Counted();
+        cancelled.cancel();
+
+        tracker.arm(ALEX, STANDING, cancelled);
+
+        assertThat(tracker.tracked()).isZero();
+    }
+
+    @Test
+    void aCancelWhoseCallbackForgetsItsOwnEntryLeavesTheCountRight() {
+        Counted forgetsItself = new Counted();
+        forgetsItself.onStop = () -> tracker.forget(ALEX.uuid(), forgetsItself);
+        tracker.arm(ALEX, STANDING, forgetsItself);
+
+        tracker.onMove(ALEX.uuid(), WALKED_OFF);
+        tracker.arm(SAM, STANDING, new Counted());
+
+        assertThat(forgetsItself.cancelled).isEqualTo(1);
+        assertThat(tracker.tracked())
+                .as("the entry left the map once, not once per caller, so the next player counts")
+                .isEqualTo(1);
+    }
+
+    @Test
     void turningOnTheSameBlockKeepsTheWarmup() {
         Counted waiting = new Counted();
         tracker.arm(ALEX, STANDING, waiting);
@@ -90,20 +131,23 @@ class CommandWarmupTrackerTest {
         assertThat(tracker.tracked()).isEqualTo(1);
     }
 
-    /** A handle that counts each way it was stopped. */
+    /** A handle that counts each way it was stopped and runs {@code onStop} after, as a real callback would. */
     private static final class Counted implements WarmupHandle {
 
         private int cancelled;
         private int superseded;
+        private Runnable onStop = () -> {};
 
         @Override
         public void cancel() {
             cancelled++;
+            onStop.run();
         }
 
         @Override
         public void supersede() {
             superseded++;
+            onStop.run();
         }
 
         @Override

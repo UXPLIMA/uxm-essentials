@@ -130,7 +130,17 @@ public final class RunCustomCommand {
                     command.id().value());
             return report(actor, command, new RunOutcome.DepthExceeded());
         }
-        boolean release = true;
+        // The level is released once, by whichever comes first: this method on any path that did not hand it to a
+        // started warmup, or the warmup's own ending. A throw while the warmup is being set up therefore cannot leak
+        // it,
+        // and a warmup that ended inside begin cannot release it twice.
+        AtomicBoolean holding = new AtomicBoolean(true);
+        Runnable release = () -> {
+            if (holding.compareAndSet(true, false)) {
+                depth.exit(actor.uuid());
+            }
+        };
+        boolean handedOver = false;
         try {
             RunOutcome blocked = stateGates(command, actor, arguments, false);
             if (blocked != null) {
@@ -139,15 +149,15 @@ public final class RunCustomCommand {
             if (command.warmup().isZero()) {
                 return report(actor, command, finish(command, actor, arguments));
             }
-            release = false;
             AtomicReference<RunOutcome> ended = new AtomicReference<>();
-            beginWarmup(command, actor, arguments, ended);
+            beginWarmup(command, actor, arguments, ended, release);
+            handedOver = true;
             RunOutcome already = ended.get();
             // A warmup that ended inside begin has reported its own outcome and released its depth already.
             return already != null ? already : report(actor, command, new RunOutcome.WarmupStarted(command.warmup()));
         } finally {
-            if (release) {
-                depth.exit(actor.uuid());
+            if (!handedOver) {
+                release.run();
             }
         }
     }
@@ -237,11 +247,15 @@ public final class RunCustomCommand {
 
     /**
      * Start the shared warmup, deferring the charge and the chain to the moment it completes. The actor's earlier
-     * warmup, if any, is superseded first. Exactly one of the three callbacks runs; each forgets this warmup, releases
-     * the depth this run holds and leaves the outcome it reported in {@code ended}.
+     * warmup, if any, is superseded first. Exactly one of the three callbacks runs; each forgets this warmup, runs
+     * {@code release} for the depth this run holds and leaves the outcome it reported in {@code ended}.
      */
     private void beginWarmup(
-            CustomCommand command, PlayerRef actor, Map<String, String> arguments, AtomicReference<RunOutcome> ended) {
+            CustomCommand command,
+            PlayerRef actor,
+            Map<String, String> arguments,
+            AtomicReference<RunOutcome> ended,
+            Runnable release) {
         UUID who = actor.uuid();
         WarmupHandle earlier = warmingUp.remove(who);
         if (earlier != null) {
@@ -265,17 +279,17 @@ public final class RunCustomCommand {
                     try {
                         ended.set(report(actor, command, finish(command, actor, arguments)));
                     } finally {
-                        depth.exit(who);
+                        release.run();
                     }
                 },
                 () -> {
                     forget.run();
-                    depth.exit(who);
+                    release.run();
                     ended.set(report(actor, command, new RunOutcome.WarmupCancelled()));
                 },
                 () -> {
                     forget.run();
-                    depth.exit(who);
+                    release.run();
                     ended.set(report(actor, command, new RunOutcome.WarmupReplaced()));
                 });
         self.set(handle);
