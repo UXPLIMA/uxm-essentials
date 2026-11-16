@@ -37,9 +37,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The {@link Sanctions} adapter: the live-player side of a sanction on top of the Paper {@link Server} and the
  * kernel {@link Scheduler}. Every per-player action hops to the player's entity thread through the scheduler
- * (Folia-valid) and silently no-ops when the player is offline. The frozen set is session-scoped runtime
- * state owned here (a {@code ConcurrentHashMap}-backed UUID set the move listener consults) so a relog
- * clears a freeze; it is not DB-backed.
+ * (Folia-valid) and silently no-ops when the player is offline. The frozen set is in-memory runtime state owned
+ * here (a {@code ConcurrentHashMap}-backed UUID set the move listener consults), not DB-backed. Nothing removes a
+ * player from it on quit, so a relog does not escape a freeze; {@link #unfreeze} and the module stop do.
  *
  * <p>The jail teleport resolves the named jail's location store-first. The DB-backed {@link JailLocationStore}
  * an operator fills with {@code /setjail}, falling back to {@link ModerationSettings} (the {@code

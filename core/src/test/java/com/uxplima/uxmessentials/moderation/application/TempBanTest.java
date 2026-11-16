@@ -132,6 +132,28 @@ class TempBanTest {
     }
 
     @Test
+    void aTempbanAsLongAsAPermanentBanIsRefusedAndPointsAtBan() {
+        String span = Ban.PERMANENT_SPAN.toDays() + "d";
+
+        assertThat(tempBan.tempban(ALEX, SAM, span, Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.BAD_DURATION);
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(online.kicked()).isEmpty();
+        assertThat(broadcasts).isEmpty();
+        assertThat(toldAlex().getLast().key()).isEqualTo(ModerationMessageKey.TEMPBAN_TOO_LONG.key());
+    }
+
+    @Test
+    void aTempbanJustShortOfThePermanentSpanIsStillATempban() {
+        String span = Ban.PERMANENT_SPAN.minusDays(1).toDays() + "d";
+
+        tempBan.tempban(ALEX, SAM, span, Optional.empty(), false).orElseThrow();
+
+        assertThat(Ban.endOf(stored())).contains(NOW.plus(Ban.PERMANENT_SPAN.minusDays(1)));
+    }
+
+    @Test
     void anIssuerWithATierCapBansOnlyForTheCapAndIsToldSo() {
         permissions.quota(CAP_NODE, QuotaResult.limited(Duration.ofHours(1).toSeconds()));
 

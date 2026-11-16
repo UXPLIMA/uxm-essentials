@@ -140,14 +140,8 @@ public final class ModerationQueries implements UxmModerationQuery {
         // A permanent ban has no state of its own: it is stored as a span so far out that nobody will see it
         // lapse. Published, that has to be an absent expiry, or every consumer would have to know the trick to
         // tell a permanent ban from a ban ending in the year 3026.
-        boolean permanent = !ban.until().isBefore(ban.issuedAt().plus(Ban.PERMANENT_SPAN));
         return new UxmSanction(
-                UxmSanctionKind.BAN,
-                playerId,
-                issuer(ban.issuer()),
-                ban.reason(),
-                ban.issuedAt(),
-                permanent ? Optional.empty() : Optional.of(ban.until()));
+                UxmSanctionKind.BAN, playerId, issuer(ban.issuer()), ban.reason(), ban.issuedAt(), Ban.endOf(ban));
     }
 
     /** A mute as the API publishes it, or empty for the state that means "not muted". */

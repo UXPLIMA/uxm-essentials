@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 
@@ -19,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>A timed ban whose expiry has already passed reports as not banned, so the check reflects the live gate the
  * login listener applies rather than the lingering row (which {@code loadTempban} returns for any present row,
  * lapsed or not). A permanent ban is stored as a far-future {@link TempbanState.Active} row, so it always reads
- * as active; the rendered expiry shows the stored instant either way.
+ * as active, and its expiry reads as permanent rather than as that far-future instant.
  */
 public final class CheckBan {
 
@@ -46,9 +47,15 @@ public final class CheckBan {
                             "player", target.name(),
                             "actor", active.issuer().name(),
                             "reason", active.reason().orElse(""),
-                            "expiry", active.until().toString()));
+                            "expiry", expiry(viewer, active)));
             return;
         }
         notifier.send(viewer, ModerationMessageKey.MOD_CHECK_NOT_BANNED, Map.of("player", target.name()));
+    }
+
+    private String expiry(PlayerRef viewer, TempbanState.Active ban) {
+        return Ban.endOf(ban)
+                .map(Instant::toString)
+                .orElseGet(() -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of()));
     }
 }

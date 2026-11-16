@@ -1,20 +1,15 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
-import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
-import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
-import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * The live reaction to a ban issued on another backend: when a peer reports that a player's ban changed, this
@@ -25,7 +20,7 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  *
  * <p>The re-evaluation mirrors the ban-on-login check ({@link LoginEnforcement}): it reads the fresh
  * {@link TempbanState} from the shared DB and, if {@link TempbanState.Active} and active now, renders the same
- * {@link ModerationMessageKey#TEMPBAN_KICK} screen and kicks. A still-online player whose ban turns out not to
+ * {@link BanScreen} (the permanent or the timed ban screen) and kicks. A still-online player whose ban turns out not to
  * be active (lifted between the frame and this read, or an out-of-order frame) is left alone, the DB, not the
  * frame, is the source of truth.
  *
@@ -62,11 +57,7 @@ public final class EnforceRemoteBan {
         PlayerRef ref = new PlayerRef(target, target.toString());
         Instant now = clock.instant();
         if (repository.loadTempban(ref) instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
-            MessageKey key = ModerationMessageKey.TEMPBAN_KICK;
-            Map<String, String> ph = Map.of(
-                    "duration", SanctionDuration.format(Duration.between(now, ban.until())),
-                    "reason", ban.reason().orElse(""));
-            sanctions.kick(ref, key, notifier.render(ref, key, ph));
+            BanScreen.of(ban, now).kick(sanctions, notifier, ref);
         }
     }
 }

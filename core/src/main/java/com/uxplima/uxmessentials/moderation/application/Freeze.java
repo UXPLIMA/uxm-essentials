@@ -15,9 +15,10 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
  * {@code /freeze <player>} and {@code /unfreeze <player>}: pin a connected player in place pending review, or
- * release them. Freeze is session-scoped runtime state owned by the {@link Sanctions} adapter (a relog clears
- * it), not a DB-backed sanction, but each toggle is still audit-logged because it is an admin action. The
- * exempt target cannot be frozen.
+ * release them. Freeze is in-memory runtime state owned by the {@link Sanctions} adapter, not a DB-backed sanction,
+ * but each toggle is still audit-logged because it is an admin action. Logging out must not escape a freeze, so it
+ * holds across a relog and ends only with {@code /unfreeze}, a restart or a module reload. The exempt target cannot
+ * be frozen.
  *
  * <p>A freeze on a target connected to another backend is refused with that backend's name before anything is
  * written: this backend cannot pin them. An unfreeze always runs here, because the freeze lives on the backend that

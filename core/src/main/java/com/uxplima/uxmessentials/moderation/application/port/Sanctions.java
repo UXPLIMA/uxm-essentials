@@ -14,9 +14,10 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * no-ops on an offline target (an offline {@code /jail} is just a DB write; the join listener re-applies it
  * on reconnect).
  *
- * <p>The freeze state is session-scoped runtime state the adapter owns (movement-cancel via a move listener),
- * not a DB-backed sanction: a relog clears a freeze. The jail teleport hops to the entity's region thread
- * through the kernel {@code Scheduler}, so it is Folia-valid.
+ * <p>The freeze state is in-memory runtime state the adapter owns (movement-cancel via a move listener), not a
+ * DB-backed sanction. It is keyed by player, not by session, so logging out does not escape it: a freeze holds
+ * across a relog until {@link #unfreeze}, a restart or a module reload. The jail teleport hops to the entity's
+ * region thread through the kernel {@code Scheduler}, so it is Folia-valid.
  */
 public interface Sanctions {
 

@@ -24,9 +24,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Pins a frozen player in place and tells them why: a {@link PlayerMoveEvent} that changes the block position
- * of a frozen player is cancelled, so they can look around but not walk. Reads the session-scoped frozen set
- * the {@link BukkitSanctions} adapter owns through a plain predicate (a relog clears the freeze, since the set
- * is in-memory, so this listener naturally stops blocking once the set no longer holds the player).
+ * of a frozen player is cancelled, so they can look around but not walk. Reads the in-memory frozen set the
+ * {@link BukkitSanctions} adapter owns through a plain predicate, so this listener stops blocking once
+ * {@code /unfreeze} drops the player from it. A relog does not, so a player who logs back in is still frozen.
  *
  * <p>The block-position check means head movement (yaw/pitch only) is not cancelled, cancelling every micro
  * move would be both jarring and needless event churn on the hot move path.

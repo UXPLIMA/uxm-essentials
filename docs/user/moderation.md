@@ -90,9 +90,12 @@ shorten a ban, `/unban` first. A ban that ends later, or a second permanent ban,
 servers of a network ban the same player at the same moment, the longer ban is the one kept. IP bans
 (`/banip`, `/tempbanip`) do not follow this rule yet: a new IP ban on an address replaces the old one.
 
-A permanent ban is stored as a ban that ends very far in the future. The kick at the moment of `/ban` uses the
-`moderation.ban.kick` screen, but every later login refusal, and the kick on another server of a network, use the
-`moderation.tempban.kick` screen, which then shows a time left of about 365000 days. This is a known issue.
+A permanently banned player sees the `moderation.ban.kick` screen, with no time left on it, when the ban kicks them,
+when they are kicked on another server of a network and every time they try to log in again. A timed ban, including
+a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
+lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
+permanent.
+A `/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
@@ -233,8 +236,10 @@ A frozen player cannot move to another block; they can still look around, chat a
 when they try to walk, at most once every `freeze.notice-interval-seconds` (3 by default; 0 sends nothing).
 
 A freeze is kept in memory on the server it was given on. It lasts until `/unfreeze` or until the server restarts
-or the module reloads, it is not stored in the database, and it does not follow the player to another server. On a
-network you can only freeze a player connected to your server.
+or the module reloads, and it is not stored in the database. Logging out does not lift it: a frozen player who
+logs back in to the same server is still frozen. It does not follow the player to another server, though: on a
+network a frozen player who switches server can move freely there, and is frozen again when they come back to the
+server that froze them. You can only freeze a player connected to your server.
 
 ## Lockdown
 
@@ -312,8 +317,7 @@ confirmation, `/jail` opens the jail menu, `/jails` the jail manager, `/jailedpl
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
 `messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
-and `moderation.tempban.kick`: a permanently banned player who logs in again sees the tempban screen (see
-[Bans](#bans)).
+(permanent bans) and `moderation.tempban.kick` (timed bans).
 
 ## On a network
 
