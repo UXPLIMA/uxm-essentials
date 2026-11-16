@@ -19,7 +19,6 @@ import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
-import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -32,13 +31,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * The teleport-sound selector a warp editor opens to pick a warp's departure or arrival sound: a three-row picker
  * with one icon per sound the warps file lists ({@link WarpPresets}), a custom-name button, a back button to the
- * editor, and a remove button. Clicking a sound runs the same set the old bespoke window did. The warp's departure or arrival sound through the shared
- * {@link EditableWarp} loader, then returns the viewer to the warp editor.
+ * editor, and a remove button. Clicking a sound runs the same set the old bespoke window did. The pick is saved through the editor's
+ * per-warp queue off the tick, then the viewer is returned to the warp editor.
  *
  * <p>The window draws through the menu engine's selector runtime ({@link Menus#openSelector}), so it is a
  * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The selector
- * serves both server and player warps: the editable warp is resolved through the loader from the warp name and its
- * (nullable) owner, so the single picker covers either kind exactly as before. The preset list is still exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
+ * serves both server and player warps: the edit names the warp and its (nullable) owner, so the single picker covers either kind exactly as before. The preset list is still exposed through {@link #getOptions()} so the engine-rendered server-warp sound menu can share
  * the same options. Every visible string resolves from the warps catalog, except a sound's name, which the warps file
  * writes per language.
  */
@@ -54,40 +52,26 @@ public final class WarpSoundSelectorView {
 
     private final Messages messages;
     private final Menus menus;
-    private final EditableWarpLoader loader;
     private final WarpEditorView editorView;
     private final TextInput textInput;
     private final WarpPresets presets;
 
     private WarpSoundSelectorView(
-            Messages messages,
-            Menus menus,
-            EditableWarpLoader loader,
-            WarpEditorView editorView,
-            TextInput textInput,
-            WarpPresets presets) {
+            Messages messages, Menus menus, WarpEditorView editorView, TextInput textInput, WarpPresets presets) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.loader = Objects.requireNonNull(loader, "loader");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
         this.presets = Objects.requireNonNull(presets, "presets");
     }
 
     /**
-     * Build the sound selector over the warps wiring's collaborators. The editable-warp loader is built here from the
-     * server-warp repository and the editor view (the same pair the editor listener loads through), so the warps wiring
-     * needs only the public collaborators it already holds. Mirrors {@code WarpSoundMenu.create}.
+     * Build the sound selector over the warps wiring's collaborators. Its saves go through the editor view, which
+     * loads the warp the same way the editor does. Mirrors {@code WarpSoundMenu.create}.
      */
     public static WarpSoundSelectorView create(
-            Messages messages,
-            Menus menus,
-            WarpRepository repository,
-            WarpEditorView editorView,
-            TextInput textInput,
-            WarpPresets presets) {
-        EditableWarpLoader loader = new EditableWarpLoader(repository, editorView);
-        return new WarpSoundSelectorView(messages, menus, loader, editorView, textInput, presets);
+            Messages messages, Menus menus, WarpEditorView editorView, TextInput textInput, WarpPresets presets) {
+        return new WarpSoundSelectorView(messages, menus, editorView, textInput, presets);
     }
 
     /** Open the sound selector for {@code warpName} (server warp when {@code warpOwner} is null), returning to the editor on pick. */
@@ -146,8 +130,17 @@ public final class WarpSoundSelectorView {
             @Nullable PlayerRef owner,
             boolean isDeparture,
             Optional<String> sound) {
-        saveSound(name, owner, isDeparture, sound);
-        editorView.open(player, viewer, name, owner);
+        editorView.edit(
+                name,
+                owner,
+                warp -> {
+                    if (isDeparture) {
+                        warp.setDepartureSound(sound);
+                    } else {
+                        warp.setArrivalSound(sound);
+                    }
+                },
+                () -> editorView.open(player, viewer, name, owner));
     }
 
     /** Prompt for a custom sound name through the shared input seam, exactly as the old custom button did. */
@@ -161,18 +154,6 @@ public final class WarpSoundSelectorView {
                 InputRequest.of("warp.sound", promptKey.key()),
                 input -> pick(player, viewer, name, owner, isDeparture, Optional.of(input.toLowerCase(Locale.ROOT))),
                 () -> open(player, viewer, name, owner, isDeparture));
-    }
-
-    private void saveSound(String name, @Nullable PlayerRef owner, boolean isDeparture, Optional<String> sound) {
-        EditableWarp warp = loader.load(name, owner);
-        if (warp == null) {
-            return;
-        }
-        if (isDeparture) {
-            warp.setDepartureSound(sound);
-        } else {
-            warp.setArrivalSound(sound);
-        }
     }
 
     private ItemStack customIcon(PlayerRef viewer) {

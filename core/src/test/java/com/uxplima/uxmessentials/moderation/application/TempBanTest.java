@@ -107,7 +107,7 @@ class TempBanTest {
     private final CheckBan checkBan = new CheckBan(records, notifier.notifier(), clock);
 
     private boolean letsIn(PlayerRef who) {
-        return login.evaluate(who, ADDRESS, false, false).allowed();
+        return Logins.check(login, who, ADDRESS, false, false).allowed();
     }
 
     /** The lines Alex was told, newest last. */
@@ -231,9 +231,9 @@ class TempBanTest {
     void aLockdownRefusesEveryoneWithoutTheBypass() {
         records.setLockedDown(true);
 
-        assertThat(login.evaluate(SAM, ADDRESS, false, true).kickReason())
+        assertThat(Logins.check(login, SAM, ADDRESS, false, true).kickReason())
                 .contains(ModerationMessageKey.MOD_LOCKDOWN_KICK.key());
-        assertThat(login.evaluate(SAM, ADDRESS, true, false).allowed()).isTrue();
+        assertThat(Logins.check(login, SAM, ADDRESS, true, false).allowed()).isTrue();
     }
 
     @Test
@@ -247,11 +247,11 @@ class TempBanTest {
                 NOW));
         tempBan.tempban(ALEX, SAM, "1h", Optional.empty(), false);
 
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).kickReason())
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).kickReason())
                 .contains(ModerationMessageKey.TEMPBAN_KICK.key());
 
         clock.advance(Duration.ofHours(1));
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).kickReason())
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).kickReason())
                 .contains(ModerationMessageKey.BANIP_KICK.key());
 
         clock.advance(Duration.ofHours(2));

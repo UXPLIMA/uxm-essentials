@@ -5,8 +5,10 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import org.bukkit.Server;
+import org.bukkit.entity.Player;
 import org.bukkit.event.Listener;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -154,14 +156,15 @@ public final class VillagersWiring {
         // permission and are present only when their feature wired, so with every sub-feature off the root still
         // exists (gated on uxmessentials.villagers.use) and its bare executor reports that no tools are enabled,
         // rather than the command silently not existing while the module reads as running.
-        commands.add(new VillagerCommand(
+        VillagerCommand villagerCommand = new VillagerCommand(
                 managerView != null ? MANAGER_PERMISSION : null,
                 managerView,
                 protectToggle != null ? PROTECT_PERMISSION : null,
                 protectToggle,
                 followService != null ? FOLLOW_PERMISSION : null,
                 followService,
-                kernel.messages()));
+                kernel.messages());
+        commands.add(villagerCommand);
         // Leashing: intercept a lead right-click on a villager and attach the lead. Wires only under the leash switch.
         if (config.leash().enabled()) {
             listeners.add(new VillagerLeashListener(true, LEASH_PERMISSION));
@@ -188,7 +191,9 @@ public final class VillagersWiring {
         // does: with the feature off there is nothing to count and the placeholder degrades to the dash.
         VillagersPlaceholders placeholders =
                 followService == null ? null : new FollowVillagersPlaceholders(followService);
-        return new Wired(listeners, commands, stop, placeholders);
+        // The hub can only offer the manager when there is one to open, so the opener exists only with the manager.
+        Consumer<Player> openManager = managerView != null ? villagerCommand::openManager : null;
+        return new Wired(listeners, commands, stop, placeholders, openManager);
     }
 
     // The click-to-trade opener: force-open the villager's trade window. Both openMerchant overloads carry a
@@ -225,12 +230,15 @@ public final class VillagersWiring {
      * @param listeners the Bukkit listeners to register
      * @param commands the Brigadier commands to register
      * @param stop the teardown hook run on module stop
+     * @param openManager opens the trade manager on the villager in the player's reach, or {@code null} when the
+     *     trade manager is switched off
      */
     public record Wired(
             List<Listener> listeners,
             List<CommandRegistration> commands,
             Runnable stop,
-            @Nullable VillagersPlaceholders placeholders) {
+            @Nullable VillagersPlaceholders placeholders,
+            @Nullable Consumer<Player> openManager) {
 
         public Wired {
             listeners = List.copyOf(listeners);

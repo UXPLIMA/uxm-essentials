@@ -256,13 +256,13 @@ class WarnEscalationTest {
 
         assertThat(online.kicked()).containsOnlyKeys(SAM);
         assertThat(records.loadTempban(SAM).expiry()).contains(clock.instant().plus(Duration.ofDays(1)));
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).allowed()).isFalse();
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).allowed()).isFalse();
 
         clock.advance(Duration.ofDays(1).minusSeconds(1));
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).allowed()).isFalse();
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).allowed()).isFalse();
 
         clock.advance(Duration.ofSeconds(1));
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).allowed()).isTrue();
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).allowed()).isTrue();
     }
 
     @Test
@@ -488,7 +488,7 @@ class WarnEscalationTest {
                         ModerationMessageKey.MOD_WARN_ESCALATED_EXTENDED.key());
         assertThat(sync.bansChanged).isEqualTo(2);
         clock.advance(Duration.ofHours(2));
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).allowed()).isFalse();
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).allowed()).isFalse();
     }
 
     @Test

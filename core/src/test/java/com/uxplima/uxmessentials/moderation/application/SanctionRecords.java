@@ -35,6 +35,7 @@ final class SanctionRecords implements ModerationRepository {
     private final Map<String, IpBan> ipBans = new HashMap<>();
     private final List<UUID> seen = new ArrayList<>();
     private boolean lockedDown;
+    private boolean unreachable;
     private @Nullable Runnable racingWrite;
     private boolean losingEveryRace;
     private int failingMuteReads;
@@ -53,6 +54,17 @@ final class SanctionRecords implements ModerationRepository {
     /** Run {@code meanwhile} once, inside the next read of a single mute, after the row was read. */
     void duringNextMuteRead(Runnable meanwhile) {
         duringMuteRead = meanwhile;
+    }
+
+    /** Make every read a login check makes fail from now on, as a database that went away does. */
+    void goUnreachable() {
+        unreachable = true;
+    }
+
+    private void reach() {
+        if (unreachable) {
+            throw new IllegalStateException("the database is unreachable");
+        }
     }
 
     /** Whose logins were recorded, in order. */
@@ -109,6 +121,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public TempbanState loadTempban(PlayerRef target) {
+        reach();
         return tempbans.getOrDefault(target.uuid(), TempbanState.none());
     }
 
@@ -184,6 +197,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public Optional<IpBan> activeIpBan(String ip, Instant now) {
+        reach();
         return Optional.ofNullable(ipBans.get(ip)).filter(ban -> ban.isActiveAt(now));
     }
 
@@ -204,6 +218,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public boolean isLockedDown() {
+        reach();
         return lockedDown;
     }
 

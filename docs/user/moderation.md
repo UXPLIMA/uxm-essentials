@@ -353,6 +353,14 @@ without arguments, `/ban`, `/tempban`, `/mute`, `/tempmute`, `/warn` and `/banip
 confirmation, `/jail` opens the jail menu, `/jails` the jail manager, `/jailedplayers` the release list, and
 `/banlist` and `/banhistory` their menus.
 
+## How a login is checked
+
+The bans, the IP ban on the player's address and the lockdown flag are read from the database while the player
+connects, before the server thread is involved. The decision follows a moment later, once the player's permissions
+are known, so a login never makes the server wait on the database. A login is never let in unchecked: when the read
+fails, or the decision finds no read for that connection (or one more than 30 seconds old), the player is refused with
+`moderation.login.unchecked`, which asks them to join again, and a line is written to the log.
+
 ## Kick screens and appeals
 
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
@@ -363,23 +371,12 @@ The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are 
 ## On a network
 
 With `network.enabled = true` every server reads bans, mutes, warnings, jails, IP bans and the lockdown flag from the
-shared database, so:
-
-- A ban kicks the player from whichever server they are on, and every server refuses their login.
-- An IP ban kicks everyone on that address on every server, exempt players aside.
-- A mute is read from the database at every chat line, so it applies everywhere at once. Private messages, mail,
-  helpop and `muted-blocked-commands` use a copy of each connected player's mute, read when they join and updated
-  when a mute or unmute lands, on another server through the bus. The copy is also read again every minute and
-  after `/uxmess import`, so a change that came with no bus message still arrives.
-- A jail sends the player to the jail's server, as described in [Jails on a network](#jails-on-a-network).
-- `/kick` and `/freeze` act only on players connected to your server; a freeze then holds on every server.
-
-The database holds bans (a permanent ban is stored as one that ends far in the future), mutes, warnings, jails and
-the jails made with `/setjail`, IP bans, last-seen records and the address history, the sanction history and the
-lockdown flag. Freezes are held in memory on every server; command spy and the staff broadcast are local to each
-server. See [network.md](network.md)
-for setting up the network, and [import.md](import.md) for bringing bans, mutes, warnings and jails over from
-EssentialsX and LiteBans.
+shared database, so a sanction holds on every server: a ban or an IP ban kicks the player wherever they are and every
+server refuses their login, a mute applies at once, and a jail sends the player to the jail's server (see
+[Jails on a network](#jails-on-a-network)). `/kick` and `/freeze` act only on players connected to your server; a
+freeze then holds on every server. Freezes are held in memory; command spy and the staff broadcast stay on one
+server. [network.md](network.md#moderation) has the details and the setup, and [import.md](import.md) brings bans,
+mutes, warnings and jails over from EssentialsX and LiteBans.
 
 ## Settings
 
