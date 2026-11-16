@@ -234,7 +234,8 @@ public final class WorldsWiring {
                 notifier,
                 tracked,
                 kernel.playerLookup(),
-                worldHops);
+                worldHops,
+                kernel.log());
         WorldAccessListener accessListener = new WorldAccessListener(
                 repository,
                 policy,

@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.util.Map;
+import java.util.Optional;
 
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
@@ -33,4 +35,13 @@ public interface SanctionBroadcast {
      * audience and the console.
      */
     void announce(MessageKey key, Map<String, String> placeholders);
+
+    /**
+     * {@link #announce(MessageKey, Map)} for a sanction whose reason the server drew from a catalog line: the adapter
+     * draws {@code drawn} for each recipient into the {@code reason} placeholder, so every reader reads the reason in
+     * their own language. Without that, every reader gets the {@code reason} placeholder as given.
+     */
+    default void announce(MessageKey key, Map<String, String> placeholders, Optional<DrawnReason> drawn) {
+        announce(key, placeholders);
+    }
 }

@@ -11,6 +11,7 @@ import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 import java.time.Instant;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
@@ -46,19 +47,10 @@ final class ModerationWrites {
     static int saveMute(DSLContext dsl, PlayerRef target, MuteState mute) {
         String key = target.uuid().toString();
         dsl.deleteFrom(MODERATION_MUTES).where(MODERATION_MUTES.TARGET.eq(key)).execute();
-        if (mute instanceof MuteState.Permanent perm) {
-            return insertMute(dsl, key, null, perm.issuer(), perm.reason().orElse(null), perm.issuedAt());
+        if (mute instanceof MuteState.None) {
+            return 0;
         }
-        if (mute instanceof MuteState.Timed timed) {
-            return insertMute(
-                    dsl,
-                    key,
-                    timed.until().toEpochMilli(),
-                    timed.issuer(),
-                    timed.reason().orElse(null),
-                    timed.issuedAt());
-        }
-        return 0;
+        return dsl.insertInto(MODERATION_MUTES).set(muteRow(key, mute)).execute();
     }
 
     /**
@@ -93,16 +85,20 @@ final class ModerationWrites {
         row.setTarget(key);
         row.setUntil(mute.expiry().map(Instant::toEpochMilli).orElse(null));
         switch (mute) {
-            case MuteState.Permanent permanent -> fillIssue(row, permanent.issuer(), permanent.reason());
-            case MuteState.Timed timed -> fillIssue(row, timed.issuer(), timed.reason());
+            case MuteState.Permanent permanent ->
+                fillIssue(row, permanent.issuer(), permanent.reason(), permanent.drawnReason());
+            case MuteState.Timed timed -> fillIssue(row, timed.issuer(), timed.reason(), timed.drawnReason());
             case MuteState.None none -> throw new IllegalArgumentException("a mute row needs a mute");
         }
         row.setCreatedAt(issuedAt(mute).toEpochMilli());
         return row;
     }
 
-    private static void fillIssue(ModerationMutesRecord row, Issuer issuer, Optional<String> reason) {
+    private static void fillIssue(
+            ModerationMutesRecord row, Issuer issuer, Optional<String> reason, Optional<DrawnReason> drawn) {
         row.setReason(reason.map(text -> fit(MODERATION_MUTES.REASON, text)).orElse(null));
+        row.setReasonKey(ReasonLines.key(drawn));
+        row.setReasonArgs(ReasonLines.args(drawn));
         row.setMutedBy(issuerUuid(issuer));
         row.setMutedByName(fit(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()));
     }
@@ -118,23 +114,6 @@ final class ModerationWrites {
     /** {@code column = value}, or {@code column IS NULL} for an empty value, which plain equality never matches. */
     private static Condition nullableEq(Field<Long> column, Optional<Instant> value) {
         return value.map(instant -> column.eq(instant.toEpochMilli())).orElseGet(column::isNull);
-    }
-
-    private static int insertMute(
-            DSLContext dsl,
-            String key,
-            @Nullable Long until,
-            Issuer issuer,
-            @Nullable String reason,
-            Instant issuedAt) {
-        return dsl.insertInto(MODERATION_MUTES)
-                .set(MODERATION_MUTES.TARGET, key)
-                .set(MODERATION_MUTES.UNTIL, until)
-                .set(MODERATION_MUTES.REASON, reason)
-                .set(MODERATION_MUTES.MUTED_BY, issuerUuid(issuer))
-                .set(MODERATION_MUTES.MUTED_BY_NAME, fit(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()))
-                .set(MODERATION_MUTES.CREATED_AT, issuedAt.toEpochMilli())
-                .execute();
     }
 
     static int saveJail(DSLContext dsl, PlayerRef target, JailState jail) {
@@ -206,6 +185,8 @@ final class ModerationWrites {
         row.setReason(ban.reason()
                 .map(reason -> fit(MODERATION_TEMPBANS.REASON, reason))
                 .orElse(null));
+        row.setReasonKey(ReasonLines.key(ban.drawnReason()));
+        row.setReasonArgs(ReasonLines.args(ban.drawnReason()));
         row.setBannedBy(issuerUuid(ban.issuer()));
         row.setBannedByName(fit(MODERATION_TEMPBANS.BANNED_BY_NAME, ban.issuer().name()));
         row.setCreatedAt(ban.issuedAt().toEpochMilli());
@@ -266,21 +247,7 @@ final class ModerationWrites {
         dsl.deleteFrom(MODERATION_IP_BANS)
                 .where(MODERATION_IP_BANS.IP.eq(ban.ip()))
                 .execute();
-        return dsl.insertInto(MODERATION_IP_BANS)
-                .set(MODERATION_IP_BANS.IP, ban.ip())
-                .set(
-                        MODERATION_IP_BANS.UNTIL,
-                        ban.until().map(Instant::toEpochMilli).orElse(null))
-                .set(MODERATION_IP_BANS.REASON, ban.reason().orElse(null))
-                .set(
-                        MODERATION_IP_BANS.TARGET,
-                        ban.target().map(java.util.UUID::toString).orElse(null))
-                .set(MODERATION_IP_BANS.BANNED_BY, issuerUuid(ban.issuer()))
-                .set(
-                        MODERATION_IP_BANS.BANNED_BY_NAME,
-                        fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()))
-                .set(MODERATION_IP_BANS.CREATED_AT, ban.issuedAt().toEpochMilli())
-                .execute();
+        return dsl.insertInto(MODERATION_IP_BANS).set(ipBanRow(ban)).execute();
     }
 
     /**
@@ -315,6 +282,8 @@ final class ModerationWrites {
         row.setUntil(ban.until().map(Instant::toEpochMilli).orElse(null));
         row.setReason(
                 ban.reason().map(text -> fit(MODERATION_IP_BANS.REASON, text)).orElse(null));
+        row.setReasonKey(ReasonLines.key(ban.drawnReason()));
+        row.setReasonArgs(ReasonLines.args(ban.drawnReason()));
         row.setTarget(ban.target().map(java.util.UUID::toString).orElse(null));
         row.setBannedBy(issuerUuid(ban.issuer()));
         row.setBannedByName(fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()));

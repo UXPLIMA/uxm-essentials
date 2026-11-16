@@ -4,22 +4,27 @@ import java.util.Map;
 
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * The shared placeholder mapping for one {@code /banhistory}, {@code /mutehistory} or {@code /history} entry
  * line, so the review use cases render a row identically. The {@code expires} placeholder is blank for a
  * permanent sanction, a lift or a kick and {@code ip} blank for a UUID-scoped row, so the catalog line
- * degrades cleanly without a separate key per shape.
+ * degrades cleanly without a separate key per shape. A reason the server drew from a catalog line reads in the
+ * viewer's language.
  */
 final class SanctionHistoryLine {
 
     private SanctionHistoryLine() {}
 
-    static Map<String, String> of(SanctionHistoryEntry row) {
+    static Map<String, String> of(Notifier notifier, PlayerRef viewer, SanctionHistoryEntry row) {
         return Map.of(
                 "action", label(row.action()),
                 "issuer", row.actor().name(),
-                "reason", row.reason().orElse(""),
+                "reason",
+                        SanctionReasons.read(notifier::render, viewer, row.reason(), row.drawnReason())
+                                .orElse(""),
                 "expires", row.expiry().map(Object::toString).orElse(""),
                 "ip", row.ip().orElse(""),
                 "when", row.at().toString());

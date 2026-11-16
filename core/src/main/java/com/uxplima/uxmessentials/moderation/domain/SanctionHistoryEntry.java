@@ -23,6 +23,8 @@ import java.util.UUID;
  * @param at when the sanction was applied
  * @param expiry the wall-clock expiry for a timed sanction, or empty for a permanent one or a lift
  * @param ip the banned address for an IP-scoped row, or empty for a UUID-scoped row
+ * @param drawnReason the catalog line {@code reason} was drawn from for the punished player, when the server wrote it
+ *     (a warn ladder step); each reader then reads it in their own language
  */
 public record SanctionHistoryEntry(
         SanctionAction action,
@@ -31,7 +33,8 @@ public record SanctionHistoryEntry(
         Optional<String> reason,
         Instant at,
         Optional<Instant> expiry,
-        Optional<String> ip) {
+        Optional<String> ip,
+        Optional<DrawnReason> drawnReason) {
 
     public SanctionHistoryEntry {
         Objects.requireNonNull(action, "action");
@@ -41,5 +44,18 @@ public record SanctionHistoryEntry(
         Objects.requireNonNull(at, "at");
         Objects.requireNonNull(expiry, "expiry");
         Objects.requireNonNull(ip, "ip");
+        Objects.requireNonNull(drawnReason, "drawnReason");
+    }
+
+    /** A row whose reason a staff member gave, or none. */
+    public SanctionHistoryEntry(
+            SanctionAction action,
+            UUID target,
+            Issuer actor,
+            Optional<String> reason,
+            Instant at,
+            Optional<Instant> expiry,
+            Optional<String> ip) {
+        this(action, target, actor, reason, at, expiry, ip, Optional.empty());
     }
 }

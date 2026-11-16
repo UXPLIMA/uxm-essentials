@@ -8,6 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
@@ -46,8 +47,19 @@ public final class SanctionHistoryRecorder {
      * {@code /banip} and counts the ban once.
      */
     public void ban(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> expiry, Instant at) {
+        ban(actor, target, reason, Optional.empty(), expiry, at);
+    }
+
+    /** Record a UUID ban whose reason the server drew from {@code drawn}; {@code reason} is its punished-player text. */
+    public void ban(
+            PlayerRef actor,
+            PlayerRef target,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            Optional<Instant> expiry,
+            Instant at) {
         Objects.requireNonNull(target, "target");
-        append(SanctionAction.BAN, target.uuid(), actor, reason, expiry, Optional.empty(), at);
+        append(SanctionAction.BAN, target.uuid(), actor, reason, drawn, expiry, Optional.empty(), at);
     }
 
     /** Record an IP ban ({@code target} the resolved player or empty for {@code /banip <ip>}). */
@@ -64,9 +76,21 @@ public final class SanctionHistoryRecorder {
             Optional<String> reason,
             Optional<Instant> expiry,
             Instant at) {
+        banIp(actor, target, ip, reason, Optional.empty(), expiry, at);
+    }
+
+    /** Record an IP ban whose reason the server drew from {@code drawn}; {@code reason} is its punished-player text. */
+    public void banIp(
+            PlayerRef actor,
+            Optional<UUID> target,
+            String ip,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            Optional<Instant> expiry,
+            Instant at) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(ip, "ip");
-        append(SanctionAction.BAN, target.orElse(NO_UUID), actor, reason, expiry, Optional.of(ip), at);
+        append(SanctionAction.BAN, target.orElse(NO_UUID), actor, reason, drawn, expiry, Optional.of(ip), at);
     }
 
     /** Record a UUID unban of {@code target}. */
@@ -83,8 +107,18 @@ public final class SanctionHistoryRecorder {
 
     /** Record a mute of {@code target} ({@code expiry} present for a tempmute, empty for a permanent mute). */
     public void mute(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Instant> expiry) {
+        mute(actor, target, reason, Optional.empty(), expiry);
+    }
+
+    /** Record a mute whose reason the server drew from {@code drawn}; {@code reason} is its punished-player text. */
+    public void mute(
+            PlayerRef actor,
+            PlayerRef target,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            Optional<Instant> expiry) {
         Objects.requireNonNull(target, "target");
-        append(SanctionAction.MUTE, target.uuid(), actor, reason, expiry, Optional.empty());
+        append(SanctionAction.MUTE, target.uuid(), actor, reason, drawn, expiry, Optional.empty(), clock.instant());
     }
 
     /** Record an unmute of {@code target}. */
@@ -101,8 +135,21 @@ public final class SanctionHistoryRecorder {
 
     /** Record a kick of {@code target} (a live disconnect: never a stored expiry, never IP-scoped). */
     public void kick(PlayerRef actor, PlayerRef target, Optional<String> reason) {
+        kick(actor, target, reason, Optional.empty());
+    }
+
+    /** Record a kick whose reason the server drew from {@code drawn}; {@code reason} is its punished-player text. */
+    public void kick(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<DrawnReason> drawn) {
         Objects.requireNonNull(target, "target");
-        append(SanctionAction.KICK, target.uuid(), actor, reason, Optional.empty(), Optional.empty());
+        append(
+                SanctionAction.KICK,
+                target.uuid(),
+                actor,
+                reason,
+                drawn,
+                Optional.empty(),
+                Optional.empty(),
+                clock.instant());
     }
 
     /**
@@ -128,7 +175,7 @@ public final class SanctionHistoryRecorder {
             Optional<String> reason,
             Optional<Instant> expiry,
             Optional<String> ip) {
-        append(action, target, actor, reason, expiry, ip, clock.instant());
+        append(action, target, actor, reason, Optional.empty(), expiry, ip, clock.instant());
     }
 
     private void append(
@@ -136,13 +183,15 @@ public final class SanctionHistoryRecorder {
             UUID target,
             PlayerRef actor,
             Optional<String> reason,
+            Optional<DrawnReason> drawn,
             Optional<Instant> expiry,
             Optional<String> ip,
             Instant at) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(reason, "reason");
+        Objects.requireNonNull(drawn, "drawn");
         Objects.requireNonNull(expiry, "expiry");
         Objects.requireNonNull(at, "at");
-        store.append(new SanctionHistoryEntry(action, target, Issuer.of(actor), reason, at, expiry, ip));
+        store.append(new SanctionHistoryEntry(action, target, Issuer.of(actor), reason, at, expiry, ip, drawn));
     }
 }

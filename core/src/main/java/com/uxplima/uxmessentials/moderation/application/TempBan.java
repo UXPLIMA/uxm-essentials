@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
@@ -100,7 +101,7 @@ public final class TempBan {
         }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
-        TempbanState.Active ban = proposal(actor, span, reason, now);
+        TempbanState.Active ban = proposal(actor, span, reason, Optional.empty(), now);
         Predicate<TempbanState.Active> longer =
                 GuardedWrite.outlasting(SanctionStrength.endOf(ban), SanctionStrength::endOf);
         return switch (GuardedWrite.storeBan(repository, target, ban, now, longer)) {
@@ -115,7 +116,7 @@ public final class TempBan {
                 yield Result.err(ModerationError.LONGER_BAN_RUNNING);
             }
             case GuardedWrite.Stored<TempbanState.Active> stored -> {
-                announce(actor, actor, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
+                announce(actor, actor, target, ban, span, span.compareTo(requested.get()) < 0, silent, now);
                 yield Result.ok(ban);
             }
         };
@@ -126,7 +127,9 @@ public final class TempBan {
      * force that ends sooner is replaced by this one as a fresh tempban (stored, recorded, announced and synced
      * like any tempban); one that ends at the same instant or later, a permanent ban above all, is kept and the
      * rung is audited as held, so a rung can never shorten a ban. The ban is issued under {@code actor}, the server
-     * rule, while what the use case says about it goes to {@code told}, the staff member whose warning set it off.
+     * rule, while what the use case says about it goes to {@code told}, the staff member whose warning set it off. A
+     * {@code drawn} reason is the catalog line {@code reason} was drawn from for the target, stored with the ban so
+     * every reader reads it in their own language.
      */
     Result<EscalationOutcome, ModerationError> escalate(
             PlayerRef actor,
@@ -134,6 +137,7 @@ public final class TempBan {
             PlayerRef target,
             String rawDuration,
             Optional<String> reason,
+            Optional<DrawnReason> drawn,
             boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(told, "told");
@@ -152,7 +156,7 @@ public final class TempBan {
         }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
-        TempbanState.Active ban = proposal(actor, span, reason, now);
+        TempbanState.Active ban = proposal(actor, span, reason, drawn, now);
         Predicate<TempbanState.Active> atLeastAsLong =
                 GuardedWrite.notOutlastedBy(SanctionStrength.endOf(ban), SanctionStrength::endOf);
         return switch (GuardedWrite.storeBan(repository, target, ban, now, atLeastAsLong)) {
@@ -161,14 +165,15 @@ public final class TempBan {
                 yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
             case GuardedWrite.Stored<TempbanState.Active> stored -> {
-                announce(actor, told, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
+                announce(actor, told, target, ban, span, span.compareTo(requested.get()) < 0, silent, now);
                 yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
             }
         };
     }
 
-    private static TempbanState.Active proposal(PlayerRef actor, Duration span, Optional<String> reason, Instant now) {
-        return (TempbanState.Active) TempbanState.active(now.plus(span), Issuer.of(actor), reason, now);
+    private static TempbanState.Active proposal(
+            PlayerRef actor, Duration span, Optional<String> reason, Optional<DrawnReason> drawn, Instant now) {
+        return (TempbanState.Active) TempbanState.active(now.plus(span), Issuer.of(actor), reason, now, drawn);
     }
 
     /** Everything a stored tempban sets off: the history row, the kick, the sync, the event and every notice. */
@@ -179,10 +184,10 @@ public final class TempBan {
             TempbanState.Active ban,
             Duration span,
             boolean capped,
-            Optional<String> reason,
             boolean silent,
             Instant now) {
-        history.ban(actor, target, reason, Optional.of(ban.until()));
+        Optional<String> reason = ban.reason();
+        history.ban(actor, target, reason, ban.drawnReason(), Optional.of(ban.until()), now);
         BanScreen.of(ban, now).kick(sanctions, notifier, target);
         // The local kick removed the target here; this wakes peers that have them online (a no-op with no bus).
         sync.banChanged(target);
@@ -204,7 +209,8 @@ public final class TempBan {
                             "actor", actor.name(),
                             "target", target.name(),
                             "reason", reason.orElse(""),
-                            "duration", SanctionDuration.format(span)));
+                            "duration", SanctionDuration.format(span)),
+                    ban.drawnReason());
         }
     }
 

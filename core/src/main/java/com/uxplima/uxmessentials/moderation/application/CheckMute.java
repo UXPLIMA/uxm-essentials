@@ -44,15 +44,15 @@ public final class CheckMute {
             notifier.send(viewer, ModerationMessageKey.MOD_CHECK_NOT_MUTED, Map.of("player", target.name()));
             return;
         }
-        notifier.send(viewer, ModerationMessageKey.MOD_CHECK_MUTED, active(target, mute));
+        notifier.send(viewer, ModerationMessageKey.MOD_CHECK_MUTED, active(viewer, target, mute));
     }
 
-    private static Map<String, String> active(PlayerRef target, MuteState mute) {
+    private Map<String, String> active(PlayerRef viewer, PlayerRef target, MuteState mute) {
         Issuer issuer = issuerOf(mute);
         return Map.of(
                 "player", target.name(),
                 "actor", issuer.name(),
-                "reason", reasonOf(mute).orElse(""),
+                "reason", reasonOf(viewer, mute).orElse(""),
                 "expiry", mute.expiry().map(Object::toString).orElse(""));
     }
 
@@ -64,10 +64,12 @@ public final class CheckMute {
         };
     }
 
-    private static Optional<String> reasonOf(MuteState mute) {
+    private Optional<String> reasonOf(PlayerRef viewer, MuteState mute) {
         return switch (mute) {
-            case MuteState.Permanent permanent -> permanent.reason();
-            case MuteState.Timed timed -> timed.reason();
+            case MuteState.Permanent permanent ->
+                SanctionReasons.read(notifier::render, viewer, permanent.reason(), permanent.drawnReason());
+            case MuteState.Timed timed ->
+                SanctionReasons.read(notifier::render, viewer, timed.reason(), timed.drawnReason());
             case MuteState.None none -> Optional.empty();
         };
     }

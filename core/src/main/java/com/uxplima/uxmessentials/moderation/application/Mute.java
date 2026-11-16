@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
@@ -93,7 +94,7 @@ public final class Mute {
         }
         Instant now = clock.instant();
         Plan plan = plan(actor, parsed);
-        MuteState mute = proposal(actor, plan, reason, now);
+        MuteState mute = proposal(actor, plan, reason, Optional.empty(), now);
         Predicate<MuteState> longer = GuardedWrite.outlasting(mute.expiry(), MuteState::expiry);
         return switch (GuardedWrite.storeMute(repository, target, mute, now, longer)) {
             case GuardedWrite.Kept<MuteState> kept -> {
@@ -109,7 +110,7 @@ public final class Mute {
                 yield Result.err(ModerationError.ALREADY_MUTED);
             }
             case GuardedWrite.Stored<MuteState> stored -> {
-                announce(actor, actor, target, mute, plan, reason, silent, now);
+                announce(actor, actor, target, mute, plan, reason, Optional.empty(), silent, now);
                 yield Result.ok(mute);
             }
         };
@@ -142,7 +143,9 @@ public final class Mute {
      * a running mute that ends at the same instant or later, or a permanent one, is kept and the rung is
      * audited as held. The write is compare and set, so a staff mute landing while the rung is written is kept
      * by the same rule. The mute is issued under {@code actor}, the server rule, while what the use case says
-     * about it goes to {@code told}, the staff member whose warning set it off.
+     * about it goes to {@code told}, the staff member whose warning set it off. A {@code drawn} reason is the catalog
+     * line {@code reason} was drawn from for the target, stored with the mute so every reader reads it in their own
+     * language.
      */
     Result<EscalationOutcome, ModerationError> escalate(
             PlayerRef actor,
@@ -150,6 +153,7 @@ public final class Mute {
             PlayerRef target,
             String rawDuration,
             Optional<String> reason,
+            Optional<DrawnReason> drawn,
             boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(told, "told");
@@ -164,7 +168,7 @@ public final class Mute {
         }
         Instant now = clock.instant();
         Plan plan = plan(actor, parsed);
-        MuteState mute = proposal(actor, plan, reason, now);
+        MuteState mute = proposal(actor, plan, reason, drawn, now);
         Predicate<MuteState> atLeastAsLong = GuardedWrite.notOutlastedBy(mute.expiry(), MuteState::expiry);
         return switch (GuardedWrite.storeMute(repository, target, mute, now, atLeastAsLong)) {
             case GuardedWrite.Kept<MuteState> kept -> {
@@ -173,7 +177,7 @@ public final class Mute {
                 yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
             case GuardedWrite.Stored<MuteState> stored -> {
-                announce(actor, told, target, mute, plan, reason, silent, now);
+                announce(actor, told, target, mute, plan, reason, drawn, silent, now);
                 yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
             }
         };
@@ -199,11 +203,12 @@ public final class Mute {
         }
     }
 
-    private static MuteState proposal(PlayerRef actor, Plan plan, Optional<String> reason, Instant now) {
+    private static MuteState proposal(
+            PlayerRef actor, Plan plan, Optional<String> reason, Optional<DrawnReason> drawn, Instant now) {
         Issuer issuer = Issuer.of(actor);
         return plan.timed()
-                ? MuteState.timed(now.plus(plan.span()), issuer, reason, now)
-                : MuteState.permanent(issuer, reason, now);
+                ? MuteState.timed(now.plus(plan.span()), issuer, reason, now, drawn)
+                : MuteState.permanent(issuer, reason, now, drawn);
     }
 
     /** Everything a stored mute sets off: the history row, the target's notice, the sync, the event and the notices. */
@@ -214,11 +219,12 @@ public final class Mute {
             MuteState mute,
             Plan plan,
             Optional<String> reason,
+            Optional<DrawnReason> drawn,
             boolean silent,
             Instant now) {
         Duration span = plan.span();
         Optional<Duration> effective = plan.effective();
-        history.mute(actor, target, reason, effective.map(now::plus));
+        history.mute(actor, target, reason, drawn, effective.map(now::plus));
         notifyTarget(target, effective, reason);
         // A peer re-reads the mute from the shared DB on the next chat attempt; this frame is published so a
         // future mute-caching peer has an invalidation hook (a no-op today and with no bus).
@@ -230,7 +236,7 @@ public final class Mute {
         }
         confirmToActor(told, target, effective);
         if (!silent) {
-            broadcastMute(actor, target, reason, effective);
+            broadcastMute(actor, target, reason, drawn, effective);
         }
     }
 
@@ -250,14 +256,19 @@ public final class Mute {
     }
 
     private void broadcastMute(
-            PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Duration> effective) {
+            PlayerRef actor,
+            PlayerRef target,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            Optional<Duration> effective) {
         broadcast.announce(
                 ModerationMessageKey.MOD_BROADCAST_MUTE,
                 Map.of(
                         "actor", actor.name(),
                         "target", target.name(),
                         "reason", reason.orElse(""),
-                        "duration", effective.map(SanctionDuration::format).orElse(SanctionBroadcast.PERMANENT)));
+                        "duration", effective.map(SanctionDuration::format).orElse(SanctionBroadcast.PERMANENT)),
+                drawn);
     }
 
     /** The word for a sanction with no end, in {@code viewer}'s language: every catalogue translates it. */

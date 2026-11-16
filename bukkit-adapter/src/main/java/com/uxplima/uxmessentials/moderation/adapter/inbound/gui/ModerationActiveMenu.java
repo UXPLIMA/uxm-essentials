@@ -130,7 +130,9 @@ public final class ModerationActiveMenu {
         return new ActiveView(rows);
     }
 
-    private ActiveRow row(PlayerRef viewer, ActivePunishment punishment) {
+    private ActiveRow row(PlayerRef viewer, ActivePunishment stored) {
+        // The detail view opens on this row's punishment, so it reads the reason the way the row shows it.
+        ActivePunishment punishment = stored.readBy(messages, viewer);
         return new ActiveRow(
                 punishment,
                 icon(punishment),

@@ -303,7 +303,8 @@ public final class ModerationWiring {
         // Every list's read (with its name/kind/remaining resolution) runs off the tick thread at the open site, so
         // the list sources only read a pre-resolved subject. The active list's left click opens the still-bespoke
         // PunishmentDetailView; that view's back reopens the engine list, a cycle broken inside ModerationGuiViews.
-        ModerationHistoryMenu historyMenu = new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory);
+        ModerationHistoryMenu historyMenu =
+                new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory, kernel.messages());
         historyMenu.register(menuBindings, dataFolder, kernel.log());
         ModerationJailedMenu jailedMenu = new ModerationJailedMenu(
                 menus, kernel.scheduler(), services.unjail(), repository, kernel.playerLookup(), clock);
@@ -718,7 +719,8 @@ public final class ModerationWiring {
 
     /**
      * The public chat mute check. Chat arrives on its own async thread, where the lane's permission reader has no
-     * answer and would count every speaker as exempt, so this one reads the live permissions, as Paper allows there.
+     * answer and would count every speaker as exempt, so this one asks the live permissions, which read the speaker's
+     * own thread and wait for the answer.
      */
     static MutedChatListener mutedChat(MutePolicy mutes, Permissions live, Messages messages, MessageSink sink) {
         return new MutedChatListener(mutes, new ModerationGuard(live)::isExempt, messages, sink);

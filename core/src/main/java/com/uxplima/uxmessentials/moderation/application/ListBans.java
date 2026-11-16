@@ -58,7 +58,8 @@ public final class ListBans {
                 "issuer",
                 ban.issuer().name(),
                 "reason",
-                ban.reason().orElse(""),
+                SanctionReasons.read(notifier::render, viewer, ban.reason(), ban.drawnReason())
+                        .orElse(""),
                 "expires",
                 Ban.endOf(ban)
                         .map(Instant::toString)

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.moderation.adapter.outbound;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.bukkit.Server;
 import org.bukkit.entity.Player;
@@ -10,7 +11,9 @@ import org.bukkit.entity.Player;
 import net.kyori.adventure.text.minimessage.tag.resolver.Placeholder;
 import net.kyori.adventure.text.minimessage.tag.resolver.TagResolver;
 
+import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
@@ -60,36 +63,52 @@ public final class PermissionSanctionBroadcast implements SanctionBroadcast {
 
     @Override
     public void announce(MessageKey key, Map<String, String> placeholders) {
-        Objects.requireNonNull(key, "key");
-        Objects.requireNonNull(placeholders, "placeholders");
-        Map<String, String> safe = Map.copyOf(placeholders);
-        scheduler.onGlobal(() -> fanOut(key, safe));
+        announce(key, placeholders, Optional.empty());
     }
 
-    private void fanOut(MessageKey key, Map<String, String> placeholders) {
+    @Override
+    public void announce(MessageKey key, Map<String, String> placeholders, Optional<DrawnReason> drawn) {
+        Objects.requireNonNull(key, "key");
+        Objects.requireNonNull(placeholders, "placeholders");
+        Objects.requireNonNull(drawn, "drawn");
+        Map<String, String> safe = Map.copyOf(placeholders);
+        scheduler.onGlobal(() -> fanOut(key, safe, drawn));
+    }
+
+    private void fanOut(MessageKey key, Map<String, String> placeholders, Optional<DrawnReason> drawn) {
         for (Player player : server.getOnlinePlayers()) {
             if (player.hasPermission(RECEIVE_NODE)) {
                 PlayerRef who = new PlayerRef(player.getUniqueId(), player.getName());
-                sink.deliver(who, messages.resolve(who, key, readBy(who, placeholders)));
+                sink.deliver(who, messages.resolve(who, key, readBy(who, placeholders, drawn)));
             }
         }
-        sendToConsole(key, placeholders);
+        sendToConsole(key, placeholders, drawn);
     }
 
-    /** {@code placeholders} with {@link SanctionBroadcast#PERMANENT} written as {@code reader}'s word for it. */
-    private Map<String, String> readBy(PlayerRef reader, Map<String, String> placeholders) {
-        if (!placeholders.containsValue(PERMANENT)) {
+    /**
+     * {@code placeholders} as {@code reader} reads them: {@link SanctionBroadcast#PERMANENT} written as their word for
+     * it, and a reason the server drew from a catalog line drawn in their language.
+     */
+    private Map<String, String> readBy(
+            PlayerRef reader, Map<String, String> placeholders, Optional<DrawnReason> drawn) {
+        if (!placeholders.containsValue(PERMANENT) && drawn.isEmpty()) {
             return placeholders;
         }
-        String word = messages.resolve(reader, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
         Map<String, String> read = new HashMap<>(placeholders);
-        read.replaceAll((name, value) -> PERMANENT.equals(value) ? word : value);
+        if (placeholders.containsValue(PERMANENT)) {
+            String word = messages.resolve(reader, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of());
+            read.replaceAll((name, value) -> PERMANENT.equals(value) ? word : value);
+        }
+        drawn.ifPresent(reason -> read.put(
+                "reason",
+                SanctionReasons.read(messages, reader, Optional.empty(), Optional.of(reason))
+                        .orElse("")));
         return read;
     }
 
-    private void sendToConsole(MessageKey key, Map<String, String> placeholders) {
+    private void sendToConsole(MessageKey key, Map<String, String> placeholders, Optional<DrawnReason> drawn) {
         TagResolver prefix = Placeholder.parsed("prefix", prefixTemplate);
-        String rendered = messages.resolve(CONSOLE, key, readBy(CONSOLE, placeholders));
+        String rendered = messages.resolve(CONSOLE, key, readBy(CONSOLE, placeholders, drawn));
         server.getConsoleSender().sendMessage(StyledText.render(rendered, prefix));
     }
 }

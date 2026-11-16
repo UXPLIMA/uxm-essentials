@@ -224,7 +224,7 @@ public final class WarpsWiring {
                 (player, viewer) -> categoryManagerView.open(player, viewer));
         categorySettingsView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorMenu(
-                menus, kernel.messages(), kernel.scheduler(), categoryRepository, repository, editorView);
+                menus, kernel.messages(), kernel.scheduler(), categoryRepository, editorView);
         categorySelectorView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         // Close the editor's sub-screen cycle now that every collaborator exists: the editor's category / welcome /
         // sound / particle buttons open these views, and each reopens the editor after its work. The editor registers

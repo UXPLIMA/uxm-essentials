@@ -128,6 +128,8 @@ public final class WarpSoundMenu {
         editorView.edit(
                 name,
                 null,
+                player,
+                viewer,
                 warp -> {
                     if (edit.departure()) {
                         warp.setDepartureSound(sound);
