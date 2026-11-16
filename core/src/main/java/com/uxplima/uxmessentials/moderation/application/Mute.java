@@ -115,6 +115,25 @@ public final class Mute {
     }
 
     /**
+     * {@code /tempmute}: {@link #mute} with a duration that must be a real span. A permanent ({@code perm}) or
+     * malformed duration is refused with {@link ModerationError#BAD_DURATION}, the way {@code /tempban} refuses
+     * one, so a command named for a timed mute never leaves a permanent one. An exempt target is still refused as
+     * exempt first, as {@code /tempban} does.
+     */
+    public Result<MuteState, ModerationError> tempmute(
+            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(rawDuration, "rawDuration");
+        Objects.requireNonNull(reason, "reason");
+        if (!guard.isExempt(target)
+                && SanctionDuration.parse(rawDuration).duration().isEmpty()) {
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
+        }
+        return mute(actor, target, rawDuration, reason, silent);
+    }
+
+    /**
      * Leave {@code target} muted for at least the given span (permanent when blank): the warn escalation's way
      * in. Unlike {@link #mute}, a mute already in force is no refusal here, because a ladder rung fires on
      * every warning that reaches it and the earlier rung's mute is usually still running. A rung that lasts

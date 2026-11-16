@@ -189,7 +189,7 @@ public final class EnforcementPermissions {
                         MODERATION),
                 PermissionSpec.of(
                         MODERATION_TOGGLEJAIL,
-                        "/togglejail <player> [jail] [reason]: release the target if jailed, otherwise jail them in the named jail (or the first configured jail).",
+                        "/togglejail <player> [jail] [reason]: release the target if jailed, otherwise jail them in the named jail (or the default-jail setting).",
                         PermissionDefault.OP,
                         MODERATION),
                 PermissionSpec.of(MODERATION_UNJAIL, "/unjail <player>.", PermissionDefault.OP, MODERATION),
