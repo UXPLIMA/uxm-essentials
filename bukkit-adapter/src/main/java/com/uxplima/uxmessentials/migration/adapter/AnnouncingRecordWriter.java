@@ -21,13 +21,14 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The live import writer, which also tells peers which warps and holograms the import changed, once the import is
- * done rather than once per row. The bus queue that carries frames over plugin messaging is bounded and drops its
- * oldest frame when full, and it drains only while a player is online, so a frame per imported row would push out
- * the frames live commands send (a ban, a payment) and leave peers with only the last few hundred rows.
+ * done rather than once per row. The bus queue that carries frames over plugin messaging is bounded and drops a
+ * frame when full, and it drains only while a player is online, so a frame per imported row would push out the
+ * frames live commands send and leave peers with only the last few hundred rows.
  *
  * <ul>
  *   <li><b>Warps</b>: one {@link WarpChanged} for the whole import. A peer drops its entire warp set on any such
- *       frame, so one is enough whatever the import held.
+ *       frame, so one is enough whatever the import held. It goes after the last hologram batch: a full queue drops
+ *       the oldest of the frames it ranks alike, so the newest is the one most likely to arrive.
  *   <li><b>Holograms</b>: one {@link HologramChanged} per changed name, each name once, sent in small batches spaced
  *       apart, because a peer reloads and redraws a hologram by name.
  * </ul>
@@ -96,19 +97,18 @@ public final class AnnouncingRecordWriter implements RecordWriter {
         if (sanctions) {
             mutesWritten.run();
         }
-        if (warp != null) {
-            bus.publish(new WarpChanged(bus.serverId(), warp));
-        }
-        publishFrom(holograms, 0);
+        publishFrom(holograms, 0, warp);
     }
 
-    private void publishFrom(List<String> names, int from) {
+    private void publishFrom(List<String> names, int from, @Nullable String warp) {
         int end = Math.min(from + HOLOGRAM_BATCH, names.size());
         for (int index = from; index < end; index++) {
             bus.publish(new HologramChanged(bus.serverId(), names.get(index)));
         }
         if (end < names.size()) {
-            scheduler.asyncAfter(BATCH_GAP, () -> publishFrom(names, end));
+            scheduler.asyncAfter(BATCH_GAP, () -> publishFrom(names, end, warp));
+        } else if (warp != null) {
+            bus.publish(new WarpChanged(bus.serverId(), warp));
         }
     }
 

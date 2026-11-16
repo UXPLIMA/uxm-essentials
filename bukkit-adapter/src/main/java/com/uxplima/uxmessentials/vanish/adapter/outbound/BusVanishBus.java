@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.vanish.adapter.outbound;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -25,8 +26,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The heartbeats are read too and passed on with what they say about the sender's run, from its boot nonce: the
  * first heard, the same run, or a new run after a restart. Every frame this backend sends carries its own boot nonce,
- * the one its heartbeats carry, so a peer can tell which run sent it. Only the nonce is compared, never the sender's
- * clock.
+ * the one its heartbeats carry, so a peer can tell which run sent it, and a sequence that grows with each frame, so a
+ * peer can tell an old frame that arrives late from a new one. Only the nonce and the sequence are compared, never the
+ * sender's clock.
  *
  * <p>The publisher stamps this backend's {@code server-id} as the frame origin, so the shared loop sentinel drops the
  * echo on the origin backend. With the network bus disabled the injected publisher is the no-op one, so publishing is
@@ -39,6 +41,7 @@ public final class BusVanishBus implements VanishBus {
     private final long bootNonce;
     private final boolean enabled;
     private final Map<String, Long> bootByPeer = new ConcurrentHashMap<>();
+    private final AtomicLong sequence = new AtomicLong();
     private volatile @Nullable Listener listener;
 
     public BusVanishBus(BusPublisher publisher, long bootNonce, boolean enabled) {
@@ -57,7 +60,8 @@ public final class BusVanishBus implements VanishBus {
                 change.vanished(),
                 change.level().level(),
                 false,
-                bootNonce));
+                bootNonce,
+                sequence.incrementAndGet()));
     }
 
     @Override
@@ -65,7 +69,14 @@ public final class BusVanishBus implements VanishBus {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(level, "level");
         publisher.publish(new VanishStateChanged(
-                publisher.serverId(), who.uuid(), who.name(), true, level.level(), true, bootNonce));
+                publisher.serverId(),
+                who.uuid(),
+                who.name(),
+                true,
+                level.level(),
+                true,
+                bootNonce,
+                sequence.incrementAndGet()));
     }
 
     @Override
@@ -91,11 +102,13 @@ public final class BusVanishBus implements VanishBus {
         }
         switch (message) {
             case VanishStateChanged frame
-            when frame.departed() -> target.departed(frame.originServer(), frame.player());
+            when frame.departed() ->
+                target.departed(frame.originServer(), runOf(frame.run()), frame.sequence(), frame.player());
             case VanishStateChanged frame ->
                 target.changed(
                         frame.originServer(),
                         runOf(frame.run()),
+                        frame.sequence(),
                         new VanishSync(
                                 frame.player(), frame.playerName(), frame.vanished(), VanishLevel.of(frame.level())));
             case ServerPing ping -> {

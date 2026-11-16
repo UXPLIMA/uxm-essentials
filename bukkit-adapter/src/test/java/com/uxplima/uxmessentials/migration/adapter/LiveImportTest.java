@@ -341,7 +341,7 @@ class LiveImportTest {
     }
 
     @Test
-    void peersHearOneWarpFrameAndEachChangedHologramOnceInSpacedBatches() {
+    void peersHearEachChangedHologramOnceInSpacedBatchesAndThenOneWarpFrame() {
         liveWarps();
         targets.holograms(new CachedHologramRepository(databases.holograms), new RecordingView());
         AnnouncingRecordWriter writer = writers().live();
@@ -356,10 +356,9 @@ class LiveImportTest {
         assertThat(bus.published).as("nothing is sent while the import runs").isEmpty();
         writer.announce();
 
-        assertThat(bus.published).filteredOn(WarpChanged.class::isInstance).hasSize(1);
         assertThat(bus.published)
-                .filteredOn(HologramChanged.class::isInstance)
-                .hasSize(AnnouncingRecordWriter.HOLOGRAM_BATCH);
+                .hasSize(AnnouncingRecordWriter.HOLOGRAM_BATCH)
+                .allMatch(HologramChanged.class::isInstance);
         while (scheduler.runNext()) {
             assertThat(scheduler.lastDelay).isEqualTo(AnnouncingRecordWriter.BATCH_GAP);
         }
@@ -368,6 +367,9 @@ class LiveImportTest {
                 .extracting(message -> ((HologramChanged) message).name())
                 .hasSize(holograms)
                 .doesNotHaveDuplicates();
+        // Last, so a queue that has to drop one of these frames drops an older hologram before the warp frame.
+        assertThat(bus.published).last().isInstanceOf(WarpChanged.class);
+        assertThat(bus.published).filteredOn(WarpChanged.class::isInstance).hasSize(1);
     }
 
     @Test

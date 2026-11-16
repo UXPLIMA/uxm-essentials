@@ -112,7 +112,9 @@ public final class JailTransfer {
     /**
      * Try {@code target}'s transfer again later, after a hop that failed or a jail backend that did not answer. One
      * retry waits per player at a time, and the wait doubles up to {@link #LONGEST_RETRY}; the retries stop once the
-     * player is in the cell, released, or gone from this backend.
+     * player is in the cell, released, or gone from this backend. The count survives the hops sent in between, so a
+     * transfer that keeps being turned away (a pending hop row that never clears) is retried, and its prisoner told,
+     * less and less often; a new jail, join or frame for the player starts it again.
      */
     public void retryLater(PlayerRef target) {
         Objects.requireNonNull(target, "target");
@@ -148,6 +150,10 @@ public final class JailTransfer {
     }
 
     private void routeOrThrow(UUID player, Optional<String> expected, boolean retry) {
+        if (!retry) {
+            // A jail, a join or a peer's frame starts a new transfer, so its retries start from the first wait.
+            forget(player);
+        }
         Optional<PlayerRef> connected = connectedHere(player);
         if (connected.isEmpty()) {
             forget(player);
@@ -183,9 +189,9 @@ public final class JailTransfer {
             }
             HopDeparture departure =
                     new HopDeparture(HopKind.JAIL, cell.name(), server, cell.name(), cell.location(), Optional.empty());
+            // The count is kept: a hop turned away at once reports back inside this call and has already asked for
+            // its retry, and one that fails later asks then; either way the next wait has to be longer than this one.
             departures.get().send(target, departure, Optional.empty(), Optional.empty());
-            // A hop that fails later starts its own retries; this one counts as a fresh start.
-            forget(player);
             return;
         }
         scheduler.onEntity(target, () -> {

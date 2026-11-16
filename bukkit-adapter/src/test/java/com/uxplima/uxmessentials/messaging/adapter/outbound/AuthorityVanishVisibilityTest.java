@@ -75,10 +75,12 @@ class AuthorityVanishVisibilityTest {
         final Map<UUID, VanishLevel> levels = new HashMap<>();
 
         @Override
-        public void apply(String origin, long run, VanishSync change) {}
+        public boolean apply(String origin, long run, long sequence, VanishSync change) {
+            return true;
+        }
 
         @Override
-        public void depart(String origin, UUID player) {}
+        public void depart(String origin, long run, long sequence, UUID player) {}
 
         @Override
         public void heartbeat(String origin, long run, boolean newRun) {}

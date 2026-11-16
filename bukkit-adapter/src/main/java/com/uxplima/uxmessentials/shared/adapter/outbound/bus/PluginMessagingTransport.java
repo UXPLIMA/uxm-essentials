@@ -1,11 +1,10 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
 import java.time.Duration;
-import java.util.ArrayDeque;
 import java.util.Collection;
-import java.util.Deque;
 import java.util.Objects;
 import java.util.OptionalLong;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
 
@@ -29,8 +28,9 @@ import org.jspecify.annotations.Nullable;
  * dispatch all live above this seam in {@link BusCore}; only the byte-moving machinery is here.
  *
  * <h2>Concurrency</h2>
- * Ownership: <b>concurrent-collection</b> for the outbound buffer ({@link #outbound}, guarded by its own
- * monitor for the small bounded push/drain). Every Bukkit touch. Registering the channel, sending a frame
+ * Ownership: <b>concurrent-collection</b> for the outbound buffer ({@link OutboundFrames}, guarded by its own
+ * monitor for the small bounded push/drain). At most one flush waits on the global thread at a time, however many
+ * frames are sent before it runs. Every Bukkit touch. Registering the channel, sending a frame
  * through a carrier player. Hops onto the right thread through the injected {@link Scheduler} port; the
  * inbound hand-off runs off the tick thread via {@link Scheduler#async}. The transport never blocks a region
  * thread and never calls a Bukkit API off it.
@@ -39,7 +39,8 @@ import org.jspecify.annotations.Nullable;
  * Plugin messages ride a player connection, so a frame can only leave once a player is online to carry it.
  * With no proxy, no peers, or no online players the buffered frames simply never drain and the bus is a no-op,
  * the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
- * nothing about the single-server happy path depends on the transport.
+ * nothing about the single-server happy path depends on the transport. A queue that fills while it waits drops the
+ * frames whose loss costs least first, and says so in the log; see {@link OutboundFrames}.
  *
  * <h2>Trust</h2>
  * Whatever sits in front of a backend decides whether a player's client can write on the channel: the
@@ -61,14 +62,13 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class PluginMessagingTransport implements PluginMessageListener, BusTransport {
 
-    private static final byte[] EMPTY = new byte[0];
     private static final long NEVER = Long.MIN_VALUE;
 
     private final PluginChannel pluginChannel;
     private final Scheduler scheduler;
     private final String channel;
-    private final int outboundQueueSize;
-    private final Deque<byte[]> outbound = new ArrayDeque<>();
+    private final OutboundFrames outbound;
+    private final AtomicBoolean flushPending = new AtomicBoolean();
     private final OversizeFrameReport oversize;
     private final LongSupplier clock;
     private final Duration answerWindow;
@@ -123,7 +123,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         if (outboundQueueSize < 1) {
             throw new IllegalArgumentException("outboundQueueSize must be positive: " + outboundQueueSize);
         }
-        this.outboundQueueSize = outboundQueueSize;
+        this.outbound = new OutboundFrames(outboundQueueSize, new DroppedFrameReport(log, clock));
         this.clock = Objects.requireNonNull(clock, "clock");
         this.answerWindow = Objects.requireNonNull(answerWindow, "answerWindow");
     }
@@ -150,18 +150,16 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         }
         running = false;
         pluginChannel.close(this);
-        synchronized (outbound) {
-            outbound.clear();
-        }
+        outbound.clear();
         lastHeardMillis = NEVER;
         waitingForPlayer = false;
         refusals.reset();
     }
 
     /**
-     * Buffer one already-encoded frame and schedule a flush. Bounded: when the buffer is full the oldest frame
-     * is dropped rather than pinning memory. A no-op when the transport is not running (stopped or never
-     * started), so a publish before start never touches the scheduler.
+     * Buffer one already-encoded frame and schedule a flush unless one is already waiting. Bounded: when the buffer is
+     * full a frame is dropped and reported rather than pinning memory, as {@link OutboundFrames} chooses. A no-op when
+     * the transport is not running (stopped or never started), so a publish before start never touches the scheduler.
      */
     @Override
     public void send(byte[] frame) {
@@ -175,13 +173,16 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             oversize.dropped(sealedLength);
             return;
         }
-        synchronized (outbound) {
-            while (outbound.size() >= outboundQueueSize) {
-                outbound.pollFirst();
+        outbound.add(frame);
+        if (flushPending.compareAndSet(false, true)) {
+            try {
+                scheduler.onGlobal(this::flush);
+            } catch (RuntimeException refused) {
+                // A flush that was never scheduled must not keep every later send from scheduling one.
+                flushPending.set(false);
+                throw refused;
             }
-            outbound.addLast(frame);
         }
-        scheduler.onGlobal(this::flush);
     }
 
     /**
@@ -241,6 +242,8 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     }
 
     private void flush() {
+        // Cleared before the drain, so a frame sent while it runs schedules the next flush instead of being missed.
+        flushPending.set(false);
         FrameSeal sealer = seal;
         if (sealer == null) {
             return;
@@ -254,16 +257,8 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         // Drain the buffer through one carrier. The proxy routes by channel, not by the carrier identity, so any
         // online player can carry a server-wide frame.
         // Sealed as it leaves, not when queued, so a frame that waited for a player is not stale on arrival.
-        for (byte[] frame = drainOne(); frame.length > 0; frame = drainOne()) {
+        for (byte[] frame = outbound.poll(); frame != null; frame = outbound.poll()) {
             carrier.accept(sealer.seal(frame));
-        }
-    }
-
-    private byte[] drainOne() {
-        synchronized (outbound) {
-            byte[] frame = outbound.pollFirst();
-            // An empty array is the "nothing left" sentinel: a real frame always carries the version byte.
-            return frame == null ? EMPTY : frame;
         }
     }
 
