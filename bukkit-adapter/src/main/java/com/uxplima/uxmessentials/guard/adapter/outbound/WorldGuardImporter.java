@@ -222,10 +222,10 @@ public final class WorldGuardImporter {
                 CompletableFuture<ImportOutcome> work;
                 try {
                     work = start(mode, source, ctx);
-                } catch (Throwable e) {
+                } catch (Throwable failure) {
                     // Whatever start throws, an Error included, ends this run; otherwise the guard stays taken and
                     // every later import is refused as busy until a restart.
-                    work = CompletableFuture.failedFuture(e);
+                    work = CompletableFuture.failedFuture(failure);
                 }
                 var unused = work.whenComplete((outcome, error) -> finish(future, outcome, error));
             });
@@ -291,8 +291,8 @@ public final class WorldGuardImporter {
         for (WgRegion region : read) {
             try {
                 converted.add(convert(region, batch, scope, names::get, report));
-            } catch (RuntimeException e) {
-                report.add(region.world() + ":" + region.id() + " skipped: " + e.getMessage());
+            } catch (RuntimeException failure) {
+                report.add(region.world() + ":" + region.id() + " skipped: " + failure.getMessage());
             }
         }
         int rules = converted.stream().mapToInt(r -> r.rules().size()).sum();
@@ -350,9 +350,9 @@ public final class WorldGuardImporter {
                             }
                         }
                         resolved.complete(found);
-                    } catch (Throwable e) {
+                    } catch (Throwable failure) {
                         // The import waits on this answer; a throw has to end it rather than leave it running.
-                        resolved.completeExceptionally(e);
+                        resolved.completeExceptionally(failure);
                     }
                 },
                 () -> resolved.completeExceptionally(new IllegalStateException("the server is stopping")));
@@ -362,16 +362,16 @@ public final class WorldGuardImporter {
     private static void write(Path file, List<String> lines) {
         try {
             Files.write(file, lines, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 
     private static void deleteIfExists(Path file) {
         try {
             Files.deleteIfExists(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 
@@ -916,7 +916,7 @@ public final class WorldGuardImporter {
         }
         try {
             return value == null ? 0 : (int) Math.round(Double.parseDouble(String.valueOf(value)));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return 0;
         }
     }

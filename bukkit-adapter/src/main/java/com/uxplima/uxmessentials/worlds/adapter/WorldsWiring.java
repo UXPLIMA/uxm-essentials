@@ -443,8 +443,8 @@ public final class WorldsWiring {
     private static void closeQuietly(AutoCloseable handle, KernelPorts kernel) {
         try {
             handle.close();
-        } catch (Exception e) {
-            kernel.log().error("failed to stop the world auto-unload sweep", e);
+        } catch (Exception failure) {
+            kernel.log().error("failed to stop the world auto-unload sweep", failure);
         }
     }
 

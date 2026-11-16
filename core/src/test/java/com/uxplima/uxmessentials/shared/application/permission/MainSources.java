@@ -85,16 +85,16 @@ final class MainSources {
                 }
             }
             return files;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 
     static String read(Path file) {
         try {
             return Files.readString(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 

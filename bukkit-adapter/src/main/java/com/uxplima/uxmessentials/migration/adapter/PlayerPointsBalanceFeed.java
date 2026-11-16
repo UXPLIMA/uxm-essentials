@@ -57,8 +57,8 @@ final class PlayerPointsBalanceFeed implements BalanceFeed {
             Object api = Class.forName(API_CLASS).getMethod("getAPI").invoke(null);
             Method look = api.getClass().getMethod("look", UUID.class);
             lookup = new Lookup(api, look);
-        } catch (ReflectiveOperationException e) {
-            log.warn("PlayerPoints import skipped: its API could not be reached: {}", e.toString());
+        } catch (ReflectiveOperationException reflectionFailure) {
+            log.warn("PlayerPoints import skipped: its API could not be reached: {}", reflectionFailure.toString());
             return Stream.empty();
         }
         return Arrays.stream(plugin.getServer().getOfflinePlayers())
@@ -71,8 +71,8 @@ final class PlayerPointsBalanceFeed implements BalanceFeed {
         int points;
         try {
             points = (Integer) lookup.look().invoke(lookup.api(), op.getUniqueId());
-        } catch (ReflectiveOperationException e) {
-            log.warn("PlayerPoints lookup failed for {}: {}", op.getUniqueId(), e.toString());
+        } catch (ReflectiveOperationException reflectionFailure) {
+            log.warn("PlayerPoints lookup failed for {}: {}", op.getUniqueId(), reflectionFailure.toString());
             return Optional.empty();
         }
         if (points <= 0) {

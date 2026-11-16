@@ -48,10 +48,11 @@ public final class IpHashing implements IpTokens {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             mac.init(new SecretKeySpec(key, HMAC_ALGORITHM));
             return HexFormat.of().formatHex(mac.doFinal(ip.getBytes(StandardCharsets.UTF_8)));
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException cryptoUnavailable) {
             // HmacSHA256 is mandated on every JDK, so this is unreachable; rethrow rather than swallow so a broken
             // provider fails loud instead of silently disabling device trust.
-            throw new IllegalStateException("JDK is missing the mandatory " + HMAC_ALGORITHM + " provider", e);
+            throw new IllegalStateException(
+                    "JDK is missing the mandatory " + HMAC_ALGORITHM + " provider", cryptoUnavailable);
         }
     }
 }

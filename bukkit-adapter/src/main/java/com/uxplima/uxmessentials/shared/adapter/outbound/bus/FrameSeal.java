@@ -109,9 +109,10 @@ final class FrameSeal {
             mac.update(DOMAIN);
             mac.update(bytes, 0, length);
             return mac.doFinal();
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException cryptoUnavailable) {
             // HmacSHA256 is mandated on every JDK; a provider without it must fail loud, not let frames through.
-            throw new IllegalStateException("JDK is missing the mandatory " + ALGORITHM + " provider", e);
+            throw new IllegalStateException(
+                    "JDK is missing the mandatory " + ALGORITHM + " provider", cryptoUnavailable);
         }
     }
 

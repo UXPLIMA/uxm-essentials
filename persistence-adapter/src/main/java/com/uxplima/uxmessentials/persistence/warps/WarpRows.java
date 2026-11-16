@@ -120,7 +120,7 @@ final class WarpRows {
                 if (list != null) {
                     return list;
                 }
-            } catch (Exception e) {
+            } catch (Exception failure) {
                 // fallback if JSON is invalid
             }
         }

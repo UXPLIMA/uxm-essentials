@@ -131,8 +131,8 @@ public final class BukkitWorldArchive implements WorldArchive {
                     initiator,
                     WorldsMessageKey.WORLD_BACKUP_CREATED,
                     Map.of("world", world.value(), "backup", id.value()));
-        } catch (IOException e) {
-            log.error("backup of " + world.value() + " failed", e);
+        } catch (IOException ioFailure) {
+            log.error("backup of " + world.value() + " failed", ioFailure);
             notify(initiator, WorldsMessageKey.WORLD_BACKUP_FAILED, Map.of("world", world.value()));
         }
     }
@@ -150,8 +150,8 @@ public final class BukkitWorldArchive implements WorldArchive {
                     .flatMap(Optional::stream)
                     .sorted(Comparator.comparing(BackupRef::createdAt).reversed())
                     .toList();
-        } catch (IOException e) {
-            log.error("listing backups of " + world.value() + " failed", e);
+        } catch (IOException ioFailure) {
+            log.error("listing backups of " + world.value() + " failed", ioFailure);
             return List.of();
         }
     }
@@ -164,10 +164,10 @@ public final class BukkitWorldArchive implements WorldArchive {
             BackupId id = new BackupId(stem);
             Instant createdAt = Files.getLastModifiedTime(archive).toInstant();
             return Optional.of(new BackupRef(id, createdAt, Files.size(archive)));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             return Optional.empty(); // a malformed file name is not one of our archives
-        } catch (IOException e) {
-            log.error("reading backup metadata of " + archive + " failed", e);
+        } catch (IOException ioFailure) {
+            log.error("reading backup metadata of " + archive + " failed", ioFailure);
             return Optional.empty();
         }
     }
@@ -182,8 +182,8 @@ public final class BukkitWorldArchive implements WorldArchive {
         for (BackupRef ref : all.subList(keep, all.size())) { // list is newest-first, so this is the oldest
             try {
                 Files.deleteIfExists(archiveFile(world, ref.id()));
-            } catch (IOException e) {
-                log.error("pruning backup " + ref.id().value() + " of " + world.value() + " failed", e);
+            } catch (IOException ioFailure) {
+                log.error("pruning backup " + ref.id().value() + " of " + world.value() + " failed", ioFailure);
             }
         }
     }
@@ -273,8 +273,8 @@ public final class BukkitWorldArchive implements WorldArchive {
         if (h != null) {
             try {
                 h.close();
-            } catch (Exception e) {
-                log.error("failed to stop restore drain", e);
+            } catch (Exception failure) {
+                log.error("failed to stop restore drain", failure);
             }
         }
     }
@@ -296,8 +296,8 @@ public final class BukkitWorldArchive implements WorldArchive {
             archiver.deleteTree(folder);
             archiver.unzip(archive, folder);
             scheduler.onGlobal(() -> finishRestore(initiator, world, id, managed));
-        } catch (IOException e) {
-            log.error("restore of " + world.value() + " failed", e);
+        } catch (IOException ioFailure) {
+            log.error("restore of " + world.value() + " failed", ioFailure);
             notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
         }
     }

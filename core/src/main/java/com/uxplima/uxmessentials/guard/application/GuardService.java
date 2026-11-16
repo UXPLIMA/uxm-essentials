@@ -363,8 +363,8 @@ public final class GuardService {
                     }
                     try {
                         store.write(current, wanted, ctx.actor(), "backup-restore");
-                    } catch (RuntimeException e) {
-                        warn.accept("guard: could not restore " + wanted.key() + ": " + e.getMessage());
+                    } catch (RuntimeException failure) {
+                        warn.accept("guard: could not restore " + wanted.key() + ": " + failure.getMessage());
                         skipped++;
                         continue;
                     }
@@ -426,7 +426,7 @@ public final class GuardService {
             long now;
             try {
                 now = store.stamp(Set.copyOf(config.loadedScopes()));
-            } catch (RuntimeException e) {
+            } catch (RuntimeException failure) {
                 return;
             }
             if (now != stamp) {
@@ -503,9 +503,9 @@ public final class GuardService {
             @Nullable Region before, @Nullable Region after, EditContext ctx, String change) {
         try {
             store.write(before, after, ctx.actor(), change);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException failure) {
             warn.accept("guard: could not store a change to " + (after != null ? after.key() : before) + ": "
-                    + e.getMessage());
+                    + failure.getMessage());
             return Result.err(GuardError.STORE_FAILED);
         }
         Region subject = after != null ? after : Objects.requireNonNull(before);
@@ -534,10 +534,10 @@ public final class GuardService {
                 regions.put(region.key(), region);
             }
             loadFailed = false;
-        } catch (RuntimeException e) {
+        } catch (RuntimeException failure) {
             loadFailed = true;
-            warn.accept(
-                    "guard: regions could not be loaded, every world is locked until they can be: " + e.getMessage());
+            warn.accept("guard: regions could not be loaded, every world is locked until they can be: "
+                    + failure.getMessage());
         }
         compileAll();
     }
@@ -587,8 +587,8 @@ public final class GuardService {
         for (Consumer<GuardSnapshot> listener : listeners) {
             try {
                 listener.accept(next);
-            } catch (RuntimeException e) {
-                warn.accept("guard: a snapshot listener failed: " + e.getMessage());
+            } catch (RuntimeException failure) {
+                warn.accept("guard: a snapshot listener failed: " + failure.getMessage());
             }
         }
     }
@@ -602,8 +602,8 @@ public final class GuardService {
         scheduler.async(() -> {
             try {
                 future.complete(task.get());
-            } catch (RuntimeException e) {
-                future.completeExceptionally(e);
+            } catch (RuntimeException failure) {
+                future.completeExceptionally(failure);
             }
         });
         return future;

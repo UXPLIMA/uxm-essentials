@@ -590,7 +590,7 @@ public final class GuardCommand implements CommandRegistration {
         ActionId action;
         try {
             action = ActionId.of(args[1]);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_ACTION, Map.of("action", args[1]));
             return;
         }
@@ -663,7 +663,7 @@ public final class GuardCommand implements CommandRegistration {
         RoleName role;
         try {
             role = clear ? null : RoleName.of(args[2]);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             feedback.send(sender, GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", args[2]));
             return;
         }
@@ -841,7 +841,7 @@ public final class GuardCommand implements CommandRegistration {
             ActionId action;
             try {
                 action = ActionId.of(args[3]);
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException invalid) {
                 feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_ACTION, Map.of("action", args[3]));
                 return;
             }
@@ -1191,7 +1191,7 @@ public final class GuardCommand implements CommandRegistration {
         ActionId action;
         try {
             action = ActionId.of(rawAction);
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             feedback.send(sender, GuardMessageKey.ERROR_UNKNOWN_ACTION, Map.of("action", rawAction));
             return;
         }
@@ -1857,7 +1857,7 @@ public final class GuardCommand implements CommandRegistration {
     private static int parseInt(String raw, int fallback) {
         try {
             return Integer.parseInt(raw.strip());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return fallback;
         }
     }

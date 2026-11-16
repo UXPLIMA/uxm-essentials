@@ -84,10 +84,10 @@ public final class BukkitSnores implements Snores {
     public void shutdown() {
         try {
             task.close();
-        } catch (Exception e) {
+        } catch (Exception failure) {
             // A cancel failure must not strand the caller (the wiring disables the module after this); log and
             // carry on so the snoring set is still cleared and the disable completes.
-            log.error("failed to cancel the poses snore task", e);
+            log.error("failed to cancel the poses snore task", failure);
         }
         snoring.clear();
     }

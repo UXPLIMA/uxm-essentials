@@ -63,8 +63,8 @@ public final class JooqGuardStore extends JooqRepository implements GuardStore {
                 }
                 return out;
             });
-        } catch (RuntimeException e) {
-            throw new GuardStoreException("guard regions could not be loaded", e);
+        } catch (RuntimeException failure) {
+            throw new GuardStoreException("guard regions could not be loaded", failure);
         }
     }
 

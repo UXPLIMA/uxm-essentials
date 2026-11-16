@@ -249,8 +249,8 @@ public final class FraudDetector implements EconomyAudit {
                     .POST(HttpRequest.BodyPublishers.ofString(json))
                     .build();
             var unused = httpClient.sendAsync(request, HttpResponse.BodyHandlers.discarding());
-        } catch (Exception e) {
-            log.warn("Failed to dispatch Discord webhook alert: " + e.getMessage());
+        } catch (Exception failure) {
+            log.warn("Failed to dispatch Discord webhook alert: " + failure.getMessage());
         }
     }
 

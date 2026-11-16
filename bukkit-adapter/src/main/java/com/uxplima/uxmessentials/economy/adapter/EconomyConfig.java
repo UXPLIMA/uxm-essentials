@@ -557,7 +557,7 @@ public final class EconomyConfig {
         try {
             return new BigDecimal(
                     config.getString("fraud-detection.single-limit", "1000000").strip());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return new BigDecimal("1000000");
         }
     }
@@ -572,7 +572,7 @@ public final class EconomyConfig {
         try {
             return new BigDecimal(config.getString("fraud-detection.velocity-limit", "5000000")
                     .strip());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return new BigDecimal("5000000");
         }
     }

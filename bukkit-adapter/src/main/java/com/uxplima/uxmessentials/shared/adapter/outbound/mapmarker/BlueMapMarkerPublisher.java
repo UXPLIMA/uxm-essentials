@@ -80,8 +80,8 @@ final class BlueMapMarkerPublisher implements MapMarkerPublisher {
                 return;
             }
             markersOf(set).put(marker.id(), poiMarker(marker));
-        } catch (Throwable t) {
-            degrade("publish", t);
+        } catch (Throwable failure) {
+            degrade("publish", failure);
         }
     }
 
@@ -98,8 +98,8 @@ final class BlueMapMarkerPublisher implements MapMarkerPublisher {
             for (Object set : setsByWorld.values()) {
                 markersOf(set).remove(markerId);
             }
-        } catch (Throwable t) {
-            degrade("remove", t);
+        } catch (Throwable failure) {
+            degrade("remove", failure);
         }
     }
 
@@ -110,8 +110,8 @@ final class BlueMapMarkerPublisher implements MapMarkerPublisher {
                 markersOf(entry.getValue()).clear();
                 forEachMap(entry.getKey(), map -> markerSetsOf(map).remove(SET_KEY));
             }
-        } catch (Throwable t) {
-            degrade("clear", t);
+        } catch (Throwable failure) {
+            degrade("clear", failure);
         } finally {
             setsByWorld.clear();
         }

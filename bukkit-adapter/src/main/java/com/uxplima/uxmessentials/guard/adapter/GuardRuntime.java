@@ -142,8 +142,8 @@ public final class GuardRuntime {
             try {
                 flushLog();
                 future.complete(store.denials(player, region, offset, limit));
-            } catch (RuntimeException e) {
-                future.completeExceptionally(e);
+            } catch (RuntimeException failure) {
+                future.completeExceptionally(failure);
             }
         });
         return future;

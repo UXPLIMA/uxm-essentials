@@ -243,12 +243,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 String file = services.backupManager().exportCsv();
                 services.notifier()
                         .send(actor, EconomyMessageKey.ECO_ADMIN_EXPORT_CREATED, java.util.Map.of("file", file));
-            } catch (Exception e) {
+            } catch (Exception failure) {
                 services.notifier()
                         .send(
                                 actor,
                                 EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
-                                java.util.Map.of("error", String.valueOf(e.getMessage())));
+                                java.util.Map.of("error", String.valueOf(failure.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;
@@ -482,12 +482,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                                 actor,
                                 EconomyMessageKey.ECO_ADMIN_BACKUP_CREATED,
                                 java.util.Map.of("timestamp", timestamp));
-            } catch (Exception e) {
+            } catch (Exception failure) {
                 services.notifier()
                         .send(
                                 actor,
                                 EconomyMessageKey.ECO_ADMIN_BACKUP_FAILED,
-                                java.util.Map.of("error", String.valueOf(e.getMessage())));
+                                java.util.Map.of("error", String.valueOf(failure.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;
@@ -518,12 +518,12 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 } else {
                     services.notifier().send(actor, EconomyMessageKey.ECO_ADMIN_RESTORE_NOT_FOUND);
                 }
-            } catch (Exception e) {
+            } catch (Exception failure) {
                 services.notifier()
                         .send(
                                 actor,
                                 EconomyMessageKey.ECO_ADMIN_RESTORE_FAILED,
-                                java.util.Map.of("error", String.valueOf(e.getMessage())));
+                                java.util.Map.of("error", String.valueOf(failure.getMessage())));
             }
         });
         return Command.SINGLE_SUCCESS;

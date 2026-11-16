@@ -57,8 +57,8 @@ public record SignedVelocityFrame(UUID player, SignedSource source, SignedChatDi
             UUID player = UUID.fromString(in.readUTF());
             SignedSource source = SignedSource.fromWire(in.readUTF());
             return new SignedVelocityFrame(player, source, directiveFrom(in, in.readUTF()));
-        } catch (IOException e) {
-            throw new UncheckedIOException("truncated SignedVelocity frame", e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException("truncated SignedVelocity frame", ioFailure);
         }
     }
 
