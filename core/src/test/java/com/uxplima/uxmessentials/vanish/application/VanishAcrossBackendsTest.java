@@ -412,7 +412,7 @@ class VanishAcrossBackendsTest {
         network.start("survival");
         network.beat();
 
-        lobby.sync.changed("survival", endedRun, VanishSync.vanished(ALEX, VanishLevel.DEFAULT));
+        lobby.sync.changed("survival", endedRun, 1L, VanishSync.vanished(ALEX, VanishLevel.DEFAULT));
 
         assertThat(lobby.listFor(SAM)).isEmpty();
     }
@@ -501,6 +501,59 @@ class VanishAcrossBackendsTest {
         assertThat(lobby.isHidden(ALEX)).isTrue();
     }
 
+    @Test
+    void aRevealThatArrivesAfterANewerVanishDoesNotShowThePlayer() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        // The reveal is held back, so the vanish sent after it reaches the lobby first.
+        network.withhold("lobby");
+        survival.toggle(ALEX);
+        network.resume();
+        survival.toggle(ALEX);
+        network.deliverWithheld();
+
+        assertThat(survival.isHidden(ALEX)).isTrue();
+        assertThat(lobby.listFor(SAM)).containsExactly(ALEX.uuid());
+    }
+
+    @Test
+    void aVanishThatArrivesAfterThePlayersDepartureDoesNotListThem() {
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+
+        network.withhold("lobby");
+        survival.toggle(ALEX);
+        network.resume();
+        survival.quit(ALEX);
+        network.deliverWithheld();
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
+    }
+
+    @Test
+    void aPeerThatNumbersNoFramesIsAppliedInTheOrderItsFramesArrive() {
+        network.namesNoRun("survival");
+        Backend survival = network.start("survival");
+        Backend lobby = network.start("lobby");
+        network.beat();
+        survival.join(ALEX);
+        survival.toggle(ALEX);
+
+        network.withhold("lobby");
+        survival.toggle(ALEX);
+        network.resume();
+        survival.toggle(ALEX);
+        network.deliverWithheld();
+
+        assertThat(lobby.listFor(SAM)).isEmpty();
+    }
+
     /** The bus between the backends, and what each one has heard of the others. */
     private final class Network {
 
@@ -510,9 +563,13 @@ class VanishAcrossBackendsTest {
         private final Map<String, Set<String>> heard = new HashMap<>();
         private final Set<String> deaf = new HashSet<>();
         private final Set<String> namesNoRun = new HashSet<>();
+        private final Map<String, Long> sent = new HashMap<>();
+        private final Set<String> withholding = new HashSet<>();
+        private final List<Runnable> withheld = new ArrayList<>();
 
         Backend start(String name) {
             runs.merge(name, 1, Integer::sum);
+            sent.remove(name);
             heard.put(name, new HashSet<>());
             runSeen.remove(name);
             Backend started = new Backend(name, this);
@@ -578,13 +635,49 @@ class VanishAcrossBackendsTest {
             namesNoRun.add(name);
         }
 
+        /** Frames to {@code receiver} are held back from now on, until {@link #deliverWithheld} sends them late. */
+        void withhold(String receiver) {
+            withholding.add(receiver);
+        }
+
+        /** Frames flow to every backend again; the ones held back stay held. */
+        void resume() {
+            withholding.clear();
+        }
+
+        /** The frames held back arrive now, after everything sent since. */
+        void deliverWithheld() {
+            List<Runnable> late = List.copyOf(withheld);
+            withheld.clear();
+            late.forEach(Runnable::run);
+        }
+
         void changed(String origin, VanishSync change) {
             long run = namesNoRun.contains(origin) ? NetworkVanishStore.UNKNOWN_RUN : runOf(origin);
-            others(origin).forEach(peer -> peer.sync.changed(origin, run, change));
+            long sequence = nextSequence(origin);
+            others(origin).forEach(peer -> send(peer, () -> peer.sync.changed(origin, run, sequence, change)));
         }
 
         void departed(String origin, UUID player) {
-            others(origin).forEach(peer -> peer.sync.departed(origin, player));
+            long run = namesNoRun.contains(origin) ? NetworkVanishStore.UNKNOWN_RUN : runOf(origin);
+            long sequence = nextSequence(origin);
+            others(origin).forEach(peer -> send(peer, () -> peer.sync.departed(origin, run, sequence, player)));
+        }
+
+        /** The number a run gives its next vanish frame; a peer on an older release numbers none. */
+        private long nextSequence(String origin) {
+            if (namesNoRun.contains(origin)) {
+                return NetworkVanishStore.UNKNOWN_SEQUENCE;
+            }
+            return sent.merge(origin, 1L, Long::sum);
+        }
+
+        private void send(Backend receiver, Runnable frame) {
+            if (withholding.contains(receiver.name)) {
+                withheld.add(frame);
+            } else {
+                frame.run();
+            }
         }
 
         boolean isLive(String viewer, String server) {

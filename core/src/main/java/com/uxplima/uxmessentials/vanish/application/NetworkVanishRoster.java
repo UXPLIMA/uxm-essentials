@@ -30,19 +30,31 @@ import com.uxplima.uxmessentials.vanish.domain.VanishLevel;
  *       a late frame from an ended run is ignored; what the new run reported before its first heartbeat is kept. A peer
  *       that names no run on its frames ({@link #UNKNOWN_RUN}) still loses its old entries on a restart, but its frames
  *       are never ignored.
+ *   <li>Frames of one run are numbered, and the newest number applied for each player and origin is kept, even after a
+ *       reveal removed the entry. A change or departure no newer than that is ignored, so a frame delivered late, out
+ *       of order or twice cannot undo a newer one. A frame that names no number is applied as it arrives.
  * </ul>
  *
- * <p>Reads and writes are lock-free map operations, so the bus dispatch thread and a command thread see a coherent
- * value.
+ * <p>Reads are lock-free map operations, so a command thread never waits on the bus. Writes take the roster's lock, so
+ * the check against the newest number and the change it allows happen as one step even when frames are dispatched
+ * on several threads at once.
  */
 public final class NetworkVanishRoster implements NetworkVanishStore {
 
     private record Entry(
             String origin, long run, String name, VanishLevel level, Instant seen, Optional<Instant> departed) {}
 
+    /** One player as one origin reports them. */
+    private record Source(UUID player, String origin) {}
+
+    /** The newest frame applied from a source: its run and its number within that run. */
+    private record Newest(long run, long sequence) {}
+
     private final ConcurrentHashMap<UUID, Entry> entries = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Set<Long>> endedRuns = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Long> currentRun = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Source, Newest> newest = new ConcurrentHashMap<>();
+    private final Object writes = new Object();
     private final NetworkPresence presence;
     private final Clock clock;
     private final Duration hopWindow;
@@ -54,26 +66,37 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
     }
 
     @Override
-    public void apply(String origin, long run, VanishSync change) {
+    public boolean apply(String origin, long run, long sequence, VanishSync change) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(change, "change");
-        if (ended(origin, run)) {
-            return;
-        }
-        if (change.vanished()) {
-            entries.put(
-                    change.player(),
-                    new Entry(origin, run, change.playerName(), change.level(), clock.instant(), Optional.empty()));
-        } else {
-            // A reveal is a real /vanish off wherever it came from, so it ends the vanish whoever reported it.
-            entries.remove(change.player());
+        synchronized (writes) {
+            if (ended(origin, run) || !newer(change.player(), origin, run, sequence)) {
+                return false;
+            }
+            if (change.vanished()) {
+                entries.put(
+                        change.player(),
+                        new Entry(origin, run, change.playerName(), change.level(), clock.instant(), Optional.empty()));
+            } else {
+                // A reveal is a real /vanish off wherever it came from, so it ends the vanish whoever reported it.
+                entries.remove(change.player());
+            }
+            return true;
         }
     }
 
     @Override
-    public void depart(String origin, UUID player) {
+    public void depart(String origin, long run, long sequence, UUID player) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(player, "player");
+        synchronized (writes) {
+            if (newer(player, origin, run, sequence)) {
+                markDeparted(origin, player);
+            }
+        }
+    }
+
+    private void markDeparted(String origin, UUID player) {
         Instant now = clock.instant();
         entries.computeIfPresent(
                 player,
@@ -91,6 +114,12 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
     @Override
     public void heartbeat(String origin, long run, boolean newRun) {
         Objects.requireNonNull(origin, "origin");
+        synchronized (writes) {
+            beat(origin, run, newRun);
+        }
+    }
+
+    private void beat(String origin, long run, boolean newRun) {
         Long before = currentRun.put(origin, run);
         if (!newRun) {
             return;
@@ -108,6 +137,10 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
                 entries.remove(id, entry);
             }
         });
+        // The numbers of an ended run order nothing any more; the new run counts from its own start.
+        newest.entrySet()
+                .removeIf(last ->
+                        last.getKey().origin().equals(origin) && last.getValue().run() != run);
     }
 
     @Override
@@ -135,9 +168,30 @@ public final class NetworkVanishRoster implements NetworkVanishStore {
 
     @Override
     public void clear() {
-        entries.clear();
-        endedRuns.clear();
-        currentRun.clear();
+        synchronized (writes) {
+            entries.clear();
+            endedRuns.clear();
+            currentRun.clear();
+            newest.clear();
+        }
+    }
+
+    /**
+     * Whether a frame is newer than the last one applied about {@code player} from the same origin and run, recording
+     * it as the newest when it is. A frame without a run or a number cannot be ordered, so it always counts as newer;
+     * one from another run than the last replaces it, since an ended run's frames were already turned away.
+     */
+    private boolean newer(UUID player, String origin, long run, long sequence) {
+        if (run == UNKNOWN_RUN || sequence == UNKNOWN_SEQUENCE) {
+            return true;
+        }
+        Source source = new Source(player, origin);
+        Newest last = newest.get(source);
+        if (last != null && last.run() == run && last.sequence() >= sequence) {
+            return false;
+        }
+        newest.put(source, new Newest(run, sequence));
+        return true;
     }
 
     private boolean ended(String origin, long run) {
