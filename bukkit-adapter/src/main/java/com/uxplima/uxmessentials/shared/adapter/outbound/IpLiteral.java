@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
+package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import java.util.Optional;
 
@@ -16,12 +16,12 @@ import org.jspecify.annotations.NullMarked;
  * as octal.
  */
 @NullMarked
-final class IpLiteral {
+public final class IpLiteral {
 
     private IpLiteral() {}
 
     /** The canonical form of {@code typed}, or empty when it is not an IPv4 or IPv6 literal. */
-    static Optional<String> canonical(String typed) {
+    public static Optional<String> canonical(String typed) {
         if (!InetAddresses.isInetAddress(typed)) {
             return Optional.empty();
         }
@@ -29,7 +29,7 @@ final class IpLiteral {
     }
 
     /** True when {@code argument} was meant as an address rather than a player name. */
-    static boolean looksLikeAddress(String argument) {
+    public static boolean looksLikeAddress(String argument) {
         return argument.contains(".") || argument.contains(":");
     }
 }

@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
+package com.uxplima.uxmessentials.shared.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

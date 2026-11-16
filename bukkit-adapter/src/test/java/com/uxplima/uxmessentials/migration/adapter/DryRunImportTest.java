@@ -161,6 +161,35 @@ class DryRunImportTest {
         assertThat(server.writes).isEmpty();
     }
 
+    @Test
+    void anImportedIpv6BanIsStoredInTheFormAPlayersAddressIsReadIn() {
+        Server server = Server.seeded(false);
+
+        server.liveWriter().write(new ImportRecord.IpBanRecord(ipBan("2001:DB8::7")), options(ConflictPolicy.SKIP));
+
+        assertThat(server.writes).containsExactly("ip ban 2001:db8:0:0:0:0:0:7");
+    }
+
+    @Test
+    void anImportedBanSpelledOtherwiseIsTheSameAddressBothRunsSkip() {
+        Server live = Server.seeded(false);
+        Server dryRun = Server.seeded(true);
+        live.ipBans.put("2001:db8:0:0:0:0:0:7", ipBan("2001:db8:0:0:0:0:0:7"));
+        dryRun.ipBans.put("2001:db8:0:0:0:0:0:7", ipBan("2001:db8:0:0:0:0:0:7"));
+        ImportRecord compressed = new ImportRecord.IpBanRecord(ipBan("2001:DB8::7"));
+
+        RecordOutcome stored = live.liveWriter()
+                .write(compressed, options(ConflictPolicy.SKIP))
+                .outcome();
+        RecordOutcome predicted = dryRun.dryRunWriter()
+                .write(compressed, options(ConflictPolicy.SKIP).asDryRun())
+                .outcome();
+
+        assertThat(stored).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(predicted).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(live.writes).isEmpty();
+    }
+
     private static void assertDryRunMatchesLive(ConflictPolicy policy) {
         Server dryRunServer = Server.seeded(true);
         Server liveServer = Server.seeded(false);

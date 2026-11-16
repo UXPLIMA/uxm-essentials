@@ -143,7 +143,9 @@ public final class DryRunRecordWriter implements RecordWriter {
     }
 
     private RecordOutcome ipBanOutcome(IpBan ban, ImportOptions options) {
-        boolean existed = moderation.activeIpBan(ban.ip(), clock.instant()).isPresent();
+        boolean existed = moderation
+                .activeIpBan(RepositoryRecordWriter.canonical(ban).ip(), clock.instant())
+                .isPresent();
         if (existed && options.onConflict() == ConflictPolicy.SKIP) {
             return RecordOutcome.SKIPPED;
         }
