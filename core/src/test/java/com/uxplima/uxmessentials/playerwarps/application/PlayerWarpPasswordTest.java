@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;

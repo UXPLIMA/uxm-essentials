@@ -4,10 +4,13 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.network.BanChanged;
+import com.uxplima.uxmessentials.shared.network.FreezeChanged;
+import com.uxplima.uxmessentials.shared.network.FreezeReset;
 import com.uxplima.uxmessentials.shared.network.IpBanChanged;
 import com.uxplima.uxmessentials.shared.network.JailChanged;
 import com.uxplima.uxmessentials.shared.network.JailHopFailed;
@@ -36,6 +39,11 @@ import org.jspecify.annotations.NullMarked;
  * failed, and {@link #jailListener} hands them to the use cases that apply the change to a player connected here
  * and tell this backend's staff. Each jail frame carries an id, so a copy delivered twice (the proxy and Redis both
  * carry it) is acted on once.
+ *
+ * <p>A freeze is held in memory by each backend, so {@link #freezePublisher(BusPublisher)} announces a freeze or
+ * release and {@link #freezeListener} hands a peer's to the use case that holds it here too, so a frozen player who
+ * switches servers arrives frozen. Each freeze frame carries an id and the time of the change, so a copy acts once
+ * and an older change cannot undo a newer one.
  *
  * <p>Self-origin frames never reach the listener. The {@link BusCore} drops any frame whose origin equals
  * this backend's id before dispatch, so the player the local {@code /ban} already kicked is never kicked
@@ -101,6 +109,48 @@ public final class ModerationSync {
                 frames.jailChanged(changed.frameId(), changed.target(), changed.jailed());
             } else if (message instanceof JailHopFailed failed) {
                 frames.hopFailed(failed.frameId(), failed.target(), failed.targetName(), failed.jail());
+            }
+        };
+    }
+
+    /**
+     * A {@link FreezeSync} that announces a freeze or release on the bus under a fresh id, and a start that left this
+     * backend holding no freeze.
+     */
+    public static FreezeSync freezePublisher(BusPublisher bus) {
+        Objects.requireNonNull(bus, "bus");
+        return new FreezeSync() {
+            @Override
+            public void freezeChanged(PlayerRef target, boolean frozen, java.time.Instant at) {
+                bus.publish(new FreezeChanged(
+                        bus.serverId(), UUID.randomUUID(), target.uuid(), target.name(), frozen, at.toEpochMilli()));
+            }
+
+            @Override
+            public void cleared(java.time.Instant at) {
+                bus.publish(new FreezeReset(bus.serverId(), at.toEpochMilli()));
+            }
+        };
+    }
+
+    /** How a backend takes a peer's freeze or release, kept as a plain callback. */
+    @FunctionalInterface
+    public interface FreezeFrames {
+
+        /** A peer froze ({@code frozen}) or released {@code target} at {@code at}. */
+        void freezeChanged(UUID frameId, PlayerRef target, boolean frozen, java.time.Instant at);
+    }
+
+    /** A listener that hands a peer's {@link FreezeChanged} frames to {@code frames}. */
+    public static RemoteSyncListener freezeListener(FreezeFrames frames) {
+        Objects.requireNonNull(frames, "frames");
+        return message -> {
+            if (message instanceof FreezeChanged changed) {
+                frames.freezeChanged(
+                        changed.frameId(),
+                        new PlayerRef(changed.target(), changed.targetName()),
+                        changed.frozen(),
+                        java.time.Instant.ofEpochMilli(changed.changedAtMillis()));
             }
         };
     }

@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
@@ -143,6 +144,7 @@ class CrossServerWarpTest {
                 online,
                 hops,
                 new PaidTeleports(lanes, log),
+                PasswordAttempts.defaults(clock),
                 log);
     }
 

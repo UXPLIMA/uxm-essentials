@@ -210,12 +210,12 @@ class CreateHomeAtSlotTest {
         }
 
         @Override
-        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+        public Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId) {
             if (!canAfford(who, amount, currencyId)) {
-                return false;
+                return Optional.empty();
             }
             balance = balance.subtract(amount);
-            return true;
+            return Optional.of(currencyId);
         }
 
         @Override

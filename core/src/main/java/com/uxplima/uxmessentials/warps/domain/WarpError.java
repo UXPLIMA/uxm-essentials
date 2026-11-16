@@ -35,6 +35,9 @@ public enum WarpError {
     /** The player entered the wrong password. */
     WRONG_PASSWORD(WarpsMessageKey.WARP_WRONG_PASSWORD),
 
+    /** The player got the warp's password wrong too often and must wait before trying again. */
+    RATE_LIMITED(WarpsMessageKey.WARP_RATE_LIMITED),
+
     /** The warp cannot be created in this world because it is blacklisted. */
     WORLD_BLACKLISTED(WarpsMessageKey.WARP_WORLD_BLACKLISTED),
 

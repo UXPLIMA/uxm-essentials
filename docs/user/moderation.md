@@ -271,11 +271,15 @@ every player arrives from the proxy's address and nothing matches.
 A frozen player cannot move to another block; they can still look around, chat and run commands. They are told why
 when they try to walk, at most once every `freeze.notice-interval-seconds` (3 by default; 0 sends nothing).
 
-A freeze is kept in memory on the server it was given on. It lasts until `/unfreeze` or until the server restarts
-or the module reloads, and it is not stored in the database. Logging out does not lift it: a frozen player who
-logs back in to the same server is still frozen. It does not follow the player to another server, though: on a
-network a frozen player who switches server can move freely there, and is frozen again when they come back to the
-server that froze them. You can only freeze a player connected to your server.
+A freeze is kept in memory and is not stored in the database. It lasts until `/unfreeze`, or until the server
+restarts or the module reloads. Logging out does not lift it: a frozen player who logs back in is still frozen. You
+can only freeze a player connected to your server.
+
+On a network the freeze is announced over the bus, and every server that hears it holds the player frozen too, so
+switching server does not lift it. `/unfreeze` on any server lifts it everywhere. With the proxy plugin, a frozen
+player cannot change server at all (`/server` and server selectors are refused with a line saying why), and one who
+logs out frozen is sent back to the server that froze them when they return. A proxy restart forgets the freezes it
+saw; the servers still hold theirs.
 
 ## Lockdown
 
@@ -368,11 +372,12 @@ shared database, so:
   when a mute or unmute lands, on another server through the bus. The copy is also read again every minute and
   after `/uxmess import`, so a change that came with no bus message still arrives.
 - A jail sends the player to the jail's server, as described in [Jails on a network](#jails-on-a-network).
-- `/kick` and `/freeze` act only on players connected to your server.
+- `/kick` and `/freeze` act only on players connected to your server; a freeze then holds on every server.
 
 The database holds bans (a permanent ban is stored as one that ends far in the future), mutes, warnings, jails and
 the jails made with `/setjail`, IP bans, last-seen records and the address history, the sanction history and the
-lockdown flag. Freezes, command spy and the staff broadcast are local to each server. See [network.md](network.md)
+lockdown flag. Freezes are held in memory on every server; command spy and the staff broadcast are local to each
+server. See [network.md](network.md)
 for setting up the network, and [import.md](import.md) for bringing bans, mutes, warnings and jails over from
 EssentialsX and LiteBans.
 

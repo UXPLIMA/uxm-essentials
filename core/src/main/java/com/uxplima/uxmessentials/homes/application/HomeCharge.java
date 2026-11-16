@@ -56,8 +56,12 @@ public final class HomeCharge {
         if (cost.isFree() || economy.isEmpty() || permissions.has(who, BYPASS_NODE)) {
             return Result.ok(Optional.empty());
         }
-        boolean withdrawn = economy.get().withdraw(who, cost.amount(), cost.currencyId());
-        return withdrawn ? Result.ok(Optional.of(cost)) : Result.err(HomeError.CANNOT_AFFORD);
+        Optional<String> takenIn = economy.get().debit(who, cost.amount(), cost.currencyId());
+        // The currency it was taken in, never "default": a refund on another server, or after a reload, must not
+        // read that as its own default currency.
+        return takenIn.<Result<Optional<HomeCost>, HomeError>>map(
+                        currency -> Result.ok(Optional.of(HomeCost.of(cost.amount(), currency))))
+                .orElseGet(() -> Result.err(HomeError.CANNOT_AFFORD));
     }
 
     /**

@@ -181,7 +181,7 @@ shared: each backend reads its own `config.conf` and module files, so keep them 
 | Player warps | Player warps, recorded per server | Visiting a player warp on another server | `playerwarps` `cross-server.enabled` |
 | Worlds | Managed worlds and settings, per server | `/worlds tp` and `/worlds spawn` to another server | `worlds` `cross-server.enabled` |
 | Teleport | Pending moves | `/tpa`, `/tpahere`, staff `/tp` and `/tphere` | `teleport` `cross-server.enabled` |
-| Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server | none |
+| Moderation | Bans, mutes, warnings, IP bans, jails, history | A ban or IP ban kicks everywhere; a jail sends the player to the jail's server; a freeze holds everywhere | none |
 | Messaging | Mail, ignore lists | `/msg`, `/reply`, `/helpop`; staff chat in the staff module | none |
 | Vanish | Vanish state | Hidden on every server | `vanish` `cross-server` |
 | Kits | One-time claims and cooldowns | none | none |
@@ -257,9 +257,14 @@ the player, or everyone on that address, wherever they are; a mute is read on th
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
 mutes again once a minute). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
-reach them; `/unfreeze` always runs. `/lockdown` is one row in the shared database, so it closes every server on
-it to new joins, but its announcement goes only to the server it was run on. Freeze, command spy and staff
-broadcasts stay on one server.
+reach them. A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
+frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
+announced never heard it, so the proxy plugin keeps a frozen player off other servers and sends one who logs out
+frozen back to the server that froze them. Redis reaches every server, empty or not. A server that restarts, or
+reloads its moderation module, holds no freeze any more, and the proxy lets go of the players frozen there once that
+server has a player online to carry the news. `/lockdown` is one row in the shared database, so it
+closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
+staff broadcasts stay on one server.
 
 ### Kits, ranks and vaults
 

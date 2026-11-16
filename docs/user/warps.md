@@ -66,6 +66,8 @@ The checks run in this order, and the first that fails stops the use with its ow
    that namespace unless it is denied, so the requirement would keep nobody out. Name a node of your own instead.
 2. The warp is not locked, unless the player holds `uxmessentials.bypass.lock.warp`.
 3. The right password was given, unless the warp has none or the player holds `uxmessentials.bypass.password.warp`.
+   A player who gets it wrong `password-attempts.max-attempts` times (3) within `password-attempts.lockout-seconds`
+   (60) is locked out of that warp's password for `lockout-seconds`, as on a player warp (see below).
 4. The destination is safe: solid ground, and no solid block, lava or fire at the feet or head. A warp in a world
    that is not loaded counts as unsafe. `uxmessentials.bypass.safety.warp` skips this check.
 5. The teleport module's jail, combat and cooldown checks.
@@ -109,6 +111,8 @@ under the old one.
 | `effects.particle.departure.type`, `effects.particle.arrival.type` | `PORTAL` | The particle when the editor set none. |
 | `selector-presets.particles`, `selector-presets.sounds` | 14 each | What the editor's pickers offer. |
 | `world-blacklist` | `[]` | World names, matched exactly, where `/warp create`, `/warp move` and the manager refuse to create or move a warp, and an import skips one. |
+| `password-attempts.max-attempts` | `3` | Wrong passwords allowed on one warp before the lockout, at least 1. |
+| `password-attempts.lockout-seconds` | `60` | How long wrong passwords count and how long the lockout lasts; 0 turns the limit off. |
 
 ## Warps on a network
 
@@ -179,7 +183,7 @@ is claimed at the next restart.
 | `/pwarp ban <name> <player> [duration] [reason]`, `/pwarp unban <name> <player>` | `uxmessentials.pwarp.ban` | Bars a player, for a time such as `7d`, `12h` or `30m`, or for good. |
 | `/pwarp rate <name> <1-5>` | `uxmessentials.pwarp.rate` | Rates a warp. |
 | `/pwarp favourite\|unfavourite <name>` | `uxmessentials.pwarp.favourite` | Stars or un-stars a warp. |
-| `/pwarp transfer <name> <player>` | `uxmessentials.pwarp.transfer` | Hands the warp to another player. |
+| `/pwarp transfer <name> <player>` | `uxmessentials.pwarp.transfer` | Hands the warp to another player, unless that would put them past their limit on all their warps or in the warp's world. |
 | `/pwarp withdraw <name>` | `uxmessentials.pwarp.withdraw` | Pays the warp's earnings to its owner. |
 | `/pwarp sponsor <name> [days]` | `uxmessentials.pwarp.sponsor` | Buys a pinned slot in the browser, while `sponsor.enabled` is on. |
 | `/pwarp admin restore\|purge <id>`, `setowner <id> <player>`, `reload` | `uxmessentials.pwarp.admin` | Staff tools by warp id. `purge` (also `delete`) asks for `confirm`. |

@@ -77,9 +77,9 @@ public final class HomeQueries implements UxmHomesQuery {
     public CompletableFuture<Optional<Integer>> limit(UUID playerId) {
         Objects.requireNonNull(playerId, "playerId");
         return AsyncQueries.supply(scheduler, () -> {
-            // No world: the per-world quota only narrows the answer, and a query has no world in hand. This is the
-            // player's limit anywhere, which is the one a consumer can act on.
-            HomeLimit resolved = quota.resolve(subject(playerId), null);
+            // The limit on all the player's homes: a world node only caps the homes in its world, and a query has no
+            // world in hand.
+            HomeLimit resolved = quota.resolve(subject(playerId));
             return resolved.unlimited() ? Optional.<Integer>empty() : Optional.of(resolved.cap());
         });
     }

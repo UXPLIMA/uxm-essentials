@@ -51,15 +51,23 @@ public final class PlayerWarpWorldLimit {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(world, "world");
-        Optional<PlayerWarpLimit> limit = quota.inWorld(owner, world);
-        if (limit.isEmpty() || !limit.get().isReachedAt(ownedIn(owner, world))) {
+        if (hasRoom(owner, world)) {
             return true;
         }
+        PlayerWarpLimit limit = quota.inWorld(owner, world).orElseThrow();
         notifier.send(
                 actor,
                 PlayerwarpsMessageKey.PWARP_WORLD_LIMIT_REACHED,
-                Map.of("limit", Integer.toString(limit.get().cap()), "world", world.name()));
+                Map.of("limit", Integer.toString(limit.cap()), "world", world.name()));
         return false;
+    }
+
+    /** Whether {@code owner} may have one more warp in {@code world}, telling nobody. */
+    public boolean hasRoom(PlayerRef owner, WorldRef world) {
+        Objects.requireNonNull(owner, "owner");
+        Objects.requireNonNull(world, "world");
+        Optional<PlayerWarpLimit> limit = quota.inWorld(owner, world);
+        return limit.isEmpty() || !limit.get().isReachedAt(ownedIn(owner, world));
     }
 
     /** Whether {@code warp} may move into {@code to}. On false {@code actor} has been told why. */

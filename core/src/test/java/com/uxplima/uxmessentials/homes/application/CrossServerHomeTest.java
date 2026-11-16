@@ -630,13 +630,13 @@ class CrossServerHomeTest {
         }
 
         @Override
-        public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+        public Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId) {
             if (!canAfford(who, amount, currencyId)) {
-                return false;
+                return Optional.empty();
             }
             wallet = wallet.subtract(amount);
             charges++;
-            return true;
+            return Optional.of(currencyId);
         }
 
         @Override

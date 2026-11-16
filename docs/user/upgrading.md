@@ -94,6 +94,15 @@ less a lower node instead: for example `max-radius = 20000`, `uxmessentials.rtp.
 it, and `uxmessentials.rtp.radius.5000` for the `default` group. Plain `/rtp` serves from the shared ready spots,
 which follow `max-radius` for everyone, so a larger `max-radius` widens it for every player.
 
+## Home world limits no longer lift the overall limit
+
+`uxmessentials.home.limit.<world>.<n>` used to be folded into the home limit when a home was set in that world, so a
+large world node raised the limit there and a small one did not hold the world back. It now counts only the owner's
+homes in that world, and the overall limit (`default-limit` or `uxmessentials.home.limit.<n>`) still caps all of them
+and sizes the `/home` grid ([homes](homes.md#how-many-homes-a-player-gets)). A player who relied on a world node for
+more homes needs an overall node as large; homes already set stay, and a new home past either limit, or a home moved
+into a full world, is refused.
+
 ## Player warp world limits no longer lift the overall limit
 
 `uxmessentials.pwarp.limit.<world>.<n>` used to be folded into the overall limit when a warp was set in that world and

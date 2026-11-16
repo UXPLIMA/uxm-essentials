@@ -46,6 +46,7 @@ public enum HomesMessageKey implements MessageKey {
 
     // failures
     HOME_LIMIT_REACHED("home.limit-reached"),
+    HOME_WORLD_LIMIT_REACHED("home.world-limit-reached"),
     HOME_NOT_FOUND("home.not-found"),
     HOME_SLOT_TAKEN("home.slot-taken"),
     HOME_SLOT_OUT_OF_RANGE("home.slot-out-of-range"),

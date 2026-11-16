@@ -55,6 +55,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.home.icon` | Pick a custom GUI icon for one of your homes from the grid. | true |
 | `uxmessentials.home.invite` | /home invite and /home uninvite to grant or revoke another player's access to one of your homes. | true |
 | `uxmessentials.home.limit.<n>` | How many homes you may keep; the largest tier held wins. | true |
+| `uxmessentials.home.limit.<world>.<n>` | How many homes you may keep in one world, counting only your homes there; the largest tier held wins. The limit across every world still applies. | true |
 | `uxmessentials.home.setserver` | /home setserver <from> <to> to move every home recorded on one server to another without moving any. | op |
 | `uxmessentials.home.use` | /home to open and manage your slot-based home grid. | true |
 | `uxmessentials.home.visit` | /home visit <player> [slot] to teleport to another player's public home or one you were invited to. | true |

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.playerwarps.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
+import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static com.uxplima.uxmessentials.testing.Fixtures.WORLD;
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -12,6 +13,7 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
@@ -199,5 +201,52 @@ class PlayerWarpLimitTest {
         assertThat(edit(10).moveHere(ALEX, PlayerWarpName.of("farm"), in(NETHER))
                         .isOk())
                 .isTrue();
+    }
+
+    private TransferPlayerWarp transfer(int defaultLimit) {
+        PlayerWarpQuota quota = new PlayerWarpQuota(permissions, defaultLimit);
+        return new TransferPlayerWarp(
+                warps,
+                new WarpAuthorization(new PlayerWarpFakes.NoMembers()),
+                quota,
+                new PlayerWarpWorldLimit(quota, warps, notifier.notifier(), WorldBlacklist.none()),
+                notifier.notifier(),
+                CLOCK);
+    }
+
+    private Result<Unit, PlayerWarpError> setFor(PlayerRef owner, String name, WorldRef world) {
+        return setWarp(5).set(owner, owner.name(), PlayerWarpName.of(name), in(world));
+    }
+
+    @Test
+    void aTransferThatWouldPutTheNewOwnerPastTheirLimitAcrossEveryWorldIsRefused() {
+        setFor(SAM, "farm", WORLD);
+        setFor(SAM, "shop", WORLD);
+        setFor(ALEX, "fortress", NETHER);
+
+        Result<Unit, PlayerWarpError> moved = transfer(2).transfer(ALEX, PlayerWarpName.of("fortress"), SAM);
+
+        assertThat(moved.asError()).contains(PlayerWarpError.LIMIT_REACHED);
+        assertThat(notifier.sent())
+                .last()
+                .isEqualTo(new RecordingNotifier.Sent(
+                        ALEX, "pwarp.transfer-limit-reached", Map.of("warp", "fortress", "player", "Sam")));
+        assertThat(warps.ownedBy(ALEX)).hasSize(1);
+    }
+
+    @Test
+    void aTransferIntoAWorldWhereTheNewOwnerIsFullIsRefusedAndAnotherWorldIsNot() {
+        permissions.holdTier(SAM, LIMIT + ".world_nether", 1);
+        setFor(SAM, "bastion", NETHER);
+        setFor(ALEX, "fortress", NETHER);
+        setFor(ALEX, "farm", WORLD);
+
+        assertThat(transfer(5)
+                        .transfer(ALEX, PlayerWarpName.of("fortress"), SAM)
+                        .asError())
+                .contains(PlayerWarpError.LIMIT_REACHED);
+        assertThat(transfer(5).transfer(ALEX, PlayerWarpName.of("farm"), SAM).isOk())
+                .isTrue();
+        assertThat(warps.ownedBy(SAM)).hasSize(2);
     }
 }
