@@ -163,9 +163,9 @@ litebans {
 ```
 
 Only rows LiteBans still marks active are imported. Reasons, issue times, expiry times and the name of the staff
-member are kept. A permanent ban is stored the way `/ban` stores one. An IP ban is imported by its address, whatever
-player it names; a wildcard (range) IP ban is skipped. A ban, mute or warning whose player is not a real UUID
-(LiteBans writes `#offline#` and similar) is skipped. A table that cannot be read is logged and skipped.
+member are kept. A permanent ban is stored the way `/ban` stores one. An IP ban is imported by its address, stored in
+the canonical form `/banip` uses, whatever player it names; a wildcard (range) IP ban is skipped. A ban, mute or
+warning whose player is not a real UUID (LiteBans writes `#offline#` and similar) is skipped. A table that cannot be read is logged and skipped.
 `table-prefix` must contain only lowercase letters, digits and `_`; any other value stops the LiteBans import with an
 error in the log.
 

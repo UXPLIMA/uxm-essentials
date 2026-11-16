@@ -255,7 +255,8 @@ server holds the player, and does nothing there if that server lacks its world.
 
 `/banip <ip>` bans that address. `/banip <player>` bans the last address the player connected from, and fails if
 none is on record. IPv4 and IPv6 are both accepted and stored in canonical form. A ban matches one exact address;
-there are no ranges or wildcards.
+there are no ranges or wildcards. `/unbanip` accepts any spelling of the address. A ban stored by an older version in
+the spelling it was typed with (compressed or upper-case IPv6) is lifted by typing that same spelling.
 
 An IP ban kicks everyone online from that address except the staff member who issued it and exempt players, and
 refuses later logins from it. The staff member is told how many other known accounts have used the address. IP bans

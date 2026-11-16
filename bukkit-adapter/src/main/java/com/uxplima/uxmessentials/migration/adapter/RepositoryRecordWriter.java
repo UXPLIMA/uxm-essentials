@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.shared.adapter.outbound.IpLiteral;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
@@ -206,7 +207,8 @@ public final class RepositoryRecordWriter implements RecordWriter {
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
     }
 
-    private RecordOutcome writeIpBan(IpBan ban, ImportOptions options) {
+    private RecordOutcome writeIpBan(IpBan imported, ImportOptions options) {
+        IpBan ban = canonical(imported);
         boolean existed = moderation.activeIpBan(ban.ip(), clock.instant()).isPresent();
         if (existed && options.onConflict() == ConflictPolicy.SKIP) {
             return RecordOutcome.SKIPPED;
@@ -214,6 +216,17 @@ public final class RepositoryRecordWriter implements RecordWriter {
         // The IP ban is keyed by address, so the upsert replaces a same-address row rather than duplicating it.
         moderation.saveIpBan(ban);
         return existed ? RecordOutcome.OVERWRITTEN : RecordOutcome.WRITTEN;
+    }
+
+    /**
+     * {@code ban} with its address in the form a connecting player's address is read in, so an imported ban written
+     * as compressed or upper-case IPv6 bars the players it names. Text that is not an address is kept as written.
+     */
+    static IpBan canonical(IpBan ban) {
+        return IpLiteral.canonical(ban.ip())
+                .filter(ip -> !ip.equals(ban.ip()))
+                .map(ip -> new IpBan(ip, ban.until(), ban.reason(), ban.target(), ban.issuer(), ban.issuedAt()))
+                .orElse(ban);
     }
 
     private RecordOutcome writeWarn(ImportRecord.WarnRecord rec) {

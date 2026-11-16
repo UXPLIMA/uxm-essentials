@@ -8,6 +8,7 @@ import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.tree.LiteralCommandNode;
 import com.uxplima.uxmessentials.moderation.adapter.ModerationServices;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
+import com.uxplima.uxmessentials.shared.adapter.outbound.IpLiteral;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
@@ -44,11 +45,11 @@ public final class UnbanipCommand extends ModerationCommandSupport implements Co
 
     private int run(CommandContext<CommandSourceStack> ctx) {
         String typed = ctx.getArgument("ip", String.class);
-        // Bans are stored in canonical form, so the typed spelling is canonicalised too; text that is not an
-        // address passes unchanged so a row stored verbatim before canonical storage can still be lifted.
+        // Bans are stored in canonical form, so the canonical spelling is tried first; a row stored before that, in
+        // the spelling it was typed with, is then tried as typed.
         PlayerRef actor = actor(ctx);
         String ip = IpLiteral.canonical(typed).orElse(typed);
-        offTick(actor, () -> services.unbanIp().unbanIp(actor, ip));
+        offTick(actor, () -> services.unbanIp().unbanIp(actor, ip, typed));
         return Command.SINGLE_SUCCESS;
     }
 }
