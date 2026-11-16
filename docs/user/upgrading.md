@@ -14,6 +14,15 @@ On a network, a paid hop is now refunded, and a player warp owner paid, in exact
 Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
 in its own default. See [network.md](network.md).
 
+## /eco giveall and resetall reach every player
+
+`/eco giveall` and `/eco resetall` used to change only the players online on the server that ran them. They now
+change every player who has joined a server of the database, offline and on other servers too, and with
+`--all-accounts` also the accounts other plugins opened. A script that ran `giveall` as a reward for the players
+online now pays everyone; use `/payall` or a reward plugin for online-only rewards. The update adds one table,
+`economy_sweeps`, where the progress of each run is kept. See
+[economy.md](economy.md#changing-every-balance).
+
 ## Transaction history ids come from the database
 
 The update adds one table, `id_allocator`, and starts the transaction history ids after the highest one already

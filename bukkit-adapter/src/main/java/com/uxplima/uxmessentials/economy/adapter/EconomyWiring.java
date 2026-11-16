@@ -193,7 +193,10 @@ public final class EconomyWiring {
         // that won the provider keeps its own accounts, which this plugin cannot list.
         AccountSweep sweep = resolved.ledgerInPlay()
                 ? WalletSync.sweep(
-                        WalletRepositories.accountSweep(persistence, ledger.telemetry()), cached, bus.publisher())
+                        WalletRepositories.accountSweep(
+                                persistence, ledger.telemetry(), currencies, clock, kernel.log()),
+                        cached,
+                        bus.publisher())
                 : AccountSweep.unreachable();
         return assemble(
                 plugin,
@@ -491,7 +494,8 @@ public final class EconomyWiring {
                 services.ecoAdmin(),
                 services.returnUnsoldItems(),
                 settings.allowNonAtomicRecurring(),
-                cached);
+                cached,
+                () -> kernel.scheduler().async(services.ecoAdmin()::resumeSweeps));
     }
 
     /**
@@ -756,7 +760,8 @@ public final class EconomyWiring {
                         audit,
                         notifier,
                         history,
-                        sweep,
+                        new com.uxplima.uxmessentials.economy.application.SweepRunner(
+                                sweep, kernel.scheduler(), audit, notifier, kernel.events(), kernel.log(), clock),
                         clock),
                 exchangeService,
                 currencies,
@@ -808,6 +813,7 @@ public final class EconomyWiring {
      *     which the modules that bill on a timer ask before they start
      * @param cache the cache under the broadcasting repository, which the importer writes through so a large
      *     import updates this server without one cross-server frame per row
+     * @param resumeSweeps hands the sweeps over every account a stop left running to the async lane, to carry on
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -834,7 +840,8 @@ public final class EconomyWiring {
             EcoAdmin admin,
             ReturnUnsoldItems returns,
             boolean allowNonAtomicRecurring,
-            CachedWalletRepository cache) {
+            CachedWalletRepository cache,
+            Runnable resumeSweeps) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -857,6 +864,7 @@ public final class EconomyWiring {
             Objects.requireNonNull(admin, "admin");
             Objects.requireNonNull(walletView, "walletView");
             Objects.requireNonNull(returns, "returns");
+            Objects.requireNonNull(resumeSweeps, "resumeSweeps");
         }
 
         /** Arm the settle, telemetry, and baltop-refresh loops. Called once after the module starts. */
@@ -871,6 +879,7 @@ public final class EconomyWiring {
             }
             maintenanceTask.start();
             bankInterestTask.start();
+            resumeSweeps.run();
         }
 
         /** Drain the queues, stop the loops, and drop this plugin's provider registration. */

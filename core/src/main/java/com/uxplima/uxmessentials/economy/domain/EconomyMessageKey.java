@@ -99,6 +99,8 @@ public enum EconomyMessageKey implements MessageKey {
     ECO_ADMIN_BULK_UNREACHABLE("eco.admin.bulk-unreachable"),
     ECO_ADMIN_BULK_RUNNING("eco.admin.bulk-running"),
     ECO_ADMIN_BULK_FAILED("eco.admin.bulk-failed"),
+    ECO_ADMIN_BULK_PAUSED("eco.admin.bulk-paused"),
+    ECO_ADMIN_BULK_GONE("eco.admin.bulk-gone"),
     ECO_ADMIN_GIVERANDOM("eco.admin.giverandom"),
     ECO_ADMIN_RESETALL("eco.admin.resetall"),
     ECO_ADMIN_RESETALL_CONFIRM("eco.admin.resetall-confirm"),

@@ -34,9 +34,9 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Registers the server-wide eco-admin screen with the menu engine and opens it. A three-row panel reached from the
  * bare-/eco hub's [Server-wide] button: Give to All (an amount captured through the shared input seam, credited to
- * every known account) and Reset All (confirm-gated, putting every known account back to the starting balance), with,
+ * every player's account) and Reset All (confirm-gated, putting every player's account back to the starting balance), with,
  * when more than one currency is configured: a shared paginated {@link CurrencyPickerMenu} between them to switch the
- * active currency. Both ops reach the same accounts the {@code /eco giveall|resetall} commands do.
+ * active currency. Both ops reach the accounts {@code /eco giveall|resetall} reach without {@code --all-accounts}.
  *
  * <p>The screen carries only the active currency as its {@link BulkSubject}, so each button's active-currency line
  * fills from the shared {@code eco_currency} placeholder without the renderer touching a port. The bulk op runs off
@@ -111,7 +111,7 @@ public final class EconomyBulkMenu {
         menus.open(viewer, SPEC_ID, new BulkSubject(active));
     }
 
-    /** Capture an amount through the input seam, then credit every known account. */
+    /** Capture an amount through the input seam, then credit every player's account. */
     private void promptGiveAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -124,7 +124,7 @@ public final class EconomyBulkMenu {
     }
 
     /**
-     * Parse the typed amount, and on success credit every known account off the tick thread, then re-open. A malformed amount sends the existing parse-error rejection and re-opens, no op
+     * Parse the typed amount, and on success credit every player's account off the tick thread, then re-open. A malformed amount sends the existing parse-error rejection and re-opens, no op
      * runs. Package-private so the amount branch is unit-tested without driving a live anvil.
      */
     void applyGiveAll(Player viewer, PlayerRef viewerRef, Currency active, String raw) {
@@ -139,7 +139,7 @@ public final class EconomyBulkMenu {
         open(viewer, viewerRef, active);
     }
 
-    /** Confirm-gate the reset-all through the engine confirm dialog; yes resets every known account and re-opens. */
+    /** Confirm-gate the reset-all through the engine confirm dialog; yes resets every player's account and re-opens. */
     private void confirmResetAll(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -149,7 +149,7 @@ public final class EconomyBulkMenu {
                 ctx.viewer(), title, () -> resetAll(viewer, viewerRef, active), () -> open(viewer, viewerRef, active));
     }
 
-    /** Reset every known account off the tick thread, then re-open. */
+    /** Reset every player's account off the tick thread, then re-open. */
     void resetAll(Player viewer, PlayerRef viewerRef, Currency active) {
         scheduler.async(() -> ops.resetAll(viewerRef, active));
         open(viewer, viewerRef, active);

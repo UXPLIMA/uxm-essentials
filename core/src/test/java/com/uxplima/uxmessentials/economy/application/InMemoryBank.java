@@ -25,6 +25,7 @@ final class InMemoryBank implements EconomyProvider {
     private final Set<Currency> currencies;
     private final Map<String, Money> balances = new HashMap<>();
     private final Set<Currency> broken = new HashSet<>();
+    private boolean transfersBroken;
 
     InMemoryBank(Currency... currencies) {
         this.currencies = Set.of(currencies);
@@ -37,6 +38,11 @@ final class InMemoryBank implements EconomyProvider {
     /** Make every credit in {@code currency} throw, the way a provider whose storage is down does. */
     void breakCredits(Currency currency) {
         broken.add(currency);
+    }
+
+    /** Make every transfer throw before it moves anything, the way a ledger that lost its connection does. */
+    void breakTransfers() {
+        transfersBroken = true;
     }
 
     @Override
@@ -78,6 +84,9 @@ final class InMemoryBank implements EconomyProvider {
 
     @Override
     public TransferResult transfer(PlayerRef from, PlayerRef to, Money amount) {
+        if (transfersBroken) {
+            throw new IllegalStateException("connection lost");
+        }
         Money have = balance(from, amount.currency());
         if (have.isLessThan(amount)) {
             return TransferResult.insufficientFunds(amount, have);

@@ -3,10 +3,7 @@ package com.uxplima.uxmessentials.economy.application;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Supplier;
 
-import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
@@ -16,11 +13,12 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import org.jspecify.annotations.Nullable;
 
 /**
  * The eco-admin surface, {@code /eco give|take|set|reset} per target and {@code /eco giveall|giverandom|resetall}
@@ -33,10 +31,9 @@ import org.jspecify.annotations.Nullable;
  * <p>A {@code set}/{@code reset} the store could not apply returns {@link TransferError#PLAYER_OFFLINE}, tells the
  * actor, and records no ledger row or audit entry.
  *
- * <p>{@code giveall} and {@code resetall} reach every account the ledger knows through the {@link AccountSweep}, not
- * the players one server happens to see. The sweep writes each account's ledger row in the same transaction as its
- * balance, so these two verbs never touch {@link TransactionHistory}. The actor hears the count only once the sweep
- * has committed. One sweep runs at a time on a server, so a second click on the bulk screen cannot pay everyone twice.
+ * <p>{@code giveall} and {@code resetall} reach every account the ledger knows, not the players one server happens to
+ * see: the {@link SweepRunner} runs them chunk by chunk, writing each account's ledger row with its balance, so these
+ * two verbs never touch {@link TransactionHistory}, and it tells the actor the count once the last chunk committed.
  *
  * <p>An offline target is first materialised via {@link WalletRepository#ensureOwner}, so a give/set to a
  * never-joined player never breaks a foreign key: every ledger row names an owner that exists.
@@ -48,9 +45,8 @@ public final class EcoAdmin {
     private final EconomyAudit audit;
     private final EconomyNotifier notifier;
     private final TransactionHistory history;
-    private final AccountSweep sweep;
+    private final SweepRunner sweeps;
     private final Clock clock;
-    private final AtomicBoolean sweeping = new AtomicBoolean();
 
     public EcoAdmin(
             EconomyProvider economy,
@@ -58,14 +54,14 @@ public final class EcoAdmin {
             EconomyAudit audit,
             EconomyNotifier notifier,
             TransactionHistory history,
-            AccountSweep sweep,
+            SweepRunner sweeps,
             Clock clock) {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.history = Objects.requireNonNull(history, "history");
-        this.sweep = Objects.requireNonNull(sweep, "sweep");
+        this.sweeps = Objects.requireNonNull(sweeps, "sweeps");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -109,29 +105,13 @@ public final class EcoAdmin {
     }
 
     /**
-     * {@code /eco giveall <amount> [currency]}: credit every known account by {@code amount}. Returns the accounts
-     * credited; an account the credit would push past the currency's {@code max} is left out, and the actor is told
-     * how many were.
+     * {@code /eco giveall <amount> [currency] [--all-accounts]}: credit every account in {@code scope} by
+     * {@code amount}. Returns the accounts credited when the sweep finished here, else 0; an account the credit would
+     * push past the currency's {@code max} is left out, and the actor is told how many were.
      */
-    public int giveAll(PlayerRef actor, Money amount) {
+    public int giveAll(PlayerRef actor, Money amount, SweepScope scope) {
         validateBulk(actor, amount);
-        SweepOutcome outcome = runSweep(
-                actor, amount.currency(), () -> sweep.creditEvery(amount, EconomyReason.ADMIN_GIVEALL, clock.millis()));
-        if (outcome == null) {
-            return 0;
-        }
-        audit.bulkMutation(actor, amount, outcome.changed(), EconomyReason.ADMIN_GIVEALL);
-        notifier.send(
-                actor,
-                EconomyMessageKey.ECO_ADMIN_GIVEALL,
-                Map.of("count", Integer.toString(outcome.changed()), "amount", notifier.amount(amount)));
-        if (outcome.skipped() > 0) {
-            notifier.send(
-                    actor,
-                    EconomyMessageKey.ECO_ADMIN_GIVEALL_CAPPED,
-                    Map.of("count", Integer.toString(outcome.skipped())));
-        }
-        return outcome.changed();
+        return sweep(actor, SweepKind.CREDIT, scope, amount, EconomyReason.ADMIN_GIVEALL);
     }
 
     /** {@code /eco giverandom <amount> [currency]}: credit {@code amount} to one chosen online player. */
@@ -179,50 +159,39 @@ public final class EcoAdmin {
     }
 
     /**
-     * {@code /eco resetall --confirm [currency]}: put every known account's balance back to the currency's starting
-     * figure. Returns the accounts whose balance changed; one already at the starting figure is not counted.
+     * {@code /eco resetall --confirm [currency] [--all-accounts]}: put every account in {@code scope} back to the
+     * currency's starting figure. Returns the accounts whose balance changed when the sweep finished here, else 0; one
+     * already at the starting figure is not counted.
      */
-    public int resetAll(PlayerRef actor, Currency currency) {
+    public int resetAll(PlayerRef actor, Currency currency, SweepScope scope) {
         Money starting = Money.of(currency, currency.starting());
         validateBulk(actor, starting);
-        SweepOutcome outcome = runSweep(
-                actor, currency, () -> sweep.resetEvery(starting, EconomyReason.ADMIN_RESETALL, clock.millis()));
-        if (outcome == null) {
-            return 0;
-        }
-        audit.bulkMutation(actor, starting, outcome.changed(), EconomyReason.ADMIN_RESETALL);
-        notifier.send(
-                actor, EconomyMessageKey.ECO_ADMIN_RESETALL, Map.of("count", Integer.toString(outcome.changed())));
-        return outcome.changed();
+        return sweep(actor, SweepKind.RESET, scope, starting, EconomyReason.ADMIN_RESETALL);
     }
 
     /**
-     * Run one sweep of {@code currency}, or tell {@code actor} why none ran: the currency's balances are kept where
-     * the ledger cannot list them, another sweep is still running here, or the sweep failed and its transaction was
-     * rolled back. Null in each of those cases, when nothing changed and nothing may be announced or audited.
+     * Carry on every sweep over every account a stop left running, on any server. Called once when the economy
+     * starts, off the tick.
      */
-    private @Nullable SweepOutcome runSweep(PlayerRef actor, Currency currency, Supplier<SweepOutcome> work) {
-        if (!sweep.reaches(currency)) {
+    public void resumeSweeps() {
+        sweeps.resumeUnfinished();
+    }
+
+    /**
+     * Run one sweep, or tell {@code actor} why none can run: the currency's balances are kept where the ledger cannot
+     * list them. The runner says the rest: the count, a sweep already running, or a pause.
+     */
+    private int sweep(PlayerRef actor, SweepKind kind, SweepScope scope, Money amount, EconomyReason reason) {
+        Objects.requireNonNull(scope, "scope");
+        if (!sweeps.reaches(amount.currency())) {
             notifier.send(
                     actor,
                     EconomyMessageKey.ECO_ADMIN_BULK_UNREACHABLE,
-                    Map.of("currency", currency.id().value()));
-            return null;
+                    Map.of("currency", amount.currency().id().value()));
+            return 0;
         }
-        if (!sweeping.compareAndSet(false, true)) {
-            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_RUNNING, Map.of());
-            return null;
-        }
-        try {
-            return work.get();
-        } catch (RuntimeException failure) {
-            // The sweep is one transaction, so a failure rolled every account back. The actor must hear that, and the
-            // failure still escapes so the async lane logs its cause.
-            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_FAILED, Map.of());
-            throw failure;
-        } finally {
-            sweeping.set(false);
-        }
+        SweepOutcome outcome = sweeps.start(kind, scope, amount, reason, actor);
+        return outcome == null ? 0 : outcome.changed();
     }
 
     /**

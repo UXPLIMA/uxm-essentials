@@ -1,8 +1,13 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -10,6 +15,8 @@ import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
@@ -32,8 +39,9 @@ import org.jspecify.annotations.NullMarked;
  * announces, so a flushed credit reaches peers. The guarded debit/credit/transfer themselves are unchanged
  * the decorator forwards to the same repository; it only appends the announcement.
  *
- * <p>A sweep over every account changes rows this cache and every peer's may hold, so it drops the whole local cache
- * and sends one {@link AllBalancesChanged} for peers to do the same.
+ * <p>A sweep over every account changes rows this cache and every peer's may hold. Here it drops the accounts each
+ * chunk changed; peers hear one {@link AllBalancesChanged} now and then rather than a frame per account, and drop
+ * every cached wallet.
  */
 @NullMarked
 public final class WalletSync {
@@ -48,16 +56,21 @@ public final class WalletSync {
     }
 
     /**
-     * An {@link AccountSweep} that, once a sweep has run, drops every wallet {@code cache} holds and tells peers to
-     * drop theirs. It does both even when the sweep failed: a failure at commit leaves no way to tell whether the rows
-     * changed, and a needless drop only costs a read.
+     * An {@link AccountSweep} that keeps cached balances true while a sweep runs. After each chunk it drops the cached
+     * wallets of exactly the accounts the chunk changed here, and tells peers to drop theirs with one
+     * {@link AllBalancesChanged}, at most once per {@link #ANNOUNCE_EVERY} and always when the sweep ends, so a large
+     * sweep does not flood the bus. A chunk that failed is announced too: a failure at commit leaves no way to tell
+     * whether its rows changed, and a needless drop only costs a read.
      */
     public static AccountSweep sweep(AccountSweep delegate, CachedWalletRepository cache, BusPublisher bus) {
         Objects.requireNonNull(delegate, "delegate");
         Objects.requireNonNull(cache, "cache");
         Objects.requireNonNull(bus, "bus");
-        return new AnnouncingSweep(delegate, cache, bus);
+        return new AnnouncingSweep(delegate, cache, bus, System::nanoTime);
     }
+
+    /** How often a running sweep tells peers to drop their cached wallets. */
+    static final Duration ANNOUNCE_EVERY = Duration.ofSeconds(2);
 
     /**
      * A listener that invalidates the affected owner's cached wallet on a remote {@link BalanceChanged}, and every
@@ -74,17 +87,21 @@ public final class WalletSync {
         };
     }
 
-    /** Runs each sweep through the delegate, then drops the local cache and announces the sweep to peers. */
-    private static final class AnnouncingSweep implements AccountSweep {
+    /** Runs each chunk through the delegate, then drops what it changed here and tells peers. */
+    static final class AnnouncingSweep implements AccountSweep {
 
         private final AccountSweep delegate;
         private final CachedWalletRepository cache;
         private final BusPublisher bus;
+        private final LongSupplier nanos;
+        private final AtomicLong lastAnnounced = new AtomicLong();
+        private final AtomicBoolean announcedOnce = new AtomicBoolean();
 
-        AnnouncingSweep(AccountSweep delegate, CachedWalletRepository cache, BusPublisher bus) {
+        AnnouncingSweep(AccountSweep delegate, CachedWalletRepository cache, BusPublisher bus, LongSupplier nanos) {
             this.delegate = delegate;
             this.cache = cache;
             this.bus = bus;
+            this.nanos = nanos;
         }
 
         @Override
@@ -93,26 +110,46 @@ public final class WalletSync {
         }
 
         @Override
-        public SweepOutcome creditEvery(Money amount, EconomyReason reason, long at) {
-            try {
-                return delegate.creditEvery(amount, reason, at);
-            } finally {
-                announce(amount.currency());
-            }
+        public Sweep open(
+                SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
+            return delegate.open(kind, scope, amount, reason, actor, at);
         }
 
         @Override
-        public SweepOutcome resetEvery(Money balance, EconomyReason reason, long at) {
+        public Step advance(Sweep sweep) {
+            Step step;
             try {
-                return delegate.resetEvery(balance, reason, at);
-            } finally {
-                announce(balance.currency());
+                step = delegate.advance(sweep);
+            } catch (RuntimeException failure) {
+                cache.invalidateAll();
+                announce(sweep);
+                throw failure;
             }
+            for (UUID owner : step.changedOwners()) {
+                cache.invalidateOwner(owner);
+            }
+            if (step.progress() != Progress.MORE || due()) {
+                announce(sweep);
+            }
+            return step;
         }
 
-        private void announce(Currency currency) {
-            cache.invalidateAll();
-            bus.publish(new AllBalancesChanged(bus.serverId(), currency.id().value()));
+        @Override
+        public List<Sweep> unfinished() {
+            return delegate.unfinished();
+        }
+
+        private boolean due() {
+            long now = nanos.getAsLong();
+            long last = lastAnnounced.get();
+            return !announcedOnce.get() || now - last >= ANNOUNCE_EVERY.toNanos();
+        }
+
+        private void announce(Sweep sweep) {
+            announcedOnce.set(true);
+            lastAnnounced.set(nanos.getAsLong());
+            bus.publish(new AllBalancesChanged(
+                    bus.serverId(), sweep.amount().currency().id().value()));
         }
     }
 

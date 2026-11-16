@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
@@ -18,6 +18,8 @@ import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepKind;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.persistence.economy.CachedWalletRepository;
@@ -26,11 +28,12 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.network.AllBalancesChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
- * A sweep over every account leaves no backend showing a balance from before it: the one that ran it drops its cached
- * wallets, and every other one drops its own on the single frame the sweep sends.
+ * A sweep over every account leaves no backend showing a balance from before it: the one running it drops the cached
+ * wallets each chunk changed, and every other one drops its own on the frames the sweep sends now and then.
  */
 class WalletSyncTest {
 
@@ -38,36 +41,48 @@ class WalletSyncTest {
             Currency.builder(CurrencyId.of("coins")).build();
     private static final PlayerRef ALEX =
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000a1e"), "Alex");
+    private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000005"), "Sam");
+    private static final AllBalancesChanged COINS_SWEPT = new AllBalancesChanged("lobby", "coins");
 
     private final Rows rows = new Rows();
     private final CachedWalletRepository cache = new CachedWalletRepository(rows);
     private final Frames frames = new Frames();
+    private final AtomicLong nanos = new AtomicLong();
+    private final Chunks chunks = new Chunks(rows);
+    private final AccountSweep sweep = new WalletSync.AnnouncingSweep(chunks, cache, frames, nanos::get);
 
     @Test
-    void aSweepRunHereShowsItsFiguresAtOnceAndTellsThePeers() {
+    void eachChunkShowsItsFiguresHereAtOnceAndPeersHearNowAndThenAndAtTheEnd() {
         rows.put(ALEX, "10");
+        rows.put(SAM, "20");
         assertThat(cached(ALEX)).isEqualByComparingTo("10");
-        AccountSweep sweep = WalletSync.sweep(new Sweep(rows, "35", null), cache, frames);
+        assertThat(cached(SAM)).isEqualByComparingTo("20");
+        AccountSweep.Sweep running = open();
 
-        sweep.creditEvery(Money.of(COINS, new BigDecimal("25")), EconomyReason.ADMIN_GIVEALL, 0L);
-
+        sweep.advance(running);
         assertThat(cached(ALEX)).isEqualByComparingTo("35");
-        assertThat(frames.published).containsExactly(new AllBalancesChanged("lobby", "coins"));
+        assertThat(cached(SAM)).isEqualByComparingTo("20");
+        assertThat(frames.published).containsExactly(COINS_SWEPT);
+
+        nanos.addAndGet(WalletSync.ANNOUNCE_EVERY.toNanos() / 2);
+        sweep.advance(running);
+        assertThat(cached(SAM)).isEqualByComparingTo("45");
+        assertThat(frames.published).hasSize(1);
+
+        sweep.advance(running);
+        assertThat(frames.published).containsExactly(COINS_SWEPT, COINS_SWEPT);
     }
 
     @Test
-    void aSweepThatFailedStillDropsTheCacheAndTellsThePeers() {
+    void aChunkThatFailedStillDropsTheCacheAndTellsThePeers() {
         rows.put(ALEX, "10");
         assertThat(cached(ALEX)).isEqualByComparingTo("10");
-        AccountSweep sweep =
-                WalletSync.sweep(new Sweep(rows, "50", new IllegalStateException("lost at commit")), cache, frames);
+        chunks.failAfterWriting(new IllegalStateException("lost at commit"));
 
-        assertThatThrownBy(
-                        () -> sweep.resetEvery(Money.of(COINS, new BigDecimal("50")), EconomyReason.ADMIN_RESETALL, 0L))
-                .hasMessage("lost at commit");
+        assertThatThrownBy(() -> sweep.advance(open())).hasMessage("lost at commit");
 
-        assertThat(cached(ALEX)).isEqualByComparingTo("50");
-        assertThat(frames.published).containsExactly(new AllBalancesChanged("lobby", "coins"));
+        assertThat(cached(ALEX)).isEqualByComparingTo("35");
+        assertThat(frames.published).containsExactly(COINS_SWEPT);
     }
 
     @Test
@@ -81,15 +96,34 @@ class WalletSyncTest {
         assertThat(cached(ALEX)).isEqualByComparingTo("35");
     }
 
+    private AccountSweep.Sweep open() {
+        return sweep.open(
+                SweepKind.CREDIT,
+                SweepScope.PLAYERS,
+                Money.of(COINS, new BigDecimal("25")),
+                EconomyReason.ADMIN_GIVEALL,
+                ALEX,
+                0L);
+    }
+
     private BigDecimal cached(PlayerRef owner) {
         return cache.findByOwner(owner).orElseThrow().balanceOf(COINS).amount();
     }
 
-    /** A sweep that writes {@code figure} into every row, then fails if told to. */
-    private record Sweep(
-            Rows rows,
-            String figure,
-            @org.jspecify.annotations.Nullable RuntimeException failure) implements AccountSweep {
+    /** A sweep that credits 25 to one stored account per chunk, in the order they were put, then finishes. */
+    private static final class Chunks implements AccountSweep {
+
+        private final Rows rows;
+        private int next;
+        private @Nullable RuntimeException failure;
+
+        Chunks(Rows rows) {
+            this.rows = rows;
+        }
+
+        void failAfterWriting(RuntimeException thrown) {
+            failure = thrown;
+        }
 
         @Override
         public boolean reaches(Currency currency) {
@@ -97,28 +131,36 @@ class WalletSyncTest {
         }
 
         @Override
-        public SweepOutcome creditEvery(Money amount, EconomyReason reason, long at) {
-            return run();
+        public Sweep open(
+                SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
+            return new Sweep("sweep-1", kind, scope, amount, reason, actor, at);
         }
 
         @Override
-        public SweepOutcome resetEvery(Money balance, EconomyReason reason, long at) {
-            return run();
+        public Step advance(Sweep sweep) {
+            List<PlayerRef> owners = new ArrayList<>(rows.held.keySet());
+            if (next >= owners.size()) {
+                return new Step(new SweepOutcome(next, 0, 0), List.of(), Progress.FINISHED);
+            }
+            PlayerRef owner = owners.get(next++);
+            rows.held.merge(owner, new BigDecimal("25"), BigDecimal::add);
+            RuntimeException thrown = failure;
+            if (thrown != null) {
+                throw thrown;
+            }
+            return new Step(new SweepOutcome(next, 0, 0), List.of(owner.uuid()), Progress.MORE);
         }
 
-        private SweepOutcome run() {
-            rows.held.replaceAll((owner, held) -> new BigDecimal(figure));
-            if (failure != null) {
-                throw failure;
-            }
-            return new SweepOutcome(rows.held.size(), 0);
+        @Override
+        public List<Sweep> unfinished() {
+            return List.of();
         }
     }
 
-    /** The stored balances in coins, the only thing the cache reads. */
+    /** The stored balances in coins, the only thing the cache reads, in the order they were first put. */
     private static final class Rows implements WalletRepository {
 
-        private final Map<PlayerRef, BigDecimal> held = new HashMap<>();
+        private final Map<PlayerRef, BigDecimal> held = new java.util.LinkedHashMap<>();
 
         void put(PlayerRef owner, String amount) {
             held.put(owner, new BigDecimal(amount));

@@ -101,13 +101,18 @@ public final class WalletRepositories {
     }
 
     /**
-     * The sweep over every account of the native ledger, drawing its ledger ids from {@code telemetry} so its rows
-     * and the buffered ones never share an id.
+     * The journalled sweep over every account of the native ledger, drawing its ledger ids from the allocator
+     * {@code telemetry} uses, so its rows and the buffered ones never share an id.
      */
-    public static AccountSweep accountSweep(Persistence persistence, TransactionTelemetry telemetry) {
+    public static AccountSweep accountSweep(
+            Persistence persistence,
+            TransactionTelemetry telemetry,
+            CurrencyRegistry currencies,
+            Clock clock,
+            Logger log) {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(telemetry, "telemetry");
-        return new JooqAccountSweep(persistence.dsl(), telemetry::reserveIds);
+        return new JooqAccountSweep(persistence.dsl(), telemetry::reserveIds, currencies, clock, log);
     }
 
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */

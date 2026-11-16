@@ -81,19 +81,29 @@ and 1 flat tax sends 50, takes 6, and the receiver keeps 44. The tax is never mo
 
 ## Changing every balance
 
-`/eco giveall <amount> [currency]` and `/eco resetall --confirm [currency]` change every account in the plugin's
-database: players who are offline, players on other servers of a network, and accounts other plugins opened through
-Vault, such as a tax holding account. `resetall` puts each balance back to the currency's `starting` figure, and
-asks for `--confirm` before it does. The bulk screen of the `/eco` menu does the same.
+`/eco giveall <amount> [currency]` and `/eco resetall --confirm [currency]` change the account of every player who
+has joined a server of this database: players who are offline and players on other servers of a network too.
+`resetall` puts each balance back to the currency's `starting` figure and asks for `--confirm` first.
 
-- The change runs in the background and the reply comes once it is done, with the number of accounts changed.
-  `giveall` leaves out an account the amount would take past `max-balance` and says how many it left out.
-- It is all or nothing. If the server stops or the database fails part way, no account is changed, and running the
-  command again is safe. Payments made while it runs wait for it and are kept.
+Other plugins can open accounts through Vault for things that are not players, such as a town's bank or a tax holding
+account. These are left alone unless `--all-accounts` ends the command: `/eco giveall 100 --all-accounts`,
+`/eco resetall --confirm coins --all-accounts`. The bulk screen of the `/eco` menu reaches players only.
+
+- The change runs in the background, a few hundred accounts at a time. Each step locks only its own accounts, for
+  a moment, so payments and other plugins' Vault calls carry on while it runs. The reply comes once it is done,
+  with the number of accounts changed. `giveall` leaves out an account the amount would take past `max-balance` and
+  says how many it left out.
+- If the server stops or the database fails part way, the change stops after the last finished step and tells you
+  how far it got. It carries on by itself a minute later, or when any server of the database starts again. No
+  account is changed twice and none is skipped.
 - Every changed account gets its own line in the transaction history; the audit log gets one line for the command.
 - The other servers of a network are told, drop the balances they held in memory, and show the new ones.
 - One runs at a time on a server. A currency whose `backend` is another plugin, or whose balances are items, cannot
-  be changed this way: the command says so and changes nothing. Use that plugin's own command.
+  be changed this way: the command says so and changes nothing. Neither can any currency while another economy
+  plugin (Treasury or Vault) provides the server's economy and this plugin uses it; use that plugin's own command.
+
+When it is done, plugins hear `UxmBalanceSweepEvent` once, with what was done, the amount and the number of accounts,
+instead of a credit or debit event per account. The REST add-on streams it as `economy.balance-sweep`.
 
 `/eco giverandom <amount> [currency]` gives the amount to one player online on this server.
 
@@ -117,7 +127,7 @@ asks for `--confirm` before it does. The bulk screen of the `/eco` menu does the
 | `/exchange` | `uxmessentials.economy.exchange` | Converts between currencies. |
 | `/eco give\|take\|set <player> <amount> [currency]` | `uxmessentials.economy.admin.give`, `.take`, `.set` | Changes a balance. |
 | `/eco reset <player> [currency]` | `uxmessentials.economy.admin.set` | Resets a balance. |
-| `/eco giveall\|resetall` | `uxmessentials.economy.admin.bulk` | Changes every account's balance, online or not; `resetall` needs `--confirm`. See [Changing every balance](#changing-every-balance). |
+| `/eco giveall\|resetall` | `uxmessentials.economy.admin.bulk` | Changes every player's balance, online or not; `resetall` needs `--confirm`, `--all-accounts` adds other plugins' accounts. See [Changing every balance](#changing-every-balance). |
 | `/eco giverandom <amount> [currency]` | `uxmessentials.economy.admin.bulk` | Gives the amount to one random player online here. |
 | `/eco give-random` | `uxmessentials.economy.admin.give` | Gives a random amount between a minimum and a maximum. |
 | `/eco note give <player> <amount> [currency]` | `uxmessentials.economy.admin.note` | Gives a banknote without taking money from anyone. |

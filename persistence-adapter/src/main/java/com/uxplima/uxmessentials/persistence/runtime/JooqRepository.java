@@ -20,6 +20,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public abstract class JooqRepository {
 
+    /** Tries of a unit of work the database rolled back to break a deadlock, the first included. */
+    private static final int DEADLOCK_ATTEMPTS = 3;
+
     private final DSLContext dsl;
 
     protected JooqRepository(DSLContext dsl) {
@@ -49,5 +52,14 @@ public abstract class JooqRepository {
     protected final <T> T write(Function<DSLContext, T> work) {
         Objects.requireNonNull(work, "work");
         return Transactions.inTransaction(dsl, work);
+    }
+
+    /**
+     * {@link #write}, run again when the database rolled it back to break a deadlock (see
+     * {@link Transactions#inTransactionRetrying}). For money moves a player or a server thread waits on.
+     */
+    protected final <T> T writeRetrying(Function<DSLContext, T> work) {
+        Objects.requireNonNull(work, "work");
+        return Transactions.inTransactionRetrying(dsl, DEADLOCK_ATTEMPTS, work);
     }
 }

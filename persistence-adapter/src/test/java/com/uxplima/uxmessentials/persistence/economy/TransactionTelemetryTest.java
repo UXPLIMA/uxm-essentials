@@ -11,6 +11,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 import com.uxplima.uxmessentials.economy.domain.Currency;
@@ -42,10 +45,16 @@ class TransactionTelemetryTest {
     private final RecordingLogger log = new RecordingLogger();
     private TransactionTelemetry survival;
     private TransactionTelemetry lobby;
+    private Executor servers = ForkJoinPool.commonPool();
 
     @BeforeEach
     void open(TestDatabase database) {
         dsl = database.dsl();
+        if (database.backend().isFile()) {
+            // The plugin holds one connection to SQLite, so its writers never overlap; the test's plain data source
+            // would open a connection per thread and contend for the file instead.
+            servers = Executors.newSingleThreadExecutor();
+        }
         survival = telemetry();
         lobby = telemetry();
     }
@@ -68,13 +77,15 @@ class TransactionTelemetryTest {
         CountDownLatch start = new CountDownLatch(1);
         List<CompletableFuture<Void>> flushes = new ArrayList<>();
         for (TransactionTelemetry server : List.of(survival, lobby)) {
-            flushes.add(CompletableFuture.runAsync(() -> {
-                await(start);
-                for (int round = 0; round < 10; round++) {
-                    credit(server, 25);
-                    server.flush();
-                }
-            }));
+            flushes.add(CompletableFuture.runAsync(
+                    () -> {
+                        await(start);
+                        for (int round = 0; round < 10; round++) {
+                            credit(server, 25);
+                            server.flush();
+                        }
+                    },
+                    servers));
         }
         start.countDown();
         for (CompletableFuture<Void> flush : flushes) {
@@ -89,14 +100,16 @@ class TransactionTelemetryTest {
         CountDownLatch start = new CountDownLatch(1);
         List<CompletableFuture<List<Long>>> reservations = new ArrayList<>();
         for (TransactionTelemetry server : List.of(survival, lobby, survival, lobby)) {
-            reservations.add(CompletableFuture.supplyAsync(() -> {
-                await(start);
-                List<Long> firsts = new ArrayList<>();
-                for (int i = 0; i < 20; i++) {
-                    firsts.add(server.reserveIds(10));
-                }
-                return firsts;
-            }));
+            reservations.add(CompletableFuture.supplyAsync(
+                    () -> {
+                        await(start);
+                        List<Long> firsts = new ArrayList<>();
+                        for (int i = 0; i < 20; i++) {
+                            firsts.add(server.reserveIds(10));
+                        }
+                        return firsts;
+                    },
+                    servers));
         }
         start.countDown();
 

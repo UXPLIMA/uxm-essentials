@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.economy.adapter.inbound.gui.EconomyAdminGuiView
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -37,9 +38,9 @@ import org.jspecify.annotations.Nullable;
  * {@code /eco giveall|giverandom|resetall [amount] [currency]} (alias {@code /economy}). {@code /eco note give <player> <amount> [currency]} mints an admin-issued
  * banknote for a player without debiting anyone.
  *
- * <p>{@code giveall} and {@code resetall} change every account the ledger knows, online or not and on any backend;
- * {@code giverandom} picks one player online here. The bulk work runs off the tick, and the sender hears the count
- * once it has committed.
+ * <p>{@code giveall} and {@code resetall} change every player's account, online or not and on any backend, and with
+ * {@code --all-accounts} also the accounts other plugins opened; {@code giverandom} picks one player online here. The
+ * bulk work runs off the tick, and the sender hears the count once it has finished.
  */
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -77,8 +78,8 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(targetVerb("take", TAKE))
                 .then(targetVerb("set", SET))
                 .then(resetVerb())
-                .then(bulkAmountVerb("giveall", BULK))
-                .then(bulkAmountVerb("giverandom", BULK))
+                .then(giveAllVerb())
+                .then(giveRandomVerb())
                 .then(resetAllVerb())
                 .then(giveRandomRangeVerb())
                 .then(historyVerb())
@@ -155,12 +156,28 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                         .then(currencyArgument().executes(ctx -> runReset(ctx))));
     }
 
-    private LiteralArgumentBuilder<CommandSourceStack> bulkAmountVerb(String literal, String permission) {
-        return Commands.literal(literal)
-                .requires(Gate.permission(permission))
+    private LiteralArgumentBuilder<CommandSourceStack> giveRandomVerb() {
+        return Commands.literal("giverandom")
+                .requires(Gate.permission(BULK))
                 .then(Commands.argument("amount", Args.token())
-                        .executes(ctx -> runBulk(ctx, literal))
-                        .then(currencyArgument().executes(ctx -> runBulk(ctx, literal))));
+                        .executes(this::runGiveRandom)
+                        .then(currencyArgument().executes(this::runGiveRandom)));
+    }
+
+    /**
+     * {@code giveall <amount> [currency] [--all-accounts]}. Without the flag only players' accounts are credited; the
+     * flag adds the accounts other plugins opened through Vault. A literal is matched before the currency argument,
+     * so the flag is never read as a currency.
+     */
+    private LiteralArgumentBuilder<CommandSourceStack> giveAllVerb() {
+        return Commands.literal("giveall")
+                .requires(Gate.permission(BULK))
+                .then(Commands.argument("amount", Args.token())
+                        .executes(ctx -> runGiveAll(ctx, SweepScope.PLAYERS))
+                        .then(allAccounts().executes(ctx -> runGiveAll(ctx, SweepScope.ALL)))
+                        .then(currencyArgument()
+                                .executes(ctx -> runGiveAll(ctx, SweepScope.PLAYERS))
+                                .then(allAccounts().executes(ctx -> runGiveAll(ctx, SweepScope.ALL)))));
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
@@ -170,8 +187,33 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 // own parse error and eco.admin.resetall-confirm, the line that names the flag, went unsent.
                 .executes(this::askForResetAllConfirm)
                 .then(Commands.literal("--confirm")
-                        .executes(ctx -> runResetAll(ctx))
-                        .then(currencyArgument().executes(ctx -> runResetAll(ctx))));
+                        .executes(ctx -> runResetAll(ctx, SweepScope.PLAYERS))
+                        .then(allAccounts().executes(ctx -> runResetAll(ctx, SweepScope.ALL)))
+                        .then(currencyArgument()
+                                .executes(ctx -> runResetAll(ctx, SweepScope.PLAYERS))
+                                .then(allAccounts().executes(ctx -> runResetAll(ctx, SweepScope.ALL)))));
+    }
+
+    /** The flag that widens a bulk verb from players' accounts to every account. */
+    private static LiteralArgumentBuilder<CommandSourceStack> allAccounts() {
+        return Commands.literal("--all-accounts");
+    }
+
+    private int runGiveAll(CommandContext<CommandSourceStack> ctx, SweepScope scope) {
+        PlayerRef actor = actor(ctx);
+        Optional<Currency> currency = currency(ctx);
+        if (currency.isEmpty()) {
+            rejectUnknownCurrency(actor);
+            return Command.SINGLE_SUCCESS;
+        }
+        Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
+        if (amount.isEmpty()) {
+            return Command.SINGLE_SUCCESS;
+        }
+        Money money = amount.get();
+        // Every account the scope covers, online or not, so no roster is read here.
+        offTick(() -> services.ecoAdmin().giveAll(actor, money, scope));
+        return Command.SINGLE_SUCCESS;
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> giveRandomRangeVerb() {
@@ -279,7 +321,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         services.ecoAdmin().reset(actor, target.get(), currency);
     }
 
-    private int runBulk(CommandContext<CommandSourceStack> ctx, String verb) {
+    private int runGiveRandom(CommandContext<CommandSourceStack> ctx) {
         PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
@@ -291,11 +333,6 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return Command.SINGLE_SUCCESS;
         }
         Money money = amount.get();
-        if ("giveall".equals(verb)) {
-            // Every account the ledger knows, online or not, so no roster is read here.
-            offTick(() -> services.ecoAdmin().giveAll(actor, money));
-            return Command.SINGLE_SUCCESS;
-        }
         List<PlayerRef> online = EcoTargets.online();
         if (noTargets(actor, online)) {
             return Command.SINGLE_SUCCESS;
@@ -323,7 +360,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         return 0;
     }
 
-    private int runResetAll(CommandContext<CommandSourceStack> ctx) {
+    private int runResetAll(CommandContext<CommandSourceStack> ctx, SweepScope scope) {
         PlayerRef actor = actor(ctx);
         Optional<Currency> currency = currency(ctx);
         if (currency.isEmpty()) {
@@ -331,7 +368,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return Command.SINGLE_SUCCESS;
         }
         Currency resolved = currency.get();
-        offTick(() -> services.ecoAdmin().resetAll(actor, resolved));
+        offTick(() -> services.ecoAdmin().resetAll(actor, resolved, scope));
         return Command.SINGLE_SUCCESS;
     }
 

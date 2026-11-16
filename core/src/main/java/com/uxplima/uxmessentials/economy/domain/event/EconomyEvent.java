@@ -23,4 +23,5 @@ public sealed interface EconomyEvent extends DomainEvent
                 LoanDisbursed,
                 LoanRepaid,
                 BankDeposited,
-                BankWithdrawn {}
+                BankWithdrawn,
+                BalancesSwept {}

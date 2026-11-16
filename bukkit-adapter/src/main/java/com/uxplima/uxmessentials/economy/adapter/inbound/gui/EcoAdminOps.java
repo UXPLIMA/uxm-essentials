@@ -5,6 +5,7 @@ import java.util.Objects;
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.economy.domain.SweepScope;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -46,13 +47,16 @@ public final class EcoAdminOps {
         ecoAdmin.reset(actor, target, currency);
     }
 
-    /** Credit every known account by {@code amount}. */
+    /**
+     * Credit every player's account by {@code amount}. The screen offers no wider scope: the accounts other plugins
+     * opened are reached only with the command's {@code --all-accounts}, typed on purpose.
+     */
     public void giveAll(PlayerRef actor, Money amount) {
-        ecoAdmin.giveAll(actor, amount);
+        ecoAdmin.giveAll(actor, amount, SweepScope.PLAYERS);
     }
 
-    /** Reset every known account to {@code currency}'s starting figure. */
+    /** Reset every player's account to {@code currency}'s starting figure. */
     public void resetAll(PlayerRef actor, Currency currency) {
-        ecoAdmin.resetAll(actor, currency);
+        ecoAdmin.resetAll(actor, currency, SweepScope.PLAYERS);
     }
 }

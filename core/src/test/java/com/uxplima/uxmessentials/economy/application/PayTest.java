@@ -4,6 +4,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -79,6 +80,17 @@ class PayTest {
         assertThat(bank.balance(ALEX, DOLLARS).amount()).isEqualByComparingTo("60");
         assertThat(bank.balance(SAM, DOLLARS).amount()).isEqualByComparingTo("40");
         assertThat(lines).containsExactly("Alex:pay.sent$40.00", "Sam:pay.received$40.00");
+    }
+
+    @Test
+    void aPaymentTheLedgerCouldNotCompleteIsAnsweredAndMovesNothing() {
+        bank.set(ALEX, dollars("100"));
+        bank.breakTransfers();
+
+        assertThatThrownBy(() -> pay().pay(ALEX, SAM, dollars("40"))).hasMessage("connection lost");
+
+        assertThat(lines).containsExactly("Alex:command.error");
+        assertThat(bank.balance(ALEX, DOLLARS).amount()).isEqualByComparingTo("100");
     }
 
     @Test

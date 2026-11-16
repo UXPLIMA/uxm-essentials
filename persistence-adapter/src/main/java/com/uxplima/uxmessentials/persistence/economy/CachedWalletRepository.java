@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
@@ -37,7 +38,11 @@ public final class CachedWalletRepository implements WalletRepository {
     private static final Duration DEFAULT_TTL = Duration.ofMinutes(5);
 
     private final WalletRepository delegate;
-    private final ReadThroughCache<UUID, Optional<Wallet>> cache;
+    private final ReadThroughCache<UUID, Loaded> cache;
+    // Bumped by invalidateAll. A load records the generation it started in, so a load that was already reading when
+    // everything was dropped, and stored its figure after the drop, is recognised as older and read again. Dropping
+    // one owner needs no generation: the cache already serialises that with a load of the same owner.
+    private final AtomicLong generation = new AtomicLong();
 
     public CachedWalletRepository(WalletRepository delegate) {
         this(delegate, DEFAULT_MAX_OWNERS, DEFAULT_TTL);
@@ -52,7 +57,12 @@ public final class CachedWalletRepository implements WalletRepository {
     @Override
     public Optional<Wallet> findByOwner(PlayerRef owner) {
         Objects.requireNonNull(owner, "owner");
-        return cache.get(owner.uuid());
+        Loaded loaded = cache.get(owner.uuid());
+        if (loaded.generation() != generation.get()) {
+            cache.invalidate(owner.uuid());
+            loaded = cache.get(owner.uuid());
+        }
+        return loaded.wallet();
     }
 
     @Override
@@ -103,8 +113,12 @@ public final class CachedWalletRepository implements WalletRepository {
         return delegate.top(currency, limit);
     }
 
-    /** Drop every cached owner; call on a module reload or a bulk mutation. */
+    /**
+     * Drop every cached owner; call on a module reload or a bulk mutation. A load already under way when this runs
+     * is not kept either: it carries the old generation and is read again on its next look.
+     */
     public void invalidateAll() {
+        generation.incrementAndGet();
         cache.invalidateAll();
     }
 
@@ -118,9 +132,13 @@ public final class CachedWalletRepository implements WalletRepository {
         cache.invalidate(Objects.requireNonNull(owner, "owner"));
     }
 
-    private Optional<Wallet> loadFresh(UUID ownerUuid) {
+    private Loaded loadFresh(UUID ownerUuid) {
+        long startedIn = generation.get();
         // The cache key is the owner uuid; the loader needs a PlayerRef and the delegate reads only the uuid
         // for the lookup (the row carries the name), so a name placeholder here never reaches a stored row.
-        return delegate.findByOwner(new PlayerRef(ownerUuid, ownerUuid.toString()));
+        return new Loaded(delegate.findByOwner(new PlayerRef(ownerUuid, ownerUuid.toString())), startedIn);
     }
+
+    /** A wallet as read, and the generation its read started in. */
+    private record Loaded(Optional<Wallet> wallet, long generation) {}
 }

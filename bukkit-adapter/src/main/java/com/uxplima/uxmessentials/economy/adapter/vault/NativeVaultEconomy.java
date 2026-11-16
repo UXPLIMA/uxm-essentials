@@ -53,6 +53,7 @@ public final class NativeVaultEconomy implements Economy {
     private static final String NOT_A_BANK = "uxmEssentials has no named bank accounts";
     private static final String UNKNOWN_PLAYER = "unknown player";
     private static final String NEGATIVE_AMOUNT = "amount must not be negative";
+    private static final String UNREACHABLE = "the ledger could not complete the change; nothing moved";
 
     private final EconomyProvider provider;
     private final Currency currency;
@@ -170,8 +171,14 @@ public final class NativeVaultEconomy implements Economy {
         PlayerRef owner = ref(player);
         Money moved = Money.of(currency, BigDecimal.valueOf(amount));
         Money before = provider.balance(owner, currency);
-        if (provider.debit(owner, moved).isErr()) {
-            return failure(amount, before.amount().doubleValue(), "insufficient funds");
+        try {
+            if (provider.debit(owner, moved).isErr()) {
+                return failure(amount, before.amount().doubleValue(), "insufficient funds");
+            }
+        } catch (RuntimeException unreachable) {
+            // A write the ledger rolled back moved nothing; the calling plugin gets Vault's failure answer, the one
+            // shape it handles, rather than an exception thrown into its own code.
+            return failure(amount, before.amount().doubleValue(), UNREACHABLE);
         }
         return success(amount, before.minus(moved).amount().doubleValue());
     }
@@ -203,8 +210,12 @@ public final class NativeVaultEconomy implements Economy {
         // No ensureAccount here: a native credit opens the account itself, and against a foreign backend the
         // call does nothing at all. Asking for it separately is a database write per reward paid, on whichever
         // thread the caller holds.
-        if (provider.credit(owner, moved).isErr()) {
-            return failure(amount, before.amount().doubleValue(), "the balance ceiling would be passed");
+        try {
+            if (provider.credit(owner, moved).isErr()) {
+                return failure(amount, before.amount().doubleValue(), "the balance ceiling would be passed");
+            }
+        } catch (RuntimeException unreachable) {
+            return failure(amount, before.amount().doubleValue(), UNREACHABLE);
         }
         return success(amount, before.plus(moved).amount().doubleValue());
     }
