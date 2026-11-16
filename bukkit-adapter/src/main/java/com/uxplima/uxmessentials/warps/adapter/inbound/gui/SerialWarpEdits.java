@@ -9,7 +9,8 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Runs the editor's saves on the async lane, one warp's edits one after another.
+ * Runs the editor's saves on the async lane, one warp's edits one after another (the category menus queue their
+ * writes through it too, one category at a time).
  *
  * <p>A save writes the database, so it cannot run on the click's thread. Once it leaves that thread, two quick clicks
  * on the same warp (a lock toggled twice) could otherwise both load the warp before either has saved, and the second

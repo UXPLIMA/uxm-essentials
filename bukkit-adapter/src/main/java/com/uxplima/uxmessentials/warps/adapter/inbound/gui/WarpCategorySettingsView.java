@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.BiConsumer;
+import java.util.function.UnaryOperator;
 
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -20,7 +21,6 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
-import com.uxplima.uxmessentials.warps.application.port.WarpCategoryRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpCategory;
 import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
@@ -59,7 +59,7 @@ public final class WarpCategorySettingsView {
     private final Menus menus;
     private final Messages messages;
     private final TextInput textInput;
-    private final WarpCategoryRepository categoryRepository;
+    private final WarpCategoryEdits edits;
     private final BiConsumer<Player, PlayerRef> onBack;
 
     /** The parent selector the parent button opens; injected after this view to break the settings↔selector cycle. */
@@ -69,12 +69,12 @@ public final class WarpCategorySettingsView {
             Menus menus,
             Messages messages,
             TextInput textInput,
-            WarpCategoryRepository categoryRepository,
+            WarpCategoryEdits edits,
             BiConsumer<Player, PlayerRef> onBack) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
-        this.categoryRepository = Objects.requireNonNull(categoryRepository, "categoryRepository");
+        this.edits = Objects.requireNonNull(edits, "edits");
         this.onBack = Objects.requireNonNull(onBack, "onBack");
     }
 
@@ -135,7 +135,7 @@ public final class WarpCategorySettingsView {
 
     /** Save {@code category} with the new display name and re-open the panel. Package-private for the golden test. */
     void applyName(Player player, PlayerRef viewer, WarpCategory category, String name) {
-        save(player, viewer, category.withDisplayName(name));
+        edit(player, viewer, category.id(), stored -> stored.withDisplayName(name));
     }
 
     /** Copy the item in the operator's main hand as the icon material, then save and re-open; empty hand is rejected. */
@@ -149,7 +149,7 @@ public final class WarpCategorySettingsView {
             open(player, viewer, category);
             return;
         }
-        save(player, viewer, category.withDisplayMaterial(Optional.of(hand.name())));
+        edit(player, viewer, category.id(), stored -> stored.withDisplayMaterial(Optional.of(hand.name())));
     }
 
     /** Capture pipe-separated lore through the input seam, then save it and re-open; cancel re-opens unchanged. */
@@ -168,7 +168,8 @@ public final class WarpCategorySettingsView {
 
     /** Save {@code category} with the pipe-split lore and re-open the panel. Package-private for the golden test. */
     void applyLore(Player player, PlayerRef viewer, WarpCategory category, String input) {
-        save(player, viewer, category.withDisplayLore(splitLines(input)));
+        List<String> lore = splitLines(input);
+        edit(player, viewer, category.id(), stored -> stored.withDisplayLore(lore));
     }
 
     /** Capture a sorting-slot index through the input seam, then save it and re-open; a non-number is rejected. */
@@ -196,7 +197,7 @@ public final class WarpCategorySettingsView {
             open(player, viewer, category);
             return;
         }
-        save(player, viewer, category.withSlot(target));
+        edit(player, viewer, category.id(), stored -> stored.withSlot(target));
     }
 
     /** Open the engine parent-category selector; choosing a parent saves it and re-opens this panel. */
@@ -206,18 +207,43 @@ public final class WarpCategorySettingsView {
         }
     }
 
-    /** Delete the category through the repository, then return to the manager: the old delete button's effect. */
+    /** Delete the category, then return to the manager: the old delete button's effect. */
     private void delete(MenuActionContext ctx) {
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
-        categoryRepository.delete(subject(ctx).id());
-        onBack.accept(player, viewer);
+        edits.delete(viewer, subject(ctx).id(), after(player, viewer));
     }
 
-    /** Save the edited category through the repository, then re-open the panel with the new subject. */
-    private void save(Player player, PlayerRef viewer, WarpCategory category) {
-        categoryRepository.save(category);
-        open(player, viewer, category);
+    /** Save a new category, then open this panel on it. The manager's create button ends here. */
+    void create(Player player, PlayerRef viewer, WarpCategory category) {
+        edits.create(viewer, category, after(player, viewer));
+    }
+
+    /**
+     * Change the stored category, then re-open the panel with it as saved, or the manager when it is gone. The parent
+     * selector's pick ends here too.
+     */
+    void edit(Player player, PlayerRef viewer, String id, UnaryOperator<WarpCategory> change) {
+        edits.edit(viewer, id, change, after(player, viewer));
+    }
+
+    private WarpCategoryEdits.After after(Player player, PlayerRef viewer) {
+        return new WarpCategoryEdits.After() {
+            @Override
+            public void show(WarpCategory category) {
+                open(player, viewer, category);
+            }
+
+            @Override
+            public void gone() {
+                onBack.accept(player, viewer);
+            }
+
+            @Override
+            public void failed() {
+                player.sendMessage(text(viewer, WarpsMessageKey.WARP_EDITOR_SAVE_FAILED));
+            }
+        };
     }
 
     /** The current parent id, or the catalog "none" string when the category has no parent. */

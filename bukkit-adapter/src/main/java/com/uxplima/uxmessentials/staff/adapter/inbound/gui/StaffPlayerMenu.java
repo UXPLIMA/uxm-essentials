@@ -97,8 +97,8 @@ public final class StaffPlayerMenu {
 
     /**
      * Left-click a head: close the picker, re-resolve the clicked player, and admin-teleport the looker onto them,
-     * sending the success or failure line. Runs on the looker's entity thread (the engine dispatches actions
-     * there), so the target read and the teleport are region-safe, mirroring the old picker's click handler.
+     * sending the success or failure line once the teleport has started or failed. The port reads the target's
+     * location on the target's own thread, which on Folia may be another region than the looker's.
      */
     private void teleportTo(MenuActionContext ctx) {
         PlayerRef looker = BukkitRefs.toRef(ctx.viewer());
@@ -109,10 +109,12 @@ public final class StaffPlayerMenu {
             deliver(looker, StaffMessageKey.STAFF_TELEPORT_FAILED, Map.of());
             return;
         }
-        PlayerRef targetRef = new PlayerRef(target.getUniqueId(), target.getName());
-        boolean ok = teleport.teleportTo(looker, targetRef);
-        MessageKey key = ok ? StaffMessageKey.STAFF_TELEPORTED : StaffMessageKey.STAFF_TELEPORT_FAILED;
-        deliver(looker, key, Map.of("target", target.getName()));
+        String name = target.getName();
+        var unused = teleport.teleportTo(looker, new PlayerRef(target.getUniqueId(), name))
+                .thenAccept(ok -> deliver(
+                        looker,
+                        ok ? StaffMessageKey.STAFF_TELEPORTED : StaffMessageKey.STAFF_TELEPORT_FAILED,
+                        Map.of("target", name)));
     }
 
     private void deliver(PlayerRef looker, MessageKey key, Map<String, String> args) {

@@ -127,8 +127,11 @@ public final class StaffGadgetActions {
     }
 
     private void teleport(PlayerRef who, Player targetPlayer, PlayerRef targetRef) {
-        boolean ok = teleport.teleportTo(who, targetRef);
-        StaffMessageKey key = ok ? StaffMessageKey.STAFF_TELEPORTED : StaffMessageKey.STAFF_TELEPORT_FAILED;
-        notifier.send(who, key, Map.of("target", targetPlayer.getName()));
+        String name = targetPlayer.getName();
+        var unused = teleport.teleportTo(who, targetRef)
+                .thenAccept(ok -> notifier.send(
+                        who,
+                        ok ? StaffMessageKey.STAFF_TELEPORTED : StaffMessageKey.STAFF_TELEPORT_FAILED,
+                        Map.of("target", name)));
     }
 }

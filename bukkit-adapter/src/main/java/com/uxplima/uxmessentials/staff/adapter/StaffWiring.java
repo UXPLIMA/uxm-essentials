@@ -261,7 +261,9 @@ public final class StaffWiring {
                 .ifPresent(audience -> channel.bind(new MessagingStaffChannel(
                         audience, kernel.messages(), kernel.messageSink(), settings.staffChatNode())));
         seams.moderationFreeze().ifPresent(m -> freeze.bind(new ModerationStaffFreeze(m.freeze(), m.sanctions())));
-        seams.teleport().ifPresent(t -> teleport.bind(new TeleportStaffTeleport(t.engine(), plugin.getServer())));
+        seams.teleport()
+                .ifPresent(t ->
+                        teleport.bind(new TeleportStaffTeleport(t.engine(), plugin.getServer(), kernel.scheduler())));
     }
 
     /**
