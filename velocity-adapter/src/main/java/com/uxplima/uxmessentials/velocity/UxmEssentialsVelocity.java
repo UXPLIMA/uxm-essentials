@@ -50,7 +50,7 @@ public final class UxmEssentialsVelocity {
         this.proxy = Objects.requireNonNull(proxy, "proxy");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory");
-        this.broker = new BusBroker(proxy, logger);
+        this.broker = new BusBroker(proxy::getAllServers, logger);
         this.channel = MinecraftChannelIdentifier.create(BusChannel.NAMESPACE, BusChannel.NAME);
     }
 

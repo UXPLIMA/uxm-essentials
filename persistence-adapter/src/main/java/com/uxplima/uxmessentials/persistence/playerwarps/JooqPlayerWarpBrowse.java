@@ -82,10 +82,14 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
             VF.PLAYER_UUID);
 
     private final Clock clock;
+    private final java.util.function.Function<java.util.UUID, String> names;
 
-    public JooqPlayerWarpBrowse(DSLContext dsl, Clock clock) {
+    /** A browse that names the owner of a row keeping no owner name through {@code names}, as the repository does. */
+    public JooqPlayerWarpBrowse(
+            DSLContext dsl, Clock clock, java.util.function.Function<java.util.UUID, String> names) {
         super(dsl);
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.names = Objects.requireNonNull(names, "names");
     }
 
     @Override
@@ -120,7 +124,7 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
                 .and(PLAYER_WARPS.ACCESS.eq(WarpAccess.PUBLIC.name()))
                 .orderBy(PLAYER_WARPS.SPONSOR_SLOT.asc(), PLAYER_WARPS.ID.asc())
                 .limit(limit)
-                .fetch(record -> toCard(record, now)));
+                .fetch(record -> toCard(record, now, names)));
     }
 
     private static long countMatching(DSLContext dsl, Condition where) {
@@ -128,7 +132,7 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
         return count == null ? 0L : count;
     }
 
-    private static List<WarpCard> fetchPage(DSLContext dsl, WarpQuery query, Condition where, long now) {
+    private List<WarpCard> fetchPage(DSLContext dsl, WarpQuery query, Condition where, long now) {
         return dsl.select(CARD_FIELDS)
                 .from(PLAYER_WARPS)
                 .leftJoin(VF)
@@ -139,7 +143,7 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
                 .orderBy(orderBy(query))
                 .limit(query.pageSize())
                 .offset(query.page() * query.pageSize())
-                .fetch(record -> toCard(record, now));
+                .fetch(record -> toCard(record, now, names));
     }
 
     private static Condition buildWhere(WarpQuery query) {
@@ -208,7 +212,7 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
         return dx.mul(dx).add(dz.mul(dz)).asc();
     }
 
-    private static WarpCard toCard(Record row, long now) {
+    private static WarpCard toCard(Record row, long now, java.util.function.Function<java.util.UUID, String> names) {
         Long sponsoredUntil = row.get(PLAYER_WARPS.SPONSORED_UNTIL);
         boolean sponsored = sponsoredUntil != null && sponsoredUntil > now;
         boolean favourited = row.get(VF.PLAYER_UUID) != null;
@@ -217,7 +221,7 @@ public final class JooqPlayerWarpBrowse extends JooqRepository implements Player
                 PlayerWarpId.of(row.get(PLAYER_WARPS.ID)),
                 row.get(PLAYER_WARPS.NAME),
                 row.get(PLAYER_WARPS.DISPLAY_NAME),
-                ownerName != null ? ownerName : row.get(PLAYER_WARPS.OWNER),
+                ownerName != null ? ownerName : names.apply(java.util.UUID.fromString(row.get(PLAYER_WARPS.OWNER))),
                 row.get(PLAYER_WARPS.WORLD_NAME),
                 row.get(PLAYER_WARPS.SERVER_ID),
                 row.get(PLAYER_WARPS.CATEGORY_ID),

@@ -294,7 +294,10 @@ public final class PlayerwarpsWiring {
         // forced off (a paid feature cannot run for free), so its command branch, its manage button, its pinned slots,
         // and its expiry sweep all stay dark. The read model the browse and the landing share is built once here.
         SponsorConfig sponsorConfig = sponsorConfig(ctx, kernel, economy);
-        PlayerWarpBrowse browse = PlayerWarpRepositories.browse(persistence, Clock.systemUTC());
+        PlayerWarpBrowse browse = PlayerWarpRepositories.browse(
+                persistence,
+                Clock.systemUTC(),
+                com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
         BuySponsorship buySponsorship =
                 new BuySponsorship(repository, warpAuthorization, economy, notifier, sponsorConfig, Clock.systemUTC());
         PlayerWarpListMenu listMenu = buildGui(

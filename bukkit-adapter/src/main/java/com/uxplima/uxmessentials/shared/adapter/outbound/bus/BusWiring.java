@@ -47,7 +47,7 @@ public final class BusWiring {
         NetworkConfig network = NetworkConfig.from(config);
         if (!network.enabled()) {
             log.info("network sync disabled (network.enabled = false in config.conf); bus runs local-only");
-            return new Wired(Bus.disabled(network.serverId()), null, null, null, network, scheduler);
+            return new Wired(Bus.disabled(network.serverId()), null, null, null, network, Carriers.NONE, scheduler);
         }
         if (NetworkConfig.isDefaultServerName(network.serverId())) {
             log.warn(
@@ -57,7 +57,8 @@ public final class BusWiring {
                     network.serverId());
         }
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
-        BusTransport transport = selectTransport(plugin, network, scheduler, log);
+        Carriers carriers = selectTransport(plugin, network, scheduler, log);
+        BusTransport transport = carriers.transport();
         long bootNonce = bootNonce();
         DuplicateServerNames duplicates = new DuplicateServerNames(
                 network.serverId(), bootNonce, network.peerLivenessWindow(), System::currentTimeMillis, log);
@@ -75,6 +76,7 @@ public final class BusWiring {
                 peers,
                 duplicates,
                 network,
+                carriers,
                 scheduler);
     }
 
@@ -99,23 +101,33 @@ public final class BusWiring {
      * already fell back to {@code velocity} in {@link NetworkConfig}; this logs the WARN so the operator sees
      * their typo without the enable crashing.
      */
-    private static BusTransport selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+    private static Carriers selectTransport(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
         if (!network.transportRecognized()) {
             log.warn(
                     "unknown network.transport value; falling back to {}. valid: velocity | redis | both",
                     network.transport().name().toLowerCase(java.util.Locale.ROOT));
         }
         return switch (network.transport()) {
-            case VELOCITY -> pluginMessaging(plugin, network, scheduler, log);
-            case REDIS -> redis(plugin, network, scheduler, log);
-            case BOTH ->
-                new CompositeBusTransport(
-                        pluginMessaging(plugin, network, scheduler, log), redis(plugin, network, scheduler, log));
+            case VELOCITY -> {
+                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, log);
+                yield new Carriers(proxy, proxy, null);
+            }
+            case REDIS -> {
+                BusTransport redis = redis(plugin, network, scheduler, log);
+                yield new Carriers(redis, null, redis);
+            }
+            case BOTH -> {
+                PluginMessagingTransport proxy = pluginMessaging(plugin, network, scheduler, log);
+                BusTransport redis = redis(plugin, network, scheduler, log);
+                yield new Carriers(new CompositeBusTransport(proxy, redis), proxy, redis);
+            }
         };
     }
 
-    private static BusTransport pluginMessaging(Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
-        return new PluginMessagingTransport(plugin, scheduler, network.channel(), network.outboundQueueSize(), log);
+    private static PluginMessagingTransport pluginMessaging(
+            Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
+        return new PluginMessagingTransport(
+                plugin, scheduler, network.channel(), network.outboundQueueSize(), network.peerLivenessWindow(), log);
     }
 
     /**
@@ -131,6 +143,18 @@ public final class BusWiring {
     }
 
     /**
+     * The transport the core drives, plus the carriers inside it the doctor reports on one by one: with
+     * {@code transport = both} one healthy carrier must not hide the other being down.
+     */
+    private record Carriers(
+            BusTransport transport,
+            @org.jspecify.annotations.Nullable PluginMessagingTransport proxy,
+            @org.jspecify.annotations.Nullable BusTransport redis) {
+
+        static final Carriers NONE = new Carriers(new LocalOnlyBusTransport(), null, null);
+    }
+
+    /**
      * The wired bus: the {@link Bus} handle contexts opt into sync through, plus the lifecycle of the live core
      * (absent for a disabled backend, in which case start/stop are no-ops). It deliberately exposes only the
      * {@link Bus}, the two lifecycle hooks, and the read-only {@link BusHealth} diagnostic view, never the
@@ -143,6 +167,7 @@ public final class BusWiring {
         private final @org.jspecify.annotations.Nullable ClusterPeers peers;
         private final @org.jspecify.annotations.Nullable DuplicateServerNames duplicates;
         private final NetworkConfig network;
+        private final Carriers carriers;
         private final Scheduler scheduler;
 
         // Lifecycle gate for the deferred start. start() schedules the real start onto the first global tick;
@@ -165,12 +190,14 @@ public final class BusWiring {
                 @org.jspecify.annotations.Nullable ClusterPeers peers,
                 @org.jspecify.annotations.Nullable DuplicateServerNames duplicates,
                 NetworkConfig network,
+                Carriers carriers,
                 Scheduler scheduler) {
             this.bus = Objects.requireNonNull(bus, "bus");
             this.lifecycle = lifecycle;
             this.peers = peers;
             this.duplicates = duplicates;
             this.network = Objects.requireNonNull(network, "network");
+            this.carriers = Objects.requireNonNull(carriers, "carriers");
             this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         }
 
@@ -181,12 +208,11 @@ public final class BusWiring {
 
         /**
          * A read-only health view for {@code /uxmess doctor}: the bus's enabled flag, the configured transport
-         * name, and a live read of the running transport's {@code healthy()} flag. For a disabled backend the
-         * view reports {@code enabled() == false} and never touches a transport.
+         * name, and live reads of each carrier in use. For a disabled backend the view reports
+         * {@code enabled() == false} and has no carrier to read.
          */
         public BusHealth health() {
-            BusCore core = lifecycle == null ? null : lifecycle.core();
-            return new WiredHealth(network, core);
+            return new WiredHealth(network, carriers);
         }
 
         /**
@@ -268,17 +294,15 @@ public final class BusWiring {
     }
 
     /**
-     * The {@link BusHealth} the doctor reads. {@code enabled} and {@code transport} come from the immutable
-     * {@link NetworkConfig} snapshot; {@code healthy()} is a live delegate to the running core's transport flag,
-     * so the doctor sees the real connection state at the moment it runs. A disabled backend has no core, so
-     * {@code healthy()} is reported false and never read by the check.
+     * The {@link BusHealth} the doctor reads. {@code enabled}, {@code transport} and the answer window come from the
+     * immutable {@link NetworkConfig} snapshot; the carrier states are live reads, so the doctor sees them as they are
+     * at the moment it runs.
      */
-    private record WiredHealth(
-            NetworkConfig network,
-            @org.jspecify.annotations.Nullable BusCore core) implements BusHealth {
+    private record WiredHealth(NetworkConfig network, Carriers carriers) implements BusHealth {
 
         private WiredHealth {
             Objects.requireNonNull(network, "network");
+            Objects.requireNonNull(carriers, "carriers");
         }
 
         @Override
@@ -292,8 +316,18 @@ public final class BusWiring {
         }
 
         @Override
-        public boolean healthy() {
-            return core != null && core.healthy();
+        public java.util.Optional<ProxyLink> proxy() {
+            return java.util.Optional.ofNullable(carriers.proxy()).map(PluginMessagingTransport::link);
+        }
+
+        @Override
+        public java.util.Optional<Boolean> redisConnected() {
+            return java.util.Optional.ofNullable(carriers.redis()).map(BusTransport::healthy);
+        }
+
+        @Override
+        public java.time.Duration answerWindow() {
+            return network.peerLivenessWindow();
         }
     }
 }

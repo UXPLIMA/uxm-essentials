@@ -60,13 +60,15 @@ public final class PlayerWarpRepositories {
      * The jOOQ {@link com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse}. The paged read model
      * the browse GUI binds. It issues one bounded {@code LIMIT}/{@code OFFSET} page query plus a {@code COUNT} over the
      * same predicate, never a full-table scan, so opening the browse costs the same on a hundred-thousand-warp server
-     * as on an eight-warp one. The {@code clock} evaluates the live-sponsorship flag on each card as of the read.
+     * as on an eight-warp one. The {@code clock} evaluates the live-sponsorship flag on each card as of the read, and
+     * {@code names} names the owner of a row that keeps no owner name, as the repository does.
      */
     public static com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpBrowse browse(
-            Persistence persistence, Clock clock) {
+            Persistence persistence, Clock clock, java.util.function.Function<java.util.UUID, String> names) {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(clock, "clock");
-        return new JooqPlayerWarpBrowse(persistence.dsl(), clock);
+        Objects.requireNonNull(names, "names");
+        return new JooqPlayerWarpBrowse(persistence.dsl(), clock, names);
     }
 
     /** The jOOQ {@link WarpBanStore}, one row per {@code (warp, player)}, active-at expiry evaluated in-store. */

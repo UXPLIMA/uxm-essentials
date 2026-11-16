@@ -46,6 +46,13 @@ class NetworkConfigTest {
     }
 
     @Test
+    void theOutboundQueueSizeIsReadAndAZeroDoesNotFailTheEnable() throws IOException {
+        assertThat(read("bus { outbound-queue-size = 512 }").outboundQueueSize())
+                .isEqualTo(512);
+        assertThat(read("bus { outbound-queue-size = 0 }").outboundQueueSize()).isEqualTo(1);
+    }
+
+    @Test
     void theServerNameIsRead() throws IOException {
         assertThat(read("server-name = \"survival-1\"").serverId()).isEqualTo("survival-1");
     }

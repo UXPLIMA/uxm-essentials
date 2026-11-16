@@ -65,7 +65,7 @@ class AxPlayerWarpsImportTest {
         ImportedPlayerWarp market = warp("Market");
 
         assertThat(market.owner()).isEqualTo(ALICE);
-        assertThat(market.ownerName()).isEqualTo("Alice");
+        assertThat(market.ownerName()).contains("Alice");
         assertThat(market.displayName()).contains("Market");
         assertThat(market.location()).isEqualTo(new Position(WORLD, 10.5, 64, -3.5, 90f, 5f));
         assertThat(market.description()).contains("Cheap tools");

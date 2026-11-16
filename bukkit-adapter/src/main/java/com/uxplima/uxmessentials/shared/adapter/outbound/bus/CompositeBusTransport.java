@@ -24,7 +24,8 @@ import org.jspecify.annotations.NullMarked;
  * reverse) the bus can still reach the peers on the live carrier, so it is a usable, if degraded, bus rather
  * than a dead one. It reports unhealthy only when neither carrier can currently deliver. A transport that has
  * no path to peers simply never delivers frames ({@code BusTransport} degradation contract), so this rule never
- * gates the single-server happy path.
+ * gates the single-server happy path. {@code /uxmess doctor} does not read this combined flag: it reports each carrier
+ * on its own, so a live carrier cannot hide a dead one.
  *
  * <h2>Concurrency</h2>
  * Stateless beyond its two final members; every call delegates straight to them. The members own their own

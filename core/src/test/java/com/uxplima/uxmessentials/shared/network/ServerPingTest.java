@@ -38,6 +38,20 @@ class ServerPingTest {
     }
 
     @Test
+    void theProxyTellsAHeartbeatFromOtherFramesByItsHeader() {
+        byte[] ping = NetworkMessageCodec.encode(new ServerPing("lobby-1", 1_700_000_000_000L, 42L));
+        byte[] home = NetworkMessageCodec.encode(new HomeChanged("lobby-1", new java.util.UUID(1L, 2L)));
+        byte[] otherVersion = ping.clone();
+        otherVersion[0] = (byte) (NetworkMessageCodec.VERSION + 1);
+
+        assertThat(NetworkMessageCodec.isServerPing(ping)).isTrue();
+        assertThat(NetworkMessageCodec.isServerPing(home)).isFalse();
+        assertThat(NetworkMessageCodec.isServerPing(otherVersion)).isFalse();
+        assertThat(NetworkMessageCodec.isServerPing(new byte[] {NetworkMessageCodec.VERSION}))
+                .isFalse();
+    }
+
+    @Test
     void aPeerOnTheOlderLayoutStillReadsTheNameAndTimeOfANewHeartbeat() throws IOException {
         byte[] frame = NetworkMessageCodec.encode(new ServerPing("lobby-1", 1_700_000_000_000L, 42L));
 

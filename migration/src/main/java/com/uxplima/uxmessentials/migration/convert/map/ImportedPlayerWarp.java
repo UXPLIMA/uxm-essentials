@@ -27,7 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * there, exactly as the EssentialsX warp mapper drops an unknown world, so the writer never touches a Bukkit world.
  *
  * @param owner the warp owner's uuid
- * @param ownerName the owner's name captured by the source, for the browse author line
+ * @param ownerName the owner's name captured by the source, for the browse author line; empty when the source never
+ *     stored it, and the writer then asks the server for the name it knows the owner by
  * @param name the source's raw warp name, sanitised and globally de-collided at write time
  * @param displayName the original-cased label to keep, if the source has one distinct from the id
  * @param location the resolved teleport destination
@@ -51,7 +52,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public record ImportedPlayerWarp(
         UUID owner,
-        String ownerName,
+        Optional<String> ownerName,
         String name,
         Optional<String> displayName,
         Position location,
