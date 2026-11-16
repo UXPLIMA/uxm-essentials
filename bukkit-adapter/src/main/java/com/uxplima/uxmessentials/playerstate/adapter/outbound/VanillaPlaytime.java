@@ -36,10 +36,8 @@ public final class VanillaPlaytime {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(then, "then");
         Runnable offline = () -> scheduler.async(() -> then.accept(of(Bukkit.getOfflinePlayer(who.uuid()))));
-        if (Bukkit.getPlayer(who.uuid()) == null) {
-            offline.run();
-            return;
-        }
+        // A player who is not connected has no entity to run on, so the scheduler takes the offline branch for them;
+        // asking the server first would read it from whatever thread called, often the async lane.
         scheduler.onEntity(
                 who,
                 () -> {

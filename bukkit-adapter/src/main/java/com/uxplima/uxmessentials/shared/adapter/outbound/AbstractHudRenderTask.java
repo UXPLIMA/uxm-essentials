@@ -19,9 +19,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The shared scaffolding for the per-player HUD render loops (the scoreboard and tablist timers): a
- * self-rescheduling task on the {@link Scheduler} port. Each tick scans the live online set off the tick thread and, for each player, hops to that player's
- * region/entity thread before touching the live {@code Player}; no Bukkit entity is touched on the async loop
- * itself. A subclass supplies only the per-player render call and the log message for a failed tick.
+ * self-rescheduling task on the {@link Scheduler} port. Each tick reads the online set on the global region thread,
+ * the only one allowed to list it, and, for each player, hops to that player's region/entity thread before touching
+ * the live {@code Player}; nothing of the Bukkit API is touched on the async loop itself. A subclass supplies only the per-player render call and the log message for a failed tick.
  *
  * <p>The interval is read fresh each reschedule, so a {@code /uxmess reload} that swaps a new cadence in changes
  * the refresh rate on the next tick without re-arming the task. The task observes the module's {@code running}
@@ -110,11 +110,16 @@ public abstract class AbstractHudRenderTask {
                 // Every render in this interval then reads the same frame.
                 animations.advance();
             }
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                if (Math.floorMod(player.getUniqueId().hashCode(), slices) == current) {
-                    enqueue(player);
+            scheduler.onGlobal(() -> {
+                if (!running.getAsBoolean()) {
+                    return;
                 }
-            }
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    if (Math.floorMod(player.getUniqueId().hashCode(), slices) == current) {
+                        enqueue(player);
+                    }
+                }
+            });
         } catch (RuntimeException failure) {
             // A throwing tick must not skip the reschedule below, or the HUD would freeze until a reload.
             log.error(tickFailureMessage(), failure);
