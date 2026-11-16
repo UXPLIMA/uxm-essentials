@@ -243,22 +243,11 @@ public final class JooqWalletRepository extends JooqRepository implements Wallet
     }
 
     private void upsertOwner(DSLContext dsl, PlayerRef owner) {
-        dsl.insertInto(ECONOMY_OWNERS)
-                .set(ECONOMY_OWNERS.OWNER, WalletRows.ownerKey(owner))
-                .set(ECONOMY_OWNERS.NAME, ownerName(owner))
-                .set(ECONOMY_OWNERS.CREATED_AT, clock.instant().toEpochMilli())
-                .onConflict(ECONOMY_OWNERS.OWNER)
-                .doNothing()
-                .execute();
+        WalletLegs.upsertOwner(dsl, owner, clock.instant().toEpochMilli());
     }
 
     private static PlayerRef ownerRef(String uuid, @org.jspecify.annotations.Nullable String name) {
         String resolved = name == null || name.isBlank() ? uuid : name;
         return new PlayerRef(java.util.UUID.fromString(uuid), resolved);
-    }
-
-    private static String ownerName(PlayerRef owner) {
-        String name = owner.name();
-        return name.length() <= 16 ? name : name.substring(0, 16);
     }
 }

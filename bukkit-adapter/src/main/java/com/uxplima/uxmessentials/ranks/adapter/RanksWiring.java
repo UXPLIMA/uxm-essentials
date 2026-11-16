@@ -168,7 +168,7 @@ public final class RanksWiring {
         Runnable stop = () -> cancelAutorank(autorankTask, kernel.log());
         return new Wired(
                 List.copyOf(commands),
-                new RankCacheListener(cache, plugin.getServer()),
+                new RankCacheListener(cache, kernel.playerLookup()),
                 config,
                 currentRank,
                 ladder,

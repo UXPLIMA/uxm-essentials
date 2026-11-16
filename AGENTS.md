@@ -31,7 +31,10 @@ The all-in-one essentials suite for Paper 26.2: 37 modules, from homes, warps an
 ## Testing
 
 Tests live in `core`, `persistence-adapter` and `bukkit-adapter`. New tests follow the repository standard: behavior through the
-public API, fakes for ports, no assertion on structure. In-game behavior is checked with Craftwire on a development server.
+public API, fakes for ports, no assertion on structure. The scenarios in `bukkit-adapter` (package `scenario`, tagged
+`integration`) enable the whole plugin on MockBukkit and drive it as players and an operator do. The modules that need
+the server's internals (holograms, NPCs, poses) and whatever MockBukkit cannot show are checked with Craftwire on a
+development server.
 
 ## Pull requests
 

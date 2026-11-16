@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.villagers.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -46,12 +45,6 @@ public final class VillagersModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // Phase 1 is entity-mechanics only; the trade-manager /villager command lands with Phase 2's adapter wiring.
-        return List.of();
     }
 
     @Override

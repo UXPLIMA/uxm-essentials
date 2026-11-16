@@ -5,15 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
@@ -22,28 +19,21 @@ import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
-/** The pending cross-server hop row of every kind through the real migrations on a SQLite file. */
+/** The pending cross-server hop row of every kind through the real migrations. */
+@EveryBackend
 class JooqPendingHopStoreTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-000000000a1e");
     private static final Instant ASKED = Instant.parse("2030-01-01T12:00:00.123456789Z");
     private static final Optional<HopSettlement> TO_THE_WARP = Optional.of(new HopSettlement("7"));
 
-    @TempDir
-    Path folder;
-
     private PendingHopStore store;
     private DSLContext dsl;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         store = new JooqPendingHopStore(dsl);
     }
 
@@ -156,7 +146,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowAnOlderReleaseWroteStillResolvesAsAPlayerWarpHop() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "survival")
@@ -164,7 +155,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -188,14 +179,15 @@ class JooqPendingHopStoreTest {
         store.record(new PendingHop(
                 ALEX, HopKind.WARP, "market", "survival", "lobby", ASKED, Optional.empty(), Optional.empty()));
         // What an older backend's upsert of a player-warp hop leaves: its own columns, and the stale kind beside them.
-        dsl.update(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .update(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
                 .set(
                         PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT,
                         ASKED.plusSeconds(1).toEpochMilli())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -216,13 +208,14 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowWithNoKindNoPlayerWarpAndNoTargetReadsAsUnknownAndCanBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -233,7 +226,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aKindANewerReleaseAddedReadsAsUnknownAndCanStillBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "SHIP")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
@@ -241,7 +235,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -254,7 +248,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowStoredUnderTheEarlierPlayerKindReadsAsARequestHopAndCanBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "PLAYER")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
@@ -262,7 +257,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 

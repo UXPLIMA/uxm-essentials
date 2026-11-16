@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Builds the economy context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link EconomyServices}. Collected in one greppable table
- * so the literal/permission pairing matches {@code permissions.md} §Economy and the kernel's
- * {@code EconomyCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. Every
+ * so the literal/permission pairing matches {@code permissions.md} §Economy and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. Every
  * command is a thin adapter over the {@code EconomyProvider} port and runs its provider call off the tick
  * thread: none reaches into {@code economy.domain.*}.
  */

@@ -76,6 +76,13 @@ dependencies {
 
     // The layer test reads the compiled classes of every module on this test class path, which is why it lives here.
     testImplementation(uxm.archunit.junit)
+    // The integration scenarios enable the whole plugin on MockBukkit, so they need what the loader provisions at
+    // boot, and a logging backend so a warning the plugin writes through SLF4J reaches the scenario.
+    testImplementation(uxm.mockbukkit)
+    testRuntimeOnly(libs.configurate.yaml)
+    testRuntimeOnly(libs.gson)
+    testRuntimeOnly(libs.bundles.db)
+    testRuntimeOnly(libs.slf4j.jdk14)
 }
 
 // The dev bundle is needed only to compile the offline-inventory adapter against server internals.

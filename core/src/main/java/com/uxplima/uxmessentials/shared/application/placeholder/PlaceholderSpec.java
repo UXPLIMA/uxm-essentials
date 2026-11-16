@@ -17,12 +17,19 @@ import org.jspecify.annotations.Nullable;
  * @param key the key as an operator types it between the percent signs, without the {@code uxm_essentials_} prefix,
  *     with the open segment written out when the shape is a family ({@code kit_cost_<kit>})
  * @param description what the key renders, in one sentence
+ * @param example a value the key could render, as an operator would see it in a line, so the published list shows
+ *     the shape of the answer (a number, a yes or no, a name, a compact duration) next to what it means
  * @param shape whether this is one key or the head of an open family
  * @param scope who the key answers about, which decides how it behaves for an offline player
  * @param owner the feature module that answers it, or empty when the kernel does
  */
 public record PlaceholderSpec(
-        String key, String description, PlaceholderShape shape, PlaceholderScope scope, Optional<ModuleId> owner) {
+        String key,
+        String description,
+        String example,
+        PlaceholderShape shape,
+        PlaceholderScope scope,
+        Optional<ModuleId> owner) {
 
     /**
      * What an operator types before every key, following the shared {@code %uxm_<plugin>_<path>%} form so the
@@ -33,6 +40,7 @@ public record PlaceholderSpec(
     public PlaceholderSpec {
         Objects.requireNonNull(key, "key");
         Objects.requireNonNull(description, "description");
+        Objects.requireNonNull(example, "example");
         Objects.requireNonNull(shape, "shape");
         Objects.requireNonNull(scope, "scope");
         Objects.requireNonNull(owner, "owner");
@@ -45,29 +53,34 @@ public record PlaceholderSpec(
         if (description.isBlank()) {
             throw new IllegalArgumentException("key " + key + " needs a description an operator can act on");
         }
+        if (example.isBlank()) {
+            throw new IllegalArgumentException("key " + key + " needs an example of what it renders");
+        }
         if ((shape == PlaceholderShape.FAMILY) != key.contains("<")) {
             throw new IllegalArgumentException("key " + key + " and shape " + shape + " disagree about its segment");
         }
     }
 
     /** A key one feature module answers. */
-    public static PlaceholderSpec of(String key, String description, PlaceholderScope scope, ModuleId owner) {
-        return new PlaceholderSpec(key, description, PlaceholderShape.FIXED, scope, Optional.of(owner));
+    public static PlaceholderSpec of(
+            String key, String description, String example, PlaceholderScope scope, ModuleId owner) {
+        return new PlaceholderSpec(key, description, example, PlaceholderShape.FIXED, scope, Optional.of(owner));
     }
 
     /** A family one feature module answers, written with its open segment. */
-    public static PlaceholderSpec family(String key, String description, PlaceholderScope scope, ModuleId owner) {
-        return new PlaceholderSpec(key, description, PlaceholderShape.FAMILY, scope, Optional.of(owner));
+    public static PlaceholderSpec family(
+            String key, String description, String example, PlaceholderScope scope, ModuleId owner) {
+        return new PlaceholderSpec(key, description, example, PlaceholderShape.FAMILY, scope, Optional.of(owner));
     }
 
     /** A key the kernel answers rather than any one module: the server metrics. */
-    public static PlaceholderSpec shared(String key, String description, PlaceholderScope scope) {
-        return new PlaceholderSpec(key, description, PlaceholderShape.FIXED, scope, Optional.empty());
+    public static PlaceholderSpec shared(String key, String description, String example, PlaceholderScope scope) {
+        return new PlaceholderSpec(key, description, example, PlaceholderShape.FIXED, scope, Optional.empty());
     }
 
     /** A kernel-owned family. */
-    public static PlaceholderSpec sharedFamily(String key, String description, PlaceholderScope scope) {
-        return new PlaceholderSpec(key, description, PlaceholderShape.FAMILY, scope, Optional.empty());
+    public static PlaceholderSpec sharedFamily(String key, String description, String example, PlaceholderScope scope) {
+        return new PlaceholderSpec(key, description, example, PlaceholderShape.FAMILY, scope, Optional.empty());
     }
 
     /** The area an operator browses this key under: the owning module's id, or {@code shared}. */

@@ -92,12 +92,15 @@ public final class ImportWorld {
         if (loaded.isErr()) {
             return fail(importer, name, loaded.errorOrThrow());
         }
-        scheduler.async(() -> persistOffTick(importer, name, world));
+        // The uid is read here, on the global thread that just loaded the world; the server's world list is not the
+        // async lane's to read.
+        ManagedWorld known = engine.uidOf(name).map(world::withKnownUid).orElse(world);
+        scheduler.async(() -> persistOffTick(importer, name, known));
         return Result.ok();
     }
 
     private void persistOffTick(PlayerRef importer, WorldName name, ManagedWorld world) {
-        repository.save(engine.uidOf(name).map(world::withKnownUid).orElse(world));
+        repository.save(world);
         events.publish(new WorldImported(name));
         scheduler.onEntity(
                 importer,

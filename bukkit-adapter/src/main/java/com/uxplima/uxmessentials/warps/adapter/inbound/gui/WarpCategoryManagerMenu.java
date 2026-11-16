@@ -158,8 +158,8 @@ public final class WarpCategoryManagerMenu {
     }
 
     /**
-     * Save a new category under the sanitized id and open its settings; a name with a space sanitizes to empty and is
-     * rejected, exactly as the old window did. Package-private so the create branch is unit-tested without an anvil.
+     * Save a new category under the sanitized id and open its settings once it is written; a name with a space
+     * sanitizes to empty and is rejected, exactly as the old window did.
      */
     void create(Player player, PlayerRef viewer, String name) {
         String clean = sanitizeId(name);
@@ -169,8 +169,9 @@ public final class WarpCategoryManagerMenu {
             return;
         }
         WarpCategory category = new WarpCategory(clean, name, Optional.empty(), List.of(), 0, Optional.empty());
-        categoryRepository.save(category);
-        openSettings(player, viewer, category);
+        if (settingsView != null) {
+            settingsView.create(player, viewer, category);
+        }
     }
 
     private void openSettings(Player player, PlayerRef viewer, WarpCategory category) {

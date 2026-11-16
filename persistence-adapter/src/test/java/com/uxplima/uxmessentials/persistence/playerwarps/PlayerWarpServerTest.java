@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.playerwarps;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -11,9 +10,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
 import com.uxplima.uxmessentials.playerwarps.application.SetPlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
@@ -28,13 +26,12 @@ import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * The server a player warp lives on: a backend that records none (off a network, or under the shipped default name)
  * writes none, and the backend holding the warp's world claims it under its real name later.
  */
+@EveryBackend
 class PlayerWarpServerTest {
 
     private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000005"), "Sam");
@@ -45,19 +42,13 @@ class PlayerWarpServerTest {
     private static final PlayerWarpName SHOP = PlayerWarpName.of("shop");
     private static final PlayerWarpName FARM = PlayerWarpName.of("farm");
 
-    @TempDir
-    Path folder;
-
     private DSLContext dsl;
     private JooqPlayerWarpRepository warps;
     private PlayerWarpServerClaimer claimer;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         warps = new JooqPlayerWarpRepository(dsl);
         claimer = new PlayerWarpServerClaimer(dsl);
     }

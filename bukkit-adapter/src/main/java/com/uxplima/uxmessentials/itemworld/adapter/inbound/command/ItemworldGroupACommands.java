@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * Builds the inbound Brigadier surface for itemworld groups A. Item utils, virtual workstations, and cleanup.
  * As {@link CommandRegistration}s over the constructed
  * {@link ItemworldServices}. Collected in one greppable table so the literal/permission pairing matches the
- * permissions reference and the kernel's {@code ItemworldCommandSurface}; the plugin's
+ * permissions reference and its entries in {@code CommandSpecCatalog}; the plugin's
  * {@code LifecycleEvents.COMMANDS} handler registers each on the next fire. The remaining groups (powertool,
  * mob/entity, time/weather aliases, admin-fun) land with the second itemworld adapter and join this list in
  * the context wiring.

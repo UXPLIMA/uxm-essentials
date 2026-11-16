@@ -1,5 +1,7 @@
 # Permissions: gameplay modules
 
+<!-- Generated from the code catalogues by ./gradlew :core:generateReference. Edit the catalogue, not this page. -->
+
 Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. A cooldown tier sets the wait: the shortest tier held wins, and the configured wait applies only to a player who holds none. Where one tier covers waits configured apart (each kit's own cooldown, a teleport verb's or warp's own cooldown), it only lowers them, so a tier meant as a perk never makes a shorter wait longer. A warmup tier only lowers the configured warmup. The staff and server modules and the plugin-wide nodes are in [permissions-server.md](permissions-server.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
 
 Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstate](#playerstate) · [playerwarps](#playerwarps) · [poses](#poses) · [survival](#survival) · [teleport](#teleport) · [trade](#trade) · [vaults](#vaults) · [villagers](#villagers) · [warps](#warps) · [worlds](#worlds)

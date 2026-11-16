@@ -6,7 +6,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.application.port.VoteContext;
 import org.jspecify.annotations.NullMarked;
@@ -19,22 +21,30 @@ import org.jspecify.annotations.Nullable;
  * shared {@link Permissions} port, and the chance roll uses {@link ThreadLocalRandom}.
  *
  * <p>The roll is read as "a {@code 1..100} draw at or below the chance passes": {@code 100} always passes and
- * {@code 0} never does, which matches {@code RewardSpec}'s percentage semantics. The cheap world/online reads
- * happen on whatever thread the engine resolves on (the vote-handling async chain), so they only touch the
- * player lookup, never mutate game state.
+ * {@code 0} never does, which matches {@code RewardSpec}'s percentage semantics. A vote is resolved on the async
+ * lane, so whether the voter is online comes from the online index, and their world is read on their own thread.
  */
 @NullMarked
 public final class BukkitVoteContext implements VoteContext {
 
     private final Permissions permissions;
+    private final PlayerLookup players;
+    private final OwningThreadReads reads;
 
-    public BukkitVoteContext(Permissions permissions) {
+    public BukkitVoteContext(Permissions permissions, PlayerLookup players, OwningThreadReads reads) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");
+        this.players = Objects.requireNonNull(players, "players");
+        this.reads = Objects.requireNonNull(reads, "reads");
     }
 
+    /** The voter's world, or empty when they are offline or their thread could not answer in time. */
     @Override
     public String worldOf(PlayerRef voter) {
         Objects.requireNonNull(voter, "voter");
+        return reads.forPlayer(voter, () -> worldNow(voter), "", "");
+    }
+
+    private static String worldNow(PlayerRef voter) {
         @Nullable Player player = Bukkit.getPlayer(voter.uuid());
         return player == null ? "" : player.getWorld().getName();
     }
@@ -56,7 +66,6 @@ public final class BukkitVoteContext implements VoteContext {
     @Override
     public boolean isOnline(PlayerRef voter) {
         Objects.requireNonNull(voter, "voter");
-        @Nullable Player player = Bukkit.getPlayer(voter.uuid());
-        return player != null;
+        return players.isOnline(voter.uuid());
     }
 }

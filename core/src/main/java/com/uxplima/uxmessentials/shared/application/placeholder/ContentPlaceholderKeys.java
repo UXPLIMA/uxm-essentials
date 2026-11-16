@@ -26,36 +26,43 @@ final class ContentPlaceholderKeys {
                 PlaceholderSpec.of(
                         "kits_list",
                         "The ids of the kits the player may claim, comma separated.",
+                        "starter, daily, vip",
                         PlaceholderScope.PLAYER,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_cooldown_<kit>",
                         "The wait left before the player may claim one kit again.",
+                        "23h59m",
                         PlaceholderScope.PLAYER,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_cooldown_<kit>_formatted",
                         "The same remaining kit wait, under the spelling a config may prefer.",
+                        "23h59m",
                         PlaceholderScope.PLAYER,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_available_<kit>",
                         "Whether the player may claim one kit right now (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_has_<kit>",
                         "Whether the player holds one kit's permission (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_cost_<kit>",
                         "What one kit charges to claim, or free when it charges nothing.",
+                        "$250.00",
                         PlaceholderScope.GLOBAL,
                         KITS),
                 PlaceholderSpec.family(
                         "kit_claims_left_<kit>",
                         "How many claims of one kit the player has left; the infinity marker when it repeats.",
+                        "2",
                         PlaceholderScope.PLAYER,
                         KITS));
     }
@@ -63,17 +70,23 @@ final class ContentPlaceholderKeys {
     private static List<PlaceholderSpec> vaults() {
         return List.of(
                 PlaceholderSpec.of(
-                        "vaults_count", "How many vaults the player holds.", PlaceholderScope.PLAYER, VAULTS),
+                        "vaults_count", "How many vaults the player holds.", "2", PlaceholderScope.PLAYER, VAULTS),
                 PlaceholderSpec.of(
                         "vaults_max",
                         "How many vaults the player may open; the infinity marker when unlimited.",
+                        "5",
                         PlaceholderScope.PLAYER,
                         VAULTS),
                 PlaceholderSpec.of(
-                        "vaults_left", "How many more vaults the player may open.", PlaceholderScope.PLAYER, VAULTS),
+                        "vaults_left",
+                        "How many more vaults the player may open.",
+                        "3",
+                        PlaceholderScope.PLAYER,
+                        VAULTS),
                 PlaceholderSpec.of(
                         "vaults_size",
                         "How many rows each of the player's vaults holds.",
+                        "6",
                         PlaceholderScope.PLAYER,
                         VAULTS));
     }
@@ -83,36 +96,57 @@ final class ContentPlaceholderKeys {
                 PlaceholderSpec.family(
                         "votes_<period>",
                         "The player's vote count for one period: daily, weekly, monthly or alltime.",
+                        "14",
                         PlaceholderScope.PLAYER,
                         VOTE),
                 PlaceholderSpec.family(
                         "votes_position_<period>",
                         "Where the player sits on one period's vote leaderboard.",
+                        "3",
                         PlaceholderScope.PLAYER,
                         VOTE),
                 PlaceholderSpec.family(
                         "votes_top_<period>_<n>_name",
                         "The name of the player ranked nth on one period's vote leaderboard.",
+                        "Steve",
                         PlaceholderScope.GLOBAL,
                         VOTE),
                 PlaceholderSpec.family(
                         "votes_top_<period>_<n>_votes",
                         "The vote count of the player ranked nth on one period's leaderboard.",
+                        "42",
                         PlaceholderScope.GLOBAL,
                         VOTE),
                 PlaceholderSpec.of(
                         "votes_streak_current",
                         "How many days in a row the player has voted.",
+                        "5",
                         PlaceholderScope.PLAYER,
                         VOTE),
                 PlaceholderSpec.of(
-                        "votes_streak_best", "The player's longest voting streak.", PlaceholderScope.PLAYER, VOTE),
+                        "votes_streak_best",
+                        "The player's longest voting streak.",
+                        "12",
+                        PlaceholderScope.PLAYER,
+                        VOTE),
                 PlaceholderSpec.of(
-                        "voteparty_current", "How many votes the party has collected.", PlaceholderScope.GLOBAL, VOTE),
+                        "voteparty_current",
+                        "How many votes the party has collected.",
+                        "37",
+                        PlaceholderScope.GLOBAL,
+                        VOTE),
                 PlaceholderSpec.of(
-                        "voteparty_required", "How many votes the party needs to fire.", PlaceholderScope.GLOBAL, VOTE),
+                        "voteparty_required",
+                        "How many votes the party needs to fire.",
+                        "50",
+                        PlaceholderScope.GLOBAL,
+                        VOTE),
                 PlaceholderSpec.of(
-                        "voteparty_remaining", "How many votes the party still needs.", PlaceholderScope.GLOBAL, VOTE));
+                        "voteparty_remaining",
+                        "How many votes the party still needs.",
+                        "13",
+                        PlaceholderScope.GLOBAL,
+                        VOTE));
     }
 
     /**
@@ -124,21 +158,25 @@ final class ContentPlaceholderKeys {
                 PlaceholderSpec.of(
                         "skin_source",
                         "Where the player's chosen skin came from: by-name, by-url, by-file, bedrock or fallback.",
+                        "by-name",
                         PlaceholderScope.PLAYER,
                         SKIN),
                 PlaceholderSpec.of(
                         "skin_value",
                         "What that source names: the account, the link, the file or the Bedrock id.",
+                        "Notch",
                         PlaceholderScope.PLAYER,
                         SKIN),
                 PlaceholderSpec.of(
                         "skin_model",
                         "The player model the skin was cut for: classic or slim.",
+                        "classic",
                         PlaceholderScope.PLAYER,
                         SKIN),
                 PlaceholderSpec.of(
                         "skin_chosen",
                         "Whether the player chose a skin of their own (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         SKIN));
     }

@@ -1,21 +1,17 @@
 package com.uxplima.uxmessentials.persistence.vaults;
 
-import static com.uxplima.uxmessentials.persistence.jooq.tables.Vaults.VAULTS;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vaults.application.port.VaultItemReturns;
 import com.uxplima.uxmessentials.vaults.application.port.VaultRepository;
@@ -26,14 +22,12 @@ import com.uxplima.uxmessentials.vaults.domain.VaultId;
 import com.uxplima.uxmessentials.vaults.domain.VaultPayment;
 import com.uxplima.uxmessentials.vaults.domain.VaultSize;
 import com.uxplima.uxmessentials.vaults.domain.VaultStamp;
-import org.flywaydb.core.Flyway;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
-/** What a vault cost to create, stored on a database the previous release left, through the real migrations. */
+/** What a vault cost to create, and the guards on its writes, through the real migrations. */
+@EveryBackend
 class VaultPaymentStoreTest {
 
     private static final PlayerRef ALEX =
@@ -41,31 +35,13 @@ class VaultPaymentStoreTest {
     private static final Instant NOW = Instant.parse("2026-01-01T00:00:00Z");
     private static final VaultPayment FIVE_COINS = new VaultPayment(new BigDecimal("5"), "coins");
 
-    @TempDir
-    Path folder;
-
-    private SQLiteDataSource data;
     private DSLContext dsl;
     private JooqVaultRepository vaults;
 
-    /** A database as the release before vaults recorded their payment left it. */
     @BeforeEach
-    void open() {
-        data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        Flyway.configure()
-                .dataSource(data)
-                .locations("classpath:db/migration")
-                .placeholders(Map.of("prefix", ""))
-                .target("97")
-                .load()
-                .migrate();
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         vaults = new JooqVaultRepository(dsl);
-    }
-
-    private void upgrade() {
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
     }
 
     private static VaultId vault(int index) {
@@ -77,22 +53,7 @@ class VaultPaymentStoreTest {
     }
 
     @Test
-    void aVaultFromBeforeTheUpgradeHasNoRecordedPayment() {
-        dsl.insertInto(VAULTS)
-                .set(VAULTS.OWNER, ALEX.uuid().toString())
-                .set(VAULTS.IDX, 1)
-                .set(VAULTS.SIZE, (short) 3)
-                .set(VAULTS.LAST_TOUCHED, NOW.toEpochMilli())
-                .execute();
-        upgrade();
-
-        assertThat(stored(1).paid()).isEmpty();
-        assertThat(stored(1).size()).isEqualTo(new VaultSize(3));
-    }
-
-    @Test
     void aCreatedVaultKeepsWhatItCostAndTheCurrency() {
-        upgrade();
 
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS));
         vaults.create(Vault.allocate(vault(2), new VaultSize(1), NOW));
@@ -106,7 +67,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void savingAVaultNeverChangesWhatItCost() {
-        upgrade();
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
@@ -127,7 +87,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void anUpsertThatBringsBackADeletedVaultCarriesNoPayment() {
-        upgrade();
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
@@ -142,7 +101,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void anUpdateNeverBringsBackADeletedVaultAndNeverChangesWhatItCost() {
-        upgrade();
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
 
@@ -159,7 +117,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aDeleteRemovesTheRowOnlyWhileItStillRecordsTheExpectedPayment() {
-        upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS));
         Optional<VaultPayment> read = stored(1).paid();
 
@@ -177,7 +134,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aDeleteExpectingNoPaymentRemovesAFreeVaultButNotARowBroughtBackWithADifferentOne() {
-        upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         vaults.create(Vault.allocate(vault(2), new VaultSize(1), NOW, FIVE_COINS));
 
@@ -188,7 +144,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aDeleteExpectingAFinerPaymentMatchesTheRoundedStoredOne() {
-        upgrade();
         VaultPayment fine = new VaultPayment(new BigDecimal("1.23459"), "coins");
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, fine));
 
@@ -197,7 +152,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void creatingOverAnExistingVaultReportsItAndKeepsTheVaultThatWasThere() {
-        upgrade();
         assertThat(vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS)))
                 .isTrue();
         vaults.writeContents(
@@ -217,7 +171,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aPaymentFinerThanTheColumnIsStoredRoundedDown() {
-        upgrade();
 
         vaults.create(
                 Vault.allocate(vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("1.23459"), "coins")));
@@ -227,7 +180,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aFractionalPaymentReadBackFromTheStoreDeletesTheRow() {
-        upgrade();
         vaults.create(
                 Vault.allocate(vault(1), new VaultSize(1), NOW, new VaultPayment(new BigDecimal("1.2345"), "coins")));
 
@@ -240,7 +192,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void keptItemsAreHandedOutOnceInTheOrderTheyWereKept() {
-        upgrade();
         JooqVaultItemReturns earlier = new JooqVaultItemReturns(dsl, Clock.fixed(NOW, ZoneOffset.UTC));
         JooqVaultItemReturns returns = new JooqVaultItemReturns(dsl, Clock.fixed(NOW.plusSeconds(1), ZoneOffset.UTC));
         VaultContents first = VaultContents.of(new byte[] {1, 2});
@@ -262,7 +213,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void eachWriteTouchesOnlyItsOwnColumns() {
-        upgrade();
         Vault created = Vault.allocate(vault(1), new VaultSize(1), NOW, FIVE_COINS);
         vaults.create(created);
         Vault opened = stored(1);
@@ -293,7 +243,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void anUpsertOverAnExistingRowWritesTheItemsButLeavesTheName() {
-        upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         Vault opened = stored(1);
         vaults.update(opened.renamedTo("loot"), Columns.PRESENTATION);
@@ -306,45 +255,7 @@ class VaultPaymentStoreTest {
     }
 
     @Test
-    void aVaultFromBeforeTheUpgradeStartsAtVersionZeroAndEveryItemWriteRaisesIt() {
-        Flyway.configure()
-                .dataSource(data)
-                .locations("classpath:db/migration")
-                .placeholders(Map.of("prefix", ""))
-                .target("100")
-                .load()
-                .migrate();
-        dsl.insertInto(VAULTS)
-                .set(VAULTS.OWNER, ALEX.uuid().toString())
-                .set(VAULTS.IDX, 1)
-                .set(VAULTS.SIZE, (short) 1)
-                .set(VAULTS.LAST_TOUCHED, NOW.toEpochMilli())
-                .execute();
-        upgrade();
-
-        Vault old = stored(1);
-        assertThat(old.stamp()).isEqualTo(VaultStamp.UNRECORDED);
-
-        VaultStamp first = vaults.writeContents(
-                        old.withContents(ALEX, VaultContents.of(new byte[] {1}), NOW)
-                                .result(),
-                        "close",
-                        null)
-                .orElseThrow();
-        VaultStamp second = vaults.save(
-                old.withContents(ALEX, VaultContents.of(new byte[] {2}), NOW).result(), "staff");
-
-        assertThat(first).isEqualTo(new VaultStamp(null, 1L));
-        assertThat(second).isEqualTo(new VaultStamp(null, 2L));
-        assertThat(stored(1).stamp()).isEqualTo(second);
-        assertThat(old.stamp().before(second)).isTrue();
-        assertThat(vaults.update(old.renamedTo("loot"), Columns.PRESENTATION)).isTrue();
-        assertThat(stored(1).stamp()).isEqualTo(second);
-    }
-
-    @Test
     void aVaultBoughtAgainAfterADeleteIsANewRowWhoseVersionsAreNotComparedWithTheOldOne() {
-        upgrade();
         Vault bought = Vault.allocate(vault(1), new VaultSize(1), NOW);
         vaults.create(bought);
         Vault first = stored(1);
@@ -367,7 +278,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aStaffUpsertThatInsertsARowGivesItALineageAndAFirstVersion() {
-        upgrade();
 
         VaultStamp inserted = vaults.save(
                 Vault.of(vault(1), new VaultSize(1), VaultContents.of(new byte[] {3}), null, null, NOW), "staff");
@@ -378,7 +288,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aStaffUpsertThatBringsBackADeletedVaultStartsANewLineage() {
-        upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         Vault old = stored(1);
         vaults.writeContents(
@@ -395,7 +304,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void aRetryWritesOnlyOverTheRowItWasWrittenAgainstOrOverItsOwnEarlierAttempt() {
-        upgrade();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         Vault base = stored(1);
         Vault mine =
@@ -417,7 +325,6 @@ class VaultPaymentStoreTest {
 
     @Test
     void theLastWriterOfARowIsReadWithItsStamp() {
-        upgrade();
         assertThat(vaults.lastWrite(vault(1))).isEmpty();
         vaults.create(Vault.allocate(vault(1), new VaultSize(1), NOW));
         Vault created = stored(1);

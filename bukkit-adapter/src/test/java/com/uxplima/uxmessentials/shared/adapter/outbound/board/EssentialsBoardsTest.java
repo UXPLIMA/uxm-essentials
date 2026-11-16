@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.board;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.lang.reflect.Proxy;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -12,6 +11,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -22,7 +22,10 @@ import com.uxplima.uxmessentials.playerstate.domain.PlaytimeSummary;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.vote.adapter.outbound.BoardCountingVotes;
+import com.uxplima.uxmessentials.vote.application.port.VoteRanking;
 import com.uxplima.uxmessentials.vote.application.port.VoteRepository;
+import com.uxplima.uxmessentials.vote.domain.QueuedReward;
+import com.uxplima.uxmessentials.vote.domain.VotePeriod;
 import com.uxplima.uxmessentials.vote.domain.VoteTally;
 import com.uxplima.uxmlib.board.Board;
 import com.uxplima.uxmlib.board.BoardPeriod;
@@ -66,7 +69,8 @@ class EssentialsBoardsTest {
     void everyVoteASavedTallyAddsIsCountedOnTheVotesBoard() {
         Map<UUID, VoteTally> tallies = new HashMap<>();
         List<Long> counted = new ArrayList<>();
-        VoteRepository votes = new BoardCountingVotes(storedTallies(tallies), (player, added) -> counted.add(added));
+        VoteRepository votes =
+                new BoardCountingVotes(new StoredTallies(tallies), (player, added) -> counted.add(added));
         PlayerRef alex = new PlayerRef(ALEX, "Alex");
         Instant now = Instant.parse("2026-10-28T12:00:00Z");
 
@@ -142,16 +146,118 @@ class EssentialsBoardsTest {
         assertThat(boards.words()).containsExactly("trades");
     }
 
-    /** A vote repository that keeps only tallies. */
-    private static VoteRepository storedTallies(Map<UUID, VoteTally> tallies) {
-        return (VoteRepository) Proxy.newProxyInstance(
-                VoteRepository.class.getClassLoader(),
-                new Class<?>[] {VoteRepository.class},
-                (proxy, method, args) -> switch (method.getName()) {
-                    case "totalsOf" -> tallies.getOrDefault(((PlayerRef) args[0]).uuid(), VoteTally.empty());
-                    case "saveTotals" -> tallies.put(((PlayerRef) args[0]).uuid(), (VoteTally) args[1]);
-                    default -> throw new UnsupportedOperationException(method.getName());
-                });
+    /** A vote repository that keeps only tallies; the board asks it nothing else. */
+    private record StoredTallies(Map<UUID, VoteTally> tallies) implements VoteRepository {
+
+        @Override
+        public VoteTally totalsOf(PlayerRef player) {
+            return tallies.getOrDefault(player.uuid(), VoteTally.empty());
+        }
+
+        @Override
+        public void saveTotals(PlayerRef player, VoteTally tally) {
+            tallies.put(player.uuid(), tally);
+        }
+
+        @Override
+        public Map<UUID, VoteTally> allTotals() {
+            return Map.copyOf(tallies);
+        }
+
+        @Override
+        public int partyCount() {
+            throw new UnsupportedOperationException("partyCount");
+        }
+
+        @Override
+        public void setPartyCount(int count) {
+            throw new UnsupportedOperationException("setPartyCount");
+        }
+
+        @Override
+        public int incrementAndGetPartyCount() {
+            throw new UnsupportedOperationException("incrementAndGetPartyCount");
+        }
+
+        @Override
+        public void enqueue(QueuedReward reward) {
+            throw new UnsupportedOperationException("enqueue");
+        }
+
+        @Override
+        public List<QueuedReward> drainFor(PlayerRef player) {
+            throw new UnsupportedOperationException("drainFor");
+        }
+
+        @Override
+        public boolean hasPending(PlayerRef player) {
+            throw new UnsupportedOperationException("hasPending");
+        }
+
+        @Override
+        public int queuedCount(PlayerRef player) {
+            throw new UnsupportedOperationException("queuedCount");
+        }
+
+        @Override
+        public List<VoteRanking> topVoters(VotePeriod period, int limit) {
+            throw new UnsupportedOperationException("topVoters");
+        }
+
+        @Override
+        public void markPartyParticipant(PlayerRef player) {
+            throw new UnsupportedOperationException("markPartyParticipant");
+        }
+
+        @Override
+        public Set<UUID> partyParticipants() {
+            throw new UnsupportedOperationException("partyParticipants");
+        }
+
+        @Override
+        public void clearPartyParticipants() {
+            throw new UnsupportedOperationException("clearPartyParticipants");
+        }
+
+        @Override
+        public long partyPeriodKey() {
+            throw new UnsupportedOperationException("partyPeriodKey");
+        }
+
+        @Override
+        public void setPartyPeriodKey(long key) {
+            throw new UnsupportedOperationException("setPartyPeriodKey");
+        }
+
+        @Override
+        public int thresholdOverride() {
+            throw new UnsupportedOperationException("thresholdOverride");
+        }
+
+        @Override
+        public void setThresholdOverride(int override) {
+            throw new UnsupportedOperationException("setThresholdOverride");
+        }
+
+        @Override
+        public boolean claimPartyFire(int threshold) {
+            throw new UnsupportedOperationException("claimPartyFire");
+        }
+
+        @Override
+        public void resetTotals(PlayerRef player) {
+            throw new UnsupportedOperationException("resetTotals");
+        }
+
+        @Override
+        public Optional<Instant> lastVoteAtSite(PlayerRef player, String site) {
+            throw new UnsupportedOperationException("lastVoteAtSite");
+        }
+
+        @Override
+        public void recordLastVoteAtSite(PlayerRef player, String site, Instant at) {
+            throw new UnsupportedOperationException("recordLastVoteAtSite");
+        }
     }
 
     /** A board store in memory: counters summed per window. */

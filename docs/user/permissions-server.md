@@ -1,8 +1,10 @@
 # Permissions: staff and server modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. A cooldown tier sets the wait: the shortest tier held wins, and the configured wait applies only to a player who holds none. Where one tier covers waits configured apart (each kit's own cooldown, a teleport verb's or warp's own cooldown), it only lowers them, so a tier meant as a perk never makes a shorter wait longer. A warmup tier only lowers the configured warmup. The plugin-wide nodes are under [shared](#shared), the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder. Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md) maps the earlier names.
+<!-- Generated from the code catalogues by ./gradlew :core:generateReference. Edit the catalogue, not this page. -->
 
-Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. A cooldown tier sets the wait: the shortest tier held wins, and the configured wait applies only to a player who holds none. Where one tier covers waits configured apart (each kit's own cooldown, a teleport verb's or warp's own cooldown), it only lowers them, so a tier meant as a perk never makes a shorter wait longer. A warmup tier only lowers the configured warmup. The plugin-wide nodes are under [shared](#shared), the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder. Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md) maps the earlier names. The node of the optional REST add-on is listed under shared, because the add-on is a separate jar.
+
+Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
 ## shared
 
@@ -16,12 +18,14 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
 | `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
 | `uxmessentials.cooldown.<label>.<seconds>` | The wait between uses of one label a menu or custom command names, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. A built-in feature's wait is its own <feature>.cooldown.<seconds> node. | true |
-| `uxmessentials.bypass.cooldown.<feature>` and `uxmessentials.bypass.cooldown.label.<label>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses or skin), or on one label a menu or custom command names, such as customcommand.<id>. | op |
+| `uxmessentials.bypass.cooldown.<feature>` | Skip the cooldown on one rate-limited feature entirely: tp, rtp, kit, poses or skin. | op |
+| `uxmessentials.bypass.cooldown.label.<label>` | Skip the cooldown of one label a menu or custom command names, such as customcommand.<id>. | op |
 | `uxmessentials.bypass.warmup.<feature>` | Start one warmup-gated feature at once, immune to move-cancel: tp or customcommand. | op |
 | `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
 | `uxmessentials.help` | /help to list the commands you can use. | true |
 | `uxmessentials.lang.use` | /lang to set or clear your personal language override. | true |
 | `uxmessentials.lang.others` | /lang set <player> <language> and /lang reset <player>: set or clear another player's language, online or away. | op |
+| `uxmessentials.rest.admin` | Checked by the optional uxmEssentials-rest add-on: /uxmapi token create\|list\|revoke and /uxmapi status to manage API tokens. | op |
 | `uxmessentials.update.notify` | Receive the join-time notice when a newer plugin version is available. | op |
 
 ## bossbar
@@ -93,7 +97,42 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 
 ## guard
 
-The guard nodes are listed in [guard.md](guard.md#permissions).
+| Permission | What it allows | Default |
+|---|---|---|
+| `uxmessentials.module.guard` | Hot-reload / inspect the guard module (region protection). | op |
+| `uxmessentials.guard.use` | /guard and /guard help, actions: the base of every guard command. | true |
+| `uxmessentials.guard.here` | /guard here: the regions you stand in and your role there. | true |
+| `uxmessentials.guard.member` | /guard member <region> <player> <member\|guest\|clear>: owners and managers edit their own region's roster. | true |
+| `uxmessentials.guard.why` | /guard why <action>: explain the verdict for an action where you stand. | true |
+| `uxmessentials.guard.define` | /guard define, redefine, wand, pos1, pos2, point, clear, expand: draw and define regions. | op |
+| `uxmessentials.guard.remove` | /guard remove and restore: delete a region or bring a removed one back. | op |
+| `uxmessentials.guard.info` | /guard info <region>: a region's shape, rules, roles and behaviours. | op |
+| `uxmessentials.guard.list` | /guard list [world]: list the regions of a world. | op |
+| `uxmessentials.guard.rule` | /guard rule <region> <action> <target> <allow\|deny\|clear>: edit a region's rules. | op |
+| `uxmessentials.guard.role` | /guard role <region> <player> <role\|clear>: give any role on any region. | op |
+| `uxmessentials.guard.set` | /guard set <region> <behaviour> <value>: set a region behaviour. | op |
+| `uxmessentials.guard.priority` | /guard priority <region> <value>: set a region's priority. | op |
+| `uxmessentials.guard.parent` | /guard parent <region> <parent\|clear>: inherit rules from another region. | op |
+| `uxmessentials.guard.family` | /guard family <region> <name\|clear>: group regions so their borders open to each other. | op |
+| `uxmessentials.guard.tag` | /guard tag <region> add\|remove\|bulk: tag regions and edit them by tag. | op |
+| `uxmessentials.guard.template` | /guard template <region> <template\|clear>: apply a rule template. | op |
+| `uxmessentials.guard.scope` | /guard scope <region> <server\|set:name>: choose which servers a region applies on. | op |
+| `uxmessentials.guard.lock` | /guard lock and unlock; edit and WorldEdit inside a locked region. | op |
+| `uxmessentials.bypass.guard` | /guard bypass: toggle ignoring every guard rule. | op |
+| `uxmessentials.bypass.gamemode.guard` | Keep your own game mode in a region whose gamemode behaviour would change it. | false |
+| `uxmessentials.guard.show` | /guard show and hide: draw region borders for yourself. | op |
+| `uxmessentials.guard.near` | /guard near [radius]: list regions around you. | op |
+| `uxmessentials.guard.test` | /guard test <player> <action> [region]: check a verdict for another player. | op |
+| `uxmessentials.guard.inspect` | /guard inspect: click a block to read what a player with no role may do there, and see why each of your own refusals happened. | op |
+| `uxmessentials.guard.history` | /guard history <region>: the change history of a region. | op |
+| `uxmessentials.guard.undo` | /guard undo <history id>: undo one change from a region's history. | op |
+| `uxmessentials.guard.log` | /guard log [player]: recent denied actions. | op |
+| `uxmessentials.guard.status` | /guard status: engine counters and memory use. | op |
+| `uxmessentials.guard.import` | /guard import worldguard: import WorldGuard regions, with dry-run and undo. | op |
+| `uxmessentials.guard.backups` | /guard backups [restore <file>]: list the region backups, or put a backup's regions back. | op |
+| `uxmessentials.guard.reload` | /guard reload: reload the guard config and recompile every world. | op |
+| `uxmessentials.guard.menu` | See the region list in /guard menu; without it a region owner or manager gets the roles window of the region they stand in. | op |
+| `uxmessentials.guard.notify` | Receive staff alerts when players repeatedly hit guard denials. | op |
 
 ## holograms
 
@@ -223,14 +262,6 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.ranks.gui` | /ranks to open the ladder panel (config-gated; registered only when the GUI is enabled). | true |
 | `uxmessentials.ranks.prestige` | /prestige to reset to the first rank for a prestige level once you reach the top rank. | true |
 | `uxmessentials.ranks.rankup` | /rankup to advance to the next rank when you meet its requirements. | true |
-
-## rest add-on
-
-The add-on is a separate jar, so its node is kept with the shared ones: in game it is listed under `/uxmess permissions shared`.
-
-| Permission | What it allows | Default |
-|---|---|---|
-| `uxmessentials.rest.admin` | Checked by the optional uxmEssentials-rest add-on: /uxmapi token create\|list\|revoke and /uxmapi status to manage API tokens. | op |
 
 ## scoreboard
 

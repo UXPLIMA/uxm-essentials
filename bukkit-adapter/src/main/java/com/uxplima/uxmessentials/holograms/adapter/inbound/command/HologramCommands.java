@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Builds the holograms context's Brigadier command surface as {@link CommandRegistration}s over the
  * constructed {@link HologramServices}. The context publishes a single {@code /hologram} command with its
- * subcommands, matching the kernel's {@code HologramCommandSurface}; the plugin's
+ * subcommands, matching its entries in {@code CommandSpecCatalog}; the plugin's
  * {@code LifecycleEvents.COMMANDS} handler registers it.
  */
 @NullMarked

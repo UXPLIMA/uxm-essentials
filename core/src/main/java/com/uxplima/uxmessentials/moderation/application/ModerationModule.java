@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -46,11 +45,6 @@ public final class ModerationModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        return ModerationCommandSurface.all();
     }
 
     @Override

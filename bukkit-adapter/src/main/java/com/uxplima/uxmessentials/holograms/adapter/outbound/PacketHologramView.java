@@ -255,6 +255,12 @@ public final class PacketHologramView implements HologramView, HologramPageCycle
     }
 
     private void show(Hologram hologram) {
+        if (!Bukkit.isPrimaryThread()) {
+            // A leaderboard's rows, a hologram sync from another server and an NPC moving reach here off the tick, and
+            // the world is looked up in the server's world list, which only a tick thread may read.
+            scheduler.onGlobal(() -> show(hologram));
+            return;
+        }
         Position anchor = anchorFor(hologram, linkedNpcs);
         World world = Bukkit.getWorld(anchor.world().uid());
         if (world == null) {

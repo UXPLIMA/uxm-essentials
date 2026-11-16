@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.security.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -25,8 +24,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The {@code security_2fa} table ships in the persistence baseline (a {@code V##} migration under
  * {@code db/migration}, always applied by the persistence layer), so the module declares no extra Flyway location of
- * its own. Phase 1 publishes no {@link CommandSpec} and registers no listener here: the {@code /2fa} and {@code /pin}
- * commands are Bukkit-facing Brigadier registrations contributed by the adapter wiring, and a disabled module wires
+ * its own. It registers no listener here: the {@code /2fa} and {@code /pin} commands are Bukkit-facing Brigadier registrations contributed by the adapter wiring, and a disabled module wires
  * zero either way (the {@code FeatureModule} contract). The lifecycle bookkeeping here keeps {@link #stop()} honest.
  */
 @NullMarked
@@ -44,13 +42,6 @@ public final class SecurityModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The /2fa and /pin verbs are Bukkit-facing Brigadier registrations contributed by the inbound adapter;
-        // the module declares no declarative CommandSpec.
-        return List.of();
     }
 
     @Override

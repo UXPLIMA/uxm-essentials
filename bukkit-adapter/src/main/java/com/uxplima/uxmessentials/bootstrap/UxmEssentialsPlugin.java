@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.worlds.adapter.outbound.WorldGeneratorResolver;
 import com.uxplima.uxmlib.command.CommandGates;
 import com.uxplima.uxmlib.command.GateVisibility;
 import com.uxplima.uxmlib.text.style.Theme;
+import org.bstats.bukkit.Metrics;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -34,11 +35,14 @@ import org.jspecify.annotations.Nullable;
  * lifecycle handler publishes the already-module-filtered command set built during wiring, so a
  * disabled module's command literal never reaches the dispatcher.
  */
+// Not final: MockBukkit starts a plugin as a generated subclass of its main class, which is how the integration
+// scenarios enable this one.
 @NullMarked
-public final class UxmEssentialsPlugin extends JavaPlugin {
+public class UxmEssentialsPlugin extends JavaPlugin {
 
     private @Nullable CloseableResources resources;
     private @Nullable CatalogPermissions permissions;
+    private @Nullable Metrics metrics;
 
     /**
      * Registers our WorldGuard custom flags before any plugin is enabled. WorldGuard locks its flag registry the moment
@@ -146,9 +150,8 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             }
         });
 
-        // Initialize bStats Metrics
-        int pluginId = 31811;
-        new org.bstats.bukkit.Metrics(this, pluginId);
+        int bStatsId = 31811;
+        this.metrics = new Metrics(this, bStatsId);
 
         long loadTime = System.currentTimeMillis() - startTime;
         getLogger().info("╔══════════════════════════════════════════════════════════╗");
@@ -203,6 +206,13 @@ public final class UxmEssentialsPlugin extends JavaPlugin {
             getLogger().info("Closing active modules and dependencies...");
             wired.close(); // stops every started module in reverse wiring order
             this.resources = null;
+        }
+        // Its timer thread outlives the plugin otherwise, and a plugin enabled again in the same server starts a
+        // second one beside it.
+        Metrics running = this.metrics;
+        if (running != null) {
+            running.shutdown();
+            this.metrics = null;
         }
         CatalogPermissions declared = this.permissions;
         if (declared != null) {

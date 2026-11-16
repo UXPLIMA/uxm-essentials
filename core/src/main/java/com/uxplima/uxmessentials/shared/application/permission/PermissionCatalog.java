@@ -13,8 +13,7 @@ import java.util.stream.Stream;
  * with the server on enable, so a permission plugin can suggest and complete them; {@code /uxmess permissions} reads
  * the same list back to an operator in game, and {@code /uxmess permissions export} writes it to a markdown file.
  * Nothing else declares a node: {@code paper-plugin.yml} lists none. The permission pages under {@code docs/user/}
- * mirror this catalogue by hand, and nothing checks them against it, so a node added here is added there in the same
- * change.
+ * are generated from it by {@code ./gradlew :core:generateReference}, and the build fails while they differ.
  *
  * <p>The tables are split by area purely so no one file carries four hundred rows. Order within an area is
  * alphabetical by node, and {@link #all()} returns them area by area.

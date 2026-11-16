@@ -5,7 +5,6 @@ import java.util.Collection;
 import java.util.Objects;
 import java.util.UUID;
 
-import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -16,6 +15,7 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 import com.destroystokyo.paper.event.player.PlayerConnectionCloseEvent;
 import com.uxplima.uxmessentials.ranks.application.CachedPlayerRankRepository;
+import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -32,11 +32,11 @@ public final class RankCacheListener implements Listener {
     private static final Duration PRELOGIN_WAIT = Duration.ofMillis(1500);
 
     private final CachedPlayerRankRepository cache;
-    private final Server server;
+    private final PlayerLookup players;
 
-    public RankCacheListener(CachedPlayerRankRepository cache, Server server) {
+    public RankCacheListener(CachedPlayerRankRepository cache, PlayerLookup players) {
         this.cache = Objects.requireNonNull(cache, "cache");
-        this.server = Objects.requireNonNull(server, "server");
+        this.players = Objects.requireNonNull(players, "players");
     }
 
     /** Load every player already online, for a module enabled or reloaded while they play. */
@@ -68,12 +68,13 @@ public final class RankCacheListener implements Listener {
     /**
      * Fires for every connection that passed the pre-login, after the quit when the player had joined. A duplicate
      * login closes the old connection while the new session for the same player is already online, and that session
-     * must keep its pointer, so only a player who is not online now is forgotten.
+     * must keep its pointer, so only a player who is not online now is forgotten. The close can fire off the tick, so
+     * the online index answers that rather than the server's player list.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onConnectionClose(PlayerConnectionCloseEvent event) {
         UUID playerId = event.getPlayerUniqueId();
-        if (server.getPlayer(playerId) == null) {
+        if (!players.isOnline(playerId)) {
             cache.quit(playerId);
         }
     }

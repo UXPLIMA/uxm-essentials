@@ -4,9 +4,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.Mail.MAIL;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToLongFunction;
@@ -15,21 +13,19 @@ import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
 import com.uxplima.uxmessentials.messaging.domain.MailSender;
 import com.uxplima.uxmessentials.messaging.domain.MessageBody;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * Two writers can read the same {@code max(id)} before either commits. The one that commits second must still store
  * its mail, under a key of its own, rather than lose it to the primary key.
  */
+@EveryBackend
 class JooqMailRepositoryTest {
 
     private static final PlayerRef ALEX =
@@ -37,12 +33,9 @@ class JooqMailRepositoryTest {
     private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000a2"), "Sam");
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
 
-    @TempDir
-    Path folder;
-
     @Test
-    void aMailWhoseKeyAnotherWriterTookFirstIsStoredUnderTheNextKey() {
-        DSLContext dsl = openDsl();
+    void aMailWhoseKeyAnotherWriterTookFirstIsStoredUnderTheNextKey(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         MailItem first = new JooqMailRepository(dsl).append(mail("first", NOW));
         // This writer read the maximum before the first one committed, so the key it read is already taken.
         JooqMailRepository late =
@@ -57,8 +50,8 @@ class JooqMailRepositoryTest {
     }
 
     @Test
-    void aKeyThatStaysTakenFailsAfterTheLastAttemptAndStoresNothing() {
-        DSLContext dsl = openDsl();
+    void aKeyThatStaysTakenFailsAfterTheLastAttemptAndStoresNothing(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         MailItem first = new JooqMailRepository(dsl).append(mail("first", NOW));
         AtomicInteger reads = new AtomicInteger();
         JooqMailRepository alwaysStale = new JooqMailRepository(dsl, ignored -> {
@@ -75,8 +68,8 @@ class JooqMailRepositoryTest {
     }
 
     @Test
-    void aFailureThatIsNotAKeyClashIsNotTriedAgain() {
-        DSLContext dsl = openDsl();
+    void aFailureThatIsNotAKeyClashIsNotTriedAgain(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         AtomicInteger reads = new AtomicInteger();
         JooqMailRepository broken = new JooqMailRepository(dsl, ignored -> {
             reads.incrementAndGet();
@@ -101,12 +94,5 @@ class JooqMailRepositoryTest {
 
     private static MailItem mail(String body, Instant sentAt) {
         return MailItem.compose(SAM, MailSender.player(ALEX), MessageBody.of(body), sentAt);
-    }
-
-    private DSLContext openDsl() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        return DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
     }
 }

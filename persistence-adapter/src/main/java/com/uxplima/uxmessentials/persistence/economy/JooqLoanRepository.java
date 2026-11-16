@@ -164,6 +164,8 @@ public final class JooqLoanRepository extends JooqRepository implements LoanRepo
     public void saveCreditScore(CreditScore creditScore) {
         Objects.requireNonNull(creditScore, "creditScore");
         write(dsl -> {
+            // The score references the owner row, which a player who never held money may not have yet.
+            WalletLegs.upsertOwner(dsl, creditScore.player(), clock.millis());
             dsl.insertInto(ECONOMY_CREDIT_SCORES)
                     .set(
                             ECONOMY_CREDIT_SCORES.PLAYER_UUID,

@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.message;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.shared.application.message.LocaleScope;
 import com.uxplima.uxmessentials.shared.application.port.LocaleStore;
@@ -28,6 +29,10 @@ import org.jspecify.annotations.NullMarked;
  *   <li>the configured default, {@code language.default}.</li>
  * </ol>
  *
+ * <p>A client language counts only when a catalogue is written in it. The catalogue would otherwise answer such a
+ * reader key by key from English, so a client set to Esperanto, or one that reports no language at all, read English
+ * on a server whose default is German. Such a reader falls through to the default instead.
+ *
  * <p>A server with one audience turns {@code follow-client} off. Its German players whose clients read English
  * then read German, and a player who wants another language chooses it. The request scope is skipped too,
  * because what it carries is what the client said.
@@ -47,16 +52,30 @@ public final class LocaleResolver {
     private final LocaleStore overrides;
     private final ClientLocales clients;
     private final LanguageSettings settings;
+    private final Predicate<Locale> catalogued;
 
-    /** A resolver that follows the client and forces nothing, with {@code serverDefault} as the default. */
+    /**
+     * A resolver that follows the client and forces nothing, with {@code serverDefault} as the default, for a caller
+     * with no catalogue at hand: every language a client names counts as written.
+     */
     public LocaleResolver(LocaleStore overrides, ClientLocales clients, Locale serverDefault) {
-        this(overrides, clients, LanguageSettings.following(Objects.requireNonNull(serverDefault, "serverDefault")));
+        this(
+                overrides,
+                clients,
+                LanguageSettings.following(Objects.requireNonNull(serverDefault, "serverDefault")),
+                locale -> true);
     }
 
-    public LocaleResolver(LocaleStore overrides, ClientLocales clients, LanguageSettings settings) {
+    /**
+     * @param catalogued whether a catalogue is written in a locale's language; a client language it refuses reads
+     *     the default
+     */
+    public LocaleResolver(
+            LocaleStore overrides, ClientLocales clients, LanguageSettings settings, Predicate<Locale> catalogued) {
         this.overrides = Objects.requireNonNull(overrides, "overrides");
         this.clients = Objects.requireNonNull(clients, "clients");
         this.settings = Objects.requireNonNull(settings, "settings");
+        this.catalogued = Objects.requireNonNull(catalogued, "catalogued");
     }
 
     /** The default, follow-client and forced language this resolver was built with. */
@@ -79,7 +98,8 @@ public final class LocaleResolver {
         if (!settings.followClient()) {
             return settings.defaultLocale();
         }
-        return LocaleScope.forViewer(viewer.uuid(), clients.of(viewer.uuid()).orElse(settings.defaultLocale()));
+        Locale client = clients.of(viewer.uuid()).map(this::readable).orElse(settings.defaultLocale());
+        return LocaleScope.forViewer(viewer.uuid(), client);
     }
 
     /** Whether this viewer's language follows their client: nothing forced, nothing chosen, the client followed. */
@@ -92,7 +112,7 @@ public final class LocaleResolver {
 
     /**
      * The viewer's locale at the command boundary, where the client's language was just read on the player's own
-     * thread. A client that has not said yet reads as no language at all.
+     * thread. A client that has not said yet reads as no language at all, and so reads the default.
      */
     public Locale resolveAt(PlayerRef viewer, Locale client) {
         Objects.requireNonNull(viewer, "viewer");
@@ -101,7 +121,12 @@ public final class LocaleResolver {
         if (chosen.isPresent()) {
             return chosen.get();
         }
-        boolean heard = !client.getLanguage().isEmpty();
-        return settings.followClient() && heard ? client : settings.defaultLocale();
+        return settings.followClient() ? readable(client) : settings.defaultLocale();
+    }
+
+    /** The client's language when a catalogue is written in it, otherwise the default. */
+    private Locale readable(Locale client) {
+        boolean written = !client.getLanguage().isEmpty() && catalogued.test(client);
+        return written ? client : settings.defaultLocale();
     }
 }

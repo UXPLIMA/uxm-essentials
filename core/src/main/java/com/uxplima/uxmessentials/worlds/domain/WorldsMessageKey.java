@@ -57,6 +57,7 @@ public enum WorldsMessageKey implements MessageKey {
     WORLD_ENTER_DENIED_FULL("world.enter.denied-full"),
     WORLD_ENTER_FEE_INSUFFICIENT("world.enter.fee-insufficient"),
     WORLD_ENTER_FEE_CHARGED("world.enter.fee-charged"),
+    WORLD_ENTER_FEE_REFUNDED("world.enter.fee-refunded"),
     WORLD_TP_DESTINATION_UNRESOLVED("world.tp.destination-unresolved"),
     WORLD_TP_OTHER("world.tp.other"),
 

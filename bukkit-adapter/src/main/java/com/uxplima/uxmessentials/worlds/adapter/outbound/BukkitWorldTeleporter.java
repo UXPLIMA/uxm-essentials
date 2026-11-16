@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.worlds.adapter.outbound;
 
 import java.util.Objects;
+import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
@@ -29,15 +31,18 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
     }
 
     @Override
-    public boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause) {
+    public boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause, Consumer<TeleportOutcome> outcome) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(cause, "cause");
+        Objects.requireNonNull(outcome, "outcome");
         if (cause == WorldTeleportCause.VOID_RESCUE) {
             // A rescue is involuntary: the player is already inside the world, so the access policy has nothing
-            // left to decide, and the hop must land at once with no warmup to walk out of and no /back point.
+            // left to decide, and the hop must land at once with no warmup to walk out of and no /back point. It is
+            // never paid for, so the move being issued is reported as the landing.
             marker.mark(who.uuid());
             engine.relocateImmediately(who, Destination.at(to));
+            outcome.accept(TeleportOutcome.LANDED);
             return true;
         }
         TeleportKind kind = kindOf(cause);
@@ -47,7 +52,7 @@ public final class BukkitWorldTeleporter implements WorldTeleporter {
             // ADMIN is instant, so the mark-to-event window is negligible; SPAWN can be cancelled mid-warmup.
             marker.mark(who.uuid());
         }
-        return engine.launch(who, Destination.at(to), kind).isOk();
+        return engine.launch(who, Destination.at(to), kind, outcome).isOk();
     }
 
     @Override

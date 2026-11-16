@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.migration;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -37,13 +36,6 @@ public final class MigrationModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The /uxmess import subcommand is published under the operator root in bootstrap, not as a
-        // top-level feature command, so this module contributes none through the feature-command seam.
-        return List.of();
     }
 
     @Override

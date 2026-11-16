@@ -116,14 +116,16 @@ public final class BukkitWorldArchive implements WorldArchive {
         // on Folia (each of a world's regions is owned by a different region thread), so flushing it from this
         // onGlobal hop is unsafe. Relying on the auto-saved folder keeps the backup Folia-safe; the small window
         // of unsaved chunks is the same staleness any on-disk copy of a live world carries.
-        scheduler.async(() -> doBackup(initiator, world, id));
+        // The folder is found here: a loaded world names its own, and the server's world list is the global thread's.
+        Path folder = worldFolder(world);
+        scheduler.async(() -> doBackup(initiator, world, id, folder));
         return Result.ok(id);
     }
 
     /** Off-tick: zip the world folder, prune older archives, and notify the initiator of the outcome. */
-    private void doBackup(PlayerRef initiator, WorldName world, BackupId id) {
+    private void doBackup(PlayerRef initiator, WorldName world, BackupId id, Path folder) {
         try {
-            archiver.zip(worldFolder(world), archiveFile(world, id));
+            archiver.zip(folder, archiveFile(world, id));
             prune(world);
             notify(
                     initiator,
@@ -245,7 +247,7 @@ public final class BukkitWorldArchive implements WorldArchive {
         World live = server.getWorld(world.value());
         if (live == null) {
             closeHandle(handle); // already gone. Nothing to evacuate or unload
-            scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed));
+            handOffSwap(initiator, world, id, archive, managed);
             return;
         }
         if (live.getPlayers().isEmpty()) {
@@ -255,7 +257,7 @@ public final class BukkitWorldArchive implements WorldArchive {
                 notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
                 return;
             }
-            scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed));
+            handOffSwap(initiator, world, id, archive, managed);
             return;
         }
         if (attempts.incrementAndGet() >= RESTORE_EVACUATE_MAX_TICKS) {
@@ -277,17 +279,20 @@ public final class BukkitWorldArchive implements WorldArchive {
         }
     }
 
+    /**
+     * Global thread, with the world just seen unloaded: find its folder and hand the swap off the tick. The world list
+     * is read here, where it may be, and the folder is resolved once: it is found by looking at the disk, and once it
+     * is deleted a second look would answer somewhere else.
+     */
+    private void handOffSwap(PlayerRef initiator, WorldName world, BackupId id, Path archive, ManagedWorld managed) {
+        Path folder = worldFolder(world);
+        scheduler.async(() -> swapAndReload(initiator, world, id, archive, managed, folder));
+    }
+
     /** Off-tick: replace the world folder from the archive, then reload the world back on the global thread. */
-    private void swapAndReload(PlayerRef initiator, WorldName world, BackupId id, Path archive, ManagedWorld managed) {
+    private void swapAndReload(
+            PlayerRef initiator, WorldName world, BackupId id, Path archive, ManagedWorld managed, Path folder) {
         try {
-            if (server.getWorld(world.value()) != null) {
-                log.warn("restore aborted: world {} still loaded", world.value());
-                notify(initiator, WorldsMessageKey.WORLD_RESTORE_FAILED, Map.of("world", world.value()));
-                return; // never delete a loaded world's files
-            }
-            // Resolved once: the folder is found by looking at the disk, and once it is deleted a second look would
-            // answer somewhere else.
-            Path folder = worldFolder(world);
             archiver.deleteTree(folder);
             archiver.unzip(archive, folder);
             scheduler.onGlobal(() -> finishRestore(initiator, world, id, managed));

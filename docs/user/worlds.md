@@ -62,8 +62,8 @@ of the same name elsewhere, and `<world>@<server>` picks one when several server
 ```
 
 The entry fee is taken once the jail, combat and cooldown checks pass, and given back, in the currency it was taken
-in, if the player does not land: the proxy never moves them, the world is gone, full or will not load, or its spawn is
-unsafe. A player holding `uxmessentials.bypass.safety.world` lands on an unsafe spawn anyway.
+in, if the player does not land: the proxy never moves them, the world is gone, full or will not load, its spawn is
+unsafe, or, in a world on this server, the warmup is cut short by a move, a hit or a newer teleport. A player holding `uxmessentials.bypass.safety.world` lands on an unsafe spawn anyway.
 
 A world that records no server is claimed by every named server that has it, at that server's first start under its
 name: a world loaded there, or a world folder of that name. Each such server gets its own copy of the world and its

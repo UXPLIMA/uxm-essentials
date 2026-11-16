@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.moderation;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -18,21 +17,19 @@ import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
- * A conditional ban, mute or IP ban write through the real migrations on a SQLite file: it lands only while the row
+ * A conditional ban, mute or IP ban write through the real migrations: it lands only while the row
  * is still the one the caller read, so a sanction written by another server in between is never overwritten by a
  * decision made without it.
  */
+@EveryBackend
 class JooqModerationRepositoryTest {
 
     private static final PlayerRef ALEX =
@@ -41,18 +38,15 @@ class JooqModerationRepositoryTest {
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
     private static final String ADDRESS = "203.0.113.7";
 
-    @TempDir
-    Path folder;
-
+    private DSLContext dsl;
     private ModerationRepository first;
     private ModerationRepository second;
-    private DSLContext dsl;
 
     @BeforeEach
-    void open() {
-        dsl = openDsl();
-        first = new JooqModerationRepository(dsl);
-        second = new JooqModerationRepository(openDsl());
+    void open(TestDatabase database) {
+        dsl = database.dsl();
+        first = openStore();
+        second = openStore();
         first.ensureUserExists(SAM, NOW);
     }
 
@@ -279,10 +273,11 @@ class JooqModerationRepositoryTest {
     @Test
     void aStoredLineThisReleaseDoesNotKnowReadsAsTheKeptText() {
         first.saveMute(SAM, MuteState.permanent(Issuer.of(ALEX), Optional.of("kept"), NOW));
-        dsl.update(MODERATION_MUTES)
+        dsl.transaction(tx -> tx.dsl()
+                .update(MODERATION_MUTES)
                 .set(MODERATION_MUTES.REASON_KEY, "moderation.no-such-line")
                 .set(MODERATION_MUTES.REASON_ARGS, "count=3")
-                .execute();
+                .execute());
 
         assertThat(second.loadMute(SAM)).isEqualTo(MuteState.permanent(Issuer.of(ALEX), Optional.of("kept"), NOW));
     }
@@ -291,10 +286,7 @@ class JooqModerationRepositoryTest {
         return new IpBan(ADDRESS, until, Optional.of(reason), Optional.empty(), Issuer.of(ALEX), at);
     }
 
-    private DSLContext openDsl() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        return DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    private ModerationRepository openStore() {
+        return new JooqModerationRepository(dsl);
     }
 }

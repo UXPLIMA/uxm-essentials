@@ -76,12 +76,15 @@ public final class CreateWorld {
             notifier.send(creator, created.errorOrThrow().messageKey(), Map.of("world", name.value()));
             return created;
         }
-        scheduler.async(() -> persistOffTick(creator, name, world));
+        // The uid is read here, on the global thread that just built the world; the server's world list is not the
+        // async lane's to read.
+        ManagedWorld known = engine.uidOf(name).map(world::withKnownUid).orElse(world);
+        scheduler.async(() -> persistOffTick(creator, name, known));
         return Result.ok();
     }
 
     private void persistOffTick(PlayerRef creator, WorldName name, ManagedWorld world) {
-        repository.save(engine.uidOf(name).map(world::withKnownUid).orElse(world));
+        repository.save(world);
         events.publish(new WorldCreated(name));
         scheduler.onEntity(
                 creator, () -> notifier.send(creator, WorldsMessageKey.WORLD_CREATED, Map.of("world", name.value())));
