@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.HeldHops;
 import com.uxplima.uxmessentials.testing.MemoryHopStore;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
@@ -65,6 +66,9 @@ class CrossServerWarpTest {
     private final MemoryHopStore store = new MemoryHopStore();
     private final List<String> storeCallsOnTheCallerThread = new ArrayList<>();
     private final Lanes lanes = new Lanes(scheduler);
+    /** The target's thread hops, which a test can hold to run them one task at a time, as Folia does. */
+    private final HeldHops targetLanes = new HeldHops(lanes);
+
     private final PendingHopStore shared = new Guarded(store);
     private final WarpFakes.Warps warps = new WarpFakes.Warps();
     private final WarpFakes.Purse purse = new WarpFakes.Purse();
@@ -100,7 +104,7 @@ class CrossServerWarpTest {
                 position -> !unsafe,
                 permissions,
                 notifier.notifier(),
-                lanes,
+                targetLanes,
                 server));
         return resolvers;
     }
@@ -426,6 +430,24 @@ class CrossServerWarpTest {
             assertThat(line.viewer()).isEqualTo(SAM);
             assertThat(line.key()).isEqualTo("warp.sent-refused");
         });
+    }
+
+    @Test
+    void aMoveThatThrowsOnThePlayersOwnThreadIsRefundedOnceAndStillReported() {
+        targetLanes.hold();
+        moves.throwsOnArrive = true;
+        useMarket();
+
+        join(survival);
+        targetLanes.runAll();
+        scheduler.advance(TTL);
+
+        assertThat(moves.made).isEmpty();
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(targetLanes.thrown())
+                .singleElement()
+                .satisfies(failure -> assertThat(failure).hasMessage("the jail lookup failed"));
     }
 
     @Test

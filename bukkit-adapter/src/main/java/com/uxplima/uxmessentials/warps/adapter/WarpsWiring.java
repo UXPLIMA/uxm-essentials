@@ -12,6 +12,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
+import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -273,7 +274,8 @@ public final class WarpsWiring {
                 presence,
                 () -> bus.publisher().publish(new WarpChanged(localServer, "*")),
                 kernel.log(),
-                recordedServer);
+                recordedServer,
+                NetworkConfig.DEFAULT_SERVER_ID);
         WarpServices services = assemble(
                 kernel,
                 repository,

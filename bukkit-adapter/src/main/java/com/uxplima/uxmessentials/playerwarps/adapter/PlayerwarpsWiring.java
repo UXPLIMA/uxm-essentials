@@ -94,6 +94,8 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.teleport.application.TeleportEngine;
 import com.uxplima.uxmessentials.teleport.application.TeleportHopGate;
+import com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker;
+import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.EntityEditorLayout;
 import com.uxplima.uxmlib.menu.Menus;
@@ -215,7 +217,17 @@ public final class PlayerwarpsWiring {
         // completes it on join (or refunds). Off, the resolver is not registered, the departures are empty and the
         // gate fails a remote warp closed (unavailable + refund) rather than a broken local hop.
         String localServerId = bus.publisher().serverId();
-        PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(repository, teleporter, economy, localServerId);
+        // The use gate judges a local warp's landing and the hop resolver a remote one's, on the backend holding it.
+        WarpSafetyChecker safety = new BukkitWarpSafetyChecker();
+        PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(
+                repository,
+                teleporter,
+                economy,
+                safety,
+                kernel.permissions(),
+                notifier,
+                kernel.scheduler(),
+                localServerId);
         Optional<HopDepartures> departures = Optional.empty();
         if (ctx.config().getBoolean("cross-server.enabled", false)) {
             hops.register(hopResolver);
@@ -225,7 +237,7 @@ public final class PlayerwarpsWiring {
                 repository,
                 teleporter,
                 notifier,
-                new com.uxplima.uxmessentials.warps.adapter.outbound.BukkitWarpSafetyChecker(),
+                safety,
                 kernel.permissions(),
                 banStore,
                 memberStore,
