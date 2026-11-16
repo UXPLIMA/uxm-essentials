@@ -39,6 +39,7 @@ final class TradeExchange {
     private final TradeHolder initiatorHolder;
     private final TradeHolder partnerHolder;
     private final AtomicBoolean settled = new AtomicBoolean(false);
+    private final CommitGate commitGate = new CommitGate(TradeSide.values().length);
 
     private TradeSession session;
     private @Nullable ItemStack @Nullable [] initiatorOffer;
@@ -163,6 +164,11 @@ final class TradeExchange {
         }
         session = session.ready().commit();
         return Outcome.COMMITTED;
+    }
+
+    /** How a confirmed trade ends once its windows are frozen; meaningful only after {@link #confirm} committed. */
+    CommitGate commitGate() {
+        return commitGate;
     }
 
     /** Claim the settlement for a cancel path; only the first caller wins, so items are returned exactly once. */

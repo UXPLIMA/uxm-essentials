@@ -20,18 +20,21 @@ import com.uxplima.uxmessentials.testing.QuietLog;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemReceiver;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemReturns;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
  * Items a trade could not hand to a player who was gone reach that player exactly once: kept in storage, handed over
- * on their next join on whichever server they join, and kept again whenever a hand-over does not land. Each byte of a
- * payload stands for one item, so the count of every byte across the inventory and the store proves nothing was
- * duplicated or lost.
+ * on their next join on whichever server they join, and left in storage whenever a hand-over does not land. Each byte
+ * of a payload stands for one item, so the bytes across the inventory and the store prove nothing was duplicated or
+ * lost.
  */
 class ReturnTradeItemsTest {
 
     /** A sword, a named stack and a shulker: three items, one per byte. */
     private static final VaultContents STAKE = VaultContents.of(new byte[] {1, 2, 3});
+
+    private static final List<Byte> ALL = List.of((byte) 1, (byte) 2, (byte) 3);
 
     private final QueuedScheduler scheduler = new QueuedScheduler();
     private final MemoryReturns store = new MemoryReturns();
@@ -40,20 +43,24 @@ class ReturnTradeItemsTest {
     private boolean running = true;
 
     private ReturnTradeItems returns() {
+        return returnsOn(scheduler);
+    }
+
+    private ReturnTradeItems returnsOn(QueuedScheduler lane) {
         Notifier notifier = new Notifier(
                 (viewer, key, placeholders) -> {
                     lines.add(key.key() + " " + placeholders.get("count"));
                     return key.key();
                 },
                 (viewer, text) -> {});
-        return new ReturnTradeItems(scheduler, store, pocket, notifier, new QuietLog(), () -> running);
+        return new ReturnTradeItems(lane, store, pocket, notifier, new QuietLog(), () -> running);
     }
 
     @Test
     void itemsKeptForAPlayerWhoLeftReachThemOnceOnTheirNextJoin() {
         returns().keep(ALEX, STAKE);
         scheduler.runAll();
-        assertThat(store.items(ALEX)).containsExactly(List.of((byte) 1, (byte) 2, (byte) 3));
+        assertThat(store.items(ALEX)).containsExactly(ALL);
 
         pocket.online(ALEX, 10);
         returns().deliverKept(ALEX);
@@ -61,7 +68,7 @@ class ReturnTradeItemsTest {
         returns().deliverKept(ALEX);
         scheduler.runAll();
 
-        assertThat(pocket.held(ALEX)).containsExactly((byte) 1, (byte) 2, (byte) 3);
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
         assertThat(store.count(ALEX)).isZero();
         assertThat(lines).containsExactly("trade.returns-delivered 3");
     }
@@ -72,18 +79,17 @@ class ReturnTradeItemsTest {
         pocket.online(ALEX, 10);
         ReturnTradeItems lobby = returns();
         ReturnTradeItems survival = returns();
-        store.pauseReads();
 
         lobby.deliverKept(ALEX);
         survival.deliverKept(ALEX);
         scheduler.runAll();
 
-        assertThat(pocket.held(ALEX)).containsExactly((byte) 1, (byte) 2, (byte) 3);
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
         assertThat(store.count(ALEX)).isZero();
     }
 
     @Test
-    void aGiveThatFailsKeepsTheWholeBatchForTheNextJoin() {
+    void aGiveThatFailsReleasesTheBatchForTheNextJoin() {
         store.keep(ALEX.uuid(), STAKE);
         pocket.online(ALEX, 10);
         pocket.breakNextGive();
@@ -92,17 +98,18 @@ class ReturnTradeItemsTest {
         scheduler.runAll();
 
         assertThat(pocket.held(ALEX)).isEmpty();
-        assertThat(store.items(ALEX)).containsExactly(List.of((byte) 1, (byte) 2, (byte) 3));
+        assertThat(store.items(ALEX)).containsExactly(ALL);
+        assertThat(store.claimedCount()).isZero();
 
         returns().deliverKept(ALEX);
         scheduler.runAll();
 
-        assertThat(pocket.held(ALEX)).containsExactly((byte) 1, (byte) 2, (byte) 3);
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
         assertThat(store.count(ALEX)).isZero();
     }
 
     @Test
-    void aPlayerWhoLeavesBeforeTheHandOverKeepsTheItemsForLater() {
+    void aPlayerWhoLeavesBeforeTheHandOverFindsTheBatchOnTheirNextJoin() {
         store.keep(ALEX.uuid(), STAKE);
         pocket.online(ALEX, 10);
 
@@ -111,11 +118,31 @@ class ReturnTradeItemsTest {
         scheduler.runAll();
 
         assertThat(pocket.held(ALEX)).isEmpty();
-        assertThat(store.items(ALEX)).containsExactly(List.of((byte) 1, (byte) 2, (byte) 3));
+        assertThat(store.items(ALEX)).containsExactly(ALL);
+        assertThat(store.claimedCount()).isZero();
     }
 
     @Test
-    void whatDoesNotFitIsKeptRatherThanDropped() {
+    void aServerThatCrashedAfterItsClaimLeavesTheBatchForALaterJoinOnceTheClaimIsStale() {
+        store.keep(ALEX.uuid(), STAKE);
+        pocket.online(ALEX, 10);
+        // The claim is taken, then the server dies before its hop to the player's thread runs.
+        returnsOn(new QueuedScheduler()).deliverKept(ALEX);
+
+        returns().deliverKept(ALEX);
+        scheduler.runAll();
+        assertThat(pocket.held(ALEX)).isEmpty();
+
+        store.expireClaims();
+        returns().deliverKept(ALEX);
+        scheduler.runAll();
+
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
+        assertThat(store.count(ALEX)).isZero();
+    }
+
+    @Test
+    void whatDoesNotFitStaysKeptInPlaceOfTheBatchRatherThanDropped() {
         store.keep(ALEX.uuid(), STAKE);
         pocket.online(ALEX, 1);
 
@@ -124,13 +151,13 @@ class ReturnTradeItemsTest {
 
         assertThat(pocket.held(ALEX)).containsExactly((byte) 1);
         assertThat(store.items(ALEX)).containsExactly(List.of((byte) 2, (byte) 3));
+        assertThat(store.claimedCount()).isZero();
         assertThat(lines).containsExactly("trade.returns-delivered 1", "trade.returns-kept 2");
     }
 
     @Test
     void aBatchKeptAfterTheJoinReadWaitsForTheFollowingJoin() {
         pocket.online(ALEX, 10);
-        store.pauseReads();
         returns().deliverKept(ALEX);
         returns().keep(ALEX, STAKE);
         scheduler.runAll();
@@ -138,11 +165,10 @@ class ReturnTradeItemsTest {
         assertThat(pocket.held(ALEX)).isEmpty();
         assertThat(store.count(ALEX)).isEqualTo(1);
 
-        store.resumeReads();
         returns().deliverKept(ALEX);
         scheduler.runAll();
 
-        assertThat(pocket.held(ALEX)).containsExactly((byte) 1, (byte) 2, (byte) 3);
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
         assertThat(store.count(ALEX)).isZero();
     }
 
@@ -169,59 +195,102 @@ class ReturnTradeItemsTest {
         assertThat(store.count(ALEX)).isEqualTo(1);
     }
 
-    /** Kept batches by key, claimed by removing them. */
+    /** Kept batches by key, each with the token of the delivery that claimed it, if any. */
     private static final class MemoryReturns implements TradeItemReturns {
 
-        private final Map<String, Map.Entry<UUID, VaultContents>> rows = new LinkedHashMap<>();
+        private final Map<String, Row> rows = new LinkedHashMap<>();
         private int ids;
-        private boolean pausedReads;
-        private List<Kept> frozen = List.of();
         boolean failReads;
 
-        /** Answer every read with the rows as they are now, as two servers reading at the same moment would. */
-        void pauseReads() {
-            pausedReads = true;
-            frozen = read(ALEX.uuid());
+        private static final class Row {
+            final UUID owner;
+            VaultContents items;
+
+            @Nullable String claimedBy;
+
+            boolean stale;
+
+            Row(UUID owner, VaultContents items) {
+                this.owner = owner;
+                this.items = items;
+            }
+
+            boolean open() {
+                return claimedBy == null || stale;
+            }
         }
 
-        void resumeReads() {
-            pausedReads = false;
+        /** Every claim taken so far is now older than the stale window. */
+        void expireClaims() {
+            rows.values().forEach(row -> row.stale = row.claimedBy != null);
         }
 
         int count(PlayerRef owner) {
-            return read(owner.uuid()).size();
+            return items(owner).size();
+        }
+
+        long claimedCount() {
+            return rows.values().stream().filter(row -> row.claimedBy != null).count();
         }
 
         List<List<Byte>> items(PlayerRef owner) {
-            return read(owner.uuid()).stream().map(kept -> asList(kept.items())).toList();
+            return rows.values().stream()
+                    .filter(row -> row.owner.equals(owner.uuid()))
+                    .map(row -> asList(row.items))
+                    .toList();
         }
 
         @Override
         public void keep(UUID owner, VaultContents items) {
-            rows.put("r" + ids++, Map.entry(owner, items));
+            rows.put("r" + ids++, new Row(owner, items));
         }
 
         @Override
-        public List<Kept> kept(UUID owner) {
+        public List<Kept> claimable(UUID owner) {
             if (failReads) {
                 throw new IllegalStateException("database unavailable");
             }
-            return pausedReads ? frozen : read(owner);
-        }
-
-        @Override
-        public boolean claim(String id) {
-            return rows.remove(id) != null;
-        }
-
-        private List<Kept> read(UUID owner) {
             List<Kept> kept = new ArrayList<>();
             rows.forEach((id, row) -> {
-                if (row.getKey().equals(owner)) {
-                    kept.add(new Kept(id, row.getValue()));
+                if (row.owner.equals(owner) && row.open()) {
+                    kept.add(new Kept(id, row.items));
                 }
             });
             return kept;
+        }
+
+        @Override
+        public boolean claim(String id, String claimant) {
+            Row row = rows.get(id);
+            if (row == null || !row.open()) {
+                return false;
+            }
+            row.claimedBy = claimant;
+            row.stale = false;
+            return true;
+        }
+
+        @Override
+        public boolean finish(String id, String claimant, VaultContents rest) {
+            Row row = rows.get(id);
+            if (row == null || !claimant.equals(row.claimedBy)) {
+                return false;
+            }
+            if (rest.isEmpty()) {
+                rows.remove(id);
+            } else {
+                row.items = rest;
+                row.claimedBy = null;
+            }
+            return true;
+        }
+
+        @Override
+        public void release(String id, String claimant) {
+            Row row = rows.get(id);
+            if (row != null && claimant.equals(row.claimedBy)) {
+                row.claimedBy = null;
+            }
         }
     }
 

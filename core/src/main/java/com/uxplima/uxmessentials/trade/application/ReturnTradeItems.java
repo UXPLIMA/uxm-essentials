@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.function.BooleanSupplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -20,15 +21,17 @@ import com.uxplima.uxmessentials.vaults.domain.VaultContents;
  * Keeps the items a trade could not hand to a player who was offline or unreachable, and hands them over on that
  * player's next join.
  *
- * <p>On join every kept batch is claimed by deleting its row first, and only the server whose delete removed the row
- * hands it over, so a batch reaches the player exactly once, even when they join two servers in quick succession. A
- * batch claimed but not given (the player left first, or the give failed) is kept again straight away. What does not
- * fit the inventory is kept for the next join too rather than dropped, since a join point is often a crowded spawn
- * where a dropped stack can be picked up by someone else or despawn. A batch kept while the player is already online
- * waits for their next join; it is never lost.
+ * <p>On join each kept batch is claimed with a fresh token before it is handed over, and removed only once the items
+ * are in the inventory, under that same token. Only one delivery wins a claim, so a batch reaches the player once even
+ * when they join two servers in quick succession, and the row is never gone while the items are still in flight. A
+ * hand-over that does not land (the player left first, or the give failed) releases the claim, leaving the batch for
+ * the next join. A claim that a crashed server never finished goes stale and is taken again; the store explains that
+ * trade-off. What does not fit the inventory is put back in place of the batch rather than dropped, since a join
+ * point is often a crowded spawn where a dropped stack can be picked up by someone else or despawn. A batch kept while
+ * the player is already online waits for their next join.
  *
- * <p>Keeping writes to storage, so it runs on the async lane. Once the plugin is no longer running the scheduler runs
- * nothing more, and the items are kept on the calling thread instead; that only happens while the server stops.
+ * <p>Storage is touched only on the async lane. Once the plugin is no longer running the scheduler runs nothing
+ * more, and storage is written on the calling thread instead; that only happens while the server stops.
  */
 public final class ReturnTradeItems {
 
@@ -66,11 +69,7 @@ public final class ReturnTradeItems {
         if (items.isEmpty()) {
             return;
         }
-        if (!running.getAsBoolean()) {
-            keepNow(owner, items);
-            return;
-        }
-        scheduler.async(() -> keepNow(owner, items));
+        offTick(() -> keepNow(owner, items));
     }
 
     /**
@@ -81,53 +80,86 @@ public final class ReturnTradeItems {
         Objects.requireNonNull(owner, "owner");
         List<TradeItemReturns.Kept> kept;
         try {
-            kept = returns.kept(owner.uuid());
+            kept = returns.claimable(owner.uuid());
         } catch (RuntimeException failure) {
             log.error("event=trade_return_read_failed player=" + owner.uuid(), failure);
             return;
         }
         for (TradeItemReturns.Kept batch : kept) {
+            String claimant = UUID.randomUUID().toString();
             boolean claimed;
             try {
-                claimed = returns.claim(batch.id());
+                claimed = returns.claim(batch.id(), claimant);
             } catch (RuntimeException failure) {
-                // The row stays, so the next join tries again.
+                // The row stays unclaimed, so the next join tries again.
                 log.error("event=trade_return_claim_failed player=" + owner.uuid() + " id=" + batch.id(), failure);
                 continue;
             }
             if (claimed) {
-                VaultContents items = batch.items();
-                scheduler.onEntity(owner, () -> give(owner, items), () -> keep(owner, items));
+                scheduler.onEntity(
+                        owner,
+                        () -> give(owner, batch, claimant),
+                        () -> offTick(() -> release(owner, batch, claimant)));
             }
         }
     }
 
-    private void give(PlayerRef owner, VaultContents items) {
+    /** On the player's thread: put the batch in their inventory, then settle the row off the tick. */
+    private void give(PlayerRef owner, TradeItemReturns.Kept batch, String claimant) {
         Optional<TradeItemReceiver.Receipt> receipt;
         try {
-            receipt = receiver.give(owner, items);
+            receipt = receiver.give(owner, batch.items());
         } catch (RuntimeException failure) {
-            // A receiver reports a partial give as leftover, so a throw means nothing went in and the batch is kept.
+            // A receiver reports a partial give as leftover, so a throw means nothing went in and the batch stays.
             log.error("event=trade_return_give_failed player=" + owner.uuid() + " (kept for the next join)", failure);
-            keep(owner, items);
+            offTick(() -> release(owner, batch, claimant));
             return;
         }
         if (receipt.isEmpty()) {
-            keep(owner, items);
+            offTick(() -> release(owner, batch, claimant));
             return;
         }
         TradeItemReceiver.Receipt given = receipt.get();
+        offTick(() -> finish(owner, batch, claimant, given.leftover()));
         if (given.given() > 0) {
             notifier.send(
                     owner, TradeMessageKey.TRADE_RETURNS_DELIVERED, Map.of("count", Integer.toString(given.given())));
         }
         if (!given.leftover().isEmpty()) {
-            keep(owner, given.leftover());
             notifier.send(
                     owner,
                     TradeMessageKey.TRADE_RETURNS_KEPT,
                     Map.of("count", Integer.toString(given.leftoverCount())));
         }
+    }
+
+    private void finish(PlayerRef owner, TradeItemReturns.Kept batch, String claimant, VaultContents rest) {
+        try {
+            if (!returns.finish(batch.id(), claimant, rest)) {
+                // The claim went stale and another delivery took it: the batch may reach the player twice.
+                log.warn("event=trade_return_claim_lost player={} id={}", owner.uuid(), batch.id());
+            }
+        } catch (RuntimeException failure) {
+            // The row stays claimed: once the claim goes stale the batch is handed over again rather than lost.
+            log.error("event=trade_return_finish_failed player=" + owner.uuid() + " id=" + batch.id(), failure);
+        }
+    }
+
+    private void release(PlayerRef owner, TradeItemReturns.Kept batch, String claimant) {
+        try {
+            returns.release(batch.id(), claimant);
+        } catch (RuntimeException failure) {
+            // The row stays claimed and is handed over once the claim goes stale.
+            log.error("event=trade_return_release_failed player=" + owner.uuid() + " id=" + batch.id(), failure);
+        }
+    }
+
+    private void offTick(Runnable storageWork) {
+        if (!running.getAsBoolean()) {
+            storageWork.run();
+            return;
+        }
+        scheduler.async(storageWork);
     }
 
     private void keepNow(PlayerRef owner, VaultContents items) {

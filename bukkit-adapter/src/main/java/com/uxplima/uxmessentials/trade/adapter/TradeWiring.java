@@ -132,10 +132,11 @@ public final class TradeWiring {
                 dataFolder,
                 kernel.log());
         // Stacks a trade could not hand to a player who was gone are kept and handed over on their next join, on any
-        // server sharing the database; the join listener is always on so they arrive even after trading is turned off.
+        // server sharing the database. The join listener lives with the module, so while trade is turned off the
+        // stacks wait in the table until it is on again.
         ReturnTradeItems returns = new ReturnTradeItems(
                 kernel.scheduler(),
-                TradeRepositories.itemReturns(persistence, Clock.systemUTC()),
+                TradeRepositories.itemReturns(persistence, Clock.systemUTC(), kernel.log()),
                 new BukkitTradeItemReceiver(),
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 kernel.log(),

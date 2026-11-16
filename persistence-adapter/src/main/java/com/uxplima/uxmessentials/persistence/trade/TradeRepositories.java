@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemReturns;
 import org.jspecify.annotations.NullMarked;
@@ -26,8 +27,8 @@ public final class TradeRepositories {
     }
 
     /** The items a same-server trade kept for a player who was away, handed over on their next join. */
-    public static TradeItemReturns itemReturns(Persistence persistence, Clock clock) {
+    public static TradeItemReturns itemReturns(Persistence persistence, Clock clock, Logger log) {
         Objects.requireNonNull(persistence, "persistence");
-        return new JooqTradeItemReturns(persistence.dsl(), clock);
+        return new JooqTradeItemReturns(persistence.dsl(), clock, log);
     }
 }

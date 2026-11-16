@@ -59,7 +59,17 @@ public final class BukkitTradeItemReceiver implements TradeItemReceiver {
                 break;
             }
         }
-        VaultContents rest = VaultItemCodec.encode(leftover.toArray(ItemStack[]::new));
+        VaultContents rest;
+        try {
+            rest = VaultItemCodec.encode(leftover.toArray(ItemStack[]::new));
+        } catch (RuntimeException unencodable) {
+            // The given part is already in the inventory, so this must not throw and have the caller keep the whole
+            // batch again. What could not be stored is dropped at the player's feet instead, so it is not lost.
+            for (ItemStack extra : leftover) {
+                live.getWorld().dropItemNaturally(live.getLocation(), extra);
+            }
+            return Optional.of(new Receipt(given + left, VaultContents.empty(), 0));
+        }
         return Optional.of(new Receipt(given, rest, left));
     }
 }

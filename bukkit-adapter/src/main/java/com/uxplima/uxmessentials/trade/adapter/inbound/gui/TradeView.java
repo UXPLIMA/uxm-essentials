@@ -8,7 +8,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
@@ -422,10 +421,16 @@ public final class TradeView {
         notifyBoth(exchange, TradeMessageKey.TRADE_CANCELLED);
     }
 
-    /** Drain every live trade on module stop or reload, returning all offered items. */
+    /**
+     * Drain every live trade on module stop or reload, returning all offered items. A trade both sides confirmed
+     * whose windows are still being frozen is taken over too: on a stop the scheduler runs no more hops, so its settle
+     * would never start and both offers would be lost.
+     */
     public void closeAll() {
         for (TradeExchange exchange : sessions.all()) {
-            cancel(exchange);
+            if (exchange.beginCancel() || exchange.commitGate().takeOverForStop()) {
+                finishCancel(exchange);
+            }
         }
     }
 
@@ -445,26 +450,41 @@ public final class TradeView {
      * settle runs only once both region reads complete, so it never races an un-read window.
      */
     private void commit(TradeExchange exchange) {
-        AtomicInteger remaining = new AtomicInteger(TradeSide.values().length);
         for (TradeSide side : TradeSide.values()) {
-            freezeAndCapture(exchange, side, remaining);
+            freezeAndCapture(exchange, side);
         }
     }
 
-    /** Read {@code side}'s live window into the item snapshot, clear and close it, and settle once both sides are read. */
-    private void freezeAndCapture(TradeExchange exchange, TradeSide side, AtomicInteger remaining) {
+    /**
+     * Read {@code side}'s live window into the item snapshot, clear and close it, and settle once both sides are read.
+     * A player who left before the hop ran (their thread retired) aborts the commit: once the other side is frozen too,
+     * nothing is settled and each side gets its own offer back, the leaver's last recorded offer kept for their next
+     * join.
+     */
+    private void freezeAndCapture(TradeExchange exchange, TradeSide side) {
         TradeHolder holder = exchange.holder(side);
         PlayerRef viewer = holder.viewer();
-        scheduler.onEntity(viewer, () -> {
-            window.live(viewer).ifPresent(inv -> {
-                exchange.captureItems(side, window.readOffer(inv));
-                window.clearOffer(inv);
-            });
-            closeWindow(viewer);
-            if (remaining.decrementAndGet() == 0) {
-                scheduler.async(() -> settleAndDeliver(exchange));
+        scheduler.onEntity(
+                viewer,
+                () -> {
+                    window.live(viewer).ifPresent(inv -> {
+                        exchange.captureItems(side, window.readOffer(inv));
+                        window.clearOffer(inv);
+                    });
+                    closeWindow(viewer);
+                    afterFreeze(exchange, exchange.commitGate().frozen());
+                },
+                () -> afterFreeze(exchange, exchange.commitGate().retired()));
+    }
+
+    private void afterFreeze(TradeExchange exchange, CommitGate.Decision decision) {
+        switch (decision) {
+            case SETTLE -> scheduler.async(() -> settleAndDeliver(exchange));
+            case RETURN -> finishCancel(exchange);
+            case WAIT -> {
+                // The other side's freeze, or a stop that took the trade over, ends it.
             }
-        });
+        }
     }
 
     private void settleAndDeliver(TradeExchange exchange) {
@@ -563,7 +583,9 @@ public final class TradeView {
         if (!returns.running()) {
             // The plugin is stopping and the scheduler runs nothing more. The stacks are emptied out of the window
             // before they are kept, where this thread may touch it (the main thread on Paper), so a window left open
-            // after a plugin disable cannot hand them out a second time.
+            // after a plugin disable cannot hand them out a second time. On Folia the stopping thread owns no region
+            // and must not touch the window; the plugin only stops there when the server does, and the window, which
+            // is never saved, goes with it.
             if (scheduler.ownsEntity(viewer)) {
                 window.live(viewer).ifPresent(window::clearOffer);
                 closeWindow(viewer);

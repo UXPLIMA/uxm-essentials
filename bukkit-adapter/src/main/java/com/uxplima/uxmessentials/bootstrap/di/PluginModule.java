@@ -2022,13 +2022,15 @@ public final class PluginModule {
             Bus bus,
             Menus menus,
             MenuBindings menuBindings) {
-        // trade persists nothing same-server: a live trade is transient in-memory state (the TradeSessions registry and
-        // its per-trade TradeExchange), and the config is read once into an immutable snapshot. The window view and its
+        // A live same-server trade is transient in-memory state (the TradeSessions registry and its per-trade
+        // TradeExchange); the one thing trade stores is the stacks it could not hand to a player who was gone, kept in
+        // trade_item_returns for their next join. The config is read once into an immutable snapshot. The window view
+        // and its
         // click/drag/close/quit listener stand up here; Phase 3 adds the money row over the shared TextInput seam and
         // the trade economy port, bridged from the provider captured at economy-wiring time (trade registers after
         // economy), or left empty when economy is disabled, in which case a trade moves items only. closeAll() drains
-        // every live trade on module stop or reload, returning both sides' offered items, so a disable leaves
-        // nothing.
+        // every live trade on module stop or reload, returning both sides' offered items or keeping them for a player
+        // who is gone, so a disable leaves nothing behind.
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
         @org.jspecify.annotations.Nullable TradeEconomy economy = provider != null && currency != null
