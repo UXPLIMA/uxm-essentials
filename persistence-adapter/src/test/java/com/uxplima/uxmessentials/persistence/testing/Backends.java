@@ -84,6 +84,9 @@ final class Backends implements ParameterResolver {
             data.setUrl("jdbc:sqlite:" + file);
             data.setJournalMode("WAL");
             data.setBusyTimeout(5000);
+            // The plugin's own SQLite pool turns foreign keys on, so a write that leaves a reference dangling fails
+            // here as it does on an operator's server.
+            data.setEnforceForeignKeys(true);
             DSLContext dsl =
                     DslContextProvider.create(data, TestBackend.SQLITE.runtime().dialect(), "");
             return new Opened(new TestDatabase(TestBackend.SQLITE, data, dsl), () -> delete(folder));
@@ -174,7 +177,7 @@ final class Backends implements ParameterResolver {
             HikariDataSource pool =
                     DataSourceFactory.create(new DatabaseSettings(new MapConfigStore(storage), real.dataFolder()));
             new FlywayMigrationRunner(pool, backend.runtime(), "").migrate(List.of());
-            DSLContext dsl = DslContextProvider.create(pool, backend.runtime().dialect(), "");
+            DSLContext dsl = DslContextProvider.create(pool, backend.runtime().dialectOn(pool), "");
             Map<Table<?>, Result<Record>> seeds = new LinkedHashMap<>();
             for (Table<?> table : tables()) {
                 Result<Record> rows = dsl.select().from(table).fetch();

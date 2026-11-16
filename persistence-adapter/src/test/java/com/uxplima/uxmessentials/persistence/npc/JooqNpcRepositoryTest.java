@@ -16,7 +16,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** An NPC's server scope through the real migrations on a SQLite file. */
+/** An NPC's server scope through the real migrations. */
 @EveryBackend
 class JooqNpcRepositoryTest {
 

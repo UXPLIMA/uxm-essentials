@@ -18,7 +18,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** A hologram's server scope through the real migrations on a SQLite file. */
+/** A hologram's server scope through the real migrations. */
 @EveryBackend
 class JooqHologramRepositoryTest {
 

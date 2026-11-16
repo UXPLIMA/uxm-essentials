@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.teleport.domain.PendingRelocation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** The {@code /tpofflinehere} relocation row through the real migrations on a SQLite file. */
+/** The {@code /tpofflinehere} relocation row through the real migrations. */
 @EveryBackend
 class JooqPendingRelocationsTest {
 

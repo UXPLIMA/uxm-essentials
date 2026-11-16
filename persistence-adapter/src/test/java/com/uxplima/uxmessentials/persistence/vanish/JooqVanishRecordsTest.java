@@ -16,7 +16,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Each player's kept vanish through the real migrations on a SQLite file. */
+/** Each player's kept vanish through the real migrations. */
 @EveryBackend
 class JooqVanishRecordsTest {
 

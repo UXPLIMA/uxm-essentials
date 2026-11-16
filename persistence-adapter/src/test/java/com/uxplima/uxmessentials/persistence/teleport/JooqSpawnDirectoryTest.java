@@ -13,7 +13,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Main spawns per scope through the real migrations on a SQLite file, and the cache that reloads them. */
+/** Main spawns per scope through the real migrations, and the cache that reloads them. */
 @EveryBackend
 class JooqSpawnDirectoryTest {
 

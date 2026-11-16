@@ -33,7 +33,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Regions, history and denials through the real migrations on a SQLite file. */
+/** Regions, history and denials through the real migrations. */
 @EveryBackend
 class JooqGuardStoreTest {
 

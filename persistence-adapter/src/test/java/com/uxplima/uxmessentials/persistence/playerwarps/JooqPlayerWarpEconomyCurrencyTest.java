@@ -92,7 +92,7 @@ class JooqPlayerWarpEconomyCurrencyTest {
     void open(TestDatabase database) {
         dsl = database.dsl();
         racing = DslContextProvider.create(
-                racing(database.dataSource()), database.runtime().dialect(), "");
+                racing(database.dataSource()), database.dsl().dialect(), "");
         market = new JooqPlayerWarpRepository(dsl)
                 .save(PlayerWarp.create(
                         SAM,
@@ -117,11 +117,12 @@ class JooqPlayerWarpEconomyCurrencyTest {
 
     /** Set the bank as another server's write would, behind the economy under test. */
     private void bankHolds(String amount, Currency currency) {
-        dsl.update(PLAYER_WARPS)
+        dsl.transaction(tx -> tx.dsl()
+                .update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, new BigDecimal(amount))
                 .set(PLAYER_WARPS.EARNED_CURRENCY, currency.id().value())
                 .where(PLAYER_WARPS.ID.eq(market.value()))
-                .execute();
+                .execute());
     }
 
     @Test

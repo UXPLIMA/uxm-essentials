@@ -22,7 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * A conditional ban, mute or IP ban write through the real migrations on a SQLite file: it lands only while the row
+ * A conditional ban, mute or IP ban write through the real migrations: it lands only while the row
  * is still the one the caller read, so a sanction written by another server in between is never overwritten by a
  * decision made without it.
  */

@@ -20,7 +20,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** The pending cross-server hop row of every kind through the real migrations on a SQLite file. */
+/** The pending cross-server hop row of every kind through the real migrations. */
 @EveryBackend
 class JooqPendingHopStoreTest {
 
@@ -146,7 +146,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowAnOlderReleaseWroteStillResolvesAsAPlayerWarpHop() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "survival")
@@ -154,7 +155,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -178,14 +179,15 @@ class JooqPendingHopStoreTest {
         store.record(new PendingHop(
                 ALEX, HopKind.WARP, "market", "survival", "lobby", ASKED, Optional.empty(), Optional.empty()));
         // What an older backend's upsert of a player-warp hop leaves: its own columns, and the stale kind beside them.
-        dsl.update(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .update(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 7L)
                 .set(
                         PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT,
                         ASKED.plusSeconds(1).toEpochMilli())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_AMOUNT, new BigDecimal("25.5000"))
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PAID_CURRENCY, "gold")
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -206,13 +208,14 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowWithNoKindNoPlayerWarpAndNoTargetReadsAsUnknownAndCanBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -223,7 +226,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aKindANewerReleaseAddedReadsAsUnknownAndCanStillBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "SHIP")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
@@ -231,7 +235,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 
@@ -244,7 +248,8 @@ class JooqPendingHopStoreTest {
 
     @Test
     void aRowStoredUnderTheEarlierPlayerKindReadsAsARequestHopAndCanBeClaimed() {
-        dsl.insertInto(PLAYER_WARP_PENDING_TELEPORTS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_PENDING_TELEPORTS)
                 .set(PLAYER_WARP_PENDING_TELEPORTS.PLAYER_UUID, ALEX.toString())
                 .set(PLAYER_WARP_PENDING_TELEPORTS.KIND, "PLAYER")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.WARP_ID, 0L)
@@ -252,7 +257,7 @@ class JooqPendingHopStoreTest {
                 .set(PLAYER_WARP_PENDING_TELEPORTS.TARGET_SERVER, "harbour")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.ORIGIN_SERVER, "lobby")
                 .set(PLAYER_WARP_PENDING_TELEPORTS.REQUESTED_AT, ASKED.toEpochMilli())
-                .execute();
+                .execute());
 
         PendingHop found = store.find(ALEX).orElseThrow();
 

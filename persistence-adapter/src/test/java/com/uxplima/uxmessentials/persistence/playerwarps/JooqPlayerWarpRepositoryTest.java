@@ -26,7 +26,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** The player warp queries the rent sweep deletes by, through the real migrations on a SQLite file. */
+/** The player warp queries the rent sweep deletes by, through the real migrations. */
 @EveryBackend
 class JooqPlayerWarpRepositoryTest {
 
@@ -84,11 +84,12 @@ class JooqPlayerWarpRepositoryTest {
     }
 
     private void favourite(PlayerWarpId warp) {
-        dsl.insertInto(PLAYER_WARP_FAVOURITES)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(PLAYER_WARP_FAVOURITES)
                 .set(PLAYER_WARP_FAVOURITES.PLAYER_UUID, SAM.uuid().toString())
                 .set(PLAYER_WARP_FAVOURITES.WARP_ID, warp.value())
                 .set(PLAYER_WARP_FAVOURITES.ADDED_AT, NOW.toEpochMilli())
-                .execute();
+                .execute());
     }
 
     private int favourites(PlayerWarpId warp) {
@@ -116,10 +117,11 @@ class JooqPlayerWarpRepositoryTest {
         repository.save(archived.withId(restored).withStatus(WarpStatus.ACTIVE, NOW));
         favourite(restored);
         PlayerWarpId rich = repository.save(archivedForRent("rich", old, old));
-        dsl.update(PLAYER_WARPS)
+        dsl.transaction(tx -> tx.dsl()
+                .update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, new BigDecimal("40"))
                 .where(PLAYER_WARPS.ID.eq(rich.value()))
-                .execute();
+                .execute());
 
         assertThat(repository.deleteIfArchivedForRent(restored, CUTOFF)).isFalse();
         assertThat(repository.deleteIfArchivedForRent(rich, CUTOFF)).isFalse();

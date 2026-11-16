@@ -17,7 +17,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** Kept give-backs through the real migrations on a SQLite file. */
+/** Kept give-backs through the real migrations. */
 @EveryBackend
 class JooqItemReturnStoreTest {
 

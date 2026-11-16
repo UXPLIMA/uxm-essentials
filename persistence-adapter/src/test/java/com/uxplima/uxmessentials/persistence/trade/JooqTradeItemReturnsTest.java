@@ -131,12 +131,13 @@ class JooqTradeItemReturnsTest {
     @Test
     void aRowThatCannotBeReadIsSkippedAndKeptWhileTheRestAreHandedOut() {
         TradeItemReturns returns = store(dsl);
-        dsl.insertInto(TRADE_ITEM_RETURNS)
+        dsl.transaction(tx -> tx.dsl()
+                .insertInto(TRADE_ITEM_RETURNS)
                 .set(TRADE_ITEM_RETURNS.ID, "broken")
                 .set(TRADE_ITEM_RETURNS.OWNER, ALEX.toString())
                 .set(TRADE_ITEM_RETURNS.CONTENTS, "not base64 !")
                 .set(TRADE_ITEM_RETURNS.CREATED_AT, NOW.toEpochMilli() - 1)
-                .execute();
+                .execute());
         returns.keep(ALEX, SWORD);
 
         assertThat(returns.claimable(ALEX))
@@ -148,7 +149,9 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aBatchFarLargerThanAMysqlTextColumnComesBackWhole() {
-        byte[] bytes = new byte[1 << 20];
+        // Eight times what a TEXT column holds, and still under the 1 MB packet the MySQL and MariaDB test servers
+        // accept (a server's own default is 16 MB or more).
+        byte[] bytes = new byte[1 << 19];
         new Random(7).nextBytes(bytes);
         VaultContents shulkers = VaultContents.of(bytes);
 

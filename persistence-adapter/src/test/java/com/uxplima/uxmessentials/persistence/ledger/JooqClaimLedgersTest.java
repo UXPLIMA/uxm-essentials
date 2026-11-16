@@ -13,7 +13,7 @@ import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-/** The shared kit claims, cooldowns and daily reward stamps through the real migrations on a SQLite file. */
+/** The shared kit claims, cooldowns and daily reward stamps through the real migrations. */
 @EveryBackend
 class JooqClaimLedgersTest {
 
