@@ -14,6 +14,7 @@ import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.application.ledger.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
@@ -36,6 +37,12 @@ import org.jspecify.annotations.Nullable;
  * a single server keeps them in PDC rather than the database. A network keeps them in the database instead
  * ({@code NetworkCooldowns}), since each backend has its own PDC. An offline player has no PDC to
  * read, so a check passes and a stamp is a no-op.
+ *
+ * <p>A player's PDC belongs to their entity thread, and a check is asked from wherever its use case runs: a command on
+ * that thread, a placeholder on another, a launch on the async lane. Every read and write goes through
+ * {@link OwningThreadReads}, which works in place on the owning thread and hops there from anywhere else. When it
+ * cannot (another region's thread, a stall, the plugin stopping), a check passes and a stamp is skipped: a cooldown
+ * missed now and then lets a command through early, where a refused check would block a player for no reason.
  */
 @NullMarked
 public final class PdcCooldowns implements Cooldowns {
@@ -48,12 +55,14 @@ public final class PdcCooldowns implements Cooldowns {
     private final PdcKeys keys;
     private final Permissions permissions;
     private final Clock clock;
+    private final OwningThreadReads reads;
 
-    public PdcCooldowns(Plugin plugin, Permissions permissions, Clock clock) {
+    public PdcCooldowns(Plugin plugin, Permissions permissions, Clock clock, OwningThreadReads reads) {
         Objects.requireNonNull(plugin, "plugin");
         this.keys = new PdcKeys(plugin, KEY_PREFIX);
         this.permissions = Objects.requireNonNull(permissions, "permissions");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.reads = Objects.requireNonNull(reads, "reads");
     }
 
     @Override
@@ -105,6 +114,11 @@ public final class PdcCooldowns implements Cooldowns {
     }
 
     private Result<Unit, Duration> gate(PlayerRef who, NamespacedKey key) {
+        Result<Unit, Duration> open = Result.ok();
+        return reads.forPlayer(who, () -> readGate(who, key), open, open);
+    }
+
+    private Result<Unit, Duration> readGate(PlayerRef who, NamespacedKey key) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null) {
             return Result.ok();
@@ -118,9 +132,14 @@ public final class PdcCooldowns implements Cooldowns {
         if (seconds <= 0) {
             return; // a zero-length cooldown stamps nothing. There is no wait to enforce
         }
+        var unused = reads.forPlayer(who, () -> stampOnOwner(who, key, seconds), false, false);
+    }
+
+    /** Write the stamp on the player's own thread; whether one was written. */
+    private boolean stampOnOwner(PlayerRef who, NamespacedKey key, long seconds) {
         Player player = Bukkit.getPlayer(who.uuid());
         if (player == null) {
-            return;
+            return false;
         }
         long now = clock.millis();
         PersistentDataContainer pdc = player.getPersistentDataContainer();
@@ -130,6 +149,7 @@ public final class PdcCooldowns implements Cooldowns {
             pdc.remove(spent);
         }
         pdc.set(key, PersistentDataType.LONG, CooldownTiers.readyAt(now, seconds));
+        return true;
     }
 
     /**

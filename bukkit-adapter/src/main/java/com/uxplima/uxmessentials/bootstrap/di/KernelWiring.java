@@ -194,14 +194,14 @@ final class KernelWiring {
 
         Scheduler scheduler = new FoliaScheduler(plugin);
         // Read on the player's own thread: most permission questions come from use cases on the async lane.
-        Permissions permissions =
-                new BukkitPermissions(metaSource(log), OwningThreadReads.onServer(scheduler, plugin, log));
+        OwningThreadReads reads = OwningThreadReads.onServer(scheduler, plugin, log);
+        Permissions permissions = new BukkitPermissions(metaSource(log), reads);
         Clock clock = Clock.systemUTC();
         Optional<NetworkClaims> networkClaims =
                 sharedLedger.map(ledger -> new NetworkClaims(ledger, scheduler, clock, log));
         Cooldowns cooldowns = networkClaims
                 .<Cooldowns>map(claims -> new NetworkCooldowns(claims, permissions, clock))
-                .orElseGet(() -> new PdcCooldowns(plugin, permissions, clock));
+                .orElseGet(() -> new PdcCooldowns(plugin, permissions, clock, reads));
         Path messagesDir = plugin.getDataFolder().toPath().resolve("messages");
         LocaleCatalog catalog = new HoconLocaleCatalog(log, messagesDir, theme);
         String prefix = catalog.template(java.util.Locale.ENGLISH, PREFIX_KEY);
