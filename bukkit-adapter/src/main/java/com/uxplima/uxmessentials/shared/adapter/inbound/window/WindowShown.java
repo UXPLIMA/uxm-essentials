@@ -32,7 +32,8 @@ public final class WindowShown {
     /**
      * Open {@code gui} for {@code player} and decide {@code outcome} exactly once: shown when the window comes up,
      * refused when the open is cancelled or a deferral ends without a window. Once refused, a window that still turns
-     * up later is cancelled, so it never shows after what hung on it went the other way. Runs on the player's thread.
+     * up later is cancelled, and closed again if a plugin listening after the cancel let it through anyway, so it never
+     * stays up after what hung on it went the other way. Runs on the player's thread.
      *
      * <p>A window that does not show after a deferral, and whose player then leaves before the check, is not decided
      * here: the caller decides it when the player leaves, through {@link WindowOutcome#settle}.
@@ -49,21 +50,27 @@ public final class WindowShown {
             }
             if (!outcome.mayOpen()) {
                 event.setCancelled(true);
-                return;
             }
-            // The open event is still being decided here, so whether it went through is read a tick later.
+            // The open event is still being decided here, and a listener after this one may undo the cancel, so
+            // whether it went through is read a tick later.
             scheduler.laterEntity(ref, Duration.ZERO, () -> {
-                if (showing(player, gui.getInventory())) {
-                    outcome.shown();
+                if (showing(player, gui.getInventory()) && !outcome.shown()) {
+                    player.closeInventory();
                 }
             });
         });
         // The same test uxmLib makes before it puts the open off.
         boolean deferred = player.isSleeping();
         gui.open(player);
-        outcome.asked(deferred, showing(player, gui.getInventory()));
+        if (!outcome.asked(deferred, showing(player, gui.getInventory()))) {
+            player.closeInventory();
+        }
         if (deferred) {
-            scheduler.laterEntity(ref, DEFERRAL, () -> outcome.settle(showing(player, gui.getInventory())));
+            scheduler.laterEntity(ref, DEFERRAL, () -> {
+                if (!outcome.settle(showing(player, gui.getInventory()))) {
+                    player.closeInventory();
+                }
+            });
         }
     }
 

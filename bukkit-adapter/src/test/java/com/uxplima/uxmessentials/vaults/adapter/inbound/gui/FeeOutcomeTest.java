@@ -123,15 +123,16 @@ class FeeOutcomeTest {
     }
 
     @Test
-    void aFeeAlreadyGivenBackIsNotGivenBackAgainByTheWindow() {
+    void aFeeAlreadyGivenBackRulesTheWindowOutAndIsNotGivenBackAgain() {
         VaultOpenFee fee = paidOpen();
         assertThat(fee.giveBack().orElseThrow().getAsBoolean()).isTrue();
         WindowOutcome outcome = outcomeOf(fee);
 
-        outcome.asked(false, false);
+        assertThat(outcome.mayOpen()).isFalse();
+        assertThat(outcome.asked(false, true)).isFalse();
         runRefunds();
 
-        assertThat(told).isEmpty();
+        assertThat(told).containsExactly("refused");
         assertThat(wallet.moves).containsExactly("-2", "+2 coins");
     }
 

@@ -69,4 +69,36 @@ class WindowOutcomeTest {
 
         assertThat(told).containsExactly("shown");
     }
+
+    @Test
+    void aRefusedWindowSeenShowingAnywayMustBeClosedAndStaysRefused() {
+        outcome.asked(false, false);
+
+        assertThat(outcome.shown()).isFalse();
+        assertThat(outcome.settle(true)).isFalse();
+
+        assertThat(told).containsExactly("refused");
+    }
+
+    @Test
+    void aShownWindowMayStay() {
+        assertThat(outcome.asked(false, true)).isTrue();
+        assertThat(outcome.shown()).isTrue();
+
+        assertThat(told).containsExactly("shown");
+    }
+
+    @Test
+    void anOpenRuledOutBeforeItsWindowIsRefusedWhenTheWindowIsSeen() {
+        boolean[] ruledOut = {false};
+        WindowOutcome guarded =
+                new WindowOutcome(() -> told.add("shown"), () -> told.add("refused"), () -> ruledOut[0]);
+        guarded.asked(true, false);
+        ruledOut[0] = true;
+
+        assertThat(guarded.mayOpen()).isFalse();
+        assertThat(guarded.shown()).isFalse();
+
+        assertThat(told).containsExactly("refused");
+    }
 }

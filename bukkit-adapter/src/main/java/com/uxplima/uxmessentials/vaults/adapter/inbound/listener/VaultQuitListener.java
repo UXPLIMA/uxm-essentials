@@ -21,9 +21,12 @@ public final class VaultQuitListener implements Listener {
         this.view = Objects.requireNonNull(view, "view");
     }
 
-    /** Last, after anything else that may close the window on quit, so a window that was showing has settled. */
+    /**
+     * Paper closes the player's open container before it raises the quit, so a window that was showing has already
+     * closed, settled and written itself by now; what is left here is unseen. Last, after other listeners.
+     */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onQuit(PlayerQuitEvent event) {
-        view.viewerLeft(event.getPlayer().getUniqueId());
+        view.viewerLeft(event.getPlayer());
     }
 }

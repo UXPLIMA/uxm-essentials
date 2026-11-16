@@ -16,8 +16,8 @@ final class FeeOutcome {
 
     /**
      * The outcome of one open that took {@code fee}. Shown spends the fee and runs {@code shown}; refused hands the
-     * fee's deposit to {@code refund}, which runs it off the tick, and runs {@code refused}. The fee decides only once,
-     * so a fee already decided elsewhere runs neither.
+     * fee's deposit to {@code refund}, which runs it off the tick, and runs {@code refused}. A fee already given back
+     * elsewhere rules the window out, so it can only be refused, and its deposit is not handed out again.
      */
     static WindowOutcome of(VaultOpenFee fee, Runnable shown, Runnable refused, Consumer<BooleanSupplier> refund) {
         Objects.requireNonNull(fee, "fee");
@@ -30,9 +30,10 @@ final class FeeOutcome {
                         shown.run();
                     }
                 },
-                () -> fee.giveBack().ifPresent(deposit -> {
-                    refund.accept(deposit);
+                () -> {
+                    fee.giveBack().ifPresent(refund);
                     refused.run();
-                }));
+                },
+                fee::givenBack);
     }
 }

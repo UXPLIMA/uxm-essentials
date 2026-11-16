@@ -8,6 +8,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
 
 import org.bukkit.Sound;
@@ -19,6 +20,7 @@ import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowOutcome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
@@ -91,8 +93,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>An open is decided once, as shown or refused ({@link WindowOutcome}). Its open fee is spent when the window is
  * showing and given back, off the tick, when it is not: another plugin or the invsee edit guard cancelled it, the vault
- * was open elsewhere, the player stayed asleep through uxmLib's deferral, or left first. A window refused that way keeps
- * its claim until its viewer opens the vault again or leaves; on leaving, a window nobody is looking at is released.
+ * was open elsewhere, the player stayed asleep through uxmLib's deferral, or left first. A window refused that way
+ * releases its claim at once, so the vault is free for others while its viewer stays online.
  *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
@@ -190,6 +192,7 @@ public final class VaultView {
             windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
                     .ifPresent(this::offTick);
         }
+        AtomicBoolean releasedUnseen = new AtomicBoolean();
         WindowOutcome outcome = FeeOutcome.of(
                 fee,
                 () -> {
@@ -198,6 +201,8 @@ public final class VaultView {
                 },
                 () -> {
                     pending.remove(gui);
+                    releasedUnseen.set(true);
+                    releaseUnseen(player, viewer, vault, gui);
                     refused.run();
                 },
                 credit -> refund(fee, credit));
@@ -206,7 +211,11 @@ public final class VaultView {
             // Only a window that was showing raises a close, so this also settles an open whose check had not run.
             outcome.shown();
             if (!windows.holds(vault.id(), gui)) {
-                return; // taken over by a newer window of the same viewer, which writes these items
+                if (releasedUnseen.get()) {
+                    // Emptied when it was released, so whatever is in it now was put there since: it goes back.
+                    handBackStray(event.getPlayer(), gui);
+                }
+                return; // otherwise taken over by a newer window of the same viewer, which writes these items
             }
             returnBlockedItems(event.getPlayer(), viewer, gui);
             windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
@@ -227,20 +236,62 @@ public final class VaultView {
     }
 
     /**
-     * {@code viewer} is leaving. Their opens still undecided are decided by whether the window is showing, and the
-     * claims they hold in windows nobody is looking at are released and written, so the vault does not stay
+     * {@code player} is leaving. Their opens still undecided are decided by whether the window is showing, which
+     * releases a refused one, and any other claim they hold in a window nobody is looking at is released and written
+     * the way a close would, blacklisted items going back to them first, so the vault does not stay
      * {@code VAULT_ALREADY_OPEN} for everyone else until they come back. The opens are decided first, so a window
-     * released here can no longer be opened late. Runs on the viewer's thread.
+     * released here can no longer be opened late. Runs on the player's thread.
      */
-    public void viewerLeft(UUID viewer) {
-        Objects.requireNonNull(viewer, "viewer");
+    public void viewerLeft(Player player) {
+        Objects.requireNonNull(player, "player");
+        UUID viewer = player.getUniqueId();
+        PlayerRef ref = BukkitRefs.toRef(player);
         pending.forEach((gui, open) -> {
             if (open.viewer().uuid().equals(viewer)) {
-                open.outcome().settle(seen(gui));
+                decide(gui, open.outcome());
             }
         });
-        windows.releaseLeft(viewer, VaultView::seen, gui -> VaultItemCodec.encode(gui.contents()))
+        windows.releaseLeft(viewer, VaultView::seen, gui -> {
+                    returnBlockedItems(player, ref, gui);
+                    return VaultItemCodec.encode(gui.contents());
+                })
                 .forEach(this::offTick);
+    }
+
+    /**
+     * Release the claim of a window whose open was refused, writing its items like a close would, and empty it. The
+     * refusal is what makes this safe while the viewer stays online: a refused window's open is cancelled, and one a
+     * plugin lets through anyway is closed again ({@link WindowShown#open}), so no second window can be filled from the
+     * row while this one is used. It is emptied all the same, so even a window that slipped through for a tick holds
+     * nothing that was already written. Blacklisted items go back to the viewer first, as on a close.
+     */
+    private void releaseUnseen(Player player, PlayerRef viewer, Vault vault, StorageGui gui) {
+        if (player.isOnline()) {
+            returnBlockedItems(player, viewer, gui);
+        }
+        windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents())).ifPresent(this::offTick);
+        gui.getInventory().clear();
+    }
+
+    /** Give whatever is in {@code gui} back to {@code closer}, and empty it. */
+    private void handBackStray(HumanEntity closer, StorageGui gui) {
+        if (!(closer instanceof Player player)) {
+            return;
+        }
+        org.bukkit.inventory.Inventory contents = gui.getInventory();
+        for (ItemStack stack : contents.getContents()) {
+            if (stack != null && !stack.getType().isAir()) {
+                returnToPlayer(player, stack);
+            }
+        }
+        contents.clear();
+    }
+
+    /** Decide {@code outcome} by whether {@code gui} is showing, closing it when it may not stay. */
+    private static void decide(StorageGui gui, WindowOutcome outcome) {
+        if (!outcome.settle(seen(gui))) {
+            List.copyOf(gui.getInventory().getViewers()).forEach(HumanEntity::closeInventory);
+        }
     }
 
     /** True while somebody has {@code gui} open. */
@@ -360,9 +411,9 @@ public final class VaultView {
         pending.forEach((gui, open) -> {
             WindowOutcome outcome = open.outcome();
             if (running.getAsBoolean()) {
-                PlayerThread.run(scheduler, open.viewer(), () -> outcome.settle(seen(gui)), outcome::refused);
+                PlayerThread.run(scheduler, open.viewer(), () -> decide(gui, outcome), outcome::refused);
             } else {
-                outcome.settle(seen(gui));
+                decide(gui, outcome);
             }
         });
     }

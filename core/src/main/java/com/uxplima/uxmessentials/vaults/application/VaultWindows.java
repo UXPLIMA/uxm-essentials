@@ -176,7 +176,7 @@ public final class VaultWindows<W> {
      * Release every vault {@code viewer} holds in a window they are not looking at, because they left. Returns the
      * writes to run, as a close would.
      *
-     * <p>Such a window is one whose open was refused or never happened, and its claim would otherwise block every
+     * <p>Such a window is one whose open never came up and was not released when it was refused, and its claim would otherwise block every
      * other viewer of that vault until this viewer came back. Releasing it is safe because nothing can reach its
      * items any more: its viewer is gone, nobody else ever sees another viewer's window, and the caller has already
      * decided its open as refused, so a late open is cancelled rather than shown. Its items are written like a
