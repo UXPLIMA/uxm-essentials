@@ -194,8 +194,8 @@ final class KernelWiring {
 
         Scheduler scheduler = new FoliaScheduler(plugin);
         // Read on the player's own thread: most permission questions come from use cases on the async lane.
-        Permissions permissions = new BukkitPermissions(
-                metaSource(log), OwningThreadReads.onServer(scheduler, Bukkit::isPrimaryThread, log));
+        Permissions permissions =
+                new BukkitPermissions(metaSource(log), OwningThreadReads.onServer(scheduler, plugin, log));
         Clock clock = Clock.systemUTC();
         Optional<NetworkClaims> networkClaims =
                 sharedLedger.map(ledger -> new NetworkClaims(ledger, scheduler, clock, log));

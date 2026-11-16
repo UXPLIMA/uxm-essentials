@@ -718,7 +718,8 @@ public final class ModerationWiring {
 
     /**
      * The public chat mute check. Chat arrives on its own async thread, where the lane's permission reader has no
-     * answer and would count every speaker as exempt, so this one reads the live permissions, as Paper allows there.
+     * answer and would count every speaker as exempt, so this one asks the live permissions, which read the speaker's
+     * own thread and wait for the answer.
      */
     static MutedChatListener mutedChat(MutePolicy mutes, Permissions live, Messages messages, MessageSink sink) {
         return new MutedChatListener(mutes, new ModerationGuard(live)::isExempt, messages, sink);

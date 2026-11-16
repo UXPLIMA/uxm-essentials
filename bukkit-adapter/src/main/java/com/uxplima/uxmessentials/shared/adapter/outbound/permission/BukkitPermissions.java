@@ -28,8 +28,8 @@ import org.jspecify.annotations.Nullable;
  * default, the canonical conservative behaviour.
  *
  * <p>Both are read on the player's own thread through {@link OwningThreadReads}: a use case on the async lane asks
- * them after its database reads, and the player's permissions are theirs to read. A read that cannot reach the player
- * in time answers as for an offline player.
+ * them after its database reads, and the player's permissions are theirs to read. A read that cannot be made in time
+ * answers as for an offline player: no permission, the config default.
  */
 @NullMarked
 public final class BukkitPermissions implements Permissions {
@@ -47,7 +47,7 @@ public final class BukkitPermissions implements Permissions {
     public boolean has(PlayerRef who, String node) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
-        return reads.forPlayer(who, () -> hasNow(who, node), false);
+        return reads.forPlayer(who, () -> hasNow(who, node), false, false);
     }
 
     private static boolean hasNow(PlayerRef who, String node) {
@@ -59,8 +59,8 @@ public final class BukkitPermissions implements Permissions {
     public QuotaResult resolveQuota(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(family, "family");
-        return reads.forPlayer(
-                who, () -> resolveNow(who, family, world, configDefault), offlineQuota(family, world, configDefault));
+        QuotaResult offline = offlineQuota(family, world, configDefault);
+        return reads.forPlayer(who, () -> resolveNow(who, family, world, configDefault), offline, offline);
     }
 
     private QuotaResult resolveNow(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {

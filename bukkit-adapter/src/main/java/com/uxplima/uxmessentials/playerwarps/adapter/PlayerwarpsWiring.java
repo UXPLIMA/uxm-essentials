@@ -225,9 +225,8 @@ public final class PlayerwarpsWiring {
         // The gate runs on the async lane after its database reads, so the blocks are read on the landing's own
         // region thread.
         BukkitWarpSafetyChecker blocks = new BukkitWarpSafetyChecker();
-        OwningThreadReads reads =
-                OwningThreadReads.onServer(kernel.scheduler(), plugin.getServer()::isPrimaryThread, kernel.log());
-        WarpSafetyChecker safety = position -> reads.at(position, () -> blocks.isSafe(position), false);
+        OwningThreadReads reads = OwningThreadReads.onServer(kernel.scheduler(), plugin, kernel.log());
+        WarpSafetyChecker safety = position -> reads.at(position, () -> blocks.isSafe(position), false, false);
         PlayerWarpHopResolver hopResolver = new PlayerWarpHopResolver(
                 repository,
                 teleporter,

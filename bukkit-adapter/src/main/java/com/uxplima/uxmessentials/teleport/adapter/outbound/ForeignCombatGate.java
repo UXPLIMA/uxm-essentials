@@ -68,7 +68,9 @@ public final class ForeignCombatGate implements CombatGate {
     public boolean isTagged(PlayerRef who) {
         Objects.requireNonNull(who, "who");
         // A cross-server hop asks this on the async lane; the combat plugins keep their tags for the player's thread.
-        return reads.forPlayer(who, () -> isTaggedNow(who), false);
+        // A player who has left is in no fight, but one whose tag cannot be read in time counts as tagged, or lagging
+        // their own region would be a way out of combat.
+        return reads.forPlayer(who, () -> isTaggedNow(who), false, true);
     }
 
     private boolean isTaggedNow(PlayerRef who) {
