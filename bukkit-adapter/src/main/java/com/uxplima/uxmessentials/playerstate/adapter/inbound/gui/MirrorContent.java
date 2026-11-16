@@ -14,17 +14,17 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The item slots of a managed mirror window: seeded once from the snapshot the window was opened with, then owned by
- * the viewer until the window closes, at which point whatever is in them is reconciled onto the target.
+ * the viewer until the window closes, at which point whatever is in them is handed over to be saved.
  *
  * <p>This is the dupe-safe half of {@code /invsee} and {@code /endersee}. The viewer moves stacks inside their own
  * private copy and never touches the target's live container, so no click can read or write a foreign inventory; the
- * write-back then overwrites the target's slots from the region in one pass, so a relocation stays a relocation
- * rather than becoming a second copy. Because the region is what the viewer is physically holding items in, it is
- * never repainted after the first draw: a redraw painted from the snapshot would undo an edit, and one painted from
- * a snapshot the viewer has emptied would mint it back.
+ * write-back hands the region to {@link MirrorEdits}, which saves what changed or takes it back. Because the region is
+ * what the viewer is physically holding items in, it is never repainted after the first draw: a redraw painted from
+ * the snapshot would undo an edit, and one painted from a snapshot the viewer has emptied would mint it back.
  *
  * <p>A viewer without the modify node opens the same window view-only: every movement is refused, and since nothing
- * can change, the write-back reconciles the same items that were there when it opened.
+ * can change, the write-back hands over the same items that were there when it opened. So does a window whose edit
+ * is no longer open.
  */
 @NullMarked
 final class MirrorContent implements ContentProvider {

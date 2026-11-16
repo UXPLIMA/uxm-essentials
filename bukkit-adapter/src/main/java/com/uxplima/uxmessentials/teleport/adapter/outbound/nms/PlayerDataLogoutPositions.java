@@ -27,9 +27,10 @@ import net.minecraft.world.level.storage.LevelResource;
  * <p>The file is the server's compressed NBT, read here with a small reader that takes {@code Pos},
  * {@code Rotation} and the world uid (or, in data without one, the {@code Dimension} key) from the root compound
  * and steps over everything else, so reading needs none
- * of the server's internals; only {@link #ofServer} asks them where the directory is. The file may be written while
- * it is read (offline {@code /invsee} saves it in place), so a file that is cut short or malformed is reported as
- * {@link LogoutPositions.Unreadable}, never as a missing position.
+ * of the server's internals; only {@link #ofServer} asks them where the directory is. Reading takes no lock: both
+ * the server and offline {@code /invsee} write a whole new file and rename it into place, so a read never sees one
+ * half written. A file that is cut short or malformed anyway is reported as {@link LogoutPositions.Unreadable},
+ * never as a missing position.
  */
 public final class PlayerDataLogoutPositions implements LogoutPositions {
 

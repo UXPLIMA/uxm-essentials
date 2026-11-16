@@ -2742,7 +2742,6 @@ public final class PluginModule {
         MirrorWindow mirrorWindow = new MirrorWindow(
                 ctx.kernel().messages(),
                 menus,
-                ctx.kernel().scheduler(),
                 plugin.getDataFolder().toPath(),
                 ctx.kernel().log());
         mirrorWindow.register(menuBindings);
