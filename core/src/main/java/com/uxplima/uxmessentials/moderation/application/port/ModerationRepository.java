@@ -64,6 +64,14 @@ public interface ModerationRepository {
     /** Upsert {@code target}'s mute. {@link MuteState.None} deletes the row. */
     void saveMute(PlayerRef target, MuteState mute);
 
+    /**
+     * Store {@code replacement}, which is never {@link MuteState.None}, as {@code target}'s mute only while their row
+     * is still {@code expected}, the state the caller read and decided on ({@link MuteState.None} meaning no row at
+     * all). Returns false and writes nothing when another write changed the row in between, so a mute decided on a
+     * stale read never overwrites one that landed since.
+     */
+    boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement);
+
     /** Upsert {@code target}'s jail. {@link JailState.None} deletes the row. */
     void saveJail(PlayerRef target, JailState jail);
 
@@ -101,6 +109,17 @@ public interface ModerationRepository {
 
     /** Upsert an IP ban (keyed by address); a re-ban of the same address overwrites. */
     void saveIpBan(IpBan ban);
+
+    /** The IP ban row for {@code ip} as stored, a lapsed one included; empty when the address has no row. */
+    Optional<IpBan> loadIpBan(String ip);
+
+    /**
+     * Store {@code replacement} as the IP ban of its address only while that address's row is still
+     * {@code expected}, the row the caller read and decided on (empty meaning no row at all). Returns false and
+     * writes nothing when another write changed the row in between, so a weaker IP ban decided on a stale read never
+     * overwrites a stronger one that landed since.
+     */
+    boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement);
 
     /** Remove the IP ban for {@code ip}; returns true when a row was removed. */
     boolean removeIpBan(String ip);

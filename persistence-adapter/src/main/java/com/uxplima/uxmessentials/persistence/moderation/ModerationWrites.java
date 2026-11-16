@@ -9,6 +9,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.
 import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
 import java.time.Instant;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -16,9 +17,13 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationIpBansRecord;
+import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationMutesRecord;
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.ModerationTempbansRecord;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jooq.Condition;
 import org.jooq.DSLContext;
+import org.jooq.Field;
 import org.jooq.impl.DSL;
 import org.jspecify.annotations.Nullable;
 
@@ -29,9 +34,10 @@ import org.jspecify.annotations.Nullable;
  * the dependent sanction write commit or roll back together.
  *
  * <p>Each {@code save} is a delete-then-insert keyed by target: a {@code None} state leaves only the delete
- * (so {@code /unmute} clears the row), and a present state re-inserts the single keyed row. The conditional ban
- * write is the exception: its insert is jOOQ's {@code ON CONFLICT DO NOTHING}, which jOOQ renders per dialect
- * ({@code INSERT IGNORE} on MySQL/MariaDB), so the database itself refuses a row that appeared since the read.
+ * (so {@code /unmute} clears the row), and a present state re-inserts the single keyed row. The conditional ban,
+ * mute and IP ban writes are the exception: their insert is jOOQ's {@code ON CONFLICT DO NOTHING}, which jOOQ renders
+ * per dialect ({@code INSERT IGNORE} on MySQL/MariaDB), so the database itself refuses a row that appeared since the
+ * read.
  */
 final class ModerationWrites {
 
@@ -53,6 +59,65 @@ final class ModerationWrites {
                     timed.issuedAt());
         }
         return 0;
+    }
+
+    /**
+     * Write {@code replacement} only while {@code target}'s mute row is still {@code expected}, the same two atomic
+     * statements as {@link #replaceTempban}: an update that names the row by its expiry (null for a permanent mute)
+     * and issue instant, or an insert that does nothing when a row appeared since. Text columns are fitted first so
+     * both branches store the same row on every backend.
+     */
+    static boolean replaceMute(DSLContext dsl, PlayerRef target, MuteState expected, MuteState replacement) {
+        String key = target.uuid().toString();
+        ModerationMutesRecord row = muteRow(key, replacement);
+        if (!(expected instanceof MuteState.None)) {
+            return dsl.update(MODERATION_MUTES)
+                            .set(row)
+                            .where(MODERATION_MUTES.TARGET.eq(key))
+                            .and(nullableEq(MODERATION_MUTES.UNTIL, expected.expiry()))
+                            .and(MODERATION_MUTES.CREATED_AT.eq(
+                                    issuedAt(expected).toEpochMilli()))
+                            .execute()
+                    == 1;
+        }
+        return dsl.insertInto(MODERATION_MUTES)
+                        .set(row)
+                        .onConflict(MODERATION_MUTES.TARGET)
+                        .doNothing()
+                        .execute()
+                == 1;
+    }
+
+    private static ModerationMutesRecord muteRow(String key, MuteState mute) {
+        ModerationMutesRecord row = new ModerationMutesRecord();
+        row.setTarget(key);
+        row.setUntil(mute.expiry().map(Instant::toEpochMilli).orElse(null));
+        switch (mute) {
+            case MuteState.Permanent permanent -> fillIssue(row, permanent.issuer(), permanent.reason());
+            case MuteState.Timed timed -> fillIssue(row, timed.issuer(), timed.reason());
+            case MuteState.None none -> throw new IllegalArgumentException("a mute row needs a mute");
+        }
+        row.setCreatedAt(issuedAt(mute).toEpochMilli());
+        return row;
+    }
+
+    private static void fillIssue(ModerationMutesRecord row, Issuer issuer, Optional<String> reason) {
+        row.setReason(reason.map(text -> fit(MODERATION_MUTES.REASON, text)).orElse(null));
+        row.setMutedBy(issuerUuid(issuer));
+        row.setMutedByName(fit(MODERATION_MUTES.MUTED_BY_NAME, issuer.name()));
+    }
+
+    private static Instant issuedAt(MuteState mute) {
+        return switch (mute) {
+            case MuteState.Permanent permanent -> permanent.issuedAt();
+            case MuteState.Timed timed -> timed.issuedAt();
+            case MuteState.None none -> throw new IllegalArgumentException("no mute, so no issue instant");
+        };
+    }
+
+    /** {@code column = value}, or {@code column IS NULL} for an empty value, which plain equality never matches. */
+    private static Condition nullableEq(Field<Long> column, Optional<Instant> value) {
+        return value.map(instant -> column.eq(instant.toEpochMilli())).orElseGet(column::isNull);
     }
 
     private static int insertMute(
@@ -216,6 +281,45 @@ final class ModerationWrites {
                         fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()))
                 .set(MODERATION_IP_BANS.CREATED_AT, ban.issuedAt().toEpochMilli())
                 .execute();
+    }
+
+    /**
+     * Write {@code replacement} only while its address's row is still {@code expected}, the same two atomic
+     * statements as {@link #replaceTempban}: an update that names the row by its expiry (null for a permanent IP ban)
+     * and issue instant, or an insert that does nothing when a row appeared since.
+     */
+    static boolean replaceIpBan(DSLContext dsl, Optional<IpBan> expected, IpBan replacement) {
+        ModerationIpBansRecord row = ipBanRow(replacement);
+        if (expected.isPresent()) {
+            IpBan seen = expected.get();
+            return dsl.update(MODERATION_IP_BANS)
+                            .set(row)
+                            .where(MODERATION_IP_BANS.IP.eq(seen.ip()))
+                            .and(nullableEq(MODERATION_IP_BANS.UNTIL, seen.until()))
+                            .and(MODERATION_IP_BANS.CREATED_AT.eq(
+                                    seen.issuedAt().toEpochMilli()))
+                            .execute()
+                    == 1;
+        }
+        return dsl.insertInto(MODERATION_IP_BANS)
+                        .set(row)
+                        .onConflict(MODERATION_IP_BANS.IP)
+                        .doNothing()
+                        .execute()
+                == 1;
+    }
+
+    private static ModerationIpBansRecord ipBanRow(IpBan ban) {
+        ModerationIpBansRecord row = new ModerationIpBansRecord();
+        row.setIp(ban.ip());
+        row.setUntil(ban.until().map(Instant::toEpochMilli).orElse(null));
+        row.setReason(
+                ban.reason().map(text -> fit(MODERATION_IP_BANS.REASON, text)).orElse(null));
+        row.setTarget(ban.target().map(java.util.UUID::toString).orElse(null));
+        row.setBannedBy(issuerUuid(ban.issuer()));
+        row.setBannedByName(fit(MODERATION_IP_BANS.BANNED_BY_NAME, ban.issuer().name()));
+        row.setCreatedAt(ban.issuedAt().toEpochMilli());
+        return row;
     }
 
     static int recordSeen(DSLContext dsl, PlayerRef who, @Nullable String ip, Instant at) {

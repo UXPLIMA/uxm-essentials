@@ -507,6 +507,21 @@ class DryRunImportTest {
             }
 
             @Override
+            public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+                throw new UnsupportedOperationException("an import overwrites with save");
+            }
+
+            @Override
+            public Optional<IpBan> loadIpBan(String ip) {
+                throw new UnsupportedOperationException("an import overwrites with save");
+            }
+
+            @Override
+            public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+                throw new UnsupportedOperationException("an import overwrites with save");
+            }
+
+            @Override
             public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
                 throw new UnsupportedOperationException("an import overwrites bans with saveTempban");
             }

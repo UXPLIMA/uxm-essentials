@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -15,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.event.AltDetected;
@@ -23,15 +25,21 @@ import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
 
 /**
  * {@code /banip <player|ip> [reason]}: ban an address by stored IP (not only by UUID). When a player is
  * given, their last-seen IP is resolved from the {@link ModerationRepository} (an indexed column, a real DB
- * read) and recorded as the ban's target UUID for a replayable audit line. The ban is upserted, then
+ * read) and recorded as the ban's target UUID for a replayable audit line. The ban is stored, then
  * alt-detection runs: the other UUIDs that have connected from the same IP are gathered and an
  * {@code AltDetected} event is published for the audit trail. Everyone connected from the address is kicked
  * at once, here and, through {@link SanctionSync}, on every peer; the login listener refuses the address on
  * every reconnect.
+ *
+ * <p>An IP ban already in force on the address that would outlast this one is never cut short: the request is refused
+ * with {@link ModerationError#LONGER_BAN_RUNNING} and the actor is told which ban runs, so shortening an IP ban takes
+ * an explicit {@code /unbanip} first. A ban that ends later, or a second permanent one, replaces it. The write is
+ * compare and set, so an IP ban landing on another server at the same moment is never overwritten blindly.
  *
  * <p>A duration is optional: blank means a permanent IP ban, a parsed span a timed one. This use case takes
  * an already-resolved {@link Target} from the command adapter (which decides whether the argument was a
@@ -73,8 +81,12 @@ public final class BanIp {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Ban {@code target}'s address, run alt-detection, and report the alts found. */
-    public Result banIp(PlayerRef actor, Target target, String rawDuration, Optional<String> reason) {
+    /**
+     * Ban {@code target}'s address, run alt-detection, and report the alts found; or refuse when an IP ban already in
+     * force on the address would outlast this one.
+     */
+    public Result<Outcome, ModerationError> banIp(
+            PlayerRef actor, Target target, String rawDuration, Optional<String> reason) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(rawDuration, "rawDuration");
@@ -82,7 +94,19 @@ public final class BanIp {
         Instant now = clock.instant();
         Optional<Duration> span = SanctionDuration.parse(rawDuration).duration();
         IpBan ban = new IpBan(target.ip(), span.map(now::plus), reason, target.uuid(), Issuer.of(actor), now);
-        repository.saveIpBan(ban);
+        Predicate<IpBan> longer = GuardedWrite.outlasting(ban.until(), IpBan::until);
+        if (GuardedWrite.store(GuardedWrite.ipBan(repository, ban), now, longer)
+                instanceof GuardedWrite.Kept<IpBan> kept) {
+            audit.ipBanned(
+                    actor,
+                    target.ip(),
+                    target.uuid(),
+                    span.map(SanctionDuration::format),
+                    false,
+                    SanctionStrength.HELD);
+            GuardedWrite.tellIpBanKept(notifier, actor, kept.running(), now);
+            return Result.err(ModerationError.LONGER_BAN_RUNNING);
+        }
         history.banIp(actor, target.uuid(), target.ip(), reason, span.map(now::plus));
         IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
         List<UUID> alts = ipAlts.onAddress(target.ip(), target.uuid().orElse(NO_UUID));
@@ -93,7 +117,7 @@ public final class BanIp {
         notify(actor, target, alts);
         // The local kick above cleared this backend; peers kick the players they have on the address.
         sync.ipBanChanged(target.ip());
-        return new Result(ban, alts);
+        return Result.ok(new Outcome(ban, alts));
     }
 
     private void notify(PlayerRef actor, Target target, List<UUID> alts) {
@@ -130,9 +154,9 @@ public final class BanIp {
      * @param ban the applied IP ban
      * @param alts the other UUIDs sharing the banned IP
      */
-    public record Result(IpBan ban, List<UUID> alts) {
+    public record Outcome(IpBan ban, List<UUID> alts) {
 
-        public Result {
+        public Outcome {
             Objects.requireNonNull(ban, "ban");
             alts = List.copyOf(Objects.requireNonNull(alts, "alts"));
         }
