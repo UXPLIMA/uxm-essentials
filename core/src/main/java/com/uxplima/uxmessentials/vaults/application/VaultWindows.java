@@ -12,6 +12,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 
@@ -31,9 +32,10 @@ import org.jspecify.annotations.Nullable;
  * one place at a time: one open window, or one write on its way to the database, or the database.
  *
  * <p>A vault lives in at most one window. Two windows seeded from the same row and written back on close would let
- * the later close restore what the earlier one had taken out, an item dupe, so a second viewer is refused. The viewer
- * already holding a vault may open it again: the new window takes the old window's live items over and the old window
- * is never written back on its own.
+ * the later close restore what the earlier one had taken out, an item dupe, so a second window is refused while one
+ * holds the vault, whoever asks. The viewer already holding it opens it again by closing their window first: its
+ * close writes it like any other, and the new window is filled from that write's pending state, so the items are in
+ * one place throughout and nothing put into the old window is left behind in it.
  *
  * <p>A closing window's items stay here as the vault's pending state until their write has landed. The write runs off
  * the tick, and the vault a reopen is filled from was read through a cache that may predate it, so a reopen filled from
@@ -72,8 +74,8 @@ import org.jspecify.annotations.Nullable;
  * takes it over) and the write is retried with a growing delay. When the retries run out the snapshot stays pending in
  * memory and its items go to the log the same way.
  *
- * <p>The window handle {@code W} is the adapter's GUI; this class never looks inside it, it only asks the caller for
- * its live items when it is taken over.
+ * <p>The window handle {@code W} is the adapter's GUI; this class never looks inside it. The caller hands over a
+ * window's items when it releases it.
  *
  * @param <W> the adapter's window type
  */
@@ -127,37 +129,32 @@ public final class VaultWindows<W> {
 
     /**
      * Claim {@code vault} for {@code window}, shown to {@code viewer}. Returns the items to fill the new window with:
-     * the live items of the viewer's own window it takes over ({@code takeOver} reads and empties that window), the
-     * pending or just written items of a window that closed, or else the vault's stored items. Empty when another
-     * viewer holds the vault, and then nothing is claimed.
+     * the pending or just written items of a window that closed, or else the vault's stored items. Empty when a window
+     * already holds the vault, the viewer's own included, and then nothing is claimed: the caller closes that window
+     * first.
      */
-    public Optional<VaultContents> claim(
-            PlayerRef viewer, PlayerRef owner, Vault vault, W window, Function<W, VaultContents> takeOver) {
+    public synchronized Optional<VaultContents> claim(PlayerRef viewer, PlayerRef owner, Vault vault, W window) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(window, "window");
-        Objects.requireNonNull(takeOver, "takeOver");
-        Window<W> retired;
-        VaultContents seed;
-        synchronized (this) {
-            VaultId id = vault.id();
-            Window<W> current = open.get(id);
-            if (current != null && !current.viewer().uuid().equals(viewer.uuid())) {
-                return Optional.empty();
-            }
-            open.put(id, new Window<>(viewer, owner, vault, window));
-            retired = current;
-            seed = retired == null ? seedFrom(vault) : VaultContents.empty();
+        VaultId id = vault.id();
+        if (open.containsKey(id)) {
+            return Optional.empty();
         }
-        // The old window is the viewer's own, so it is read on the thread this runs on, outside the lock.
-        return Optional.of(retired == null ? seed : takeOver.apply(retired.window()));
+        open.put(id, new Window<>(viewer, owner, vault, window));
+        return Optional.of(seedFrom(vault));
+    }
+
+    /** The window holding {@code id}, if one does. */
+    public synchronized Optional<Window<W>> holder(VaultId id) {
+        return Optional.ofNullable(open.get(Objects.requireNonNull(id, "id")));
     }
 
     /**
      * Release {@code window}'s claim on {@code id}, keeping {@code contents} (the items left in it) as the vault's
      * pending state. Returns the write to run, on the async lane or on the calling thread; empty when the window was
-     * taken over or already released, and then nothing is to be written.
+     * already released, and then nothing is to be written.
      */
     public Optional<Runnable> release(VaultId id, W window, VaultContents contents) {
         return snapshot(id, window, contents, true);
@@ -174,7 +171,8 @@ public final class VaultWindows<W> {
 
     /**
      * Release every vault {@code viewer} holds in a window they are not looking at, because they left. Returns the
-     * writes to run, as a close would.
+     * writes to run, as a close would; {@code released} is told of each window released, so it can be emptied of what
+     * was just written.
      *
      * <p>Such a window is one whose open never came up and was not released when it was refused, and its claim would otherwise block every
      * other viewer of that vault until this viewer came back. Releasing it is safe because nothing can reach its
@@ -184,15 +182,21 @@ public final class VaultWindows<W> {
      * and keeps its claim: releasing it would let a second window be filled from the same row while this one can
      * still be emptied, and the two writes would duplicate items. Its own close writes it.
      */
-    public List<Runnable> releaseLeft(UUID viewer, Predicate<W> seen, Function<W, VaultContents> contents) {
+    public List<Runnable> releaseLeft(
+            UUID viewer, Predicate<W> seen, Function<W, VaultContents> contents, Consumer<W> released) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(seen, "seen");
         Objects.requireNonNull(contents, "contents");
+        Objects.requireNonNull(released, "released");
         List<Runnable> writes = new ArrayList<>();
         for (Window<W> held : held()) {
             W window = held.window();
             if (held.viewer().uuid().equals(viewer) && !seen.test(window)) {
-                release(held.vault().id(), window, contents.apply(window)).ifPresent(writes::add);
+                Optional<Runnable> write = release(held.vault().id(), window, contents.apply(window));
+                if (write.isPresent()) {
+                    released.accept(window);
+                    writes.add(write.get());
+                }
             }
         }
         return writes;
