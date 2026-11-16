@@ -149,6 +149,19 @@ class NetworkConfigTest {
     }
 
     @Test
+    void theRedisPasswordNeverShowsInTheTextOfTheConfig() throws IOException {
+        String password = "s3cr3t-redis-pass";
+
+        NetworkConfig set = read("redis {\n  host = \"10.0.0.5\"\n  password = \"" + password + "\"\n}");
+        NetworkConfig blank = read("redis { host = \"10.0.0.5\" }");
+
+        assertThat(set.redis().password()).isEqualTo(password);
+        assertThat(set.toString()).doesNotContain(password).contains("10.0.0.5", "password=set");
+        assertThat(set.redis().toString()).doesNotContain(password);
+        assertThat(blank.redis().toString()).contains("password=blank");
+    }
+
+    @Test
     void theNewNameWinsWhenAFileHasBoth() throws IOException {
         assertThat(read("server-name = \"new\"\n  server-id = \"old\"").serverId())
                 .isEqualTo("new");

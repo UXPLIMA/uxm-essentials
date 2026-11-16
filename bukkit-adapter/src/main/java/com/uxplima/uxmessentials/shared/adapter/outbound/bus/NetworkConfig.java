@@ -198,6 +198,13 @@ public record NetworkConfig(
             Objects.requireNonNull(channel, "channel");
         }
 
+        /** The block without its password, which only says whether one is set, so the text is safe to log. */
+        @Override
+        public String toString() {
+            return "Redis[host=" + host + ", port=" + port + ", password=" + (password.isEmpty() ? "blank" : "set")
+                    + ", channel=" + channel + ", db=" + db + "]";
+        }
+
         static Redis from(ConfigStore config) {
             return new Redis(
                     config.getString("network.redis.host", DEFAULT_HOST),
