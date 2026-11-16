@@ -35,6 +35,9 @@ import org.mockbukkit.mockbukkit.scheduler.BukkitSchedulerMock;
  * disables. The stock async lane can only be waited on by cancelling every repeating task and ticking until nothing is
  * scheduled, which never ends for a plugin whose timers reschedule themselves. Here async work runs on a pool this
  * server counts, and a delayed or repeating async task is timed by ticks and handed to that pool when it is due.
+ *
+ * <p>It also has a world folder, which the worlds module lists on start, and chests whose holder can be read without
+ * a snapshot, which the plugin asks of every window it sees open; the stock server leaves both unimplemented.
  */
 // ServerMock's raw getBanList override is inherited, not written here, and javac reports it on every subclass.
 @SuppressWarnings("unchecked")
