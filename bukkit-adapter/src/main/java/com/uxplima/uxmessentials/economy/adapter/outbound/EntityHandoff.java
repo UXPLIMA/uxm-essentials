@@ -48,8 +48,13 @@ final class EntityHandoff<T> {
         }
         try {
             result.complete(work.get());
-        } catch (RuntimeException failure) {
+        } catch (Throwable failure) {
+            // Any throwable, an Error included, must settle the result: once the state is RUNNING the waiter no
+            // longer gives up on its own and would otherwise wait forever. An Error still reaches the thread.
             result.completeExceptionally(failure);
+            if (failure instanceof Error error) {
+                throw error;
+            }
         }
     }
 

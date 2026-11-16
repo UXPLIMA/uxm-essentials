@@ -66,6 +66,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
     private final Scheduler scheduler;
     private final PlayerLookup players;
     private final Logger log;
+    private final Duration marshalTimeout;
     private final AtomicLong lastTimeoutWarnAt = new AtomicLong(Long.MIN_VALUE);
     private final EntityHandoff.Outcomes handoffOutcomes = new EntityHandoff.Outcomes() {
         @Override
@@ -87,6 +88,20 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             Scheduler scheduler,
             PlayerLookup players,
             Logger log) {
+        this(delegate, pendingRepo, calculations, registry, scheduler, players, log, MARSHAL_TIMEOUT);
+    }
+
+    /** Tests shorten the wait so a timeout can be shown without stalling the suite. */
+    PhysicalWalletRepositoryDecorator(
+            WalletRepository delegate,
+            PendingTransactionRepository pendingRepo,
+            BukkitInventoryCalculations calculations,
+            CurrencyRegistry registry,
+            Scheduler scheduler,
+            PlayerLookup players,
+            Logger log,
+            Duration marshalTimeout) {
+        this.marshalTimeout = Objects.requireNonNull(marshalTimeout, "marshalTimeout");
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.pendingRepo = Objects.requireNonNull(pendingRepo, "pendingRepo");
         this.calculations = Objects.requireNonNull(calculations, "calculations");
@@ -134,6 +149,13 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         return findByOwner(owner).orElseGet(() -> Wallet.empty(owner));
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>For a physical currency of an online holder the change is made on the holder's thread. When that thread
+     * does not take it (the holder left, the work failed, or the wait ran out before it started) nothing was changed
+     * and this throws {@link IllegalStateException}, so the caller never records a balance that was not set.
+     */
     @Override
     public void upsertBalance(PlayerRef owner, Money balance) {
         if (!balance.currency().isPhysical()) {
@@ -144,7 +166,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
             pendingRepo.queueCredit(owner.uuid(), balance.currency().id().value(), balance.amount());
             return;
         }
-        onEntityVoid(owner, player -> {
+        boolean applied = applyOnEntity(owner, player -> {
             BigDecimal current = calculations.getBalance(player, balance.currency());
             BigDecimal diff = balance.amount().subtract(current);
             if (diff.signum() > 0) {
@@ -153,6 +175,10 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
                 calculations.debit(player, Money.of(balance.currency(), diff.negate()));
             }
         });
+        if (!applied) {
+            throw new IllegalStateException("physical balance of " + owner.uuid() + " in "
+                    + balance.currency().id().value() + " was not set: the holder's thread did not take the change");
+        }
     }
 
     @Override
@@ -235,11 +261,15 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         if (!amount.currency().isPhysical()) {
             Result<Unit, TransferError> back = delegate.credit(owner, amount);
             if (back.isErr()) {
+                // Refused (for example a max-balance clamp): the owed amount waits in the queue in the currency it
+                // was taken in, and the next join delivers it.
+                pendingRepo.queueCredit(owner.uuid(), amount.currency().id().value(), amount.amount());
                 log.warn(
-                        "event=physical_rollback_refused player={} amount={} currency={}; the player is owed that amount",
+                        "event=physical_rollback_queued player={} amount={} currency={} reason={}",
                         owner.uuid(),
                         amount.amount(),
-                        amount.currency().id().value());
+                        amount.currency().id().value(),
+                        back.errorOrThrow());
             }
             return;
         }
@@ -353,17 +383,29 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
                     return player == null || !player.isOnline() ? fallback : work.apply(player);
                 }),
                 () -> handoff.retire(fallback));
-        return handoff.await(MARSHAL_TIMEOUT, fallback, handoffOutcomes);
+        return handoff.await(marshalTimeout, fallback, handoffOutcomes);
     }
 
-    /** Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it to finish. */
+    /**
+     * Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it, tolerating a miss: a read
+     * that cannot reach the inventory keeps the balances it already has.
+     */
     private void onEntityVoid(PlayerRef owner, Consumer<Player> work) {
+        applyOnEntity(owner, work);
+    }
+
+    /**
+     * Run a side-effecting {@code work} on {@code owner}'s entity thread and wait for it. Answers whether it ran:
+     * false when the holder was gone, the work failed, or the wait ran out before it started (then it never runs).
+     */
+    private boolean applyOnEntity(PlayerRef owner, Consumer<Player> work) {
         if (scheduler.ownsEntity(owner)) {
             Player player = Bukkit.getPlayer(owner.uuid());
-            if (player != null && player.isOnline()) {
-                work.accept(player);
+            if (player == null || !player.isOnline()) {
+                return false;
             }
-            return;
+            work.accept(player);
+            return true;
         }
         EntityHandoff<Boolean> handoff = new EntityHandoff<>();
         scheduler.onEntity(
@@ -377,7 +419,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
                     return Boolean.TRUE;
                 }),
                 () -> handoff.retire(Boolean.FALSE));
-        handoff.await(MARSHAL_TIMEOUT, Boolean.FALSE, handoffOutcomes);
+        return handoff.await(marshalTimeout, Boolean.FALSE, handoffOutcomes);
     }
 
     /**
@@ -401,7 +443,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
 
     private <T> T await(CompletableFuture<T> future, T fallback) {
         try {
-            return future.get(MARSHAL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
+            return future.get(marshalTimeout.toMillis(), TimeUnit.MILLISECONDS);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             return fallback;
@@ -419,7 +461,7 @@ public final class PhysicalWalletRepositoryDecorator implements WalletRepository
         long now = System.currentTimeMillis();
         long previous = lastTimeoutWarnAt.get();
         if (now - previous >= WARN_THROTTLE_MILLIS && lastTimeoutWarnAt.compareAndSet(previous, now)) {
-            log.warn("physical wallet inventory marshalling timed out after {}ms", MARSHAL_TIMEOUT.toMillis());
+            log.warn("physical wallet inventory marshalling timed out after {}ms", marshalTimeout.toMillis());
         }
     }
 }

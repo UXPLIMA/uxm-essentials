@@ -96,6 +96,39 @@ class EntityHandoffTest {
         assertThat(outcomes.events).containsExactly("failed: inventory is gone");
     }
 
+    @Test
+    void workThatThrowsAnErrorAfterTheWaitRanOutStillReleasesTheWaiter() throws Exception {
+        EntityHandoff<String> handoff = new EntityHandoff<>();
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        CompletableFuture<Throwable> reachedThread = new CompletableFuture<>();
+        Thread playerThread = new Thread(() -> {
+            try {
+                handoff.run(() -> {
+                    started.countDown();
+                    awaitQuietly(release);
+                    throw new AssertionError("region thread died");
+                });
+                reachedThread.complete(null);
+            } catch (Error error) {
+                reachedThread.complete(error);
+            }
+        });
+        playerThread.start();
+        started.await();
+
+        CompletableFuture<String> answer = new CompletableFuture<>();
+        Thread caller = new Thread(() -> answer.complete(handoff.await(NO_WAIT, "refused", outcomes)));
+        caller.start();
+        release.countDown();
+
+        assertThat(answer.get(10, TimeUnit.SECONDS)).isEqualTo("refused");
+        assertThat(outcomes.events).containsExactly("failed: region thread died");
+        assertThat(reachedThread.get(10, TimeUnit.SECONDS)).isInstanceOf(AssertionError.class);
+        playerThread.join();
+        caller.join();
+    }
+
     private String credit() {
         credits.incrementAndGet();
         return "credited";
