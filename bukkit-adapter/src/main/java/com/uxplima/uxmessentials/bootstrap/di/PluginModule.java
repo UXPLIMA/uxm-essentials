@@ -1106,6 +1106,8 @@ public final class PluginModule {
                 persistence,
                 config.scoped(module.id().configRoot()),
                 config.scoped(ModuleId.of("economy").configRoot()),
+                config.scoped(ModuleId.of("warps").configRoot()),
+                config.scoped(ModuleId.of("playerwarps").configRoot()),
                 kernel.scheduler(),
                 kernel.log(),
                 auditChannel,

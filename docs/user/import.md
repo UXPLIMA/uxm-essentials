@@ -90,7 +90,8 @@ Each `userdata/<uuid>.yml` gives one player:
 Each `warps/<name>.yml` becomes a warp of that name, free and open to everyone. Each entry of `kits.yml` becomes a
 kit (see [What is not imported](#what-is-not-imported) for what a kit loses). An unreadable file, a warp in a world
 that is not loaded, and a kit that cannot be converted are each skipped with a warning naming them; the rest of the
-import goes on.
+import goes on. A warp in a world on the warps module's `world-blacklist` is skipped too (see
+[Reading the result](#reading-the-result)).
 
 ### Kit permissions
 
@@ -176,7 +177,8 @@ Prices are recorded in the default currency. Athelion and Olzie do not store the
 the name this server knows the owner by. An owner who has not joined this server yet is shown by uuid until they
 join, and then by name. A warp name is turned into a valid player warp name (lowercase letters, digits, `_` and `-`,
 3 to 32 characters); when another player already owns that name, the warp gets `name2`, `name3` and so on. A warp
-whose world is not loaded or that names no owner account is left out.
+whose world is not loaded or that names no owner account is left out. A warp in a world on the playerwarps module's
+`world-blacklist` is skipped, as `/setpwarp` would refuse it there.
 
 ## Holograms
 
@@ -257,7 +259,9 @@ Each record line has `ok=`, and every one but the `jail` and `mute` lines has `c
 `overwritten`, `partial` or `failed`). A `user` line also says which parts landed: `homes_written`, `homes_kept`,
 `balance` (`written`, `kept` or `none`), `mail_written`, `mail_kept`, and when they apply `mail_expired`,
 `mail_past_retention` and `mail_skipped=messaging_disabled`. `partial` means some of the player's parts were kept
-back. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
+back. A `warp` or `player_warp` line with `conflict=skipped held_back=world_blacklist world=<name>` is a warp in a
+world its module's `world-blacklist` names: it is not written, and a dry run reports it the same way. Such a warp
+counts in `skipped`. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
 `partial` and `failed`; player warps, holograms and worlds appear only on their own record lines. One record that
 fails is counted and the run goes on. A run that cannot continue logs `migration import failed for source <source>`.
 

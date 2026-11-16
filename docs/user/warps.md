@@ -108,7 +108,7 @@ under the old one.
 | `effects.sound.departure.type`, `effects.sound.arrival.type` | `ENTITY_ENDERMAN_TELEPORT` | The sound when the editor set none. |
 | `effects.particle.departure.type`, `effects.particle.arrival.type` | `PORTAL` | The particle when the editor set none. |
 | `selector-presets.particles`, `selector-presets.sounds` | 14 each | What the editor's pickers offer. |
-| `world-blacklist` | `[]` | World names, matched exactly, where `/warp create` and the manager's create button refuse a warp; `/warp move` is not held back. |
+| `world-blacklist` | `[]` | World names, matched exactly, where `/warp create`, `/warp move` and the manager refuse to create or move a warp, and an import skips one. |
 
 ## Warps on a network
 
@@ -245,7 +245,7 @@ server's average are added to each warp, so a single five-star vote does not top
 |---|---|---|
 | `enabled` | `true` | Switches the module and its commands on or off. |
 | `default-limit` | `3` | Warps per player across every world without a `limit` node. |
-| `world-blacklist` | `[]` | World names, matched exactly, where `/setpwarp`, `/pwarp set` and the menu refuse a warp; `/pwarp move` is not held back. |
+| `world-blacklist` | `[]` | World names, matched exactly, where `/setpwarp`, `/pwarp set`, `/pwarp move` and the menus refuse to create or move a warp, and an import skips one. |
 | `password-attempts.max-attempts` | `3` | Wrong passwords allowed on one warp before the lockout, at least 1. |
 | `password-attempts.lockout-seconds` | `60` | How long wrong passwords count and how long the lockout lasts; 0 turns the limit off. |
 | `payout.cut-percent` | `10` | The server's share of each entry fee, 0 to 100. |

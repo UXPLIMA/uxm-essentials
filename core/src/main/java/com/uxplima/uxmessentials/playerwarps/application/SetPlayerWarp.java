@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 
 /**
  * {@code /setpwarp <name>}: create a player-owned warp at the player's current position, or re-anchor an
@@ -53,7 +54,7 @@ public final class SetPlayerWarp {
     private final DomainEventPublisher events;
     private final DomainGate gate;
     private final Clock clock;
-    private final java.util.List<String> worldBlacklist;
+    private final WorldBlacklist worldBlacklist;
     private final Optional<String> recordedServer;
 
     /** The use case with nothing outside the plugin able to refuse a warp. The form the pure tests use. */
@@ -63,7 +64,7 @@ public final class SetPlayerWarp {
             Notifier notifier,
             DomainEventPublisher events,
             Clock clock,
-            java.util.List<String> worldBlacklist,
+            WorldBlacklist worldBlacklist,
             Optional<String> recordedServer) {
         this(repository, quota, notifier, events, DomainGate.allowAll(), clock, worldBlacklist, recordedServer);
     }
@@ -75,16 +76,16 @@ public final class SetPlayerWarp {
             DomainEventPublisher events,
             DomainGate gate,
             Clock clock,
-            java.util.List<String> worldBlacklist,
+            WorldBlacklist worldBlacklist,
             Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.quota = Objects.requireNonNull(quota, "quota");
-        this.worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier);
+        this.worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier, worldBlacklist);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.gate = Objects.requireNonNull(gate, "gate");
         this.clock = Objects.requireNonNull(clock, "clock");
-        this.worldBlacklist = java.util.List.copyOf(worldBlacklist);
+        this.worldBlacklist = Objects.requireNonNull(worldBlacklist, "worldBlacklist");
         this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
     }
 
@@ -100,7 +101,7 @@ public final class SetPlayerWarp {
             return Result.err(PlayerWarpError.RESERVED_NAME);
         }
 
-        if (worldBlacklist.contains(at.world().name())) {
+        if (worldBlacklist.bars(at.world())) {
             notifier.send(
                     owner,
                     PlayerWarpError.WORLD_BLACKLISTED.messageKey(),
@@ -123,8 +124,9 @@ public final class SetPlayerWarp {
                     Map.of("warp", existing.name().value()));
             return Result.err(PlayerWarpError.NAME_TAKEN);
         }
-        if (!worldLimit.admitsMove(owner, existing, at.world())) {
-            return Result.err(PlayerWarpError.LIMIT_REACHED);
+        Optional<PlayerWarpError> refused = worldLimit.refusesMove(owner, existing, at.world());
+        if (refused.isPresent()) {
+            return Result.err(refused.get());
         }
         repository.save(existing.movedTo(at, recordedServer, clock.instant()));
         notifier.send(

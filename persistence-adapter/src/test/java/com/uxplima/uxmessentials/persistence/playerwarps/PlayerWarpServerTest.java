@@ -22,6 +22,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
@@ -68,7 +69,7 @@ class PlayerWarpServerTest {
                 new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {}),
                 event -> {},
                 Clock.fixed(Instant.ofEpochMilli(1L), ZoneOffset.UTC),
-                List.of(),
+                WorldBlacklist.none(),
                 recordedServer);
     }
 
