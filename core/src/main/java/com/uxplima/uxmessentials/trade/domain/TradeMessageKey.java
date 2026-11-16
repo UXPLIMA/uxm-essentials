@@ -76,6 +76,10 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_CROSS_SERVER_ESCROWED("trade.cross-server-escrowed"),
     TRADE_CROSS_SERVER_COMPLETED("trade.cross-server-completed"),
 
+    // Items a trade handed back while the player was away, delivered on their next join; and what did not fit.
+    TRADE_RETURNS_DELIVERED("trade.returns-delivered"),
+    TRADE_RETURNS_KEPT("trade.returns-kept"),
+
     // The bare /trade root's usage line, shown to a sender who ran it without a target or subcommand.
     TRADE_USAGE("trade.usage");
 

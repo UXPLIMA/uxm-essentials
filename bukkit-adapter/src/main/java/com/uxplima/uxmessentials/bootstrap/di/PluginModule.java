@@ -2044,7 +2044,8 @@ public final class PluginModule {
                 menus,
                 menuBindings,
                 plugin.getDataFolder().toPath(),
-                links.livePeers);
+                links.livePeers,
+                plugin::isEnabled);
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::closeAll);

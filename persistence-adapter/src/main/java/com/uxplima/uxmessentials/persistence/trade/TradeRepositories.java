@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.persistence.trade;
 
+import java.time.Clock;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.trade.application.port.TradeEscrowStore;
+import com.uxplima.uxmessentials.trade.application.port.TradeItemReturns;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -21,5 +23,11 @@ public final class TradeRepositories {
     public static TradeEscrowStore escrowStore(Persistence persistence) {
         Objects.requireNonNull(persistence, "persistence");
         return new JooqTradeEscrowStore(persistence.dsl());
+    }
+
+    /** The items a same-server trade kept for a player who was away, handed over on their next join. */
+    public static TradeItemReturns itemReturns(Persistence persistence, Clock clock) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new JooqTradeItemReturns(persistence.dsl(), clock);
     }
 }

@@ -10,6 +10,7 @@
 - [Kits](user/kits.md): making kits, cooldowns, costs and schedules.
 - [Playtime](user/playtime.md): the tracked record, corrections, the vanilla import and the rank requirements.
 - [Economy](user/economy.md): currencies, payments, tax and the admin commands.
+- [Trade](user/trade.md): where the offered items go when a trade ends, and the items kept for a player who left.
 - [Moderation](user/moderation.md): bans, mutes, warnings and their ladder, jails, IP bans, lockdown and freeze.
 - [Invsee and endersee](user/invsee.md): how a window on a player's inventory saves, online or offline, and what
   happens when it cannot.

@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.trade.application.ReturnTradeItems;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeReceipt;
 import com.uxplima.uxmessentials.trade.application.TradeSettlement;
@@ -31,6 +32,7 @@ import com.uxplima.uxmessentials.trade.domain.TradeSession;
 import com.uxplima.uxmessentials.trade.domain.TradeSide;
 import com.uxplima.uxmessentials.trade.domain.event.TradeCancelled;
 import com.uxplima.uxmessentials.trade.domain.event.TradeCompleted;
+import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -48,7 +50,9 @@ import org.jspecify.annotations.Nullable;
  * <p>Item safety is absolute. An offered stack physically sits in the placing player's window, out of their
  * inventory; every terminal path (a commit, a window close, a disconnect, a world change, or a plugin stop) either
  * swaps or returns those stacks exactly once, gated by the exchange's single-winner settle flag. Every live-player
- * touch hops to that player's region thread through the injected {@link Scheduler}, so the flow is Folia-safe.
+ * touch hops to that player's region thread through the injected {@link Scheduler}, so the flow is Folia-safe. A
+ * player who is gone by the time their stacks are handed over (they left mid-settle, or the plugin is stopping) gets
+ * them kept in storage by {@link ReturnTradeItems} and handed over on their next join, on any server.
  */
 @NullMarked
 public final class TradeView {
@@ -72,6 +76,9 @@ public final class TradeView {
 
     /** Where the two facts a trade ends with are published, whatever the audit knob is set to. */
     private final DomainEventPublisher events;
+
+    /** Keeps the stacks of a player who cannot take them now, for their next join. */
+    private final ReturnTradeItems returns;
 
     /** Whether a completed trade emits an audit line: the module's {@code audit} config knob, resolved once. */
     private final boolean auditEnabled;
@@ -97,7 +104,8 @@ public final class TradeView {
             TradeSettlement settlement,
             TradeExperience experience,
             TradeAudit audit,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            ReturnTradeItems returns) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.messageSink = Objects.requireNonNull(messageSink, "messageSink");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
@@ -110,6 +118,7 @@ public final class TradeView {
         this.experience = Objects.requireNonNull(experience, "experience");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
+        this.returns = Objects.requireNonNull(returns, "returns");
         this.auditEnabled = config.audit();
         this.blacklist = parseBlacklist(config.itemBlacklist());
     }
@@ -489,16 +498,36 @@ public final class TradeView {
         }
     }
 
-    /** Deliver the (cloned) stacks {@code incoming} to {@code side}'s player, dropping any overflow at their feet. */
+    /**
+     * Deliver the (cloned) stacks {@code incoming} to {@code side}'s player, dropping any overflow at their feet. A
+     * player who is offline by then, whose thread retires before the hop runs, or whom the scheduler can no longer
+     * reach because the plugin is stopping, has the stacks kept for their next join instead, so no path drops them.
+     */
     private void giveBack(TradeExchange exchange, TradeSide side, @Nullable ItemStack @Nullable [] incoming) {
         PlayerRef viewer = exchange.holder(side).viewer();
         List<ItemStack> gifts = TradeItemCodec.stacks(incoming);
-        scheduler.onEntity(viewer, () -> {
-            Player live = Bukkit.getPlayer(viewer.uuid());
-            if (live != null && live.isOnline()) {
-                deliver(live, gifts);
-            }
-        });
+        // The commit already emptied and closed this player's window, so only the hand-over is left.
+        if (!returns.running()) {
+            keep(viewer, gifts);
+            return;
+        }
+        scheduler.onEntity(
+                viewer,
+                () -> {
+                    Player live = Bukkit.getPlayer(viewer.uuid());
+                    if (live == null || !live.isOnline()) {
+                        keep(viewer, gifts);
+                        return;
+                    }
+                    deliver(live, gifts);
+                },
+                () -> keep(viewer, gifts));
+    }
+
+    private void keep(PlayerRef viewer, List<ItemStack> gifts) {
+        if (!gifts.isEmpty()) {
+            returns.keep(viewer, VaultItemCodec.encode(gifts.toArray(ItemStack[]::new)));
+        }
     }
 
     /** Claim the settlement for a cancel and, having won it, return both sides' items and close both windows. */
@@ -531,14 +560,30 @@ public final class TradeView {
     private void deliverAndClose(TradeExchange exchange, TradeSide side, @Nullable ItemStack @Nullable [] incoming) {
         PlayerRef viewer = exchange.holder(side).viewer();
         List<ItemStack> gifts = TradeItemCodec.stacks(incoming);
-        scheduler.onEntity(viewer, () -> {
-            window.live(viewer).ifPresent(window::clearOffer);
-            Player live = Bukkit.getPlayer(viewer.uuid());
-            if (live != null && live.isOnline()) {
-                deliver(live, gifts);
-                live.closeInventory();
+        if (!returns.running()) {
+            // The plugin is stopping and the scheduler runs nothing more. The stacks are emptied out of the window
+            // before they are kept, where this thread may touch it (the main thread on Paper), so a window left open
+            // after a plugin disable cannot hand them out a second time.
+            if (scheduler.ownsEntity(viewer)) {
+                window.live(viewer).ifPresent(window::clearOffer);
+                closeWindow(viewer);
             }
-        });
+            keep(viewer, gifts);
+            return;
+        }
+        scheduler.onEntity(
+                viewer,
+                () -> {
+                    window.live(viewer).ifPresent(window::clearOffer);
+                    Player live = Bukkit.getPlayer(viewer.uuid());
+                    if (live == null || !live.isOnline()) {
+                        keep(viewer, gifts);
+                        return;
+                    }
+                    deliver(live, gifts);
+                    live.closeInventory();
+                },
+                () -> keep(viewer, gifts));
     }
 
     /** Close {@code viewer}'s window, if they are still online to have one. Runs on their own region thread. */

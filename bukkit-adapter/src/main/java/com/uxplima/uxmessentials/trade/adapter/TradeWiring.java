@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 import org.bukkit.Bukkit;
@@ -18,6 +19,7 @@ import com.uxplima.uxmessentials.persistence.trade.TradeRepositories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand;
@@ -29,12 +31,15 @@ import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeSessions;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeView;
 import com.uxplima.uxmessentials.trade.adapter.inbound.gui.TradeWindow;
 import com.uxplima.uxmessentials.trade.adapter.inbound.listener.TradeReconcileListener;
+import com.uxplima.uxmessentials.trade.adapter.inbound.listener.TradeReturnListener;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeExperience;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemDelivery;
+import com.uxplima.uxmessentials.trade.adapter.outbound.BukkitTradeItemReceiver;
 import com.uxplima.uxmessentials.trade.adapter.outbound.BusTradeBus;
 import com.uxplima.uxmessentials.trade.adapter.outbound.LoggingTradeAudit;
 import com.uxplima.uxmessentials.trade.application.CrossServerInvites;
 import com.uxplima.uxmessentials.trade.application.CrossServerTrade;
+import com.uxplima.uxmessentials.trade.application.ReturnTradeItems;
 import com.uxplima.uxmessentials.trade.application.TradeConfig;
 import com.uxplima.uxmessentials.trade.application.TradeCooldown;
 import com.uxplima.uxmessentials.trade.application.TradeRequests;
@@ -62,7 +67,8 @@ import org.jspecify.annotations.Nullable;
  * port is present only when economy is wired, so without it a trade moves items only. Phase 4 adds the {@code /trade}
  * request/accept flow. The in-memory {@link TradeRequests} book and the per-player {@link TradeCooldown}, both clock
  * driven: plus the config-gated completed-trade audit through the {@link TradeAudit} port. A same-server trade holds
- * its session purely in memory, so there is still no repository or migration; the cross-server bus escrow lands in the
+ * its session purely in memory; the one thing it stores is the stacks it had to hand back to a player who was gone by
+ * then, kept by {@link ReturnTradeItems} and handed over on their next join. The cross-server bus escrow lands in the
  * final phase behind this same {@link Wired} seam.
  */
 @NullMarked
@@ -81,13 +87,16 @@ public final class TradeWiring {
             AuditChannel auditChannel,
             TextInput textInput,
             @Nullable TradeEconomy economy,
-            @Nullable Persistence persistence,
+            Persistence persistence,
             Bus bus,
             Menus menus,
             MenuBindings menuBindings,
             Path dataFolder,
-            Supplier<Set<String>> livePeers) {
+            Supplier<Set<String>> livePeers,
+            BooleanSupplier running) {
         Objects.requireNonNull(ctx, "ctx");
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(running, "running");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(menus, "menus");
@@ -122,6 +131,15 @@ public final class TradeWiring {
                 moneyEnabled ? config.currenciesAllowed() : List.of(),
                 dataFolder,
                 kernel.log());
+        // Stacks a trade could not hand to a player who was gone are kept and handed over on their next join, on any
+        // server sharing the database; the join listener is always on so they arrive even after trading is turned off.
+        ReturnTradeItems returns = new ReturnTradeItems(
+                kernel.scheduler(),
+                TradeRepositories.itemReturns(persistence, Clock.systemUTC()),
+                new BukkitTradeItemReceiver(),
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                kernel.log(),
+                running);
         TradeView view = new TradeView(
                 kernel.messages(),
                 kernel.messageSink(),
@@ -134,7 +152,8 @@ public final class TradeWiring {
                 settlement,
                 experience,
                 audit,
-                kernel.events());
+                kernel.events(),
+                returns);
         view.register(menuBindings);
         // The request/accept flow: a per-request expiry book and a per-player cooldown, both driven by the same clock,
         // gate /trade and open the window through the view once the target accepts. The clock is UTC so a request's
@@ -146,8 +165,9 @@ public final class TradeWiring {
         // same-server-only install wires none of it and /trade to a non-local name is refused.
         List<Listener> listeners = new java.util.ArrayList<>();
         listeners.add(view.newListener());
+        listeners.add(new TradeReturnListener(returns, kernel.scheduler()));
         @Nullable CrossServerTradeView crossView = null;
-        if (config.crossServer() && persistence != null) {
+        if (config.crossServer()) {
             crossView = buildCrossServer(
                     ctx,
                     config,
