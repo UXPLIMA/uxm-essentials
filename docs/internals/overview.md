@@ -52,6 +52,16 @@ uxmEssentials is split into the modules `api`, `bukkit-api`, `core`, `persistenc
 Configuration is read into immutable snapshots and swapped whole on reload. Work that touches files or a
 database runs on the uxmLib `Scheduler` async lane; work on a player or a block runs on its region thread.
 
+## Migrations
+
+The Flyway scripts under `persistence-adapter/src/main/resources/db/migration` run on every backend and are written
+in the DDL SQLite, MySQL/MariaDB and PostgreSQL all accept; the jOOQ classes are generated from them. A limit only one
+backend has, such as the 64 KB `TEXT` column of MySQL and MariaDB, is lifted by a script under `db/vendor/<backend>`
+(today `db/vendor/mariadb`), which `FlywayMigrationRunner` adds to the locations for that backend only. Such a script
+takes the next free version like any other, and only changes storage: never a name, a column or whether a column takes
+NULL. `MariadbItemColumnsTest` holds the MariaDB scripts to the shared schema, and fails on a new text column until it
+is either widened there or named as one that never holds items.
+
 ## With uxmChat
 
 When uxmChat is installed, the chat features both plugins have are left to it: chat format, private

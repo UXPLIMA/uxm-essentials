@@ -209,6 +209,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.Requireme
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.SoundActions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.StringConditions;
 import com.uxplima.uxmessentials.shared.adapter.inbound.ip.IpHistoryRecorder;
+import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndexListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
@@ -401,26 +402,33 @@ public final class PluginModule {
     /**
      * Seed the name index from the server's own user cache the first time it runs, so players who joined before
      * this version resolve by name without having to join again. It only runs while the table is empty; from then
-     * on the join listener owns the index.
+     * on the join listener owns the index. Called on the async lane: the server's account list is read on the global
+     * thread, the only one allowed to ask for it, and the names are written back here off the tick.
      */
     private static void backfillNameIndex(
             JavaPlugin plugin,
+            com.uxplima.uxmessentials.shared.application.port.Scheduler scheduler,
             PlayerNameRepository store,
             PlayerNameIndex index,
             com.uxplima.uxmessentials.shared.application.port.Logger log) {
         if (store.count() > 0) {
             return;
         }
-        int seeded = 0;
-        for (OfflinePlayer known : plugin.getServer().getOfflinePlayers()) {
-            String name = known.getName();
-            if (name == null) {
-                continue;
+        scheduler.onGlobal(() -> {
+            List<com.uxplima.uxmessentials.shared.domain.PlayerRef> known = new ArrayList<>();
+            for (OfflinePlayer account : plugin.getServer().getOfflinePlayers()) {
+                String name = account.getName();
+                if (name != null) {
+                    known.add(new com.uxplima.uxmessentials.shared.domain.PlayerRef(account.getUniqueId(), name));
+                }
             }
-            index.record(known.getUniqueId(), name);
-            seeded++;
-        }
-        log.info("event=name_index_backfilled players={}", String.valueOf(seeded));
+            scheduler.async(() -> {
+                for (com.uxplima.uxmessentials.shared.domain.PlayerRef account : known) {
+                    index.record(account.uuid(), account.name());
+                }
+                log.info("event=name_index_backfilled players={}", String.valueOf(known.size()));
+            });
+        });
     }
 
     /**
@@ -537,9 +545,15 @@ public final class PluginModule {
         int nameIndexSize = config.getInt("lookup.name-index-size", DEFAULT_NAME_INDEX_SIZE);
         kernel.scheduler().async(() -> {
             nameIndex.backWith(nameStore, nameIndexSize);
-            backfillNameIndex(plugin, nameStore, nameIndex, kernelLog);
+            backfillNameIndex(plugin, kernel.scheduler(), nameStore, nameIndex, kernelLog);
         });
         resources.addListener(new PlayerNameRecordingListener(nameIndex));
+        // Who is connected, for the lookup port's online answers. The players already online are seeded here, on
+        // the enable thread, so a plugin reload does not forget them.
+        resources.addListener(new OnlinePlayerIndexListener(wiredKernel.online()));
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            wiredKernel.online().joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online));
+        }
 
         // The cross-server bus is a kernel concern (one per backend), built before the modules so each context
         // that opts into sync registers its listener and wraps its repository through the Bus handle. The

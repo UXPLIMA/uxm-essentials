@@ -47,9 +47,11 @@ While an editable window is open, and until its save comes back, the staff membe
 they cannot drop items, move items into or out of a bundle, open another inventory, place, use or eat items, use
 an armour stand or their crafting grid, and if they die they keep their inventory. That keeps what may have to be taken back in their inventory. The one exception is a
 drop of an item that would not fit back into a full inventory, such as what the window hands back on close: it is
-let through so the item is not lost, and logged.
+let through so the item is not lost, and logged. An inventory refused this way, such as `/enderchest` or a vault,
+tells the staff member why and is not reported as opened.
 
 If another plugin stops the window from opening, nothing is edited and the container is free for the next editor.
+The "viewing" line is only sent once the window is open.
 
 ## When the window closes by itself
 

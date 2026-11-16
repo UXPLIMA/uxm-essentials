@@ -11,9 +11,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface InventoryViewer {
 
-    /** Open {@code subject}'s inventory in {@code viewer}'s screen. */
-    void viewInventory(PlayerRef viewer, PlayerRef subject);
+    /**
+     * Open {@code subject}'s inventory in {@code viewer}'s screen, running {@code shown} once the window is in front
+     * of them. The window opens later than this call returns and may be refused (by another plugin, or because the
+     * viewer is still saving an edit), and then {@code shown} never runs.
+     */
+    void viewInventory(PlayerRef viewer, PlayerRef subject, Runnable shown);
 
-    /** Open {@code subject}'s ender chest in {@code viewer}'s screen. */
-    void viewEnderChest(PlayerRef viewer, PlayerRef subject);
+    /** Open {@code subject}'s ender chest in {@code viewer}'s screen; {@code shown} as for {@link #viewInventory}. */
+    void viewEnderChest(PlayerRef viewer, PlayerRef subject, Runnable shown);
 }

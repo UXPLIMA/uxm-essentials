@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
 import com.uxplima.uxmessentials.kits.domain.KitsMessageKey;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -96,6 +97,12 @@ public final class KitEditorView {
         KitGuiLayout.seedEditable(menu, kit.items());
         open.add(holder);
         player.openInventory(menu);
+        if (WindowShown.showing(player, menu)) {
+            kitEditor.opened(editor, kit.id());
+        } else {
+            // Refused: the window never showed, and a later flush must not write its stale copy over the kit.
+            open.remove(holder);
+        }
     }
 
     private void persist(KitEditorHolder holder) {

@@ -100,9 +100,15 @@ public final class NametagRenderTask {
             // Advance the global animation clock once, on this loop thread, before fanning out so every per-wearer text
             // callback the lib invokes this period reads the same frame.
             animations.advance();
-            for (Player player : Bukkit.getOnlinePlayers()) {
-                scheduler.onEntity(BukkitRefs.toRef(player), () -> presenter.update(player));
-            }
+            // The roster is listed on the global region thread, the only one allowed to list it.
+            scheduler.onGlobal(() -> {
+                if (!running.getAsBoolean()) {
+                    return;
+                }
+                for (Player player : Bukkit.getOnlinePlayers()) {
+                    scheduler.onEntity(BukkitRefs.toRef(player), () -> presenter.update(player));
+                }
+            });
         } catch (RuntimeException failure) {
             // A throwing tick must not skip the reschedule below, or nametags would stop reconciling until a reload.
             log.error("nametag reconcile tick failed", failure);

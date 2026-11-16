@@ -14,6 +14,18 @@ On a network, a paid hop is now refunded, and a player warp owner paid, in exact
 Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
 in its own default. See [network.md](network.md).
 
+## Item columns hold more on MySQL and MariaDB
+
+On MySQL and MariaDB the columns that hold serialized items are widened from `TEXT`, which stops at 64 KB, to
+`LONGTEXT`: vaults, the items kept from a deleted vault or a trade, the cross-server trade escrow, inventory
+rollback snapshots, the staff mode loadout and NPC equipment. A full vault, an inventory snapshot with an ender chest,
+or a kept batch of filled shulker boxes could be larger than 64 KB, and was then refused, or cut short on a server
+with strict mode off. SQLite and PostgreSQL had no such limit and are not changed.
+
+Nothing needs editing. Back up the database first: the first server to start on the new release alters those tables,
+and MySQL and MariaDB rebuild a table to change a column, so the start takes longer while a large `inv_snapshots`
+table is copied. A row that was cut short before the upgrade stays cut short; the update cannot restore it.
+
 ## Cross-server trades need the same release on both servers
 
 A cross-server trade opens the window of the player who accepted only after the inviter's server says its own
