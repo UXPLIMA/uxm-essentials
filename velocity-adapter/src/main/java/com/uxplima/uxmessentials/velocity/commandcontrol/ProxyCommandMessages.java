@@ -130,6 +130,12 @@ public record ProxyCommandMessages(
         return render(spamWarn, locale);
     }
 
+    /** A catalogue line as a player reads it, the theme's role tags in the colours the backend ships. */
+    public static Component styled(String line) {
+        Objects.requireNonNull(line, "line");
+        return MiniMessage.miniMessage().deserialize(line, ROLES);
+    }
+
     /** {@code raw} as a reader in {@code locale} sees it, or empty when it says nothing. */
     private Optional<Component> render(String raw, @Nullable Locale locale) {
         String source = CatalogLine.parse(raw)

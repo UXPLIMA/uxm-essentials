@@ -11,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.shared.network.FreezeChanged;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
@@ -18,6 +19,7 @@ import com.velocitypowered.api.event.connection.PluginMessageEvent;
 import com.velocitypowered.api.proxy.Player;
 import com.velocitypowered.api.proxy.ServerConnection;
 import com.velocitypowered.api.proxy.messages.ChannelIdentifier;
+import com.velocitypowered.api.proxy.messages.ChannelMessageSource;
 import com.velocitypowered.api.proxy.messages.MinecraftChannelIdentifier;
 import com.velocitypowered.api.proxy.messages.PluginMessageEncoder;
 import com.velocitypowered.api.proxy.server.PingOptions;
@@ -35,7 +37,9 @@ class BusBrokerTest {
     private final FakeServer lobby = new FakeServer("lobby-1");
     private final FakeServer survival = new FakeServer("survival-1");
     private final FakeServer creative = new FakeServer("creative-1");
-    private final BusBroker broker = new BusBroker(() -> List.of(lobby, survival, creative), NOPLogger.NOP_LOGGER);
+    private final ProxyFreezes freezes = new ProxyFreezes();
+    private final BusBroker broker =
+            new BusBroker(() -> List.of(lobby, survival, creative), freezes, NOPLogger.NOP_LOGGER);
 
     private PluginMessageEvent fromLobby(byte[] frame) {
         FakeConnection source = new FakeConnection(lobby);
@@ -75,6 +79,46 @@ class BusBrokerTest {
 
         assertThat(lobby.received).isEmpty();
         assertThat(survival.received).containsExactly(ping);
+    }
+
+    @Test
+    void aFreezeRelayedFromABackendKeepsThePlayerOnThatServerUntilALaterRelease() {
+        UUID steve = new UUID(3L, 4L);
+        byte[] freeze = NetworkMessageCodec.encode(
+                new FreezeChanged("lobby-1", new UUID(5L, 6L), steve, "Steve", true, 1_000L));
+        byte[] release = NetworkMessageCodec.encode(
+                new FreezeChanged("survival-1", new UUID(7L, 8L), steve, "Steve", false, 2_000L));
+
+        broker.relay(fromLobby(freeze));
+        assertThat(freezes.frozenOn(steve)).contains("lobby-1");
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "survival-1", true))
+                .isInstanceOf(FrozenServerSwitch.Decision.Refuse.class);
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "survival-1", false))
+                .isEqualTo(new FrozenServerSwitch.Decision.SendTo("lobby-1"));
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "lobby-1", true))
+                .isInstanceOf(FrozenServerSwitch.Decision.Allow.class);
+
+        FakeConnection fromSurvival = new FakeConnection(survival);
+        broker.relay(new PluginMessageEvent(fromSurvival, fromSurvival, CHANNEL, release));
+        broker.relay(fromLobby(freeze));
+
+        assertThat(freezes.frozenOn(steve)).isEmpty();
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "survival-1", true))
+                .isInstanceOf(FrozenServerSwitch.Decision.Allow.class);
+    }
+
+    @Test
+    void aFreezeFrameAClientWroteIsNeitherRelayedNorHeld() {
+        UUID steve = new UUID(3L, 4L);
+        byte[] freeze = NetworkMessageCodec.encode(
+                new FreezeChanged("lobby-1", new UUID(5L, 6L), steve, "Steve", true, 1_000L));
+        ChannelMessageSource client = new ChannelMessageSource() {};
+        PluginMessageEvent fromClient = new PluginMessageEvent(client, new FakeConnection(lobby), CHANNEL, freeze);
+
+        broker.relay(fromClient);
+
+        assertThat(freezes.frozenOn(steve)).isEmpty();
+        assertThat(survival.received).isEmpty();
     }
 
     /** A backend that records what the proxy sends it; with nobody on it, nothing can be sent, as on Velocity. */

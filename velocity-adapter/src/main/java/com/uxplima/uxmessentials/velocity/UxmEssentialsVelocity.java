@@ -5,6 +5,7 @@ import java.util.Objects;
 
 import com.google.inject.Inject;
 import com.uxplima.uxmessentials.shared.network.BusChannel;
+import com.uxplima.uxmessentials.velocity.commandcontrol.ProxyCatalog;
 import com.uxplima.uxmessentials.velocity.commandcontrol.ProxyCommandControl;
 import com.velocitypowered.api.event.Subscribe;
 import com.velocitypowered.api.event.connection.PluginMessageEvent;
@@ -24,10 +25,10 @@ import org.slf4j.Logger;
  * other backend in the cluster.
  *
  * <p>This class is a thin Velocity-lifecycle shell: it holds the injected {@link ProxyServer} and
- * {@link Logger}, registers the channel on proxy init, and forwards the plugin-message event to the
- * {@link BusBroker}, which owns the fan-out logic (and is plain Java, testable without a live proxy).
- * Construction is by constructor injection. The only fields are the two injected collaborators and the
- * broker built from them.
+ * {@link Logger}, registers the channel and the {@link FrozenServerSwitch} on proxy init, and forwards the
+ * plugin-message event to the {@link BusBroker}, which owns the fan-out logic (and is plain Java, testable without a
+ * live proxy). The broker notes each freeze it relays in the {@link ProxyFreezes} the switch guard reads, so a frozen
+ * player stays on the server that froze them. Construction is by constructor injection.
  */
 @Plugin(
         id = "uxmessentials-velocity",
@@ -42,6 +43,7 @@ public final class UxmEssentialsVelocity {
     private final ProxyServer proxy;
     private final Logger logger;
     private final Path dataDirectory;
+    private final ProxyFreezes freezes = new ProxyFreezes();
     private final BusBroker broker;
     private final MinecraftChannelIdentifier channel;
 
@@ -50,7 +52,7 @@ public final class UxmEssentialsVelocity {
         this.proxy = Objects.requireNonNull(proxy, "proxy");
         this.logger = Objects.requireNonNull(logger, "logger");
         this.dataDirectory = Objects.requireNonNull(dataDirectory, "dataDirectory");
-        this.broker = new BusBroker(proxy::getAllServers, logger);
+        this.broker = new BusBroker(proxy::getAllServers, freezes, logger);
         this.channel = MinecraftChannelIdentifier.create(BusChannel.NAMESPACE, BusChannel.NAME);
     }
 
@@ -59,6 +61,11 @@ public final class UxmEssentialsVelocity {
     public void onProxyInitialize(ProxyInitializeEvent event) {
         proxy.getChannelRegistrar().register(channel);
         logger.info("uxmEssentials bus broker ready on channel {}", channel.getId());
+        proxy.getEventManager()
+                .register(
+                        this,
+                        new FrozenServerSwitch(
+                                freezes, proxy::getServer, ProxyCatalog.load(dataDirectory, logger::warn)));
         ProxyCommandControl.enable(this, proxy, logger, dataDirectory);
     }
 

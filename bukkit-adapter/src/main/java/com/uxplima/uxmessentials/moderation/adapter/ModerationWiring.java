@@ -68,6 +68,7 @@ import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationSessions;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
+import com.uxplima.uxmessentials.moderation.application.NetworkFreeze;
 import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
 import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
@@ -96,6 +97,7 @@ import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
+import com.uxplima.uxmessentials.moderation.application.port.FreezeSync;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
@@ -218,6 +220,15 @@ public final class ModerationWiring {
         ModerationGuard guard = new ModerationGuard(lanePermissions(plugin, kernel));
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
+        // A freeze is held in memory on each backend; on a network it is announced so every backend holds it, and a
+        // peer's freeze or release is applied here. With the network off this listener is never invoked.
+        NetworkFreeze freezes = new NetworkFreeze(
+                sanctions,
+                networked ? ModerationSync.freezePublisher(bus.publisher()) : FreezeSync.NONE,
+                presence,
+                new Notifier(kernel.messages(), kernel.messageSink()),
+                clock);
+        bus.registry().register(ModerationSync.freezeListener(freezes::changedElsewhere));
         JailNetwork jailNetwork = jailNetwork(
                 plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
         ModerationServices services = assemble(
@@ -234,6 +245,7 @@ public final class ModerationWiring {
                 commandSpyStore,
                 sync,
                 jailNetwork,
+                freezes,
                 ipHistory,
                 ipTokens,
                 presence,
@@ -471,6 +483,7 @@ public final class ModerationWiring {
             InMemoryCommandSpyStore commandSpyStore,
             SanctionSync sync,
             JailNetwork jailNetwork,
+            NetworkFreeze freezes,
             IpHistoryStore ipHistory,
             IpTokens ipTokens,
             NetworkPresence presence,
@@ -605,7 +618,7 @@ public final class ModerationWiring {
                         history,
                         clock))
                 .unbanIp(new UnbanIp(repository, notifier, audit, history))
-                .freeze(new Freeze(sanctionPort, guard, notifier, audit, presence))
+                .freeze(new Freeze(freezes, guard, notifier, audit, presence))
                 .seen(new Seen(
                         repository,
                         ipAlts,
