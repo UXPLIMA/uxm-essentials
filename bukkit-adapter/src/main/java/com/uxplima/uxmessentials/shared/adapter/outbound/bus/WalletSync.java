@@ -110,7 +110,7 @@ public final class WalletSync {
         }
 
         @Override
-        public Sweep open(
+        public Opening open(
                 SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
             return delegate.open(kind, scope, amount, reason, actor, at);
         }
@@ -135,8 +135,23 @@ public final class WalletSync {
         }
 
         @Override
-        public List<Sweep> unfinished() {
+        public void pause(Sweep sweep, String error) {
+            delegate.pause(sweep, error);
+        }
+
+        @Override
+        public List<Sweep> resumable() {
+            return delegate.resumable();
+        }
+
+        @Override
+        public List<SweepStatus> unfinished() {
             return delegate.unfinished();
+        }
+
+        @Override
+        public Optional<SweepStatus> cancel(String id, long at) {
+            return delegate.cancel(id, at);
         }
 
         private boolean due() {

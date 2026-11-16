@@ -27,6 +27,7 @@ import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
+import com.uxplima.uxmessentials.economy.domain.SweepState;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.Wallet;
 import com.uxplima.uxmessentials.economy.domain.event.BalancesSwept;
@@ -42,7 +43,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * {@code /eco giveall} and {@code /eco resetall} answer with what the sweep over every account committed, once, by
- * whoever ran its last chunk; a sweep that stopped part way says how far it got and carries on by itself.
+ * whoever ran its last chunk; a sweep that stopped part way says how far it got and carries on by itself, one the
+ * database refuses for good ends there, and an operator can list and cancel the unfinished ones.
  */
 class SweepRunnerTest {
 
@@ -67,8 +69,8 @@ class SweepRunnerTest {
             },
             (viewer, text) -> {});
     private final SweepRunner runner = new SweepRunner(journal, scheduler, audit, notifier, events, log, CLOCK);
-    private final EcoAdmin admin =
-            new EcoAdmin(new InMemoryBank(COINS), new NoWallets(), audit, notifier, new NoHistory(), runner, CLOCK);
+    private final InMemoryBank bank = new InMemoryBank(COINS);
+    private final EcoAdmin admin = new EcoAdmin(bank, new NoWallets(), audit, notifier, new NoHistory(), runner, CLOCK);
 
     private static Money coins(String amount) {
         return Money.of(COINS, new BigDecimal(amount));
@@ -134,17 +136,136 @@ class SweepRunnerTest {
     }
 
     @Test
-    void aSecondSweepAskedForWhileOneRunsHereIsRefused() {
-        journal.accounts(6);
-        List<Integer> second = new ArrayList<>();
-        journal.duringFirstAdvance(() -> second.add(admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS)));
+    void aSweepAskedForWhileTheCurrencyHasAnUnfinishedOneIsRefusedNamingIt() {
+        journal.accounts(12);
+        journal.failAdvances(2);
+        admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+        lines.clear();
+        placeholders.clear();
 
-        int first = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+        // Repeating the command after the pause would pay the first chunk's accounts twice once the first resumed.
+        int again = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
 
-        assertThat(first).isEqualTo(6);
-        assertThat(second).containsExactly(0);
+        assertThat(again).isZero();
         assertThat(journal.opened).hasSize(1);
-        assertThat(audit.lines).containsExactly("bulk:6:ADMIN_GIVEALL");
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_BULK_RUNNING.key());
+        assertThat(placeholders.getFirst())
+                .containsEntry("id", "sweep-0")
+                .containsEntry("currency", "coins")
+                .containsEntry("state", "paused");
+
+        scheduler.runAsync();
+        assertThat(journal.balanceOfEveryAccount()).isEqualTo(1);
+        assertThat(admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS)).isEqualTo(12);
+    }
+
+    @Test
+    void aChunkTheDatabaseRefusesForGoodEndsTheSweepAndSaysHowFarItGot() {
+        journal.accounts(12);
+        journal.refuseAdvance(2);
+
+        int affected = admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+
+        assertThat(affected).isZero();
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_BULK_HALTED.key());
+        assertThat(placeholders.getFirst()).containsEntry("count", "5");
+        assertThat(audit.lines).containsExactly("bulk:5:ADMIN_GIVEALL");
+        assertThat(events.published()).isEmpty();
+        assertThat(journal.state("sweep-0")).isEqualTo(SweepState.FAILED);
+        // Not paused: nothing is tried again.
+        scheduler.runAsync();
+        assertThat(lines).hasSize(1);
+        assertThat(admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS)).isEqualTo(12);
+    }
+
+    @Test
+    void aPausedSweepIsJournalledAsPausedWithWhatWentWrong() {
+        journal.accounts(12);
+        journal.failAdvances(2);
+
+        admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+
+        assertThat(journal.state("sweep-0")).isEqualTo(SweepState.PAUSED);
+        assertThat(journal.error("sweep-0")).contains("connection lost");
+    }
+
+    @Test
+    void aCancelledSweepKeepsWhatItChangedAndIsNotTriedAgain() {
+        journal.accounts(12);
+        journal.failAdvances(2);
+        admin.giveAll(ADMIN, coins("25"), SweepScope.PLAYERS);
+        lines.clear();
+        placeholders.clear();
+
+        boolean cancelled = admin.cancelSweep(ADMIN, "sweep-0");
+
+        assertThat(cancelled).isTrue();
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_SWEEP_CANCELLED.key());
+        assertThat(placeholders.getFirst()).containsEntry("id", "sweep-0").containsEntry("count", "5");
+        assertThat(audit.lines).containsExactly("bulk:5:ADMIN_GIVEALL");
+        scheduler.runAsync();
+        assertThat(lines).hasSize(1);
+        assertThat(journal.changedAccounts()).isEqualTo(5);
+        assertThat(events.published()).isEmpty();
+    }
+
+    @Test
+    void cancellingAnIdNoUnfinishedSweepHasChangesNothing() {
+        boolean cancelled = admin.cancelSweep(ADMIN, "nope");
+
+        assertThat(cancelled).isFalse();
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_SWEEP_UNKNOWN.key());
+        assertThat(placeholders.getFirst()).containsEntry("id", "nope");
+    }
+
+    @Test
+    void theUnfinishedSweepsAreListedWithHowFarTheyGotAndTheirLastError() {
+        journal.accounts(12);
+        journal.failAdvances(2);
+        admin.giveAll(ADMIN, coins("25"), SweepScope.ALL);
+        lines.clear();
+        placeholders.clear();
+
+        admin.listSweeps(ADMIN);
+
+        assertThat(lines)
+                .containsExactly(
+                        EconomyMessageKey.ECO_ADMIN_SWEEPS_HEADER.key(),
+                        EconomyMessageKey.ECO_ADMIN_SWEEPS_ENTRY.key(),
+                        EconomyMessageKey.ECO_ADMIN_SWEEPS_ERROR.key());
+        assertThat(placeholders.get(1))
+                .containsEntry("id", "sweep-0")
+                .containsEntry("kind", "giveall")
+                .containsEntry("currency", "coins")
+                .containsEntry("scope", "all")
+                .containsEntry("state", "paused")
+                .containsEntry("count", "5")
+                .containsEntry("actor", "Admin");
+        assertThat(placeholders.get(2).get("error")).contains("connection lost");
+    }
+
+    @Test
+    void noUnfinishedSweepIsSaidSo() {
+        admin.listSweeps(ADMIN);
+
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_SWEEPS_NONE.key());
+    }
+
+    @Test
+    void aGiveAllToThePlayersOnlineHereCreditsEachOfThemAndNoOneElse() {
+        journal.accounts(12);
+        PlayerRef alex = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000001"), "Alex");
+        PlayerRef sam = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000002"), "Sam");
+
+        int affected = admin.giveOnline(ADMIN, List.of(alex, sam), coins("25"));
+
+        assertThat(affected).isEqualTo(2);
+        assertThat(bank.balance(alex, COINS)).isEqualTo(coins("25"));
+        assertThat(bank.balance(sam, COINS)).isEqualTo(coins("25"));
+        assertThat(journal.opened).isEmpty();
+        assertThat(audit.lines).containsExactly("bulk:2:ADMIN_GIVEALL");
+        assertThat(lines).containsExactly(EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE.key());
+        assertThat(placeholders.getFirst()).containsEntry("count", "2");
     }
 
     @Test
@@ -174,8 +295,8 @@ class SweepRunnerTest {
     @Test
     void aSweepLeftRunningByAStopIsCarriedOnAtStartAndAnnouncedOnce() {
         journal.accounts(7);
-        AccountSweep.Sweep left =
-                journal.open(SweepKind.CREDIT, SweepScope.PLAYERS, coins("3"), EconomyReason.ADMIN_GIVEALL, ADMIN, 1L);
+        AccountSweep.Sweep left = journal.opened(
+                SweepKind.CREDIT, SweepScope.PLAYERS, coins("3"), EconomyReason.ADMIN_GIVEALL, ADMIN, 1L);
         journal.advance(left);
 
         runner.resumeUnfinished();
@@ -190,8 +311,8 @@ class SweepRunnerTest {
     @Test
     void aSweepAnotherServerFinishedIsNotAnnouncedHere() {
         journal.accounts(3);
-        AccountSweep.Sweep elsewhere =
-                journal.open(SweepKind.CREDIT, SweepScope.PLAYERS, coins("3"), EconomyReason.ADMIN_GIVEALL, ADMIN, 1L);
+        AccountSweep.Sweep elsewhere = journal.opened(
+                SweepKind.CREDIT, SweepScope.PLAYERS, coins("3"), EconomyReason.ADMIN_GIVEALL, ADMIN, 1L);
         journal.finishElsewhere(elsewhere);
 
         assertThat(runner.run(elsewhere)).isNull();
@@ -214,7 +335,7 @@ class SweepRunnerTest {
 
     /**
      * The journal and the accounts it walks, in memory: each advance does one chunk of accounts and moves the cursor,
-     * all or nothing, the way one transaction does.
+     * all or nothing, the way one transaction does. Like the real journal it holds one unfinished sweep per currency.
      */
     private static final class Journal implements AccountSweep {
 
@@ -223,12 +344,12 @@ class SweepRunnerTest {
         private final Map<String, Integer> credits = new LinkedHashMap<>();
         private final Map<String, Entry> entries = new LinkedHashMap<>();
         private final Set<Integer> failing = new HashSet<>();
+        private final Set<Integer> refusing = new HashSet<>();
         final List<String> opened = new ArrayList<>();
         int advances;
         private boolean reaches = true;
         private @Nullable SweepOutcome fixedChunk;
         private @Nullable RuntimeException openFailure;
-        private @Nullable Runnable during;
 
         Journal(int chunk) {
             this.chunk = chunk;
@@ -252,16 +373,34 @@ class SweepRunnerTest {
             failing.addAll(List.of(calls));
         }
 
+        void refuseAdvance(int call) {
+            refusing.add(call);
+        }
+
         void failOpen(RuntimeException failure) {
             openFailure = failure;
         }
 
-        void duringFirstAdvance(Runnable action) {
-            during = action;
+        void finishElsewhere(Sweep sweep) {
+            entry(sweep.id()).state = SweepState.DONE;
         }
 
-        void finishElsewhere(Sweep sweep) {
-            java.util.Objects.requireNonNull(entries.get(sweep.id())).done = true;
+        SweepState state(String id) {
+            return entry(id).state;
+        }
+
+        @Nullable String error(String id) {
+            return entry(id).error;
+        }
+
+        /** Opened straight in the journal, the way a sweep another server or an earlier run opened is found. */
+        Sweep opened(SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
+            return ((Opened) open(kind, scope, amount, reason, actor, at)).sweep();
+        }
+
+        /** How many accounts were changed at all. */
+        int changedAccounts() {
+            return credits.size();
         }
 
         /** How many times each account was changed, when every account was changed the same number of times. */
@@ -272,43 +411,53 @@ class SweepRunnerTest {
             return distinct.iterator().next();
         }
 
+        private Entry entry(String id) {
+            return java.util.Objects.requireNonNull(entries.get(id));
+        }
+
         @Override
         public boolean reaches(Currency currency) {
             return reaches;
         }
 
         @Override
-        public Sweep open(
+        public Opening open(
                 SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
             RuntimeException failure = openFailure;
             if (failure != null) {
                 openFailure = null;
                 throw failure;
             }
+            for (Entry entry : entries.values()) {
+                if (entry.state.unfinished() && entry.sweep.amount().currency().equals(amount.currency())) {
+                    return new Busy(entry.status());
+                }
+            }
             Sweep sweep = new Sweep("sweep-" + entries.size(), kind, scope, amount, reason, actor, at);
             opened.add(kind + ":" + scope + ":"
                     + amount.amount().stripTrailingZeros().toPlainString() + ":" + reason);
             entries.put(sweep.id(), new Entry(sweep));
-            return sweep;
+            return new Opened(sweep);
         }
 
         @Override
         public Step advance(Sweep sweep) {
             advances++;
-            Runnable action = during;
-            during = null;
-            if (action != null) {
-                action.run();
-            }
             if (failing.remove(advances)) {
                 throw new IllegalStateException("connection lost");
             }
-            Entry entry = java.util.Objects.requireNonNull(entries.get(sweep.id()));
-            if (entry.done) {
-                return new Step(entry.total, List.of(), Progress.ALREADY_FINISHED);
+            Entry entry = entry(sweep.id());
+            if (!entry.state.unfinished()) {
+                return new Step(entry.total, List.of(), Progress.ENDED);
             }
+            if (refusing.remove(advances)) {
+                entry.state = SweepState.FAILED;
+                entry.error = "numeric value out of range";
+                return new Step(entry.total, List.of(), Progress.FAILED, entry.error);
+            }
+            entry.state = SweepState.RUNNING;
             if (entry.cursor >= owners.size()) {
-                entry.done = true;
+                entry.state = SweepState.DONE;
                 return new Step(entry.total, List.of(), Progress.FINISHED);
             }
             List<String> slice = owners.subList(entry.cursor, Math.min(owners.size(), entry.cursor + chunk));
@@ -322,21 +471,63 @@ class SweepRunnerTest {
         }
 
         @Override
-        public List<Sweep> unfinished() {
+        public void pause(Sweep sweep, String error) {
+            Entry entry = entry(sweep.id());
+            entry.state = SweepState.PAUSED;
+            entry.error = error;
+        }
+
+        @Override
+        public List<Sweep> resumable() {
             return entries.values().stream()
-                    .filter(entry -> !entry.done)
+                    .filter(entry -> entry.state.unfinished())
                     .map(entry -> entry.sweep)
                     .toList();
+        }
+
+        @Override
+        public List<SweepStatus> unfinished() {
+            return entries.values().stream()
+                    .filter(entry -> entry.state.unfinished())
+                    .map(Entry::status)
+                    .toList();
+        }
+
+        @Override
+        public Optional<SweepStatus> cancel(String id, long at) {
+            Entry entry = entries.get(id);
+            if (entry == null || !entry.state.unfinished()) {
+                return Optional.empty();
+            }
+            entry.state = SweepState.CANCELLED;
+            return Optional.of(entry.status());
         }
 
         private static final class Entry {
             final Sweep sweep;
             int cursor;
             SweepOutcome total = SweepOutcome.none();
-            boolean done;
+            SweepState state = SweepState.RUNNING;
+
+            @Nullable String error;
 
             Entry(Sweep sweep) {
                 this.sweep = sweep;
+            }
+
+            SweepStatus status() {
+                return new SweepStatus(
+                        sweep.id(),
+                        sweep.kind(),
+                        sweep.scope(),
+                        sweep.amount().currency().id().value(),
+                        sweep.amount().amount(),
+                        sweep.reason(),
+                        sweep.actor(),
+                        state,
+                        total,
+                        sweep.startedAt(),
+                        error);
             }
         }
     }

@@ -39,8 +39,10 @@ import org.jspecify.annotations.Nullable;
  * banknote for a player without debiting anyone.
  *
  * <p>{@code giveall} and {@code resetall} change every player's account, online or not and on any backend, and with
- * {@code --all-accounts} also the accounts other plugins opened; {@code giverandom} picks one player online here. The
- * bulk work runs off the tick, and the sender hears the count once it has finished.
+ * {@code --all-accounts} also the accounts other plugins opened; {@code giveall --online} credits only the players
+ * online on this server, and {@code giverandom} picks one of them. The bulk work runs off the tick, and the sender
+ * hears the count once it has finished. {@code /eco sweeps} lists the changes to every balance still unfinished and
+ * {@code /eco sweeps cancel <id>} stops one.
  */
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -55,6 +57,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     private static final String NOTE = EconomyPermissions.ECONOMY_ADMIN_NOTE;
     private static final String BACKUP = EconomyPermissions.ECONOMY_ADMIN_BACKUP;
     private static final String RESTORE = EconomyPermissions.ECONOMY_ADMIN_RESTORE;
+    private static final String SWEEPS = EconomyPermissions.ECONOMY_ADMIN_SWEEPS;
 
     private final BanknoteMinter minter;
     private final @Nullable EconomyAdminGuiViews adminGui;
@@ -81,6 +84,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(giveAllVerb())
                 .then(giveRandomVerb())
                 .then(resetAllVerb())
+                .then(sweepsVerb())
                 .then(giveRandomRangeVerb())
                 .then(historyVerb())
                 .then(logsVerb())
@@ -165,9 +169,10 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     /**
-     * {@code giveall <amount> [currency] [--all-accounts]}. Without the flag only players' accounts are credited; the
-     * flag adds the accounts other plugins opened through Vault. A literal is matched before the currency argument,
-     * so the flag is never read as a currency.
+     * {@code giveall <amount> [currency] [--all-accounts|--online]}. Without a flag every player's account is credited;
+     * {@code --all-accounts} adds the accounts other plugins opened through Vault, and {@code --online} credits only
+     * the players online on this server, the way a scheduled reward for being online wants. A literal is matched
+     * before the currency argument, so a flag is never read as a currency.
      */
     private LiteralArgumentBuilder<CommandSourceStack> giveAllVerb() {
         return Commands.literal("giveall")
@@ -175,9 +180,58 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
                 .then(Commands.argument("amount", Args.token())
                         .executes(ctx -> runGiveAll(ctx, SweepScope.PLAYERS))
                         .then(allAccounts().executes(ctx -> runGiveAll(ctx, SweepScope.ALL)))
+                        .then(onlineOnly().executes(this::runGiveOnline))
                         .then(currencyArgument()
                                 .executes(ctx -> runGiveAll(ctx, SweepScope.PLAYERS))
-                                .then(allAccounts().executes(ctx -> runGiveAll(ctx, SweepScope.ALL)))));
+                                .then(allAccounts().executes(ctx -> runGiveAll(ctx, SweepScope.ALL)))
+                                .then(onlineOnly().executes(this::runGiveOnline))));
+    }
+
+    /** The flag that narrows {@code giveall} to the players online on this server. */
+    private static LiteralArgumentBuilder<CommandSourceStack> onlineOnly() {
+        return Commands.literal("--online");
+    }
+
+    /** {@code sweeps} lists the unfinished changes to every balance; {@code sweeps cancel <id>} stops one. */
+    private LiteralArgumentBuilder<CommandSourceStack> sweepsVerb() {
+        return Commands.literal("sweeps")
+                .requires(Gate.permission(SWEEPS))
+                .executes(this::runListSweeps)
+                .then(Commands.literal("cancel")
+                        .then(Commands.argument("id", Args.token()).executes(this::runCancelSweep)));
+    }
+
+    private int runListSweeps(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = actor(ctx);
+        offTick(() -> services.ecoAdmin().listSweeps(actor));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runCancelSweep(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = actor(ctx);
+        String id = ctx.getArgument("id", String.class);
+        offTick(() -> services.ecoAdmin().cancelSweep(actor, id));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    private int runGiveOnline(CommandContext<CommandSourceStack> ctx) {
+        PlayerRef actor = actor(ctx);
+        Optional<Currency> currency = currency(ctx);
+        if (currency.isEmpty()) {
+            rejectUnknownCurrency(actor);
+            return Command.SINGLE_SUCCESS;
+        }
+        Optional<Money> amount = amount(ctx.getArgument("amount", String.class), currency.get(), actor);
+        if (amount.isEmpty()) {
+            return Command.SINGLE_SUCCESS;
+        }
+        Money money = amount.get();
+        List<PlayerRef> online = EcoTargets.online();
+        if (noTargets(actor, online)) {
+            return Command.SINGLE_SUCCESS;
+        }
+        offTick(() -> services.ecoAdmin().giveOnline(actor, online, money));
+        return Command.SINGLE_SUCCESS;
     }
 
     private LiteralArgumentBuilder<CommandSourceStack> resetAllVerb() {
@@ -343,7 +397,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
     }
 
     /**
-     * Whether {@code giverandom} has nobody online to choose from, telling {@code actor} so when that is the case, so
+     * Whether {@code giverandom} or {@code giveall --online} has nobody online to reach, telling {@code actor} so when that is the case, so
      * an empty server never runs the verb and reports nothing at all.
      */
     private boolean noTargets(PlayerRef actor, List<PlayerRef> online) {

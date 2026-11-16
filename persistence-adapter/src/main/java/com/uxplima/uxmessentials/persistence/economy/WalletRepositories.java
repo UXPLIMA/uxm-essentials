@@ -112,7 +112,8 @@ public final class WalletRepositories {
             Logger log) {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(telemetry, "telemetry");
-        return new JooqAccountSweep(persistence.dsl(), telemetry::reserveIds, currencies, clock, log);
+        return new JooqAccountSweep(
+                persistence.dsl(), telemetry::reserveIds, telemetry::windIdsForward, currencies, clock, log);
     }
 
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */

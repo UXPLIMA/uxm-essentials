@@ -2,8 +2,11 @@ package com.uxplima.uxmessentials.economy.application;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -11,6 +14,7 @@ import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Step;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Sweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStatus;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
@@ -29,18 +33,24 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>A sweep is advanced one chunk at a time, each its own short transaction, so the runner holds no lock between
  * chunks. Whoever runs the last chunk announces the result once: one audit line, the count to the actor, and one
- * {@link BalancesSwept} event. A chunk that fails changed nothing; the sweep pauses there, the actor is told how far
- * it got, and the runner tries again after {@link #RETRY_AFTER}, for as long as it takes. A sweep left running by a
- * stop is picked up by {@link #resumeUnfinished} when the economy starts on any server. None of this can change an
- * account twice: the journal's cursor moves in the same transaction as the balances.
+ * {@link BalancesSwept} event. A chunk that fails for a reason that passes (a lost connection, a lock cycle) changed
+ * nothing; the sweep is journalled as paused, the actor is told how far it got, and the runner tries again after
+ * {@link #RETRY_AFTER} until it finishes or an operator cancels it. A chunk the database refuses for good ends the
+ * sweep as failed, with one audit line for the accounts already changed. A sweep left running by a stop is picked up
+ * by {@link #resumeUnfinished} when the economy starts on any server. None of this can change an account twice: the
+ * journal's cursor moves in the same transaction as the balances.
  *
- * <p>One new sweep at a time per server, so a second click on the bulk screen cannot pay everyone twice. Every method
- * runs off the tick thread.
+ * <p>The journal keeps one unfinished sweep per currency across every server, so a second click on the bulk screen,
+ * or the command repeated after a pause, is refused rather than paying everyone twice. Every method runs off the tick
+ * thread.
  */
 public final class SweepRunner {
 
     /** How long a paused sweep waits before it tries its chunk again. */
     static final Duration RETRY_AFTER = Duration.ofMinutes(1);
+
+    /** How many characters of a sweep id are shown. */
+    private static final int SHORT_ID = 8;
 
     private final AccountSweep sweeps;
     private final Scheduler scheduler;
@@ -51,7 +61,6 @@ public final class SweepRunner {
     private final Clock clock;
     private final Set<String> running = ConcurrentHashMap.newKeySet();
     private final Set<String> toldPaused = ConcurrentHashMap.newKeySet();
-    private final Object starting = new Object();
 
     public SweepRunner(
             AccountSweep sweeps,
@@ -76,31 +85,40 @@ public final class SweepRunner {
     }
 
     /**
-     * Open a sweep and run it here to its end. Returns its totals when this call finished it; null when another sweep
-     * is still running on this server (the actor is told), or when the sweep paused and will carry on by itself.
+     * Open a sweep and run it here to its end. Returns its totals when this call finished it; null when the currency
+     * already has an unfinished sweep (the actor is told which), or when the sweep paused or failed.
      */
     @Nullable SweepOutcome start(SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor) {
-        Sweep sweep;
-        synchronized (starting) {
-            if (!running.isEmpty()) {
-                notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_RUNNING, Map.of());
-                return null;
-            }
-            try {
-                sweep = sweeps.open(kind, scope, amount, reason, actor, clock.millis());
-            } catch (RuntimeException failure) {
-                // Nothing was opened, so nothing changed and nothing will resume.
-                notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_FAILED, Map.of());
-                throw failure;
-            }
-            running.add(sweep.id());
+        AccountSweep.Opening opening;
+        try {
+            opening = sweeps.open(kind, scope, amount, reason, actor, clock.millis());
+        } catch (RuntimeException failure) {
+            // Nothing was opened, so nothing changed and nothing will resume.
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_BULK_FAILED, Map.of());
+            throw failure;
         }
-        return runClaimed(sweep);
+        return switch (opening) {
+            case AccountSweep.Opened opened -> run(opened.sweep());
+            case AccountSweep.Busy busy -> {
+                SweepStatus existing = busy.existing();
+                notifier.send(
+                        actor,
+                        EconomyMessageKey.ECO_ADMIN_BULK_RUNNING,
+                        Map.of(
+                                "id",
+                                shortId(existing.id()),
+                                "currency",
+                                existing.currency(),
+                                "state",
+                                existing.state().name().toLowerCase(Locale.ROOT)));
+                yield null;
+            }
+        };
     }
 
-    /** Carry on every sweep the journal still has running, here and one after another. Called when the economy starts. */
+    /** Carry on every sweep the journal still has running or paused, here and one after another. */
     public void resumeUnfinished() {
-        for (Sweep sweep : sweeps.unfinished()) {
+        for (Sweep sweep : sweeps.resumable()) {
             log.info(
                     "event=economy_sweep_resumed id={} kind={} currency={}",
                     sweep.id(),
@@ -108,6 +126,33 @@ public final class SweepRunner {
                     sweep.amount().currency().id().value());
             run(sweep);
         }
+    }
+
+    /** Every sweep still running or paused, on any server. */
+    List<SweepStatus> unfinished() {
+        return sweeps.unfinished();
+    }
+
+    /**
+     * Stop the unfinished sweep {@code id} (or the one id that starts with it). The accounts it changed keep the
+     * change; a runner still working on it stops at its next chunk.
+     */
+    Optional<SweepStatus> cancel(PlayerRef by, String id) {
+        Optional<SweepStatus> cancelled = sweeps.cancel(id, clock.millis());
+        cancelled.ifPresent(status -> {
+            toldPaused.remove(status.id());
+            log.info(
+                    "event=economy_sweep_cancelled id={} by={} changed={}",
+                    status.id(),
+                    by.name(),
+                    status.total().changed());
+        });
+        return cancelled;
+    }
+
+    /** The part of a sweep id an operator reads and types; any unique start of it is accepted. */
+    static String shortId(String id) {
+        return id.length() <= SHORT_ID ? id : id.substring(0, SHORT_ID);
     }
 
     /** Run {@code sweep} to its end here, unless this server already runs it. */
@@ -138,7 +183,12 @@ public final class SweepRunner {
                         finished(sweep, step.total());
                         return step.total();
                     }
-                    case ALREADY_FINISHED -> {
+                    case ENDED -> {
+                        toldPaused.remove(sweep.id());
+                        return null;
+                    }
+                    case FAILED -> {
+                        failed(sweep, step);
                         return null;
                     }
                 }
@@ -150,6 +200,11 @@ public final class SweepRunner {
 
     private void paused(Sweep sweep, SweepOutcome sofar, RuntimeException failure) {
         log.error("event=economy_sweep_paused id=" + sweep.id() + " changed=" + sofar.changed(), failure);
+        try {
+            sweeps.pause(sweep, describe(failure));
+        } catch (RuntimeException unrecorded) {
+            // The journal is as unreachable as the chunk was; the sweep still reads as running and is retried.
+        }
         if (toldPaused.add(sweep.id())) {
             notifier.send(
                     sweep.actor(),
@@ -157,6 +212,30 @@ public final class SweepRunner {
                     Map.of("count", Integer.toString(sofar.changed())));
         }
         scheduler.asyncAfter(RETRY_AFTER, () -> run(sweep));
+    }
+
+    private void failed(Sweep sweep, Step step) {
+        toldPaused.remove(sweep.id());
+        SweepOutcome total = step.total();
+        log.error(
+                "event=economy_sweep_failed id=" + sweep.id() + " changed=" + total.changed() + " error="
+                        + step.error(),
+                new IllegalStateException("sweep " + sweep.id() + " refused by the database"));
+        audit.bulkMutation(sweep.actor(), sweep.amount(), total.changed(), sweep.reason());
+        notifier.send(
+                sweep.actor(),
+                EconomyMessageKey.ECO_ADMIN_BULK_HALTED,
+                Map.of("count", Integer.toString(total.changed())));
+    }
+
+    /** One line saying what failed, for the journal an operator reads. */
+    private static String describe(Throwable failure) {
+        Throwable root = failure;
+        while (root.getCause() != null && root.getCause() != root) {
+            root = root.getCause();
+        }
+        String message = root.getMessage();
+        return root.getClass().getSimpleName() + (message == null ? "" : ": " + message);
     }
 
     private void finished(Sweep sweep, SweepOutcome total) {

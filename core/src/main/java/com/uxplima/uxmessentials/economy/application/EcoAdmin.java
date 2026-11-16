@@ -1,10 +1,15 @@
 package com.uxplima.uxmessentials.economy.application;
 
 import java.time.Clock;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStatus;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
@@ -114,6 +119,28 @@ public final class EcoAdmin {
         return sweep(actor, SweepKind.CREDIT, scope, amount, EconomyReason.ADMIN_GIVEALL);
     }
 
+    /**
+     * {@code /eco giveall <amount> [currency] --online}: credit each of {@code online}, the players online on the
+     * issuing server, one by one, the way a scheduled reward for being online expects. Returns how many were credited.
+     */
+    public int giveOnline(PlayerRef actor, List<PlayerRef> online, Money amount) {
+        validateBulk(actor, amount);
+        int affected = 0;
+        for (PlayerRef target : List.copyOf(online)) {
+            repository.ensureOwner(target);
+            if (economy.credit(target, amount).isOk()) {
+                history.recordCredit(ownerId(target), amount, EconomyReason.ADMIN_GIVEALL, clock.millis());
+                affected++;
+            }
+        }
+        audit.bulkMutation(actor, amount, affected, EconomyReason.ADMIN_GIVEALL);
+        notifier.send(
+                actor,
+                EconomyMessageKey.ECO_ADMIN_GIVEALL_ONLINE,
+                Map.of("count", Integer.toString(affected), "amount", notifier.amount(amount)));
+        return affected;
+    }
+
     /** {@code /eco giverandom <amount> [currency]}: credit {@code amount} to one chosen online player. */
     public Result<Unit, TransferError> giveRandom(PlayerRef actor, PlayerRef chosen, Money amount) {
         validate(actor, chosen, amount);
@@ -175,6 +202,77 @@ public final class EcoAdmin {
      */
     public void resumeSweeps() {
         sweeps.resumeUnfinished();
+    }
+
+    /** {@code /eco sweeps}: tell {@code actor} every unfinished sweep, how far it got and why it last stopped. */
+    public void listSweeps(PlayerRef actor) {
+        Objects.requireNonNull(actor, "actor");
+        List<SweepStatus> unfinished = sweeps.unfinished();
+        if (unfinished.isEmpty()) {
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_NONE, Map.of());
+            return;
+        }
+        notifier.send(
+                actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_HEADER, Map.of("count", Integer.toString(unfinished.size())));
+        for (SweepStatus status : unfinished) {
+            Map<String, String> values = new HashMap<>();
+            values.put("id", SweepRunner.shortId(status.id()));
+            values.put("kind", status.kind() == SweepKind.CREDIT ? "giveall" : "resetall");
+            values.put("amount", amount(status));
+            values.put("currency", status.currency());
+            values.put("scope", status.scope().name().toLowerCase(Locale.ROOT));
+            values.put("state", status.state().name().toLowerCase(Locale.ROOT));
+            values.put("count", Integer.toString(status.total().changed()));
+            values.put("actor", status.actor().name());
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_ENTRY, values);
+            String error = status.lastError();
+            if (error != null) {
+                notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEPS_ERROR, Map.of("error", error));
+            }
+        }
+    }
+
+    /**
+     * {@code /eco sweeps cancel <id>}: stop an unfinished sweep. The accounts it already changed keep the change, and
+     * the audit gets one line with their count, as for a sweep that ran to its end.
+     */
+    public boolean cancelSweep(PlayerRef actor, String id) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(id, "id");
+        Optional<SweepStatus> cancelled = sweeps.cancel(actor, id);
+        if (cancelled.isEmpty()) {
+            notifier.send(actor, EconomyMessageKey.ECO_ADMIN_SWEEP_UNKNOWN, Map.of("id", id));
+            return false;
+        }
+        SweepStatus status = cancelled.get();
+        currency(status.currency())
+                .ifPresent(currency -> audit.bulkMutation(
+                        status.actor(),
+                        Money.of(currency, status.amount()),
+                        status.total().changed(),
+                        status.reason()));
+        notifier.send(
+                actor,
+                EconomyMessageKey.ECO_ADMIN_SWEEP_CANCELLED,
+                Map.of(
+                        "id",
+                        SweepRunner.shortId(status.id()),
+                        "count",
+                        Integer.toString(status.total().changed())));
+        return true;
+    }
+
+    private Optional<Currency> currency(String id) {
+        return economy.currencies().stream()
+                .filter(currency -> currency.id().value().equals(id))
+                .findFirst();
+    }
+
+    /** The sweep's amount as money, or as a bare figure when its currency is no longer configured. */
+    private String amount(SweepStatus status) {
+        return currency(status.currency())
+                .map(currency -> notifier.amount(Money.of(currency, status.amount())))
+                .orElseGet(() -> status.amount().stripTrailingZeros().toPlainString());
     }
 
     /**

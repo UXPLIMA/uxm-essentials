@@ -13,10 +13,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The players online on this server, for the verbs that mean exactly them: {@code /eco giverandom} and
- * {@code /payall}. The roster is read once on the thread that may read it and handed to the off-tick worker as an
- * immutable list, so the database writes never run on the tick thread. {@code /eco giveall|resetall} do not come
- * here: they reach every account through the ledger's sweep.
+ * The players online on this server, for the verbs that mean exactly them: {@code /eco giverandom},
+ * {@code /eco giveall --online} and {@code /payall}. The roster is read once on the thread that may read it and handed to the off-tick worker as an
+ * immutable list, so the database writes never run on the tick thread. {@code /eco giveall|resetall} without
+ * {@code --online} do not come here: they reach every account through the ledger's sweep.
  */
 @NullMarked
 final class EcoTargets {

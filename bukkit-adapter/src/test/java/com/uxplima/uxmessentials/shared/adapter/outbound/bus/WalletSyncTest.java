@@ -97,13 +97,14 @@ class WalletSyncTest {
     }
 
     private AccountSweep.Sweep open() {
-        return sweep.open(
-                SweepKind.CREDIT,
-                SweepScope.PLAYERS,
-                Money.of(COINS, new BigDecimal("25")),
-                EconomyReason.ADMIN_GIVEALL,
-                ALEX,
-                0L);
+        return ((AccountSweep.Opened) sweep.open(
+                        SweepKind.CREDIT,
+                        SweepScope.PLAYERS,
+                        Money.of(COINS, new BigDecimal("25")),
+                        EconomyReason.ADMIN_GIVEALL,
+                        ALEX,
+                        0L))
+                .sweep();
     }
 
     private BigDecimal cached(PlayerRef owner) {
@@ -131,9 +132,9 @@ class WalletSyncTest {
         }
 
         @Override
-        public Sweep open(
+        public Opening open(
                 SweepKind kind, SweepScope scope, Money amount, EconomyReason reason, PlayerRef actor, long at) {
-            return new Sweep("sweep-1", kind, scope, amount, reason, actor, at);
+            return new Opened(new Sweep("sweep-1", kind, scope, amount, reason, actor, at));
         }
 
         @Override
@@ -152,8 +153,21 @@ class WalletSyncTest {
         }
 
         @Override
-        public List<Sweep> unfinished() {
+        public void pause(Sweep sweep, String error) {}
+
+        @Override
+        public List<Sweep> resumable() {
             return List.of();
+        }
+
+        @Override
+        public List<SweepStatus> unfinished() {
+            return List.of();
+        }
+
+        @Override
+        public Optional<SweepStatus> cancel(String id, long at) {
+            return Optional.empty();
         }
     }
 

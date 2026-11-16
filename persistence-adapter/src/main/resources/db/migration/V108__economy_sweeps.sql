@@ -7,9 +7,16 @@
 -- servers resuming the same sweep take turns rather than repeat a chunk.
 --
 -- `kind` is CREDIT (giveall, adds `amount`) or RESET (resetall, sets `amount`); `scope` is PLAYERS (accounts of
--- players who have joined) or ALL (every account, also those other plugins opened). `state` is RUNNING until the
--- last chunk, then DONE with `finished_at`. Owners are the canonical 36-character UUID text, `after_owner` is ''
--- before the first chunk, timestamps are epoch milliseconds, money is DECIMAL(20,4) like the wallets.
+-- players who have joined) or ALL (every account, also those other plugins opened). `state` is RUNNING, or PAUSED
+-- while a failure that may pass (a lost connection) waits to be tried again, with `last_error` saying what failed.
+-- It ends as DONE after the last chunk, CANCELLED by an operator, or FAILED when the database refuses a chunk's rows
+-- for good or the currency is no longer configured, each with `finished_at`.
+--
+-- `active_currency` holds the currency while the sweep is unfinished and is NULL once it ends. Its unique constraint
+-- lets one currency have one unfinished sweep across every server: a second opened while one runs or is paused would
+-- pay everyone twice when the first resumes, or interleave a giveall with a resetall. Every backend lets a unique
+-- column hold any number of NULLs. Owners are the canonical 36-character UUID text, `after_owner` is '' before the
+-- first chunk, timestamps are epoch milliseconds, money is DECIMAL(20,4) like the wallets.
 --
 -- Same portability contract as the earlier migrations: plain CREATE TABLE and CREATE INDEX in the subset SQLite,
 -- MySQL/MariaDB and PostgreSQL all accept.
@@ -28,9 +35,12 @@ CREATE TABLE ${prefix}economy_sweeps (
     skipped      INT            NOT NULL,
     gone         INT            NOT NULL,
     state        VARCHAR(16)    NOT NULL,
+    active_currency VARCHAR(32),
+    last_error   VARCHAR(255),
     finished_at  BIGINT,
-    CONSTRAINT ${prefix}pk_economy_sweeps PRIMARY KEY (id)
+    CONSTRAINT ${prefix}pk_economy_sweeps PRIMARY KEY (id),
+    CONSTRAINT ${prefix}uq_economy_sweeps_active UNIQUE (active_currency)
 );
 
--- Serves the start-up read of the sweeps still running.
+-- Serves the start-up read of the sweeps still running or paused.
 CREATE INDEX ${prefix}idx_economy_sweeps_state ON ${prefix}economy_sweeps (state);

@@ -28,6 +28,7 @@ public final class EconomyPermissions {
     public static final String ECONOMY_ADMIN_NOTE = "uxmessentials.economy.admin.note";
     public static final String ECONOMY_ADMIN_RESTORE = "uxmessentials.economy.admin.restore";
     public static final String ECONOMY_ADMIN_SET = "uxmessentials.economy.admin.set";
+    public static final String ECONOMY_ADMIN_SWEEPS = "uxmessentials.economy.admin.sweeps";
     public static final String ECONOMY_ADMIN_TAKE = "uxmessentials.economy.admin.take";
     public static final String ECONOMY_BALANCE = "uxmessentials.economy.balance";
     public static final String ECONOMY_BALANCE_OTHERS = "uxmessentials.economy.balance.others";
@@ -100,7 +101,7 @@ public final class EconomyPermissions {
                         ECONOMY),
                 PermissionSpec.of(
                         ECONOMY_ADMIN_BULK,
-                        "/eco giveall, /eco giverandom, /eco resetall server-wide bulk mutations.",
+                        "/eco giveall, /eco giverandom, /eco resetall: change every player's balance, or those of the players online here.",
                         PermissionDefault.OP,
                         ECONOMY),
                 PermissionSpec.of(
@@ -131,6 +132,11 @@ public final class EconomyPermissions {
                 PermissionSpec.of(
                         ECONOMY_ADMIN_SET,
                         "/eco set <player> <amount> [currency] and /eco reset only.",
+                        PermissionDefault.OP,
+                        ECONOMY),
+                PermissionSpec.of(
+                        ECONOMY_ADMIN_SWEEPS,
+                        "/eco sweeps and /eco sweeps cancel <id>: list the unfinished changes to every balance and stop one.",
                         PermissionDefault.OP,
                         ECONOMY),
                 PermissionSpec.of(

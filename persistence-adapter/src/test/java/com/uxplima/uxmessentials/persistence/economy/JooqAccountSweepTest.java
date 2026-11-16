@@ -13,6 +13,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -21,11 +22,16 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.IntToLongFunction;
 
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Busy;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Opened;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Opening;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Progress;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Step;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.Sweep;
 import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepOutcome;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep.SweepStatus;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.CurrencyRegistry;
@@ -33,6 +39,7 @@ import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.economy.domain.SweepKind;
 import com.uxplima.uxmessentials.economy.domain.SweepScope;
+import com.uxplima.uxmessentials.economy.domain.SweepState;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -45,8 +52,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A sweep reaches every account it should, writes one ledger row per changed account with its balance, holds its locks
- * one chunk at a time, and never changes an account twice: not when it stops part way and carries on, and not when two
- * runners advance it at once.
+ * one chunk at a time, and never changes an account twice: not when it stops part way and carries on, not when two
+ * runners advance it at once, and not when the command is given again while it is unfinished. One the database
+ * refuses for good, or whose currency is gone, ends as failed; an operator can cancel one.
  */
 @EveryBackend
 class JooqAccountSweepTest {
@@ -69,6 +77,7 @@ class JooqAccountSweepTest {
     private TransactionTelemetry telemetry;
     private JooqAccountSweep sweeps;
     private Executor servers = ForkJoinPool.commonPool();
+    private TestDatabase backend;
 
     @BeforeEach
     void open(TestDatabase database) {
@@ -81,11 +90,12 @@ class JooqAccountSweepTest {
         wallets = new JooqWalletRepository(dsl, CURRENCIES, CLOCK);
         telemetry = new TransactionTelemetry(dsl, new IdleScheduler(), new SilentLogger(), Duration.ofHours(1));
         telemetry.start();
-        sweeps = sweeps(telemetry::reserveIds);
+        sweeps = sweeps(telemetry::reserveIds, telemetry::windIdsForward);
+        backend = database;
     }
 
-    private JooqAccountSweep sweeps(java.util.function.IntToLongFunction ids) {
-        return new JooqAccountSweep(dsl, ids, CURRENCIES, CLOCK, new SilentLogger());
+    private JooqAccountSweep sweeps(IntToLongFunction ids, Runnable windForward) {
+        return new JooqAccountSweep(dsl, ids, windForward, CURRENCIES, CLOCK, new RecordingLogger());
     }
 
     @Test
@@ -159,14 +169,17 @@ class JooqAccountSweepTest {
         insertOwners(accounts);
         Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, coins("1"));
         assertThat(sweeps.advance(sweep).progress()).isEqualTo(Progress.MORE);
-        // The second chunk is handed an id another writer already took, so its ledger insert fails at the database.
+        // The second chunk's ledger insert meets an id another writer took, after its balances were written, and the
+        // connection is lost before it can move past that id.
         long taken = telemetry.reserveIds(1);
         writeLedgerRow(taken);
-        JooqAccountSweep stopping = sweeps(count -> taken);
+        JooqAccountSweep stopping = sweeps(count -> taken, () -> {
+            throw new IllegalStateException("connection lost");
+        });
 
         assertThatThrownBy(() -> stopping.advance(sweep)).isInstanceOf(RuntimeException.class);
 
-        assertThat(sweeps.unfinished()).extracting(Sweep::id).containsExactly(sweep.id());
+        assertThat(sweeps.resumable()).extracting(Sweep::id).containsExactly(sweep.id());
         assertThat(ledger()).hasSize(JooqAccountSweep.CHUNK + 1);
         SweepOutcome outcome = runToEnd(sweep);
         assertThat(outcome).isEqualTo(new SweepOutcome(accounts, 0, 0));
@@ -178,11 +191,159 @@ class JooqAccountSweepTest {
     }
 
     @Test
+    void ledgerIdsAServerOnAnOlderReleaseTookAreSteppedOverAndTheChunkLands() {
+        insertOwners(5);
+        long next = telemetry.reserveIds(1) + 1;
+        for (long id = next; id < next + JooqAccountSweep.CHUNK * 2; id++) {
+            writeLedgerRow(id);
+        }
+
+        SweepOutcome outcome = runToEnd(open(SweepKind.CREDIT, SweepScope.ALL, coins("1")));
+
+        assertThat(outcome).isEqualTo(new SweepOutcome(5, 0, 0));
+        assertThat(ledger()).hasSize(JooqAccountSweep.CHUNK * 2 + 5);
+    }
+
+    @Test
+    void aChunkTheDatabaseRefusesForGoodFailsTheSweepAndChangesNothingOfIt() {
+        if (backend.backend().isFile()) {
+            // SQLite keeps any figure in a DECIMAL column; this refuses the figures the server databases cannot hold.
+            dsl.execute("CREATE TRIGGER refuse_huge_balance BEFORE UPDATE ON wallet_balances"
+                    + " WHEN NEW.amount >= 1e16 BEGIN SELECT RAISE(ABORT, 'out of range'); END");
+        }
+        Currency vast = Currency.builder(CurrencyId.of("coins"))
+                .max(new BigDecimal("1000000000000000000"))
+                .build();
+        wallets.credit(ALEX, coins("10"));
+        wallets.credit(SAM, coins("20"));
+        Money huge = Money.of(vast, new BigDecimal("9999999999999999"));
+
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, huge);
+        Step step = sweeps.advance(sweep);
+
+        assertThat(step.progress()).isEqualTo(Progress.FAILED);
+        assertThat(step.error()).isNotBlank();
+        assertThat(balance(ALEX, COINS)).isEqualByComparingTo("10");
+        assertThat(balance(SAM, COINS)).isEqualByComparingTo("20");
+        assertThat(ledger()).isEmpty();
+        assertThat(sweeps.unfinished()).isEmpty();
+        assertThat(sweeps.advance(sweep).progress()).isEqualTo(Progress.ENDED);
+        // A failed sweep no longer holds its currency.
+        assertThat(sweeps.open(SweepKind.CREDIT, SweepScope.ALL, coins("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+                .isInstanceOf(Opened.class);
+    }
+
+    @Test
+    void aCurrencyWithAnUnfinishedSweepRefusesASecondOnAnyServer() {
+        wallets.ensureOwner(ALEX);
+        Sweep first = open(SweepKind.CREDIT, SweepScope.ALL, coins("5"));
+        JooqAccountSweep elsewhere = sweeps(telemetry::reserveIds, telemetry::windIdsForward);
+
+        Opening second = elsewhere.open(
+                SweepKind.RESET, SweepScope.PLAYERS, starting(COINS), EconomyReason.ADMIN_RESETALL, ADMIN, AT);
+
+        assertThat(second).isInstanceOfSatisfying(Busy.class, busy -> {
+            assertThat(busy.existing().id()).isEqualTo(first.id());
+            assertThat(busy.existing().state()).isEqualTo(SweepState.RUNNING);
+        });
+        assertThat(elsewhere.open(SweepKind.CREDIT, SweepScope.ALL, gems("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+                .isInstanceOf(Opened.class);
+        runToEnd(first);
+        assertThat(elsewhere.open(
+                        SweepKind.RESET, SweepScope.PLAYERS, starting(COINS), EconomyReason.ADMIN_RESETALL, ADMIN, AT))
+                .isInstanceOf(Opened.class);
+    }
+
+    @Test
+    void twoServersOpeningASweepOfOneCurrencyAtOnceGetOneBetweenThem() throws Exception {
+        CountDownLatch start = new CountDownLatch(1);
+        List<CompletableFuture<Opening>> openings = new ArrayList<>();
+        for (int i = 0; i < 4; i++) {
+            JooqAccountSweep server = sweeps(telemetry::reserveIds, telemetry::windIdsForward);
+            openings.add(CompletableFuture.supplyAsync(
+                    () -> {
+                        await(start);
+                        return server.open(
+                                SweepKind.CREDIT, SweepScope.ALL, coins("5"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT);
+                    },
+                    servers));
+        }
+        start.countDown();
+
+        int opened = 0;
+        for (CompletableFuture<Opening> opening : openings) {
+            if (opening.get(60, TimeUnit.SECONDS) instanceof Opened) {
+                opened++;
+            }
+        }
+        assertThat(opened).isEqualTo(1);
+        assertThat(sweeps.unfinished()).hasSize(1);
+    }
+
+    @Test
+    void aCancelledSweepKeepsWhatItChangedAndChangesNothingMore() {
+        int accounts = JooqAccountSweep.CHUNK + 9;
+        insertOwners(accounts);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, coins("1"));
+        sweeps.advance(sweep);
+
+        Optional<SweepStatus> cancelled = sweeps(telemetry::reserveIds, telemetry::windIdsForward)
+                .cancel(sweep.id().substring(0, 8), AT);
+
+        assertThat(cancelled).hasValueSatisfying(status -> {
+            assertThat(status.id()).isEqualTo(sweep.id());
+            assertThat(status.state()).isEqualTo(SweepState.CANCELLED);
+            assertThat(status.total().changed()).isEqualTo(JooqAccountSweep.CHUNK);
+        });
+        assertThat(sweeps.advance(sweep).progress()).isEqualTo(Progress.ENDED);
+        assertThat(ledger()).hasSize(JooqAccountSweep.CHUNK);
+        assertThat(sweeps.unfinished()).isEmpty();
+        assertThat(sweeps.cancel(sweep.id(), AT)).isEmpty();
+        assertThat(sweeps.open(SweepKind.CREDIT, SweepScope.ALL, coins("1"), EconomyReason.ADMIN_GIVEALL, ADMIN, AT))
+                .isInstanceOf(Opened.class);
+    }
+
+    @Test
+    void aPausedSweepIsListedWithItsErrorAndRunsOnWhenTriedAgain() {
+        wallets.ensureOwner(ALEX);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, coins("5"));
+
+        sweeps.pause(sweep, "SQLTransientConnectionException: connection lost");
+
+        assertThat(sweeps.unfinished()).singleElement().satisfies(status -> {
+            assertThat(status.state()).isEqualTo(SweepState.PAUSED);
+            assertThat(status.lastError()).contains("connection lost");
+        });
+        assertThat(sweeps.resumable()).extracting(Sweep::id).containsExactly(sweep.id());
+        assertThat(runToEnd(sweep)).isEqualTo(new SweepOutcome(1, 0, 0));
+    }
+
+    @Test
+    void aSweepWhoseCurrencyIsNoLongerConfiguredFailsInsteadOfWaitingForEver() {
+        wallets.ensureOwner(ALEX);
+        Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, gems("5"));
+        RecordingLogger log = new RecordingLogger();
+        JooqAccountSweep withoutGems = new JooqAccountSweep(
+                dsl,
+                telemetry::reserveIds,
+                telemetry::windIdsForward,
+                CurrencyRegistry.of(List.of(COINS), COINS.id()),
+                CLOCK,
+                log);
+
+        assertThat(withoutGems.resumable()).isEmpty();
+
+        assertThat(log.errors).singleElement().asString().contains("event=economy_sweep_failed", sweep.id());
+        assertThat(sweeps.unfinished()).isEmpty();
+        assertThat(sweeps.advance(sweep).progress()).isEqualTo(Progress.ENDED);
+    }
+
+    @Test
     void twoRunnersOfOneSweepTakeTurnsAndOnlyOneFinishesIt() throws Exception {
         int accounts = JooqAccountSweep.CHUNK * 3 + 11;
         insertOwners(accounts);
         Sweep sweep = open(SweepKind.CREDIT, SweepScope.ALL, coins("1"));
-        JooqAccountSweep elsewhere = sweeps(telemetry::reserveIds);
+        JooqAccountSweep elsewhere = sweeps(telemetry::reserveIds, telemetry::windIdsForward);
         AtomicInteger finishes = new AtomicInteger();
         CountDownLatch start = new CountDownLatch(1);
         List<CompletableFuture<Void>> runners = new ArrayList<>();
@@ -270,10 +431,11 @@ class JooqAccountSweepTest {
     void theJournalListsTheSweepsStillRunningForAnyServerToCarryOn() {
         wallets.ensureOwner(ALEX);
         Sweep running = open(SweepKind.CREDIT, SweepScope.ALL, coins("5"));
-        Sweep done = open(SweepKind.RESET, SweepScope.PLAYERS, starting(COINS));
+        Sweep done = open(SweepKind.RESET, SweepScope.PLAYERS, Money.zero(GEMS));
         runToEnd(done);
 
-        List<Sweep> unfinished = sweeps(telemetry::reserveIds).unfinished();
+        List<Sweep> unfinished =
+                sweeps(telemetry::reserveIds, telemetry::windIdsForward).resumable();
 
         assertThat(unfinished).singleElement().satisfies(sweep -> {
             assertThat(sweep.id()).isEqualTo(running.id());
@@ -283,12 +445,12 @@ class JooqAccountSweepTest {
             assertThat(sweep.actor()).isEqualTo(ADMIN);
             assertThat(sweep.startedAt()).isEqualTo(AT);
         });
-        assertThat(sweeps.advance(done).progress()).isEqualTo(Progress.ALREADY_FINISHED);
+        assertThat(sweeps.advance(done).progress()).isEqualTo(Progress.ENDED);
     }
 
     private Sweep open(SweepKind kind, SweepScope scope, Money amount) {
         EconomyReason reason = kind == SweepKind.CREDIT ? EconomyReason.ADMIN_GIVEALL : EconomyReason.ADMIN_RESETALL;
-        return sweeps.open(kind, scope, amount, reason, ADMIN, AT);
+        return ((Opened) sweeps.open(kind, scope, amount, reason, ADMIN, AT)).sweep();
     }
 
     private SweepOutcome runToEnd(Sweep sweep) {
@@ -404,6 +566,26 @@ class JooqAccountSweepTest {
 
         @Override
         public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
+    }
+
+    /** Keeps the error lines, which are what an operator would be told. */
+    private static final class RecordingLogger implements Logger {
+
+        private final List<String> errors = new java.util.concurrent.CopyOnWriteArrayList<>();
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {
+            errors.add(message);
+        }
 
         @Override
         public void debug(String message, Object... args) {}
