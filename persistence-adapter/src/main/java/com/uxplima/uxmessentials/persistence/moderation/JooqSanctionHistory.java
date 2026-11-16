@@ -22,6 +22,8 @@ import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import org.jooq.Condition;
 import org.jooq.DSLContext;
 import org.jooq.Field;
+import org.jooq.Record6;
+import org.jooq.ResultQuery;
 import org.jooq.TableField;
 import org.jooq.exception.DataAccessException;
 import org.jooq.exception.SQLStateClass;
@@ -149,6 +151,21 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
     public List<Tally> countsSince(Instant threshold, Optional<UUID> actor) {
         Objects.requireNonNull(threshold, "threshold");
         Objects.requireNonNull(actor, "actor");
+        return read(dsl -> countsQuery(dsl, threshold, actor)
+                .fetch(record -> new Tally(
+                        Optional.ofNullable(record.value1()).map(UUID::fromString),
+                        record.value2(),
+                        SanctionAction.valueOf(record.value3()),
+                        ACTION_KICK.equals(record.value3()) ? record.value5() : record.value4(),
+                        Instant.ofEpochMilli(Objects.requireNonNull(record.value6(), "latest")))));
+    }
+
+    /**
+     * The {@link #countsSince} query: per actor and action, the rows, the distinct instants and the latest instant
+     * since {@code threshold}. Separate so its SQL can be rendered for each dialect without a database.
+     */
+    static ResultQuery<Record6<String, String, String, Integer, Integer, Long>> countsQuery(
+            DSLContext dsl, Instant threshold, Optional<UUID> actor) {
         ModerationSanctionHistory row = MODERATION_SANCTION_HISTORY.as("counted");
         ModerationSanctionHistory player = MODERATION_SANCTION_HISTORY.as("player_ban");
         // An IP row written at the same instant as the same staff member's ban of the same player is a STRICT ban's
@@ -168,18 +185,12 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
         // The kicks of one /kickall share their instant, so counting instants counts the command once.
         Field<Integer> instants = DSL.countDistinct(row.TS);
         Field<Long> latest = DSL.max(row.TS);
-        return read(dsl -> dsl.select(row.ACTOR, row.ACTOR_NAME, row.ACTION, rows, instants, latest)
+        return dsl.select(row.ACTOR, row.ACTOR_NAME, row.ACTION, rows, instants, latest)
                 .from(row)
                 .where(row.TS.ge(threshold.toEpochMilli()))
                 .and(scope)
                 .and(counted)
-                .groupBy(row.ACTOR, row.ACTOR_NAME, row.ACTION)
-                .fetch(record -> new Tally(
-                        Optional.ofNullable(record.value1()).map(UUID::fromString),
-                        record.value2(),
-                        SanctionAction.valueOf(record.value3()),
-                        ACTION_KICK.equals(record.value3()) ? record.value5() : record.value4(),
-                        Instant.ofEpochMilli(Objects.requireNonNull(record.value6(), "latest")))));
+                .groupBy(row.ACTOR, row.ACTOR_NAME, row.ACTION);
     }
 
     private List<SanctionHistoryEntry> scoped(UUID target, int limit, SanctionAction a, SanctionAction b) {
