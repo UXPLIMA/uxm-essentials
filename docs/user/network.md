@@ -146,8 +146,14 @@ This holds only once every backend runs the same version. During a rolling upgra
 or a vote party sent by one, can still pay a vote party twice. A backend remembers the ids it acted on in memory
 only, so a copy that arrives very late, after that backend restarted, can act again. Vote parties are the exception:
 a party sent over both carriers carries the time it fired, and a backend that is itself on both carriers drops one
-that fired before it started, so the late proxy copy of a party it already paid does not pay again. A party sent on
-the proxy alone, or received by a backend on the proxy alone, is never dropped this way. Use `both` only while moving from one carrier to the other.
+that fired more than 60 seconds before it started, so the late proxy copy of a party it already paid does not pay
+again. The 60 seconds cover a Redis copy sent while the backend was still starting and a sender whose clock runs a
+little ahead; a backend that restarts within 60 seconds of a party can still pay its late proxy copy again. A party
+sent on the proxy alone, or received by a backend on the proxy alone, is never dropped this way.
+
+The rule has one cost. If a party's Redis copy never reached a backend (Redis was down, or the backend was) and that
+backend restarted while the proxy copy was still queued, the proxy copy arrives after the restart and is dropped, so
+the party is not paid on that backend. Use `both` only while moving from one carrier to the other.
 
 ## The proxy plugin
 

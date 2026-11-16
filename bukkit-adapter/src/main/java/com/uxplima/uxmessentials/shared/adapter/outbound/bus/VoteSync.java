@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
@@ -59,6 +60,13 @@ public final class VoteSync {
      */
     static final int MAX_VOTERS_ON_WIRE = 1000;
 
+    /**
+     * How long before this listener started a both-carrier party may have fired and still be run. Its Redis copy can
+     * have been published while this server was still subscribing, and the sender's clock can run ahead of this
+     * one's, so only a party clearly older than the start is taken for a late proxy copy.
+     */
+    static final Duration LATE_COPY_GRACE = Duration.ofSeconds(60);
+
     private VoteSync() {}
 
     /** A {@link VoteRepository} that broadcasts a {@link VoteCounterChanged} after every counter mutation. */
@@ -74,8 +82,9 @@ public final class VoteSync {
      * {@code channels} and hands the frame's eligible players to {@code rewards}, which pays the ones online
      * here. {@code dropCachedCounter} is the cache's invalidation ({@link CachedVoteRepository#invalidate}),
      * passed as a {@code Runnable} so this seam is testable without the persistence graph. {@code listeningSince}
-     * is when this listener starts taking frames, before which any both-carrier party is a late copy; a backend on
-     * one carrier passes {@link Instant#MIN}, since it never receives the other copy and so drops nothing.
+     * is when this listener starts taking frames; a both-carrier party that fired more than {@link #LATE_COPY_GRACE}
+     * before it is a late copy. A backend on one carrier passes {@link Instant#MIN}, since it never receives the other
+     * copy and so drops nothing.
      */
     public static RemoteSyncListener listener(
             Runnable dropCachedCounter,
@@ -88,13 +97,14 @@ public final class VoteSync {
         Objects.requireNonNull(channels, "channels");
         Objects.requireNonNull(rewards, "rewards");
         Objects.requireNonNull(listeningSince, "listeningSince");
+        Instant lateBefore = listeningSince.equals(Instant.MIN) ? Instant.MIN : listeningSince.minus(LATE_COPY_GRACE);
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
         RecentIds celebrated = new RecentIds();
         return message -> {
             if (message instanceof VoteCounterChanged) {
                 dropCachedCounter.run();
             } else if (message instanceof VotePartyFired fired
-                    && !fired.firedBefore(listeningSince)
+                    && !fired.firedBefore(lateBefore)
                     && firstCopy(fired, celebrated)) {
                 dropCachedCounter.run();
                 broadcaster.broadcast(

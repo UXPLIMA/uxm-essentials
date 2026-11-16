@@ -125,6 +125,26 @@ class VoteSyncTest {
     }
 
     @Test
+    void aBothCarrierPartyThatFiredJustBeforeThisServerStartedListeningIsStillPaid() {
+        Instant withinGrace = STARTED.minus(VoteSync.LATE_COPY_GRACE).plusSeconds(1);
+
+        listener.onRemoteChange(
+                new VotePartyFired("vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), withinGrace, true));
+
+        assertThat(paid).containsExactly(ALEX, SAM);
+    }
+
+    @Test
+    void aBothCarrierPartyThatFiredJustPastTheGraceIsNotPaid() {
+        Instant pastGrace = STARTED.minus(VoteSync.LATE_COPY_GRACE).minusSeconds(1);
+
+        listener.onRemoteChange(
+                new VotePartyFired("vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), pastGrace, true));
+
+        assertThat(paid).isEmpty();
+    }
+
+    @Test
     void aProxyOnlyPartyThatArrivesLateIsStillPaid() {
         listener.onRemoteChange(new VotePartyFired(
                 "vote-1", PARTY, 25, VotePartyFired.Reach.EVERYONE, Set.of(), STARTED.minusSeconds(3600), false));
