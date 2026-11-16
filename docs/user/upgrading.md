@@ -20,9 +20,12 @@ The update adds one table, `id_allocator`, and starts the transaction history id
 written. Each server used to count those ids itself from the highest one it saw at start, so two servers sharing one
 database wrote the same ids, and the history of one of them stopped being saved. Nothing needs editing.
 
-Upgrade every server that shares the database in the same window. A server still on the previous release keeps
-counting for itself; when a batch of history meets an id it took, the upgraded server tries once more and then drops
-that batch with `event=ledger_flush_dropped` in the log. Balances are not affected, only the history lines.
+Upgrade every server that shares the database in the same window. A server still on the previous release, or one
+rolled back to it, keeps counting for itself from the highest id it saw at start. When a batch of history meets an id
+such a server took, the upgraded server moves its counter past the highest id written and stores the batch again, so
+the history is kept on both. A row the database refuses even then (a figure too large for the column, say) is
+dropped alone and logged as `event=ledger_rows_dropped` with the rows it concerns; the rest of its batch is stored.
+Balances are never affected, only the history lines.
 
 ## Ladder reasons follow each reader's language
 

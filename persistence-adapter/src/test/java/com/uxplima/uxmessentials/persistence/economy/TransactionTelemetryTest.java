@@ -31,8 +31,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 /**
- * Two servers writing the ledger of one database never write the same id, and a batch that meets an id somebody else
- * wrote is dropped and logged instead of being retried for ever.
+ * Two servers writing the ledger of one database never write the same id. A batch that meets ids a server on an older
+ * release wrote moves past them and lands, and a row no database would store is dropped and logged alone, never with
+ * its whole batch and never retried for ever.
  */
 @EveryBackend
 class TransactionTelemetryTest {
@@ -125,19 +126,44 @@ class TransactionTelemetryTest {
     }
 
     @Test
-    void aBatchMeetingIdsAnotherWriterTookIsDroppedAndLoggedAndTheNextOneLands() {
+    void aBatchMeetingIdsAnOlderServerTookMovesPastThemAndLands() {
         long next = survival.reserveIds(1) + 1;
-        // A server on an older release counts ids itself and writes the next two the allocator would hand out.
-        writeRow(next);
-        writeRow(next + 1);
-        credit(survival, 1);
+        // A server on an older release counts ids itself and has written well past where the allocator stands.
+        for (long id = next; id < next + 40; id++) {
+            writeRow(id);
+        }
+        credit(survival, 3);
 
         survival.flush();
 
-        assertThat(log.errors).singleElement().asString().contains("event=ledger_flush_dropped rows=1");
-        credit(survival, 1);
+        assertThat(ids()).hasSize(43).doesNotHaveDuplicates();
+        assertThat(log.errors).isEmpty();
+        // The allocator now stands past them, so the next batch meets no clash at all.
+        assertThat(lobby.reserveIds(1)).isGreaterThanOrEqualTo(next + 40);
+    }
+
+    @Test
+    void aRowNoDatabaseCanStoreIsDroppedAloneAndTheRestOfItsBatchLands(TestDatabase database) {
+        if (database.backend().isFile()) {
+            // SQLite keeps any figure in a DECIMAL column; this refuses the same figures the server databases do.
+            dsl.execute("CREATE TRIGGER refuse_huge_amount BEFORE INSERT ON transactions"
+                    + " WHEN NEW.amount >= 1e16 BEGIN SELECT RAISE(ABORT, 'amount out of range'); END");
+        }
+        credit(survival, 40);
+        survival.recordCredit(
+                "00000000-0000-0000-0000-0000000000ff",
+                Money.of(COINS, new BigDecimal("1000000000000000000")),
+                EconomyReason.ADMIN_GIVE,
+                AT);
+        credit(survival, 40);
+
         survival.flush();
-        assertThat(ids()).hasSize(3).doesNotHaveDuplicates();
+
+        assertThat(ids()).hasSize(80).doesNotHaveDuplicates();
+        assertThat(log.errors).singleElement().asString().contains("event=ledger_rows_dropped rows=1");
+        credit(survival, 2);
+        survival.flush();
+        assertThat(ids()).hasSize(82);
         assertThat(log.errors).hasSize(1);
     }
 
