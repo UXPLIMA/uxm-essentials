@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.customcommands.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.Proxy;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -13,11 +12,6 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
-
-import org.bukkit.Location;
-import org.bukkit.World;
-import org.bukkit.entity.Player;
-import org.bukkit.event.player.PlayerMoveEvent;
 
 import com.uxplima.uxmessentials.customcommands.adapter.inbound.listener.CommandWarmupTracker;
 import com.uxplima.uxmessentials.customcommands.application.FeeBackendPolicy;
@@ -115,39 +109,6 @@ class TrackingCommandWarmupsTest {
         return runner.run(command, who, false, Map.of());
     }
 
-    /** The server's move event for {@code who} walking from {@link #STANDING} to {@code to}. */
-    private static PlayerMoveEvent moveEvent(PlayerRef who, Position to) {
-        World world = fake(World.class, method -> switch (method) {
-            case "getUID" -> WORLD.uid();
-            case "getName" -> WORLD.name();
-            default -> throw new UnsupportedOperationException(method);
-        });
-        Player player = fake(Player.class, method -> switch (method) {
-            case "getUniqueId" -> who.uuid();
-            default -> throw new UnsupportedOperationException(method);
-        });
-        return new PlayerMoveEvent(
-                player,
-                new Location(world, STANDING.x(), STANDING.y(), STANDING.z()),
-                new Location(world, to.x(), to.y(), to.z()));
-    }
-
-    private interface Answer {
-        Object answer(String method);
-    }
-
-    private static <T> T fake(Class<T> type, Answer answer) {
-        return type.cast(Proxy.newProxyInstance(
-                TrackingCommandWarmupsTest.class.getClassLoader(),
-                new Class<?>[] {type},
-                (self, method, args) -> switch (method.getName()) {
-                    case "hashCode" -> System.identityHashCode(self);
-                    case "equals" -> self == args[0];
-                    case "toString" -> type.getSimpleName();
-                    default -> answer.answer(method.getName());
-                }));
-    }
-
     /** Exactly one chain ran, and it was {@code id}'s. */
     private void assertRan(String id) {
         assertThat(actions.runs).isEqualTo(1);
@@ -189,7 +150,7 @@ class TrackingCommandWarmupsTest {
         tracker.onMove(ALEX.uuid(), WALKED_OFF);
 
         run(REWARD, SAM);
-        tracker.onMove(moveEvent(SAM, WALKED_OFF));
+        tracker.onMove(SAM.uuid(), WALKED_OFF);
         scheduler.elapse();
 
         assertThat(actions.runs)

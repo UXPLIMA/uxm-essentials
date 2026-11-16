@@ -3,25 +3,15 @@ package com.uxplima.uxmessentials.persistence.playerwarps;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAYER_WARPS;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
-import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
-
-import javax.sql.DataSource;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
@@ -35,7 +25,6 @@ import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
 import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy.PayoutConfig;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
 import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
 import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
@@ -49,6 +38,9 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.DSLContext;
+import org.jooq.ExecuteContext;
+import org.jooq.ExecuteListener;
+import org.jooq.ExecuteType;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -76,7 +68,7 @@ class JooqPlayerWarpEconomyCurrencyTest {
     private final Bank bank = new Bank();
 
     private DSLContext dsl;
-    /** The same database, read through connections that run {@link #afterNextBankRead}. */
+    /** The same database, running {@link #afterNextBankRead} after its next read. */
     private DSLContext racing;
 
     private PlayerWarpId market;
@@ -91,8 +83,7 @@ class JooqPlayerWarpEconomyCurrencyTest {
     @BeforeEach
     void open(TestDatabase database) {
         dsl = database.dsl();
-        racing = DslContextProvider.create(
-                racing(database.dataSource()), database.dsl().dialect(), "");
+        racing = dsl.configuration().deriveAppending(new AfterBankRead()).dsl();
         market = new JooqPlayerWarpRepository(dsl)
                 .save(PlayerWarp.create(
                         SAM,
@@ -273,48 +264,16 @@ class JooqPlayerWarpEconomyCurrencyTest {
         assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("10");
     }
 
-    /** {@code real}, with every connection running {@link #afterNextBankRead} once a select has finished. */
-    private DataSource racing(DataSource real) {
-        return proxy(DataSource.class, (self, method, args) -> {
-            Object result = call(method, real, args);
-            return method.getName().equals("getConnection")
-                    ? racing((Connection) Objects.requireNonNull(result, "connection"))
-                    : result;
-        });
-    }
+    /** Runs {@link #afterNextBankRead} once a read has finished, before the economy's next statement. */
+    private final class AfterBankRead implements ExecuteListener {
 
-    /** Runs {@link #afterNextBankRead} once a select has finished, before the economy's next statement. */
-    private Connection racing(Connection real) {
-        return proxy(Connection.class, (self, method, args) -> {
-            Object result = call(method, real, args);
-            if (method.getName().equals("prepareStatement")
-                    && args != null
-                    && args[0] instanceof String sql
-                    && sql.trim().toLowerCase(Locale.ROOT).startsWith("select")) {
-                PreparedStatement statement = (PreparedStatement) Objects.requireNonNull(result, "statement");
-                return proxy(PreparedStatement.class, (inner, closing, closeArgs) -> {
-                    Object closed = call(closing, statement, closeArgs);
-                    Runnable next = afterNextBankRead;
-                    if (closing.getName().equals("close") && next != null) {
-                        afterNextBankRead = null;
-                        next.run();
-                    }
-                    return closed;
-                });
+        @Override
+        public void end(ExecuteContext ctx) {
+            Runnable next = afterNextBankRead;
+            if (ctx.type() == ExecuteType.READ && next != null) {
+                afterNextBankRead = null;
+                next.run();
             }
-            return result;
-        });
-    }
-
-    private static <T> T proxy(Class<T> type, InvocationHandler handler) {
-        return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
-    }
-
-    private static @Nullable Object call(Method method, Object target, Object @Nullable [] args) throws Throwable {
-        try {
-            return method.invoke(target, args);
-        } catch (InvocationTargetException thrown) {
-            throw thrown.getCause();
         }
     }
 
