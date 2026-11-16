@@ -1,8 +1,7 @@
 /**
  * The itemworld context's application layer, the {@link
- * com.uxplima.uxmessentials.itemworld.application.ItemworldModule feature module}, the {@link
- * com.uxplima.uxmessentials.itemworld.application.ItemworldCommandSurface command surface}, the thin
- * per-verb-group policies where domain logic exists, and the itemworld audit port.
+ * com.uxplima.uxmessentials.itemworld.application.ItemworldModule feature module}, the thin per-verb-group
+ * policies where domain logic exists, and the itemworld audit port.
  *
  * <p>itemworld is overwhelmingly stateless, ACL-thin mutations, so the
  * application layer is thin by design: it carries the policies that hold a real rule, the {@code

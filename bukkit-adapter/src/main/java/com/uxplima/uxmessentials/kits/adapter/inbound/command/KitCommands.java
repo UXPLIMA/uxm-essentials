@@ -16,7 +16,7 @@ import org.jspecify.annotations.NullMarked;
  * with kits hangs off one {@code /kit} command: {@code <name>} claims a kit, while {@code list}, {@code show},
  * {@code create}, {@code del}, {@code editor} and {@code reset} are Brigadier literals each gated by its own
  * permission node via a {@code Gate}. Collected here so the literal/permission pairing matches the
- * permissions reference and the kernel's {@code KitCommandSurface}; the plugin's
+ * permissions reference and its entries in {@code CommandSpecCatalog}; the plugin's
  * {@code LifecycleEvents.COMMANDS} handler registers it. Mirrors the subcommand-tree idiom {@code /warp} and
  * {@code /home} use.
  */

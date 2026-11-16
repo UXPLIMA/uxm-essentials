@@ -1,6 +1,8 @@
 # Documentation
 
-- [Reference](user/reference.md): commands, placeholders and files.
+- [Reference](user/reference.md): where everything is listed, the leaderboard keys and the files the plugin writes.
+- [Commands](user/commands.md): every command with its aliases and node.
+- [Placeholders](user/placeholders.md) and [player and server facts](user/placeholders-facts.md): every key with an example value.
 - [Permissions: gameplay](user/permissions-gameplay.md), [staff and server](user/permissions-server.md) and [item and world tools](user/permissions-items.md): every node with its default.
 - [Management hub](user/management-hub.md): the `/uxmess gui` tiles, the node each needs, and the modules without one.
 - [Network](user/network.md): the server name, the shared database, Velocity or Redis, and what each module shares

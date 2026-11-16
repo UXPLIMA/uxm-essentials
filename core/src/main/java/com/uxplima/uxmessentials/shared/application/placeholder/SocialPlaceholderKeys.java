@@ -33,81 +33,104 @@ final class SocialPlaceholderKeys {
                 PlaceholderSpec.of(
                         "ignoring",
                         "Whether the viewer's ignore list holds the player the line is about (yes/no).",
+                        "no",
                         PlaceholderScope.RELATIONAL,
                         MESSAGING),
                 PlaceholderSpec.of(
                         "ignored_by",
                         "Whether the player the line is about ignores the viewer (yes/no).",
+                        "no",
                         PlaceholderScope.RELATIONAL,
                         MESSAGING),
                 PlaceholderSpec.of(
                         "cansee",
                         "Whether the viewer can see the player the line is about, or vanish hides them (yes/no).",
+                        "yes",
                         PlaceholderScope.RELATIONAL,
                         VANISH),
                 PlaceholderSpec.of(
                         "hidden",
                         "The same read the other way round: whether vanish hides them from the viewer (yes/no).",
+                        "no",
                         PlaceholderScope.RELATIONAL,
                         VANISH),
                 PlaceholderSpec.of(
                         "trading",
                         "Whether the two are the sides of the same live trade (yes/no).",
+                        "no",
                         PlaceholderScope.RELATIONAL,
                         TRADE),
                 PlaceholderSpec.of(
                         "prefix",
                         "The chat prefix of the player the line is about, a catalogue-line prefix read in the viewer's"
                                 + " language.",
+                        "[VIP] ",
                         PlaceholderScope.RELATIONAL,
                         COMMUNICATION),
                 PlaceholderSpec.of(
                         "suffix",
                         "The chat suffix of the player the line is about, read the same way.",
+                        " *",
                         PlaceholderScope.RELATIONAL,
                         COMMUNICATION));
     }
 
     private static List<PlaceholderSpec> presence() {
         return List.of(
-                PlaceholderSpec.of("afk", "Whether the player is away (yes/no).", PlaceholderScope.SESSION, PRESENCE),
+                PlaceholderSpec.of(
+                        "afk", "Whether the player is away (yes/no).", "yes", PlaceholderScope.SESSION, PRESENCE),
                 PlaceholderSpec.of(
                         "afk_duration",
                         "How long the player has been away, in the compact 1h30m form.",
+                        "12m",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
-                        "vanished", "Whether the player is vanished (yes/no).", PlaceholderScope.SESSION, PRESENCE),
+                        "vanished",
+                        "Whether the player is vanished (yes/no).",
+                        "no",
+                        PlaceholderScope.SESSION,
+                        PRESENCE),
                 PlaceholderSpec.of(
-                        "presence_afk", "Whether the player is away (yes/no).", PlaceholderScope.SESSION, PRESENCE),
+                        "presence_afk",
+                        "Whether the player is away (yes/no).",
+                        "yes",
+                        PlaceholderScope.SESSION,
+                        PRESENCE),
                 PlaceholderSpec.of(
                         "presence_afk_duration",
                         "How long the player has been away, in the compact 1h30m form.",
+                        "12m",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
                         "presence_afk_since",
                         "The same away duration, under the spelling a config may prefer.",
+                        "12m",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
                         "presence_afk_reason",
                         "The reason the player gave when they went away.",
+                        "dinner",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
                         "presence_vanished",
                         "Whether the player is vanished (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
                         "presence_nickname",
                         "The player's nickname, or their name when they have not set one.",
+                        "Stevie",
                         PlaceholderScope.SESSION,
                         PRESENCE),
                 PlaceholderSpec.of(
                         "presence_realname",
                         "The player's account name, whatever nickname they wear.",
+                        "Steve",
                         PlaceholderScope.SESSION,
                         PRESENCE));
     }
@@ -117,28 +140,37 @@ final class SocialPlaceholderKeys {
                 PlaceholderSpec.of(
                         "messaging_mail_unread",
                         "How much mail the player has not read.",
+                        "2",
                         PlaceholderScope.PLAYER,
                         MESSAGING),
                 PlaceholderSpec.of(
-                        "messaging_mail_total", "How much mail the player holds.", PlaceholderScope.PLAYER, MESSAGING),
+                        "messaging_mail_total",
+                        "How much mail the player holds.",
+                        "5",
+                        PlaceholderScope.PLAYER,
+                        MESSAGING),
                 PlaceholderSpec.of(
                         "messaging_ignoring_count",
                         "How many players this player is ignoring.",
+                        "1",
                         PlaceholderScope.PLAYER,
                         MESSAGING),
                 PlaceholderSpec.of(
                         "messaging_reply_target",
                         "Who /r would answer: the last player this one talked to.",
+                        "Alex",
                         PlaceholderScope.SESSION,
                         MESSAGING),
                 PlaceholderSpec.of(
                         "messaging_msgtoggle",
                         "Whether the player accepts private messages (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         MESSAGING),
                 PlaceholderSpec.of(
                         "messaging_socialspy",
                         "Whether the player is watching other players' messages (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         MESSAGING));
     }
@@ -148,21 +180,25 @@ final class SocialPlaceholderKeys {
                 PlaceholderSpec.of(
                         "communication_chat_enabled",
                         "Whether public chat is open rather than locked by /togglechat (yes/no).",
+                        "yes",
                         PlaceholderScope.GLOBAL,
                         COMMUNICATION),
                 PlaceholderSpec.of(
                         "communication_broadcasts",
                         "Whether the player receives the rotating announcements (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         COMMUNICATION),
                 PlaceholderSpec.of(
                         "communication_prefix",
                         "The player's chat prefix, a catalogue-line prefix read in the player's own language.",
+                        "[VIP] ",
                         PlaceholderScope.SESSION,
                         COMMUNICATION),
                 PlaceholderSpec.of(
                         "communication_suffix",
                         "The player's chat suffix, read the same way.",
+                        " *",
                         PlaceholderScope.SESSION,
                         COMMUNICATION));
     }
@@ -170,12 +206,17 @@ final class SocialPlaceholderKeys {
     private static List<PlaceholderSpec> staff() {
         return List.of(
                 PlaceholderSpec.of(
-                        "staff_mode", "Whether the player is in staff mode (yes/no).", PlaceholderScope.SESSION, STAFF),
+                        "staff_mode",
+                        "Whether the player is in staff mode (yes/no).",
+                        "no",
+                        PlaceholderScope.SESSION,
+                        STAFF),
                 PlaceholderSpec.of(
-                        "staff_online", "How many staff members are connected.", PlaceholderScope.GLOBAL, STAFF),
+                        "staff_online", "How many staff members are connected.", "3", PlaceholderScope.GLOBAL, STAFF),
                 PlaceholderSpec.of(
                         "staff_count",
                         "The same connected-staff count, under the spelling a config may prefer.",
+                        "3",
                         PlaceholderScope.GLOBAL,
                         STAFF));
     }
@@ -183,84 +224,113 @@ final class SocialPlaceholderKeys {
     private static List<PlaceholderSpec> moderation() {
         return List.of(
                 PlaceholderSpec.of(
-                        "muted", "Whether the player is muted (yes/no).", PlaceholderScope.PLAYER, MODERATION),
+                        "muted", "Whether the player is muted (yes/no).", "no", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
-                        "jailed", "Whether the player is jailed (yes/no).", PlaceholderScope.PLAYER, MODERATION),
+                        "jailed", "Whether the player is jailed (yes/no).", "no", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
                         "moderation_banned",
                         "Whether the player is banned (yes/no).",
+                        "no",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_muted",
                         "Whether the player is muted (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_jailed",
                         "Whether the player is jailed (yes/no).",
+                        "no",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_frozen",
                         "Whether the player is frozen in place by staff (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_warns",
                         "How many warnings the player carries.",
+                        "1",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_ban_reason", "Why the player was banned.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_ban_reason",
+                        "Why the player was banned.",
+                        "Cheating",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_ban_issuer", "Who banned the player.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_ban_issuer", "Who banned the player.", "Alex", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
                         "moderation_ban_remaining",
                         "How long is left on the ban, in the compact 1d2h form.",
+                        "6d23h",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_ban_remaining_formatted",
                         "The same remaining ban, under the spelling a config may prefer.",
+                        "6d23h",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_jail_name",
                         "The named jail the player is held in.",
+                        "cells",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_jail_reason", "Why the player was jailed.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_jail_reason",
+                        "Why the player was jailed.",
+                        "Griefing",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_jail_issuer", "Who jailed the player.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_jail_issuer",
+                        "Who jailed the player.",
+                        "Alex",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
                 PlaceholderSpec.of(
                         "moderation_jail_remaining",
                         "How long is left on the jail, in whole seconds; permanent when only an unjail lifts it.",
+                        "1800",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_jail_remaining_formatted",
                         "The same remaining jail, in the compact 1d2h form.",
+                        "30m",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_jail_online_only",
                         "Whether the jail counts down on online time rather than the wall clock (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_mute_reason", "Why the player was muted.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_mute_reason",
+                        "Why the player was muted.",
+                        "Spam",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
                 PlaceholderSpec.of(
-                        "moderation_mute_issuer", "Who muted the player.", PlaceholderScope.PLAYER, MODERATION),
+                        "moderation_mute_issuer", "Who muted the player.", "Alex", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
                         "moderation_mute_remaining",
                         "How long is left on the mute, in the compact 1d2h form.",
+                        "1h30m",
                         PlaceholderScope.PLAYER,
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_mute_remaining_formatted",
                         "The same remaining mute, under the spelling a config may prefer.",
+                        "1h30m",
                         PlaceholderScope.PLAYER,
                         MODERATION));
     }

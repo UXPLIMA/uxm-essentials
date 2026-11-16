@@ -5,8 +5,8 @@
  * threshold), the {@code RewardEngine} (pure resolution of per-vote/per-site/first-vote/milestone reward
  * sets against a {@code RewardContext}), {@code ApplyQueuedRewards} (pay an offline voter on join),
  * {@code VoteLinks} and
- * {@code VotePartyStatus} (the {@code /vote} and {@code /voteparty} displays), the {@code Notifier}
- * (MessageKey resolution + delivery), and the {@code VoteCommandSurface} (platform-neutral command specs).
+ * {@code VotePartyStatus} (the {@code /vote} and {@code /voteparty} displays) and the {@code Notifier}
+ * (MessageKey resolution + delivery).
  * Use cases orchestrate the domain through the outbound ports in
  * {@code application/port}; no Bukkit, Paper, Kyori, or logging type appears here.
  */

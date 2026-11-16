@@ -82,10 +82,10 @@ class PlaceholderRouteTest {
 
     @Test
     void theCatalogueListsEachKeyAsItIsTyped() {
-        PlaceholderSpec mine =
-                PlaceholderSpec.shared("server_tps", "The server's ticks per second.", PlaceholderScope.GLOBAL);
+        PlaceholderSpec mine = PlaceholderSpec.shared(
+                "server_tps", "The server's ticks per second.", "19.98", PlaceholderScope.GLOBAL);
         PlaceholderSpec between = PlaceholderSpec.shared(
-                "can_see", "Whether the viewer can see the player.", PlaceholderScope.RELATIONAL);
+                "can_see", "Whether the viewer can see the player.", "yes", PlaceholderScope.RELATIONAL);
 
         assertThat(mine.placeholder()).isEqualTo("%uxm_essentials_server_tps%");
         assertThat(between.placeholder()).isEqualTo("%rel_uxm_essentials_can_see%");

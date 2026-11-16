@@ -11,7 +11,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>This record is the one place a node is declared. The adapter registers the fixed nodes with the server on
  * enable, so the server and the permission plugin know they exist, and {@code /uxmess permissions} lists every entry
- * to an operator in game. The permission pages under {@code docs/user/} are kept in step with the catalogue by hand.
+ * to an operator in game. The permission pages under {@code docs/user/} are generated from the catalogue.
  *
  * @param node the node, written with its placeholder visible when the shape is a family
  *     ({@code uxmessentials.home.limit.<n>})

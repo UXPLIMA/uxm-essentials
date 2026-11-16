@@ -74,6 +74,12 @@ public final class InfoPageCommand extends CommunicationCommandSupport implement
                 .build();
     }
 
+    /** Built from an operator's file, so no catalogue lists it. */
+    @Override
+    public boolean declared() {
+        return false;
+    }
+
     @Override
     public String description() {
         return "Show the " + command + " info page.";

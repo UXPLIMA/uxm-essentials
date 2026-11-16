@@ -11,8 +11,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Builds the messaging context's Brigadier command surface (no public chat) as {@link CommandRegistration}s over the constructed {@link MessagingServices}. Collected in one
- * greppable table so the literal/permission pairing matches the permissions reference and the kernel's
- * {@code MessagingCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
+ * greppable table so the literal/permission pairing matches the permissions reference and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
  */
 @NullMarked
 public final class MessagingCommands {

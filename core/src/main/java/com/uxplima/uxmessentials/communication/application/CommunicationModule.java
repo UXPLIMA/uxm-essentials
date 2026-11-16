@@ -4,7 +4,6 @@ import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -53,14 +52,6 @@ public final class CommunicationModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The static surface only: /broadcast and /broadcasttoggle. The operator-configured info-page commands
-        // (/rules, /motd, …) are dynamic. Built from the config-derived InfoRegistry at start and registered by
-        // the adapter, so they are not part of this fixed table.
-        return CommunicationCommandSurface.staticCommands();
     }
 
     @Override

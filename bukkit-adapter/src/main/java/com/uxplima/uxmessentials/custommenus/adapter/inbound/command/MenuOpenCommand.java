@@ -81,6 +81,12 @@ public final class MenuOpenCommand implements CommandRegistration {
         return spec.aliases();
     }
 
+    /** Built from an operator's file, so no catalogue lists it. */
+    @Override
+    public boolean declared() {
+        return false;
+    }
+
     @Override
     public String description() {
         return spec.usage().orElseGet(() -> "Opens the " + menuId + " custom menu.");

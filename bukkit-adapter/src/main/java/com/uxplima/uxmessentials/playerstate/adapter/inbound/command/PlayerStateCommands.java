@@ -16,8 +16,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Builds the playerstate context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link PlayerStateServices}. Collected in one greppable
- * table so the literal/permission pairing matches the permissions reference and the kernel's
- * {@code PlayerstateCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
+ * table so the literal/permission pairing matches the permissions reference and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
  *
  * <p>The {@code /gmc /gms /gma /gmsp} mode shortcuts are separate fixed-mode commands (each pins a
  * {@link GameModeRef}), and {@code /walkspeed} / {@code /flyspeed} are the split forms of {@code /speed}.
