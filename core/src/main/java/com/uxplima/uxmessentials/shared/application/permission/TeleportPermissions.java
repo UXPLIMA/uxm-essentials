@@ -81,7 +81,7 @@ public final class TeleportPermissions {
                         TELEPORT),
                 PermissionSpec.of(
                         TPA_TOGGLE,
-                        "/tptoggle to refuse all incoming teleport requests.",
+                        "/tptoggle to refuse incoming teleport requests and staff /tp and /tphere; /tpo and /tpohere still pass.",
                         PermissionDefault.TRUE,
                         TELEPORT),
                 PermissionSpec.of(

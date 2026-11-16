@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
@@ -236,8 +237,8 @@ public final class TeleportEngine {
     }
 
     /**
-     * The checks an accepted request's mover passes before a hop to another backend: jail and combat tag, each told to
-     * the player. No cooldown, since a local accepted request never checks one either; it only stamps.
+     * The checks an accepted request's mover passes, on this backend or before a hop to another: jail and combat tag,
+     * each told to the player. No cooldown, since an accepted request never checks one; it only stamps.
      */
     public Result<Unit, TeleportError> gateAcceptedRequest(PlayerRef mover) {
         Objects.requireNonNull(mover, "mover");
@@ -644,10 +645,33 @@ public final class TeleportEngine {
                 mover,
                 warmupKind,
                 onComplete,
+                (CancelCause cause) ->
+                        onWarmupCancelled(mover, kind, reasonOf(cause), reported, TeleportOutcome.CANCELLED),
                 () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_CANCELLED, reported, TeleportOutcome.CANCELLED),
-                () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_REPLACED, reported, TeleportOutcome.SUPERSEDED));
+                        mover, kind, WarmupCancelReason.SUPERSEDED, reported, TeleportOutcome.SUPERSEDED));
+    }
+
+    private static WarmupCancelReason reasonOf(CancelCause cause) {
+        return switch (cause) {
+            case MOVED -> WarmupCancelReason.MOVED;
+            case ROTATED -> WarmupCancelReason.ROTATED;
+            case DAMAGED -> WarmupCancelReason.DAMAGED;
+            case INTERACTED -> WarmupCancelReason.INTERACTED;
+            case QUIT -> WarmupCancelReason.QUIT;
+            case ABORTED -> WarmupCancelReason.ABORTED;
+        };
+    }
+
+    private static TeleportMessageKey noticeOf(WarmupCancelReason reason) {
+        return switch (reason) {
+            case MOVED -> TeleportMessageKey.WARMUP_CANCELLED;
+            case ROTATED -> TeleportMessageKey.WARMUP_ROTATED;
+            case DAMAGED -> TeleportMessageKey.WARMUP_DAMAGED;
+            case INTERACTED -> TeleportMessageKey.WARMUP_INTERACTED;
+            case QUIT -> TeleportMessageKey.WARMUP_QUIT;
+            case SUPERSEDED -> TeleportMessageKey.WARMUP_REPLACED;
+            case ABORTED -> TeleportMessageKey.WARMUP_ABORTED;
+        };
     }
 
     private void hop(
@@ -676,13 +700,14 @@ public final class TeleportEngine {
     }
 
     private void onWarmupCancelled(
-            PlayerRef mover, TeleportKind kind, TeleportMessageKey notice, OneOutcome reported, TeleportOutcome ended) {
-        // A warmup stopped by a move and one replaced by the player's next teleport both end here and differ only in
-        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped. The
-        // outcome is reported even when the notice fails, since a caller gives a charge back on it.
+            PlayerRef mover, TeleportKind kind, WarmupCancelReason reason, OneOutcome reported, TeleportOutcome ended) {
+        // Every way a warmup is stopped (a move, a hit, the player leaving, the player's next teleport) ends here and
+        // differs only in what the player and listeners are told, so whatever a cancel has to undo is done once,
+        // whichever way it was stopped. The outcome is reported even when the notice fails, since a caller gives a
+        // charge back on it.
         try {
-            notifier.send(mover, notice);
-            events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
+            notifier.send(mover, noticeOf(reason));
+            events.publish(new WarmupCancelled(mover, kind, reason));
         } finally {
             reported.report(ended);
         }

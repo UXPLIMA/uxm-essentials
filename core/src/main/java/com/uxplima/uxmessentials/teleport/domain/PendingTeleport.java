@@ -21,6 +21,8 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  */
 public final class PendingTeleport {
 
+    private static final float LOOK_TOLERANCE_DEGREES = 0.001f;
+
     private final PlayerRef player;
     private final TeleportKind kind;
     private final Position origin;
@@ -62,17 +64,31 @@ public final class PendingTeleport {
      * Reconcile a movement: when move-cancel is armed and the player drifted off the origin block <em>and</em>
      * past the configured move threshold, this warmup cancels with {@link WarmupCancelReason#MOVED}. Sub-block
      * jitter (same block cell) never cancels, and with a non-zero threshold a small drift across a block edge
-     * is tolerated too, so mouse jitter near a boundary does not abort the warmup.
+     * is tolerated too, so mouse jitter near a boundary does not abort the warmup. When rotate-cancel is armed, a
+     * look that differs from the one at the start cancels with {@link WarmupCancelReason#ROTATED}.
      */
     public Outcome onMovement(Position to) {
         Objects.requireNonNull(to, "to");
-        if (cancelled || !toggles.cancelOnMove() || origin.sameBlock(to)) {
+        if (cancelled) {
             return Outcome.unchanged(this);
         }
-        if (!toggles.movePassesThreshold(origin.distanceTo(to))) {
-            return Outcome.unchanged(this);
+        if (toggles.cancelOnMove() && !origin.sameBlock(to) && toggles.movePassesThreshold(origin.distanceTo(to))) {
+            return Outcome.cancelled(markCancelled(), WarmupCancelReason.MOVED);
         }
-        return Outcome.cancelled(markCancelled(), WarmupCancelReason.MOVED);
+        if (toggles.cancelOnRotate() && turned(to)) {
+            return Outcome.cancelled(markCancelled(), WarmupCancelReason.ROTATED);
+        }
+        return Outcome.unchanged(this);
+    }
+
+    /**
+     * Whether the look differs from the one the warmup began with. Yaw is compared around the circle, since the
+     * client reports it unbounded (-90 and 270 face the same way); the tolerance only absorbs float rounding.
+     */
+    private boolean turned(Position to) {
+        float yawDelta = Math.abs(((to.yaw() - origin.yaw()) % 360f + 540f) % 360f - 180f);
+        float pitchDelta = Math.abs(to.pitch() - origin.pitch());
+        return yawDelta > LOOK_TOLERANCE_DEGREES || pitchDelta > LOOK_TOLERANCE_DEGREES;
     }
 
     /** Reconcile a non-move action (rotation, damage, explicit abort) against the toggles. */

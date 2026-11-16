@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -23,7 +24,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The warn, mute, tempban and IP ban rows of the moderation store, plus the lockdown switch. Like the real store, the
+ * The warn, mute, tempban and IP ban rows of the moderation store, plus the lockdown switch; no player is jailed. Like the real store, the
  * count a new warning returns leaves out warnings that had lapsed when it was issued.
  */
 final class SanctionRecords implements ModerationRepository {
@@ -95,32 +96,57 @@ final class SanctionRecords implements ModerationRepository {
     }
 
     /**
-     * Run {@code write} once, just before the next conditional ban write is checked: another server's ban landing
-     * between a use case's read and its write.
+     * Run {@code write} once, just before the next conditional ban, mute or IP ban write is checked: another server's
+     * sanction landing between a use case's read and its write.
      */
     void beforeNextReplace(Runnable write) {
         racingWrite = write;
     }
 
-    /** Make every conditional ban write lose its race and write nothing, as if the row changed each time. */
+    /** Make every conditional write lose its race and write nothing, as if the row changed each time. */
     void loseEveryReplace() {
         losingEveryRace = true;
     }
 
-    @Override
-    public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+    /** Whether the conditional write may land on a row that is {@code current}, after any racing write has run. */
+    private boolean landsOn(Supplier<Object> current, Object expected) {
         Runnable racing = racingWrite;
         racingWrite = null;
         if (racing != null) {
             racing.run();
         }
-        if (losingEveryRace) {
-            return false;
-        }
-        if (!loadTempban(target).equals(expected)) {
+        return !losingEveryRace && current.get().equals(expected);
+    }
+
+    @Override
+    public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+        if (!landsOn(() -> loadTempban(target), expected)) {
             return false;
         }
         tempbans.put(target.uuid(), replacement);
+        return true;
+    }
+
+    @Override
+    public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+        if (!landsOn(() -> loadMute(target), expected)) {
+            return false;
+        }
+        mutes.put(target.uuid(), replacement);
+        return true;
+    }
+
+    @Override
+    public Optional<IpBan> loadIpBan(String ip) {
+        return Optional.ofNullable(ipBans.get(ip));
+    }
+
+    @Override
+    public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+        if (!landsOn(() -> loadIpBan(replacement.ip()), expected)) {
+            return false;
+        }
+        ipBans.put(replacement.ip(), replacement);
         return true;
     }
 
@@ -166,7 +192,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public ModerationProfile load(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        return new ModerationProfile(target, loadMute(target), JailState.none(), loadTempban(target));
     }
 
     @Override
@@ -181,7 +207,13 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public List<BanEntry> activeBans(Instant now, int limit) {
-        throw new UnsupportedOperationException();
+        List<BanEntry> active = new ArrayList<>();
+        tempbans.forEach((target, state) -> {
+            if (state instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
+                active.add(new BanEntry(target, ban.issuer(), ban.reason(), ban.until(), ban.issuedAt()));
+            }
+        });
+        return active.stream().limit(limit).toList();
     }
 
     @Override

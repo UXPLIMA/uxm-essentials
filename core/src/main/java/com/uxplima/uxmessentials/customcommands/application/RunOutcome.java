@@ -90,6 +90,17 @@ public sealed interface RunOutcome {
         }
     }
 
+    /**
+     * The actor started another custom command warmup before this one finished, so this one was dropped for it:
+     * nothing was charged and nothing ran. Told apart from {@link WarmupCancelled} so the actor is not told they moved.
+     */
+    record WarmupReplaced() implements RunOutcome {
+        @Override
+        public String gate() {
+            return "warmup";
+        }
+    }
+
     /** The command has a price, its currency backend does not answer, and the operator chose to refuse it. */
     record FeeBackendMissing() implements RunOutcome {
         @Override

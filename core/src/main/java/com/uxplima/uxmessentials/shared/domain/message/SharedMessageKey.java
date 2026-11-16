@@ -140,6 +140,13 @@ public enum SharedMessageKey implements MessageKey {
     // for every context rather than one per context: this line only has to say that something outside uxmEssentials
     // said no, and the plugin that said no is the one that knows why and can send its own reason.
     COMMON_ACTION_VETOED("common.action-vetoed"),
+    // What a player is told when a cross-server move is not started because another one of theirs is still under
+    // way. One key for every kind of move: the line is about the player's other move, not this destination, and the
+    // refund line that follows a paid one already names it.
+    COMMON_HOP_BUSY("common.hop-busy"),
+    // The same refusal for a move the player did not ask for, a jail transfer or a staff teleport: it gives no advice
+    // to try again, since there is nothing for them to retry.
+    COMMON_HOP_BUSY_ORDERED("common.hop-busy-ordered"),
 
     // The words a leaderboard placeholder answers with, the same in every UXM plugin: the name of a place nobody holds,
     // the value of one and a rank the reader does not have, and the time until a period starts again.

@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.shared.application.port;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,6 +43,43 @@ public interface Warmups {
     default WarmupHandle begin(
             PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
         return begin(who, kind, onComplete, onCancel);
+    }
+
+    /**
+     * Begin a warmup like {@link #begin(PlayerRef, WarmupKind, Runnable, Runnable, Runnable)}, handing {@code onCancel}
+     * what stopped it, so the player is told the real reason rather than one line for every cancel. An implementation
+     * that cannot tell the causes apart reports {@link CancelCause#ABORTED}, which is still a correct cancel.
+     */
+    default WarmupHandle begin(
+            PlayerRef who,
+            WarmupKind kind,
+            Runnable onComplete,
+            Consumer<CancelCause> onCancel,
+            Runnable onSuperseded) {
+        Objects.requireNonNull(onCancel, "onCancel");
+        return begin(who, kind, onComplete, () -> onCancel.accept(CancelCause.ABORTED), onSuperseded);
+    }
+
+    /** What stopped a warmup before it elapsed, other than the same player beginning another one. */
+    enum CancelCause {
+
+        /** The player left the block they started on. */
+        MOVED,
+
+        /** The player turned their head while turning counts as moving. */
+        ROTATED,
+
+        /** The player took damage while damage cancels. */
+        DAMAGED,
+
+        /** The player used an item or a block while interacting cancels. */
+        INTERACTED,
+
+        /** The player left the server. */
+        QUIT,
+
+        /** Called off with no more specific cause. */
+        ABORTED
     }
 
     /**
@@ -88,6 +126,15 @@ public interface Warmups {
 
         /** Request cancellation; idempotent, and a no-op after completion. */
         void cancel();
+
+        /**
+         * Cancel because of {@code cause}, which reaches the cancel callback of a warmup begun with one. In every
+         * other respect the same as {@link #cancel()}, which is what a handle that carries no cause does.
+         */
+        default void cancel(CancelCause cause) {
+            Objects.requireNonNull(cause, "cause");
+            cancel();
+        }
 
         /**
          * Cancel because the same player began another warmup. It is a cancel in every respect, once-only and a

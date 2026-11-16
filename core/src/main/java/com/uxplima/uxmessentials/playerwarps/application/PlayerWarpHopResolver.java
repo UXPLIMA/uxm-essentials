@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.application.permission.DestinationPermis
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
 
 /**
@@ -48,6 +49,7 @@ public final class PlayerWarpHopResolver implements HopResolver {
                     HopNotice.MISROUTED, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_MISROUTED,
                     HopNotice.FAILED, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_FAILED,
                     HopNotice.UNAVAILABLE, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_UNAVAILABLE,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     HopNotice.REFUNDED, PlayerwarpsMessageKey.PWARP_CROSS_SERVER_REFUNDED));
 
     private final PlayerWarpRepository repository;

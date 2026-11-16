@@ -92,7 +92,8 @@ public final class CustomCommandsWiring {
         RunCustomCommand runner = new RunCustomCommand(
                 ctx.kernel().permissions(),
                 ctx.kernel().cooldowns(),
-                new TrackingCommandWarmups(ctx.kernel().warmups(), warmups),
+                new TrackingCommandWarmups(
+                        ctx.kernel().warmups(), warmups, ctx.kernel().playerLocator()),
                 actions,
                 new MenuRequirementCheck(menus),
                 fee,

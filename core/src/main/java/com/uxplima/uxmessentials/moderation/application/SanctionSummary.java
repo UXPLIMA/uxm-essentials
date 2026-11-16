@@ -82,10 +82,15 @@ public final class SanctionSummary {
     private void ban(PlayerRef actor, TempbanState tempban, Instant now) {
         if (tempban.isActiveAt(now)) {
             notifier.send(
-                    actor, ModerationMessageKey.SANCTION_BAN_ACTIVE, Map.of("until", until(actor, tempban.expiry())));
+                    actor, ModerationMessageKey.SANCTION_BAN_ACTIVE, Map.of("until", until(actor, banEnd(tempban))));
         } else {
             notifier.send(actor, ModerationMessageKey.SANCTION_BAN_NONE);
         }
+    }
+
+    /** When an active ban ends, empty for a permanent one, whose stored expiry is a far-future stand-in. */
+    private static Optional<Instant> banEnd(TempbanState tempban) {
+        return tempban instanceof TempbanState.Active active ? Ban.endOf(active) : tempban.expiry();
     }
 
     /** A wall-clock expiry rendered as an instant, or the {@code permanent} marker when there is none. */

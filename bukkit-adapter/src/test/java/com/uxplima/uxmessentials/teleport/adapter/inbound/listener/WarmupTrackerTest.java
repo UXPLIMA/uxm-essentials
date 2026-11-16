@@ -81,15 +81,50 @@ class WarmupTrackerTest {
         assertThat(tracker.completesAt(ALEX.uuid())).isEmpty();
     }
 
-    /** A handle that counts how it was stopped. */
+    @Test
+    void aCancelWhoseCallbackStartsAnotherTeleportLeavesTheNewWarmupTracked() {
+        Counted second = new Counted();
+        // What a listener that starts a teleport on the cancel does: the new warmup supersedes, then arms, both on
+        // the same player the cancel is for.
+        Counted first = new Counted(() -> {
+            tracker.supersede(ALEX.uuid());
+            arm(second);
+        });
+        arm(first);
+
+        tracker.onMove(ALEX.uuid(), WALKED_OFF);
+
+        assertThat(first.cancelled).isEqualTo(1);
+        assertThat(tracker.isTracking(ALEX.uuid()))
+                .as("the warmup armed from the cancel callback is still tracked")
+                .isTrue();
+        assertThat(tracker.completesAt(ALEX.uuid())).contains(LATER);
+
+        tracker.onMove(ALEX.uuid(), WALKED_OFF);
+
+        assertThat(second.cancelled).isEqualTo(1);
+        assertThat(tracker.isTracking(ALEX.uuid())).isFalse();
+    }
+
+    /** A handle that counts how it was stopped, running {@code onCancel} when it is cancelled. */
     private static final class Counted implements WarmupHandle {
 
+        private final Runnable onCancel;
         private int cancelled;
         private int superseded;
+
+        Counted() {
+            this(() -> {});
+        }
+
+        Counted(Runnable onCancel) {
+            this.onCancel = onCancel;
+        }
 
         @Override
         public void cancel() {
             cancelled++;
+            onCancel.run();
         }
 
         @Override

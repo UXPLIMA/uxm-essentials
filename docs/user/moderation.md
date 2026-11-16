@@ -83,21 +83,25 @@ by `muted-blocked-commands` while muted.
 `/ban` and `/tempban` kick the player at once and refuse every later login until the ban ends or `/unban` lifts it.
 The player sees the reason, and for a timed ban how long is left, on the kick screen.
 
-A player ban never cuts short one that is already running on that player. A `/tempban`, a capped `/ban`, a
-`/punish` template or an API call whose ban would end before the running one is refused, and the staff member is
-told which ban is in force and how long it still runs. A capped staff member is also told their ban was capped. To
-shorten a ban, `/unban` first. A ban that ends later, or a second permanent ban, replaces the old one. When two
-servers of a network ban the same player at the same moment, the longer ban is the one kept. IP bans
-(`/banip`, `/tempbanip`) do not follow this rule yet: a new IP ban on an address replaces the old one.
+A ban never cuts short one that is already running on that player or address. A `/tempban`, a capped `/ban`, a
+`/punish` template, a `/banip` or `/tempbanip`, or an API call whose ban would end before the running one is refused,
+and the staff member is told which ban is in force and how long it still runs. A capped staff member is also told
+their ban was capped. To shorten a ban, `/unban` or `/unbanip` first. A ban that ends later, or a second permanent
+ban, replaces the old one. When two servers of a network ban the same player or address at the same moment, the
+longer ban is the one kept.
 
-A permanent ban is stored as a ban that ends very far in the future. The kick at the moment of `/ban` uses the
-`moderation.ban.kick` screen, but every later login refusal, and the kick on another server of a network, use the
-`moderation.tempban.kick` screen, which then shows a time left of about 365000 days. This is a known issue.
+A permanently banned player sees the `moderation.ban.kick` screen, with no time left on it, when the ban kicks them,
+when they are kicked on another server of a network and every time they try to log in again. A timed ban, including
+a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
+lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
+permanent.
+A `/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
 account. STRICT catches anyone else on those addresses too (a household, a school network), so leave it off unless
-you want that. If the ban was shortened by a duration cap, the IP bans end with it.
+you want that. If the ban was shortened by a duration cap, the IP bans end with it. An address that is already
+banned at least as long keeps its own ban, so a capped `/ban` never shortens a permanent `/banip`.
 
 ## Mutes
 
@@ -110,7 +114,9 @@ different word and must be listed on its own:
 muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply"]
 ```
 
-`/mute` refuses a player who is already muted; `/unmute` first to change a mute. A timed mute ends on its own.
+`/mute` refuses a player who is already muted and says how long that mute still runs; `/unmute` first to change a
+mute. When two servers of a network mute the same player at the same moment, the first mute stays and the second is
+refused the same way. A timed mute ends on its own.
 
 ## Warnings and the escalation ladder
 
@@ -145,13 +151,21 @@ A step never weakens what is already running. A mute or ban step leaves the play
 sanction and the running one of that kind ends later: a permanent one beats any timed one, and a tie keeps the
 running one. So a `tempmute:10m` step extends a mute that has five minutes left, while a `tempban:1d` step on a
 permanently banned player leaves the permanent ban in place. A step that is held back this way is written to the
-audit log as not applied (`held_by_stronger`).
+audit log as not applied (`held_by_stronger`). A staff mute or ban that lands while a step is being written is kept
+by the same rule.
+
+The sanction a step applies is stored with a reason that names the warning count that tripped it and the reason of
+that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The reason is written once,
+when the step fires, and cut to 256 characters. Its language is the punished player's `/lang` choice when they made
+one, otherwise usually the language of the staff member who gave the warning. The staff member reads what the
+sanction itself reports, such as the mute confirmation or why it could not be applied, followed by a line on how the
+step landed.
 
 ## Kicks
 
 `/kick` disconnects a player on this server with an optional reason. On a network, a player connected to another
-server cannot be kicked from here; the command says which server they are on. `/kickall` kicks everyone on this
-server but you and exempt players.
+server cannot be kicked from here; the command says which server they are on. A player who is not online anywhere
+is not kicked, and the command says so. `/kickall` kicks everyone on this server but you and exempt players.
 
 ## Jail
 
@@ -233,8 +247,10 @@ A frozen player cannot move to another block; they can still look around, chat a
 when they try to walk, at most once every `freeze.notice-interval-seconds` (3 by default; 0 sends nothing).
 
 A freeze is kept in memory on the server it was given on. It lasts until `/unfreeze` or until the server restarts
-or the module reloads, it is not stored in the database, and it does not follow the player to another server. On a
-network you can only freeze a player connected to your server.
+or the module reloads, and it is not stored in the database. Logging out does not lift it: a frozen player who
+logs back in to the same server is still frozen. It does not follow the player to another server, though: on a
+network a frozen player who switches server can move freely there, and is frozen again when they come back to the
+server that froze them. You can only freeze a player connected to your server.
 
 ## Lockdown
 
@@ -312,8 +328,7 @@ confirmation, `/jail` opens the jail menu, `/jails` the jail manager, `/jailedpl
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
 `messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
-and `moderation.tempban.kick`: a permanently banned player who logs in again sees the tempban screen (see
-[Bans](#bans)).
+(permanent bans) and `moderation.tempban.kick` (timed bans).
 
 ## On a network
 

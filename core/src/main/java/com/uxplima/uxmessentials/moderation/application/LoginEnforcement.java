@@ -12,7 +12,6 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
-import com.uxplima.uxmessentials.moderation.domain.SanctionDuration;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -83,10 +82,7 @@ public final class LoginEnforcement {
 
     private Optional<Decision> tempbanKick(PlayerRef who, Instant now) {
         if (repository.loadTempban(who) instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
-            Map<String, String> ph = Map.of(
-                    "duration", SanctionDuration.format(java.time.Duration.between(now, ban.until())),
-                    "reason", ban.reason().orElse(""));
-            return Optional.of(Decision.deny(render(who, ModerationMessageKey.TEMPBAN_KICK, ph)));
+            return Optional.of(Decision.deny(BanScreen.of(ban, now).render(notifier, who)));
         }
         return Optional.empty();
     }

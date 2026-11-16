@@ -13,9 +13,11 @@ import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -170,7 +172,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 "event=migration_import_ban source={} uuid={} until={} conflict={} ok={}",
                 source,
                 rec.target().uuid(),
-                until(rec.ban().expiry()),
+                until(banEnd(rec.ban())),
                 outcome.token(),
                 outcome.ok());
     }
@@ -201,6 +203,11 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
 
     private static String jailUntil(ModerationProfile profile) {
         return profile.jail() instanceof JailState.Active active ? until(active.until()) : "permanent";
+    }
+
+    /** When an imported ban ends, empty for a permanent one rather than its far-future stored expiry. */
+    private static Optional<Instant> banEnd(TempbanState ban) {
+        return ban instanceof TempbanState.Active active ? Ban.endOf(active) : ban.expiry();
     }
 
     private static String until(Optional<Instant> expiry) {

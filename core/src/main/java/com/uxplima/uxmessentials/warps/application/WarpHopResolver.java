@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.warps.application.port.WarpEconomy;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.application.port.WarpSafetyChecker;
@@ -45,6 +46,7 @@ public final class WarpHopResolver implements HopResolver {
                     HopNotice.MISROUTED, WarpsMessageKey.WARP_CROSS_SERVER_MISROUTED,
                     HopNotice.FAILED, WarpsMessageKey.WARP_CROSS_SERVER_FAILED,
                     HopNotice.UNAVAILABLE, WarpsMessageKey.WARP_CROSS_SERVER_UNAVAILABLE,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     HopNotice.REFUNDED, WarpsMessageKey.WARP_CROSS_SERVER_REFUNDED));
 
     private final WarpRepository repository;
