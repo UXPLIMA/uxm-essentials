@@ -37,8 +37,9 @@ import java.util.stream.Collectors;
  * <p>Two families can share one shape. {@code uxmessentials.kit.cooldown.<seconds>} (a tier) and
  * {@code uxmessentials.kit.cooldown.<group>} (a name, default {@code false}) are both a word after the same prefix, so
  * a check of {@code uxmessentials.kit.cooldown.0} is answered as a group nobody was given. That is harmless: no code
- * asks for a tier node by name, the tier is read by {@code resolveQuota} from the nodes a player actually holds, and a
- * tier node somebody granted is set and answered by its setting before any default is looked at.
+ * asks for a tier node by name, the tier is read by {@code resolveQuota} from the nodes a player actually holds, a kit
+ * skips a group named by a number when it loads, so no group check asks for one either, and a tier node somebody
+ * granted is set and answered by its setting before any default is looked at.
  *
  * <p>The catalogue is fixed at class load, so the lookup is built once: the fixed nodes as a set, and each name family
  * filed under its prefix up to the last dot before the placeholder. A check walks the dots of the node from the

@@ -696,13 +696,13 @@ public final class ContentPermissions {
                         KITS),
                 PermissionSpec.family(
                         kitCooldown("<group>"),
-                        "Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins.",
+                        "Use the wait a kit's permission-cooldowns block sets for <group>; the shortest wait held wins. A group named by a number is skipped with a warning, since that name is a kit cooldown tier.",
                         PermissionDefault.FALSE,
                         PermissionShape.LABEL,
                         KITS),
                 PermissionSpec.family(
                         SharedPermissions.featureCooldown("kit") + ".<seconds>",
-                        "The wait before a kit can be claimed again, in seconds; the shortest tier held wins and 0 removes it.",
+                        "A cap on the wait before a kit can be claimed again, in seconds; the shortest tier held wins and 0 removes it. It lowers each kit's own wait but never lengthens it.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         KITS),
@@ -872,7 +872,7 @@ public final class ContentPermissions {
                         SKIN),
                 PermissionSpec.family(
                         SharedPermissions.featureCooldown("skin") + ".<seconds>",
-                        "The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it.",
+                        "The wait between skin changes, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         SKIN));
