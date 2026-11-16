@@ -1,6 +1,6 @@
 # Permissions: staff and server modules
 
-Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. The plugin-wide nodes are under [shared](#shared), the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder. Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md) maps the earlier names.
+Every node the plugin checks, by module, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node with `<n>` takes a number; its description says whether the highest or the lowest granted number wins. A cooldown tier sets the wait: the shortest tier held wins, and the configured wait applies only to a player who holds none. Where one tier covers waits configured apart (each kit's own cooldown, a teleport verb's or warp's own cooldown), it only lowers them, so a tier meant as a perk never makes a shorter wait longer. A warmup tier only lowers the configured warmup. The plugin-wide nodes are under [shared](#shared), the gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md), and the item and world tools are in [permissions-items.md](permissions-items.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder. Every exemption starts with `uxmessentials.bypass.`; [upgrading.md](upgrading.md) maps the earlier names.
 
 Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandcontrol) · [communication](#communication) · [customcommands](#customcommands) · [custommenus](#custommenus) · [guard](#guard) · [holograms](#holograms) · [invrollback](#invrollback) · [messaging](#messaging) · [moderation](#moderation) · [nametags](#nametags) · [npc](#npc) · [presence](#presence) · [ranks](#ranks) · [rest add-on](#rest-add-on) · [scoreboard](#scoreboard) · [security](#security) · [servertweaks](#servertweaks) · [skin](#skin) · [staff](#staff) · [tablist](#tablist) · [vanish](#vanish) · [vote](#vote)
 
@@ -15,7 +15,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.admin.placeholders` | /uxmess placeholders [area] [page] and /uxmess placeholders export: read the placeholder catalogue in game or write it to a file. | op |
 | `uxmessentials.admin.reload` | Reload all modules via /uxmess reload. | op |
 | `uxmessentials.admin.doctor.repair` | /uxmess doctor repair confirm: transactionally remove safe, unambiguous orphan rows. | op |
-| `uxmessentials.cooldown.<label>.<seconds>` | The wait between uses of one label a menu or custom command names, in seconds; the shortest tier held wins and 0 removes the wait. A built-in feature's wait is its own <feature>.cooldown.<seconds> node. | true |
+| `uxmessentials.cooldown.<label>.<seconds>` | The wait between uses of one label a menu or custom command names, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. A built-in feature's wait is its own <feature>.cooldown.<seconds> node. | true |
 | `uxmessentials.bypass.cooldown.<feature>` and `uxmessentials.bypass.cooldown.label.<label>` | Skip the cooldown on one rate-limited feature entirely (tp, rtp, kit, poses or skin), or on one label a menu or custom command names, such as customcommand.<id>. | op |
 | `uxmessentials.bypass.warmup.<feature>` | Start one warmup-gated feature at once, immune to move-cancel: tp or customcommand. | op |
 | `uxmessentials.gui` | /uxmess gui to open the module management hub. | op |
@@ -276,7 +276,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.skin.info` | /skin info <player>: which skin somebody wears, from where, and when it was set. | op |
 | `uxmessentials.skin.purge` | /skin purge <name>: forget a cached texture so the next lookup goes back to the source. | op |
 | `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | op |
-| `uxmessentials.skin.cooldown.<seconds>` | The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it. | true |
+| `uxmessentials.skin.cooldown.<seconds>` | The wait between skin changes, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. | true |
 
 ## staff
 

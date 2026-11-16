@@ -133,7 +133,7 @@ public final class TeleportPermissions {
                         TELEPORT),
                 PermissionSpec.family(
                         SharedPermissions.featureCooldown("rtp") + ".<seconds>",
-                        "The wait between random teleports, in seconds; the shortest tier held wins and 0 removes it.",
+                        "The wait between random teleports, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         TELEPORT),
@@ -200,7 +200,7 @@ public final class TeleportPermissions {
                         TELEPORT),
                 PermissionSpec.family(
                         SharedPermissions.featureCooldown("tp") + ".<seconds>",
-                        "The wait between teleports, per verb when a verb has its own clock, in seconds; the shortest tier held wins and 0 removes it.",
+                        "The wait between teleports, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. A verb or warp with its own cooldown keeps it as a ceiling the tier can only lower.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER,
                         TELEPORT),

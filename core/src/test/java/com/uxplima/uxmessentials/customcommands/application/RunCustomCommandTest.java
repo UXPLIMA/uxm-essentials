@@ -19,12 +19,18 @@ import com.uxplima.uxmessentials.customcommands.domain.ChainDepth;
 import com.uxplima.uxmessentials.customcommands.domain.CommandLiteral;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommand;
 import com.uxplima.uxmessentials.customcommands.domain.CustomCommandId;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
+import com.uxplima.uxmessentials.shared.application.ledger.NetworkCooldowns;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.ClockCooldowns;
 import com.uxplima.uxmessentials.testing.FakePermissions;
+import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
+import com.uxplima.uxmessentials.testing.QueuedScheduler;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import org.junit.jupiter.api.Test;
 
 class RunCustomCommandTest {
@@ -37,9 +43,13 @@ class RunCustomCommandTest {
     private final Log log = new Log();
 
     private RunCustomCommand runner(FeeBackendPolicy policy) {
+        return runner(policy, new FakePermissions(), new ClockCooldowns(CLOCK));
+    }
+
+    private RunCustomCommand runner(FeeBackendPolicy policy, FakePermissions permissions, Cooldowns cooldowns) {
         return new RunCustomCommand(
-                new FakePermissions(),
-                new ClockCooldowns(CLOCK),
+                permissions,
+                cooldowns,
                 new NoWarmups(),
                 actions,
                 (actor, requirements, arguments) -> true,
@@ -48,6 +58,39 @@ class RunCustomCommandTest {
                 feedback,
                 new ChainDepth(5),
                 log);
+    }
+
+    /** Cooldowns kept for a network, with Alex's still being read until {@code scheduler} runs. */
+    private static NetworkCooldowns networkCooldowns(FakePermissions permissions, QueuedScheduler scheduler) {
+        NetworkClaims claims = new NetworkClaims(new MemoryClaimLedger(), scheduler, CLOCK, new RecordingLogger());
+        claims.joined(ALEX.uuid());
+        return new NetworkCooldowns(claims, permissions, CLOCK);
+    }
+
+    @Test
+    void aLabelTierAddsAWaitToACommandDeclaredWithoutOne() {
+        FakePermissions permissions =
+                new FakePermissions().holdTier(ALEX, "uxmessentials.cooldown.customcommand.reward", 30);
+        QueuedScheduler scheduler = new QueuedScheduler();
+        RunCustomCommand runner = runner(FeeBackendPolicy.ALLOW, permissions, networkCooldowns(permissions, scheduler));
+        scheduler.runAll();
+
+        assertThat(run(runner)).isInstanceOf(RunOutcome.Ok.class);
+        scheduler.runAll();
+
+        assertThat(run(runner)).isInstanceOf(RunOutcome.OnCooldown.class);
+        assertThat(actions.runs).isEqualTo(1);
+    }
+
+    @Test
+    void aCommandNobodyWaitsForRunsBeforeTheActorsCooldownsAreRead() {
+        FakePermissions permissions = new FakePermissions();
+        RunCustomCommand runner =
+                runner(FeeBackendPolicy.ALLOW, permissions, networkCooldowns(permissions, new QueuedScheduler()));
+
+        assertThat(run(runner)).isInstanceOf(RunOutcome.Ok.class);
+        assertThat(run(runner)).isInstanceOf(RunOutcome.Ok.class);
+        assertThat(actions.runs).isEqualTo(2);
     }
 
     private static CustomCommand priced() {

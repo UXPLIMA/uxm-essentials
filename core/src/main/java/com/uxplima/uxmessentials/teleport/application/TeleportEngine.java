@@ -713,7 +713,9 @@ public final class TeleportEngine {
      * resolves the shared {@code uxmessentials.tp.cooldown.<n>} permission tiers. A verb whose config
      * override is set ({@code cooldowns.<verb> >= 0}) gets its own stamp scope ({@code tp.<verb>}) so it
      * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
-     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour.
+     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. On the
+     * shared clock a held tier sets the wait; a verb or destination with its own value keeps that value as a ceiling
+     * the tier can only lower ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
      */
     private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
         if (kind == TeleportKind.RANDOM && destination.cooldownOverride().isEmpty()) {
@@ -741,8 +743,8 @@ public final class TeleportEngine {
      *
      * <p>RTP keys its own {@code rtp} tier ({@code uxmessentials.rtp.cooldown.<seconds>}) with its own stamp, so
      * a {@code /rtp} cooldown is independent of the shared {@code tp} tier. The config default is the per-verb
-     * {@code cooldowns.rtp} override when set, else the shared {@code default-cooldown}; the numbered tier still
-     * refines it through the shared min-reducer (the shortest tier the player holds wins).
+     * {@code cooldowns.rtp} override when set, else the shared {@code default-cooldown}; a held numbered tier sets
+     * the wait instead (the shortest tier the player holds wins).
      */
     private CooldownKind randomCooldownKind() {
         long override = settings.verbCooldownOverrideSeconds(TeleportKind.RANDOM);
