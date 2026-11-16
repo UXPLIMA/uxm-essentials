@@ -229,7 +229,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.tpa.auto` | /tpauto to auto-accept incoming teleport requests. | true |
 | `uxmessentials.tpa.block` | /tpblock / /tpunblock to block a player's requests. | true |
 | `uxmessentials.tpa.cancel` | /tpcancel / /tpacancel to withdraw your outgoing request. | true |
-| `uxmessentials.tpa.toggle` | /tptoggle to refuse all incoming teleport requests. | true |
+| `uxmessentials.tpa.toggle` | /tptoggle to refuse incoming teleport requests and staff /tp and /tphere; /tpo and /tpohere still pass. | true |
 | `uxmessentials.tpa.use` | /tpa, /tpaccept, /tpdeny to request and resolve a teleport. | true |
 | `uxmessentials.tpahere.use` | /tpahere to ask a player to come to you. | true |
 | `uxmessentials.tpsettings.use` | /tpsettings opens your personal teleport settings panel. | true |

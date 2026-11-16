@@ -9,6 +9,9 @@ member is told to use `/tpo` or `/tpohere`, which still go through. Grant `uxmes
 who must keep moving such players. The position forms of `/tp`, and players on another server, are not stopped. See
 [teleport.md](teleport.md#staff-teleports).
 
+The console and automation are stopped too: a script or a plugin that runs `/tp <player> <destination>` must run
+`/tpo <player> <destination>` to keep reaching a player with `/tptoggle` off.
+
 ## Server warps are open to every player
 
 `uxmessentials.warp.use.<warp>` is asked for every server warp. It is meant to default to every player, but the

@@ -55,17 +55,26 @@ kept in memory and empties on a restart.
 | `/tprandomplayer` | `uxmessentials.tp.use` | Teleports you to a random player you can see. Alias `/tprp`. |
 | `/top`, `/bottom`, `/jump`, `/up`, `/down`, `/ascend`, `/descend`, `/thru` | `uxmessentials.tp.vertical` | Moves you up, down, to the block you look at, or through a wall. |
 | `/tpoffline <player>` | `uxmessentials.tp.offline` | Teleports you to where an offline player left this server. |
-| `/tpofflinehere <player>` | `uxmessentials.tp.offline` | Makes an offline player log in to this server where you stand. |
+| `/tpofflinehere <player>` | `uxmessentials.tp.offline` | Moves an offline player to where you stand when they next join this server. |
 
 Staff teleports have no warmup, cooldown, cost, jail or combat check. `/tp`, `/tphere`, `/goto` and `/bring` stop
 at a player who refuses teleports with `/tptoggle` and tell you to use `/tpo` or `/tpohere`, which go through; with
 `/tp <player> <destination>`, both players are asked. The position forms move only the named player and are not
 stopped. A position keeps your facing. When uxmParkour is installed it owns `/jump`.
 
-`/tpoffline` and `/tpofflinehere` use the position this server saved in the player's data when they left it, so on a
-network it is where they left this server. A player online on this server is refused: use `/tp` or `/tphere`.
-`/tpofflinehere` changes the saved position, so the player logs in at your spot the next time they join this server;
-nothing moves until then.
+`/tpoffline` reads the position this server saved in the player's data when they left it, so on a network it is
+where they left this server. An ender pearl the player had in flight is saved with them and lands only after they
+join again, so the saved position does not include where it would have taken them.
+
+`/tpofflinehere` does not touch the player's data. It stores your spot in the database for this server, and once the
+player has joined this server they are teleported there, a moment after the join. A later `/tpofflinehere` replaces
+an earlier one, and a move left on one server waits for a join on that server. The teleport takes them off any mount
+or vehicle, which stays where they logged out with everything on it. You must stand on the ground, not fly or fall,
+since the spot is used exactly as it is. A spot in a world that is not loaded waits for a later join. An ender pearl
+the player had in flight comes back with them and can still carry them off when it lands.
+
+Both refuse a player online on this server: use `/tp` or `/tphere`. A player you cannot see because of vanish gets
+the same answer as a player this server knows nothing of.
 
 ## /back
 

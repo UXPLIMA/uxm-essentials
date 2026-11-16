@@ -79,6 +79,11 @@ public final class WarmupTracker {
         return entry == null ? Optional.empty() : Optional.of(entry.completesAt());
     }
 
+    /** Whether {@code who} has a warmup armed, so a listener can skip everyone else before building anything. */
+    public boolean isTracking(UUID who) {
+        return pending.containsKey(Objects.requireNonNull(who, "who"));
+    }
+
     /** Reconcile a movement; cancels and clears the warmup when the player left the origin block. */
     public void onMove(UUID who, Position to) {
         Objects.requireNonNull(who, "who");

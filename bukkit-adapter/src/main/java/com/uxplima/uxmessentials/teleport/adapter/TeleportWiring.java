@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.teleport.CachedSpawnDirectory;
+import com.uxplima.uxmessentials.persistence.teleport.PendingRelocationStores;
 import com.uxplima.uxmessentials.persistence.teleport.RtpPoolStores;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -47,6 +48,7 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.BiomeHotspotListener;
+import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RelocationJoinListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.SpawnJoinListener;
@@ -102,6 +104,8 @@ import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeCatalog;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
+import com.uxplima.uxmessentials.teleport.application.port.LogoutPositions;
+import com.uxplima.uxmessentials.teleport.application.port.PendingRelocations;
 import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
@@ -216,7 +220,8 @@ public final class TeleportWiring {
                 rtp,
                 fee,
                 graceGuard,
-                crossServer);
+                crossServer,
+                PendingRelocationStores.of(persistence));
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
@@ -294,7 +299,8 @@ public final class TeleportWiring {
             RtpBundle rtp,
             TeleportFee fee,
             ArrivalGrace grace,
-            CrossServer crossServer) {
+            CrossServer crossServer,
+            PendingRelocations relocations) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
@@ -409,12 +415,17 @@ public final class TeleportWiring {
                 .crossServerRequests(crossServerRequests)
                 .crossServerStaff(crossServerStaff)
                 .offlineTeleport(new OfflineTeleport(
-                        new PlayerDataLogoutPositions(kernel.log()),
+                        logoutPositions(kernel.log()),
+                        relocations,
                         kernel.playerLookup(),
                         kernel.worldLookup(),
+                        crossServer.visibility(),
                         executor,
                         kernel.scheduler(),
-                        notifier))
+                        notifier,
+                        clock,
+                        network.localServer().serverId(),
+                        kernel.log()))
                 .engine(engine)
                 .notifier(notifier)
                 .settings(settings)
@@ -585,6 +596,19 @@ public final class TeleportWiring {
             @Nullable Listener hotspotListener) {}
 
     /**
+     * The saved player data {@code /tpoffline} reads, through the server's internals. When those moved in a server
+     * update, {@code /tpoffline} answers that the position could not be read and the rest of the module still starts.
+     */
+    private static LogoutPositions logoutPositions(Logger log) {
+        try {
+            return PlayerDataLogoutPositions.ofServer(log);
+        } catch (LinkageError | RuntimeException unavailable) {
+            log.warn("event=tpoffline_unavailable cause={}", unavailable.toString());
+            return LogoutPositions.UNAVAILABLE;
+        }
+    }
+
+    /**
      * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn leaves
      * every other's alone, and the network-wide main spawn on a lone server, which has no other server to keep apart
      * from and so keeps its spawn when its server name changes. A server name no scope can hold also writes the
@@ -635,6 +659,7 @@ public final class TeleportWiring {
                         services.captureBack(),
                         config,
                         services.settings()::backCapturePolicy),
+                new RelocationJoinListener(services.offlineTeleport()),
                 respawnListener,
                 joinListener,
                 graceGuard));

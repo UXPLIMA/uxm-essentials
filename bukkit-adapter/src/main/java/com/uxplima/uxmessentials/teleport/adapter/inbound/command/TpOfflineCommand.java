@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.teleport.adapter.inbound.command;
 
 import java.util.Objects;
 
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -16,14 +17,16 @@ import com.uxplima.uxmessentials.shared.application.permission.TeleportPermissio
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportRefs;
 import com.uxplima.uxmessentials.teleport.adapter.TeleportServices;
+import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /tpoffline <player>} and {@code /tpofflinehere <player>}: reach a player who is not on this server
- * through the position this server saved when they left it. {@link Pull#GO} sends the invoking player there;
- * {@link Pull#BRING} makes the player log in where the invoking player stands. The saved data is read and written
- * off the tick by {@code OfflineTeleport}; this handler only reads the sender's own position, on the sender's thread.
+ * {@code /tpoffline <player>} and {@code /tpofflinehere <player>}, for a player who is not on this server.
+ * {@link Pull#GO} sends the invoking player to the position this server saved when that player left it;
+ * {@link Pull#BRING} moves the player to where the invoking player stands once they next join this server, so the
+ * invoking player must be standing on the ground. The saved data and the stored move are handled off the tick by
+ * {@code OfflineTeleport}; this handler only reads the sender's own position, on the sender's thread.
  */
 @NullMarked
 public final class TpOfflineCommand extends TeleportCommandSupport implements CommandRegistration {
@@ -70,8 +73,20 @@ public final class TpOfflineCommand extends TeleportCommandSupport implements Co
         if (pull == Pull.GO) {
             services.offlineTeleport().goTo(ref(sender), name);
         } else {
+            if (!standing(sender)) {
+                // The spot is applied as it is, with no search for ground, so it must be one a player can stand on.
+                services.notifier()
+                        .send(ref(sender), TeleportMessageKey.TPOFFLINE_AIRBORNE, java.util.Map.of("player", name));
+                return 0;
+            }
             services.offlineTeleport().bring(ref(sender), name, TeleportRefs.positionOf(sender));
         }
         return Command.SINGLE_SUCCESS;
+    }
+
+    /** Whether {@code player} stands on something, rather than flying, gliding, falling or swimming. */
+    private static boolean standing(Player player) {
+        Entity body = player;
+        return body.isOnGround() && !player.isFlying() && !player.isGliding();
     }
 }

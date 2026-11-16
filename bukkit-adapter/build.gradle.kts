@@ -1,6 +1,6 @@
 plugins {
     id("uxm.paper-plugin")
-    // Offline /invsee and /tpoffline read player-data NBT through Mojang-mapped server internals.
+    // Offline /invsee reads player-data NBT, and /tpoffline finds it, through Mojang-mapped server internals.
     id("io.papermc.paperweight.userdev")
 }
 

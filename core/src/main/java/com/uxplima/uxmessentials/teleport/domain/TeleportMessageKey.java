@@ -24,6 +24,8 @@ public enum TeleportMessageKey implements MessageKey {
     TPA_SELF("teleport.tpa.self"),
     TPA_TARGET_OFFLINE("teleport.tpa.target-offline"),
     TPA_TOGGLED_OFF("teleport.tpa.toggled-off"),
+    // the /tpahere requester, when the player who accepted may not be moved (jailed or in combat)
+    TPA_MOVER_REFUSED("teleport.tpa.mover-refused"),
     TPA_BLOCKED("teleport.tpa.blocked"),
     TPA_NONE_PENDING("teleport.tpa.none-pending"),
     TPA_LIST_HEADER("teleport.tpa.list-header"),
@@ -104,11 +106,13 @@ public enum TeleportMessageKey implements MessageKey {
     TP_NO_TARGET_BLOCK("teleport.tp.no-target-block"),
     // a staff /tp refused by the target's /tptoggle; /tpo overrides it
     TP_TOGGLED_OFF("teleport.tp.toggled-off"),
-    // /tpoffline and /tpofflinehere, read from and written to the logout position this server keeps
+    // /tpoffline reads the logout position this server saved; /tpofflinehere stores a move for the next join
     TPOFFLINE_ONLINE("teleport.tpoffline.online"),
     TPOFFLINE_UNKNOWN("teleport.tpoffline.unknown"),
     TPOFFLINE_WORLD_MISSING("teleport.tpoffline.world-missing"),
     TPOFFLINE_MOVED("teleport.tpoffline.moved"),
+    TPOFFLINE_FAILED("teleport.tpoffline.failed"),
+    TPOFFLINE_AIRBORNE("teleport.tpoffline.airborne"),
     TPRANDOM_NONE("teleport.tprandom.none"),
 
     // a jailed player may not self-teleport. The moderation context's JailGate denies it here

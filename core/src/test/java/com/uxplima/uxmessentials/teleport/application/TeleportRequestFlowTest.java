@@ -200,7 +200,7 @@ class TeleportRequestFlowTest {
     }
 
     @Test
-    void aCombatTaggedMoverOfAHereRequestIsKeptInPlaceWhenTheyAccept() {
+    void aCombatTaggedMoverOfAHereRequestIsKeptInPlaceAndTheRequesterIsTold() {
         assertThat(request.request(ALEX, SAM, RequestDirection.TO_REQUESTER).isOk())
                 .isTrue();
         tagged = true;
@@ -209,6 +209,10 @@ class TeleportRequestFlowTest {
         warmups.finish();
 
         assertThat(hops.landed).isEmpty();
-        assertThat(notifier.sent()).contains(new RecordingNotifier.Sent(SAM, "teleport.combat-tagged", Map.of()));
+        assertThat(notifier.sent())
+                .contains(
+                        new RecordingNotifier.Sent(SAM, "teleport.combat-tagged", Map.of()),
+                        new RecordingNotifier.Sent(ALEX, "teleport.tpa.mover-refused", Map.of("player", "Sam")))
+                .doesNotContain(new RecordingNotifier.Sent(ALEX, "teleport.tpa.accepted", Map.of("player", "Sam")));
     }
 }

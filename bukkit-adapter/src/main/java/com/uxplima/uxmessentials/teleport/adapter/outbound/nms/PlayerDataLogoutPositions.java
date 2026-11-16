@@ -1,117 +1,200 @@
 package com.uxplima.uxmessentials.teleport.adapter.outbound.nms;
 
+import java.io.BufferedInputStream;
+import java.io.DataInput;
+import java.io.DataInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.zip.GZIPInputStream;
 
 import org.bukkit.Bukkit;
 import org.bukkit.craftbukkit.CraftServer;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
-import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.application.port.LogoutPositions;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtAccounter;
-import net.minecraft.nbt.NbtIo;
-import net.minecraft.util.Util;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraft.world.phys.Vec2;
-import net.minecraft.world.phys.Vec3;
 
 /**
  * The {@link LogoutPositions} the server itself keeps: the position saved in an offline player's
- * {@code players/data/<uuid>.dat} when they left. The file is read and written with the server's own NBT codecs,
- * and the world is the Bukkit world uid the server stores beside the position and reads first on login.
+ * {@code players/data/<uuid>.dat} when they left. The world is the Bukkit world uid the server stores beside the
+ * position and reads first on login. Read only: nothing here writes the file.
  *
- * <p>The directory is resolved once, on the thread that builds this, so the async lane only touches files. A write
- * goes to a temporary file that then replaces the real one, the way the server saves a player, so a login that
- * reads the file meanwhile sees the old position or the new one, never half a file. The caller writes only for a
- * player who is not online here; a player whose data the server holds in memory would overwrite it on leaving.
- *
- * <p>Like the offline inventory storage, this class is deliberately not {@code @NullMarked}: the NMS surface it
- * touches is unannotated. It is reached only through the null-marked {@link LogoutPositions} port.
+ * <p>The file is the server's compressed NBT, read here with a small reader that takes {@code Pos},
+ * {@code Rotation} and the world uid from the root compound and steps over everything else, so reading needs none
+ * of the server's internals; only {@link #ofServer} asks them where the directory is. The file may be written while
+ * it is read (offline {@code /invsee} saves it in place), so a file that is cut short or malformed is reported as
+ * {@link LogoutPositions.Unreadable}, never as a missing position.
  */
 public final class PlayerDataLogoutPositions implements LogoutPositions {
 
     private static final String POSITION = "Pos";
     private static final String ROTATION = "Rotation";
-    private static final String MOTION = "Motion";
-    private static final String FALL_DISTANCE = "fall_distance";
     private static final String WORLD_MOST = "WorldUUIDMost";
     private static final String WORLD_LEAST = "WorldUUIDLeast";
-    private static final String DIMENSION = "Dimension";
-    private static final String VEHICLE = "RootVehicle";
+
+    private static final byte END = 0;
+    private static final byte BYTE = 1;
+    private static final byte SHORT = 2;
+    private static final byte INT = 3;
+    private static final byte LONG = 4;
+    private static final byte FLOAT = 5;
+    private static final byte DOUBLE = 6;
+    private static final byte BYTE_ARRAY = 7;
+    private static final byte STRING = 8;
+    private static final byte LIST = 9;
+    private static final byte COMPOUND = 10;
+    private static final byte INT_ARRAY = 11;
+    private static final byte LONG_ARRAY = 12;
+
+    /** The nesting the server itself allows; deeper is a broken file, not a deep one. */
+    private static final int MAX_DEPTH = 512;
 
     private final Path directory;
     private final Logger log;
 
-    public PlayerDataLogoutPositions(Logger log) {
+    /** Reads the files in {@code directory}, the server's player data directory. */
+    public PlayerDataLogoutPositions(Path directory, Logger log) {
+        this.directory = Objects.requireNonNull(directory, "directory");
         this.log = Objects.requireNonNull(log, "log");
-        this.directory = ((CraftServer) Bukkit.getServer()).getServer().getWorldPath(LevelResource.PLAYER_DATA_DIR);
+    }
+
+    /**
+     * The reader over this server's player data directory, resolved here, on the thread that wires the module, so
+     * the async lane only touches files. Throws a {@link LinkageError} when the server's internals moved.
+     */
+    public static PlayerDataLogoutPositions ofServer(Logger log) {
+        Path directory = ((CraftServer) Bukkit.getServer()).getServer().getWorldPath(LevelResource.PLAYER_DATA_DIR);
+        return new PlayerDataLogoutPositions(directory, log);
     }
 
     @Override
     public Optional<SavedSpot> read(UUID player) {
-        Path file = dataFile(player);
+        Path file = directory.resolve(Objects.requireNonNull(player, "player") + ".dat");
         if (!Files.isRegularFile(file)) {
             return Optional.empty();
         }
-        try {
-            CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
-            Optional<Vec3> position = root.read(POSITION, Vec3.CODEC);
-            Optional<Long> most = root.getLong(WORLD_MOST);
-            Optional<Long> least = root.getLong(WORLD_LEAST);
-            if (position.isEmpty() || most.isEmpty() || least.isEmpty()) {
-                return Optional.empty();
+        try (InputStream raw = Files.newInputStream(file);
+                DataInputStream in = new DataInputStream(new BufferedInputStream(new GZIPInputStream(raw)))) {
+            return spotOf(in);
+        } catch (IOException | RuntimeException unreadable) {
+            log.error("Failed to read the saved position of " + player, unreadable);
+            throw new Unreadable("the saved position of " + player + " could not be read");
+        }
+    }
+
+    /** The root compound's position, facing and world uid; empty when the position or the world is not there. */
+    private static Optional<SavedSpot> spotOf(DataInput in) throws IOException {
+        if (in.readByte() != COMPOUND) {
+            throw new IOException("the root tag is not a compound");
+        }
+        in.readUTF();
+        double[] position = null;
+        float[] rotation = null;
+        Long most = null;
+        Long least = null;
+        for (byte type = in.readByte(); type != END; type = in.readByte()) {
+            String name = in.readUTF();
+            if (type == LIST && name.equals(POSITION)) {
+                position = doubles(in, 3);
+            } else if (type == LIST && name.equals(ROTATION)) {
+                rotation = floats(in, 2);
+            } else if (type == LONG && name.equals(WORLD_MOST)) {
+                most = in.readLong();
+            } else if (type == LONG && name.equals(WORLD_LEAST)) {
+                least = in.readLong();
+            } else {
+                skip(in, type, 0);
             }
-            Vec2 rotation = root.read(ROTATION, Vec2.CODEC).orElse(Vec2.ZERO);
-            Vec3 at = position.get();
-            return Optional.of(
-                    new SavedSpot(new UUID(most.get(), least.get()), at.x, at.y, at.z, rotation.x, rotation.y));
-        } catch (IOException ex) {
-            log.error("Failed to read the saved position of " + player, ex);
+        }
+        if (position == null || most == null || least == null) {
             return Optional.empty();
         }
+        float yaw = rotation == null ? 0f : rotation[0];
+        float pitch = rotation == null ? 0f : rotation[1];
+        return Optional.of(new SavedSpot(new UUID(most, least), position[0], position[1], position[2], yaw, pitch));
     }
 
-    @Override
-    public boolean write(UUID player, Position at) {
-        Objects.requireNonNull(at, "at");
-        Path file = dataFile(player);
-        if (!Files.isRegularFile(file)) {
-            return false;
+    private static double[] doubles(DataInput in, int count) throws IOException {
+        byte type = in.readByte();
+        int length = in.readInt();
+        if (type != DOUBLE || length != count) {
+            throw new IOException("expected " + count + " doubles, found " + length + " of type " + type);
         }
-        try {
-            CompoundTag root = NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap());
-            root.store(POSITION, Vec3.CODEC, new Vec3(at.x(), at.y(), at.z()));
-            root.store(ROTATION, Vec2.CODEC, new Vec2(at.yaw(), at.pitch()));
-            root.store(MOTION, Vec3.CODEC, Vec3.ZERO);
-            root.putDouble(FALL_DISTANCE, 0.0);
-            root.putLong(WORLD_MOST, at.world().uid().getMostSignificantBits());
-            root.putLong(WORLD_LEAST, at.world().uid().getLeastSignificantBits());
-            // The dimension is only read when no world uid is stored, and a saved vehicle would carry the player back
-            // to where they left; neither may contradict the new position.
-            root.remove(DIMENSION);
-            root.remove(VEHICLE);
-            Path written = Files.createTempFile(directory, player + "-", ".dat");
-            NbtIo.writeCompressed(root, written);
-            // The server's own replace: the old file becomes the backup a login falls back to while the new one
-            // is moved into place, and is put back if that move fails.
-            if (Util.safeReplaceOrMoveFile(file, written, directory.resolve(player + ".dat_old"), false)) {
-                return true;
+        double[] values = new double[count];
+        for (int i = 0; i < count; i++) {
+            values[i] = in.readDouble();
+        }
+        return values;
+    }
+
+    private static float[] floats(DataInput in, int count) throws IOException {
+        byte type = in.readByte();
+        int length = in.readInt();
+        if (type != FLOAT || length != count) {
+            throw new IOException("expected " + count + " floats, found " + length + " of type " + type);
+        }
+        float[] values = new float[count];
+        for (int i = 0; i < count; i++) {
+            values[i] = in.readFloat();
+        }
+        return values;
+    }
+
+    /** Step over one payload of {@code type}. */
+    private static void skip(DataInput in, byte type, int depth) throws IOException {
+        if (depth > MAX_DEPTH) {
+            throw new IOException("tags nested deeper than " + MAX_DEPTH);
+        }
+        switch (type) {
+            case BYTE -> skipFully(in, 1);
+            case SHORT -> skipFully(in, 2);
+            case INT, FLOAT -> skipFully(in, 4);
+            case LONG, DOUBLE -> skipFully(in, 8);
+            case BYTE_ARRAY -> skipFully(in, length(in));
+            case STRING -> in.readUTF();
+            case INT_ARRAY -> skipFully(in, 4L * length(in));
+            case LONG_ARRAY -> skipFully(in, 8L * length(in));
+            case LIST -> {
+                byte element = in.readByte();
+                int length = length(in);
+                for (int i = 0; i < length; i++) {
+                    skip(in, element, depth + 1);
+                }
             }
-            Files.deleteIfExists(written);
-            return false;
-        } catch (IOException ex) {
-            log.error("Failed to write the saved position of " + player, ex);
-            return false;
+            case COMPOUND -> {
+                for (byte entry = in.readByte(); entry != END; entry = in.readByte()) {
+                    in.readUTF();
+                    skip(in, entry, depth + 1);
+                }
+            }
+            default -> throw new IOException("unknown tag type " + type);
         }
     }
 
-    private Path dataFile(UUID player) {
-        return directory.resolve(Objects.requireNonNull(player, "player") + ".dat");
+    private static int length(DataInput in) throws IOException {
+        int length = in.readInt();
+        if (length < 0) {
+            throw new IOException("negative length " + length);
+        }
+        return length;
+    }
+
+    /** Skip exactly {@code count} bytes, or fail: a file that ends early must not read as complete. */
+    private static void skipFully(DataInput in, long count) throws IOException {
+        long left = count;
+        while (left > 0) {
+            int step = (int) Math.min(left, Integer.MAX_VALUE);
+            int skipped = in.skipBytes(step);
+            if (skipped <= 0) {
+                in.readByte(); // throws EOFException at the end of the file
+                skipped = 1;
+            }
+            left -= skipped;
+        }
     }
 }
