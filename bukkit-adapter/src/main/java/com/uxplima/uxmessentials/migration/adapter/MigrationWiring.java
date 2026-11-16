@@ -63,12 +63,11 @@ import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitOfflineProfiles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
-import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
@@ -334,7 +333,7 @@ public final class MigrationWiring {
     private static PlayerWarpRecordWriter playerWarpWriter(
             PlayerWarpRepository repository, Persistence persistence, Clock clock, Logger log) {
         // The server's profile cache names the owner of a warp whose source kept only the uuid.
-        PlayerLookup players = new BukkitPlayerLookup();
+        BukkitOfflineProfiles profiles = new BukkitOfflineProfiles();
         return new PlayerWarpRecordWriter(
                 repository,
                 PlayerWarpRepositories.passwordStore(persistence),
@@ -343,7 +342,7 @@ public final class MigrationWiring {
                 PlayerWarpRepositories.banStore(persistence),
                 PlayerWarpRepositories.favouriteStore(persistence, clock),
                 PlayerWarpRepositories.ratingStore(persistence),
-                uuid -> players.findByUuid(uuid).map(PlayerRef::name));
+                uuid -> profiles.byUuid(uuid).map(PlayerRef::name));
     }
 
     /**

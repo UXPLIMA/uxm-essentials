@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -134,7 +135,7 @@ public final class Ban {
             return refuseExempt(actor, actor, target, reason);
         }
         Instant now = clock.instant();
-        TempbanState.Active ban = proposal(actor, reason, now);
+        TempbanState.Active ban = proposal(actor, reason, Optional.empty(), now);
         Predicate<TempbanState.Active> longer =
                 GuardedWrite.outlasting(SanctionStrength.endOf(ban), SanctionStrength::endOf);
         return switch (GuardedWrite.storeBan(repository, target, ban, now, longer)) {
@@ -148,7 +149,7 @@ public final class Ban {
                 yield Result.err(ModerationError.LONGER_BAN_RUNNING);
             }
             case GuardedWrite.Stored<TempbanState.Active> stored -> {
-                announce(actor, actor, target, ban, reason, silent, now);
+                announce(actor, actor, target, ban, silent, now);
                 yield Result.ok(ban);
             }
         };
@@ -159,10 +160,17 @@ public final class Ban {
      * in. A timed ban already in force is replaced by this one (stored, recorded, announced and synced like any
      * ban); a permanent ban already in force, or a timed one that outlasts what {@code actor}'s tier allows, is
      * kept and the rung is audited as held. The ban is issued under {@code actor}, the server rule, while what the
-     * use case says about it goes to {@code told}, the staff member whose warning set it off.
+     * use case says about it goes to {@code told}, the staff member whose warning set it off. A {@code drawn} reason is
+     * the catalog line {@code reason} was drawn from for the target, stored with the ban (and the addresses a STRICT
+     * ban reaches) so every reader reads it in their own language.
      */
     Result<EscalationOutcome, ModerationError> escalate(
-            PlayerRef actor, PlayerRef told, PlayerRef target, Optional<String> reason, boolean silent) {
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(told, "told");
         Objects.requireNonNull(target, "target");
@@ -171,7 +179,7 @@ public final class Ban {
             return refuseExempt(actor, told, target, reason);
         }
         Instant now = clock.instant();
-        TempbanState.Active ban = proposal(actor, reason, now);
+        TempbanState.Active ban = proposal(actor, reason, drawn, now);
         Predicate<TempbanState.Active> atLeastAsLong =
                 GuardedWrite.notOutlastedBy(SanctionStrength.endOf(ban), SanctionStrength::endOf);
         return switch (GuardedWrite.storeBan(repository, target, ban, now, atLeastAsLong)) {
@@ -180,7 +188,7 @@ public final class Ban {
                 yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
             case GuardedWrite.Stored<TempbanState.Active> stored -> {
-                announce(actor, told, target, ban, reason, silent, now);
+                announce(actor, told, target, ban, silent, now);
                 yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
             }
         };
@@ -194,9 +202,10 @@ public final class Ban {
     }
 
     /** The ban {@code actor} may issue: permanent, or a timed ban of their tier's length when it caps bans. */
-    private TempbanState.Active proposal(PlayerRef actor, Optional<String> reason, Instant now) {
+    private TempbanState.Active proposal(
+            PlayerRef actor, Optional<String> reason, Optional<DrawnReason> drawn, Instant now) {
         Duration effective = limit.cap(actor, "ban", PERMANENT_SPAN);
-        return (TempbanState.Active) TempbanState.active(now.plus(effective), Issuer.of(actor), reason, now);
+        return (TempbanState.Active) TempbanState.active(now.plus(effective), Issuer.of(actor), reason, now, drawn);
     }
 
     private static Duration spanOf(TempbanState.Active ban) {
@@ -213,17 +222,13 @@ public final class Ban {
 
     /** Everything a stored ban sets off: the history row, the kick, the event, the notices and the IP fan-out. */
     private void announce(
-            PlayerRef actor,
-            PlayerRef told,
-            PlayerRef target,
-            TempbanState.Active ban,
-            Optional<String> reason,
-            boolean silent,
-            Instant now) {
+            PlayerRef actor, PlayerRef told, PlayerRef target, TempbanState.Active ban, boolean silent, Instant now) {
         boolean capped = capped(ban);
         Duration effective = spanOf(ban);
         Instant expiry = ban.until();
-        history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
+        Optional<String> reason = ban.reason();
+        Optional<DrawnReason> drawn = ban.drawnReason();
+        history.ban(actor, target, reason, drawn, capped ? Optional.of(expiry) : Optional.empty(), now);
         BanScreen.of(ban, now).kick(sanctions, notifier, target);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, label(ban), true, reason);
@@ -238,9 +243,10 @@ public final class Ban {
         sync.banChanged(target);
         // A capped /ban lands a timed UUID ban, so its IP collateral must expire with it; a true permanent ban
         // (no cap) fans out permanent IP bans. Empty until = permanent, mirroring the UUID ban's own expiry.
-        fanOutToIps(actor, told, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
+        fanOutToIps(actor, told, target, reason, drawn, capped ? Optional.of(expiry) : Optional.empty(), now);
         if (!silent) {
-            broadcast.announce(broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective));
+            broadcast.announce(
+                    broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective), drawn);
         }
     }
 
@@ -264,6 +270,7 @@ public final class Ban {
             PlayerRef told,
             PlayerRef target,
             Optional<String> reason,
+            Optional<DrawnReason> drawn,
             Optional<Instant> until,
             Instant now) {
         if (!strictness.fansOutToIps() || guard.isExempt(target)) {
@@ -277,13 +284,13 @@ public final class Ban {
         Predicate<IpBan> atLeastAsLong = GuardedWrite.notOutlastedBy(until, IpBan::until);
         int banned = 0;
         for (String ip : ips) {
-            IpBan ipBan = new IpBan(ip, until, reason, Optional.of(target.uuid()), Issuer.of(actor), now);
+            IpBan ipBan = new IpBan(ip, until, reason, Optional.of(target.uuid()), Issuer.of(actor), now, drawn);
             switch (GuardedWrite.store(GuardedWrite.ipBan(repository, ipBan), now, atLeastAsLong)) {
                 case GuardedWrite.Kept<IpBan> kept ->
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, false, SanctionStrength.HELD);
                 case GuardedWrite.Stored<IpBan> stored -> {
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, true, reason);
-                    history.banIp(actor, Optional.of(target.uuid()), ip, reason, until, now);
+                    history.banIp(actor, Optional.of(target.uuid()), ip, reason, drawn, until, now);
                     banned++;
                 }
             }

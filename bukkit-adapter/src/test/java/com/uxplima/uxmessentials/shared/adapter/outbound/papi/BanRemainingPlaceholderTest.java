@@ -49,7 +49,12 @@ class BanRemainingPlaceholderTest {
     private final BanRows bans = new BanRows();
     private final PlaceholderResolver resolver = new PlaceholderResolver(PlaceholderContexts.builder()
             .moderation(new GateModerationPlaceholders(
-                    MutePolicy.NEVER, JailGate.NEVER, bans, new NoSanctions(), Clock.fixed(NOW, ZoneOffset.UTC)))
+                    MutePolicy.NEVER,
+                    JailGate.NEVER,
+                    bans,
+                    new NoSanctions(),
+                    (viewer, key, placeholders) -> key.key(),
+                    Clock.fixed(NOW, ZoneOffset.UTC)))
             .build());
 
     private Optional<String> banRemaining() {

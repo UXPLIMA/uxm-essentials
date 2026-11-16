@@ -16,8 +16,10 @@ import com.uxplima.uxmessentials.api.view.UxmSanctionKind;
 import com.uxplima.uxmessentials.api.view.UxmSanctionRecord;
 import com.uxplima.uxmessentials.api.view.UxmWarn;
 import com.uxplima.uxmessentials.moderation.application.Ban;
+import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -27,6 +29,7 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.AsyncQueries;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -50,18 +53,25 @@ public final class ModerationQueries implements UxmModerationQuery {
     private final SanctionHistory history;
     private final PlayerLookup players;
     private final Scheduler scheduler;
+    private final Messages messages;
     private final Clock clock;
 
+    /**
+     * @param messages draws a reason the server wrote from a catalog line (a warn ladder step); the API has no reader
+     *     of its own, so such a reason reads in the server's default language
+     */
     public ModerationQueries(
             ModerationRepository repository,
             SanctionHistory history,
             PlayerLookup players,
             Scheduler scheduler,
+            Messages messages,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.history = Objects.requireNonNull(history, "history");
         this.players = Objects.requireNonNull(players, "players");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -74,7 +84,7 @@ public final class ModerationQueries implements UxmModerationQuery {
             if (!(state instanceof TempbanState.Active active) || !state.isActiveAt(now)) {
                 return Optional.empty();
             }
-            return Optional.of(view(playerId, active));
+            return Optional.of(view(messages, playerId, active));
         });
     }
 
@@ -87,7 +97,7 @@ public final class ModerationQueries implements UxmModerationQuery {
             if (!state.isActiveAt(now)) {
                 return Optional.empty();
             }
-            return view(playerId, state);
+            return view(messages, playerId, state);
         });
     }
 
@@ -123,7 +133,7 @@ public final class ModerationQueries implements UxmModerationQuery {
         return AsyncQueries.supply(
                 scheduler,
                 () -> history.recentForTarget(playerId, limit).stream()
-                        .map(ModerationQueries::view)
+                        .map(entry -> view(messages, entry))
                         .toList());
     }
 
@@ -135,24 +145,32 @@ public final class ModerationQueries implements UxmModerationQuery {
         return new UxmWarn(issuer(warn.issuer()), warn.reason(), warn.issuedAt(), warn.expiresAt());
     }
 
-    /** A ban as the API publishes it. Shared with the write side, so a ban reads the same however it was laid down. */
-    static UxmSanction view(UUID playerId, TempbanState.Active ban) {
+    /**
+     * A ban as the API publishes it. Shared with the write side, so a ban reads the same however it was laid down. A
+     * reason the server drew from a catalog line reads in the server's default language.
+     */
+    static UxmSanction view(Messages messages, UUID playerId, TempbanState.Active ban) {
         // A permanent ban has no state of its own: it is stored as a span so far out that nobody will see it
         // lapse. Published, that has to be an absent expiry, or every consumer would have to know the trick to
         // tell a permanent ban from a ban ending in the year 3026.
         return new UxmSanction(
-                UxmSanctionKind.BAN, playerId, issuer(ban.issuer()), ban.reason(), ban.issuedAt(), Ban.endOf(ban));
+                UxmSanctionKind.BAN,
+                playerId,
+                issuer(ban.issuer()),
+                reason(messages, ban.reason(), ban.drawnReason()),
+                ban.issuedAt(),
+                Ban.endOf(ban));
     }
 
     /** A mute as the API publishes it, or empty for the state that means "not muted". */
-    static Optional<UxmSanction> view(UUID playerId, MuteState mute) {
+    static Optional<UxmSanction> view(Messages messages, UUID playerId, MuteState mute) {
         return switch (mute) {
             case MuteState.Permanent permanent ->
                 Optional.of(new UxmSanction(
                         UxmSanctionKind.MUTE,
                         playerId,
                         issuer(permanent.issuer()),
-                        permanent.reason(),
+                        reason(messages, permanent.reason(), permanent.drawnReason()),
                         permanent.issuedAt(),
                         Optional.empty()));
             case MuteState.Timed timed ->
@@ -160,7 +178,7 @@ public final class ModerationQueries implements UxmModerationQuery {
                         UxmSanctionKind.MUTE,
                         playerId,
                         issuer(timed.issuer()),
-                        timed.reason(),
+                        reason(messages, timed.reason(), timed.drawnReason()),
                         timed.issuedAt(),
                         Optional.of(timed.until())));
             case MuteState.None ignored -> Optional.empty();
@@ -178,14 +196,19 @@ public final class ModerationQueries implements UxmModerationQuery {
                 sentence.until());
     }
 
-    private static UxmSanctionRecord view(SanctionHistoryEntry entry) {
+    private static UxmSanctionRecord view(Messages messages, SanctionHistoryEntry entry) {
         return new UxmSanctionRecord(
                 action(entry.action()),
                 entry.target(),
                 issuer(entry.actor()),
-                entry.reason(),
+                reason(messages, entry.reason(), entry.drawnReason()),
                 entry.at(),
                 entry.expiry());
+    }
+
+    /** A sanction's reason as the API reads it: as given, or drawn in the server's default language. */
+    static Optional<String> reason(Messages messages, Optional<String> text, Optional<DrawnReason> drawn) {
+        return SanctionReasons.read(messages, SanctionReasons.NO_READER, text, drawn);
     }
 
     private static UxmIssuer issuer(Issuer issuer) {

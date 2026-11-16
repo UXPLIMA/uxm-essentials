@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
@@ -40,11 +41,12 @@ final class ModerationRows {
     static MuteState toMute(ModerationMutesRecord row) {
         Issuer issuer = issuer(row.getMutedBy(), row.getMutedByName());
         Optional<String> reason = Optional.ofNullable(row.getReason());
+        Optional<DrawnReason> drawn = ReasonLines.read(row.getReasonKey(), row.getReasonArgs());
         Instant issuedAt = Instant.ofEpochMilli(row.getCreatedAt());
         Long until = row.getUntil();
         return until == null
-                ? MuteState.permanent(issuer, reason, issuedAt)
-                : MuteState.timed(Instant.ofEpochMilli(until), issuer, reason, issuedAt);
+                ? MuteState.permanent(issuer, reason, issuedAt, drawn)
+                : MuteState.timed(Instant.ofEpochMilli(until), issuer, reason, issuedAt, drawn);
     }
 
     static JailState toJail(ModerationJailsRecord row) {
@@ -68,7 +70,8 @@ final class ModerationRows {
                 Instant.ofEpochMilli(row.getUntil()),
                 issuer,
                 Optional.ofNullable(row.getReason()),
-                Instant.ofEpochMilli(row.getCreatedAt()));
+                Instant.ofEpochMilli(row.getCreatedAt()),
+                ReasonLines.read(row.getReasonKey(), row.getReasonArgs()));
     }
 
     static BanEntry toBanEntry(ModerationTempbansRecord row) {
@@ -77,7 +80,8 @@ final class ModerationRows {
                 issuer(row.getBannedBy(), row.getBannedByName()),
                 Optional.ofNullable(row.getReason()),
                 Instant.ofEpochMilli(row.getUntil()),
-                Instant.ofEpochMilli(row.getCreatedAt()));
+                Instant.ofEpochMilli(row.getCreatedAt()),
+                ReasonLines.read(row.getReasonKey(), row.getReasonArgs()));
     }
 
     static JailEntry toJailEntry(ModerationJailsRecord row) {
@@ -96,7 +100,8 @@ final class ModerationRows {
                 UUID.fromString(row.getTarget()),
                 issuer(row.getMutedBy(), row.getMutedByName()),
                 Optional.ofNullable(row.getReason()),
-                Optional.ofNullable(until).map(Instant::ofEpochMilli));
+                Optional.ofNullable(until).map(Instant::ofEpochMilli),
+                ReasonLines.read(row.getReasonKey(), row.getReasonArgs()));
     }
 
     static Warn toWarn(ModerationWarnsRecord row) {
@@ -123,7 +128,8 @@ final class ModerationRows {
                     Optional.ofNullable(row.getReason()),
                     Optional.ofNullable(row.getTarget()).map(UUID::fromString),
                     issuer(row.getBannedBy(), row.getBannedByName()),
-                    Instant.ofEpochMilli(row.getCreatedAt()));
+                    Instant.ofEpochMilli(row.getCreatedAt()),
+                    ReasonLines.read(row.getReasonKey(), row.getReasonArgs()));
         }
     }
 

@@ -5,14 +5,18 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.entity.Player;
 
+import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
+import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -52,11 +56,13 @@ public final class ModerationHistoryMenu {
     private final Menus menus;
     private final Scheduler scheduler;
     private final SanctionHistory history;
+    private final Messages messages;
 
-    public ModerationHistoryMenu(Menus menus, Scheduler scheduler, SanctionHistory history) {
+    public ModerationHistoryMenu(Menus menus, Scheduler scheduler, SanctionHistory history, Messages messages) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.history = Objects.requireNonNull(history, "history");
+        this.messages = Objects.requireNonNull(messages, "messages");
     }
 
     /** Register the per-entry list source and placeholders the spec names and the spec itself; called once at wiring. */
@@ -75,7 +81,7 @@ public final class ModerationHistoryMenu {
         bindings.placeholder("mod_history_issuer", ctx -> entry(ctx).actor().name());
         bindings.placeholder(
                 "mod_history_reason",
-                ctx -> entry(ctx).reason().filter(r -> !r.isBlank()).orElse(""));
+                ctx -> reason(ctx).filter(r -> !r.isBlank()).orElse(""));
         bindings.placeholder("mod_history_at", ctx -> STAMP.format(entry(ctx).at()));
         menus.registerSpec(SPEC_ID, MenuSpecs.loadOrBundled(SPEC_RESOURCE, dataFolder, 6, EngineLog.of(log)));
     }
@@ -96,6 +102,12 @@ public final class ModerationHistoryMenu {
 
     private SanctionHistoryEntry entry(MenuContext ctx) {
         return ctx.entry(SanctionHistoryEntry.class);
+    }
+
+    /** The entry's reason as the viewer reads it, in their language when the server wrote it. */
+    private Optional<String> reason(MenuContext ctx) {
+        SanctionHistoryEntry entry = entry(ctx);
+        return SanctionReasons.read(messages, BukkitRefs.toRef(ctx.viewer()), entry.reason(), entry.drawnReason());
     }
 
     /** The per-action icon material name, mirroring the deleted view's switch so the grid renders identically. */

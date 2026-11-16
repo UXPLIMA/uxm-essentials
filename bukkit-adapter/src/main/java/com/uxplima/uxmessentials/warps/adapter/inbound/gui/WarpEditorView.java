@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.warps.application.UseWarp;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
+import com.uxplima.uxmessentials.warps.domain.Warp;
 import com.uxplima.uxmessentials.warps.domain.WarpName;
 import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmessentials.warps.domain.WelcomeMessage;
@@ -398,27 +399,79 @@ public final class WarpEditorView {
             MenuActionContext ctx, WarpEditTarget target, java.util.function.Consumer<EditableWarp> change) {
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
-        edit(target.warpName(), target.owner(), change, () -> open(player, viewer, target.warpName(), target.owner()));
+        edit(
+                target.warpName(),
+                target.owner(),
+                player,
+                viewer,
+                change,
+                () -> open(player, viewer, target.warpName(), target.owner()));
     }
 
     /**
      * Load the warp, apply {@code change} and save it on the async lane, since the save writes the database, then run
-     * {@code then}. Edits of one warp run one after another; a stale warp is a no-op the re-open catches. {@code then}
-     * runs even when the save fails, so the operator is never left without the menu.
+     * {@code then}. Edits of one warp run one after another; a stale warp is a no-op the re-open catches.
      */
     void edit(
             String warpName,
             @Nullable PlayerRef warpOwner,
+            Player player,
+            PlayerRef viewer,
             java.util.function.Consumer<EditableWarp> change,
+            Runnable then) {
+        queue(
+                warpName,
+                warpOwner,
+                player,
+                viewer,
+                () -> {
+                    EditableWarp warp = loader.load(warpName, warpOwner);
+                    if (warp != null) {
+                        change.accept(warp);
+                    }
+                },
+                then);
+    }
+
+    /** As {@link #edit}, for a change only a server warp has (its category), made on the warp record itself. */
+    void editServerWarp(
+            String warpName,
+            Player player,
+            PlayerRef viewer,
+            java.util.function.UnaryOperator<Warp> change,
+            Runnable then) {
+        queue(
+                warpName,
+                null,
+                player,
+                viewer,
+                () -> warpRepository
+                        .find(WarpName.of(warpName))
+                        .ifPresent(warp -> warpRepository.save(change.apply(warp))),
+                then);
+    }
+
+    /**
+     * Run {@code save} in the warp's queue on the async lane, then {@code then}, which runs even when the save fails so
+     * the operator is never left without the menu. A failed save is told to the operator, who would otherwise see the
+     * menu come back unchanged with no reason, and still reaches the async lane's log.
+     */
+    private void queue(
+            String warpName,
+            @Nullable PlayerRef warpOwner,
+            Player player,
+            PlayerRef viewer,
+            Runnable save,
             Runnable then) {
         String key = (warpOwner == null ? "server" : warpOwner.uuid().toString()) + ":"
                 + warpName.toLowerCase(java.util.Locale.ROOT);
         edits.run(key, () -> {
             try {
-                EditableWarp warp = loader.load(warpName, warpOwner);
-                if (warp != null) {
-                    change.accept(warp);
-                }
+                save.run();
+            } catch (RuntimeException failure) {
+                scheduler.onEntity(
+                        viewer, () -> player.sendMessage(text(viewer, WarpsMessageKey.WARP_EDITOR_SAVE_FAILED)));
+                throw failure;
             } finally {
                 then.run();
             }
