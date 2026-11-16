@@ -35,7 +35,7 @@ class WarmupTrackerTest {
                 STANDING,
                 Destination.at(STANDING),
                 new WarmupCancelToggles(true, false, false, false, 0.0));
-        tracker.arm(ALEX, warmup, handle, LATER);
+        tracker.arm(ALEX, tracker.beginning(ALEX.uuid()), warmup, handle, LATER);
     }
 
     @Test

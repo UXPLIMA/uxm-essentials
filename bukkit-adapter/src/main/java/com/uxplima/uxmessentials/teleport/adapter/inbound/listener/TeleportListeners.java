@@ -11,6 +11,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerMoveEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerTeleportEvent;
@@ -108,6 +109,12 @@ public final class TeleportListeners implements Listener {
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
         warmupTracker.quit(event.getPlayer().getUniqueId());
+    }
+
+    // First, so a teleport another join listener starts already belongs to the new session.
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onJoin(PlayerJoinEvent event) {
+        warmupTracker.joined(event.getPlayer().getUniqueId());
     }
 
     private static TeleportCauseCategory categoryOf(PlayerTeleportEvent.TeleportCause cause) {
