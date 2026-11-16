@@ -20,6 +20,31 @@ A node completed from a name, such as a warp, a kit or a world, now takes its li
 plugin does not resolve wildcards, and a `.*` above it that you set still decides first. Without a permission plugin
 that resolves wildcards, a literal `uxmessentials.*` grant therefore reaches every such named node but no fixed node.
 
+## Cooldown tiers set the wait
+
+A `<feature>.cooldown.<seconds>` node a player holds used to be compared with the wait in the config, and the shorter
+one won, so a node could only shorten a wait. A held node now is the wait, the shortest node held wins, and the config
+value applies only to a player who holds none. This covers poses, skin, `/rtp`, the shared teleport clock, custom
+commands and the menu `cooldown:` labels ([permission pages](permissions-gameplay.md)). Three things change:
+
+- A node longer than the config value now lengthens the wait. A `uxmessentials.poses.cooldown.30` that did nothing
+  before now makes its holder wait 30 seconds between poses.
+- Changing the config value no longer reaches a player who holds a node. Their node decides.
+- A kit's `permission-cooldowns` group named by a number, such as `"60" = 60`, is skipped with a warning in the log:
+  its node is also the kit cooldown node `uxmessentials.kit.cooldown.60`, so its holders got a 60 second cap on every
+  kit. The entry stays in the kit file; rename the group to a word and move the grant.
+
+Kits, a teleport command with its own `cooldowns.<command>` value and a warp with its own cooldown are not affected:
+one node covers all of them, so there it still only lowers each value ([teleport](teleport.md#cooldowns),
+[kits](kits.md)).
+
+An example with LuckPerms: the `default` group holds `uxmessentials.tp.cooldown.10` and `default-cooldown` was lowered
+to 5. Before the upgrade everyone waited 5 seconds; after it every rank that inherits `default` waits 10.
+
+What to check, for each group (`lp group <group> permission info`, starting with `default`) and for single players:
+look for `cooldown.<seconds>` nodes longer than the config value of their feature. Lower the node or remove it, and
+let the config value apply again.
+
 ## Exemptions and placeholders follow the shared names
 
 Every exemption node now starts with `uxmessentials.bypass.`, and every placeholder reads `%uxm_essentials_<key>%`,

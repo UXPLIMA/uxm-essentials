@@ -29,7 +29,7 @@ The rules of a kit are keys in its file:
 | `cooldown` | Seconds between two claims by the same player. 0 means no wait. |
 | `one-time` | `true`: each player claims it once. `/kit reset` gives the claim back. |
 | `permission` | `true`: claiming needs `uxmessentials.kit.<name>`, or the node in `permission-node`. |
-| `permission-cooldowns` | A shorter wait per group, for example `{ vip = 3600 }`: a player with `uxmessentials.kit.cooldown.vip` waits one hour. The shortest wait the player holds wins. |
+| `permission-cooldowns` | A shorter wait per group, for example `{ vip = 3600 }`: a player with `uxmessentials.kit.cooldown.vip` waits one hour. The shortest wait the player holds wins. A group named by a number is skipped with a warning in the log, since `uxmessentials.kit.cooldown.<number>` is the kit cooldown tier. |
 | `cost` | The price, as `"<amount> <currency>"`, for example `"250 coins"`. Empty is free. |
 | `claim-money`, `claim-money-currency` | Money paid to the player on every claim. |
 | `stock` | How many times the kit may be claimed in total, across all players. 0 means no limit. |
@@ -83,6 +83,8 @@ Some limits to know:
 | `/kit reset <player> [kit]` | `uxmessentials.kit.reset` | operators | Clears a player's claims and cooldowns, for one kit or all. |
 
 `uxmessentials.bypass.cooldown.kit` skips cooldowns and lets a one-time kit be claimed again.
+`uxmessentials.kit.cooldown.<seconds>` caps every kit's wait for its holder: a kit set longer waits the node's
+seconds, a kit set shorter keeps its own wait. One node covers every kit, so it never lengthens one.
 `uxmessentials.oversizedstacks` lets a player receive stacks larger than the item normally allows.
 
 ## Placeholders

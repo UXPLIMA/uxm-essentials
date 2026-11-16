@@ -13,10 +13,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * The one place the poses context consults the shared {@link Cooldowns} port, so all six pose starters gate against
  * a single rate limit rather than duplicating the wiring. The wait is a per-player tier read from the numbered
- * {@code uxmessentials.poses.cooldown.<seconds>} permission (the shortest matching tier wins, {@code 0}, the
- * default when a player holds no tier node. Means no wait), and {@code uxmessentials.bypass.cooldown.poses} skips
- * the gate entirely; the stamp is a transient PDC "ready-at" the adapter keeps. This mirrors how {@code /kit} and
- * the teleport verbs resolve their own {@code <seconds>} tiers through the same port.
+ * {@code uxmessentials.poses.cooldown.<seconds>} permission: a held tier sets the wait and the shortest one held
+ * wins, {@code 0} means no wait, and a player who holds no tier waits for nothing.
+ * {@code uxmessentials.bypass.cooldown.poses} skips the gate entirely; the stamp is a transient "ready-at" the
+ * adapter keeps. This mirrors how {@code /kit} and the teleport verbs resolve their own {@code <seconds>} tiers
+ * through the same port.
  *
  * <p>Every pose shares one stamp scope ({@code "poses"}), so the cooldown is between <em>starting</em> poses of any
  * kind: sitting then immediately trying to lie down waits out the same clock. A start use case calls
@@ -26,8 +27,8 @@ import org.jspecify.annotations.Nullable;
 public final class PoseCooldown {
 
     /**
-     * One tier space, one stamp, keyed by the {@code poses} feature segment. The default is zero, absent a
-     * {@code poses.cooldown.<seconds>} node a player waits for nothing. The start phase is irrelevant here (poses
+     * One tier space, one stamp, keyed by the {@code poses} feature segment. The configured wait is zero, so the wait
+     * comes from the {@code poses.cooldown.<seconds>} tier alone. The start phase is irrelevant here (poses
      * stamp explicitly on a successful start, not through the teleport arrival machinery), so it takes the plain
      * default.
      */

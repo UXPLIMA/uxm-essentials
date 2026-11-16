@@ -269,9 +269,9 @@ public final class IntegrationConditions {
     /**
      * {@code set-cooldown:<label> [seconds]}. Start or refresh the persistent cooldown keyed by {@code label} so a
      * {@code cooldown:} view-condition then gates it. The optional {@code [seconds]} token is accepted for a natural
-     * operator grammar but is not applied per call: the {@link Cooldowns} port sizes a label's duration from its
-     * resolved quota nodes (the {@code uxmessentials.cooldown.<label>.<seconds>} min-reducer), not from the action, so
-     * we stamp the label and let the port own the length. A blank label is a no-op.
+     * operator grammar but is not applied per call: the {@link Cooldowns} port sizes a label's duration from the
+     * {@code uxmessentials.cooldown.<label>.<seconds>} tier the viewer holds (the shortest held wins; no tier, no
+     * wait), not from the action, so we stamp the label and let the port own the length. A blank label is a no-op.
      */
     private static void setCooldown(MenuActionContext ctx, Cooldowns cooldowns) {
         String label = firstToken(ctx.arg());
