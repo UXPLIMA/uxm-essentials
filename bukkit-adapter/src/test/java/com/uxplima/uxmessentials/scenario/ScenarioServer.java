@@ -176,6 +176,14 @@ final class ScenarioServer extends ServerMock {
         return stacks.toString();
     }
 
+    /**
+     * Runs work the server itself runs off the tick, such as raising a chat line, on a thread {@link #settle} counts,
+     * so a settle does not return while that work is still going.
+     */
+    void runOffTick(Runnable work) {
+        offTick(work).run();
+    }
+
     void shutdownAsync() {
         asyncPool.shutdownNow();
     }

@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.scenario;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,11 +13,7 @@ import org.bukkit.event.player.AsyncPlayerPreLoginEvent;
 import org.bukkit.event.player.PlayerLoginEvent;
 import org.bukkit.plugin.Plugin;
 
-import io.papermc.paper.chat.ChatRenderer;
 import io.papermc.paper.event.player.AsyncChatEvent;
-
-import net.kyori.adventure.chat.SignedMessage;
-import net.kyori.adventure.text.Component;
 
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
@@ -107,8 +102,8 @@ class ModerationScenarioTest {
         running.run(moderator, "mute Milo 10m spam");
         RunningPlugin.said(muted);
 
-        AsyncChatEvent fromMuted = chat(muted, "hello");
-        AsyncChatEvent fromTalker = chat(talker, "hello");
+        AsyncChatEvent fromMuted = running.chat(muted, "hello");
+        AsyncChatEvent fromTalker = running.chat(talker, "hello");
 
         assertThat(fromMuted.isCancelled()).isTrue();
         assertThat(RunningPlugin.said(muted)).as("why the line went nowhere").hasSize(1);
@@ -120,33 +115,18 @@ class ModerationScenarioTest {
     void aMutedPlayerWhoIsExemptStillTalks() {
         ScenarioPlayer exempt = running.join("Ezra");
         running.run(moderator, "mute Ezra 10m spam");
-        assertThat(chat(exempt, "first").isCancelled()).as("muted").isTrue();
+        assertThat(running.chat(exempt, "first").isCancelled()).as("muted").isTrue();
         // Granted after the mute, which a moderator could not place on an exempt player.
         exempt.addAttachment(watcher, ModerationGuard.EXEMPT_NODE, true);
         RunningPlugin.said(exempt);
 
-        AsyncChatEvent line = chat(exempt, "hello");
+        AsyncChatEvent line = running.chat(exempt, "hello");
 
         assertThat(line.isCancelled()).isFalse();
         assertThat(RunningPlugin.said(exempt))
                 .as("nothing tells them the line was stopped")
                 .isEmpty();
         assertThat(running.problems()).isEmpty();
-    }
-
-    /** A chat line as the server raises it: asynchronously, on a chat thread. */
-    private AsyncChatEvent chat(ScenarioPlayer speaker, String line) {
-        Component message = Component.text(line);
-        AsyncChatEvent event = new AsyncChatEvent(
-                true,
-                speaker,
-                new HashSet<>(running.server.getOnlinePlayers()),
-                ChatRenderer.defaultRenderer(),
-                message,
-                message,
-                SignedMessage.system(line, message));
-        running.callOffTick(event);
-        return event;
     }
 
     /** What the server decided for each login, after every plugin had its say. */

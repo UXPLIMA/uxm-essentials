@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,10 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryView;
 import org.bukkit.inventory.ItemStack;
 
+import io.papermc.paper.chat.ChatRenderer;
+import io.papermc.paper.event.player.AsyncChatEvent;
+
+import net.kyori.adventure.chat.SignedMessage;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
 
@@ -190,16 +195,37 @@ final class RunningPlugin implements AutoCloseable {
         return lines;
     }
 
+    /** A chat line as the server raises it: asynchronously, on a chat thread, seen by everyone online. */
+    AsyncChatEvent chat(ScenarioPlayer speaker, String line) {
+        Component message = Component.text(line);
+        AsyncChatEvent event = new AsyncChatEvent(
+                true,
+                speaker,
+                new HashSet<>(server.getOnlinePlayers()),
+                ChatRenderer.defaultRenderer(),
+                message,
+                message,
+                SignedMessage.system(line, message));
+        callOffTick(event);
+        return event;
+    }
+
     /**
      * Raises an event the server raises off the tick, such as a chat line, on a thread of its own, and lets the
-     * server tick until every listener has seen it.
+     * server tick until every listener has seen it and the work they started has finished.
+     *
+     * <p>The wait is for the call itself, not for a number of ticks: the ticks run as fast as the machine allows while
+     * nothing else is going on, so a listener that is slow against the clock, as any is on a busy machine, would
+     * otherwise be outrun.
      */
     void callOffTick(Event event) {
-        await(CompletableFuture.runAsync(() -> server.getPluginManager().callEvent(event), work -> {
-            Thread thread = new Thread(work, "scenario-event");
-            thread.setDaemon(true);
-            thread.start();
-        }));
+        CompletableFuture<Void> called =
+                CompletableFuture.runAsync(() -> server.getPluginManager().callEvent(event), server::runOffTick);
+        settle();
+        if (!called.isDone()) {
+            throw new AssertionError("settled while the event was still being called");
+        }
+        called.join();
     }
 
     /** Waits for a future the plugin's API handed out, letting the server run while it does. */
