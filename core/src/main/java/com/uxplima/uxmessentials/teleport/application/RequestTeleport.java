@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.teleport.application;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -15,6 +17,7 @@ import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.RequestRegistry;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportFlags;
+import com.uxplima.uxmessentials.teleport.domain.CooldownStartPhase;
 import com.uxplima.uxmessentials.teleport.domain.RequestDirection;
 import com.uxplima.uxmessentials.teleport.domain.RequestId;
 import com.uxplima.uxmessentials.teleport.domain.TeleportError;
@@ -26,7 +29,8 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportRequest.Transition;
  * The {@code /tpa} and {@code /tpahere} use case: open a teleport request after the toggle/block/self
  * gates pass, store it, publish {@code TeleportRequested}, and notify both parties. The request's TTL is
  * computed from {@link TeleportSettings#requestTtl()} against an injected {@link Clock}, so expiry is
- * deterministic and the domain never reads the wall clock itself.
+ * deterministic and the domain never reads the wall clock itself. Under the {@code request} cooldown phase the
+ * requester's cooldown starts once the request is open, so a request the target refuses stamps nothing.
  *
  * <p>Vanish-awareness (a request to a player the requester cannot see is silently refused) is applied
  * by the adapter's {@code canSee} check before reaching this use case, mirroring the presence-context
@@ -41,6 +45,7 @@ public final class RequestTeleport {
     private final TeleportSettings settings;
     private final JailGate jail;
     private final CombatGate combat;
+    private final TeleportEngine engine;
     private final Clock clock;
 
     public RequestTeleport(
@@ -50,8 +55,9 @@ public final class RequestTeleport {
             DomainEventPublisher events,
             TeleportSettings settings,
             JailGate jail,
+            TeleportEngine engine,
             Clock clock) {
-        this(requests, flags, notifier, events, settings, jail, CombatGate.NEVER, clock);
+        this(requests, flags, notifier, events, settings, jail, CombatGate.NEVER, engine, clock);
     }
 
     public RequestTeleport(
@@ -62,6 +68,7 @@ public final class RequestTeleport {
             TeleportSettings settings,
             JailGate jail,
             CombatGate combat,
+            TeleportEngine engine,
             Clock clock) {
         this.requests = Objects.requireNonNull(requests, "requests");
         this.flags = Objects.requireNonNull(flags, "flags");
@@ -70,11 +77,38 @@ public final class RequestTeleport {
         this.settings = Objects.requireNonNull(settings, "settings");
         this.jail = Objects.requireNonNull(jail, "jail");
         this.combat = Objects.requireNonNull(combat, "combat");
+        this.engine = Objects.requireNonNull(engine, "engine");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     /** Issue a request in {@code direction} from {@code requester} to {@code target}. */
     public Result<TeleportRequest, TeleportError> request(
+            PlayerRef requester, PlayerRef target, RequestDirection direction) {
+        Result<TeleportRequest, TeleportError> opened = open(requester, target, direction);
+        if (opened.isOk()) {
+            engine.stampForPhase(requester, CooldownStartPhase.REQUEST);
+        }
+        return opened;
+    }
+
+    /**
+     * Issue one request in {@code direction} from {@code requester} to each of {@code targets}, as {@code /tpaall}
+     * does. One command is one attempt, so a {@code request}-phase cooldown starts once, when at least one opened.
+     */
+    public List<Result<TeleportRequest, TeleportError>> requestEach(
+            PlayerRef requester, List<PlayerRef> targets, RequestDirection direction) {
+        Objects.requireNonNull(targets, "targets");
+        List<Result<TeleportRequest, TeleportError>> results = new ArrayList<>(targets.size());
+        for (PlayerRef target : targets) {
+            results.add(open(requester, target, direction));
+        }
+        if (results.stream().anyMatch(Result::isOk)) {
+            engine.stampForPhase(requester, CooldownStartPhase.REQUEST);
+        }
+        return results;
+    }
+
+    private Result<TeleportRequest, TeleportError> open(
             PlayerRef requester, PlayerRef target, RequestDirection direction) {
         Objects.requireNonNull(requester, "requester");
         Objects.requireNonNull(target, "target");
