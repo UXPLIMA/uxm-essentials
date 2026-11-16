@@ -19,9 +19,9 @@ import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
  * How {@link UsePlayerWarp} hands a warp on another backend to the shared cross-server hop. {@code departures} is
- * empty while the {@code cross-server} sub-group is off; {@link #admit} then refuses every such use before the charge,
- * telling the player the warp is on a server this one does not send players to, so nothing is taken or given back.
- * While the sub-group is on, {@link #admit} runs the jail, combat and cooldown checks of a local teleport.
+ * empty while the {@code cross-server} sub-group is off; {@link #routeOpen} then refuses every such use before any
+ * other check, telling the player the warp is on a server this one does not send players to, so nothing is taken or
+ * given back. While the sub-group is on, {@link #admit} runs the jail, combat and cooldown checks of a local teleport.
  *
  * <p>The owner's share is never banked at charge time for such a use: the hop carries a settlement to the warp, so
  * the target pays the owner only once the visitor has landed, and every miss gives the visitor their charge back.
@@ -42,22 +42,34 @@ public final class PlayerWarpHops {
     }
 
     /**
-     * Whether {@code who} may hop to {@code warp} under the local teleport rules; asked before the charge. With the
-     * cross-server sub-group off no hop can start, so the use is refused here, before anything is charged. On false
-     * the player has already been told why.
+     * Whether a hop to {@code warp} can start at all: false while the cross-server sub-group is off, and then
+     * {@code who} is told the warp is on a server this one does not send players to. Asked first, before any other
+     * check of the use, so a use that can never leave spends nothing.
+     */
+    public boolean routeOpen(PlayerRef who, PlayerWarp warp) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(warp, "warp");
+        if (departures.isPresent()) {
+            return true;
+        }
+        notifier.send(
+                who,
+                PlayerwarpsMessageKey.PWARP_CROSS_SERVER_OFF,
+                Map.of("warp", warp.name().value(), "server", warp.serverId().orElseThrow()));
+        return false;
+    }
+
+    /**
+     * Whether {@code who} may hop to {@code warp} under the local teleport rules: the jail, combat and cooldown
+     * checks; asked before the charge. On false the player has already been told why, also when the route is off.
      */
     public boolean admit(PlayerRef who, PlayerWarp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
-        HopDeparture departure = departureOf(warp);
         if (departures.isEmpty()) {
-            notifier.send(
-                    who,
-                    PlayerwarpsMessageKey.PWARP_CROSS_SERVER_OFF,
-                    Map.of("warp", departure.label(), "server", departure.targetServer()));
-            return false;
+            return routeOpen(who, warp);
         }
-        return departures.get().admit(who, departure);
+        return departures.get().admit(who, departureOf(warp));
     }
 
     /**

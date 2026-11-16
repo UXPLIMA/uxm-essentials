@@ -17,7 +17,6 @@ import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
-import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
@@ -255,6 +254,11 @@ public final class UsePlayerWarp {
      * and the cost step; every other step applies uniformly.
      */
     private Admission gate(PlayerRef actor, PlayerWarp warp, Optional<String> password) {
+        // A warp on another server with the cross-server route off can never be reached, so nothing else is asked:
+        // not the password, which would spend a try, and not the money.
+        if (isRemote(warp) && !hops.routeOpen(actor, warp)) {
+            return Admission.refusedQuietly(PlayerWarpError.TELEPORT_REFUSED);
+        }
         PlayerWarpError status = checkStatus(warp);
         if (status != null) {
             return Admission.refused(status);
@@ -338,24 +342,24 @@ public final class UsePlayerWarp {
 
     /**
      * The PASSWORD access branch, rate-limited by {@link PasswordAttempts} per player and warp. The password bypass
-     * skips it entirely. A player locked out by too many wrong passwords is refused {@link PlayerWarpError#RATE_LIMITED}
-     * before any match is tried; otherwise a correct password passes and clears the count, and a wrong (or absent) one
-     * is counted and refused {@link PlayerWarpError#WRONG_PASSWORD}. The plaintext is only ever handed to the password
+     * skips it entirely. The try is counted before the match, so tries racing each other cannot all pass the limit; a
+     * player locked out by too many tries is refused {@link PlayerWarpError#RATE_LIMITED} before any match is tried.
+     * A correct password passes and clears the count, and a wrong (or absent) one keeps its count and is refused
+     * {@link PlayerWarpError#WRONG_PASSWORD}. The plaintext is only ever handed to the password
      * store to verify: it is never logged, rendered, or placed in a message placeholder.
      */
     private @Nullable PlayerWarpError passwordStep(PlayerRef actor, PlayerWarp warp, Optional<String> entered) {
         if (permissions.has(actor, BYPASS_PASSWORD)) {
             return null;
         }
-        PlayerWarpId id = warp.id().orElseThrow();
-        if (passwordAttempts.lockedFor(actor.uuid(), id).isPresent()) {
+        String key = warp.stableKey();
+        if (passwordAttempts.reserve(actor.uuid(), key).isPresent()) {
             return PlayerWarpError.RATE_LIMITED;
         }
-        if (entered.isPresent() && passwordStore.matches(id, entered.get())) {
-            passwordAttempts.succeeded(actor.uuid(), id);
+        if (entered.isPresent() && passwordStore.matches(warp.id().orElseThrow(), entered.get())) {
+            passwordAttempts.succeeded(actor.uuid(), key);
             return null;
         }
-        passwordAttempts.failed(actor.uuid(), id);
         return PlayerWarpError.WRONG_PASSWORD;
     }
 

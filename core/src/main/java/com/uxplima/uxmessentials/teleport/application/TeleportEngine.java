@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownScope;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
@@ -731,7 +732,7 @@ public final class TeleportEngine {
         if (own.isPresent()) {
             return CooldownKind.scoped(
                     FEATURE,
-                    FEATURE + "." + own.get().clock(),
+                    FEATURE + "." + CooldownScope.distinct(own.get().clock()),
                     own.get().length().toSeconds(),
                     mapPhase(settings.cooldownStartPhase()));
         }

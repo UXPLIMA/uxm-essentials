@@ -154,6 +154,12 @@ final class PlayerWarpFakes {
 
         private final Map<PlayerWarpId, String> byWarp = new HashMap<>();
 
+        /** How many passwords were checked. */
+        int checks;
+
+        /** Run inside each check, as other tries arriving while the slow hash runs would. */
+        Runnable duringCheck = () -> {};
+
         @Override
         public void set(PlayerWarpId warp, String plaintext) {
             byWarp.put(warp, plaintext);
@@ -166,6 +172,10 @@ final class PlayerWarpFakes {
 
         @Override
         public boolean matches(PlayerWarpId warp, String plaintext) {
+            checks++;
+            Runnable during = duringCheck;
+            duringCheck = () -> {};
+            during.run();
             return plaintext.equals(byWarp.get(warp));
         }
     }

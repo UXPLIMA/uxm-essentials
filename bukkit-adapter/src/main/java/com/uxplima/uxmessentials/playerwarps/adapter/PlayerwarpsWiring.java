@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.playerwarps.application.PasswordAttempts;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
+import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpWorldLimit;
 import com.uxplima.uxmessentials.playerwarps.application.PurgeArchivedRentWarps;
 import com.uxplima.uxmessentials.playerwarps.application.RatePlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.application.RatingRewardConfig;
@@ -298,8 +299,10 @@ public final class PlayerwarpsWiring {
         WithdrawEarnings withdrawEarnings = new WithdrawEarnings(repository, warpAuthorization, notifier, economy);
         // The single-warp edit verbs and the ownership transfer gate through the same shared WarpAuthorization and
         // reuse the repository, notifier, and password store built above: no new persistence, just use cases.
+        // Every path that moves a warp into another world asks the owner's limit for that world, as a new warp does.
+        PlayerWarpWorldLimit worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier);
         EditPlayerWarp editPlayerWarp = new EditPlayerWarp(
-                repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer);
+                repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer, worldLimit);
         TransferPlayerWarp transferPlayerWarp =
                 new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
         // The sponsorship sub-group: an owner buys a paid, time-limited pinned browse slot through the same
@@ -324,7 +327,8 @@ public final class PlayerwarpsWiring {
                 guiLayouts,
                 textInput,
                 menus,
-                recordedServer);
+                recordedServer,
+                worldLimit);
         listMenu.register(menuBindings, plugin.getDataFolder().toPath(), kernel.log());
         // The paged public browse bare /pwarp opens: one card per public warp read a page at a time through the
         // browse read model. The read model is the jOOQ LIMIT/OFFSET+COUNT projection, never a full-table scan, so
@@ -688,7 +692,8 @@ public final class PlayerwarpsWiring {
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
-            Optional<String> recordedServer) {
+            Optional<String> recordedServer,
+            PlayerWarpWorldLimit worldLimit) {
         PlayerWarpEditorSubLayouts subLayouts = PlayerWarpEditorSubLayouts.load(
                 plugin.getDataFolder().toPath(), "playerwarps", "pwarp-editor", kernel.log());
         EntityEditorLayout editorLayout =
@@ -706,7 +711,8 @@ public final class PlayerwarpsWiring {
                 editorLayout,
                 subLayouts,
                 (player, viewer) -> listHolder[0].open(player, viewer),
-                recordedServer);
+                recordedServer,
+                worldLimit);
         PlayerWarpListMenu listMenu = new PlayerWarpListMenu(
                 menus,
                 kernel.scheduler(),

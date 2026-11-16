@@ -128,4 +128,76 @@ class PlayerWarpLimitTest {
 
         assertThat(set(use, "bastion", shouted).asError()).contains(PlayerWarpError.LIMIT_REACHED);
     }
+
+    private EditPlayerWarp edit(int defaultLimit) {
+        PlayerWarpQuota quota = new PlayerWarpQuota(permissions, defaultLimit);
+        return new EditPlayerWarp(
+                warps,
+                new WarpAuthorization(new PlayerWarpFakes.NoMembers()),
+                notifier.notifier(),
+                new PlayerWarpFakes.Passwords(),
+                CLOCK,
+                Optional.empty(),
+                new PlayerWarpWorldLimit(quota, warps, notifier.notifier()));
+    }
+
+    @Test
+    void movingWarpsInOneByOneCannotWalkPastAWorldLimit() {
+        permissions.holdTier(ALEX, LIMIT + ".world_nether", 1);
+        SetPlayerWarp use = setWarp(10);
+        EditPlayerWarp edit = edit(10);
+        set(use, "fortress", NETHER);
+        set(use, "farm", WORLD);
+
+        Result<Unit, PlayerWarpError> moved = edit.moveHere(ALEX, PlayerWarpName.of("farm"), in(NETHER));
+
+        assertThat(moved.asError()).contains(PlayerWarpError.LIMIT_REACHED);
+        assertThat(notifier.keys()).last().isEqualTo("pwarp.world-limit-reached");
+        assertThat(warps.findByName(PlayerWarpName.of("farm"))
+                        .orElseThrow()
+                        .location()
+                        .world())
+                .isEqualTo(WORLD);
+    }
+
+    @Test
+    void reAnchoringAWarpIntoAFullWorldIsRefused() {
+        permissions.holdTier(ALEX, LIMIT + ".world_nether", 1);
+        SetPlayerWarp use = setWarp(10);
+        set(use, "fortress", NETHER);
+        set(use, "farm", WORLD);
+
+        Result<Unit, PlayerWarpError> moved = set(use, "farm", NETHER);
+
+        assertThat(moved.asError()).contains(PlayerWarpError.LIMIT_REACHED);
+        assertThat(warps.findByName(PlayerWarpName.of("farm"))
+                        .orElseThrow()
+                        .location()
+                        .world())
+                .isEqualTo(WORLD);
+    }
+
+    @Test
+    void aWarpMovesWithinAFullWorld() {
+        permissions.holdTier(ALEX, LIMIT + ".world_nether", 1);
+        SetPlayerWarp use = setWarp(10);
+        set(use, "fortress", NETHER);
+
+        assertThat(edit(10).moveHere(ALEX, PlayerWarpName.of("fortress"), new Position(NETHER, 50, 70, 50, 0f, 0f))
+                        .isOk())
+                .isTrue();
+        assertThat(set(use, "fortress", NETHER).isOk()).isTrue();
+    }
+
+    @Test
+    void aWarpMovesIntoAWorldWithRoomLeft() {
+        permissions.holdTier(ALEX, LIMIT + ".world_nether", 2);
+        SetPlayerWarp use = setWarp(10);
+        set(use, "fortress", NETHER);
+        set(use, "farm", WORLD);
+
+        assertThat(edit(10).moveHere(ALEX, PlayerWarpName.of("farm"), in(NETHER))
+                        .isOk())
+                .isTrue();
+    }
 }

@@ -269,16 +269,21 @@ public record PlayerWarp(
     }
 
     /**
-     * The cooldown this warp sets, on a clock of its own named after the warp's id, so a rename keeps the clock and a
-     * warp with a long wait never holds back another warp that sets a short one. Only a stored warp is teleported to,
-     * so a warp that sets a cooldown carries its id here.
+     * The cooldown this warp sets, on a clock of its own named after the warp's {@link #stableKey}, so a rename keeps
+     * the clock, a warp with a long wait never holds back another warp that sets a short one, and a later warp that
+     * reuses this one's id starts on a clock of its own.
      */
     public Optional<OwnCooldown> ownCooldown() {
-        return timing.cooldown()
-                .map(wait -> new OwnCooldown(
-                        "pwarp."
-                                + id.orElseThrow(() -> new IllegalStateException("an unsaved warp has no clock"))
-                                        .value(),
-                        wait));
+        return timing.cooldown().map(wait -> new OwnCooldown("pwarp." + stableKey(), wait));
+    }
+
+    /**
+     * A key this warp keeps for life and no other warp ever has: its id with the second it was created. The id alone
+     * is not enough, since the store can hand a deleted warp's id to the next new one; a name changes on a rename.
+     * Only a stored warp has one, which every warp a player can reach is.
+     */
+    public String stableKey() {
+        PlayerWarpId stored = id.orElseThrow(() -> new IllegalStateException("an unsaved warp has no key"));
+        return stored.value() + "." + createdAt.getEpochSecond();
     }
 }

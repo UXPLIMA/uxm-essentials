@@ -112,6 +112,7 @@ class CrossServerTeleportTest {
     private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
 
+    private final PlayerWarpFakes.Passwords passwords = new PlayerWarpFakes.Passwords();
     private HopGate gate = HopGate.OPEN;
     private boolean tagged;
     private boolean jailed;
@@ -179,7 +180,7 @@ class CrossServerTeleportTest {
                 new PlayerWarpFakes.NoBans(),
                 new PlayerWarpFakes.NoMembers(),
                 new PlayerWarpFakes.NoWhitelist(),
-                new PlayerWarpFakes.Passwords(),
+                passwords,
                 PasswordAttempts.defaults(clock),
                 Optional.of(purse),
                 LOBBY,
@@ -317,6 +318,17 @@ class CrossServerTeleportTest {
 
         assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
         assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(notifier.keys()).containsExactly("pwarp.cross-server.off");
+    }
+
+    @Test
+    void aPasswordWarpOnAnotherServerWithTheRouteOffIsRefusedBeforeThePasswordIsAsked() {
+        warps.put(marketOn(SURVIVAL).withAccess(WarpAccess.PASSWORD, NOW));
+
+        Result<Unit, PlayerWarpError> used = lobbyGate(false).useFor(ALEX, MARKET_NAME, Optional.of("guess"));
+
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(passwords.checks).isZero();
         assertThat(notifier.keys()).containsExactly("pwarp.cross-server.off");
     }
 

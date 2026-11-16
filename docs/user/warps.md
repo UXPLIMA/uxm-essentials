@@ -217,8 +217,10 @@ paid at once, in a currency that can be paid to an offline player.
 A player who gets a warp's password wrong `password-attempts.max-attempts` times (3) within
 `password-attempts.lockout-seconds` (60) is locked out of that warp's password for `lockout-seconds`, the right
 password included. A right password starts the count again, and other warps are not affected. No permission tier
-changes this limit; only `uxmessentials.bypass.password.pwarp`, which skips the password, gets past it. Each server
-counts the attempts typed on it, and a restart starts the count again. `lockout-seconds = 0` turns the limit off.
+changes this limit; only `uxmessentials.bypass.password.pwarp`, which skips the password, gets past it. Tries sent at
+the same moment are counted before their password is checked, so they cannot slip past the limit together. Each
+server counts the attempts typed on it, and a restart starts the count again. `lockout-seconds = 0` turns the limit
+off.
 
 A player warp can set its own cooldown in its editor. Like a server warp's, it runs on a clock of its own, which
 follows the warp through a rename.
@@ -227,9 +229,12 @@ follows the warp through a rename.
 
 A player owns up to `default-limit` warps (3) across every world. `uxmessentials.pwarp.limit.<n>` raises it, the
 largest node held wins, and `-1` removes the limit. `uxmessentials.pwarp.limit.<world>.<n>` adds a limit for one
-world: it counts only the owner's warps in that world, the largest node held wins, and `-1` removes it. Both limits
-apply, so a world node larger than the limit across every world does not lift that one. A world with no node of its
-own is held only by the limit across every world.
+world: it counts only the owner's warps in that world, the largest node held wins, and `-1` removes it. It applies to
+a new warp and to a warp moved into the world, by `/setpwarp`, `/pwarp move` or the menus. Both limits apply, so a
+world node larger than the limit across every world does not lift that one. A world with no node of its own is held
+only by the limit across every world. A world is told apart by its uid, not its name: on a network each server's
+world counts on its own even when two share a name, and after a world is reset (a new uid) the warps left in the old
+one count only toward the limit across every world.
 
 Categories come from the warp categories made in `/warp editor`. While none exist, the browser offers `building`,
 `shop`, `pvp`, `farm`, `redstone` and `misc`. The browser sorts by name, age, visits, unique visitors, rating,

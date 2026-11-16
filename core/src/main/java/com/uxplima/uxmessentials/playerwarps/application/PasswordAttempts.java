@@ -7,22 +7,26 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
-import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import org.jspecify.annotations.Nullable;
 
 /**
- * How many wrong passwords one player may try on one player warp before they must wait. Up to {@code maxAttempts}
- * wrong passwords within {@code lockout} of the first are allowed; the one that reaches the limit locks the player
- * out of that warp's password for {@code lockout}. A right password, or a window that passes without reaching the
- * limit, starts the count again.
+ * How many passwords one player may try on one player warp before they must wait. Up to {@code maxAttempts} tries
+ * within {@code lockout} of the first are allowed; the try that reaches the limit locks the player out of that warp's
+ * password for {@code lockout}. A right password, or a window that passes without reaching the limit, starts the count
+ * again.
+ *
+ * <p>A try is counted before its password is checked, in one atomic step that also refuses a locked player, so tries
+ * sent at the same moment cannot all slip through while the slow hash check runs. A try that turns out right gives its
+ * count back through {@link #succeeded}.
  *
  * <p>No permission tier sizes or lifts this limit, so a tier granted for some other wait can never remove it by
  * accident: only the password bypass, which skips the password altogether, gets past it. A {@code lockout} of zero
  * turns the limit off, which an operator can only do on purpose in the config.
  *
- * <p>The count lives in this server's memory: it starts again on a restart, and each server of a network counts the
- * attempts typed on it.
+ * <p>The count is keyed by the warp's {@code stableKey}, never by an id a later warp may reuse, and lives in this
+ * server's memory: it starts again on a restart, and each server of a network counts the tries typed on it.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. Uses of a warp run on the async lane, so each player and warp's count is
@@ -30,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class PasswordAttempts {
 
-    /** The shipped limit: three wrong passwords within a minute lock the warp's password for a minute. */
+    /** The shipped limit: three tries within a minute lock the warp's password for a minute. */
     public static final int DEFAULT_MAX_ATTEMPTS = 3;
 
     /** The shipped window and lockout. */
@@ -62,41 +66,37 @@ public final class PasswordAttempts {
         return new PasswordAttempts(DEFAULT_MAX_ATTEMPTS, DEFAULT_LOCKOUT, clock);
     }
 
-    /** How long {@code player} must still wait before trying {@code warp}'s password again, if they must. */
-    public Optional<Duration> lockedFor(UUID player, PlayerWarpId warp) {
+    /**
+     * Count one try {@code player} is about to make on the warp {@code warpKey} names, before the password is checked.
+     * Empty when the try may go ahead; otherwise how long the player is still locked out, and nothing is counted.
+     */
+    public Optional<Duration> reserve(UUID player, String warpKey) {
         Objects.requireNonNull(player, "player");
-        Objects.requireNonNull(warp, "warp");
-        Count count = counts.get(new Key(player, warp));
-        @Nullable Instant lockedUntil = count == null ? null : count.lockedUntil();
-        Instant now = clock.instant();
-        if (lockedUntil == null || !now.isBefore(lockedUntil)) {
-            return Optional.empty();
-        }
-        return Optional.of(Duration.between(now, lockedUntil));
-    }
-
-    /** Count a wrong password {@code player} typed for {@code warp}. */
-    public void failed(UUID player, PlayerWarpId warp) {
-        Objects.requireNonNull(player, "player");
-        Objects.requireNonNull(warp, "warp");
+        Objects.requireNonNull(warpKey, "warpKey");
         if (lockout.isZero()) {
-            return;
+            return Optional.empty();
         }
         Instant now = clock.instant();
         sweepIfLarge(now);
-        counts.compute(new Key(player, warp), (key, count) -> {
+        AtomicReference<@Nullable Duration> locked = new AtomicReference<>();
+        counts.compute(new Key(player, warpKey), (key, count) -> {
+            @Nullable Instant until = count == null ? null : count.lockedUntil();
+            if (count != null && until != null && now.isBefore(until)) {
+                locked.set(Duration.between(now, until));
+                return count;
+            }
             Count running = count == null || count.endedBy(now, lockout) ? new Count(0, now, null) : count;
-            int failures = running.failures() + 1;
-            @Nullable Instant lockedUntil = failures >= maxAttempts ? now.plus(lockout) : null;
-            return new Count(failures, running.since(), lockedUntil);
+            int tries = running.tries() + 1;
+            return new Count(tries, running.since(), tries >= maxAttempts ? now.plus(lockout) : null);
         });
+        return Optional.ofNullable(locked.get());
     }
 
-    /** Forget {@code player}'s wrong passwords for {@code warp}, after they typed the right one. */
-    public void succeeded(UUID player, PlayerWarpId warp) {
+    /** Forget {@code player}'s tries on the warp {@code warpKey} names, after they typed the right password. */
+    public void succeeded(UUID player, String warpKey) {
         Objects.requireNonNull(player, "player");
-        Objects.requireNonNull(warp, "warp");
-        counts.remove(new Key(player, warp));
+        Objects.requireNonNull(warpKey, "warpKey");
+        counts.remove(new Key(player, warpKey));
     }
 
     private void sweepIfLarge(Instant now) {
@@ -105,17 +105,14 @@ public final class PasswordAttempts {
         }
     }
 
-    private record Key(UUID player, PlayerWarpId warp) {}
+    private record Key(UUID player, String warp) {}
 
-    /**
-     * The wrong passwords counted since {@code since}, and when the lockout they earned ends, if they earned one.
-     */
-    private record Count(
-            int failures, Instant since, @Nullable Instant lockedUntil) {
+    /** The tries counted since {@code since}, and when the lockout they earned ends, if they earned one. */
+    private record Count(int tries, Instant since, @Nullable Instant lockedUntil) {
 
         /** Whether this count no longer holds anything back: its window and any lockout are over. */
         boolean endedBy(Instant now, Duration window) {
-            Instant until = lockedUntil;
+            @Nullable Instant until = lockedUntil;
             if (until != null) {
                 return !now.isBefore(until);
             }

@@ -157,4 +157,35 @@ class WarpOwnCooldownTest {
 
         assertThat(refused(toWarp("market", 60))).isFalse();
     }
+
+    @Test
+    void warpsNamedInAnotherAlphabetKeepApartClocks() {
+        land(toWarp("шахта", 60));
+
+        assertThat(refused(toWarp("лавка", 60))).isFalse();
+        assertThat(refused(toWarp("шахта", 60))).isTrue();
+    }
+
+    @Test
+    void namesThatOnlyDifferInPunctuationKeepApartClocks() {
+        land(toWarp("my shop", 60));
+
+        assertThat(refused(toWarp("my!shop", 60))).isFalse();
+        assertThat(refused(toWarp("my_shop", 60))).isFalse();
+    }
+
+    @Test
+    void aPlayerWarpThatReusesADeletedWarpsIdStartsOnAClockOfItsOwn() {
+        PlayerWarp market = PlayerWarp.create(SAM, "Sam", PlayerWarpName.of("market"), Fixtures.at(0, 64, 0), NOW)
+                .withId(PlayerWarpId.of(7))
+                .withTiming(new WarpTimingOverrides(Optional.empty(), Optional.of(60.0)), NOW);
+        PlayerWarp reused = PlayerWarp.create(
+                        SAM, "Sam", PlayerWarpName.of("bazaar"), Fixtures.at(0, 64, 0), NOW.plusSeconds(10))
+                .withId(PlayerWarpId.of(7))
+                .withTiming(new WarpTimingOverrides(Optional.empty(), Optional.of(60.0)), NOW);
+        land(Destination.at(market.location(), Optional.empty(), market.ownCooldown()));
+
+        assertThat(refused(Destination.at(reused.location(), Optional.empty(), reused.ownCooldown())))
+                .isFalse();
+    }
 }

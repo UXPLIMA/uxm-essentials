@@ -201,6 +201,47 @@ class PlayerWarpPasswordTest {
         assertThat(tryPassword(use, VAULT, SECRET).isOk()).isTrue();
     }
 
+    @Test
+    void triesThatArriveWhileAPasswordIsBeingCheckedStillCountTowardTheLimit() {
+        UsePlayerWarp use = shipped();
+        List<Result<Unit, PlayerWarpError>> racing = new ArrayList<>();
+        passwords.duringCheck = () -> {
+            for (int i = 0; i < 5; i++) {
+                racing.add(tryPassword(use, VAULT, "guess" + i));
+            }
+        };
+
+        tryPassword(use, VAULT, "first");
+
+        assertThat(racing)
+                .extracting(result -> result.asError().orElseThrow())
+                .containsExactly(
+                        PlayerWarpError.WRONG_PASSWORD,
+                        PlayerWarpError.WRONG_PASSWORD,
+                        PlayerWarpError.RATE_LIMITED,
+                        PlayerWarpError.RATE_LIMITED,
+                        PlayerWarpError.RATE_LIMITED);
+        assertThat(passwords.checks)
+                .as("only the tries within the limit reach the hash check")
+                .isEqualTo(3);
+    }
+
+    @Test
+    void aNewWarpThatReusesADeletedWarpsIdDoesNotInheritItsLockout() {
+        UsePlayerWarp use = shipped();
+        tryPassword(use, VAULT, "a");
+        tryPassword(use, VAULT, "b");
+        tryPassword(use, VAULT, "c");
+        warps.deleteById(VAULT_ID);
+        PlayerWarp reused = PlayerWarp.create(
+                        SAM, "Sam", PlayerWarpName.of("bunker"), at(0, 64, 0), NOW.plusSeconds(30))
+                .withId(VAULT_ID)
+                .withAccess(WarpAccess.PASSWORD, NOW);
+        warps.put(reused);
+
+        assertThat(tryPassword(use, PlayerWarpName.of("bunker"), SECRET).isOk()).isTrue();
+    }
+
     /** Lands every local teleport at once, keeping who it moved where. */
     private static final class Visits implements PlayerWarpTeleporter {
 

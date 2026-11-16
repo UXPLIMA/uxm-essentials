@@ -21,7 +21,6 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
 
 /**
  * {@code /setpwarp <name>}: create a player-owned warp at the player's current position, or re-anchor an
@@ -35,7 +34,8 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
  *
  * <p>Two limits gate a new warp, both resolved through {@link PlayerWarpQuota}: the owner's limit across every world,
  * against all their warps, and, when they hold a {@code uxmessentials.pwarp.limit.<world>.<n>} node for the new warp's
- * world, that world's limit against their warps in that world only. {@code ownerName} is the player's display name,
+ * world, that world's limit against their warps in that world only. Re-anchoring a warp into another world asks the
+ * world's limit too, so moving warps in cannot walk past it. {@code ownerName} is the player's display name,
  * captured onto the new warp so a browse can render its author without a lookup; the edit timestamp comes from
  * the injected {@link Clock}, never from the domain.
  *
@@ -48,6 +48,7 @@ public final class SetPlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final PlayerWarpQuota quota;
+    private final PlayerWarpWorldLimit worldLimit;
     private final Notifier notifier;
     private final DomainEventPublisher events;
     private final DomainGate gate;
@@ -78,6 +79,7 @@ public final class SetPlayerWarp {
             Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.quota = Objects.requireNonNull(quota, "quota");
+        this.worldLimit = new PlayerWarpWorldLimit(quota, repository, notifier);
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
         this.gate = Objects.requireNonNull(gate, "gate");
@@ -121,6 +123,9 @@ public final class SetPlayerWarp {
                     Map.of("warp", existing.name().value()));
             return Result.err(PlayerWarpError.NAME_TAKEN);
         }
+        if (!worldLimit.admitsMove(owner, existing, at.world())) {
+            return Result.err(PlayerWarpError.LIMIT_REACHED);
+        }
         repository.save(existing.movedTo(at, recordedServer, clock.instant()));
         notifier.send(
                 owner,
@@ -136,14 +141,7 @@ public final class SetPlayerWarp {
                     owner, PlayerWarpError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
             return Result.err(PlayerWarpError.LIMIT_REACHED);
         }
-        Optional<PlayerWarpLimit> worldLimit = quota.inWorld(owner, at.world());
-        if (worldLimit.isPresent() && worldLimit.get().isReachedAt(ownedIn(owner, at.world()))) {
-            notifier.send(
-                    owner,
-                    PlayerwarpsMessageKey.PWARP_WORLD_LIMIT_REACHED,
-                    Map.of(
-                            "limit", Integer.toString(worldLimit.get().cap()),
-                            "world", at.world().name()));
+        if (!worldLimit.admitsNew(owner, owner, at.world())) {
             return Result.err(PlayerWarpError.LIMIT_REACHED);
         }
         // Past the owner's quota and with nothing written yet. Only the create is asked about: re-anchoring keeps
@@ -157,12 +155,5 @@ public final class SetPlayerWarp {
         events.publish(new PlayerWarpCreated(owner, name, at));
         notifier.send(owner, PlayerwarpsMessageKey.PWARP_SET, Map.of("warp", name.value()));
         return Result.ok();
-    }
-
-    /** How many of {@code owner}'s warps are in {@code world}, matched by the world's uid as every position is. */
-    private int ownedIn(PlayerRef owner, WorldRef world) {
-        return Math.toIntExact(repository.ownedBy(owner).stream()
-                .filter(warp -> warp.location().world().equals(world))
-                .count());
     }
 }
