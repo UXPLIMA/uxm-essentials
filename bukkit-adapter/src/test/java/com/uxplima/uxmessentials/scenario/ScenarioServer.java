@@ -57,6 +57,7 @@ final class ScenarioServer extends ServerMock {
     private final List<Throwable> asyncFailures = new CopyOnWriteArrayList<>();
     private final Object idle = new Object();
     private int asyncInFlight;
+    private long asyncStartedCount;
 
     @Override
     public File getWorldContainer() {
@@ -108,17 +109,23 @@ final class ScenarioServer extends ServerMock {
     }
 
     /**
-     * Runs at least one game second of ticks and keeps ticking until no async work is running, the way a server keeps
-     * ticking while its async lane works: async work often waits for a hop onto a player's thread, which only a tick
-     * runs. Between ticks it waits for the async lane, briefly, so work that does not wait on a tick is not raced.
+     * Runs at least one game second of ticks and keeps ticking until the async lane has been quiet for two ticks, the
+     * way a server keeps ticking while its async lane works: async work often waits for a hop onto a player's thread,
+     * and what it hands back to the tick runs on a later tick, so a scenario must not stop the moment the lane goes
+     * idle. Between ticks it waits for the async lane, briefly, so work that does not wait on a tick is not raced.
      */
     void settle() {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         int ticks = 0;
-        while (ticks < 20 || asyncBusy()) {
+        int quietTicks = 0;
+        long seen = asyncStarted();
+        while (ticks < 20 || quietTicks < 2) {
             getScheduler().performOneTick();
             ticks++;
             awaitAsyncIdle(TimeUnit.MILLISECONDS.toNanos(5));
+            long started = asyncStarted();
+            quietTicks = started == seen && !asyncBusy() ? quietTicks + 1 : 0;
+            seen = started;
             if (System.nanoTime() > deadline) {
                 throw new IllegalStateException("async work still running after 10 seconds:" + asyncStacks());
             }
@@ -128,6 +135,12 @@ final class ScenarioServer extends ServerMock {
     private boolean asyncBusy() {
         synchronized (idle) {
             return asyncInFlight > 0;
+        }
+    }
+
+    private long asyncStarted() {
+        synchronized (idle) {
+            return asyncStartedCount;
         }
     }
 
@@ -183,6 +196,7 @@ final class ScenarioServer extends ServerMock {
         return () -> {
             synchronized (idle) {
                 asyncInFlight++;
+                asyncStartedCount++;
             }
             try {
                 asyncPool.execute(() -> {
