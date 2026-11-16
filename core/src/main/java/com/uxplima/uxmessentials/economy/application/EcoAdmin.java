@@ -26,6 +26,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * currency clamp and the offline-target upsert; {@code set}/{@code reset} target an exact balance, which only
  * the native ledger expresses, so they go through the {@link WalletRepository} the economy context owns.
  *
+ * <p>A {@code set}/{@code reset} the store could not apply returns {@link TransferError#PLAYER_OFFLINE}, tells the
+ * actor, and records no ledger row or audit entry; {@code resetall} leaves that target out of its count.
+ *
  * <p>An offline target is first materialised via {@link WalletRepository#ensureOwner}, so a give/set to a
  * never-joined player never breaks a foreign key (the {@code ensureUserExists} invariant, §10.2).
  */
@@ -68,7 +71,9 @@ public final class EcoAdmin {
         validate(actor, target, amount);
         repository.ensureOwner(target);
         Money before = economy.balance(target, amount.currency());
-        repository.upsertBalance(target, amount);
+        if (!settle(target, amount)) {
+            return notSet(actor, amount);
+        }
         recordNetChange(target, before, amount, EconomyReason.ADMIN_SET);
         audit.adminMutation(actor, target, amount, EconomyReason.ADMIN_SET);
         notify(actor, target, amount, EconomyMessageKey.ECO_ADMIN_SET);
@@ -81,7 +86,9 @@ public final class EcoAdmin {
         validate(actor, target, starting);
         repository.ensureOwner(target);
         Money before = economy.balance(target, currency);
-        repository.upsertBalance(target, starting);
+        if (!settle(target, starting)) {
+            return notSet(actor, starting);
+        }
         recordNetChange(target, before, starting, EconomyReason.ADMIN_RESET);
         audit.adminMutation(actor, target, starting, EconomyReason.ADMIN_RESET);
         notify(actor, target, starting, EconomyMessageKey.ECO_ADMIN_RESET);
@@ -152,7 +159,9 @@ public final class EcoAdmin {
         for (PlayerRef target : List.copyOf(targets)) {
             repository.ensureOwner(target);
             Money before = economy.balance(target, currency);
-            repository.upsertBalance(target, starting);
+            if (!settle(target, starting)) {
+                continue;
+            }
             recordNetChange(target, before, starting, EconomyReason.ADMIN_RESETALL);
             affected++;
         }
@@ -198,6 +207,25 @@ public final class EcoAdmin {
         audit.adminMutation(actor, target, amount, reason);
         notify(actor, target, amount, feedback);
         return Result.ok();
+    }
+
+    /**
+     * Write an exact balance. False when the store could not apply it (a physical balance whose holder's thread
+     * did not take the change); nothing changed then, so the caller must not record or announce it.
+     */
+    private boolean settle(PlayerRef target, Money balance) {
+        try {
+            repository.upsertBalance(target, balance);
+            return true;
+        } catch (IllegalStateException notApplied) {
+            return false;
+        }
+    }
+
+    private Result<Unit, TransferError> notSet(PlayerRef actor, Money amount) {
+        TransferError error = TransferError.PLAYER_OFFLINE;
+        notifier.send(actor, error.messageKey(), Map.of("amount", notifier.amount(amount)));
+        return Result.err(error);
     }
 
     private static String ownerId(PlayerRef owner) {

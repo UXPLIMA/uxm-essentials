@@ -34,7 +34,12 @@ public interface WalletRepository {
      */
     Wallet ensureOwner(PlayerRef owner);
 
-    /** Last-write-wins settle of a single {@code (uuid, currency)} balance (the debounced/coalesced path). */
+    /**
+     * Last-write-wins settle of a single {@code (uuid, currency)} balance (the debounced/coalesced path).
+     *
+     * @throws IllegalStateException when the balance could not be set and was left unchanged (a physical balance
+     *     whose holder's thread did not take the change)
+     */
     void upsertBalance(PlayerRef owner, Money balance);
 
     /**
