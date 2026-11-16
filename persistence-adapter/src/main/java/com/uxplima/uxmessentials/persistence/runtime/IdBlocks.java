@@ -5,6 +5,9 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.IdAllocator.ID_A
 import java.util.Objects;
 
 import org.jooq.DSLContext;
+import org.jooq.Field;
+import org.jooq.Table;
+import org.jooq.impl.DSL;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -16,6 +19,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>A reservation opens its own transaction, so it must not be called while the caller holds one: on SQLite the
  * plugin's single connection would be waiting on itself. A caller that writes the ids inside a transaction reserves
  * them first.
+ *
+ * <p>A writer that does not draw from the allocator (a server still on an older release, or one rolled back to it)
+ * can take ids ahead of it. {@link #windPast} moves the sequence beyond every id already written, so a writer that met
+ * such an id clashes once instead of on every block until the allocator passes them by itself.
  */
 @NullMarked
 public final class IdBlocks {
@@ -51,6 +58,25 @@ public final class IdBlocks {
                     .where(ID_ALLOCATOR.SEQUENCE_NAME.eq(sequence))
                     .fetchOne(ID_ALLOCATOR.NEXT_ID);
             return Objects.requireNonNull(next, "next_id") - count;
+        });
+    }
+
+    /**
+     * Move the sequence past the highest {@code id} in {@code table}, never back. The comparison is a {@code CASE}
+     * because SQLite has no {@code GREATEST}.
+     */
+    public void windPast(Table<?> table, Field<Long> id) {
+        Transactions.inTransaction(dsl, tx -> {
+            Long highest = tx.select(DSL.max(id)).from(table).fetchOne(0, Long.class);
+            long floor = (highest == null ? 0L : highest) + 1;
+            tx.update(ID_ALLOCATOR)
+                    .set(
+                            ID_ALLOCATOR.NEXT_ID,
+                            DSL.when(ID_ALLOCATOR.NEXT_ID.gt(floor), ID_ALLOCATOR.NEXT_ID)
+                                    .otherwise(DSL.val(floor)))
+                    .where(ID_ALLOCATOR.SEQUENCE_NAME.eq(sequence))
+                    .execute();
+            return null;
         });
     }
 }

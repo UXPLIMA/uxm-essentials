@@ -18,8 +18,8 @@ import com.uxplima.uxmessentials.economy.application.port.TransactionHistory;
 import com.uxplima.uxmessentials.economy.domain.EconomyReason;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.persistence.runtime.IdBlocks;
-import com.uxplima.uxmessentials.persistence.runtime.IntegrityViolation;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
+import com.uxplima.uxmessentials.persistence.runtime.RowsRefused;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -42,9 +42,11 @@ import org.jspecify.annotations.Nullable;
  * whole telemetry window.
  *
  * <p>A row gets its id when it is flushed, from a block the database hands out ({@link IdBlocks}), so every server
- * sharing the database writes ids no other server writes. A flush refused for a duplicate id is therefore not a
- * transient failure: only a writer that does not draw from the allocator (a server still on an older release) can
- * cause it. It is retried once with a fresh block and then dropped and logged, never retried for ever.
+ * sharing the database writes ids no other server writes. A batch the database refuses for its rows (a duplicate id,
+ * a value a column cannot hold) is not a transient failure and is never requeued: the allocator is wound past every
+ * id already written, which a server on an older release may have taken, and the batch tried again with fresh ids.
+ * Refused again, it is halved and each half stored the same way, so only the rows no database would take are dropped
+ * and logged, never the batch around them.
  */
 @NullMarked
 public final class TransactionTelemetry extends JooqRepository implements TransactionHistory {
@@ -56,8 +58,8 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
      */
     private static final int MAX_RETAINED = 100_000;
 
-    /** Tries of a batch refused for a duplicate id, the second with a fresh block, before it is dropped. */
-    private static final int DUPLICATE_ATTEMPTS = 2;
+    /** How many dropped rows one log line describes; the count covers them all. */
+    private static final int DROPPED_SHOWN = 5;
 
     /** The {@code id_allocator} sequence the ledger's ids are drawn from. */
     static final String ID_SEQUENCE = "transactions";
@@ -170,28 +172,59 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
         if (drained.isEmpty()) {
             return;
         }
-        for (int attempt = 1; ; attempt++) {
-            try {
-                long first = ids.reserve(drained.size());
-                write(dsl -> {
-                    batch(dsl, drained, first).execute();
-                    return null;
-                });
-                return;
-            } catch (RuntimeException cause) {
-                if (!IntegrityViolation.causedBy(cause)) {
-                    requeue(drained);
-                    return;
-                }
-                if (attempt >= DUPLICATE_ATTEMPTS) {
-                    log.error(
-                            "event=ledger_flush_dropped rows=" + drained.size()
-                                    + " reason=duplicate_id (a server on an older release still counts ledger ids"
-                                    + " itself; upgrade every server sharing this database)",
-                            cause);
-                    return;
-                }
-            }
+        Dropped dropped = new Dropped();
+        store(drained, dropped);
+        dropped.report(log);
+    }
+
+    /**
+     * Store {@code rows}, or put them back for the next window when the failure is transient. A refusal of the rows
+     * themselves winds the ids forward and tries again, then splits the rows in two, down to the single rows that
+     * cannot be stored at all.
+     */
+    private void store(List<Row> rows, Dropped dropped) {
+        RuntimeException failure = insert(rows);
+        if (failure == null) {
+            return;
+        }
+        if (!RowsRefused.causedBy(failure)) {
+            requeue(rows);
+            return;
+        }
+        try {
+            windIdsForward();
+        } catch (RuntimeException windFailed) {
+            requeue(rows);
+            return;
+        }
+        failure = insert(rows);
+        if (failure == null) {
+            return;
+        }
+        if (!RowsRefused.causedBy(failure)) {
+            requeue(rows);
+            return;
+        }
+        if (rows.size() == 1) {
+            dropped.add(rows.getFirst(), failure);
+            return;
+        }
+        int half = rows.size() / 2;
+        store(rows.subList(0, half), dropped);
+        store(rows.subList(half, rows.size()), dropped);
+    }
+
+    /** Insert {@code rows} under a fresh block of ids; the failure, or null once they are stored. */
+    private @Nullable RuntimeException insert(List<Row> rows) {
+        try {
+            long first = ids.reserve(rows.size());
+            write(dsl -> {
+                batch(dsl, rows, first).execute();
+                return null;
+            });
+            return null;
+        } catch (RuntimeException failure) {
+            return failure;
         }
     }
 
@@ -202,6 +235,14 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
      */
     public long reserveIds(int count) {
         return ids.reserve(count);
+    }
+
+    /**
+     * Move the ledger's id sequence past every id already written, for a writer outside this buffer whose rows met an
+     * id a server on an older release took. Runs in a transaction of its own.
+     */
+    public void windIdsForward() {
+        ids.windPast(TRANSACTIONS, TRANSACTIONS.ID);
     }
 
     /**
@@ -350,6 +391,32 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
             flush();
             scheduleNext();
         });
+    }
+
+    /** The rows of one flush no database would store, told to the operator in one line. */
+    private static final class Dropped {
+
+        private final List<Row> rows = new ArrayList<>();
+        private @Nullable RuntimeException first;
+
+        void add(Row row, RuntimeException failure) {
+            rows.add(row);
+            if (first == null) {
+                first = failure;
+            }
+        }
+
+        void report(Logger log) {
+            RuntimeException cause = first;
+            if (cause == null) {
+                return;
+            }
+            log.error(
+                    "event=ledger_rows_dropped rows=" + rows.size() + " shown="
+                            + rows.subList(0, Math.min(DROPPED_SHOWN, rows.size()))
+                            + " (the database refused these history rows; balances are not affected)",
+                    cause);
+        }
     }
 
     /**
