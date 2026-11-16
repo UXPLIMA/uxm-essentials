@@ -257,8 +257,10 @@ public final class PlayerwarpsWiring {
             playerWarpHandle.bind(repository);
         }
         if (playerWarpGoTo != null) {
-            playerWarpGoTo.bind((viewer, owner, name) -> usePlayerWarp.useFor(
-                    viewer, owner, com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName.of(name)));
+            playerWarpGoTo.bind(
+                    kernel.scheduler(),
+                    (viewer, owner, name) -> usePlayerWarp.useFor(
+                            viewer, owner, com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName.of(name)));
         }
         // Build the use cases, then the management GUI over them, then the services holder carrying both editors.
         WorldBlacklist worldBlacklist = worldBlacklist(ctx.config());

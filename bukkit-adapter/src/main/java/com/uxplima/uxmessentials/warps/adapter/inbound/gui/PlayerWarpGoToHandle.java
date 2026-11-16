@@ -1,7 +1,9 @@
 package com.uxplima.uxmessentials.warps.adapter.inbound.gui;
 
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -17,7 +19,9 @@ import org.jspecify.annotations.Nullable;
  * <p>Ownership: the action is written exactly once by the player-warps wiring on enable and read on the editor's
  * entity thread; the {@link AtomicReference} makes that publication safe across threads. The bound action sends
  * the viewer to the named warp owned by {@code owner} through the same {@code UsePlayerWarp} path the
- * {@code /pwarp <owner> <name>} command takes.
+ * {@code /pwarp <owner> <name>} command takes, and like that command it runs on the async lane: the use reads the
+ * warp and records the visit in storage, which must not happen on the tick. The use case hops back to the
+ * player's own thread for the teleport itself.
  */
 @NullMarked
 public final class PlayerWarpGoToHandle {
@@ -28,18 +32,23 @@ public final class PlayerWarpGoToHandle {
         void teleport(PlayerRef viewer, PlayerRef owner, String name);
     }
 
-    private final AtomicReference<@Nullable GoTo> ref = new AtomicReference<>();
+    private record Binding(Scheduler scheduler, GoTo goTo) {}
 
-    /** Bind the player-warp go-to teleport; called once by the player-warps wiring on enable. */
-    public void bind(GoTo goTo) {
-        ref.set(goTo);
+    private final AtomicReference<@Nullable Binding> ref = new AtomicReference<>();
+
+    /**
+     * Bind the player-warp go-to teleport, run on {@code scheduler}'s async lane; called once by the player-warps
+     * wiring on enable.
+     */
+    public void bind(Scheduler scheduler, GoTo goTo) {
+        ref.set(new Binding(Objects.requireNonNull(scheduler, "scheduler"), Objects.requireNonNull(goTo, "goTo")));
     }
 
-    /** Send {@code viewer} to {@code owner}'s warp {@code name}, or no-op when player-warps is disabled. */
+    /** Send {@code viewer} to {@code owner}'s warp {@code name} off the tick, or no-op when player-warps is disabled. */
     public void teleport(PlayerRef viewer, PlayerRef owner, String name) {
-        GoTo goTo = ref.get();
-        if (goTo != null) {
-            goTo.teleport(viewer, owner, name);
+        Binding binding = ref.get();
+        if (binding != null) {
+            binding.scheduler().async(() -> binding.goTo().teleport(viewer, owner, name));
         }
     }
 }
