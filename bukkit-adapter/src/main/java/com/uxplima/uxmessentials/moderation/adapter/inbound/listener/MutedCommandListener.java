@@ -36,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
  * connected player, so the server thread never waits on the database here, and an expired timed mute no longer
  * blocks. A player holding the moderation exempt node is never blocked. When the configured list is empty the
  * listener short-circuits before any mute lookup, so an operator who leaves the list blank pays nothing. A mute that
- * could not be read blocks the listed command too, and the player is told to try again.
+ * is not known yet (or could not be read) blocks the listed command too, and the player is told to try again.
  */
 @NullMarked
 public final class MutedCommandListener implements Listener {

@@ -225,7 +225,7 @@ final class SocialPlaceholderKeys {
         return List.of(
                 PlaceholderSpec.of(
                         "muted",
-                        "Whether the player is muted (yes/no, or a dash when the mute cannot be read).",
+                        "Whether the player is muted (yes/no, or a dash while it is not known).",
                         "no",
                         PlaceholderScope.PLAYER,
                         MODERATION),
@@ -239,7 +239,7 @@ final class SocialPlaceholderKeys {
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_muted",
-                        "Whether the player is muted (yes/no, or a dash when the mute cannot be read).",
+                        "Whether the player is muted (yes/no, or a dash while it is not known).",
                         "yes",
                         PlaceholderScope.PLAYER,
                         MODERATION),

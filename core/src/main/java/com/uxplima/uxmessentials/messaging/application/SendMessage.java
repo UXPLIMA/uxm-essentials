@@ -218,7 +218,7 @@ public final class SendMessage {
     }
 
     /**
-     * Refuse {@code sender} when they are muted or their mute could not be read, telling them why; whether they were
+     * Refuse {@code sender} when they are muted or their mute is not known, telling them why; whether they were
      * refused.
      */
     boolean refusedMuted(PlayerRef sender) {

@@ -39,6 +39,7 @@ final class SanctionRecords implements ModerationRepository {
     private @Nullable Runnable racingWrite;
     private boolean losingEveryRace;
     private int failingMuteReads;
+    private int muteReads;
     private @Nullable Runnable duringMuteRead;
 
     /** Every warning row of {@code target}, lapsed ones included. */
@@ -49,6 +50,11 @@ final class SanctionRecords implements ModerationRepository {
     /** Let the next {@code times} reads of a single mute fail, as a database that is briefly unreachable does. */
     void failMuteReads(int times) {
         failingMuteReads = times;
+    }
+
+    /** How many reads of a single mute were asked for, failed ones included. */
+    int muteReads() {
+        return muteReads;
     }
 
     /** Run {@code meanwhile} once, inside the next read of a single mute, after the row was read. */
@@ -101,6 +107,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public MuteState loadMute(PlayerRef target) {
+        muteReads++;
         if (failingMuteReads > 0) {
             failingMuteReads--;
             throw new IllegalStateException("the database is unreachable");

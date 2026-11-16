@@ -10,7 +10,7 @@ final class MuteRefusal {
 
     private MuteRefusal() {}
 
-    /** A mute that could not be read refuses too, so a muted sender is never let through by a failed read. */
+    /** A mute that is not known refuses too, so a muted sender is never let through on a guess. */
     static Optional<MessagingError> of(MuteAnswer answer) {
         return switch (answer) {
             case NOT_MUTED -> Optional.empty();
