@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -154,6 +156,47 @@ class HologramSyncTest {
         assertThat(drawn.rendered).containsExactly("board");
     }
 
+    @Test
+    void aShowWhoseFrameWasLostReachesThePeerOnTheNextResyncAndRedrawsTheHologram() {
+        rows.save(board());
+        Backend survival = new Backend(new LocalServer("survival", List.of()));
+        assertThat(survival.cache.manualViewers(BOARD)).isEmpty();
+        UUID viewer = UUID.randomUUID();
+        rows.showTo(BOARD, viewer);
+
+        HologramSync.resync(survival.cache, survival.view).run();
+
+        assertThat(survival.cache.manualViewers(BOARD)).containsExactly(viewer);
+        assertThat(survival.drawn.rendered).containsExactly("board");
+    }
+
+    @Test
+    void aBlacklistEntryWhoseFrameWasLostReachesThePeerOnTheNextResync() {
+        rows.save(board());
+        Backend survival = new Backend(new LocalServer("survival", List.of()));
+        assertThat(survival.cache.blacklisted(BOARD)).isEmpty();
+        UUID viewer = UUID.randomUUID();
+        rows.addToBlacklist(BOARD, viewer);
+
+        HologramSync.resync(survival.cache, survival.view).run();
+
+        assertThat(survival.cache.blacklisted(BOARD)).containsExactly(viewer);
+        assertThat(survival.drawn.rendered).containsExactly("board");
+    }
+
+    @Test
+    void aResyncThatFindsNothingChangedRedrawsNothing() {
+        rows.save(board());
+        rows.showTo(BOARD, UUID.randomUUID());
+        Backend survival = new Backend(new LocalServer("survival", List.of()));
+        survival.cache.manualViewers(BOARD);
+        survival.cache.blacklisted(BOARD);
+
+        HologramSync.resync(survival.cache, survival.view).run();
+
+        assertThat(survival.drawn.rendered).isEmpty();
+    }
+
     private static Hologram board() {
         return Hologram.create(
                 BOARD, new Position(WORLD, 0, 70, 0, 0, 0), List.of(new HologramLine("Welcome")), Instant.EPOCH);
@@ -235,6 +278,8 @@ class HologramSyncTest {
     /** The shared database every backend reads. */
     private static final class SharedRows implements HologramRepository {
         private final Map<String, Hologram> rows = new LinkedHashMap<>();
+        private final Map<String, Set<UUID>> viewers = new HashMap<>();
+        private final Map<String, Set<UUID>> blacklists = new HashMap<>();
 
         @Override
         public Optional<Hologram> find(HologramName name) {
@@ -263,25 +308,33 @@ class HologramSyncTest {
 
         @Override
         public Set<UUID> manualViewers(HologramName name) {
-            return Set.of();
+            return Set.copyOf(viewers.getOrDefault(name.value(), Set.of()));
         }
 
         @Override
-        public void showTo(HologramName name, UUID viewer) {}
+        public void showTo(HologramName name, UUID viewer) {
+            viewers.computeIfAbsent(name.value(), key -> new HashSet<>()).add(viewer);
+        }
 
         @Override
-        public void hideFrom(HologramName name, UUID viewer) {}
+        public void hideFrom(HologramName name, UUID viewer) {
+            viewers.getOrDefault(name.value(), new HashSet<>()).remove(viewer);
+        }
 
         @Override
         public Set<UUID> blacklisted(HologramName name) {
-            return Set.of();
+            return Set.copyOf(blacklists.getOrDefault(name.value(), Set.of()));
         }
 
         @Override
-        public void addToBlacklist(HologramName name, UUID viewer) {}
+        public void addToBlacklist(HologramName name, UUID viewer) {
+            blacklists.computeIfAbsent(name.value(), key -> new HashSet<>()).add(viewer);
+        }
 
         @Override
-        public void removeFromBlacklist(HologramName name, UUID viewer) {}
+        public void removeFromBlacklist(HologramName name, UUID viewer) {
+            blacklists.getOrDefault(name.value(), new HashSet<>()).remove(viewer);
+        }
     }
 
     private static final class RecordingView implements HologramView {

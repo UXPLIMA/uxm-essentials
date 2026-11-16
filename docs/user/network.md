@@ -85,9 +85,9 @@ Plugin messages ride a player's connection, which sets the limits:
 
 - A frame leaves a backend only while a player is online on it, and reaches only backends with a player online.
   The proxy keeps no queue, so a backend that sat empty misses what changed meanwhile. It reloads every shared cache
-  when its first player joins, and warps, spawns, worlds, NPCs, holograms and the vote counter also reload every
-  `network.cache-refresh-seconds` (default 300; `0` turns the timer off). Balances, homes and other per-player data
-  expire on their own after a few minutes.
+  when its first player joins, and warps, spawns, worlds, NPCs, holograms (with who may see them) and the vote
+  counter also reload every `network.cache-refresh-seconds` (default 300; `0` turns the timer off). Balances, homes
+  and other per-player data expire on their own after a few minutes.
 - Frames waiting for a player are kept in a queue of `network.bus.outbound-queue-size` (default 256). When it is
   full the oldest frame is dropped.
 - A frame larger than 32767 bytes is never sent; the log reports the drop, at most once a minute.
