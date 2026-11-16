@@ -20,8 +20,8 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.cooldown.PdcCooldowns;
 import com.uxplima.uxmessentials.shared.adapter.outbound.event.InProcessDomainEventPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hud.HudText;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.Slf4jLogger;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitOfflineProfiles;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLocator;
-import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
@@ -250,7 +250,7 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex, online),
+                new IndexedPlayerLookup(new BukkitOfflineProfiles(), nameIndex, online),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),

@@ -552,7 +552,9 @@ public final class PluginModule {
         // the enable thread, so a plugin reload does not forget them.
         resources.addListener(new OnlinePlayerIndexListener(wiredKernel.online()));
         for (Player online : plugin.getServer().getOnlinePlayers()) {
-            wiredKernel.online().joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online));
+            wiredKernel
+                    .online()
+                    .joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online), online);
         }
 
         // The cross-server bus is a kernel concern (one per backend), built before the modules so each context

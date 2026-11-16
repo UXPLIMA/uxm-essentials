@@ -16,31 +16,43 @@ import org.jspecify.annotations.NullMarked;
  * <p>Asking the server instead ({@code Bukkit.getPlayer}) is legal only on a tick thread, and most of the questions
  * come from the async lane, after a database read, where the answer decides whether a player is still worth
  * charging, messaging or hopping. A name is matched in any case, as the server matches an online name.
+ *
+ * <p>Each entry belongs to one session, named by the caller (the live {@code Player} object of that connection). On
+ * Folia the quit of an old connection can run after the join of the player's new one, on another thread; only the
+ * session that is still current can take the player out.
  */
 @NullMarked
 public final class OnlinePlayerIndex {
 
-    private final Map<UUID, PlayerRef> byId = new ConcurrentHashMap<>();
+    /** One connection: who it is and the caller's key for it, compared by identity. */
+    private record Session(PlayerRef player, Object key) {}
+
+    private final Map<UUID, Session> byId = new ConcurrentHashMap<>();
     private final Map<String, PlayerRef> byName = new ConcurrentHashMap<>();
 
-    /** {@code player} has joined, under the name they joined with. */
-    public void joined(PlayerRef player) {
+    /** {@code player} has joined, under the name they joined with, in the connection {@code session}. */
+    public void joined(PlayerRef player, Object session) {
         Objects.requireNonNull(player, "player");
-        PlayerRef previous = byId.put(player.uuid(), player);
-        if (previous != null && !previous.name().equals(player.name())) {
-            byName.remove(key(previous.name()), previous);
+        Objects.requireNonNull(session, "session");
+        Session previous = byId.put(player.uuid(), new Session(player, session));
+        if (previous != null && !previous.player().name().equals(player.name())) {
+            byName.remove(key(previous.player().name()), previous.player());
         }
         byName.put(key(player.name()), player);
     }
 
-    /** The player with this id has left. */
-    public void left(UUID uuid) {
+    /** The connection {@code session} of the player with this id has ended; a newer connection stays. */
+    public void left(UUID uuid, Object session) {
         Objects.requireNonNull(uuid, "uuid");
-        PlayerRef gone = byId.remove(uuid);
-        if (gone != null) {
+        Objects.requireNonNull(session, "session");
+        byId.computeIfPresent(uuid, (id, current) -> {
+            if (current.key() != session) {
+                return current;
+            }
             // Only this account's entry: another account may already hold the name.
-            byName.remove(key(gone.name()), gone);
-        }
+            byName.remove(key(current.player().name()), current.player());
+            return null;
+        });
     }
 
     /** True while the player with this id is connected. */
@@ -52,7 +64,7 @@ public final class OnlinePlayerIndex {
     /** The connected player with this id. */
     public Optional<PlayerRef> byUuid(UUID uuid) {
         Objects.requireNonNull(uuid, "uuid");
-        return Optional.ofNullable(byId.get(uuid));
+        return Optional.ofNullable(byId.get(uuid)).map(Session::player);
     }
 
     /** The connected player with this name, in any case. */
