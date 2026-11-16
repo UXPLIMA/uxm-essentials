@@ -30,7 +30,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.vaults.adapter.VaultServices;
+import com.uxplima.uxmessentials.vaults.application.OpenedVault;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
+import com.uxplima.uxmessentials.vaults.application.VaultOpenFee;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
@@ -199,12 +201,13 @@ public final class VaultCommand implements CommandRegistration {
      */
     private void openOwn(Player player, PlayerRef viewer, int index) {
         scheduler.async(() -> {
-            Result<Vault, VaultError> resolved = services.openVault().open(viewer, index);
+            Result<OpenedVault, VaultError> resolved = services.openVault().open(viewer, index);
             if (resolved.isErr()) {
                 rejectOwn(viewer, index, resolved.errorOrThrow());
                 return;
             }
-            openWindow(player, viewer, viewer, resolved.orElseThrow());
+            OpenedVault opened = resolved.orElseThrow();
+            openWindow(player, viewer, viewer, opened.vault(), opened.fee());
         });
     }
 
@@ -223,7 +226,7 @@ public final class VaultCommand implements CommandRegistration {
         // bridge the window open back to the staff member's region thread (the staff member is the one viewing).
         scheduler.async(() -> {
             Vault vault = services.openAdminVault().open(actor, owner, index);
-            openWindow(staff, actor, owner, vault);
+            openWindow(staff, actor, owner, vault, VaultOpenFee.free());
         });
         return Command.SINGLE_SUCCESS;
     }
@@ -359,16 +362,26 @@ public final class VaultCommand implements CommandRegistration {
         };
     }
 
-    private void openWindow(Player player, PlayerRef viewer, PlayerRef owner, Vault vault) {
+    /** Show the window on the viewer's thread; a viewer who left before that gets the open fee back. */
+    private void openWindow(Player player, PlayerRef viewer, PlayerRef owner, Vault vault, VaultOpenFee fee) {
         scheduler.onEntity(
                 viewer,
-                () -> services.view().open(player, viewer, owner, vault, () -> {
-                    if (viewer.uuid().equals(owner.uuid())) {
-                        notifier.opened(viewer, vault.index());
-                    } else {
-                        notifier.adminOpened(viewer, owner, vault.index());
-                    }
-                }));
+                () -> services.view()
+                        .open(
+                                player,
+                                viewer,
+                                owner,
+                                vault,
+                                fee,
+                                () -> {
+                                    if (viewer.uuid().equals(owner.uuid())) {
+                                        notifier.opened(viewer, vault.index());
+                                    } else {
+                                        notifier.adminOpened(viewer, owner, vault.index());
+                                    }
+                                },
+                                () -> {}),
+                () -> services.view().notOpened(fee));
     }
 
     private void rejectOwn(PlayerRef viewer, int index, VaultError error) {

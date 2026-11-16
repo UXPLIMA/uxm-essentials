@@ -16,33 +16,43 @@ import org.jspecify.annotations.Nullable;
 /**
  * Windows asked for that have not opened yet, each with what to run once it does. A window that opens later than it
  * was asked for (a menu built off the tick) can only be confirmed from its open event, and only when nothing
- * cancelled it. A window that is not seen within {@link #WAIT} is forgotten, so a later open of the same window
- * confirms nothing.
+ * cancelled it. A window that is not seen within its wait ({@link #WAIT} unless given) is forgotten, so a later open
+ * of the same window confirms nothing.
  *
  * @param <W> the window type
  */
 @NullMarked
 public final class OpenWatch<W> {
 
-    /** How long a window may take to open before nothing is confirmed for it any more. */
+    /** How long a window may take to open, unless the watch is given another wait, before nothing is confirmed. */
     public static final Duration WAIT = Duration.ofSeconds(10);
 
     private record Expected<W>(Predicate<W> window, Runnable shown, long deadline) {}
 
     private final Map<UUID, List<Expected<W>>> expected = new ConcurrentHashMap<>();
     private final LongSupplier nanos;
+    private final Duration wait;
 
     /** @param nanos a monotonic clock in nanoseconds */
     public OpenWatch(LongSupplier nanos) {
-        this.nanos = Objects.requireNonNull(nanos, "nanos");
+        this(nanos, WAIT);
     }
 
-    /** Run {@code shown} once a window matching {@code window} opens for {@code player} within {@link #WAIT}. */
+    /**
+     * @param nanos a monotonic clock in nanoseconds
+     * @param wait how long a window may take to open
+     */
+    public OpenWatch(LongSupplier nanos, Duration wait) {
+        this.nanos = Objects.requireNonNull(nanos, "nanos");
+        this.wait = Objects.requireNonNull(wait, "wait");
+    }
+
+    /** Run {@code shown} once a window matching {@code window} opens for {@code player} within the wait. */
     public void expect(UUID player, Predicate<W> window, Runnable shown) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(window, "window");
         Objects.requireNonNull(shown, "shown");
-        Expected<W> entry = new Expected<>(window, shown, nanos.getAsLong() + WAIT.toNanos());
+        Expected<W> entry = new Expected<>(window, shown, nanos.getAsLong() + wait.toNanos());
         expected.compute(player, (uuid, list) -> {
             List<Expected<W>> next = live(list);
             next.add(entry);

@@ -49,7 +49,8 @@ public final class VaultCharge {
      * left the balance: the whole withdrawal, which {@link #giveBack} returns if the vault cannot be stored, and
      * the create fee within it, which is what the vault cost. Only the create fee counts as the vault's cost: the
      * open fee buys this one open, like every later open, so it is spent rather than held by the vault, and leaving
-     * it out keeps the refund ceiling at the price of the vault itself.
+     * it out keeps the refund ceiling at the price of the vault itself. The open fee within it is reported too, since it
+     * goes back on its own when the window never shows while the vault, and so its create fee, stays.
      */
     public Result<Allocation, VaultError> chargeAllocate(PlayerRef who) {
         Objects.requireNonNull(who, "who");
@@ -58,13 +59,12 @@ public final class VaultCharge {
         }
         VaultEconomy wallet = economy.orElseThrow();
         BigDecimal create = wallet.denominate(settings.costToCreate());
-        BigDecimal total = create.add(wallet.denominate(settings.costToOpen()));
-        Result<Optional<VaultPayment>, VaultError> taken = take(who, total);
+        BigDecimal open = wallet.denominate(settings.costToOpen());
+        Result<Optional<VaultPayment>, VaultError> taken = take(who, create.add(open));
         if (taken.isErr()) {
             return Result.err(taken.errorOrThrow());
         }
-        Optional<VaultPayment> cost = paymentOf(create, wallet);
-        return Result.ok(new Allocation(taken.orElseThrow(), cost));
+        return Result.ok(new Allocation(taken.orElseThrow(), paymentOf(create, wallet), paymentOf(open, wallet)));
     }
 
     /**
@@ -79,6 +79,14 @@ public final class VaultCharge {
             return Result.ok(Optional.empty());
         }
         return take(who, economy.orElseThrow().denominate(settings.costToOpen()));
+    }
+
+    /**
+     * The open fee {@code taken} from {@code payer}, to be spent once the window is in front of them or given back,
+     * through {@link #giveBack}, when it never gets there.
+     */
+    public VaultOpenFee openFee(PlayerRef payer, Optional<VaultPayment> taken) {
+        return new VaultOpenFee(this, payer, taken);
     }
 
     /**
@@ -150,15 +158,18 @@ public final class VaultCharge {
      * @param taken the whole withdrawal (create and open fee together), or empty when nothing was withdrawn
      * @param vaultCost the create fee within it, what the vault cost and the ceiling on its refund, or empty when
      *     the vault was free
+     * @param openFee the open fee within it, what this first open cost, or empty when it was free
      */
-    public record Allocation(Optional<VaultPayment> taken, Optional<VaultPayment> vaultCost) {
+    public record Allocation(
+            Optional<VaultPayment> taken, Optional<VaultPayment> vaultCost, Optional<VaultPayment> openFee) {
 
         /** Nothing was withdrawn and the vault cost nothing. */
-        public static final Allocation FREE = new Allocation(Optional.empty(), Optional.empty());
+        public static final Allocation FREE = new Allocation(Optional.empty(), Optional.empty(), Optional.empty());
 
         public Allocation {
             Objects.requireNonNull(taken, "taken");
             Objects.requireNonNull(vaultCost, "vaultCost");
+            Objects.requireNonNull(openFee, "openFee");
         }
     }
 }

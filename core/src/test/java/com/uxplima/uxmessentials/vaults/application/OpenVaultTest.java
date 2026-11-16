@@ -51,7 +51,7 @@ class OpenVaultTest {
 
     @Test
     void aFirstOpenPaysTheCreateAndOpenFeesInOneWithdrawal() {
-        Result<Vault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1);
+        Result<OpenedVault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1);
 
         assertThat(opened.isOk()).isTrue();
         assertThat(purse.moves()).containsExactly("-12");
@@ -90,7 +90,7 @@ class OpenVaultTest {
                 .result();
         store.beforeNextCreate(() -> vaults.put(winner));
 
-        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow();
+        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow().vault();
 
         assertThat(purse.moves()).containsExactly("-12", "+12 coins");
         assertThat(purse.balance()).isEqualByComparingTo("100");
@@ -113,7 +113,7 @@ class OpenVaultTest {
     void aCreateThatThrowsAfterStoringTheVaultKeepsTheMoneyAndOpensIt() {
         store.failNextCreateAfterWriting();
 
-        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow();
+        Vault opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow().vault();
 
         assertThat(purse.moves()).containsExactly("-12");
         assertThat(opened.id()).isEqualTo(VaultId.of(ALEX, 1));
@@ -125,7 +125,7 @@ class OpenVaultTest {
         vaults.put(Vault.allocate(VaultId.of(ALEX, 1), new VaultSize(1), NOW));
         store.beforeNextUpdate(() -> store.delete(VaultId.of(ALEX, 1), Optional.empty()));
 
-        Result<Vault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1);
+        Result<OpenedVault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 1);
 
         assertThat(opened.errorOrThrow()).isEqualTo(VaultError.VAULT_UNKNOWN);
         assertThat(purse.moves()).containsExactly("-2", "+2 coins");
@@ -157,10 +157,75 @@ class OpenVaultTest {
     }
 
     @Test
+    void anOpenWhoseWindowShowedKeepsItsFee() {
+        OpenVault open = openVault(CREATE_10_OPEN_2);
+        open.open(ALEX, 1).orElseThrow().fee().spend();
+
+        VaultOpenFee fee = open.open(ALEX, 1).orElseThrow().fee();
+
+        assertThat(fee.spend()).isTrue();
+        assertThat(fee.giveBack()).isEmpty();
+        assertThat(purse.moves()).containsExactly("-12", "-2");
+    }
+
+    @Test
+    void aRefusedReopenGivesTheOpenFeeBackExactlyOnce() {
+        OpenVault open = openVault(CREATE_10_OPEN_2);
+        open.open(ALEX, 1).orElseThrow().fee().spend();
+        VaultOpenFee fee = open.open(ALEX, 1).orElseThrow().fee();
+
+        assertThat(fee.giveBack().orElseThrow().getAsBoolean()).isTrue();
+
+        assertThat(fee.giveBack()).isEmpty();
+        assertThat(fee.spend()).isFalse();
+        assertThat(fee.givenBack()).isTrue();
+        assertThat(purse.moves()).containsExactly("-12", "-2", "+2 coins");
+        assertThat(purse.balance()).isEqualByComparingTo("88");
+    }
+
+    @Test
+    void aRefusedFirstOpenGivesBackOnlyTheOpenFeeAndKeepsTheVaultItBought() {
+        VaultOpenFee fee =
+                openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow().fee();
+
+        assertThat(fee.giveBack().orElseThrow().getAsBoolean()).isTrue();
+
+        assertThat(purse.moves()).containsExactly("-12", "+2 coins");
+        Vault stored = vaults.find(VaultId.of(ALEX, 1)).orElseThrow();
+        assertThat(stored.paid().orElseThrow().amount()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void anOpenFeeGoesBackInTheCurrencyItWasTakenIn() {
+        OpenVault open = openVault(CREATE_10_OPEN_2);
+        open.open(ALEX, 1).orElseThrow().fee().spend();
+        VaultOpenFee fee = open.open(ALEX, 1).orElseThrow().fee();
+        purse.chargeIn("gems");
+
+        assertThat(fee.giveBack().orElseThrow().getAsBoolean()).isTrue();
+
+        assertThat(fee.taken().orElseThrow().currencyId()).isEqualTo("coins");
+        assertThat(purse.moves()).containsExactly("-12", "-2", "+2 coins");
+        assertThat(purse.balance("gems")).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void anOpenThatLostTheRaceToCreateTheVaultHasNoOpenFeeLeftToGiveBack() {
+        store.beforeNextCreate(() -> vaults.put(Vault.allocate(VaultId.of(ALEX, 1), new VaultSize(3), NOW)));
+
+        VaultOpenFee fee =
+                openVault(CREATE_10_OPEN_2).open(ALEX, 1).orElseThrow().fee();
+        assertThat(fee.giveBack().orElseThrow().getAsBoolean()).isTrue();
+
+        assertThat(fee.taken()).isEmpty();
+        assertThat(purse.moves()).containsExactly("-12", "+12 coins");
+    }
+
+    @Test
     void aPlayerWhoCannotAffordANewVaultIsRefusedAndNoRowIsWritten() {
         VaultPurse poor = new VaultPurse("11");
 
-        Result<Vault, VaultError> opened =
+        Result<OpenedVault, VaultError> opened =
                 openVault(CREATE_10_OPEN_2, Optional.of(poor)).open(ALEX, 1);
 
         assertThat(opened.errorOrThrow()).isEqualTo(VaultError.CANNOT_AFFORD);
@@ -176,7 +241,7 @@ class OpenVaultTest {
         vaults.put(stored);
         VaultPurse poor = new VaultPurse("1");
 
-        Result<Vault, VaultError> opened =
+        Result<OpenedVault, VaultError> opened =
                 openVault(CREATE_10_OPEN_2, Optional.of(poor)).open(ALEX, 1);
 
         assertThat(opened.errorOrThrow()).isEqualTo(VaultError.CANNOT_AFFORD);
@@ -186,7 +251,7 @@ class OpenVaultTest {
 
     @Test
     void anIndexBeyondTheCountQuotaIsRefusedBeforeAnyCharge() {
-        Result<Vault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 2);
+        Result<OpenedVault, VaultError> opened = openVault(CREATE_10_OPEN_2).open(ALEX, 2);
 
         assertThat(opened.errorOrThrow()).isEqualTo(VaultError.AMOUNT_EXCEEDED);
         assertThat(purse.moves()).isEmpty();
@@ -243,7 +308,10 @@ class OpenVaultTest {
                 .result());
         permissions.quota(VaultSizeQuota.FAMILY.node(), QuotaResult.limited(6));
 
-        Vault opened = openVault(VaultChargeSettings.allFree()).open(ALEX, 1).orElseThrow();
+        Vault opened = openVault(VaultChargeSettings.allFree())
+                .open(ALEX, 1)
+                .orElseThrow()
+                .vault();
 
         assertThat(opened.size()).isEqualTo(new VaultSize(6));
         assertThat(vaults.find(VaultId.of(ALEX, 1)).orElseThrow().size()).isEqualTo(new VaultSize(6));
@@ -274,7 +342,10 @@ class OpenVaultTest {
     @Test
     void savingAClosedVaultStoresExactlyTheNewItemsOnce() {
         RecordingEvents events = new RecordingEvents();
-        Vault opened = openVault(VaultChargeSettings.allFree()).open(ALEX, 1).orElseThrow();
+        Vault opened = openVault(VaultChargeSettings.allFree())
+                .open(ALEX, 1)
+                .orElseThrow()
+                .vault();
         int savesAfterOpen = vaults.saves();
         Clock later = Clock.offset(CLOCK, Duration.ofMinutes(5));
         VaultContents items = VaultContents.of(new byte[] {4, 5});

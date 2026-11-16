@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.ServerConnector;
 import com.uxplima.uxmessentials.shared.adapter.outbound.currency.Currencies;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.EngineTheme;
@@ -69,6 +70,7 @@ public final class CloseableResources implements AutoCloseable {
     private @Nullable ServerConnector serverConnector;
     private @Nullable BedrockDetector bedrock;
     private @Nullable BedrockScreen bedrockScreen;
+    private @Nullable FormReportingScreen menuForms;
 
     /** The theme the menu engine draws in; set once during wiring and re-read on a theme reload. */
     private @Nullable EngineTheme engineTheme;
@@ -288,6 +290,16 @@ public final class CloseableResources implements AutoCloseable {
         return bedrockScreen;
     }
 
+    /** Captures the menu engine's Bedrock screen, which reports each menu form it sends. */
+    public void menuForms(FormReportingScreen resolved) {
+        this.menuForms = Objects.requireNonNull(resolved, "resolved");
+    }
+
+    /** The menu engine's reporting Bedrock screen, or null before wiring has constructed it. */
+    public @Nullable FormReportingScreen menuForms() {
+        return menuForms;
+    }
+
     /**
      * Record the theme the menu engine draws in, so every module wiring hands the engine the same one and a reload
      * reaches all of them. Held here rather than threaded because the module wirings run long after it is read.
@@ -366,6 +378,7 @@ public final class CloseableResources implements AutoCloseable {
         serverConnector = null;
         bedrock = null;
         bedrockScreen = null;
+        menuForms = null;
     }
 
     /**

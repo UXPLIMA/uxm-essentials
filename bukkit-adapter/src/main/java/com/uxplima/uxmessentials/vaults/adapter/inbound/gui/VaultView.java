@@ -6,6 +6,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BooleanSupplier;
 
 import org.bukkit.Sound;
@@ -15,6 +17,7 @@ import org.bukkit.inventory.ItemStack;
 
 import net.kyori.adventure.text.Component;
 
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowOutcome;
 import com.uxplima.uxmessentials.shared.adapter.inbound.window.WindowShown;
 import com.uxplima.uxmessentials.shared.adapter.outbound.PlayerThread;
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
@@ -27,6 +30,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.VaultItemCodec;
+import com.uxplima.uxmessentials.vaults.application.VaultOpenFee;
 import com.uxplima.uxmessentials.vaults.application.VaultWindows;
 import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
@@ -85,6 +89,11 @@ import org.jspecify.annotations.Nullable;
  * after its items were written. When the plugin is no longer running (the server is stopping), the scheduler runs
  * nothing more, so the writes run on the calling thread instead.
  *
+ * <p>An open is decided once, as shown or refused ({@link WindowOutcome}). Its open fee is spent when the window is
+ * showing and given back, off the tick, when it is not: another plugin or the invsee edit guard cancelled it, the vault
+ * was open elsewhere, the player stayed asleep through uxmLib's deferral, or left first. A window refused that way keeps
+ * its claim until its viewer opens the vault again or leaves; on leaving, a window nobody is looking at is released.
+ *
  * <p>A non-blank {@code open-sound} is played to the opener as the window opens (resolved once at wire time, so
  * the open path never touches the registry). An unknown sound resolves to {@code null} and is simply not played.
  *
@@ -105,6 +114,8 @@ public final class VaultView {
     private final @Nullable Sound openSound;
     private final BooleanSupplier running;
     private final Logger log;
+    /** Opens not decided yet, by window, so a viewer leaving or the module stopping decides them. */
+    private final Map<StorageGui, Pending> pending = new ConcurrentHashMap<>();
 
     public VaultView(
             Messages messages,
@@ -130,20 +141,27 @@ public final class VaultView {
     /**
      * Open {@code owner}'s {@code vault} for {@code player} (the live viewer behind {@code viewer}). Use the
      * owner title when the viewer is the owner and the admin title when staff is auditing someone else. A vault
-     * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened. {@code shown}
-     * runs once the window is in front of the player, never for a refused open, so the caller confirms only a vault
-     * that really opened.
+     * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened.
      *
-     * <p>A window another plugin refused keeps its claim until the same viewer opens that vault again, which
-     * takes it over. Releasing it here instead would be wrong for a sleeping player, whose window opens a tick late:
-     * a second viewer could then claim the same row while the first window was still on its way.
+     * <p>The open is decided exactly once. When the window is in front of the player, {@code fee} is spent and
+     * {@code shown} runs; when it is refused or never comes, {@code fee} is given back and {@code refused} runs. A
+     * deferred open may be decided a few ticks later, or when the player leaves.
      */
-    public void open(Player player, PlayerRef viewer, PlayerRef owner, Vault vault, Runnable shown) {
+    public void open(
+            Player player,
+            PlayerRef viewer,
+            PlayerRef owner,
+            Vault vault,
+            VaultOpenFee fee,
+            Runnable shown,
+            Runnable refused) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
+        Objects.requireNonNull(fee, "fee");
         Objects.requireNonNull(shown, "shown");
+        Objects.requireNonNull(refused, "refused");
         int size = vault.size().slots();
         StorageGui gui = Guis.storage()
                 .title(title(viewer, owner, vault.index()))
@@ -156,6 +174,8 @@ public final class VaultView {
         Optional<VaultContents> seed =
                 windows.claim(viewer, owner, vault, gui, retired -> takeOver(player, viewer, retired));
         if (seed.isEmpty()) {
+            giveBack(fee);
+            refused.run();
             notifyAlreadyOpen(viewer, vault.index());
             return;
         }
@@ -168,19 +188,85 @@ public final class VaultView {
             // The overflow is now safely with the player, but the DB row still carries it; persist the truncated
             // (in-range) GUI immediately so a crash before close cannot re-run the rescue and hand it out again.
             windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
-                    .ifPresent(this::write);
+                    .ifPresent(this::offTick);
         }
+        WindowOutcome outcome = FeeOutcome.of(
+                fee,
+                () -> {
+                    pending.remove(gui);
+                    shown.run();
+                },
+                () -> {
+                    pending.remove(gui);
+                    refused.run();
+                },
+                credit -> refund(fee, credit));
+        pending.put(gui, new Pending(viewer, outcome));
         gui.onClose(event -> {
+            // Only a window that was showing raises a close, so this also settles an open whose check had not run.
+            outcome.shown();
             if (!windows.holds(vault.id(), gui)) {
                 return; // taken over by a newer window of the same viewer, which writes these items
             }
             returnBlockedItems(event.getPlayer(), viewer, gui);
             windows.release(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
-                    .ifPresent(this::write);
+                    .ifPresent(this::offTick);
         });
-        WindowShown.confirm(gui, player, scheduler, shown);
-        gui.open(player);
-        playOpenSound(player);
+        WindowShown.open(gui, player, scheduler, outcome);
+        if (outcome.mayOpen()) {
+            playOpenSound(player);
+        }
+    }
+
+    /**
+     * Give back {@code fee} for an open that never got as far as a window: the player left before their thread could
+     * show it.
+     */
+    public void notOpened(VaultOpenFee fee) {
+        giveBack(Objects.requireNonNull(fee, "fee"));
+    }
+
+    /**
+     * {@code viewer} is leaving. Their opens still undecided are decided by whether the window is showing, and the
+     * claims they hold in windows nobody is looking at are released and written, so the vault does not stay
+     * {@code VAULT_ALREADY_OPEN} for everyone else until they come back. The opens are decided first, so a window
+     * released here can no longer be opened late. Runs on the viewer's thread.
+     */
+    public void viewerLeft(UUID viewer) {
+        Objects.requireNonNull(viewer, "viewer");
+        pending.forEach((gui, open) -> {
+            if (open.viewer().uuid().equals(viewer)) {
+                open.outcome().settle(seen(gui));
+            }
+        });
+        windows.releaseLeft(viewer, VaultView::seen, gui -> VaultItemCodec.encode(gui.contents()))
+                .forEach(this::offTick);
+    }
+
+    /** True while somebody has {@code gui} open. */
+    private static boolean seen(StorageGui gui) {
+        return !gui.getInventory().getViewers().isEmpty();
+    }
+
+    /**
+     * Give {@code fee} back when the open was not decided yet, off the tick since the deposit reaches the economy.
+     */
+    private void giveBack(VaultOpenFee fee) {
+        fee.giveBack().ifPresent(credit -> refund(fee, credit));
+    }
+
+    /** Run {@code fee}'s deposit {@code credit} off the tick, logging a credit the economy refused. */
+    private void refund(VaultOpenFee fee, BooleanSupplier credit) {
+        offTick(() -> {
+            if (!credit.getAsBoolean()) {
+                fee.taken()
+                        .ifPresent(paid -> log.warn(
+                                "event=vault_open_fee_not_returned amount={} currency={}"
+                                        + " (the window did not open and the economy refused the refund: pay it by hand)",
+                                paid.amount().toPlainString(),
+                                paid.currencyId()));
+            }
+        });
     }
 
     /**
@@ -253,6 +339,8 @@ public final class VaultView {
      * are written on this thread, since the scheduler runs nothing more.
      */
     public void flushAll() {
+        // First, while every window is still there to look at.
+        decidePending();
         for (VaultWindows.Window<StorageGui> window : windows.held()) {
             if (running.getAsBoolean()) {
                 // Closed right here when this thread owns the viewer (the main thread on Paper), so the stop can wait
@@ -262,6 +350,21 @@ public final class VaultView {
                 writeNow(window);
             }
         }
+    }
+
+    /**
+     * Decide every open still pending by whether its window is showing, since the checks that would have decided it
+     * do not run once the module stops. A viewer already gone saw nothing, so theirs is refused.
+     */
+    private void decidePending() {
+        pending.forEach((gui, open) -> {
+            WindowOutcome outcome = open.outcome();
+            if (running.getAsBoolean()) {
+                PlayerThread.run(scheduler, open.viewer(), () -> outcome.settle(seen(gui)), outcome::refused);
+            } else {
+                outcome.settle(seen(gui));
+            }
+        });
     }
 
     /**
@@ -278,7 +381,7 @@ public final class VaultView {
     private void writeNow(VaultWindows.Window<StorageGui> window) {
         StorageGui gui = window.window();
         windows.release(window.vault().id(), gui, VaultItemCodec.encode(gui.contents()))
-                .ifPresent(this::write);
+                .ifPresent(this::offTick);
     }
 
     /** The number of vault windows currently open (the {@code open-guis=N} the doctor line reports). */
@@ -358,12 +461,15 @@ public final class VaultView {
                         viewer, VaultsMessageKey.VAULT_OVERFLOW_RETURNED, Map.of("count", Integer.toString(count))));
     }
 
-    /** Run a write off the tick, or on this thread once the plugin has stopped and the scheduler runs nothing. */
-    private void write(Runnable write) {
+    /**
+     * Run a write or a refund off the tick, or on this thread once the plugin has stopped and the scheduler runs
+     * nothing.
+     */
+    private void offTick(Runnable work) {
         if (running.getAsBoolean()) {
-            scheduler.async(write);
+            scheduler.async(work);
         } else {
-            write.run();
+            work.run();
         }
     }
 
@@ -377,4 +483,7 @@ public final class VaultView {
         // the menu engine that would otherwise do it.
         return StyledText.title(messages.resolve(viewer, key, placeholders));
     }
+
+    /** An open not decided yet: whose it is and its outcome. */
+    private record Pending(PlayerRef viewer, WindowOutcome outcome) {}
 }
