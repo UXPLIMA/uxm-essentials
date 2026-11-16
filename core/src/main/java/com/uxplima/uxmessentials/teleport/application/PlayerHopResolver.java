@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
@@ -43,17 +44,10 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
  */
 public final class PlayerHopResolver implements HopResolver {
 
-    private static final HopNotices NOTICES = new HopNotices(
-            "player",
-            Map.of(
-                    HopNotice.SENDING, TeleportMessageKey.CROSS_SERVER_SENDING,
-                    HopNotice.ARRIVED, TeleportMessageKey.CROSS_SERVER_ARRIVED,
-                    HopNotice.TIMED_OUT, TeleportMessageKey.CROSS_SERVER_TIMED_OUT,
-                    HopNotice.MISROUTED, TeleportMessageKey.CROSS_SERVER_MISROUTED,
-                    HopNotice.FAILED, TeleportMessageKey.CROSS_SERVER_FAILED,
-                    HopNotice.UNAVAILABLE, TeleportMessageKey.CROSS_SERVER_UNAVAILABLE,
-                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
-                    HopNotice.REFUNDED, TeleportMessageKey.CROSS_SERVER_REFUNDED));
+    private static final HopNotices REQUEST_NOTICES = noticesWith(SharedMessageKey.COMMON_HOP_BUSY);
+    // A staff teleport moves a player who did not ask to go, so a hop turned away for another move under way gives
+    // them no advice to try again.
+    private static final HopNotices STAFF_NOTICES = noticesWith(SharedMessageKey.COMMON_HOP_BUSY_ORDERED);
 
     private final HopKind kind;
     private final TeleportEngine engine;
@@ -90,7 +84,21 @@ public final class PlayerHopResolver implements HopResolver {
 
     @Override
     public HopNotices notices() {
-        return NOTICES;
+        return kind == HopKind.PLAYER_STAFF ? STAFF_NOTICES : REQUEST_NOTICES;
+    }
+
+    private static HopNotices noticesWith(MessageKey busy) {
+        return new HopNotices(
+                "player",
+                Map.of(
+                        HopNotice.SENDING, TeleportMessageKey.CROSS_SERVER_SENDING,
+                        HopNotice.ARRIVED, TeleportMessageKey.CROSS_SERVER_ARRIVED,
+                        HopNotice.TIMED_OUT, TeleportMessageKey.CROSS_SERVER_TIMED_OUT,
+                        HopNotice.MISROUTED, TeleportMessageKey.CROSS_SERVER_MISROUTED,
+                        HopNotice.FAILED, TeleportMessageKey.CROSS_SERVER_FAILED,
+                        HopNotice.UNAVAILABLE, TeleportMessageKey.CROSS_SERVER_UNAVAILABLE,
+                        HopNotice.BUSY, busy,
+                        HopNotice.REFUNDED, TeleportMessageKey.CROSS_SERVER_REFUNDED));
     }
 
     @Override

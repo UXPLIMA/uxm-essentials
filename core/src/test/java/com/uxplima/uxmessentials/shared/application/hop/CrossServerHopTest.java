@@ -281,6 +281,9 @@ class CrossServerHopTest {
         assertThat(ledger.wallet).isEqualByComparingTo("90");
         // The first hop is still on its way, so the second is told so rather than that the server is down.
         assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.refunded", "home.hop.sending");
+        // The refund landed before the player read any line, and the kind heard of it after both.
+        assertThat(ledger.linesBeforeRefund).containsExactly(0);
+        assertThat(ledger.failures).containsExactly("busy:refunded");
 
         scheduler.advance(TTL);
         assertThat(ledger.wallet).isEqualByComparingTo(START);
@@ -296,6 +299,7 @@ class CrossServerHopTest {
         assertThat(connects).containsExactly("Alex->survival");
         assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.sending");
         assertThat(ledger.refunds).isZero();
+        assertThat(ledger.failures).containsExactly("busy:unpaid");
     }
 
     @Test
@@ -355,6 +359,7 @@ class CrossServerHopTest {
         assertThat(connects).isEmpty();
         assertThat(ledger.wallet).isEqualByComparingTo(START);
         assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.refunded");
+        assertThat(ledger.failures).containsExactly("busy:refunded");
     }
 
     @Test
@@ -402,6 +407,10 @@ class CrossServerHopTest {
         private BigDecimal keeper = BigDecimal.ZERO;
         private int refunds;
         private boolean settles = true;
+        /** Each failure the kind heard of, with whether the refund had already landed when it was told. */
+        private final List<String> failures = new ArrayList<>();
+        /** How many lines the player had read when each refund landed. */
+        private final List<Integer> linesBeforeRefund = new ArrayList<>();
     }
 
     /** A test kind: a home resolved by name, moved to by the fake landing, paid through the ledger. */
@@ -453,7 +462,14 @@ class CrossServerHopTest {
         public boolean refund(PlayerRef who, HopCharge charge) {
             ledger.wallet = ledger.wallet.add(charge.amount());
             ledger.refunds++;
+            ledger.linesBeforeRefund.add(notifier.keys().size());
             return true;
+        }
+
+        @Override
+        public void failed(PlayerRef who, String label, HopNotice reason) {
+            String paid = ledger.refunds > 0 ? "refunded" : "unpaid";
+            ledger.failures.add(reason.name().toLowerCase(java.util.Locale.ROOT) + ":" + paid);
         }
 
         @Override

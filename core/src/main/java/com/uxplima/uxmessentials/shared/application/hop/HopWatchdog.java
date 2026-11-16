@@ -36,8 +36,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>Two tracks for the same player at once would both read no earlier row, the second write would replace the
  * first unseen, and the first hop's timer would then find nothing to claim and keep its charge. So while one track
  * is between its read and its write, a second one for that player on this backend is refused and refunded there;
- * the first goes ahead. Either refusal tells the player {@link HopNotice#BUSY}: their other move is still under way,
- * and the new destination's server is fine. Once a row is written, a later track reads it and replaces it as above.
+ * the first goes ahead. Either refusal refunds first, then tells the player {@link HopNotice#BUSY} (their other move
+ * is still under way and the new destination's server is fine), then reports it to the kind so a kind that must
+ * retry, such as a jail transfer, does. Once a row is written, a later track reads it and replaces it as above.
  *
  * <p>The claim and the refund are IO, so {@link #track} is called off the tick thread and the TTL check runs on the
  * {@link Scheduler}'s async lane.
@@ -84,18 +85,16 @@ public final class HopWatchdog {
                 .find(pending.kind())
                 .orElseThrow(() -> new IllegalStateException("no hop resolver for " + pending.kind()));
         if (!recording.add(who.uuid())) {
-            // Nothing of this hop was written, so this refund is the only one its charge can get. The kind's failure
-            // hook is not told: the hop never started, and the first one is still on its way.
+            // Nothing of this hop was written, so this refund is the only one its charge can get.
             log.debug("event=cross_server_hop_refused player={} reason=concurrent_hop", who.uuid());
-            charges.tell(resolver, who, HopNotice.BUSY, Map.of(), label);
-            charges.refund(resolver, who, pending.charge(), label);
+            turnAway(resolver, who, pending, label);
             return false;
         }
         try {
             if (!replaceEarlier(who)) {
                 // The earlier row is a hop still under way that this backend cannot settle, not a target that is
                 // down, so the player is told their other move is pending.
-                charges.fail(resolver, who, pending.charge(), HopNotice.BUSY, Map.of(), label);
+                turnAway(resolver, who, pending, label);
                 return false;
             }
             store.record(pending);
@@ -153,6 +152,16 @@ public final class HopWatchdog {
             return;
         }
         charges.fail(resolver, who, pending.charge(), HopNotice.TIMED_OUT, Map.of(), label);
+    }
+
+    /**
+     * Refund and tell {@code who} that {@code pending} was not started because another of their hops is under way,
+     * then let the kind hear of it: a hop nobody chose, such as a jail transfer, must be tried again once the other
+     * move ends, since nothing else would send the player again while they stay on this backend.
+     */
+    private void turnAway(HopResolver resolver, PlayerRef who, PendingHop pending, String label) {
+        charges.turnAway(resolver, who, pending.charge(), label);
+        charges.report(resolver, who, HopNotice.BUSY, label);
     }
 
     private void unreachable(HopResolver resolver, PlayerRef who, PendingHop pending, String label) {
