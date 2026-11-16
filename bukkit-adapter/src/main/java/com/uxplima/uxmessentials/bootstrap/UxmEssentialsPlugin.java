@@ -34,8 +34,10 @@ import org.jspecify.annotations.Nullable;
  * lifecycle handler publishes the already-module-filtered command set built during wiring, so a
  * disabled module's command literal never reaches the dispatcher.
  */
+// Not final: MockBukkit starts a plugin as a generated subclass of its main class, which is how the integration
+// scenarios enable this one.
 @NullMarked
-public final class UxmEssentialsPlugin extends JavaPlugin {
+public class UxmEssentialsPlugin extends JavaPlugin {
 
     private @Nullable CloseableResources resources;
     private @Nullable CatalogPermissions permissions;
