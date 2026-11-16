@@ -8,10 +8,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.SQLException;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,6 +20,8 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+
+import javax.sql.DataSource;
 
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
@@ -35,9 +35,9 @@ import com.uxplima.uxmessentials.economy.domain.Precision;
 import com.uxplima.uxmessentials.economy.domain.TransferError;
 import com.uxplima.uxmessentials.economy.domain.TransferResult;
 import com.uxplima.uxmessentials.persistence.playerwarps.JooqPlayerWarpEconomy.PayoutConfig;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
 import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -52,14 +52,13 @@ import org.jooq.DSLContext;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * A player warp use charged on one server and settled on another, where the default currency differs: the visitor is
  * refunded, and the owner paid, in the currency the visitor was charged in, and an id the settling server does not
  * know is neither refunded nor paid in another currency.
  */
+@EveryBackend
 class JooqPlayerWarpEconomyCurrencyTest {
 
     private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000005"), "Sam");
@@ -72,9 +71,6 @@ class JooqPlayerWarpEconomyCurrencyTest {
     private static final Currency GEMS = Currency.builder(CurrencyId.of("gems")).build();
     private static final BigDecimal FEE = new BigDecimal("10");
     private static final PayoutConfig NO_CUT = new PayoutConfig(BigDecimal.ZERO, false);
-
-    @TempDir
-    Path folder;
 
     /** One database of balances and one of warps, shared by both servers as a network shares them. */
     private final Bank bank = new Bank();
@@ -93,14 +89,10 @@ class JooqPlayerWarpEconomyCurrencyTest {
     private @Nullable Runnable afterNextBankRead;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
-        RacingDataSource racingData = new RacingDataSource();
-        racingData.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        racing = DslContextProvider.create(racingData, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
+        racing = DslContextProvider.create(
+                racing(database.dataSource()), database.dsl().dialect(), "");
         market = new JooqPlayerWarpRepository(dsl)
                 .save(PlayerWarp.create(
                         SAM,
@@ -125,11 +117,12 @@ class JooqPlayerWarpEconomyCurrencyTest {
 
     /** Set the bank as another server's write would, behind the economy under test. */
     private void bankHolds(String amount, Currency currency) {
-        dsl.update(PLAYER_WARPS)
+        dsl.transaction(tx -> tx.dsl()
+                .update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, new BigDecimal(amount))
                 .set(PLAYER_WARPS.EARNED_CURRENCY, currency.id().value())
                 .where(PLAYER_WARPS.ID.eq(market.value()))
-                .execute();
+                .execute());
     }
 
     @Test
@@ -280,43 +273,48 @@ class JooqPlayerWarpEconomyCurrencyTest {
         assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("10");
     }
 
+    /** {@code real}, with every connection running {@link #afterNextBankRead} once a select has finished. */
+    private DataSource racing(DataSource real) {
+        return proxy(DataSource.class, (self, method, args) -> {
+            Object result = call(method, real, args);
+            return method.getName().equals("getConnection")
+                    ? racing((Connection) Objects.requireNonNull(result, "connection"))
+                    : result;
+        });
+    }
+
     /** Runs {@link #afterNextBankRead} once a select has finished, before the economy's next statement. */
-    private final class RacingDataSource extends SQLiteDataSource {
-
-        @Override
-        public Connection getConnection() throws SQLException {
-            Connection real = super.getConnection();
-            return proxy(Connection.class, (self, method, args) -> {
-                Object result = call(method, real, args);
-                if (method.getName().equals("prepareStatement")
-                        && args != null
-                        && args[0] instanceof String sql
-                        && sql.trim().toLowerCase(Locale.ROOT).startsWith("select")) {
-                    PreparedStatement statement = (PreparedStatement) Objects.requireNonNull(result, "statement");
-                    return proxy(PreparedStatement.class, (inner, closing, closeArgs) -> {
-                        Object closed = call(closing, statement, closeArgs);
-                        Runnable next = afterNextBankRead;
-                        if (closing.getName().equals("close") && next != null) {
-                            afterNextBankRead = null;
-                            next.run();
-                        }
-                        return closed;
-                    });
-                }
-                return result;
-            });
-        }
-
-        private static <T> T proxy(Class<T> type, InvocationHandler handler) {
-            return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
-        }
-
-        private static @Nullable Object call(Method method, Object target, Object @Nullable [] args) throws Throwable {
-            try {
-                return method.invoke(target, args);
-            } catch (InvocationTargetException thrown) {
-                throw thrown.getCause();
+    private Connection racing(Connection real) {
+        return proxy(Connection.class, (self, method, args) -> {
+            Object result = call(method, real, args);
+            if (method.getName().equals("prepareStatement")
+                    && args != null
+                    && args[0] instanceof String sql
+                    && sql.trim().toLowerCase(Locale.ROOT).startsWith("select")) {
+                PreparedStatement statement = (PreparedStatement) Objects.requireNonNull(result, "statement");
+                return proxy(PreparedStatement.class, (inner, closing, closeArgs) -> {
+                    Object closed = call(closing, statement, closeArgs);
+                    Runnable next = afterNextBankRead;
+                    if (closing.getName().equals("close") && next != null) {
+                        afterNextBankRead = null;
+                        next.run();
+                    }
+                    return closed;
+                });
             }
+            return result;
+        });
+    }
+
+    private static <T> T proxy(Class<T> type, InvocationHandler handler) {
+        return type.cast(Proxy.newProxyInstance(type.getClassLoader(), new Class<?>[] {type}, handler));
+    }
+
+    private static @Nullable Object call(Method method, Object target, Object @Nullable [] args) throws Throwable {
+        try {
+            return method.invoke(target, args);
+        } catch (InvocationTargetException thrown) {
+            throw thrown.getCause();
         }
     }
 

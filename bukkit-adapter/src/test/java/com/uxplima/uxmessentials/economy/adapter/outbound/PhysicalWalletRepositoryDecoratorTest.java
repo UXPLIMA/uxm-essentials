@@ -198,8 +198,8 @@ class PhysicalWalletRepositoryDecoratorTest {
         final List<String> credits = new ArrayList<>();
 
         @Override
-        public void queueCredit(UUID playerUuid, String currencyId, BigDecimal amount) {
-            credits.add(playerUuid + ":" + currencyId + ":"
+        public void queueCredit(PlayerRef player, String currencyId, BigDecimal amount) {
+            credits.add(player.uuid() + ":" + currencyId + ":"
                     + amount.stripTrailingZeros().toPlainString());
         }
 

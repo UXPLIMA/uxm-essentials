@@ -1,6 +1,11 @@
 package com.uxplima.uxmessentials.persistence.runtime;
 
+import java.sql.Connection;
+import java.sql.DatabaseMetaData;
+import java.sql.SQLException;
 import java.util.Locale;
+
+import javax.sql.DataSource;
 
 import org.jooq.SQLDialect;
 import org.jspecify.annotations.NullMarked;
@@ -11,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
  * storage.type} in {@code config.conf}; the same migrations and the same generated jOOQ DSL run against every backend
  * (the backend-parity invariant).
  *
- * <p>Each constant carries its jOOQ {@link SQLDialect} so the {@code DSLContext} is rendered in the
- * dialect of the live connection, and the JDBC sub-protocol the {@code DataSourceFactory} builds the
+ * <p>Each constant carries its jOOQ {@link SQLDialect} ({@link #dialectOn} tells MySQL from MariaDB on the live
+ * connection), and the JDBC sub-protocol the {@code DataSourceFactory} builds the
  * URL from. SQLite additionally marks itself single-writer so the factory sizes the pool to one
  * connection and enables WAL.
  */
@@ -23,10 +28,8 @@ public enum DatabaseBackend {
     SQLITE("sqlite", "org.sqlite.JDBC", SQLDialect.SQLITE, true),
 
     /**
-     * MySQL/MariaDB over the network. The MariaDB driver speaks both wire protocols, and the MYSQL
-     * jOOQ dialect renders SQL valid on both. Crucially it emits {@code LIMIT}, whereas the MARIADB
-     * dialect emits the standard {@code FETCH NEXT … ROWS ONLY} that MariaDB 10.6+ accepts but a real
-     * MySQL 8 rejects. Using MYSQL keeps the one network backend correct against either server.
+     * MySQL/MariaDB over the network. The MariaDB driver speaks both wire protocols, but the two servers do not
+     * accept the same SQL, so the dialect is the server's own, read from the connection by {@link #dialectOn}.
      */
     MARIADB("mariadb", "org.mariadb.jdbc.Driver", SQLDialect.MYSQL, false),
 
@@ -60,9 +63,33 @@ public enum DatabaseBackend {
         return driverClassName;
     }
 
-    /** The jOOQ dialect the {@code DSLContext} renders SQL in for this backend. */
+    /**
+     * The jOOQ dialect this backend renders SQL in when the server behind it is not asked. For MySQL/MariaDB that is
+     * MySQL's; a {@code DSLContext} over a live server takes {@link #dialectOn} instead.
+     */
     public SQLDialect dialect() {
         return dialect;
+    }
+
+    /**
+     * The jOOQ dialect for the server behind {@code dataSource}. MySQL and MariaDB share this backend but not all of
+     * their SQL: an upsert in MySQL's dialect names the inserted row with an alias MariaDB has no syntax for, and a
+     * row limit in MariaDB's is a clause MySQL rejects. The server names itself in its version string, so one
+     * connection settles which it is.
+     *
+     * @throws PersistenceException when no connection can be opened to ask
+     */
+    public SQLDialect dialectOn(DataSource dataSource) {
+        if (this != MARIADB) {
+            return dialect;
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            DatabaseMetaData server = connection.getMetaData();
+            String product = server.getDatabaseProductName() + " " + server.getDatabaseProductVersion();
+            return product.toLowerCase(Locale.ROOT).contains("mariadb") ? SQLDialect.MARIADB : SQLDialect.MYSQL;
+        } catch (SQLException failure) {
+            throw new PersistenceException("could not ask the database whether it is MySQL or MariaDB", failure);
+        }
     }
 
     /** True when the engine permits only one concurrent writer (SQLite). */

@@ -2,43 +2,33 @@ package com.uxplima.uxmessentials.persistence.npc;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.npc.domain.Npc;
 import com.uxplima.uxmessentials.npc.domain.NpcName;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
-/** An NPC's server scope through the real migrations on a SQLite file. */
+/** An NPC's server scope through the real migrations. */
+@EveryBackend
 class JooqNpcRepositoryTest {
 
     private static final WorldRef WORLD =
             new WorldRef(UUID.fromString("00000000-0000-0000-0000-00000000aaaa"), "world");
     private static final NpcName GUIDE = NpcName.of("guide");
 
-    @TempDir
-    Path folder;
-
     private JooqNpcRepository store;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         store = new JooqNpcRepository(dsl);
     }
 

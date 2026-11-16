@@ -110,7 +110,7 @@ public final class DeliverPendingCredits {
 
     private void requeue(PlayerRef player, String currencyId, BigDecimal amount) {
         try {
-            pending.queueCredit(player.uuid(), currencyId, amount);
+            pending.queueCredit(player, currencyId, amount);
         } catch (RuntimeException failure) {
             log.error(
                     "event=pending_credit_requeue_failed player=" + player.uuid() + " currency=" + currencyId

@@ -80,7 +80,7 @@ public final class Persistence implements AutoCloseable {
         log.info("persistence opened on {} backend", backend.jdbcSubprotocol());
         return new Persistence(
                 dataSource,
-                DslContextProvider.create(dataSource, backend.dialect(), tablePrefix),
+                DslContextProvider.create(dataSource, backend.dialectOn(dataSource), tablePrefix),
                 backend,
                 tablePrefix);
     }

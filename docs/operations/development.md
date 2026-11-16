@@ -10,8 +10,14 @@ from the `uxm` catalog.
 ```sh
 ./gradlew build       # everything CI runs
 ./gradlew runServer   # a local server with the plugin, in run/
+./gradlew :persistence-adapter:realDatabaseTest   # the repository tests on MySQL, MariaDB and PostgreSQL
 ./gradlew :core:generateReference   # rewrite the generated pages under docs/user
 ```
+
+A repository test class carries `@EveryBackend` and takes a `TestDatabase` in its `@BeforeEach`. The build runs it
+on SQLite; `mysqlTest`, `mariadbTest` and `postgresqlTest` run it again on that server in a container, with the
+plugin's own pool and migrations, and CI runs each in a job of its own. Without Docker those three tasks skip their
+tests and say why; `-Puxm.requireDocker=true` makes them fail instead, as CI does.
 
 The command, permission and placeholder pages under `docs/user/` (`commands.md`, `permissions-*.md`,
 `placeholders*.md`) are generated from `CommandSpecCatalog`, `PermissionCatalog` and `PlaceholderCatalog`. The build

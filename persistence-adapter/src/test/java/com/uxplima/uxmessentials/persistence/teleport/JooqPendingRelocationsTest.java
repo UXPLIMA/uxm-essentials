@@ -2,22 +2,18 @@ package com.uxplima.uxmessentials.persistence.teleport;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.teleport.application.port.PendingRelocations;
 import com.uxplima.uxmessentials.teleport.domain.PendingRelocation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
-/** The {@code /tpofflinehere} relocation row through the real migrations on a SQLite file. */
+/** The {@code /tpofflinehere} relocation row through the real migrations. */
+@EveryBackend
 class JooqPendingRelocationsTest {
 
     private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-000000000005");
@@ -25,17 +21,11 @@ class JooqPendingRelocationsTest {
     private static final UUID WORLD = UUID.fromString("00000000-0000-0000-0000-00000000aaaa");
     private static final Instant SET = Instant.parse("2030-01-01T12:00:00.123456Z");
 
-    @TempDir
-    Path folder;
-
     private PendingRelocations store;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        store = new JooqPendingRelocations(DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), ""));
+    void open(TestDatabase database) {
+        store = new JooqPendingRelocations(database.dsl());
     }
 
     private static PendingRelocation to(String server, double x, Instant at) {
