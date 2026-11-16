@@ -14,6 +14,19 @@ On a network, a paid hop is now refunded, and a player warp owner paid, in exact
 Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
 in its own default. See [network.md](network.md).
 
+## Transaction history ids come from the database
+
+The update adds one table, `id_allocator`, and starts the transaction history ids after the highest one already
+written. Each server used to count those ids itself from the highest one it saw at start, so two servers sharing one
+database wrote the same ids, and the history of one of them stopped being saved. Nothing needs editing.
+
+Upgrade every server that shares the database in the same window. A server still on the previous release, or one
+rolled back to it, keeps counting for itself from the highest id it saw at start. When a batch of history meets an id
+such a server took, the upgraded server moves its counter past the highest id written and stores the batch again, so
+the history is kept on both. A row the database refuses even then (a figure too large for the column, say) is
+dropped alone and logged as `event=ledger_rows_dropped` with the rows it concerns; the rest of its batch is stored.
+Balances are never affected, only the history lines.
+
 ## Ladder reasons follow each reader's language
 
 The update adds two nullable columns, `reason_key` and `reason_args`, to `moderation_mutes`, `moderation_tempbans`,
