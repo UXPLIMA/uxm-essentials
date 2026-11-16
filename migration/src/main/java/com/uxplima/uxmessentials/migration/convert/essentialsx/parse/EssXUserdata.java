@@ -22,6 +22,8 @@ import org.jspecify.annotations.NullMarked;
  * @param balance the EssentialsX {@code money} figure, empty when absent
  * @param mail the mail entries in source order
  * @param moderation the parsed mute/jail block, {@link EssXModeration#none()} for a clean player
+ * @param kitTimestamps when the player last claimed each kit, epoch milliseconds by lower-case kit name; only kits with
+ *     a recorded claim (a time above zero) are kept
  */
 @NullMarked
 public record EssXUserdata(
@@ -30,7 +32,8 @@ public record EssXUserdata(
         Map<String, EssXLocation> homes,
         Optional<BigDecimal> balance,
         List<EssXMail> mail,
-        EssXModeration moderation) {
+        EssXModeration moderation,
+        Map<String, Long> kitTimestamps) {
 
     public EssXUserdata {
         Objects.requireNonNull(uuid, "uuid");
@@ -39,5 +42,6 @@ public record EssXUserdata(
         Objects.requireNonNull(balance, "balance");
         mail = List.copyOf(Objects.requireNonNull(mail, "mail"));
         Objects.requireNonNull(moderation, "moderation");
+        kitTimestamps = Map.copyOf(Objects.requireNonNull(kitTimestamps, "kitTimestamps"));
     }
 }

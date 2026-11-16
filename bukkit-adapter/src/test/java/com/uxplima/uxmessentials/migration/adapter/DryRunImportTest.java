@@ -10,6 +10,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
+import com.uxplima.uxmessentials.migration.KitClaimTarget;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.RecordWriter;
@@ -113,7 +115,9 @@ class DryRunImportTest {
                 new ImportRecord.WorldRecord(new ImportedWorld(world("resource"))),
                 new ImportRecord.WorldRecord(new ImportedWorld(world("arena"))),
                 new ImportRecord.UserRecord(
-                        new ImportedUser(FRESH, List.of(), Optional.of(new BigDecimal("10")), List.of())));
+                        new ImportedUser(FRESH, List.of(), Optional.of(new BigDecimal("10")), List.of())),
+                new ImportRecord.UserRecord(kitClaim(KNOWN)),
+                new ImportRecord.UserRecord(kitClaim(FRESH)));
     }
 
     @Test
@@ -151,6 +155,8 @@ class DryRunImportTest {
                         RecordOutcome.WRITTEN,
                         RecordOutcome.SKIPPED,
                         RecordOutcome.WRITTEN,
+                        RecordOutcome.WRITTEN,
+                        RecordOutcome.SKIPPED,
                         RecordOutcome.WRITTEN);
         assertThat(server.writes).isEmpty();
     }
@@ -186,6 +192,12 @@ class DryRunImportTest {
     private static KitDefinition kit(String id) {
         // No items: the live writer resolves each item through the server's item codec, which a unit test lacks.
         return KitDefinition.repeatable(KitId.of(id), List.of(), Duration.ZERO);
+    }
+
+    /** A player who claimed the one-time welcome kit in the source and brings nothing else. */
+    private static ImportedUser kitClaim(PlayerRef player) {
+        return new ImportedUser(
+                player, List.of(), Optional.empty(), List.of(), Map.of(KitId.of("welcome"), NOW.minusSeconds(3600)));
     }
 
     private static ImportedModeration mute(PlayerRef target) {
@@ -228,6 +240,7 @@ class DryRunImportTest {
         private final Map<UUID, List<Warn>> warns = new HashMap<>();
         private final Map<HologramName, Hologram> holograms = new LinkedHashMap<>();
         private final Map<WorldName, ManagedWorld> worlds = new LinkedHashMap<>();
+        private final Map<UUID, Set<KitId>> kitClaims = new HashMap<>();
 
         private Server(boolean refuseWrites) {
             this.refuseWrites = refuseWrites;
@@ -244,6 +257,7 @@ class DryRunImportTest {
             server.warns.put(KNOWN.uuid(), new ArrayList<>(List.of(OLD_WARNING)));
             server.holograms.put(HologramName.of("welcome"), hologram("welcome"));
             server.worlds.put(WorldName.of("resource"), world("resource"));
+            server.kitClaims.put(KNOWN.uuid(), new HashSet<>(Set.of(KitId.of("welcome"))));
             return server;
         }
 
@@ -277,6 +291,7 @@ class DryRunImportTest {
                     new UntouchedImportPorts.Homes(),
                     new Wallets(),
                     Optional.empty(),
+                    new KitClaims(),
                     Duration.ZERO,
                     text -> text,
                     COINS,
@@ -287,6 +302,22 @@ class DryRunImportTest {
             writes.add(what);
             if (refuseWrites) {
                 throw new AssertionError("a dry run wrote " + what);
+            }
+        }
+
+        private final class KitClaims implements KitClaimTarget {
+
+            @Override
+            public Set<KitId> claimed(PlayerRef player) {
+                return Set.copyOf(kitClaims.getOrDefault(player.uuid(), Set.of()));
+            }
+
+            @Override
+            public boolean record(PlayerRef player, KitId kit, Instant claimedAt) {
+                write("kit claim " + player.uuid() + " " + kit);
+                return kitClaims
+                        .computeIfAbsent(player.uuid(), id -> new HashSet<>())
+                        .add(kit);
             }
         }
 

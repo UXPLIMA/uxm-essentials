@@ -4,10 +4,14 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.ImportPlan;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.map.JailMuteMapper;
@@ -22,6 +26,7 @@ import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.WarpParser;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The EssentialsX source's lazy {@link ImportPlan}. It composes three sub-streams: userdata files,
@@ -31,6 +36,9 @@ import org.jspecify.annotations.NullMarked;
  * dropped from the stream with a warning that names them, so one bad entry never aborts the import (§4). A dropped
  * entry never reaches the writer, so it is not in the run's summary counts; the warning is the operator's record of
  * it. A home in a world the server does not know is left out of its player, who still imports.
+ *
+ * <p>A player's claim of a one-time kit is told apart from a cooldown stamp by the kit's {@code delay} in
+ * {@code kits.yml}, so the file is read once, before the first player, and its kits are kept for the kit records.
  */
 @NullMarked
 final class EssentialsXPlan implements ImportPlan {
@@ -44,6 +52,8 @@ final class EssentialsXPlan implements ImportPlan {
     private final KitMapper kitMapper;
     private final JailMuteMapper jailMuteMapper;
     private final Logger log;
+    private @Nullable List<EssXKit> parsedKits;
+    private @Nullable Set<KitId> oneTimeKits;
 
     EssentialsXPlan(
             Path root,
@@ -85,7 +95,7 @@ final class EssentialsXPlan implements ImportPlan {
     private Stream<ImportRecord> userRecords(EssXUserdata parsed) {
         // One userdata file yields the player record plus, when the player carries a mute or jail, a separate
         // moderation record: both keyed by the same uuid so a re-run upserts each idempotently (§6).
-        ImportRecord user = new ImportRecord.UserRecord(userMapper.map(parsed));
+        ImportRecord user = new ImportRecord.UserRecord(userMapper.map(parsed, oneTimeKits()));
         PlayerRef owner = new PlayerRef(parsed.uuid(), parsed.name());
         return jailMuteMapper
                 .map(owner, parsed.moderation())
@@ -120,15 +130,54 @@ final class EssentialsXPlan implements ImportPlan {
     }
 
     private Stream<ImportRecord> kitRecords() {
+        return kits().stream().flatMap(this::toKitRecord);
+    }
+
+    /** The kits of {@code kits.yml}, read on first use; empty, after one warning, when the file cannot be read. */
+    private synchronized List<EssXKit> kits() {
+        List<EssXKit> known = parsedKits;
+        if (known == null) {
+            known = readKits();
+            parsedKits = known;
+        }
+        return known;
+    }
+
+    private List<EssXKit> readKits() {
         Path file = root.resolve("kits.yml");
         if (!Files.isRegularFile(file)) {
-            return Stream.empty();
+            return List.of();
         }
         try {
-            return kits.parse(file).stream().flatMap(this::toKitRecord);
+            return List.copyOf(kits.parse(file));
         } catch (IOException | RuntimeException badFile) {
             log.warn("skipping EssentialsX kits.yml, no kit is imported: {}", reason(badFile));
-            return Stream.empty();
+            return List.of();
+        }
+    }
+
+    /** The ids of the kits EssentialsX lets each player claim once: a negative {@code delay}. */
+    private synchronized Set<KitId> oneTimeKits() {
+        Set<KitId> known = oneTimeKits;
+        if (known == null) {
+            Set<KitId> ids = new HashSet<>();
+            for (EssXKit kit : kits()) {
+                if (kit.delaySeconds() < 0) {
+                    oneTimeId(kit).ifPresent(ids::add);
+                }
+            }
+            known = Set.copyOf(ids);
+            oneTimeKits = known;
+        }
+        return known;
+    }
+
+    private static Optional<KitId> oneTimeId(EssXKit kit) {
+        try {
+            return Optional.of(KitId.of(kit.name()));
+        } catch (IllegalArgumentException unusableName) {
+            // The kit itself is left out with a warning when its record is built; its claims go with it.
+            return Optional.empty();
         }
     }
 

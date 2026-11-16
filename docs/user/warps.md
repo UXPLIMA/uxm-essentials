@@ -29,7 +29,7 @@ out of the box.
 | `/warp create <name> at <world> <x> <y> <z>` | `uxmessentials.warp.set` | The same at a given position; also `/warp createat <name> <world> <x> <y> <z>`. |
 | `/warp move <name>` | `uxmessentials.warp.move` | Moves a warp to your position; `move <name> at <world> <x> <y> <z>` or `moveat` for a given one. |
 | `/warp del <name>` | `uxmessentials.warp.delete` | Deletes a warp. |
-| `/warp info <name>` | `uxmessentials.warp.info` | Shows the owner, creation time and cost. |
+| `/warp info <name>` | `uxmessentials.warp.info` | Shows the owner, creation time, cost and required permission. |
 | `/warp lock <name>` | `uxmessentials.warp.lock` | Locks or unlocks a warp. |
 | `/warp password <name> [password]` | `uxmessentials.warp.password` | Sets a password, or clears it when none is given. |
 | `/warp rate <name> <1-5>` | `uxmessentials.warp.use` | Rates a warp. |
@@ -108,9 +108,7 @@ under the old one.
 | `effects.sound.departure.type`, `effects.sound.arrival.type` | `ENTITY_ENDERMAN_TELEPORT` | The sound when the editor set none. |
 | `effects.particle.departure.type`, `effects.particle.arrival.type` | `PORTAL` | The particle when the editor set none. |
 | `selector-presets.particles`, `selector-presets.sounds` | 14 each | What the editor's pickers offer. |
-
-`world-blacklist`, a list of world names, is read but not in the shipped file: `/warp create` refuses a warp in one
-of those worlds.
+| `world-blacklist` | `[]` | World names, matched exactly, where `/warp create` and the manager's create button refuse a warp; `/warp move` is not held back. |
 
 ## Warps on a network
 
@@ -247,6 +245,7 @@ server's average are added to each warp, so a single five-star vote does not top
 |---|---|---|
 | `enabled` | `true` | Switches the module and its commands on or off. |
 | `default-limit` | `3` | Warps per player across every world without a `limit` node. |
+| `world-blacklist` | `[]` | World names, matched exactly, where `/setpwarp`, `/pwarp set` and the menu refuse a warp; `/pwarp move` is not held back. |
 | `password-attempts.max-attempts` | `3` | Wrong passwords allowed on one warp before the lockout, at least 1. |
 | `password-attempts.lockout-seconds` | `60` | How long wrong passwords count and how long the lockout lasts; 0 turns the limit off. |
 | `payout.cut-percent` | `10` | The server's share of each entry fee, 0 to 100. |

@@ -12,7 +12,7 @@ package com.uxplima.uxmessentials.moderation.domain;
  */
 public enum ModerationError {
 
-    /** The target holds the exempt node and cannot be sanctioned by lower staff. */
+    /** The target holds the exempt node and cannot be sanctioned by anyone. */
     TARGET_EXEMPT(ModerationMessageKey.TARGET_EXEMPT),
 
     /**

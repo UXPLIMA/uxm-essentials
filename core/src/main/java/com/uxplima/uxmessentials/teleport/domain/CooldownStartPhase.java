@@ -13,10 +13,17 @@ package com.uxplima.uxmessentials.teleport.domain;
  */
 public enum CooldownStartPhase {
 
-    /** The clock starts the moment {@code /tpa} is issued: even a request later denied burns it. */
+    /**
+     * The clock starts for the sender the moment a {@code /tpa} or {@code /tpahere} is open: even a request later
+     * denied burns it. A teleport with no request step starts it once its checks pass and its warmup begins, and keeps
+     * it when the warmup is cancelled.
+     */
     REQUEST,
 
-    /** The clock starts when the target accepts; a denied or expired request does not burn it. */
+    /**
+     * The clock starts for the mover when the target accepts; a denied or expired request does not burn it. A
+     * teleport with no request step has nothing to accept and starts it as {@link #REQUEST} does.
+     */
     ACCEPT,
 
     /** The clock starts only on arrival; the cooldown is added after the warmup. The safe default. */

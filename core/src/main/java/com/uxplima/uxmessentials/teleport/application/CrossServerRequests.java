@@ -384,8 +384,17 @@ public final class CrossServerRequests implements RemoteRequests {
             return;
         }
         if (!sent.delivered() && outgoing.replace(id, sent, sent.asDelivered())) {
-            tell(sent, TeleportMessageKey.TPA_SENT);
+            opened(sent);
         }
+    }
+
+    /**
+     * The target's backend holds the request, the point where a local request opens: the requester reads their
+     * receipt, and a {@code request}-phase cooldown starts for them, so a request the target refused stamps nothing.
+     */
+    private void opened(Outgoing sent) {
+        tell(sent, TeleportMessageKey.TPA_SENT);
+        engine.stampForPhase(sent.requester(), CooldownStartPhase.REQUEST);
     }
 
     /**
@@ -404,7 +413,7 @@ public final class CrossServerRequests implements RemoteRequests {
         end(id, Ending.ANSWERED);
         if (!sent.delivered()) {
             // The accept overtook the delivery, which would now be swallowed; the receipt still belongs to the reader.
-            tell(sent, TeleportMessageKey.TPA_SENT);
+            opened(sent);
         }
         tell(sent, TeleportMessageKey.TPA_ACCEPTED);
         if (sent.direction() == RequestDirection.TO_TARGET) {

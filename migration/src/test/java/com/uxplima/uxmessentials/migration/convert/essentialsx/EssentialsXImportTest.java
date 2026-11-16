@@ -12,6 +12,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -182,6 +183,19 @@ class EssentialsXImportTest {
         assertThat(KitAccess.permissionNode(kit("use"))).isEqualTo("essentials.kits.use");
         assertThat(log.warnings())
                 .anySatisfy(line -> assertThat(line).contains("use", "uxmessentials.kit.use", "essentials.kits.use"));
+    }
+
+    @Test
+    void aOneTimeKitThePlayerAlreadyClaimedComesAlongWithWhenTheyClaimedIt() {
+        // Steve also claimed the repeatable starter kit and a kit kits.yml no longer has; neither is a one-time claim.
+        assertThat(user(STEVE).kitClaims())
+                .containsExactly(Map.entry(KitId.of("welcome"), Instant.ofEpochMilli(1_700_000_100_000L)));
+    }
+
+    @Test
+    void aKitTimestampOfZeroIsAKitThePlayerNeverClaimed() {
+        assertThat(user(ALEX).kitClaims()).isEmpty();
+        assertThat(user(BRAMBLEWICK).kitClaims()).isEmpty();
     }
 
     @Test

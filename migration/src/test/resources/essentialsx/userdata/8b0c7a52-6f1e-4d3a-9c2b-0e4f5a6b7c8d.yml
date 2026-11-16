@@ -35,3 +35,5 @@ timestamps:
   mute: 1900000000000
   jail: 0
   onlinejail: 600000
+  kits:
+    welcome: 0

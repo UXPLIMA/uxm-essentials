@@ -2,14 +2,17 @@ package com.uxplima.uxmessentials.migration.convert.essentialsx.map;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXLocation;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXMail;
 import com.uxplima.uxmessentials.migration.convert.essentialsx.parse.EssXUserdata;
@@ -24,7 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * Translates a parsed EssentialsX userdata record into domain aggregates. Pure
  * ACL: no Bukkit, no YAML, no I/O: those stay in {@code parse/}. It maps homes whose world the server
  * knows into {@link Home} value objects (a home in an unknown world is dropped, not fatal), carries the raw
- * balance forward for the writer to seed a wallet with, and turns each mail entry into an {@link ImportedMail}.
+ * balance forward for the writer to seed a wallet with, turns each mail entry into an {@link ImportedMail}, and keeps
+ * the claim time of each one-time kit the player already took.
  */
 @NullMarked
 public final class UserdataMapper {
@@ -36,10 +40,36 @@ public final class UserdataMapper {
         this.worlds = Objects.requireNonNull(worlds, "worlds");
     }
 
+    /** Map {@code src} as a player who claimed no one-time kit. */
     public ImportedUser map(EssXUserdata src) {
+        return map(src, Set.of());
+    }
+
+    /**
+     * Map {@code src}, keeping the claims of the kits in {@code oneTimeKits}. A claim of a repeatable kit is only a
+     * cooldown, and one of a kit {@code kits.yml} no longer has names nothing to claim, so both are left out.
+     */
+    public ImportedUser map(EssXUserdata src, Set<KitId> oneTimeKits) {
         Objects.requireNonNull(src, "src");
+        Objects.requireNonNull(oneTimeKits, "oneTimeKits");
         PlayerRef owner = new PlayerRef(src.uuid(), src.name());
-        return new ImportedUser(owner, mapHomes(owner, src.homes()), src.balance(), mapMail(src.mail()));
+        return new ImportedUser(
+                owner,
+                mapHomes(owner, src.homes()),
+                src.balance(),
+                mapMail(src.mail()),
+                kitClaims(src.kitTimestamps(), oneTimeKits));
+    }
+
+    private static Map<KitId, Instant> kitClaims(Map<String, Long> timestamps, Set<KitId> oneTimeKits) {
+        Map<KitId, Instant> claims = new HashMap<>();
+        for (KitId kit : oneTimeKits) {
+            Long claimedAt = timestamps.get(kit.value());
+            if (claimedAt != null) {
+                claims.put(kit, Instant.ofEpochMilli(claimedAt));
+            }
+        }
+        return claims;
     }
 
     private List<ImportedMail> mapMail(List<EssXMail> rawMail) {

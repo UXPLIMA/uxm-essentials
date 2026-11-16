@@ -114,6 +114,7 @@ class LiveImportTest {
                         UntouchedImportPorts::playerWarpWriter,
                         Optional.empty(),
                         Duration.ZERO,
+                        new UntouchedImportPorts.KitClaims(),
                         COINS,
                         CLOCK,
                         log),

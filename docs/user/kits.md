@@ -67,7 +67,9 @@ Some limits to know:
 - Cooldowns are not locked across servers the way one-time claims are: a player who switches servers in the instant
   after claiming a repeatable kit may claim it once more before the new server sees the cooldown.
 - While the network is on, the player data on each server is no longer updated. Turning the network off later goes
-  back to that older data, so kits claimed in the meantime can be claimed again.
+  back to that older data for cooldowns, so a cooldown running at that moment is over. One-time claims stay: on a
+  single server, the claims the database holds for a player are copied into their player data when they join, and
+  `/kit reset` clears them from both.
 
 ## Commands
 

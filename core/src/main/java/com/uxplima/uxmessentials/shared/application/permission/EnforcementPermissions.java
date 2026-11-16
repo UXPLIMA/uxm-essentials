@@ -116,7 +116,7 @@ public final class EnforcementPermissions {
         return List.of(
                 PermissionSpec.family(
                         maxDuration("<sanction>") + ".<seconds>",
-                        "The longest ban, mute or jail you may hand out, in seconds; the largest tier held wins.",
+                        "The longest ban or mute you may hand out, in seconds: <sanction> is ban (which also caps /tempban) or mute. The largest tier held wins, -1 or no node means no limit, and a jail has no limit.",
                         PermissionDefault.OP,
                         PermissionShape.TIER,
                         MODERATION),
@@ -221,7 +221,7 @@ public final class EnforcementPermissions {
                         MODERATION),
                 PermissionSpec.of(
                         MODERATION_EXEMPT,
-                        "Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff.",
+                        "Cannot be banned, tempbanned, IP-banned, muted, warned, kicked, jailed or frozen by anyone, whatever their rank; also left online by /kickall and by an IP ban on their address.",
                         PermissionDefault.OP,
                         MODERATION),
                 PermissionSpec.of(

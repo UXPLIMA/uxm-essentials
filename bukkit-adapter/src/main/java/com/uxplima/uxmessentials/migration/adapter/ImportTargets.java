@@ -1,12 +1,14 @@
 package com.uxplima.uxmessentials.migration.adapter;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramRepository;
 import com.uxplima.uxmessentials.holograms.application.port.HologramView;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
+import com.uxplima.uxmessentials.kits.application.LocalKitClaims;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -41,6 +43,7 @@ public final class ImportTargets {
     private @Nullable WalletRepository wallets;
     private @Nullable WarpRepository warps;
     private @Nullable KitRepository kits;
+    private @Nullable LocalKitClaims kitClaims;
     private @Nullable HologramRepository holograms;
     private @Nullable WorldRepository worlds;
     private @Nullable PlayerWarpRepository playerWarps;
@@ -90,6 +93,20 @@ public final class ImportTargets {
         return () -> {
             if (kits == registered) {
                 kits = null;
+            }
+        };
+    }
+
+    /**
+     * The kits module's one-time claim store on a single server. A claim the import records for a player who is
+     * online is stamped through it at once, since their stamps are read from the database only as they join.
+     */
+    public Runnable kitClaims(LocalKitClaims live) {
+        LocalKitClaims registered = Objects.requireNonNull(live, "live");
+        this.kitClaims = registered;
+        return () -> {
+            if (kitClaims == registered) {
+                kitClaims = null;
             }
         };
     }
@@ -149,6 +166,11 @@ public final class ImportTargets {
     /** The kits module's catalog, or {@code store} when the module is not running. */
     public KitRepository kitsOr(Supplier<KitRepository> store) {
         return orElse(kits, store);
+    }
+
+    /** The kits module's single-server claim store; empty on a network or when the kits module is off. */
+    public Optional<LocalKitClaims> kitClaims() {
+        return Optional.ofNullable(kitClaims);
     }
 
     /** The holograms module's cache, rendering what it saves, or {@code store} when the module is off. */
