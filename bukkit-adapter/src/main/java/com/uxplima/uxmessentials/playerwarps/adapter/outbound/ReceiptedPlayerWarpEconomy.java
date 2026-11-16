@@ -45,8 +45,10 @@ public final class ReceiptedPlayerWarpEconomy implements PlayerWarpEconomy {
     }
 
     @Override
-    public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
-        return report(delegate.charge(payer, price, currencyId), payer, price, currencyId);
+    public Result<String, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
+        Result<String, ChargeError> charged = delegate.charge(payer, price, currencyId);
+        // The receipt names the currency the money left in, which the delegate has already resolved.
+        return report(charged, payer, price, charged.isOk() ? charged.orElseThrow() : currencyId);
     }
 
     @Override
@@ -88,8 +90,8 @@ public final class ReceiptedPlayerWarpEconomy implements PlayerWarpEconomy {
     }
 
     /** Add the receipt to a charge that took, and pass every result through untouched. */
-    private Result<Unit, ChargeError> report(
-            Result<Unit, ChargeError> outcome, PlayerRef payer, BigDecimal amount, String currencyId) {
+    private <T> Result<T, ChargeError> report(
+            Result<T, ChargeError> outcome, PlayerRef payer, BigDecimal amount, String currencyId) {
         if (outcome.isOk()) {
             receipts.charged(payer, Money.of(currency(currencyId), amount), EconomyMessageKey.CHARGE_PLAYERWARP);
         }

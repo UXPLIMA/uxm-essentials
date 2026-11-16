@@ -216,6 +216,10 @@ landing whose owner share cannot be banked gives the fee back too. Earnings wait
 `/pwarp withdraw`, which pays the owner even when a co-owner runs it. With `payout.auto-payout = true` the owner is
 paid at once, in a currency that can be paid to an offline player.
 
+The owner is always paid in the currency the visitor paid, which a `default` price takes on the visitor's server. A
+bank holds one currency at a time: a share in another currency than the bank already holds is paid straight to the
+owner when that currency can be paid to an offline player, and otherwise the visitor gets the fee back.
+
 A player who gets a warp's password wrong `password-attempts.max-attempts` times (3) within
 `password-attempts.lockout-seconds` (60) is locked out of that warp's password for `lockout-seconds`, the right
 password included. A right password starts the count again, and other warps are not affected. No permission tier

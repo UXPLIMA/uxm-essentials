@@ -88,12 +88,9 @@ public abstract class AbstractProviderEconomy {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Objects.requireNonNull(currencyId, "currencyId");
-        Optional<Currency> target = currencyId.equalsIgnoreCase("default")
-                ? Optional.of(currency)
-                : economy.currencies().stream()
-                        .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
-                        .findFirst();
-        return target.map(c -> economy.credit(who, Money.of(c, amount)).isOk()).orElse(false);
+        return named(currencyId)
+                .map(c -> economy.credit(who, Money.of(c, amount)).isOk())
+                .orElse(false);
     }
 
     /**
@@ -114,12 +111,16 @@ public abstract class AbstractProviderEconomy {
      */
     protected Currency resolve(String currencyId) {
         Objects.requireNonNull(currencyId, "currencyId");
+        return named(currencyId).orElse(currency);
+    }
+
+    /** The currency {@code currencyId} names, {@code "default"} being this server's; empty for an id it does not know. */
+    private Optional<Currency> named(String currencyId) {
         if (currencyId.equalsIgnoreCase("default")) {
-            return currency;
+            return Optional.of(currency);
         }
         return economy.currencies().stream()
                 .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
-                .findFirst()
-                .orElse(currency);
+                .findFirst();
     }
 }
