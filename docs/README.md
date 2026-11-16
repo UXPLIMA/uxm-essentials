@@ -11,6 +11,8 @@
 - [Playtime](user/playtime.md): the tracked record, corrections, the vanilla import and the rank requirements.
 - [Economy](user/economy.md): currencies, payments, tax and the admin commands.
 - [Moderation](user/moderation.md): bans, mutes, warnings and their ladder, jails, IP bans, lockdown and freeze.
+- [Invsee and endersee](user/invsee.md): how a window on a player's inventory saves, online or offline, and what
+  happens when it cannot.
 - [Importing](user/import.md): moving in from EssentialsX, LiteBans, player warp plugins and WorldGuard.
 - [Guard](user/guard.md): the region protection nodes and placeholders.
 - [Worlds and dimensions](user/worlds.md): how the worlds module names and imports the dimensions of Paper 26.2.

@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.PlayerState
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.command.RegionBehaviourGate;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.EnderseeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.InvseeView;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorEditing;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
@@ -36,6 +37,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.VanillaPlaytime;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsItemCodec;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.FileOfflinePlayerStorage;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.PlayerDataFiles;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.PlayerPresence;
 import com.uxplima.uxmessentials.playerstate.application.AdjustPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
@@ -127,15 +129,14 @@ public final class PlayerstateWiring {
         PlayerStateStore store = new InMemoryPlayerStateStore();
         StateReconciler reconciler = new BukkitStateReconciler(kernel.scheduler());
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler(), teams);
-        InvseeView invseeView = new InvseeView(kernel.scheduler(), mirrorWindow);
-        EnderseeView enderseeView = new EnderseeView(kernel.scheduler(), mirrorWindow);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         PlayerDataFiles playerData = playerDataFiles(kernel.log());
         OfflinePlayerStorage offlineStorage =
                 playerData == null ? OfflinePlayerStorage.unavailable() : offlineStorage(playerData, kernel.log());
-        OfflineContainerView offlineView =
-                new OfflineContainerView(kernel.scheduler(), offlineStorage, mirrorWindow, notifier, kernel.log());
-        InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
+        MirrorEditing mirrors =
+                new MirrorEditing(kernel.scheduler(), mirrorWindow, offlineStorage, notifier, kernel.log());
+        InventoryViewer inventoryViewer = new BukkitInventoryViewer(
+                new InvseeView(mirrors), new EnderseeView(mirrors), new OfflineContainerView(mirrors));
         NearbyPlayers nearby = new BukkitNearbyPlayers(kernel.scheduler());
         PlayerInfo info = new BukkitPlayerInfo();
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
@@ -174,26 +175,18 @@ public final class PlayerstateWiring {
         List<Listener> listeners = new ArrayList<>(List.of(
                 new PlayerStateListener(store, reconciler, teams),
                 new WorldCommandListener(settings.worldCommandPolicy(), kernel.messages(), kernel.messageSink()),
-                new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink())));
+                new NoFlyWorldListener(noFlyWorlds, kernel.scheduler(), kernel.messages(), kernel.messageSink()),
+                mirrors));
         if (settings.playtimeImportOnJoin()) {
             listeners.add(new PlaytimeImportListener(playtimeAdmin));
         }
         if (playerData != null) {
-            PlayerDataLoginListener logins = new PlayerDataLoginListener(playerData, kernel.messages(), kernel.log());
+            PlayerDataLoginListener logins =
+                    new PlayerDataLoginListener(playerData, PlayerPresence.shared(), kernel.messages(), kernel.log());
             logins.adoptOnline(plugin.getServer().getOnlinePlayers());
             listeners.add(logins);
         }
-        return new Wired(
-                commands,
-                List.copyOf(listeners),
-                invseeView,
-                enderseeView,
-                offlineView,
-                services,
-                store,
-                info,
-                sampler,
-                afkStatus);
+        return new Wired(commands, List.copyOf(listeners), mirrors, services, store, info, sampler, afkStatus);
     }
 
     /**
@@ -203,7 +196,7 @@ public final class PlayerstateWiring {
      */
     private static @Nullable PlayerDataFiles playerDataFiles(Logger log) {
         try {
-            return new PlayerDataFiles(NmsItemCodec.playerDataDirectory());
+            return new PlayerDataFiles(NmsItemCodec.playerDataDirectory(), PlayerPresence.shared());
         } catch (LinkageError | RuntimeException moved) {
             log.warn(
                     "event=offline_inventories_unavailable reason={}; offline /invsee and /endersee are off",
@@ -284,9 +277,7 @@ public final class PlayerstateWiring {
      *
      * @param commands the Brigadier command registrations to publish
      * @param listeners the Bukkit listeners to register
-     * @param invseeView the online invsee menu, held so {@code stop()} flushes every still-open view
-     * @param enderseeView the online endersee menu, held so {@code stop()} flushes every still-open view
-     * @param offlineView the offline invsee/endersee menus, held so {@code stop()} flushes every still-open view
+     * @param mirrors the invsee and endersee windows, online and offline, held so {@code stop()} saves and closes them
      * @param services the constructed use cases, exposing {@code openContainer} cross-context for the staff EXAMINE gadget
      * @param store the in-memory snapshot map, read by the placeholder seam for the god flag
      * @param info the live-player read port, read by the placeholder seam for total play time
@@ -296,9 +287,7 @@ public final class PlayerstateWiring {
     public record Wired(
             List<CommandRegistration> commands,
             List<Listener> listeners,
-            InvseeView invseeView,
-            EnderseeView enderseeView,
-            OfflineContainerView offlineView,
+            MirrorEditing mirrors,
             PlayerStateServices services,
             PlayerStateStore store,
             PlayerInfo info,
@@ -308,9 +297,7 @@ public final class PlayerstateWiring {
         public Wired {
             commands = List.copyOf(commands);
             listeners = List.copyOf(listeners);
-            Objects.requireNonNull(invseeView, "invseeView");
-            Objects.requireNonNull(enderseeView, "enderseeView");
-            Objects.requireNonNull(offlineView, "offlineView");
+            Objects.requireNonNull(mirrors, "mirrors");
             Objects.requireNonNull(services, "services");
             Objects.requireNonNull(store, "store");
             Objects.requireNonNull(info, "info");
@@ -326,9 +313,7 @@ public final class PlayerstateWiring {
         /** Stop the sampler and reconcile every still-open invsee/endersee menu back onto its target. */
         public void stop() {
             sampler.stop();
-            invseeView.flushAll();
-            enderseeView.flushAll();
-            offlineView.flushAll();
+            mirrors.stop();
         }
     }
 }

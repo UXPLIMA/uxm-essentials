@@ -10,6 +10,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
+import org.jspecify.annotations.Nullable;
+
 /**
  * Just enough of the NBT format to edit a few tags of a file and leave the rest alone. A compound is read as its
  * entries in file order, each a type, a name and the payload bytes as they were; a list as its element type and its
@@ -134,13 +136,24 @@ final class RawNbt {
 
     /** The value of a whole-number tag; any other type is a broken file here. */
     static long number(byte type, TagPayload payload) throws IOException {
+        Number value = numeric(type, payload);
+        if (value == null || type == FLOAT || type == DOUBLE) {
+            throw new IOException("tag type " + type + " is not a whole number");
+        }
+        return value.longValue();
+    }
+
+    /** The value of any numeric tag, or {@code null} when {@code type} is not numeric. */
+    static @Nullable Number numeric(byte type, TagPayload payload) throws IOException {
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(payload.shared()));
         return switch (type) {
             case BYTE -> in.readByte();
             case SHORT -> in.readShort();
             case INT -> in.readInt();
             case LONG -> in.readLong();
-            default -> throw new IOException("tag type " + type + " is not a whole number");
+            case FLOAT -> in.readFloat();
+            case DOUBLE -> in.readDouble();
+            default -> null;
         };
     }
 

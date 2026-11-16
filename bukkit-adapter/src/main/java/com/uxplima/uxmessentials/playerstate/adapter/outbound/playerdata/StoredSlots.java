@@ -17,7 +17,7 @@ public final class StoredSlots {
     private final int dataVersion;
     private final Map<Integer, TagPayload> slots;
 
-    StoredSlots(int dataVersion, Map<Integer, TagPayload> slots) {
+    public StoredSlots(int dataVersion, Map<Integer, TagPayload> slots) {
         this.dataVersion = dataVersion;
         this.slots = Map.copyOf(Objects.requireNonNull(slots, "slots"));
     }

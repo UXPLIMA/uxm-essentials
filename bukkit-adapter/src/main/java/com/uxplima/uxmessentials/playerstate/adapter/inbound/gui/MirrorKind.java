@@ -36,6 +36,11 @@ enum MirrorKind {
         return regionId;
     }
 
+    /** The name a log line uses. */
+    String label() {
+        return this == INVENTORY ? "inventory" : "ender_chest";
+    }
+
     /** How many item slots the mirror carries; the region must declare exactly this many. */
     int slotCount() {
         return slotCount;

@@ -10,9 +10,12 @@ import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
@@ -23,6 +26,7 @@ import java.util.stream.Stream;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -39,8 +43,10 @@ class PlayerDataFilesTest {
     @TempDir
     Path players;
 
+    private final PlayerPresence presence = new PlayerPresence(Clock.systemUTC());
+
     private PlayerDataFiles files() {
-        return new PlayerDataFiles(players);
+        return new PlayerDataFiles(players, presence);
     }
 
     @Test
@@ -49,13 +55,13 @@ class PlayerDataFilesTest {
         PlayerDataFiles files = files();
         StoredSlots seen = found(files, ContainerLayout.INVENTORY);
 
-        SaveOutcome outcome = files.write(
+        SaveResult result = files.write(
                 SAM,
                 ContainerLayout.INVENTORY,
                 seen,
                 List.of(new SlotWrite(0, null), new SlotWrite(5, payload(GOLD)), new SlotWrite(38, payload(CHEST))));
 
-        assertThat(outcome).isEqualTo(SaveOutcome.SAVED);
+        assertThat(result).isEqualTo(SaveResult.of(SaveOutcome.SAVED));
         assertThat(stored())
                 .as("only slot 0, slot 5 and the chestplate differ from the file before the save")
                 .isEqualTo(raw(player(
@@ -66,17 +72,20 @@ class PlayerDataFilesTest {
 
     @Test
     void theFileBeforeTheSaveIsKeptAsDatOldAndNoTemporaryFileIsLeft() throws IOException {
-        byte[] before = save(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of()));
+        byte[] before = save(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of(slotted(1, STONE))));
         PlayerDataFiles files = files();
 
         files.write(
                 SAM,
                 ContainerLayout.ENDER,
                 found(files, ContainerLayout.ENDER),
-                List.of(new SlotWrite(4, payload(APPLE))));
+                List.of(new SlotWrite(1, null), new SlotWrite(4, payload(APPLE))));
 
         assertThat(players.resolve(SAM + ".dat_old")).hasBinaryContent(before);
         assertThat(fileNames()).containsExactlyInAnyOrder(SAM + ".dat", SAM + ".dat_old");
+        assertThat(stored())
+                .as("the ender chest lost its stone and gained an apple; nothing else changed")
+                .isEqualTo(raw(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of(slotted(4, APPLE)))));
     }
 
     @Test
@@ -87,34 +96,54 @@ class PlayerDataFilesTest {
         StoredSlots second = found(files, ContainerLayout.INVENTORY);
 
         files.write(SAM, ContainerLayout.INVENTORY, first, List.of(new SlotWrite(0, null)));
-        SaveOutcome later =
+        SaveResult later =
                 files.write(SAM, ContainerLayout.INVENTORY, second, List.of(new SlotWrite(7, payload(GOLD))));
 
-        assertThat(later).isEqualTo(SaveOutcome.SAVED);
+        assertThat(later).isEqualTo(SaveResult.of(SaveOutcome.SAVED));
         assertThat(stored())
                 .as("the second save adds its slot without putting back the diamonds the first one took")
                 .isEqualTo(raw(player(List.of(slotted(7, GOLD)), helmetOnly(), List.of())));
     }
 
     @Test
-    void anEditOfASlotThatChangedSinceItsWindowOpenedIsRefusedAndWritesNothing() throws IOException {
+    void anEditOfASlotThatChangedSinceItsWindowOpenedWritesNothingUnlessThePartIsAccepted() throws IOException {
         save(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of()));
         PlayerDataFiles files = files();
         StoredSlots first = found(files, ContainerLayout.INVENTORY);
         StoredSlots second = found(files, ContainerLayout.INVENTORY);
         files.write(SAM, ContainerLayout.INVENTORY, first, List.of(new SlotWrite(0, null)));
         byte[] afterFirst = stored();
+        List<SlotWrite> moveDiamonds = List.of(new SlotWrite(0, null), new SlotWrite(9, payload(DIAMONDS)));
 
-        SaveOutcome later = files.write(
-                SAM,
-                ContainerLayout.INVENTORY,
-                second,
-                List.of(new SlotWrite(0, null), new SlotWrite(9, payload(DIAMONDS))));
+        SaveResult refused = files.write(SAM, ContainerLayout.INVENTORY, second, moveDiamonds, conflicts -> false);
 
-        assertThat(later)
+        assertThat(refused)
                 .as("moving the diamonds the first edit already took would hand them out twice")
-                .isEqualTo(SaveOutcome.CHANGED);
+                .isEqualTo(new SaveResult(SaveOutcome.CHANGED, Set.of(0)));
         assertThat(stored()).isEqualTo(afterFirst);
+
+        SaveResult partly = files.write(
+                SAM, ContainerLayout.INVENTORY, second, moveDiamonds, conflicts -> conflicts.equals(Set.of(0)));
+
+        assertThat(partly).isEqualTo(new SaveResult(SaveOutcome.SAVED, Set.of(0)));
+        assertThat(stored())
+                .as("the accepted part is written and the conflicting slot is left as the first save left it")
+                .isEqualTo(raw(player(List.of(slotted(9, DIAMONDS)), helmetOnly(), List.of())));
+    }
+
+    @Test
+    void aFileWrittenByAnotherVersionSinceTheReadIsNotWritten() throws IOException {
+        save(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of()));
+        PlayerDataFiles files = files();
+        StoredSlots seen = found(files, ContainerLayout.INVENTORY);
+        byte[] upgraded =
+                save(compound("DataVersion", intTag(VERSION + 1), "Inventory", list(COMPOUND, slotted(0, DIAMONDS))));
+
+        SaveResult result = files.write(
+                SAM, ContainerLayout.INVENTORY, seen, List.of(new SlotWrite(3, payload(GOLD))), any -> true);
+
+        assertThat(result).isEqualTo(new SaveResult(SaveOutcome.CHANGED, Set.of(3)));
+        assertThat(players.resolve(SAM + ".dat")).hasBinaryContent(upgraded);
     }
 
     @Test
@@ -124,7 +153,7 @@ class PlayerDataFilesTest {
         StoredSlots seen = found(files, ContainerLayout.INVENTORY);
         int saves = 8;
         CountDownLatch start = new CountDownLatch(1);
-        List<Callable<SaveOutcome>> tasks = new ArrayList<>();
+        List<Callable<SaveResult>> tasks = new ArrayList<>();
         for (int slot = 0; slot < saves; slot++) {
             SlotWrite write = new SlotWrite(slot, payload(STONE));
             tasks.add(() -> {
@@ -133,19 +162,19 @@ class PlayerDataFilesTest {
             });
         }
 
-        List<SaveOutcome> outcomes = new ArrayList<>();
+        List<SaveResult> results = new ArrayList<>();
         try (ExecutorService pool = Executors.newFixedThreadPool(saves)) {
-            List<Future<SaveOutcome>> running = new ArrayList<>();
-            for (Callable<SaveOutcome> task : tasks) {
+            List<Future<SaveResult>> running = new ArrayList<>();
+            for (Callable<SaveResult> task : tasks) {
                 running.add(pool.submit(task));
             }
             start.countDown();
-            for (Future<SaveOutcome> result : running) {
-                outcomes.add(result.get());
+            for (Future<SaveResult> result : running) {
+                results.add(result.get());
             }
         }
 
-        assertThat(outcomes).containsOnly(SaveOutcome.SAVED);
+        assertThat(results).containsOnly(SaveResult.of(SaveOutcome.SAVED));
         assertThat(found(files(), ContainerLayout.INVENTORY).filled())
                 .as("every save's slot is in the file")
                 .containsOnlyKeys(0, 1, 2, 3, 4, 5, 6, 7, 39);
@@ -167,7 +196,7 @@ class PlayerDataFilesTest {
     }
 
     @Test
-    void aPlayerWhoIsJoiningOrOnlineIsNeitherReadNorWrittenUntilTheyLeave() throws Exception {
+    void aPlayerWhoIsJoiningOrConnectedIsNeitherReadNorWrittenUntilTheirConnectionCloses() throws Exception {
         byte[] before = save(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of()));
         PlayerDataFiles files = files();
         StoredSlots seen = found(files, ContainerLayout.INVENTORY);
@@ -178,12 +207,81 @@ class PlayerDataFilesTest {
         assertThat(files.read(SAM, ContainerLayout.INVENTORY))
                 .isEqualTo(new PlayerDataFiles.Refused(SaveOutcome.PLAYER_PRESENT));
         assertThat(files.write(SAM, ContainerLayout.INVENTORY, seen, takeDiamonds))
-                .isEqualTo(SaveOutcome.PLAYER_PRESENT);
+                .isEqualTo(SaveResult.of(SaveOutcome.PLAYER_PRESENT));
+        presence.validated(SAM);
+        assertThat(files.write(SAM, ContainerLayout.INVENTORY, seen, takeDiamonds))
+                .isEqualTo(SaveResult.of(SaveOutcome.PLAYER_PRESENT));
         assertThat(players.resolve(SAM + ".dat")).hasBinaryContent(before);
 
-        files.release(SAM);
+        presence.closed(SAM);
         assertThat(files.write(SAM, ContainerLayout.INVENTORY, seen, takeDiamonds))
-                .isEqualTo(SaveOutcome.SAVED);
+                .isEqualTo(SaveResult.of(SaveOutcome.SAVED));
+    }
+
+    @Test
+    void aSlotIsReadAsTheServerReadsItAndEntriesItSkipsAreKept() throws IOException {
+        Tag notANumber = compound("Slot", string("two"), "id", string("minecraft:gold_ingot"), "count", intTag(7));
+        Tag wide = compound("Slot", intTag(263), "id", string("minecraft:stone"), "count", intTag(64));
+        Tag unslotted = APPLE;
+        save(player(
+                List.of(slotted(2, DIAMONDS), notANumber, slotted(2, STONE), unslotted, wide),
+                helmetOnly(),
+                List.of()));
+        PlayerDataFiles files = files();
+
+        StoredSlots seen = found(files, ContainerLayout.INVENTORY);
+
+        assertThat(seen.filled())
+                .as("a missing slot is 0, an int is narrowed to an unsigned byte, the later of two entries wins")
+                .containsOnlyKeys(0, 2, 7, 39)
+                .containsEntry(0, payload(APPLE))
+                .containsEntry(2, payload(slotted(2, STONE)))
+                .containsEntry(7, payload(wide));
+
+        files.write(SAM, ContainerLayout.INVENTORY, seen, List.of(new SlotWrite(2, payload(GOLD))));
+
+        assertThat(stored())
+                .as("the slot's earlier duplicate goes, its last entry is replaced in place, the rest is kept")
+                .isEqualTo(
+                        raw(player(List.of(notANumber, slotted(2, GOLD), unslotted, wide), helmetOnly(), List.of())));
+    }
+
+    @Test
+    void equipmentKeysThisDoesNotShowAreKeptAndAnEmptyEquipmentTagIsLeftOut() throws IOException {
+        save(player(List.of(), compound("head", HELMET, "body", CHEST), List.of()));
+        PlayerDataFiles files = files();
+        List<SlotWrite> takeHelmet = List.of(new SlotWrite(39, null));
+
+        files.write(SAM, ContainerLayout.INVENTORY, found(files, ContainerLayout.INVENTORY), takeHelmet);
+
+        assertThat(stored()).isEqualTo(raw(player(List.of(), compound("body", CHEST), List.of())));
+
+        save(player(List.of(), helmetOnly(), List.of()));
+        files.write(SAM, ContainerLayout.INVENTORY, found(files, ContainerLayout.INVENTORY), takeHelmet);
+
+        assertThat(stored())
+                .as("the server leaves the key out when nothing is worn")
+                .isEqualTo(raw(player(List.of(), null, List.of())));
+    }
+
+    @Test
+    void aBrokenFileIsUnreadableRatherThanReadAsLessThanItHolds() throws IOException {
+        byte[] whole = raw(player(List.of(slotted(0, DIAMONDS)), helmetOnly(), List.of()));
+        Tag tooDeep = list(INT);
+        for (int i = 0; i < 600; i++) {
+            tooDeep = list(LIST, tooDeep);
+        }
+        List<byte[]> broken = List.of(
+                Arrays.copyOf(whole, whole.length / 2),
+                raw(compound("blob", new Simple(BYTE_ARRAY, out -> out.writeInt(-1)))),
+                raw(compound("deep", tooDeep)),
+                raw(compound("odd", new Simple((byte) 13, out -> out.writeInt(0)))));
+        PlayerDataFiles files = files();
+
+        for (byte[] file : broken) {
+            saveRaw(file);
+            assertThatThrownBy(() -> files.read(SAM, ContainerLayout.INVENTORY)).isInstanceOf(IOException.class);
+        }
     }
 
     // ---- the player data file, written the way the server writes it -------------------------------------------
@@ -203,8 +301,8 @@ class PlayerDataFilesTest {
     }
 
     /** A player's data with every tag type around the three containers, as the server lays it out. */
-    private static Tag player(List<Tag> inventory, Tag equipment, List<Tag> ender) {
-        return compound(
+    private static Tag player(List<Tag> inventory, @Nullable Tag equipment, List<Tag> ender) {
+        List<Object> entries = new ArrayList<>(List.of(
                 "DataVersion", intTag(VERSION),
                 "Pos", list(DOUBLE, doubleTag(12.5), doubleTag(64), doubleTag(-80.25)),
                 "Rotation", list(FLOAT, floatTag(90f), floatTag(-15f)),
@@ -214,13 +312,17 @@ class PlayerDataFilesTest {
                 "WorldUUIDMost", longTag(-42L),
                 "seed", longArray(7L, -7L),
                 "blob", byteArray((byte) 1, (byte) -2, (byte) 3),
-                "Inventory", list(COMPOUND, inventory.toArray(Tag[]::new)),
-                "equipment", equipment,
+                "Inventory", list(COMPOUND, inventory.toArray(Tag[]::new))));
+        if (equipment != null) {
+            entries.addAll(List.of("equipment", equipment));
+        }
+        entries.addAll(List.of(
                 "EnderItems", list(COMPOUND, ender.toArray(Tag[]::new)),
                 "LastDeathLocation", compound("dimension", string("minecraft:the_nether"), "pos", intArray(1, 2, 3)),
                 "bukkit", compound("lastKnownName", string("Sam Şükrü ✓")),
                 "recipeBook", compound("recipes", list(STRING, string("minecraft:bread"))),
-                "future_tag", list(LIST, list(INT, intTag(1)), list(END)));
+                "future_tag", list(LIST, list(INT, intTag(1)), list(END))));
+        return compound(entries.toArray());
     }
 
     private static Tag slotted(int slot, Tag item) {
@@ -238,9 +340,13 @@ class PlayerDataFilesTest {
     }
 
     private byte[] save(Tag root) throws IOException {
+        return saveRaw(raw(root));
+    }
+
+    private byte[] saveRaw(byte[] uncompressed) throws IOException {
         ByteArrayOutputStream compressed = new ByteArrayOutputStream();
         try (GZIPOutputStream gzip = new GZIPOutputStream(compressed)) {
-            gzip.write(raw(root));
+            gzip.write(uncompressed);
         }
         byte[] bytes = compressed.toByteArray();
         Files.write(players.resolve(SAM + ".dat"), bytes);

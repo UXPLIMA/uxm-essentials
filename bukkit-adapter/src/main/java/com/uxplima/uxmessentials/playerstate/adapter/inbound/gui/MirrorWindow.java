@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
-import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
@@ -16,7 +15,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.LivePlayers;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
-import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -59,14 +57,12 @@ public final class MirrorWindow {
 
     private final Messages messages;
     private final Menus menus;
-    private final Scheduler scheduler;
     private final Map<MirrorKind, MenuSpec> specs = new EnumMap<>(MirrorKind.class);
     private final Map<MirrorKind, List<Integer>> slots = new EnumMap<>(MirrorKind.class);
 
-    public MirrorWindow(Messages messages, Menus menus, Scheduler scheduler, Path dataFolder, Logger log) {
+    public MirrorWindow(Messages messages, Menus menus, Path dataFolder, Logger log) {
         this.messages = Objects.requireNonNull(messages, "messages");
         this.menus = Objects.requireNonNull(menus, "menus");
-        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(dataFolder, "dataFolder");
         load(MirrorKind.INVENTORY, INVSEE_RESOURCE, INVSEE_ROWS, dataFolder, log);
         load(MirrorKind.ENDER, ENDERSEE_RESOURCE, ENDERSEE_ROWS, dataFolder, log);
@@ -101,26 +97,21 @@ public final class MirrorWindow {
                 .ifPresent(viewer -> menus.open(viewer, holder.kind().specId(), holder));
     }
 
-    /** The live window behind {@code holder}, when the viewer still has it open. Read on the viewer's own thread. */
-    Optional<Inventory> live(MirrorHolder holder) {
-        return LivePlayers.of(holder.viewer())
-                .flatMap(viewer -> menus.openWindow(viewer, holder.kind().specId()));
-    }
-
-    /** Read the mirrored region out of a live window, as a positional array of copies. */
-    @Nullable ItemStack[] read(MirrorHolder holder, Inventory inv) {
+    /** What {@code holder}'s window holds now, when its viewer still has it open. Read on the viewer's thread. */
+    Optional<@Nullable ItemStack[]> contents(MirrorHolder holder) {
         // Both kinds are loaded in the constructor, so a missing entry would mean the window was never built.
-        return ContentRegions.read(inv, Objects.requireNonNull(slots.get(holder.kind())));
+        List<Integer> region = Objects.requireNonNull(slots.get(holder.kind()));
+        return LivePlayers.of(holder.viewer())
+                .flatMap(viewer -> menus.openWindow(viewer, holder.kind().specId()))
+                .map(inv -> ContentRegions.read(inv, region));
     }
 
-    /**
-     * Reconcile a still-open window from outside its close, on module stop or reload. The region is read on the
-     * viewer's own thread (their screen owns it) and handed to the holder's write-back, which claims the window so
-     * a close arriving at the same moment does not write it a second time. A window the viewer has already closed
-     * has been written back by that close, so there is nothing to drain.
-     */
-    void drain(MirrorHolder holder) {
-        scheduler.onEntity(holder.viewer(), () -> live(holder).ifPresent(inv -> holder.writeBack(read(holder, inv))));
+    /** Close {@code holder}'s window, if its viewer still has it open. Run on the viewer's thread. */
+    void close(MirrorHolder holder) {
+        LivePlayers.of(holder.viewer())
+                .filter(viewer ->
+                        menus.openWindow(viewer, holder.kind().specId()).isPresent())
+                .ifPresent(viewer -> viewer.closeInventory());
     }
 
     /** How many slots the window of {@code kind} mirrors; the array a write-back reconciles is this long. */

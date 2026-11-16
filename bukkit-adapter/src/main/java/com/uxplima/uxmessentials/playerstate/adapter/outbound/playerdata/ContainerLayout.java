@@ -31,6 +31,7 @@ public final class ContainerLayout {
     public static final ContainerLayout ENDER = new ContainerLayout("ender chest", "EnderItems", 27, List.of());
 
     private static final String SLOT = "Slot";
+    private static final int NO_SLOT = -1;
     private static final String EQUIPMENT = "equipment";
 
     private final String name;
@@ -187,14 +188,18 @@ public final class ContainerLayout {
         }
     }
 
-    /** The slot an item compound names; the server reads a missing one as slot 0 and the byte as unsigned. */
+    /**
+     * The slot an item compound names, read as the server reads it: any number, narrowed to an unsigned byte, and a
+     * missing one is slot 0. A slot that is not a number makes the server skip the entry, so it is {@code NO_SLOT}
+     * here: such an entry is never shown and is written back as it was.
+     */
     private static int slotOf(TagPayload element) throws IOException {
         Entry slot = find(RawNbt.entries(element), SLOT);
         if (slot == null) {
             return 0;
         }
-        long value = RawNbt.number(slot.type(), slot.payload());
-        return slot.type() == RawNbt.BYTE ? (int) (value & 0xFF) : (int) value;
+        Number value = RawNbt.numeric(slot.type(), slot.payload());
+        return value == null ? NO_SLOT : Byte.toUnsignedInt(value.byteValue());
     }
 
     private static TagPayload withSlot(TagPayload item, int slot) throws IOException {

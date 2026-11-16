@@ -6,7 +6,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import org.bukkit.inventory.ItemStack;
 
@@ -25,6 +27,8 @@ import org.jspecify.annotations.Nullable;
  */
 public final class FileOfflinePlayerStorage implements OfflinePlayerStorage {
 
+    private static final ItemStack[] NO_ITEMS = new ItemStack[0];
+
     private final PlayerDataFiles files;
     private final ItemCodec codec;
     private final Logger log;
@@ -36,11 +40,11 @@ public final class FileOfflinePlayerStorage implements OfflinePlayerStorage {
     }
 
     @Override
-    public OfflineSnapshot read(UUID player, ContainerLayout layout) {
+    public OfflineSnapshot<ItemStack> read(UUID player, ContainerLayout layout) {
         try {
             PlayerDataFiles.Read read = files.read(player, layout);
             if (read instanceof PlayerDataFiles.Refused(SaveOutcome reason)) {
-                return OfflineSnapshot.unreadable(reason, layout);
+                return OfflineSnapshot.unreadable(reason, NO_ITEMS);
             }
             StoredSlots stored = ((PlayerDataFiles.Found) read).slots();
             @Nullable ItemStack[] items = new ItemStack[layout.size()];
@@ -56,32 +60,37 @@ public final class FileOfflinePlayerStorage implements OfflinePlayerStorage {
             return OfflineSnapshot.found(items, stored, understood && stored.dataVersion() == codec.dataVersion());
         } catch (IOException | RuntimeException failed) {
             log.error("Failed to read offline player data for " + player, failed);
-            return OfflineSnapshot.unreadable(SaveOutcome.FAILED, layout);
+            return OfflineSnapshot.unreadable(SaveOutcome.FAILED, NO_ITEMS);
         } catch (LinkageError moved) {
             log.error("The server's internals for offline player data changed; " + player + " was not read", moved);
-            return OfflineSnapshot.unreadable(SaveOutcome.UNAVAILABLE, layout);
+            return OfflineSnapshot.unreadable(SaveOutcome.UNAVAILABLE, NO_ITEMS);
         }
     }
 
     @Override
-    public SaveOutcome save(UUID player, ContainerLayout layout, OfflineSnapshot base, @Nullable ItemStack[] contents) {
+    public SaveResult save(
+            UUID player,
+            ContainerLayout layout,
+            OfflineSnapshot<ItemStack> base,
+            Map<Integer, @Nullable ItemStack> changes,
+            Predicate<Set<Integer>> partly) {
         try {
             List<SlotWrite> writes = new ArrayList<>();
-            for (int slot : base.changedSlots(contents)) {
-                ItemStack item = slot < contents.length ? contents[slot] : null;
-                writes.add(
-                        new SlotWrite(slot, item == null || OfflineSnapshot.nothing(item) ? null : codec.encode(item)));
+            for (Map.Entry<Integer, @Nullable ItemStack> change : changes.entrySet()) {
+                ItemStack item = change.getValue();
+                boolean empty = item == null || item.getType().isAir() || item.getAmount() <= 0;
+                writes.add(new SlotWrite(change.getKey(), empty ? null : codec.encode(item)));
             }
             if (writes.isEmpty()) {
-                return SaveOutcome.SAVED;
+                return SaveResult.of(SaveOutcome.SAVED);
             }
-            return files.write(player, layout, base.stored(), writes);
+            return files.write(player, layout, base.stored(), writes, partly);
         } catch (IOException | RuntimeException failed) {
             log.error("Failed to save offline player data for " + player + "; the file is unchanged", failed);
-            return SaveOutcome.FAILED;
+            return SaveResult.of(SaveOutcome.FAILED);
         } catch (LinkageError moved) {
             log.error("The server's internals for offline player data changed; " + player + " was not saved", moved);
-            return SaveOutcome.FAILED;
+            return SaveResult.of(SaveOutcome.FAILED);
         }
     }
 }
