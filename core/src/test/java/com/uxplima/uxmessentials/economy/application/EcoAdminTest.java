@@ -2,8 +2,8 @@ package com.uxplima.uxmessentials.economy.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
-import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -14,6 +14,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
 import com.uxplima.uxmessentials.economy.application.port.HistoryRecord;
@@ -34,7 +35,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * An exact-balance write the store could not apply (a physical balance whose holder's thread never took it) changed
- * nothing, so the admin verb must say it failed and leave no ledger row or audit line behind.
+ * nothing, so the admin verb must say it failed and leave no ledger row or audit line behind. The bulk verbs answer
+ * with what the sweep over every account committed, and with nothing at all when no sweep ran.
  */
 class EcoAdminTest {
 
@@ -48,14 +50,17 @@ class EcoAdminTest {
     private final Wallets wallets = new Wallets();
     private final Audit audit = new Audit();
     private final History history = new History();
+    private final Sweep sweep = new Sweep();
     private final List<String> lines = new ArrayList<>();
+    private final List<Map<String, String>> placeholders = new ArrayList<>();
     private final EconomyNotifier notifier = new EconomyNotifier(
-            (PlayerRef viewer, MessageKey key, Map<String, String> placeholders) -> {
+            (PlayerRef viewer, MessageKey key, Map<String, String> values) -> {
                 lines.add(viewer.name() + ":" + key.key());
+                placeholders.add(values);
                 return key.key();
             },
             (viewer, text) -> {});
-    private final EcoAdmin admin = new EcoAdmin(bank, wallets, audit, notifier, history, CLOCK);
+    private final EcoAdmin admin = new EcoAdmin(bank, wallets, audit, notifier, history, sweep, CLOCK);
 
     private static Money coins(String amount) {
         return Money.of(COINS, new BigDecimal(amount));
@@ -105,18 +110,146 @@ class EcoAdminTest {
     }
 
     @Test
-    void aResetAllLeavesOutTheTargetsTheStoreCouldNotSet() {
-        bank.set(ALEX, coins("70"));
-        bank.set(SAM, coins("30"));
-        wallets.refuse(ALEX);
+    void aGiveAllAnswersWithTheAccountsTheSweepCredited() {
+        sweep.answer(new AccountSweep.SweepOutcome(1200, 0));
 
-        int affected = admin.resetAll(ADMIN, List.of(ALEX, SAM), COINS);
+        int affected = admin.giveAll(ADMIN, coins("25"));
 
-        assertThat(affected).isEqualTo(1);
-        assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("70");
-        assertThat(bank.balance(SAM, COINS).amount()).isEqualByComparingTo("10");
-        assertThat(history.lines).containsExactly("debit:20:ADMIN_RESETALL");
-        assertThat(audit.lines).containsExactly("bulk:1:ADMIN_RESETALL");
+        assertThat(affected).isEqualTo(1200);
+        assertThat(sweep.calls).containsExactly("credit:25:ADMIN_GIVEALL");
+        assertThat(audit.lines).containsExactly("bulk:1200:ADMIN_GIVEALL");
+        assertThat(lines).containsExactly("Admin:" + EconomyMessageKey.ECO_ADMIN_GIVEALL.key());
+        assertThat(placeholders.getFirst()).containsEntry("count", "1200");
+        // The sweep writes each account's ledger row in its own transaction; nothing is buffered beside it.
+        assertThat(history.lines).isEmpty();
+    }
+
+    @Test
+    void aGiveAllSaysHowManyAccountsWereAtTheirLimit() {
+        sweep.answer(new AccountSweep.SweepOutcome(40, 3));
+
+        admin.giveAll(ADMIN, coins("25"));
+
+        assertThat(lines)
+                .containsExactly(
+                        "Admin:" + EconomyMessageKey.ECO_ADMIN_GIVEALL.key(),
+                        "Admin:" + EconomyMessageKey.ECO_ADMIN_GIVEALL_CAPPED.key());
+        assertThat(placeholders.get(1)).containsEntry("count", "3");
+    }
+
+    @Test
+    void aResetAllPutsEveryAccountBackToTheStartingBalance() {
+        sweep.answer(new AccountSweep.SweepOutcome(7, 0));
+
+        int affected = admin.resetAll(ADMIN, COINS);
+
+        assertThat(affected).isEqualTo(7);
+        assertThat(sweep.calls).containsExactly("reset:10:ADMIN_RESETALL");
+        assertThat(audit.lines).containsExactly("bulk:7:ADMIN_RESETALL");
+        assertThat(lines).containsExactly("Admin:" + EconomyMessageKey.ECO_ADMIN_RESETALL.key());
+        assertThat(placeholders.getFirst()).containsEntry("count", "7");
+    }
+
+    @Test
+    void aCurrencyKeptOutsideTheLedgerIsRefusedAndNothingChanges() {
+        sweep.unreachable();
+
+        int affected = admin.giveAll(ADMIN, coins("25"));
+
+        assertThat(affected).isZero();
+        assertThat(sweep.calls).isEmpty();
+        assertThat(audit.lines).isEmpty();
+        assertThat(lines).containsExactly("Admin:" + EconomyMessageKey.ECO_ADMIN_BULK_UNREACHABLE.key());
+        assertThat(placeholders.getFirst()).containsEntry("currency", "coins");
+    }
+
+    @Test
+    void aSecondSweepAskedForWhileOneRunsIsRefused() {
+        sweep.answer(new AccountSweep.SweepOutcome(5, 0));
+        List<Integer> second = new ArrayList<>();
+        sweep.during(() -> second.add(admin.giveAll(ADMIN, coins("25"))));
+
+        int first = admin.giveAll(ADMIN, coins("25"));
+
+        assertThat(first).isEqualTo(5);
+        assertThat(second).containsExactly(0);
+        assertThat(sweep.calls).hasSize(1);
+        assertThat(audit.lines).containsExactly("bulk:5:ADMIN_GIVEALL");
+        assertThat(lines)
+                .containsExactly(
+                        "Admin:" + EconomyMessageKey.ECO_ADMIN_BULK_RUNNING.key(),
+                        "Admin:" + EconomyMessageKey.ECO_ADMIN_GIVEALL.key());
+    }
+
+    @Test
+    void aSweepThatFailedIsReportedAndNeitherAuditedNorAnnouncedAndTheNextOneRuns() {
+        sweep.fail(new IllegalStateException("connection lost"));
+
+        assertThatThrownBy(() -> admin.resetAll(ADMIN, COINS)).hasMessage("connection lost");
+
+        assertThat(audit.lines).isEmpty();
+        assertThat(lines).containsExactly("Admin:" + EconomyMessageKey.ECO_ADMIN_BULK_FAILED.key());
+
+        sweep.answer(new AccountSweep.SweepOutcome(2, 0));
+        assertThat(admin.resetAll(ADMIN, COINS)).isEqualTo(2);
+    }
+
+    /** A sweep over every account that answers what it is told to, recording each run. */
+    private static final class Sweep implements AccountSweep {
+
+        final List<String> calls = new ArrayList<>();
+        private boolean reaches = true;
+        private SweepOutcome outcome = SweepOutcome.none();
+        private @org.jspecify.annotations.Nullable RuntimeException failure;
+        private Runnable during = () -> {};
+
+        void answer(SweepOutcome next) {
+            outcome = next;
+            failure = null;
+        }
+
+        void unreachable() {
+            reaches = false;
+        }
+
+        void fail(RuntimeException next) {
+            failure = next;
+        }
+
+        void during(Runnable action) {
+            during = action;
+        }
+
+        @Override
+        public boolean reaches(Currency currency) {
+            return reaches;
+        }
+
+        @Override
+        public SweepOutcome creditEvery(Money amount, EconomyReason reason, long at) {
+            return run("credit:" + plain(amount) + ":" + reason);
+        }
+
+        @Override
+        public SweepOutcome resetEvery(Money balance, EconomyReason reason, long at) {
+            return run("reset:" + plain(balance) + ":" + reason);
+        }
+
+        private SweepOutcome run(String call) {
+            calls.add(call);
+            Runnable action = during;
+            during = () -> {};
+            action.run();
+            RuntimeException thrown = failure;
+            if (thrown != null) {
+                throw thrown;
+            }
+            return outcome;
+        }
+
+        private static String plain(Money money) {
+            return money.amount().stripTrailingZeros().toPlainString();
+        }
     }
 
     /** Exact-balance writes land in the bank, except for owners whose holder thread will not take the change. */

@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.economy.adapter.inbound.gui;
 
-import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.economy.application.EcoAdmin;
@@ -47,13 +46,13 @@ public final class EcoAdminOps {
         ecoAdmin.reset(actor, target, currency);
     }
 
-    /** Credit every wallet in {@code targets} by {@code amount}. */
-    public void giveAll(PlayerRef actor, List<PlayerRef> targets, Money amount) {
-        ecoAdmin.giveAll(actor, targets, amount);
+    /** Credit every known account by {@code amount}. */
+    public void giveAll(PlayerRef actor, Money amount) {
+        ecoAdmin.giveAll(actor, amount);
     }
 
-    /** Reset every wallet in {@code targets} to {@code currency}'s starting figure. */
-    public void resetAll(PlayerRef actor, List<PlayerRef> targets, Currency currency) {
-        ecoAdmin.resetAll(actor, targets, currency);
+    /** Reset every known account to {@code currency}'s starting figure. */
+    public void resetAll(PlayerRef actor, Currency currency) {
+        ecoAdmin.resetAll(actor, currency);
     }
 }

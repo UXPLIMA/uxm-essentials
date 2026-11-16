@@ -50,7 +50,8 @@ public sealed interface NetworkMessage
                 StaffTeleportFrame,
                 WorldChanged,
                 FreezeChanged,
-                FreezeReset {
+                FreezeReset,
+                AllBalancesChanged {
 
     /** The {@code server-id} of the backend that produced this frame; the loop sentinel keys on it. */
     String originServer();
@@ -95,7 +96,8 @@ public sealed interface NetworkMessage
         JAIL_HOP_FAILED(29),
         WORLD_CHANGED(30),
         FREEZE_CHANGED(31),
-        FREEZE_RESET(32);
+        FREEZE_RESET(32),
+        ALL_BALANCES_CHANGED(33);
 
         private final byte wireTag;
 

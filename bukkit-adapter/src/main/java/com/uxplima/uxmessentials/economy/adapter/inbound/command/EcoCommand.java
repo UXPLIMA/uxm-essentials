@@ -36,6 +36,10 @@ import org.jspecify.annotations.Nullable;
  * {@code /eco give|take|set|reset <player> <amount> [currency]} and the bulk
  * {@code /eco giveall|giverandom|resetall [amount] [currency]} (alias {@code /economy}). {@code /eco note give <player> <amount> [currency]} mints an admin-issued
  * banknote for a player without debiting anyone.
+ *
+ * <p>{@code giveall} and {@code resetall} change every account the ledger knows, online or not and on any backend;
+ * {@code giverandom} picks one player online here. The bulk work runs off the tick, and the sender hears the count
+ * once it has committed.
  */
 @NullMarked
 public final class EcoCommand extends EconomyCommandSupport implements CommandRegistration {
@@ -287,17 +291,23 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return Command.SINGLE_SUCCESS;
         }
         Money money = amount.get();
+        if ("giveall".equals(verb)) {
+            // Every account the ledger knows, online or not, so no roster is read here.
+            offTick(() -> services.ecoAdmin().giveAll(actor, money));
+            return Command.SINGLE_SUCCESS;
+        }
         List<PlayerRef> online = EcoTargets.online();
         if (noTargets(actor, online)) {
             return Command.SINGLE_SUCCESS;
         }
-        offTick(() -> dispatchBulk(verb, actor, money, online));
+        offTick(() -> EcoTargets.randomOnline(online)
+                .ifPresent(chosen -> services.ecoAdmin().giveRandom(actor, chosen, money)));
         return Command.SINGLE_SUCCESS;
     }
 
     /**
-     * Whether the bulk verb has nobody to act on, telling {@code actor} so when that is the case, so an empty
-     * server never runs the verb over an empty roster and reports nothing at all.
+     * Whether {@code giverandom} has nobody online to choose from, telling {@code actor} so when that is the case, so
+     * an empty server never runs the verb and reports nothing at all.
      */
     private boolean noTargets(PlayerRef actor, List<PlayerRef> online) {
         if (!online.isEmpty()) {
@@ -305,14 +315,6 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
         }
         services.notifier().send(actor, EconomyMessageKey.ECO_ADMIN_NO_TARGETS, Map.of());
         return true;
-    }
-
-    private void dispatchBulk(String verb, PlayerRef actor, Money money, List<PlayerRef> online) {
-        if ("giveall".equals(verb)) {
-            services.ecoAdmin().giveAll(actor, online, money);
-            return;
-        }
-        EcoTargets.randomOnline(online).ifPresent(chosen -> services.ecoAdmin().giveRandom(actor, chosen, money));
     }
 
     /** Tell the operator the flag this verb wants, and change nothing. */
@@ -329,11 +331,7 @@ public final class EcoCommand extends EconomyCommandSupport implements CommandRe
             return Command.SINGLE_SUCCESS;
         }
         Currency resolved = currency.get();
-        List<PlayerRef> online = EcoTargets.online();
-        if (noTargets(actor, online)) {
-            return Command.SINGLE_SUCCESS;
-        }
-        offTick(() -> services.ecoAdmin().resetAll(actor, online, resolved));
+        offTick(() -> services.ecoAdmin().resetAll(actor, resolved));
         return Command.SINGLE_SUCCESS;
     }
 

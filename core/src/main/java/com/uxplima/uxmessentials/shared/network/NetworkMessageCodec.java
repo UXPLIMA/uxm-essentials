@@ -298,6 +298,7 @@ public final class NetworkMessageCodec {
                 out.writeLong(freeze.changedAtMillis());
             }
             case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
+            case AllBalancesChanged swept -> out.writeUTF(swept.currencyId());
         }
     }
 
@@ -395,6 +396,7 @@ public final class NetworkMessageCodec {
             case FREEZE_CHANGED ->
                 new FreezeChanged(origin, readUuid(in), readUuid(in), in.readUTF(), in.readBoolean(), in.readLong());
             case FREEZE_RESET -> new FreezeReset(origin, in.readLong());
+            case ALL_BALANCES_CHANGED -> new AllBalancesChanged(origin, in.readUTF());
         };
     }
 

@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.util.Objects;
 
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.PayPreferences;
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
 import com.uxplima.uxmessentials.economy.application.port.WorthOverrideStore;
@@ -97,6 +98,16 @@ public final class WalletRepositories {
         DebouncedWalletWriter writer = new DebouncedWalletWriter(repository, scheduler, log, writeDebounce);
         TransactionTelemetry telemetry = new TransactionTelemetry(persistence.dsl(), scheduler, log, batchFlush);
         return new WalletLedger(repository, writer, telemetry);
+    }
+
+    /**
+     * The sweep over every account of the native ledger, drawing its ledger ids from {@code telemetry} so its rows
+     * and the buffered ones never share an id.
+     */
+    public static AccountSweep accountSweep(Persistence persistence, TransactionTelemetry telemetry) {
+        Objects.requireNonNull(persistence, "persistence");
+        Objects.requireNonNull(telemetry, "telemetry");
+        return new JooqAccountSweep(persistence.dsl(), telemetry::reserveIds);
     }
 
     /** The jOOQ-backed {@code /paytoggle} accept-pay flag over the shared persistence DSL. */

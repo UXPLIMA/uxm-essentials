@@ -343,6 +343,18 @@ public final class TransactionTelemetry extends JooqRepository implements Transa
         return ids.incrementAndGet();
     }
 
+    /**
+     * Hand out {@code count} consecutive ids for rows written outside this buffer, returning the first. A sweep over
+     * every account inserts its ledger rows in its own transaction, and they must not take an id a buffered row
+     * already holds. Ids of a sweep that rolled back are simply never used.
+     */
+    long reserveIds(int count) {
+        if (count <= 0) {
+            throw new IllegalArgumentException("count must be positive: " + count);
+        }
+        return ids.getAndAdd(count) + 1;
+    }
+
     /** One buffered ledger row; a single-sided move leaves the absent side null, mirroring the table shape. */
     private record Row(
             long id,

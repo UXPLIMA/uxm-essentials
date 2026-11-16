@@ -60,6 +60,7 @@ import com.uxplima.uxmessentials.economy.application.SellItem;
 import com.uxplima.uxmessentials.economy.application.SetWorth;
 import com.uxplima.uxmessentials.economy.application.WorthSource;
 import com.uxplima.uxmessentials.economy.application.WorthTable;
+import com.uxplima.uxmessentials.economy.application.port.AccountSweep;
 import com.uxplima.uxmessentials.economy.application.port.BaltopExemption;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
 import com.uxplima.uxmessentials.economy.application.port.EconomyAudit;
@@ -188,6 +189,12 @@ public final class EconomyWiring {
 
         ResolvedEconomy resolved =
                 resolveProvider(plugin, ctx, kernel, hooks, settings, currencies, decoratedRepository, clock);
+        // giveall and resetall reach every account only while this plugin's ledger holds the money. A foreign economy
+        // that won the provider keeps its own accounts, which this plugin cannot list.
+        AccountSweep sweep = resolved.ledgerInPlay()
+                ? WalletSync.sweep(
+                        WalletRepositories.accountSweep(persistence, ledger.telemetry()), cached, bus.publisher())
+                : AccountSweep.unreachable();
         return assemble(
                 plugin,
                 ctx,
@@ -200,6 +207,7 @@ public final class EconomyWiring {
                 resolved.provider(),
                 resolved.backends(),
                 decoratedRepository,
+                sweep,
                 pendingRepo,
                 textInput,
                 picker,
@@ -240,12 +248,14 @@ public final class EconomyWiring {
         if (foreign.isPresent()) {
             kernel.log().info("event=economy_provider_deferred (consuming foreign economy)");
             return new ResolvedEconomy(
-                    new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()), backends);
+                    new PublishingEconomyProvider(foreign.get(), kernel.events(), clock, kernel.log()),
+                    backends,
+                    false);
         }
         logBackendsInUse(currencies, kernel.log());
         if (!settings.registerProvider()) {
             kernel.log().info("native economy provider registration disabled by config; using it locally");
-            return new ResolvedEconomy(nativeProvider, backends);
+            return new ResolvedEconomy(nativeProvider, backends, true);
         }
         EconomyProviderRegistrar registrar = new EconomyProviderRegistrar(
                 plugin.getServer().getServicesManager(), plugin, kernel.log(), settings.registerPriority());
@@ -257,7 +267,7 @@ public final class EconomyWiring {
             ForeignEconomyProviders.publishNative(
                     plugin, resolved, currencies, settings.registerPriority(), kernel.log());
         }
-        return new ResolvedEconomy(resolved, backends);
+        return new ResolvedEconomy(resolved, backends, resolved == nativeProvider);
     }
 
     /**
@@ -284,8 +294,11 @@ public final class EconomyWiring {
                 currency.backendId()));
     }
 
-    /** The provider the plugin talks through and the backend set it routes over, resolved together at start. */
-    private record ResolvedEconomy(EconomyProvider provider, CurrencyBackendRegistry backends) {}
+    /**
+     * The provider the plugin talks through and the backend set it routes over, resolved together at start, and
+     * whether that provider is this plugin's own, so its ledger is where native currencies are kept.
+     */
+    private record ResolvedEconomy(EconomyProvider provider, CurrencyBackendRegistry backends, boolean ledgerInPlay) {}
 
     private static Wired assemble(
             Plugin plugin,
@@ -299,6 +312,7 @@ public final class EconomyWiring {
             EconomyProvider resolved,
             CurrencyBackendRegistry backends,
             WalletRepository repository,
+            AccountSweep sweep,
             PendingTransactionRepository pendingRepo,
             com.uxplima.uxmlib.gui.input.@org.jspecify.annotations.Nullable TextInput textInput,
             com.uxplima.uxmessentials.shared.adapter.inbound.gui.@org.jspecify.annotations.Nullable PlayerPickerView
@@ -332,6 +346,7 @@ public final class EconomyWiring {
                 settings,
                 currencies,
                 repository,
+                sweep,
                 resolved,
                 snapshots,
                 ledger.telemetry(),
@@ -356,7 +371,6 @@ public final class EconomyWiring {
                     guiText,
                     kernel.messages(),
                     kernel.scheduler(),
-                    plugin.getServer(),
                     picker,
                     currencyPicker,
                     textInput,
@@ -551,6 +565,7 @@ public final class EconomyWiring {
             EconomyConfig settings,
             CurrencyRegistry currencies,
             WalletRepository repository,
+            AccountSweep sweep,
             EconomyProvider resolved,
             BaltopSnapshots snapshots,
             com.uxplima.uxmessentials.economy.application.port.TransactionHistory history,
@@ -741,6 +756,7 @@ public final class EconomyWiring {
                         audit,
                         notifier,
                         history,
+                        sweep,
                         clock),
                 exchangeService,
                 currencies,
