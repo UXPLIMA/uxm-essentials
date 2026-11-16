@@ -86,7 +86,6 @@ public final class TeleportWarpAdapter implements WarpTeleporter {
 
     private static Destination destinationOf(Warp warp) {
         var warmup = warp.warmupOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
-        var cooldown = warp.cooldownOverrideSeconds().map(sec -> java.time.Duration.ofMillis((long) (sec * 1000)));
-        return Destination.at(warp.location(), warmup, cooldown);
+        return Destination.at(warp.location(), warmup, warp.ownCooldown());
     }
 }

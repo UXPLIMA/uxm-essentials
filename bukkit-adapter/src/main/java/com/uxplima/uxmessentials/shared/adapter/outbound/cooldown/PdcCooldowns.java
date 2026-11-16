@@ -2,11 +2,15 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.cooldown;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.function.Function;
 
 import org.bukkit.Bukkit;
 import org.bukkit.NamespacedKey;
 import org.bukkit.entity.Player;
+import org.bukkit.persistence.PersistentDataContainer;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
@@ -18,6 +22,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link Cooldowns} implementation: a per-holder "ready-at" epoch-millis stamped in PDC. The
@@ -117,7 +122,40 @@ public final class PdcCooldowns implements Cooldowns {
         if (player == null) {
             return;
         }
-        long readyAt = CooldownTiers.readyAt(clock.millis(), seconds);
-        player.getPersistentDataContainer().set(key, PersistentDataType.LONG, readyAt);
+        long now = clock.millis();
+        PersistentDataContainer pdc = player.getPersistentDataContainer();
+        // Each warp with its own cooldown adds a stamp of its own, so stamps that already ran out are dropped here
+        // rather than left in the player's data for good.
+        for (NamespacedKey spent : expired(pdc.getKeys(), keys.namespace(), stamp -> readyAtOf(pdc, stamp), now)) {
+            pdc.remove(spent);
+        }
+        pdc.set(key, PersistentDataType.LONG, CooldownTiers.readyAt(now, seconds));
+    }
+
+    /**
+     * The cooldown stamps among {@code held} that ran out by {@code nowMillis}: keys of {@code namespace} under
+     * {@link #KEY_PREFIX} whose ready-at, as {@code readyAt} reads it, is not after now. A key {@code readyAt} cannot
+     * read as a stamp is never offered for removal.
+     */
+    static List<NamespacedKey> expired(
+            Iterable<NamespacedKey> held,
+            String namespace,
+            Function<NamespacedKey, @Nullable Long> readyAt,
+            long nowMillis) {
+        List<NamespacedKey> spent = new ArrayList<>();
+        for (NamespacedKey key : held) {
+            if (!key.getNamespace().equals(namespace) || !key.getKey().startsWith(KEY_PREFIX)) {
+                continue;
+            }
+            Long end = readyAt.apply(key);
+            if (end != null && end <= nowMillis) {
+                spent.add(key);
+            }
+        }
+        return spent;
+    }
+
+    private static @Nullable Long readyAtOf(PersistentDataContainer pdc, NamespacedKey key) {
+        return pdc.has(key, PersistentDataType.LONG) ? pdc.get(key, PersistentDataType.LONG) : null;
     }
 }

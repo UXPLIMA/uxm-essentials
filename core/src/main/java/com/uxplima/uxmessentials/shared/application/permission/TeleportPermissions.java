@@ -139,7 +139,7 @@ public final class TeleportPermissions {
                         TELEPORT),
                 PermissionSpec.family(
                         RTP_RADIUS + ".<blocks>",
-                        "How far from the world centre /rtp may drop you; the largest tier held wins.",
+                        "How far from the world centre /rtp biome may search; the largest tier held wins. It only narrows rtp.max-radius, never widens it.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
                         TELEPORT),

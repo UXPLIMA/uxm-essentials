@@ -86,7 +86,6 @@ public final class TeleportPlayerWarpAdapter implements PlayerWarpTeleporter {
     }
 
     private static Destination destinationOf(PlayerWarp warp) {
-        return Destination.at(
-                warp.location(), warp.timing().warmup(), warp.timing().cooldown());
+        return Destination.at(warp.location(), warp.timing().warmup(), warp.ownCooldown());
     }
 }
