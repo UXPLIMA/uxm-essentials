@@ -43,7 +43,8 @@ public interface UxmModerationActions {
      * Ban this player for {@code duration}, answering the ban as it now stands.
      *
      * <p>A duration of zero or less is {@link IllegalArgumentException}: a ban that has already lapsed is not a
-     * punishment, and a permanent one is {@link #ban(UUID, String)}.
+     * punishment, and a permanent one is {@link #ban(UUID, String)}. A ban already in force that lasts longer is
+     * never cut short: the call is refused with {@link UxmFailure#ALREADY_IN_STATE} and the running ban stays.
      */
     CompletableFuture<UxmResult<UxmSanction>> tempBan(UUID targetId, Duration duration, String reason);
 

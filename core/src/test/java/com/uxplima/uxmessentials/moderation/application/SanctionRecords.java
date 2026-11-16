@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.moderation.domain.SeenRecord;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The warn, mute, tempban and IP ban rows of the moderation store, plus the lockdown switch. Like the real store, the
@@ -33,6 +34,8 @@ final class SanctionRecords implements ModerationRepository {
     private final Map<String, IpBan> ipBans = new HashMap<>();
     private final List<UUID> seen = new ArrayList<>();
     private boolean lockedDown;
+    private @Nullable Runnable racingWrite;
+    private boolean losingEveryRace;
 
     /** Every warning row of {@code target}, lapsed ones included. */
     List<Warn> allWarns(PlayerRef target) {
@@ -89,6 +92,36 @@ final class SanctionRecords implements ModerationRepository {
     @Override
     public void saveTempban(PlayerRef target, TempbanState tempban) {
         tempbans.put(target.uuid(), tempban);
+    }
+
+    /**
+     * Run {@code write} once, just before the next conditional ban write is checked: another server's ban landing
+     * between a use case's read and its write.
+     */
+    void beforeNextReplace(Runnable write) {
+        racingWrite = write;
+    }
+
+    /** Make every conditional ban write lose its race and write nothing, as if the row changed each time. */
+    void loseEveryReplace() {
+        losingEveryRace = true;
+    }
+
+    @Override
+    public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
+        Runnable racing = racingWrite;
+        racingWrite = null;
+        if (racing != null) {
+            racing.run();
+        }
+        if (losingEveryRace) {
+            return false;
+        }
+        if (!loadTempban(target).equals(expected)) {
+            return false;
+        }
+        tempbans.put(target.uuid(), replacement);
+        return true;
     }
 
     @Override

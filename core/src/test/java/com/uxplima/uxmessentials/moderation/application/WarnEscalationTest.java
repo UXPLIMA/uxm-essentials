@@ -531,6 +531,23 @@ class WarnEscalationTest {
     }
 
     @Test
+    void aStaffPermanentBanLandingWhileATempbanRungIsWrittenIsKept() {
+        warnTimes(4, false);
+        records.beforeNextReplace(() -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+
+        warnTimes(1, false);
+
+        assertThat(records.loadTempban(SAM)).isInstanceOfSatisfying(TempbanState.Active.class, active -> {
+            assertThat(active.until()).isEqualTo(NOW.plus(Ban.PERMANENT_SPAN));
+            assertThat(active.issuer().name()).isEqualTo("Alex");
+        });
+        assertThat(toldAlex())
+                .containsExactly(
+                        ModerationMessageKey.MOD_WARN_ESCALATED.key(),
+                        ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
+    }
+
+    @Test
     void aBanRungMakesATempbanPermanentAndALaterBanRungLeavesItBe() {
         IssueWarn toBan = warnUnder(ladder(
                 rung(2, EscalationAction.TEMPBAN, Duration.ofDays(1)),
