@@ -131,7 +131,8 @@ reload, for example) is only seen after `/uxmess reload`.
 A mute follows the ban rule. A `/mute` or `/tempmute` that ends later than the running mute, or a second permanent
 mute, replaces it; one that would end sooner is refused, and the staff member is told how long the running mute still
 runs. To shorten a mute, `/unmute` first. When two servers of a network mute the same player at the same moment, the
-longer mute is the one kept. A timed mute ends on its own.
+longer mute is the one kept. A timed mute ends on its own. A mute the database cannot answer for holds back the chat
+line, message or listed command and tells the player to try again; the log says `event=mute_check_read_failed`.
 
 ## Warnings and the escalation ladder
 

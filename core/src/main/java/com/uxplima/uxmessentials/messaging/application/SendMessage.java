@@ -134,8 +134,9 @@ public final class SendMessage {
     /** The offline path: mail when offline-to-mail is on, else the offline line. Writes storage, so off the tick. */
     Result<Unit, MessagingError> offline(PlayerRef sender, PlayerRef target, MessageBody body) {
         // A muted sender is gated even on the mail fallback, mirroring SendMail's mute gate.
-        if (mute.isMuted(sender)) {
-            return reject(sender, MessagingError.SENDER_MUTED);
+        Optional<MessagingError> muted = MuteRefusal.of(mute.check(sender));
+        if (muted.isPresent()) {
+            return reject(sender, muted.get());
         }
         if (!offlineToMail) {
             return reject(sender, MessagingError.TARGET_OFFLINE);
@@ -163,8 +164,9 @@ public final class SendMessage {
     }
 
     private Result<Unit, MessagingError> gate(PlayerRef sender, PlayerRef target) {
-        if (mute.isMuted(sender)) {
-            return Result.err(MessagingError.SENDER_MUTED);
+        Optional<MessagingError> muted = MuteRefusal.of(mute.check(sender));
+        if (muted.isPresent()) {
+            return Result.err(muted.get());
         }
         if (sender.equals(target)) {
             return Result.err(MessagingError.SELF);
@@ -215,13 +217,14 @@ public final class SendMessage {
         conversations.remember(target, LastConversation.with(sender, now));
     }
 
-    /** Refuse {@code sender} when they are muted, telling them why; whether they were refused. */
+    /**
+     * Refuse {@code sender} when they are muted or their mute could not be read, telling them why; whether they were
+     * refused.
+     */
     boolean refusedMuted(PlayerRef sender) {
-        if (!mute.isMuted(sender)) {
-            return false;
-        }
-        reject(sender, MessagingError.SENDER_MUTED);
-        return true;
+        Optional<MessagingError> muted = MuteRefusal.of(mute.check(sender));
+        muted.ifPresent(error -> reject(sender, error));
+        return muted.isPresent();
     }
 
     /**

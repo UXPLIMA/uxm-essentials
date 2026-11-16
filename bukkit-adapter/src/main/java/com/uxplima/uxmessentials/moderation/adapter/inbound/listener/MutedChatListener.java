@@ -10,12 +10,15 @@ import org.bukkit.event.Listener;
 
 import io.papermc.paper.event.player.AsyncChatEvent;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -29,6 +32,9 @@ import org.jspecify.annotations.NullMarked;
  * <p>Runs at {@link EventPriority#LOW}, before a chat formatter or a bridge at NORMAL reads the line. The event is
  * asynchronous, so the policy's database read stays off the tick. The mute is asked first, so the exempt node is only
  * read for a player who is muted; that read is the live one, which Paper allows on the chat thread.
+ *
+ * <p>A mute that could not be read stops the line too, and the speaker is told to try again: letting a muted player's
+ * line out is the worse mistake, and the next line reads the mute again.
  */
 @NullMarked
 public final class MutedChatListener implements Listener {
@@ -48,10 +54,14 @@ public final class MutedChatListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
         PlayerRef speaker = BukkitRefs.toRef(event.getPlayer());
-        if (!mutes.isMuted(speaker) || exempt.test(speaker)) {
+        MuteAnswer mute = mutes.check(speaker);
+        if (mute == MuteAnswer.NOT_MUTED || exempt.test(speaker)) {
             return;
         }
         event.setCancelled(true);
-        sink.deliver(speaker, messages.resolve(speaker, ModerationMessageKey.MUTED_CHAT_BLOCKED, Map.of()));
+        MessageKey why = mute == MuteAnswer.MUTED
+                ? ModerationMessageKey.MUTED_CHAT_BLOCKED
+                : MessagingMessageKey.MSG_MUTE_UNCHECKED;
+        sink.deliver(speaker, messages.resolve(speaker, why, Map.of()));
     }
 }

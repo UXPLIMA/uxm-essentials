@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.papi;
 import java.time.Duration;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -18,8 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  */
 public interface ModerationPlaceholders {
 
-    /** True when {@code who} is currently muted. */
-    boolean isMuted(PlayerRef who);
+    /** Whether {@code who} is currently muted, or that their mute could not be read. */
+    MuteAnswer muted(PlayerRef who);
 
     /** True when {@code who} is currently jailed. */
     boolean isJailed(PlayerRef who);

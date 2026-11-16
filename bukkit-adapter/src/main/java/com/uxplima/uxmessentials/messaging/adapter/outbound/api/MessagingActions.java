@@ -100,6 +100,7 @@ public final class MessagingActions implements UxmMessagingActions {
             case SELF -> UxmFailure.of(UxmFailure.REFUSED, "a player cannot message themselves");
             case TARGET_TOGGLED_OFF -> UxmFailure.of(UxmFailure.REFUSED, "the recipient has private messages off");
             case SENDER_MUTED -> UxmFailure.of(UxmFailure.REFUSED, "the sender is muted");
+            case MUTE_UNCHECKED -> UxmFailure.of(UxmFailure.FAILED, "the sender's mute could not be read");
             case NO_REPLY_TARGET -> UxmFailure.of(UxmFailure.NOT_FOUND, "there is nobody to reply to");
             case MAILBOX_EMPTY -> UxmFailure.of(UxmFailure.NOT_FOUND, "there is no mail there");
             default ->

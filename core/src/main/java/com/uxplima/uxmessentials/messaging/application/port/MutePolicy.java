@@ -8,6 +8,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * (docs/permissions.md: a muted player is blocked regardless of the messaging nodes). The messaging context
  * does not own mute state; it asks this port.
  *
+ * <p>The answer is never an exception: a mute that cannot be read is {@link MuteAnswer#UNKNOWN}, and the caller holds
+ * the action back.
+ *
  * <p>The coupling is soft: when the moderation module is disabled the wiring binds
  * {@link #NEVER}, so messaging degrades to "no one is muted" rather than failing. This is the same
  * degrade-when-the-other-module-is-off pattern the warps cost uses against economy.
@@ -15,8 +18,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public interface MutePolicy {
 
     /** A policy under which no one is ever muted: the binding when moderation is disabled. */
-    MutePolicy NEVER = who -> false;
+    MutePolicy NEVER = who -> MuteAnswer.NOT_MUTED;
 
-    /** True when {@code who} is currently muted and may not send outbound messaging. */
-    boolean isMuted(PlayerRef who);
+    /** Whether {@code who} is currently muted and may not send outbound messaging, or that it could not be read. */
+    MuteAnswer check(PlayerRef who);
 }

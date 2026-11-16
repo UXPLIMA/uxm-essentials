@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.application;
 import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.messaging.application.port.IgnoreStore;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
@@ -65,9 +66,10 @@ public final class SendMail {
         Objects.requireNonNull(sender, "sender");
         Objects.requireNonNull(recipient, "recipient");
         Objects.requireNonNull(body, "body");
-        if (mute.isMuted(sender)) {
-            notifier.send(sender, MessagingError.SENDER_MUTED.messageKey());
-            return Result.err(MessagingError.SENDER_MUTED);
+        Optional<MessagingError> muted = MuteRefusal.of(mute.check(sender));
+        if (muted.isPresent()) {
+            notifier.send(sender, muted.get().messageKey());
+            return Result.err(muted.get());
         }
         return persist(sender, recipient, body);
     }

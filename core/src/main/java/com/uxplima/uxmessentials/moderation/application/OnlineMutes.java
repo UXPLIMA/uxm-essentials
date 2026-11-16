@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -10,6 +11,7 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -33,6 +35,11 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * stay. Until the read at join succeeds, and for a player not connected here, the answer comes from the database.
  * A read at join that fails is tried again a couple of times, a little later each time.
  *
+ * <p>A check whose database read fails answers {@link MuteAnswer#UNKNOWN} instead of throwing, so the gate holds the
+ * action back rather than letting a muted player through; the next check reads again, so nobody stays held once the
+ * database answers. Those failures are logged at most once per {@link #LOG_QUIET}, so an outage under a busy chat
+ * leaves a line a minute rather than one per message.
+ *
  * <p>Each change is numbered, and a read finishing late never replaces a change numbered after it began, so a mute that
  * lands while a peer's frame is being read again is not undone by that older read.
  */
@@ -44,12 +51,17 @@ public final class OnlineMutes implements MutePolicy {
     /** The wait before the second read; each later one waits that much longer again. */
     static final Duration RETRY_AFTER = Duration.ofSeconds(2);
 
+    /** How long a failed check stays the only one logged; the next line counts those left out meanwhile. */
+    static final Duration LOG_QUIET = Duration.ofMinutes(1);
+
     private final ModerationRepository repository;
     private final Scheduler scheduler;
     private final Clock clock;
     private final Logger log;
     private final AtomicLong changes = new AtomicLong();
     private final ConcurrentHashMap<UUID, Known> known = new ConcurrentHashMap<>();
+    private Instant quietUntil = Instant.MIN;
+    private int unlogged;
 
     public OnlineMutes(ModerationRepository repository, Scheduler scheduler, Clock clock, Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
@@ -111,13 +123,55 @@ public final class OnlineMutes implements MutePolicy {
     }
 
     @Override
-    public boolean isMuted(PlayerRef who) {
+    public MuteAnswer check(PlayerRef who) {
         Objects.requireNonNull(who, "who");
+        Optional<MuteState> kept = kept(who);
+        if (kept.isPresent()) {
+            return answer(kept.get());
+        }
+        return read(who).map(this::answer).orElse(MuteAnswer.UNKNOWN);
+    }
+
+    /**
+     * The policy for a check that already runs off the server thread (the chat listener on Paper's chat thread): it
+     * reads the database every time, so a mute set on any server counts at once, and falls back to the mute kept here
+     * when that read fails.
+     */
+    public MutePolicy live() {
+        return who -> {
+            Objects.requireNonNull(who, "who");
+            return read(who).or(() -> kept(who)).map(this::answer).orElse(MuteAnswer.UNKNOWN);
+        };
+    }
+
+    private Optional<MuteState> kept(PlayerRef who) {
         Known entry = known.get(who.uuid());
-        MuteState mute = entry == null || entry.mute().isEmpty()
-                ? repository.loadMute(who)
-                : entry.mute().get();
-        return mute.isActiveAt(clock.instant());
+        return entry == null ? Optional.empty() : entry.mute();
+    }
+
+    /** {@code who}'s mute from the database, or empty when the read failed (and was logged). */
+    private Optional<MuteState> read(PlayerRef who) {
+        try {
+            return Optional.of(repository.loadMute(who));
+        } catch (RuntimeException failure) {
+            readFailed(who, failure);
+            return Optional.empty();
+        }
+    }
+
+    private MuteAnswer answer(MuteState mute) {
+        return mute.isActiveAt(clock.instant()) ? MuteAnswer.MUTED : MuteAnswer.NOT_MUTED;
+    }
+
+    private synchronized void readFailed(PlayerRef who, RuntimeException failure) {
+        Instant now = clock.instant();
+        if (now.isBefore(quietUntil)) {
+            unlogged++;
+            return;
+        }
+        log.error("event=mute_check_read_failed player=" + who.name() + " unlogged=" + unlogged, failure);
+        unlogged = 0;
+        quietUntil = now.plus(LOG_QUIET);
     }
 
     private void set(PlayerRef player, MuteState mute) {

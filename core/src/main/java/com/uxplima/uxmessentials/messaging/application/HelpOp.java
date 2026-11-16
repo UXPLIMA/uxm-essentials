@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.application;
 import java.time.Clock;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
@@ -76,9 +77,10 @@ public final class HelpOp {
     public Result<Unit, MessagingError> raise(PlayerRef requester, MessageBody body) {
         Objects.requireNonNull(requester, "requester");
         Objects.requireNonNull(body, "body");
-        if (mute.isMuted(requester)) {
-            notifier.send(requester, MessagingError.SENDER_MUTED.messageKey());
-            return Result.err(MessagingError.SENDER_MUTED);
+        Optional<MessagingError> muted = MuteRefusal.of(mute.check(requester));
+        if (muted.isPresent()) {
+            notifier.send(requester, muted.get().messageKey());
+            return Result.err(muted.get());
         }
         fanOut(requester, body);
         events.publish(new HelpOpRaised(requester, body, clock.instant()));

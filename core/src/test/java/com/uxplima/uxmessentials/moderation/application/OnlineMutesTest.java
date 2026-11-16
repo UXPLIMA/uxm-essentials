@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -49,7 +50,7 @@ class OnlineMutesTest {
         // Written behind the cache's back: a check on the server thread does not go to the database for it.
         records.saveMute(SAM, MuteState.none());
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -57,7 +58,7 @@ class OnlineMutesTest {
         records.saveMute(SAM, permanent());
         mutes.joined(SAM);
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -66,10 +67,10 @@ class OnlineMutesTest {
         scheduler.runAll();
 
         mutes.onEvent(new PlayerMuted(SAM, permanent(), NOW));
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
 
         mutes.onEvent(new PlayerUnmuted(SAM, NOW));
-        assertThat(mutes.isMuted(SAM)).isFalse();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.NOT_MUTED);
     }
 
     @Test
@@ -81,7 +82,7 @@ class OnlineMutesTest {
         mutes.changedElsewhere(SAM.uuid());
         scheduler.runAll();
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -91,7 +92,7 @@ class OnlineMutesTest {
 
         scheduler.runAll();
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -103,7 +104,7 @@ class OnlineMutesTest {
 
         clock.advance(Duration.ofMinutes(5));
 
-        assertThat(mutes.isMuted(SAM)).isFalse();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.NOT_MUTED);
     }
 
     @Test
@@ -116,7 +117,7 @@ class OnlineMutesTest {
         mutes.changedElsewhere(SAM.uuid());
         mutes.onEvent(new PlayerUnmuted(SAM, NOW));
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -132,7 +133,7 @@ class OnlineMutesTest {
                 .containsExactly(
                         "event=online_mute_read_failed player=Sam attempt=1",
                         "event=online_mute_read_failed player=Sam attempt=2");
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test
@@ -144,7 +145,69 @@ class OnlineMutesTest {
         records.saveMute(SAM, permanent());
 
         assertThat(log.errors()).hasSize(OnlineMutes.READ_ATTEMPTS);
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
+    }
+
+    @Test
+    void aMuteThatCannotBeReadIsUnknownRatherThanAThrow() {
+        records.failMuteReads(1);
+
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.UNKNOWN);
+        assertThat(log.errors()).containsExactly("event=mute_check_read_failed player=Sam unlogged=0");
+    }
+
+    @Test
+    void aDatabaseThatStaysDownIsLoggedOncePerQuietSpell() {
+        records.failMuteReads(4);
+
+        mutes.check(SAM);
+        mutes.check(ALEX);
+        mutes.live().check(SAM);
+        clock.advance(OnlineMutes.LOG_QUIET);
+        mutes.check(SAM);
+
+        assertThat(log.errors())
+                .containsExactly(
+                        "event=mute_check_read_failed player=Sam unlogged=0",
+                        "event=mute_check_read_failed player=Sam unlogged=2");
+    }
+
+    @Test
+    void aPlayerWhoseJoinReadsAllFailedIsAnsweredOnceTheDatabaseIsBack() {
+        records.saveMute(SAM, permanent());
+        records.failMuteReads(OnlineMutes.READ_ATTEMPTS + 1);
+        mutes.joined(SAM);
+        scheduler.runAll();
+
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.UNKNOWN);
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
+    }
+
+    @Test
+    void theLiveCheckSeesAMuteSetElsewhereAtOnce() {
+        mutes.joined(SAM);
+        scheduler.runAll();
+
+        records.saveMute(SAM, permanent());
+
+        assertThat(mutes.live().check(SAM)).isEqualTo(MuteAnswer.MUTED);
+    }
+
+    @Test
+    void whenTheLiveReadFailsTheKeptMuteAnswers() {
+        records.saveMute(SAM, permanent());
+        mutes.joined(SAM);
+        scheduler.runAll();
+        records.failMuteReads(1);
+
+        assertThat(mutes.live().check(SAM)).isEqualTo(MuteAnswer.MUTED);
+    }
+
+    @Test
+    void whenTheLiveReadFailsForAPlayerWithNothingKeptTheAnswerIsUnknown() {
+        records.failMuteReads(1);
+
+        assertThat(mutes.live().check(SAM)).isEqualTo(MuteAnswer.UNKNOWN);
     }
 
     @Test
@@ -158,8 +221,8 @@ class OnlineMutesTest {
         scheduler.runAll();
         records.saveMute(SAM, MuteState.none());
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
-        assertThat(mutes.isMuted(ALEX)).isFalse();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
+        assertThat(mutes.check(ALEX)).isEqualTo(MuteAnswer.NOT_MUTED);
     }
 
     @Test
@@ -175,9 +238,9 @@ class OnlineMutesTest {
 
         scheduler.runNext();
 
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
         scheduler.runAll();
-        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.check(SAM)).isEqualTo(MuteAnswer.MUTED);
     }
 
     @Test

@@ -74,7 +74,6 @@ import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
 import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
-import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ResolveTemplate;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
@@ -710,11 +709,7 @@ public final class ModerationWiring {
                         settings.freezeNoticeInterval()),
                 new MutedCommandListener(mutes, mutedCommands, live, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
-                mutedChat(
-                        new RepositoryMutePolicy(repository, clock),
-                        kernel.permissions(),
-                        kernel.messages(),
-                        kernel.messageSink()),
+                mutedChat(mutes.live(), kernel.permissions(), kernel.messages(), kernel.messageSink()),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
     }
 

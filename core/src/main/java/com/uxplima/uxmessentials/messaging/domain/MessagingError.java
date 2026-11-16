@@ -24,6 +24,9 @@ public enum MessagingError {
     /** The sender is muted by the moderation context: outbound messaging is gated. */
     SENDER_MUTED(MessagingMessageKey.MSG_MUTED),
 
+    /** The sender's mute could not be read, so the message is held back until it can be. */
+    MUTE_UNCHECKED(MessagingMessageKey.MSG_MUTE_UNCHECKED),
+
     /** The target ignores the sender; delivery is silently declined (rendered as delivered to the sender). */
     IGNORED(MessagingMessageKey.MSG_IGNORED),
 
