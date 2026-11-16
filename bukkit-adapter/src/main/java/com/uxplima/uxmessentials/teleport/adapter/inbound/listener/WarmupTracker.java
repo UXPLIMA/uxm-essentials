@@ -6,6 +6,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
@@ -98,9 +99,16 @@ public final class WarmupTracker {
         reconcile(who, entry -> entry.warmup().onAction(reason));
     }
 
-    /** Drop the player's warmup because the player logged out. */
-    public void forget(UUID who) {
-        pending.remove(Objects.requireNonNull(who, "who"));
+    /**
+     * Cancel {@code who}'s armed warmup because they left the server. Dropping the entry alone is not enough: the
+     * countdown reaches the player by uuid, so after a fast relog it would still land them, a charge taken for it kept.
+     * As with a supersede, the entry leaves the map first and is cancelled outside its lock.
+     */
+    public void quit(UUID who) {
+        Entry previous = pending.remove(Objects.requireNonNull(who, "who"));
+        if (previous != null) {
+            previous.handle().cancel(CancelCause.QUIT);
+        }
     }
 
     /** Drop {@code handle} once it has completed; a newer warmup armed for the same player stays tracked. */
@@ -120,12 +128,26 @@ public final class WarmupTracker {
         // and its handle is flipped inside the mapping so move-vs-fire resolves to one loser.
         pending.computeIfPresent(who, (id, entry) -> {
             PendingTeleport.Outcome outcome = step.apply(entry);
-            if (outcome.didCancel()) {
-                entry.handle().cancel();
+            WarmupCancelReason reason = outcome.cancelReason();
+            if (reason != null) {
+                stop(entry.handle(), reason);
                 return null;
             }
             return new Entry(outcome.state(), entry.handle(), entry.completesAt());
         });
+    }
+
+    /** Stop {@code handle} for {@code reason}, so the player is told what they did rather than that they moved. */
+    private static void stop(WarmupHandle handle, WarmupCancelReason reason) {
+        switch (reason) {
+            case MOVED -> handle.cancel(CancelCause.MOVED);
+            case ROTATED -> handle.cancel(CancelCause.ROTATED);
+            case DAMAGED -> handle.cancel(CancelCause.DAMAGED);
+            case INTERACTED -> handle.cancel(CancelCause.INTERACTED);
+            case QUIT -> handle.cancel(CancelCause.QUIT);
+            case ABORTED -> handle.cancel(CancelCause.ABORTED);
+            case SUPERSEDED -> handle.supersede();
+        }
     }
 
     private record Entry(PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {}

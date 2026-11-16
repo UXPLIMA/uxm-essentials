@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -14,6 +15,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLocator;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.WarmupTracker;
@@ -89,6 +91,17 @@ public final class TrackingWarmups implements Warmups {
     @Override
     public WarmupHandle begin(
             PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+        Objects.requireNonNull(onCancel, "onCancel");
+        return begin(who, kind, onComplete, (CancelCause cause) -> onCancel.run(), onSuperseded);
+    }
+
+    @Override
+    public WarmupHandle begin(
+            PlayerRef who,
+            WarmupKind kind,
+            Runnable onComplete,
+            Consumer<CancelCause> onCancel,
+            Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
         Optional<Position> origin = locator.locate(who);

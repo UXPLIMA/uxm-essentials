@@ -5,13 +5,15 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * Warmups that end only when the test says: {@link #finish} counts one down, {@link #move} cancels it as a step off
- * the origin block would. A player has one warmup at a time, and starting another supersedes the earlier one, as the
+ * the origin block would, {@link #supersede} stops it as the player's next teleport would. A player has one warmup at a time, and starting another supersedes the earlier one, as the
  * plugin's tracking warmups do. Each handle lets exactly one of its complete, cancel and supersede callbacks run.
  */
 public final class ManualWarmups implements Warmups {
@@ -26,6 +28,16 @@ public final class ManualWarmups implements Warmups {
     @Override
     public WarmupHandle begin(
             PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+        return begin(who, kind, onComplete, (CancelCause cause) -> onCancel.run(), onSuperseded);
+    }
+
+    @Override
+    public WarmupHandle begin(
+            PlayerRef who,
+            WarmupKind kind,
+            Runnable onComplete,
+            Consumer<CancelCause> onCancel,
+            Runnable onSuperseded) {
         Pending started = new Pending(onComplete, onCancel, onSuperseded);
         Pending earlier = current.put(who.uuid(), started);
         if (earlier != null) {
@@ -47,11 +59,19 @@ public final class ManualWarmups implements Warmups {
         }
     }
 
-    /** Cancel {@code who}'s warmup, as a move, a hit or an interaction does. */
+    /** Cancel {@code who}'s warmup as a step off the origin block does. */
     public void move(PlayerRef who) {
         Pending due = current.remove(who.uuid());
         if (due != null) {
-            due.cancel();
+            due.cancel(CancelCause.MOVED);
+        }
+    }
+
+    /** Stop {@code who}'s warmup as their next teleport does, here or to another backend. */
+    public void supersede(PlayerRef who) {
+        Pending due = current.remove(who.uuid());
+        if (due != null) {
+            due.supersede();
         }
     }
 
@@ -70,11 +90,11 @@ public final class ManualWarmups implements Warmups {
         }
 
         private final Runnable onComplete;
-        private final Runnable onCancel;
+        private final Consumer<CancelCause> onCancel;
         private final Runnable onSuperseded;
         private final AtomicReference<State> state = new AtomicReference<>(State.PENDING);
 
-        Pending(Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+        Pending(Runnable onComplete, Consumer<CancelCause> onCancel, Runnable onSuperseded) {
             this.onComplete = onComplete;
             this.onCancel = onCancel;
             this.onSuperseded = onSuperseded;
@@ -89,8 +109,13 @@ public final class ManualWarmups implements Warmups {
 
         @Override
         public void cancel() {
+            cancel(CancelCause.ABORTED);
+        }
+
+        @Override
+        public void cancel(CancelCause cause) {
             if (state.compareAndSet(State.PENDING, State.CANCELLED)) {
-                onCancel.run();
+                onCancel.accept(cause);
             }
         }
 

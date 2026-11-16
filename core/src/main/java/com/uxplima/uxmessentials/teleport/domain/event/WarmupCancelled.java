@@ -7,12 +7,12 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelReason;
 
 /**
- * A pending warmup was cancelled before it elapsed. The player moved, rotated, or took damage,
- * depending on the per-axis cancel toggles. No teleport follows.
+ * A pending warmup was cancelled before it elapsed: the player moved, rotated, took damage or interacted (each
+ * subject to its cancel toggle), left the server, or started another teleport. No teleport follows.
  *
  * @param player the player whose warmup aborted
  * @param kind the teleport that will not happen
- * @param reason which cancel axis tripped
+ * @param reason what stopped it
  */
 public record WarmupCancelled(PlayerRef player, TeleportKind kind, WarmupCancelReason reason) implements TeleportEvent {
 

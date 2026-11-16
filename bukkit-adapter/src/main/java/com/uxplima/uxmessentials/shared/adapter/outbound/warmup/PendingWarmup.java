@@ -2,7 +2,9 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.warmup;
 
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -29,11 +31,11 @@ final class PendingWarmup implements WarmupHandle {
     }
 
     private final Runnable onComplete;
-    private final Runnable onCancel;
+    private final Consumer<CancelCause> onCancel;
     private final Runnable onSuperseded;
     private final AtomicReference<State> state = new AtomicReference<>(State.PENDING);
 
-    PendingWarmup(PlayerRef who, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+    PendingWarmup(PlayerRef who, Runnable onComplete, Consumer<CancelCause> onCancel, Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         this.onComplete = Objects.requireNonNull(onComplete, "onComplete");
         this.onCancel = Objects.requireNonNull(onCancel, "onCancel");
@@ -49,8 +51,14 @@ final class PendingWarmup implements WarmupHandle {
 
     @Override
     public void cancel() {
+        cancel(CancelCause.ABORTED);
+    }
+
+    @Override
+    public void cancel(CancelCause cause) {
+        Objects.requireNonNull(cause, "cause");
         if (state.compareAndSet(State.PENDING, State.CANCELLED)) {
-            onCancel.run();
+            onCancel.accept(cause);
         }
     }
 

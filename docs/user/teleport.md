@@ -158,7 +158,9 @@ A warp can set its own warmup in its editor.
 | `warmup.cancel-on-rotate` | `false` | Turning your head cancels. |
 
 A player has one warmup at a time. A new teleport replaces the waiting one, which never lands, and the player is told
-it was replaced. Logging off ends it too.
+it was replaced; a home, warp or other hop to another server replaces it the same way. Logging off cancels it, and it
+does not land after the player rejoins. Each cause (moving, turning, damage, a click, leaving, a replacement) has its
+own line in the language files, and `UxmWarmupCancelEvent` names the same reason.
 
 ### Paid teleports that do not land
 
