@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -26,6 +27,7 @@ import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
 import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
+import org.bukkit.event.player.PlayerArmorStandManipulateEvent;
 import org.bukkit.event.player.PlayerDropItemEvent;
 import org.bukkit.event.player.PlayerInteractEntityEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
@@ -54,13 +56,30 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>It is also the listener that keeps an edit's items where they are. While a staff member has an editable window
  * open, or its save has not come back, they cannot drop items (unless the item would not fit back into their
- * inventory), open another inventory, use, place or eat items, use their crafting grid, or lose their items on death.
+ * inventory), move items into or out of a bundle, open another inventory, use, place or eat items, use an armour
+ * stand or their crafting grid, or lose their items on death.
  * It tells the rules when a window appears or is refused. It records why a window closed, so a close by disconnecting
  * is saved before the server saves the staff member, and it lets a staff member who leaves with a save still under
  * way finish it first.
  */
 @NullMarked
 public final class MirrorEditing implements Listener {
+
+    /**
+     * Clicks that put items where taking them back cannot reach: dropped on the ground, or into or out of a bundle,
+     * whose contents the take-back does not look inside.
+     */
+    private static final Set<InventoryAction> MOVES_AWAY = Set.copyOf(EnumSet.of(
+            InventoryAction.DROP_ALL_CURSOR,
+            InventoryAction.DROP_ONE_CURSOR,
+            InventoryAction.DROP_ALL_SLOT,
+            InventoryAction.DROP_ONE_SLOT,
+            InventoryAction.PICKUP_FROM_BUNDLE,
+            InventoryAction.PICKUP_ALL_INTO_BUNDLE,
+            InventoryAction.PICKUP_SOME_INTO_BUNDLE,
+            InventoryAction.PLACE_FROM_BUNDLE,
+            InventoryAction.PLACE_ALL_INTO_BUNDLE,
+            InventoryAction.PLACE_SOME_INTO_BUNDLE));
 
     private final MirrorWindow window;
     private final MirrorEdits<ItemStack> edits;
@@ -160,12 +179,10 @@ public final class MirrorEditing implements Listener {
             return;
         }
         InventoryAction action = event.getAction();
-        boolean drops = action == InventoryAction.DROP_ALL_CURSOR
-                || action == InventoryAction.DROP_ONE_CURSOR
-                || action == InventoryAction.DROP_ALL_SLOT
-                || action == InventoryAction.DROP_ONE_SLOT;
         InventoryType.SlotType type = event.getSlotType();
-        if (drops || type == InventoryType.SlotType.OUTSIDE || type == InventoryType.SlotType.CRAFTING) {
+        if (MOVES_AWAY.contains(action)
+                || type == InventoryType.SlotType.OUTSIDE
+                || type == InventoryType.SlotType.CRAFTING) {
             event.setCancelled(true);
         }
     }
@@ -178,8 +195,17 @@ public final class MirrorEditing implements Listener {
         }
     }
 
+    /** Also sees {@code PlayerInteractAtEntityEvent}, which has no handler list of its own. */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onInteractEntity(PlayerInteractEntityEvent event) {
+        if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Has a handler list of its own, so the handler above does not see it. */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onArmorStand(PlayerArmorStandManipulateEvent event) {
         if (edits.holding(event.getPlayer().getUniqueId())) {
             event.setCancelled(true);
         }

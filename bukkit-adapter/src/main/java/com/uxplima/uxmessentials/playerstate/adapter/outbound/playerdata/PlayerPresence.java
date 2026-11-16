@@ -7,6 +7,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Predicate;
+
+import org.bukkit.Bukkit;
+import org.bukkit.entity.Player;
 
 /**
  * Who is joining or connected to this server, which is when a player's data file belongs to the server: it reads the
@@ -31,15 +35,22 @@ public final class PlayerPresence {
     /** How long a pre-login counts as joining without being validated; validation follows it within a tick. */
     static final Duration JOINING_FOR = Duration.ofSeconds(60);
 
-    private static final PlayerPresence SHARED = new PlayerPresence(Clock.systemUTC());
+    private static final PlayerPresence SHARED = new PlayerPresence(Clock.systemUTC(), PlayerPresence::listed);
 
     private final Clock clock;
+    private final Predicate<UUID> listed;
     private final Map<UUID, Instant> joining = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> connected = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> uncounted = new ConcurrentHashMap<>();
 
     public PlayerPresence(Clock clock) {
+        this(clock, player -> false);
+    }
+
+    /** {@code listed} tells whether the server lists a player as online, whatever this record saw of their login. */
+    PlayerPresence(Clock clock, Predicate<UUID> listed) {
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.listed = Objects.requireNonNull(listed, "listed");
     }
 
     /** The record the running plugin uses. */
@@ -81,6 +92,20 @@ public final class PlayerPresence {
         }
     }
 
+    /**
+     * Whether the server lists {@code player} as online: a safety net for a connection this record lost count of. It
+     * walks the online players, which the server keeps in a copy-on-write list that any thread may read; looking a
+     * player up by id would read a plain map the tick thread writes.
+     */
+    private static boolean listed(UUID player) {
+        for (Player online : Bukkit.getOnlinePlayers()) {
+            if (online.getUniqueId().equals(player)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** {@code player} was already connected when this started; counting them twice is avoided. */
     public void adopt(UUID player) {
         connected.merge(Objects.requireNonNull(player, "player"), 1, Math::max);
@@ -88,7 +113,7 @@ public final class PlayerPresence {
 
     /** Whether {@code player}'s file belongs to the server now. */
     public boolean present(UUID player) {
-        if (connected.containsKey(player)) {
+        if (connected.containsKey(player) || listed.test(player)) {
             return true;
         }
         Instant since = joining.get(player);

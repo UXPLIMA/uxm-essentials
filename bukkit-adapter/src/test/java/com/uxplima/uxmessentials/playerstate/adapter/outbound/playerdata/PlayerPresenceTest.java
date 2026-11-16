@@ -8,6 +8,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.locks.ReentrantLock;
@@ -111,6 +113,17 @@ class PlayerPresenceTest {
                 .isTrue();
         presence.closed(SAM);
         assertThat(presence.present(SAM)).isFalse();
+    }
+
+    @Test
+    void aPlayerTheServerListsAsOnlineIsPresentEvenIfTheirLoginWasMissed() {
+        Set<UUID> online = new HashSet<>();
+        PlayerPresence listing = new PlayerPresence(clock, online::contains);
+        assertThat(listing.present(SAM)).isFalse();
+
+        online.add(SAM);
+
+        assertThat(listing.present(SAM)).isTrue();
     }
 
     @Test

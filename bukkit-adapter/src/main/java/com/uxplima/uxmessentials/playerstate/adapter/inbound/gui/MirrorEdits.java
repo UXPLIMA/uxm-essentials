@@ -330,7 +330,9 @@ final class MirrorEdits<I> {
                     edits.add(shown);
                     viewers.open(shown);
                     Edit<I> asked = shown;
-                    scheduler.laterEntity(edit.viewer, OPEN_WAIT, () -> unlessShown(asked));
+                    scheduler.laterGlobal(
+                            OPEN_WAIT,
+                            () -> scheduler.onEntity(edit.viewer, () -> unlessShown(asked), () -> notShown(asked)));
                     if (settling) {
                         notifier.send(edit.viewer, PlayerstateMessageKey.MIRROR_VIEW_ONLY_SAVING, Map.of());
                     } else if (heldBy != null) {
@@ -499,8 +501,9 @@ final class MirrorEdits<I> {
     }
 
     /**
-     * Run a save. One that throws still has an outcome, so the edit is settled and its editor slot freed; a live save
-     * that wrote some slots before it threw counts as saved for those.
+     * Run a save. One that throws still has an outcome, so the edit is settled and its editor slot freed. A live save
+     * that threw after writing some slots first puts them back as the window opened with them, still on the target's
+     * thread, so the whole edit is undone: keeping half of a move made inside the window would copy the item.
      */
     private SaveResult run(Edit<I> edit, Supplier<SaveResult> work) {
         try {
@@ -510,14 +513,32 @@ final class MirrorEdits<I> {
                     "event=mirror_edit_save_failed viewer=" + edit.viewer.name() + " target=" + edit.target.name()
                             + " container=" + edit.kind.label(),
                     failure);
-            Set<Integer> written = Set.copyOf(edit.written);
-            if (written.isEmpty()) {
+            Set<Integer> kept = rollBack(edit);
+            if (kept.isEmpty()) {
                 return SaveResult.of(SaveOutcome.FAILED);
             }
-            Set<Integer> unwritten = new HashSet<>(edit.changed);
-            unwritten.removeAll(written);
-            return new SaveResult(SaveOutcome.SAVED, Set.copyOf(unwritten));
+            Set<Integer> undone = new HashSet<>(edit.changed);
+            undone.removeAll(kept);
+            return new SaveResult(SaveOutcome.SAVED, Set.copyOf(undone));
         }
+    }
+
+    /** Put the slots a failed live save wrote back as they were; returns those that could not be. */
+    private Set<Integer> rollBack(Edit<I> edit) {
+        Set<Integer> kept = new HashSet<>();
+        for (int slot : Set.copyOf(edit.written)) {
+            try {
+                targets.set(edit.target, edit.kind, slot, edit.base.get(slot));
+                edit.written.remove(slot);
+            } catch (RuntimeException | LinkageError failure) {
+                kept.add(slot);
+                log.error(
+                        "event=mirror_edit_rollback_failed viewer=" + edit.viewer.name() + " target="
+                                + edit.target.name() + " container=" + edit.kind.label() + " slot=" + slot,
+                        failure);
+            }
+        }
+        return kept;
     }
 
     private void afterResult(Edit<I> edit) {

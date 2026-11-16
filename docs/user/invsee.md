@@ -44,8 +44,8 @@ while the window was open, or the file could not be written. Nothing is ever kep
 member to put things back.
 
 While an editable window is open, and until its save comes back, the staff member's items stay where they are:
-they cannot drop items, open another inventory, place, use or eat items, or use their crafting grid, and if they
-die they keep their inventory. That keeps what may have to be taken back in their inventory. The one exception is a
+they cannot drop items, move items into or out of a bundle, open another inventory, place, use or eat items, use
+an armour stand or their crafting grid, and if they die they keep their inventory. That keeps what may have to be taken back in their inventory. The one exception is a
 drop of an item that would not fit back into a full inventory, such as what the window hands back on close: it is
 let through so the item is not lost, and logged.
 
@@ -78,8 +78,10 @@ file as it was. `<uuid>.dat_old` is the file as it was before the last save, by 
   `viewer_is_owed` what they put in that the player did not get.
 - `event=mirror_drop_let_through`: a staff member with an edit open dropped an item that had no room to go back
   into their inventory. The line has the item's full data.
-- `event=mirror_edit_save_failed`: a save threw an error. The edit is undone like any other failed save; the line
-  has the stack trace.
+- `event=mirror_edit_save_failed`: a save threw an error. Any slot it already wrote on an online player is put
+  back, and the edit is undone like any other failed save; the line has the stack trace.
+- `event=mirror_edit_rollback_failed`: putting back a slot after such an error failed too. The line names the slot,
+  which keeps what the edit wrote; the edit's other slots are undone.
 - `event=player_data_busy`: a login was refused because a save of the player's file did not finish in time.
 - `event=offline_inventories_unavailable`: this server version's internals could not be reached, so offline
   windows are off. Online windows still work.

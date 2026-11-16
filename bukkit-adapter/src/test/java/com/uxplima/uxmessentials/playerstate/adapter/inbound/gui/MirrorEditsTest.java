@@ -351,7 +351,7 @@ class MirrorEditsTest {
     }
 
     @Test
-    void aLiveSaveThatThrowsMidwayCountsAsSavedForTheSlotsItWrote() {
+    void aLiveSaveThatThrowsMidwayPutsBackWhatItWroteAndIsUndone() {
         world.join(SAM, slots(DIAMONDS, GOLD));
         MirrorEdits.Edit<Stack> ann = openOnline(ANN, true);
         takeOut(ann, 0);
@@ -360,9 +360,26 @@ class MirrorEditsTest {
 
         close(ann, MirrorEdits.Cause.CLOSED);
 
-        assertThat(world.live(SAM)).containsExactly(null, GOLD);
-        assertThat(world.inventory(ANN)).containsExactly(DIAMONDS);
-        assertThat(told).containsExactly("Ann: playerstate.mirror.partly-saved");
+        assertThat(world.live(SAM)).containsExactly(DIAMONDS, GOLD);
+        assertThat(world.inventory(ANN)).isEmpty();
+        assertThat(told).containsExactly("Ann: playerstate.mirror.undone-failed");
+    }
+
+    @Test
+    void aMoveInsideTheWindowWhoseLiveSaveThrowsMidwayCreatesNoItem() {
+        world.join(SAM, slots(null, DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOnline(ANN, true);
+        world.screen(ann).set(1, null);
+        world.screen(ann).set(0, DIAMONDS);
+        world.failingSlot = 1;
+
+        close(ann, MirrorEdits.Cause.CLOSED);
+
+        assertThat(world.live(SAM))
+                .as("slot 0 was written and put back, so the diamonds are not in both slots")
+                .containsExactly(null, DIAMONDS);
+        assertThat(world.inventory(ANN)).isEmpty();
+        assertThat(told).containsExactly("Ann: playerstate.mirror.undone-failed");
     }
 
     // ---- closes that cannot wait -------------------------------------------------------------------------------
@@ -777,8 +794,8 @@ class MirrorEditsTest {
         }
 
         @Override
-        public void laterEntity(PlayerRef player, java.time.Duration delay, Runnable task) {
-            later.add(() -> onEntity(player, task));
+        public void laterGlobal(java.time.Duration delay, Runnable task) {
+            later.add(task);
         }
 
         @Override
