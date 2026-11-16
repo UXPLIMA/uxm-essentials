@@ -144,8 +144,10 @@ changes, trade signals and vote parties), and a second cache reload is harmless.
 
 This holds only once every backend runs the same version. During a rolling upgrade, a backend on an older version,
 or a vote party sent by one, can still pay a vote party twice. A backend remembers the ids it acted on in memory
-only, so a copy that arrives very late, after that backend restarted, can act again. Use `both` only while moving
-from one carrier to the other.
+only, so a copy that arrives very late, after that backend restarted, can act again. Vote parties are the exception:
+a party sent over both carriers carries the time it fired, and a backend that is itself on both carriers drops one
+that fired before it started, so the late proxy copy of a party it already paid does not pay again. A party sent on
+the proxy alone, or received by a backend on the proxy alone, is never dropped this way. Use `both` only while moving from one carrier to the other.
 
 ## The proxy plugin
 

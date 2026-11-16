@@ -1,5 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.bus;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -30,16 +32,18 @@ import org.jspecify.annotations.NullMarked;
  *       repository so every counter mutation ({@code incrementAndGetPartyCount}, {@code setPartyCount},
  *       {@code claimPartyFire}) publishes a {@link VoteCounterChanged} frame after the durable write commits
  *       peers learn the running total advanced and drop their cached copy.
- *   <li><b>Outbound (party fire)</b>: {@link #partyPublisher(BusPublisher)} returns a domain-event consumer
+ *   <li><b>Outbound (party fire)</b>: {@link #partyPublisher(BusPublisher, Clock, boolean)} returns a domain-event consumer
  *       that, on a local {@link VotePartyTriggered}, publishes a {@link VotePartyFired} frame so peers run
  *       their own party celebration once, in lockstep, rather than each racing to detect the crossing.
- *   <li><b>Inbound</b>: {@link #listener(Runnable, VoteBroadcaster, Set, RewardNetworkParty)}
+ *   <li><b>Inbound</b>: {@link #listener(Runnable, VoteBroadcaster, Set, RewardNetworkParty, Instant)}
  *       returns a {@link RemoteSyncListener} that, on a remote {@link VoteCounterChanged}, drops the cached
  *       counter, and on a remote {@link VotePartyFired}, drops the cached counter, re-broadcasts the party
  *       announcement on the configured channels and rewards the players online here whom the frame makes
  *       eligible. The origin paid only its own players, and a player is online on one backend at a time, so
  *       nobody is paid twice. With {@code network.transport = both} each frame arrives once per transport, so a
- *       party id already celebrated here is dropped.
+ *       party id already celebrated here is dropped, and so is a both-carrier frame for a party that fired before
+ *       this listener started: the proxy copy can lag the Redis one by hours, past a restart that emptied the
+ *       memory of celebrated ids.
  * </ul>
  *
  * <p>The decorator wraps the <em>same</em> cache the vote commands read, so the loop closes: a write here emits
@@ -69,23 +73,29 @@ public final class VoteSync {
      * {@link VotePartyFired} drops the counter, re-broadcasts {@link VoteMessageKey#VOTEPARTY_REACHED} on
      * {@code channels} and hands the frame's eligible players to {@code rewards}, which pays the ones online
      * here. {@code dropCachedCounter} is the cache's invalidation ({@link CachedVoteRepository#invalidate}),
-     * passed as a {@code Runnable} so this seam is testable without the persistence graph.
+     * passed as a {@code Runnable} so this seam is testable without the persistence graph. {@code listeningSince}
+     * is when this listener starts taking frames, before which any both-carrier party is a late copy; a backend on
+     * one carrier passes {@link Instant#MIN}, since it never receives the other copy and so drops nothing.
      */
     public static RemoteSyncListener listener(
             Runnable dropCachedCounter,
             VoteBroadcaster broadcaster,
             Set<BroadcastChannel> channels,
-            RewardNetworkParty rewards) {
+            RewardNetworkParty rewards,
+            Instant listeningSince) {
         Objects.requireNonNull(dropCachedCounter, "dropCachedCounter");
         Objects.requireNonNull(broadcaster, "broadcaster");
         Objects.requireNonNull(channels, "channels");
         Objects.requireNonNull(rewards, "rewards");
+        Objects.requireNonNull(listeningSince, "listeningSince");
         Set<BroadcastChannel> safeChannels = Set.copyOf(channels);
         RecentIds celebrated = new RecentIds();
         return message -> {
             if (message instanceof VoteCounterChanged) {
                 dropCachedCounter.run();
-            } else if (message instanceof VotePartyFired fired && firstCopy(fired, celebrated)) {
+            } else if (message instanceof VotePartyFired fired
+                    && !fired.firedBefore(listeningSince)
+                    && firstCopy(fired, celebrated)) {
                 dropCachedCounter.run();
                 broadcaster.broadcast(
                         VoteMessageKey.VOTEPARTY_REACHED,
@@ -112,27 +122,35 @@ public final class VoteSync {
 
     /**
      * A domain-event consumer that publishes a {@link VotePartyFired} when a {@link VotePartyTriggered} fires
-     * locally, so peers celebrate the same party. Any other event is ignored.
+     * locally, so peers celebrate the same party. The frame carries the time from {@code clock} and whether
+     * {@code bothCarriers} are in use, which is what lets a receiver tell a late copy from a late party. Any other
+     * event is ignored.
      */
-    public static Consumer<DomainEvent> partyPublisher(BusPublisher bus) {
+    public static Consumer<DomainEvent> partyPublisher(BusPublisher bus, Clock clock, boolean bothCarriers) {
         Objects.requireNonNull(bus, "bus");
+        Objects.requireNonNull(clock, "clock");
         return event -> {
             if (event instanceof VotePartyTriggered triggered) {
-                bus.publish(fired(bus.serverId(), triggered));
+                bus.publish(fired(bus.serverId(), triggered, clock.instant(), bothCarriers));
             }
         };
     }
 
-    private static VotePartyFired fired(String origin, VotePartyTriggered triggered) {
+    private static VotePartyFired fired(
+            String origin, VotePartyTriggered triggered, Instant firedAt, boolean bothCarriers) {
         UUID party = UUID.randomUUID();
         int threshold = triggered.threshold();
+        VotePartyFired.Reach reach;
+        Set<UUID> voters = Set.of();
         if (!triggered.onlyVoters()) {
-            return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.EVERYONE, Set.of());
+            reach = VotePartyFired.Reach.EVERYONE;
+        } else if (triggered.absentVoters().size() > MAX_VOTERS_ON_WIRE) {
+            reach = VotePartyFired.Reach.NONE;
+        } else {
+            reach = VotePartyFired.Reach.VOTERS;
+            voters = triggered.absentVoters();
         }
-        if (triggered.absentVoters().size() > MAX_VOTERS_ON_WIRE) {
-            return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.NONE, Set.of());
-        }
-        return new VotePartyFired(origin, party, threshold, VotePartyFired.Reach.VOTERS, triggered.absentVoters());
+        return new VotePartyFired(origin, party, threshold, reach, voters, firedAt, bothCarriers);
     }
 
     /** Forwards every call to the cached delegate, then announces each counter mutation on the bus. */
