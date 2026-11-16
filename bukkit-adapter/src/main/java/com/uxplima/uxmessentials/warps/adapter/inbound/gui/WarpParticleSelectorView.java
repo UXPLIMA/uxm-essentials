@@ -132,6 +132,8 @@ public final class WarpParticleSelectorView {
         editorView.edit(
                 name,
                 owner,
+                player,
+                viewer,
                 warp -> {
                     if (isDeparture) {
                         warp.setDepartureParticle(particle);

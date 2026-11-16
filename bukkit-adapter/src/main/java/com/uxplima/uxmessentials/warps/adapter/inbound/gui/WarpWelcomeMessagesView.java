@@ -265,6 +265,8 @@ public final class WarpWelcomeMessagesView {
         editorView.edit(
                 list.warpName(),
                 list.warpOwner(),
+                player,
+                viewer,
                 warp -> {
                     List<WelcomeMessage> next = edit.apply(new ArrayList<>(warp.welcomeMessages()));
                     if (next != null) {
