@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLook
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitWorldLookup;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.CachingPlayerNameIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.IndexedPlayerLookup;
+import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.OnlinePlayerIndex;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.AdventureTranslations;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.CatalogMessages;
 import com.uxplima.uxmessentials.shared.adapter.outbound.message.HoconLocaleCatalog;
@@ -110,6 +111,7 @@ final class KernelWiring {
      * @param serverDefault the configured server-default locale (client fallback at the boundary)
      * @param nameIndex the player-name index behind the lookup port, still to be backed by the database
      * @param networkClaims the shared kit claims and cooldowns on a network, empty on a single server
+     * @param online who is connected, behind the lookup port, still to be seeded and kept by a listener
      */
     record Kernel(
             KernelPorts ports,
@@ -118,7 +120,8 @@ final class KernelWiring {
             LocaleResolver resolver,
             java.util.Locale serverDefault,
             CachingPlayerNameIndex nameIndex,
-            Optional<NetworkClaims> networkClaims) {
+            Optional<NetworkClaims> networkClaims,
+            OnlinePlayerIndex online) {
         Kernel {
             Objects.requireNonNull(ports, "ports");
             Objects.requireNonNull(localeStore, "localeStore");
@@ -127,6 +130,7 @@ final class KernelWiring {
             Objects.requireNonNull(serverDefault, "serverDefault");
             Objects.requireNonNull(nameIndex, "nameIndex");
             Objects.requireNonNull(networkClaims, "networkClaims");
+            Objects.requireNonNull(online, "online");
         }
     }
 
@@ -220,6 +224,7 @@ final class KernelWiring {
         // server, so without this an offline-mode server cannot resolve a name typed in a different case at all.
         // It starts empty and memory-only; PluginModule backs it with the database once persistence is open.
         CachingPlayerNameIndex nameIndex = new CachingPlayerNameIndex(scheduler, log);
+        OnlinePlayerIndex online = new OnlinePlayerIndex();
 
         // One skin fetch for every context that dresses something in a player's skin. It asks Mojang directly
         // rather than through Bukkit's profile completion, which consults the session service only on an
@@ -248,14 +253,14 @@ final class KernelWiring {
                 new SchedulerWarmups(scheduler, permissions),
                 messages,
                 new BukkitMessageSink(scheduler, prefix, messageBridgeFactory()),
-                new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex),
+                new IndexedPlayerLookup(new BukkitPlayerLookup(), nameIndex, online),
                 new BukkitWorldLookup(),
                 new BukkitPlayerLocator(),
                 new InProcessDomainEventPublisher(log),
                 log,
                 mojangSkins,
                 new BukkitDomainGate(vetoes, plugin.getServer().getPluginManager(), log));
-        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex, networkClaims);
+        return new Kernel(ports, localeStore, catalog, resolver, serverDefault, nameIndex, networkClaims, online);
     }
 
     /**

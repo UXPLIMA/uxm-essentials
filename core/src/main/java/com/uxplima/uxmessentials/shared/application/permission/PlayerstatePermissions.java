@@ -194,7 +194,7 @@ public final class PlayerstatePermissions {
                         PLAYERSTATE),
                 PermissionSpec.of(
                         ENDERSEE_USE,
-                        "/endersee [player] to view a player's ender chest.",
+                        "/endersee [player] (and the endersee entry on the /uxmess gui hub) to view a player's ender chest.",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
@@ -209,7 +209,7 @@ public final class PlayerstatePermissions {
                         PLAYERSTATE),
                 PermissionSpec.of(
                         INVSEE_USE,
-                        "/invsee [player] to view a player's inventory.",
+                        "/invsee [player] (and the invsee entry on the /uxmess gui hub) to view a player's inventory.",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(
@@ -233,7 +233,7 @@ public final class PlayerstatePermissions {
                         PLAYERSTATE),
                 PermissionSpec.of(
                         PLAYTIME_USE,
-                        "/playtime [player] to show a player's playtime breakdown (active/afk, today/week/month/all-time).",
+                        "/playtime [player] (and your own panel from the /uxmess gui hub) to show a player's playtime breakdown (active/afk, today/week/month/all-time).",
                         PermissionDefault.OP,
                         PLAYERSTATE),
                 PermissionSpec.of(

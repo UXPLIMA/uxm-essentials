@@ -350,7 +350,7 @@ public final class EnforcementPermissions {
                         INVROLLBACK),
                 PermissionSpec.of(
                         INVROLLBACK_RESTORE,
-                        "/invrestore <player> opens the inventory-snapshot restore GUI for a player.",
+                        "/invrestore <player> (and the invrollback entry on the /uxmess gui hub) opens the inventory-snapshot restore GUI for a player.",
                         PermissionDefault.OP,
                         INVROLLBACK),
                 PermissionSpec.of(

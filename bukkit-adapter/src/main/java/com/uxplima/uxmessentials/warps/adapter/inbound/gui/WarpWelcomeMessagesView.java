@@ -4,10 +4,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 import org.bukkit.Material;
@@ -72,8 +69,6 @@ public final class WarpWelcomeMessagesView {
     private final EditableWarpLoader loader;
 
     /** The last save asked for on each warp, which the next save of that warp waits for. */
-    private final Map<String, CompletableFuture<Void>> saves = new ConcurrentHashMap<>();
-
     private WarpWelcomeMessagesView(
             Menus menus,
             Scheduler scheduler,
@@ -259,57 +254,24 @@ public final class WarpWelcomeMessagesView {
     /**
      * Apply {@code edit} to the warp's live welcome messages and save them on the async lane, then re-open the list on
      * the viewer's thread. The edit gets a mutable copy and answers the list to save, or null to save nothing; a warp
-     * that is gone saves nothing. The save waits for the warp's previous save, so it reads what that one wrote. The
-     * list re-opens even when the save throws, so the operator is never left without the menu, and the failure still
-     * reaches the async lane's log.
+     * that is gone saves nothing. The save goes through the editor's queue for the warp, so it waits for any other
+     * edit of the same warp and reads what that one wrote. The list re-opens even when the save throws.
      */
     private void saveThenOpen(
             Player player,
             PlayerRef viewer,
             WelcomeList list,
             Function<List<WelcomeMessage>, @Nullable List<WelcomeMessage>> edit) {
-        String key = warpKey(list);
-        CompletableFuture<Void> done = new CompletableFuture<>();
-        CompletableFuture<Void> previous = saves.put(key, done);
-        Runnable save = () -> {
-            try {
-                EditableWarp warp = loader.load(list.warpName(), list.warpOwner());
-                if (warp != null) {
+        editorView.edit(
+                list.warpName(),
+                list.warpOwner(),
+                warp -> {
                     List<WelcomeMessage> next = edit.apply(new ArrayList<>(warp.welcomeMessages()));
                     if (next != null) {
                         warp.setWelcomeMessages(next);
                     }
-                }
-            } finally {
-                settle(key, done);
-                open(player, viewer, list.warpName(), list.warpOwner());
-            }
-        };
-        if (previous == null) {
-            offTick(key, done, save);
-        } else {
-            var unused = previous.whenComplete((ignored, error) -> offTick(key, done, save));
-        }
-    }
-
-    private void offTick(String key, CompletableFuture<Void> done, Runnable save) {
-        try {
-            scheduler.async(save);
-        } catch (RuntimeException refused) {
-            // The lane refuses work while the plugin stops; the save never runs, and the next one must not wait on it.
-            settle(key, done);
-        }
-    }
-
-    private void settle(String key, CompletableFuture<Void> done) {
-        done.complete(null);
-        saves.remove(key, done);
-    }
-
-    private static String warpKey(WelcomeList list) {
-        PlayerRef owner = list.warpOwner();
-        return (owner == null ? "server" : owner.uuid().toString()) + ":"
-                + list.warpName().toLowerCase(Locale.ROOT);
+                },
+                () -> open(player, viewer, list.warpName(), list.warpOwner()));
     }
 
     private static Material materialFor(String type) {

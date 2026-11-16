@@ -186,7 +186,8 @@ public final class PlayerstateWiring {
             logins.adoptOnline(plugin.getServer().getOnlinePlayers());
             listeners.add(logins);
         }
-        return new Wired(commands, List.copyOf(listeners), mirrors, services, store, info, sampler, afkStatus);
+        return new Wired(
+                commands, List.copyOf(listeners), mirrors, services, store, info, sampler, afkStatus, playtimeView);
     }
 
     /**
@@ -283,6 +284,7 @@ public final class PlayerstateWiring {
      * @param info the live-player read port, read by the placeholder seam for total play time
      * @param sampler the AFK-aware playtime sampler, armed by {@code startBackgroundWork} and stopped by {@code stop}
      * @param afkStatus the rebindable AFK seam presence rebinds to its store when it wires
+     * @param playtimeView the {@code /playtime} panel, which the {@code /uxmess gui} hub opens for the viewer too
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -292,7 +294,8 @@ public final class PlayerstateWiring {
             PlayerStateStore store,
             PlayerInfo info,
             PlaytimeSampler sampler,
-            MutablePlaytimeAfkStatus afkStatus) {
+            MutablePlaytimeAfkStatus afkStatus,
+            PlaytimeView playtimeView) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -303,6 +306,7 @@ public final class PlayerstateWiring {
             Objects.requireNonNull(info, "info");
             Objects.requireNonNull(sampler, "sampler");
             Objects.requireNonNull(afkStatus, "afkStatus");
+            Objects.requireNonNull(playtimeView, "playtimeView");
         }
 
         /** Arm the playtime sampler. Called once after registration, like the presence sweep. */

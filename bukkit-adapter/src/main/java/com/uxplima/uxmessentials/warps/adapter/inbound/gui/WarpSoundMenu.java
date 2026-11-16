@@ -12,7 +12,6 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpSoundSelectorView.SoundOption;
-import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.WarpsMessageKey;
 import com.uxplima.uxmlib.gui.input.InputRequest;
 import com.uxplima.uxmlib.gui.input.TextInput;
@@ -43,36 +42,24 @@ public final class WarpSoundMenu {
 
     private final Menus menus;
     private final WarpSoundSelectorView optionSource;
-    private final EditableWarpLoader loader;
     private final WarpEditorView editorView;
     private final TextInput textInput;
 
     private WarpSoundMenu(
-            Menus menus,
-            WarpSoundSelectorView optionSource,
-            EditableWarpLoader loader,
-            WarpEditorView editorView,
-            TextInput textInput) {
+            Menus menus, WarpSoundSelectorView optionSource, WarpEditorView editorView, TextInput textInput) {
         this.menus = Objects.requireNonNull(menus, "menus");
         this.optionSource = Objects.requireNonNull(optionSource, "optionSource");
-        this.loader = Objects.requireNonNull(loader, "loader");
         this.editorView = Objects.requireNonNull(editorView, "editorView");
         this.textInput = Objects.requireNonNull(textInput, "textInput");
     }
 
     /**
-     * Build the sound menu over the warps wiring's collaborators. The editable-warp loader is built here from the
-     * server-warp repository and the editor view (the same pair the editor listener loads through), so the warps
-     * wiring needs only the public collaborators it already holds.
+     * Build the sound menu over the warps wiring's collaborators. Its saves go through the editor view, which loads the
+     * warp the same way the editor does.
      */
     public static WarpSoundMenu create(
-            Menus menus,
-            WarpSoundSelectorView optionSource,
-            WarpRepository repository,
-            WarpEditorView editorView,
-            TextInput textInput) {
-        EditableWarpLoader loader = new EditableWarpLoader(repository, editorView);
-        return new WarpSoundMenu(menus, optionSource, loader, editorView, textInput);
+            Menus menus, WarpSoundSelectorView optionSource, WarpEditorView editorView, TextInput textInput) {
+        return new WarpSoundMenu(menus, optionSource, editorView, textInput);
     }
 
     /** Register the bindings the spec names and the spec itself; called once at warps wiring time. */
@@ -102,8 +89,7 @@ public final class WarpSoundMenu {
     /** Set the clicked preset sound on the warp's departure or arrival side, then reopen the editor. */
     private void setSound(MenuActionContext ctx) {
         SoundOption option = ctx.entry(SoundOption.class);
-        saveSound(ctx, Optional.of(option.soundName()));
-        reopenEditor(ctx);
+        saveThenReopen(ctx, Optional.of(option.soundName()));
     }
 
     /** Prompt for a custom sound name through the shared text-input seam, exactly as the old custom button did. */
@@ -111,7 +97,6 @@ public final class WarpSoundMenu {
         WarpSoundEdit edit = ctx.subject(WarpSoundEdit.class);
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
-        String name = edit.warp().value();
         WarpsMessageKey promptKey = edit.departure()
                 ? WarpsMessageKey.WARP_EDITOR_SOUND_DEPARTURE_PROMPT
                 : WarpsMessageKey.WARP_EDITOR_SOUND_ARRIVAL_PROMPT;
@@ -119,17 +104,13 @@ public final class WarpSoundMenu {
         textInput.prompt(
                 player,
                 InputRequest.of("warp.sound", promptKey.key()),
-                input -> {
-                    save(edit, Optional.of(input.toLowerCase(Locale.ROOT)));
-                    editorView.open(player, viewer, name, null);
-                },
+                input -> save(edit, Optional.of(input.toLowerCase(Locale.ROOT)), player, viewer),
                 () -> open(ctx.viewer(), edit));
     }
 
     /** Clear the warp's sound on the subject's side, then reopen the editor. */
     private void removeSound(MenuActionContext ctx) {
-        saveSound(ctx, Optional.empty());
-        reopenEditor(ctx);
+        saveThenReopen(ctx, Optional.empty());
     }
 
     /** The back button: reopen the warp editor for this warp. */
@@ -137,20 +118,24 @@ public final class WarpSoundMenu {
         reopenEditor(ctx);
     }
 
-    private void saveSound(MenuActionContext ctx, Optional<String> sound) {
-        save(ctx.subject(WarpSoundEdit.class), sound);
+    private void saveThenReopen(MenuActionContext ctx, Optional<String> sound) {
+        save(ctx.subject(WarpSoundEdit.class), sound, ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
-    private void save(WarpSoundEdit edit, Optional<String> sound) {
-        EditableWarp warp = loader.load(edit.warp().value(), null);
-        if (warp == null) {
-            return;
-        }
-        if (edit.departure()) {
-            warp.setDepartureSound(sound);
-        } else {
-            warp.setArrivalSound(sound);
-        }
+    /** Save the sound on the warp's chosen side off the tick, then reopen the editor once it is written. */
+    private void save(WarpSoundEdit edit, Optional<String> sound, Player player, PlayerRef viewer) {
+        String name = edit.warp().value();
+        editorView.edit(
+                name,
+                null,
+                warp -> {
+                    if (edit.departure()) {
+                        warp.setDepartureSound(sound);
+                    } else {
+                        warp.setArrivalSound(sound);
+                    }
+                },
+                () -> editorView.open(player, viewer, name, null));
     }
 
     private void reopenEditor(MenuActionContext ctx) {
