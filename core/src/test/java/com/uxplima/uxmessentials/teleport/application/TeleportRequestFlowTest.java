@@ -53,7 +53,7 @@ class TeleportRequestFlowTest {
             who -> jailed,
             who -> tagged);
     private final RequestTeleport request =
-            new RequestTeleport(requests, flags, notifier.notifier(), events, settings, who -> jailed, clock);
+            new RequestTeleport(requests, flags, notifier.notifier(), events, settings, who -> jailed, engine, clock);
     private final AcceptTeleport accept = new AcceptTeleport(requests, engine, notifier.notifier(), events, clock);
 
     private void alexAsksSam() {

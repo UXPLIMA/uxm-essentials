@@ -44,9 +44,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The cooldown/warmup machinery every cooldowned teleport flows through. It owns three steps in order:
  * (1) gate the shared teleport cooldown, (2) begin a move-cancellable warmup through the {@link Warmups}
- * port, and (3) on completion issue the async hop via {@link TeleportExecutor} and, under the
- * {@code teleport} start phase. Stamp the cooldown only then, so a denied, cancelled, or move-cancelled
- * teleport never burns it (the cooldown is added <em>after</em> the warmup).
+ * port, and (3) on completion issue the async hop via {@link TeleportExecutor}. Under the {@code teleport} start
+ * phase the cooldown is stamped only on landing, so a denied, cancelled, or move-cancelled teleport never burns it;
+ * under {@code request} and {@code accept} it is stamped once the checks pass and the warmup begins.
  *
  * <p>The move-cancels-warmup invariant is enforced by the adapter's {@code PlayerMoveEvent} listener
  * flipping the {@link WarmupHandle}; this engine wires the warmup's {@code onComplete}/{@code onCancel}
@@ -401,7 +401,8 @@ public final class TeleportEngine {
      * warmup and no cooldown check, since the origin ran {@link #gateHop} before it charged and the player has
      * just joined. A jailed or combat-tagged player is still refused, and so is a hop the veto gate stops, each with
      * its notice. The landing goes through the same path as a local teleport's, so a {@code teleport}-phase
-     * cooldown is stamped once the player stands at the destination. Exactly one of {@code onLanded} and
+     * cooldown is stamped once the player stands at the destination, and a {@code request} or {@code accept}-phase one
+     * as the move starts, on the clock the origin's {@link #gateHop} checked. Exactly one of {@code onLanded} and
      * {@code onFailed} runs for a hop that was issued; a refusal runs neither and returns the error, so the caller
      * can give the money back.
      */
@@ -423,6 +424,12 @@ public final class TeleportEngine {
         if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
             notifier.send(mover, TeleportError.VETOED.messageKey());
             return Result.err(TeleportError.VETOED);
+        }
+        try {
+            startClock(mover, destination, kind);
+        } catch (RuntimeException stampFailure) {
+            // The player has paid and waited for this hop, so a stamp that fails lets them through and is logged.
+            log.error("cooldown stamp for the cross-server hop of " + mover.name() + " failed", stampFailure);
         }
         executor.teleport(mover, destination, kind, () -> landArrival(mover, destination, kind, onLanded), onFailed);
         return Result.ok();
@@ -633,6 +640,7 @@ public final class TeleportEngine {
             }
             return new Warmups.RefusedWarmup();
         }
+        startClock(mover, destination, kind);
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
@@ -699,6 +707,20 @@ public final class TeleportEngine {
         postArrival.run();
     }
 
+    /**
+     * Start the cooldown as a teleport is let through, under the {@code request} and {@code accept} phases. A teleport
+     * that is not a player request has no request or accept step of its own, so both phases mean the moment every
+     * check has passed: its warmup starting, or, for a hop from another server, its move starting here. The stamp
+     * stays when the warmup is then cancelled or the hop misses, as a denied request keeps a {@code request}-phase
+     * stamp: what sets these phases apart from {@code teleport} is that trying is what costs the wait. A player
+     * request stamps at its own request and accept moments instead, through {@link #stampForPhase}.
+     */
+    private void startClock(PlayerRef mover, Destination destination, TeleportKind kind) {
+        if (settings.cooldownStartPhase() != CooldownStartPhase.TELEPORT && kind != TeleportKind.REQUEST) {
+            cooldowns.stamp(mover, cooldownKind(kind, destination));
+        }
+    }
+
     private void onWarmupCancelled(
             PlayerRef mover, TeleportKind kind, WarmupCancelReason reason, OneOutcome reported, TeleportOutcome ended) {
         // Every way a warmup is stopped (a move, a hit, the player leaving, the player's next teleport) ends here and
@@ -714,9 +736,10 @@ public final class TeleportEngine {
     }
 
     /**
-     * Stamp the cooldown for an earlier phase ({@code request}/{@code accept}) when configured. This is the
-     * {@code tpa} path, so the kind is {@link TeleportKind#REQUEST}; tpa carries no per-verb override and
-     * stamps under the shared {@code tp} scope, matching its prior single-cooldown behaviour.
+     * Stamp a player request's cooldown at {@code atPhase} when that is the configured phase: {@code request} once a
+     * {@code /tpa} or {@code /tpahere} is open, for the player who sent it, and {@code accept} when it is accepted,
+     * for the player who moves. The kind is {@link TeleportKind#REQUEST}, which carries no per-verb override and
+     * stamps under the shared {@code tp} scope.
      */
     public void stampForPhase(PlayerRef mover, CooldownStartPhase atPhase) {
         if (settings.cooldownStartPhase() == atPhase && atPhase != CooldownStartPhase.TELEPORT) {

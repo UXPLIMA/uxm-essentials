@@ -92,6 +92,9 @@ class CrossServerTeleportTest {
     private final Map<UUID, Integer> vanishRows = new HashMap<>();
 
     private boolean proxyCarries = true;
+    /** The {@code cooldown-start-phase} every backend runs with. */
+    private String startPhase = "teleport";
+
     private boolean holdWarmups;
     private final List<Runnable[]> heldWarmups = new ArrayList<>();
 
@@ -386,6 +389,53 @@ class CrossServerTeleportTest {
         assertThat(keys(ALEX)).doesNotContain("teleport.cooldown.active");
     }
 
+    @Test
+    void underTheRequestPhaseARemoteRequestStartsTheSendersCooldownOnceTheTargetHoldsIt() {
+        startPhase = "request";
+
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
+        assertThat(onCooldown(ALEX))
+                .as("nothing is open until the target's server holds it")
+                .isFalse();
+        bus.deliver();
+
+        assertThat(onCooldown(ALEX)).isTrue();
+    }
+
+    @Test
+    void underTheRequestPhaseARemoteRequestTheTargetRefusesStartsNoCooldown() {
+        startPhase = "request";
+        survival.flags.off.add(SAM.uuid());
+
+        lobby.requests.request(ALEX, "Sam", RequestDirection.TO_TARGET);
+        bus.deliver();
+
+        assertThat(keys(ALEX)).containsExactly("teleport.tpa.toggled-off");
+        assertThat(onCooldown(ALEX)).isFalse();
+    }
+
+    @Test
+    void underTheAcceptPhaseARemoteRequestStartsTheMoversCooldownOnAccept() {
+        startPhase = "accept";
+        holdWarmups = true;
+
+        acceptAlexToSam();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).as("still warming up").isEmpty();
+        assertThat(onCooldown(ALEX)).isTrue();
+    }
+
+    @Test
+    void underTheTeleportPhaseARemoteRequestStartsTheMoversCooldownOnlyOnLanding() {
+        acceptAlexToSam();
+        assertThat(onCooldown(ALEX)).isFalse();
+        scheduler.advance(SETTLE);
+
+        assertThat(moves).containsExactly("Alex@survival->10,64,10 REQUEST");
+        assertThat(onCooldown(ALEX)).isTrue();
+    }
+
     // Either player may switch servers between the request and the move.
 
     @Test
@@ -658,6 +708,11 @@ class CrossServerTeleportTest {
         bus.deliver();
     }
 
+    /** Whether {@code who} waits on the shared teleport clock every backend checks. */
+    private boolean onCooldown(PlayerRef who) {
+        return cooldowns.checkLabel(who, "tp").isErr();
+    }
+
     private List<String> keys(PlayerRef viewer) {
         return notifier.sent().stream()
                 .filter(line -> line.viewer().equals(viewer))
@@ -745,6 +800,7 @@ class CrossServerTeleportTest {
                     settings,
                     who -> jailed.contains(who.uuid()),
                     who -> false,
+                    engine,
                     clock);
             Net network = new Net(name);
             AcceptTeleport[] holder = new AcceptTeleport[1];
@@ -1112,7 +1168,7 @@ class CrossServerTeleportTest {
     }
 
     /** The shipped teleport settings: a 60 second request, a 5 second cooldown stamped on landing. */
-    private static final class Config implements ConfigStore {
+    private final class Config implements ConfigStore {
 
         @Override
         public boolean getBoolean(String path, boolean fallback) {
@@ -1121,7 +1177,7 @@ class CrossServerTeleportTest {
 
         @Override
         public String getString(String path, String fallback) {
-            return fallback;
+            return path.equals("cooldown-start-phase") ? startPhase : fallback;
         }
 
         @Override
