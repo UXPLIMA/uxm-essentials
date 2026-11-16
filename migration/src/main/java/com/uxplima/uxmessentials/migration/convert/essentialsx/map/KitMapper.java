@@ -14,7 +14,8 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Translates a parsed EssentialsX kit into a domain {@link KitDefinition}. The
- * EssentialsX {@code delay} (seconds) becomes the kit cooldown; each raw item descriptor line becomes an
+ * EssentialsX {@code delay} (seconds) becomes the kit cooldown, every kit is reserved behind its per-kit
+ * permission node as EssentialsX reserves it behind {@code essentials.kits.<name>}, and each raw item descriptor line becomes an
  * opaque {@link KitItem} whose {@code data} is the descriptor and whose amount is the trailing quantity
  * token (defaulting to 1). The descriptor stays opaque. The bukkit-side writer round-trips it through
  * Bukkit's item codec, so this mapper never imports an {@code ItemStack} type.
@@ -28,7 +29,10 @@ public final class KitMapper {
         boolean oneTime = src.delaySeconds() < 0;
         KitDefinition definition = KitDefinition.repeatable(
                         KitId.of(src.name()), items(src.items()), Duration.ofSeconds(oneTime ? 0L : src.delaySeconds()))
-                .withOneTime(oneTime);
+                .withOneTime(oneTime)
+                // EssentialsX hands a kit only to holders of essentials.kits.<name>, so a rank kit must stay
+                // reserved: the per-kit node uxmessentials.kit.<id> takes that role and defaults to operators.
+                .withPermission(true);
         return new ImportedKit(definition);
     }
 

@@ -92,6 +92,41 @@ kit (see [What is not imported](#what-is-not-imported) for what a kit loses). An
 that is not loaded, and a kit that cannot be converted are each skipped with a warning naming them; the rest of the
 import goes on.
 
+### Kit permissions
+
+EssentialsX hands a kit only to players with `essentials.kits.<name>`. Every imported kit keeps that gate: its file
+gets `permission = true`, so claiming it needs `uxmessentials.kit.<name>` (the name in lower case) on top of
+`uxmessentials.kit.use`. Operators hold every `uxmessentials.kit.<name>` node by default and nobody else does, so after
+the import only operators can claim the kits until the new nodes are granted.
+
+| EssentialsX node | uxmEssentials node |
+|---|---|
+| `essentials.kit` | `uxmessentials.kit.use` (everyone by default) |
+| `essentials.kits.<name>` | `uxmessentials.kit.<name>` (operators by default) |
+
+Grant each kit to the groups that held its EssentialsX node, with LuckPerms for example:
+
+```
+/lp group default permission set uxmessentials.kit.starter true
+/lp group vip permission set uxmessentials.kit.vip true
+```
+
+To move the existing grants of one kit in a single step, contexts and expiry included, rename the node with a bulk
+update and confirm it with the command LuckPerms prints. It renames rather than copies, so do it once EssentialsX is
+gone, and once per kit:
+
+```
+/lp bulkupdate all update permission uxmessentials.kit.vip "permission == essentials.kits.vip"
+```
+
+Do not replace `essentials.kits.*` with `uxmessentials.kit.*`: that wildcard also grants the staff nodes under it,
+such as `uxmessentials.kit.edit`, `uxmessentials.kit.others` and `uxmessentials.kit.reset`. Grant the kits one by one.
+To keep using the EssentialsX nodes instead, set `permission-node = "essentials.kits.<name>"` in the kit's file.
+
+A kit that was imported before kits kept their gate stays open to everyone, and a new import with
+`on-conflict = "skip"` leaves it as it is. Set `permission = true` in its file, or import again with `overwrite`,
+which replaces the kit and any change made to it since.
+
 ## LiteBans
 
 The importer reads the `bans`, `mutes` and `warnings` tables with the configured prefix. Leave `jdbc-url` empty to
@@ -220,10 +255,8 @@ matter.
 
 ## What is not imported
 
-- **Kit claims and kit permissions.** EssentialsX records which players claimed a kit and when; that is not read,
-  so every player can claim an imported one-time kit once more and no cooldown is running. Imported kits do not
-  require a permission: anyone with `uxmessentials.kit.use` can claim them. Set `permission = true` in the kit's file
-  to gate a kit with `uxmessentials.kit.<name>` (see [kits.md](kits.md)).
+- **Kit claims.** EssentialsX records which players claimed a kit and when; that is not read, so every player can
+  claim an imported one-time kit once more and no cooldown is running.
 - **Kit contents beyond plain items.** A kit keeps its name, its `delay` as the cooldown (a negative delay becomes
   `one-time = true`) and its items with amount, damage and enchantments. Item names, lore and other item data are
   dropped; money lines, command lines and items whose material does not exist are left out without a warning.

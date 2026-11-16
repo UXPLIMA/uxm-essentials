@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
@@ -158,6 +159,18 @@ class EssentialsXImportTest {
         assertThat(kit("welcome").oneTime()).isTrue();
         assertThat(kit("welcome").cooldown()).isZero();
         assertThat(kit("starter").oneTime()).isFalse();
+    }
+
+    @Test
+    void everyKitStaysReservedBehindItsOwnKitNodeAsEssentialsXGatedItBehindItsKitPermission() {
+        assertThat(only(records, ImportRecord.KitRecord.class))
+                .extracting(rec -> rec.kit().definition())
+                .allSatisfy(kit -> assertThat(kit.requiresPermission())
+                        .as("kit %s is reserved", kit.id())
+                        .isTrue())
+                .extracting(KitAccess::permissionNode)
+                .containsExactlyInAnyOrder(
+                        "uxmessentials.kit.starter", "uxmessentials.kit.welcome", "uxmessentials.kit.tools");
     }
 
     @Test
