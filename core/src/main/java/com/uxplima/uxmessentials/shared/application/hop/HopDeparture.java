@@ -1,9 +1,9 @@
 package com.uxplima.uxmessentials.shared.application.hop;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
@@ -14,7 +14,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
  * @param targetServer the network name of the backend the destination lives on
  * @param label the name the player knows the destination by, for notices
  * @param destination where the player will land, as the origin last read it; the gate checks against it
- * @param cooldown the destination's own cooldown, when it overrides the teleport default
+ * @param cooldown the destination's own cooldown and its clock, when it sets one
  */
 public record HopDeparture(
         HopKind kind,
@@ -22,7 +22,7 @@ public record HopDeparture(
         String targetServer,
         String label,
         Position destination,
-        Optional<Duration> cooldown) {
+        Optional<OwnCooldown> cooldown) {
 
     public HopDeparture {
         Objects.requireNonNull(kind, "kind");

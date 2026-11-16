@@ -91,6 +91,7 @@ class PermissionFamiliesTest {
             checked(tier(DestinationPermissions.HOME_LIMIT, "5"), "5"),
             checked(DestinationPermissions.warpUse("spawn"), "spawn"),
             checked(tier(PlayerWarpQuota.FAMILY.node(), "3"), "3"),
+            checked(tier(DestinationPermissions.pwarpWorldLimit("nether"), "2"), "nether", "2"),
             checked(WorldAccessPolicy.enterNode(WorldName.of("lobby")), "lobby"),
             checked(tier(VaultAmountQuota.FAMILY.node(), "2"), "2"),
             checked(tier(VaultSizeQuota.FAMILY.node(), "6"), "6"),

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
+import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
 import com.uxplima.uxmessentials.shared.application.hop.HopDeparture;
@@ -12,13 +13,15 @@ import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
 import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.hop.HopNotice;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
 
 /**
  * How {@link UsePlayerWarp} hands a warp on another backend to the shared cross-server hop. {@code departures} is
- * empty while the {@code cross-server} sub-group is off; the gate then refuses nobody here, and a use that was
- * charged is told the warp is unreachable and refunded, since the player never moves.
+ * empty while the {@code cross-server} sub-group is off; {@link #routeOpen} then refuses every such use before any
+ * other check, telling the player the warp is on a server this one does not send players to, so nothing is taken or
+ * given back. While the sub-group is on, {@link #admit} runs the jail, combat and cooldown checks of a local teleport.
  *
  * <p>The owner's share is never banked at charge time for such a use: the hop carries a settlement to the warp, so
  * the target pays the owner only once the visitor has landed, and every miss gives the visitor their charge back.
@@ -28,21 +31,51 @@ public final class PlayerWarpHops {
     private final Optional<HopDepartures> departures;
     private final HopCharges charges;
     private final PlayerWarpHopResolver resolver;
+    private final Notifier notifier;
 
-    public PlayerWarpHops(Optional<HopDepartures> departures, HopCharges charges, PlayerWarpHopResolver resolver) {
+    public PlayerWarpHops(
+            Optional<HopDepartures> departures, HopCharges charges, PlayerWarpHopResolver resolver, Notifier notifier) {
         this.departures = Objects.requireNonNull(departures, "departures");
         this.charges = Objects.requireNonNull(charges, "charges");
         this.resolver = Objects.requireNonNull(resolver, "resolver");
+        this.notifier = Objects.requireNonNull(notifier, "notifier");
     }
 
-    /** Whether {@code who} may hop to {@code warp} under the local teleport rules; asked before the charge. */
+    /**
+     * Whether a hop to {@code warp} can start at all: false while the cross-server sub-group is off, and then
+     * {@code who} is told the warp is on a server this one does not send players to. Asked first, before any other
+     * check of the use, so a use that can never leave spends nothing.
+     */
+    public boolean routeOpen(PlayerRef who, PlayerWarp warp) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(warp, "warp");
+        if (departures.isPresent()) {
+            return true;
+        }
+        notifier.send(
+                who,
+                PlayerwarpsMessageKey.PWARP_CROSS_SERVER_OFF,
+                Map.of("warp", warp.name().value(), "server", warp.serverId().orElseThrow()));
+        return false;
+    }
+
+    /**
+     * Whether {@code who} may hop to {@code warp} under the local teleport rules: the jail, combat and cooldown
+     * checks; asked before the charge. On false the player has already been told why, also when the route is off.
+     */
     public boolean admit(PlayerRef who, PlayerWarp warp) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
-        return departures.map(route -> route.admit(who, departureOf(warp))).orElse(true);
+        if (departures.isEmpty()) {
+            return routeOpen(who, warp);
+        }
+        return departures.get().admit(who, departureOf(warp));
     }
 
-    /** Send {@code who} to the remote {@code warp}, carrying exactly what the gate {@code charged}. */
+    /**
+     * Send {@code who} to the remote {@code warp}, carrying exactly what the gate {@code charged}. {@link #admit} has
+     * already refused a use while the sub-group is off; one that gets here anyway is refunded as unavailable.
+     */
     public void send(PlayerRef who, PlayerWarp warp, Optional<WarpCost> charged) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(warp, "warp");
@@ -70,6 +103,6 @@ public final class PlayerWarpHops {
                 warp.serverId().orElseThrow(),
                 warp.name().value(),
                 warp.location(),
-                warp.timing().cooldown());
+                warp.ownCooldown());
     }
 }
