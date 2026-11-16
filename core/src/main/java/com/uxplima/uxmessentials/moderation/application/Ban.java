@@ -223,7 +223,7 @@ public final class Ban {
         boolean capped = capped(ban);
         Duration effective = spanOf(ban);
         Instant expiry = ban.until();
-        history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty());
+        history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
         BanScreen.of(ban, now).kick(sanctions, notifier, target);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, label(ban), true, reason);
@@ -255,7 +255,9 @@ public final class Ban {
      *
      * <p>An address already banned at least as long keeps its ban: the fan-out is collateral, so it only ever
      * lengthens an IP ban, and a capped {@code /ban} never turns a permanent {@code /banip} into a timed one. Each
-     * address is written by compare and set, like the player ban, and only the addresses it banned are counted.
+     * address is written by compare and set, like the player ban, and only the addresses it banned are counted and
+     * written to the history, as a {@code /banip} of that address naming the player; a kept address is only
+     * audited as held, since its own ban is the one in force.
      */
     private void fanOutToIps(
             PlayerRef actor,
@@ -281,6 +283,7 @@ public final class Ban {
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, false, SanctionStrength.HELD);
                 case GuardedWrite.Stored<IpBan> stored -> {
                     audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, true, reason);
+                    history.banIp(actor, Optional.of(target.uuid()), ip, reason, until, now);
                     banned++;
                 }
             }

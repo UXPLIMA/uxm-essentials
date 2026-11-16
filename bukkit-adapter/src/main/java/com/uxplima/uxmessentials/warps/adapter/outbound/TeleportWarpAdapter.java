@@ -75,7 +75,7 @@ public final class TeleportWarpAdapter implements WarpTeleporter {
         Objects.requireNonNull(onLanded, "onLanded");
         Objects.requireNonNull(onMissed, "onMissed");
         registry.register(who.uuid(), warp);
-        // The warp's own cooldown rides along so the landing stamps the key the origin's gate checked.
+        // The warp's own cooldown rides along, so the stamp at any phase hits the key the origin checked.
         if (engine.arriveImmediately(who, destinationOf(warp), TeleportKind.WARP, onLanded, onMissed)
                 .isErr()) {
             // No hop was issued, so the landing notice registered above would otherwise greet the next teleport.

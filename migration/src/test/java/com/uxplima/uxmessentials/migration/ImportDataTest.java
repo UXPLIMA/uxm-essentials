@@ -112,15 +112,15 @@ class ImportDataTest {
         assertThat(audit.records).filteredOn(line -> line.endsWith("failed")).hasSize((int) summary.warps());
     }
 
-    /** Three readable players (two with sanctions), three warps in a known world and three importable kits. */
+    /** Three readable players (two with sanctions), three warps in a known world and five importable kits. */
     private static void assertSummaryOfTheFixture(ImportSummary summary) {
         assertThat(summary.source()).isEqualTo(SourceId.of("essentialsx"));
         assertThat(summary.users()).isEqualTo(3);
         assertThat(summary.mutes()).isEqualTo(2);
         assertThat(summary.jails()).isEqualTo(1);
         assertThat(summary.warps()).isEqualTo(3);
-        assertThat(summary.kits()).isEqualTo(3);
-        assertThat(summary.total()).isEqualTo(11);
+        assertThat(summary.kits()).isEqualTo(5);
+        assertThat(summary.total()).isEqualTo(13);
     }
 
     private static final class RecordingAudit implements MigrationAudit {

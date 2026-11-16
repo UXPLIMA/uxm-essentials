@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
@@ -36,7 +37,12 @@ final class DiscardedHistory implements SanctionHistory {
     }
 
     @Override
-    public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
+    public List<SanctionHistoryEntry> revocableByActor(UUID actor, int limit) {
+        return List.of();
+    }
+
+    @Override
+    public List<SanctionHistory.Tally> countsSince(Instant threshold, Optional<UUID> actor) {
         return List.of();
     }
 }

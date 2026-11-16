@@ -361,8 +361,8 @@ public final class TeleportWiring {
                 notifier,
                 kernel.scheduler(),
                 new RtpRadiusTier(kernel.permissions()));
-        RequestTeleport requestTeleport =
-                new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, clock);
+        RequestTeleport requestTeleport = new RequestTeleport(
+                requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, engine, clock);
         PlayerHops playerHops = PlayerHops.off();
         if (crossServer.enabled()) {
             for (HopKind kind : List.of(HopKind.PLAYER_REQUEST, HopKind.PLAYER_STAFF)) {

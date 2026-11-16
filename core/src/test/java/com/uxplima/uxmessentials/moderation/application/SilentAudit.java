@@ -7,8 +7,8 @@ import java.util.UUID;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
-/** An audit log that writes nothing; the audit lines are not what these tests look at. */
-final class SilentAudit implements ModerationAudit {
+/** An audit log that writes nothing; a test that looks at one line overrides that method. */
+class SilentAudit implements ModerationAudit {
 
     @Override
     public void muted(
