@@ -31,6 +31,11 @@ import org.jspecify.annotations.Nullable;
  * and no refund path is needed. The cooldown is stamped at the same moment the chain starts, so a run that was
  * refused at any gate leaves the clock alone.
  *
+ * <p>A player has at most one custom command warmup, as with teleports. Running a command with a warmup while an
+ * earlier one is still counting down replaces the earlier one rather than being refused: the earlier one ends as
+ * {@link RunOutcome.WarmupReplaced}, releases its depth and is never charged, and only the latest one can run. A
+ * repeat refused at an earlier gate (requirements, cooldown, depth) starts no warmup and leaves the earlier one alone.
+ *
  * <p>Depth is entered before the requirements are evaluated and released once the chain has run, which means a
  * command that calls itself through a {@code command:} action inside the same dispatch is refused at the configured
  * depth. A step scheduled behind a {@code delay:} runs later at depth zero: that is a fresh execution rather than a
@@ -203,7 +208,10 @@ public final class RunCustomCommand {
                 || CooldownTiers.labelWaitSeconds(permissions, actor, cooldownLabel(command.id()), 0L) > 0;
     }
 
-    /** Start the shared warmup, deferring the charge and the chain to the moment it completes. */
+    /**
+     * Start the shared warmup, deferring the charge and the chain to the moment it completes. Exactly one of the
+     * three callbacks runs, and each releases the depth this run holds.
+     */
     private void beginWarmup(CustomCommand command, PlayerRef actor, Map<String, String> arguments) {
         Warmups.WarmupKind kind =
                 new Warmups.WarmupKind(WARMUP_FEATURE, command.warmup().toSeconds());
@@ -220,6 +228,10 @@ public final class RunCustomCommand {
                 () -> {
                     depth.exit(actor.uuid());
                     report(actor, command, new RunOutcome.WarmupCancelled());
+                },
+                () -> {
+                    depth.exit(actor.uuid());
+                    report(actor, command, new RunOutcome.WarmupReplaced());
                 });
     }
 
