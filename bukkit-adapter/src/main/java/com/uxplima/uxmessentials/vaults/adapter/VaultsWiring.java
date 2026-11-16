@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.command.VaultCommands;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultSelectorMenu;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
+import com.uxplima.uxmessentials.vaults.adapter.inbound.listener.VaultQuitListener;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.listener.VaultReturnListener;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.BukkitVaultItemReceiver;
 import com.uxplima.uxmessentials.vaults.adapter.outbound.LoggingVaultAudit;
@@ -168,7 +169,7 @@ public final class VaultsWiring {
         Optional<VaultCleanupSweep> sweep = cleanupSweep(kernel, settings, repository, audit, running, clock);
         return new Wired(
                 VaultCommands.all(services),
-                List.of(new VaultReturnListener(returns, kernel.scheduler())),
+                List.of(new VaultReturnListener(returns, kernel.scheduler()), new VaultQuitListener(services.view())),
                 services.view(),
                 services.selector(),
                 repository,
@@ -280,8 +281,8 @@ public final class VaultsWiring {
      * own.
      *
      * @param commands the Brigadier command registrations to publish
-     * @param listeners the Bukkit listeners to register: the join hand-over of kept vault items (the menu listener
-     *     is uxmLib's)
+     * @param listeners the Bukkit listeners to register: the join hand-over of kept vault items and the quit that
+     *     decides a leaving viewer's opens (the menu listener is uxmLib's)
      * @param view the GUI, held for the stop-time flush
      * @param selector the engine-rendered vault selector the {@code /vault} command and the management hub both open
      * @param repository the vault store the {@code vaults_count} placeholder reads

@@ -9,6 +9,7 @@ import org.bukkit.inventory.Inventory;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.gui.StorageGui;
 import org.jspecify.annotations.NullMarked;
 
@@ -20,7 +21,58 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class WindowShown {
 
+    /**
+     * How long after a deferred open its outcome is read. uxmLib tries a sleeping player's open again one tick later
+     * and drops it when they are still asleep, so three ticks leave that try and its open event behind.
+     */
+    static final Duration DEFERRAL = Duration.ofMillis(150);
+
     private WindowShown() {}
+
+    /**
+     * Open {@code gui} for {@code player} and decide {@code outcome} exactly once: shown when the window comes up,
+     * refused when the open is cancelled or a deferral ends without a window. Once refused, a window that still turns
+     * up later is cancelled, and closed again if a plugin listening after the cancel let it through anyway, so it never
+     * stays up after what hung on it went the other way. Runs on the player's thread.
+     *
+     * <p>A window that does not show after a deferral, and whose player then leaves before the check, is not decided
+     * here: the caller decides it when the player leaves, through {@link WindowOutcome#settle}.
+     */
+    public static void open(StorageGui gui, Player player, Scheduler scheduler, WindowOutcome outcome) {
+        Objects.requireNonNull(gui, "gui");
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(scheduler, "scheduler");
+        Objects.requireNonNull(outcome, "outcome");
+        PlayerRef ref = BukkitRefs.toRef(player);
+        gui.onOpen(event -> {
+            if (!event.getPlayer().getUniqueId().equals(player.getUniqueId())) {
+                return;
+            }
+            if (!outcome.mayOpen()) {
+                event.setCancelled(true);
+            }
+            // The open event is still being decided here, and a listener after this one may undo the cancel, so
+            // whether it went through is read a tick later.
+            scheduler.laterEntity(ref, Duration.ZERO, () -> {
+                if (showing(player, gui.getInventory()) && !outcome.shown()) {
+                    player.closeInventory();
+                }
+            });
+        });
+        // The same test uxmLib makes before it puts the open off.
+        boolean deferred = player.isSleeping();
+        gui.open(player);
+        if (!outcome.asked(deferred, showing(player, gui.getInventory()))) {
+            player.closeInventory();
+        }
+        if (deferred) {
+            scheduler.laterEntity(ref, DEFERRAL, () -> {
+                if (!outcome.settle(showing(player, gui.getInventory()))) {
+                    player.closeInventory();
+                }
+            });
+        }
+    }
 
     /** Run {@code shown} at most once, after {@code gui} has opened for {@code player}. Call before opening it. */
     public static void confirm(StorageGui gui, Player player, Scheduler scheduler, Runnable shown) {

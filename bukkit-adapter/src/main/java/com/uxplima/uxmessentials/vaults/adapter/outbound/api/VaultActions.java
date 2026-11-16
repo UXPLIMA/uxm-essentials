@@ -21,9 +21,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 import com.uxplima.uxmessentials.vaults.adapter.inbound.gui.VaultView;
 import com.uxplima.uxmessentials.vaults.application.DeleteVault;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
+import com.uxplima.uxmessentials.vaults.application.OpenedVault;
 import com.uxplima.uxmessentials.vaults.application.RenameVault;
 import com.uxplima.uxmessentials.vaults.application.SetVaultIcon;
-import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -37,7 +37,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The open is the one that has to move between threads. Resolving the vault reads the database, which a tick
  * thread may not do; showing the window touches the player, which only their own thread may do. So it reads on a
- * worker, hops to the player, and completes once the window is up. The other three never leave the worker.
+ * worker, hops to the player, and completes once the window is up, or as refused when it never comes up, with the open
+ * fee given back. The other three never leave the worker.
  */
 @NullMarked
 public final class VaultActions implements UxmVaultsActions {
@@ -125,20 +126,41 @@ public final class VaultActions implements UxmVaultsActions {
         return write(() -> setVaultIcon.setIcon(owner, index, null));
     }
 
-    /** Hop to the owner's own thread and put the window up, which is the half a worker thread may not do. */
-    private CompletableFuture<UxmOutcome> show(PlayerRef owner, Vault vault) {
-        return AsyncActions.onPlayer(
-                scheduler,
+    /**
+     * Hop to the owner's own thread and put the window up, which is the half a worker thread may not do. The answer
+     * waits for the window to be decided: shown, or refused with the fee given back.
+     */
+    private CompletableFuture<UxmOutcome> show(PlayerRef owner, OpenedVault opened) {
+        CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();
+        scheduler.onEntity(
                 owner,
                 () -> {
                     @Nullable Player live = Bukkit.getPlayer(owner.uuid());
                     if (live == null) {
-                        return gone();
+                        view.notOpened(opened.fee());
+                        answer.complete(gone());
+                        return;
                     }
-                    view.open(live, owner, owner, vault, () -> {});
-                    return UxmOutcome.ok();
+                    try {
+                        view.open(
+                                live,
+                                owner,
+                                owner,
+                                opened.vault(),
+                                opened.fee(),
+                                () -> answer.complete(UxmOutcome.ok()),
+                                () -> answer.complete(notShown()));
+                    } catch (RuntimeException failure) {
+                        // An open that broke before it was decided never showed a window to pay for.
+                        view.notOpened(opened.fee());
+                        answer.completeExceptionally(failure);
+                    }
                 },
-                gone());
+                () -> {
+                    view.notOpened(opened.fee());
+                    answer.complete(gone());
+                });
+        return answer;
     }
 
     private CompletableFuture<UxmOutcome> write(java.util.function.Supplier<Result<Unit, VaultError>> body) {
@@ -158,6 +180,13 @@ public final class VaultActions implements UxmVaultsActions {
 
     private static UxmOutcome gone() {
         return UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player left before the vault could be opened");
+    }
+
+    private static UxmOutcome notShown() {
+        return UxmOutcome.failed(
+                UxmFailure.REFUSED,
+                "the window did not open: the vault is open elsewhere, another plugin refused it, or the player was"
+                        + " asleep or left; any open fee was given back");
     }
 
     private static UxmOutcome refusal(VaultError error) {

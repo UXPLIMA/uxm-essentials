@@ -104,7 +104,7 @@ class VaultWindowsTest {
 
     /** ALEX buys vault 2 and it ends up holding {@code items}, written and settled. */
     private void vaultHolding(VaultContents items) {
-        Chest chest = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest chest = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         chest.items = items;
         close(SECOND, chest);
         runWrites();
@@ -113,11 +113,11 @@ class VaultWindowsTest {
     @Test
     void aReopenBeforeTheCloseWasWrittenShowsWhatTheWindowClosedWith() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = VaultContents.empty(); // X taken into the inventory
 
         close(SECOND, a);
-        Vault cached = openVault.open(ALEX, 2).orElseThrow(); // read before the write lands
+        Vault cached = openVault.open(ALEX, 2).orElseThrow().vault(); // read before the write lands
         Chest b = show(ALEX, cached);
         runWrites();
         close(SECOND, b);
@@ -131,10 +131,10 @@ class VaultWindowsTest {
     @Test
     void aReopenWhoseReadPredatesALandedWriteShowsWhatWasWritten() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         close(SECOND, a);
-        Vault readBefore = openVault.open(ALEX, 2).orElseThrow();
+        Vault readBefore = openVault.open(ALEX, 2).orElseThrow().vault();
         runWrites();
 
         Chest b = show(ALEX, readBefore);
@@ -146,12 +146,12 @@ class VaultWindowsTest {
     @Test
     void aReopenReadAfterTheWriteLandedShowsTheStoredItems() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         close(SECOND, a);
         runWrites();
 
-        Chest b = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest b = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
 
         assertThat(b.items).isEqualTo(Y);
     }
@@ -159,9 +159,9 @@ class VaultWindowsTest {
     @Test
     void anOlderWriteThatRunsLastNeverOverwritesANewerOne() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         close(SECOND, a);
-        Chest b = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest b = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         b.items = Y;
         close(SECOND, b);
 
@@ -176,8 +176,8 @@ class VaultWindowsTest {
     @Test
     void aVaultDeletedBeforeAClosedWindowWasWrittenGivesItsItemsBackOnceEvenWhenReopened() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
-        Vault cached = openVault.open(ALEX, 2).orElseThrow();
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
+        Vault cached = openVault.open(ALEX, 2).orElseThrow().vault();
         close(SECOND, a);
         assertThat(deleteVault.delete(ALEX, 2).isOk()).isTrue();
 
@@ -195,8 +195,8 @@ class VaultWindowsTest {
     @Test
     void aClosedWindowWhoseVaultWasDeletedGivesItsItemsBackAndAStaleReopenIsEmpty() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
-        Vault cached = openVault.open(ALEX, 2).orElseThrow();
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
+        Vault cached = openVault.open(ALEX, 2).orElseThrow().vault();
         deleteVault.delete(ALEX, 2);
         close(SECOND, a);
         runWrites();
@@ -210,8 +210,8 @@ class VaultWindowsTest {
     @Test
     void reopeningAVaultDeletedInTheSameTickGivesItsItemsBackOnce() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
-        Vault stale = openVault.open(ALEX, 2).orElseThrow();
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
+        Vault stale = openVault.open(ALEX, 2).orElseThrow().vault();
         assertThat(deleteVault.delete(ALEX, 2).isOk()).isTrue();
 
         Chest b = show(ALEX, stale);
@@ -228,7 +228,7 @@ class VaultWindowsTest {
     @Test
     void aWriteOfAWindowThatStaysOpenNeverHandsItsItemsBack() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         deleteVault.delete(ALEX, 2);
 
         windows.checkpoint(SECOND, a, a.items).ifPresent(Runnable::run);
@@ -242,7 +242,7 @@ class VaultWindowsTest {
     @Test
     void aClosingWindowLeavesANameSetWhileItWasOpen() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         new RenameVault(vaults, notifier).rename(ALEX, 2, "loot");
         a.items = Y;
 
@@ -270,20 +270,21 @@ class VaultWindowsTest {
                 vaults, new VaultAmountQuota(permissions, 10), new VaultSizeQuota(permissions, 1), charge, behind);
 
         // Here: the window closes with the diamonds still in it, and the write lands.
-        Chest here = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest here = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         close(SECOND, here);
         runWrites();
         // On survival, two seconds later by its own clock: the diamonds are taken out and the window closes.
         behind.advance(java.time.Duration.ofSeconds(2));
         Chest there = new Chest();
-        there.items = survival.claim(ALEX, ALEX, survivalOpen.open(ALEX, 2).orElseThrow(), there, old -> old.items)
+        there.items = survival.claim(
+                        ALEX, ALEX, survivalOpen.open(ALEX, 2).orElseThrow().vault(), there, old -> old.items)
                 .orElseThrow();
         assertThat(there.items).isEqualTo(X);
         there.items = VaultContents.empty();
         survival.release(SECOND, there, there.items).orElseThrow().run();
 
         // Back here within the minute: the store's copy is newer than this server's write, whatever the clocks say.
-        Chest again = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest again = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
 
         assertThat(stored(SECOND).lastTouched()).isBefore(clock.instant());
         assertThat(again.items).isEqualTo(VaultContents.empty());
@@ -292,14 +293,14 @@ class VaultWindowsTest {
     @Test
     void aWriteThatFailsOnceIsRetriedAndLandsWithoutHandingAnythingBack() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         store.failNextWrite();
 
         close(SECOND, a);
         runWrites();
         assertThat(stored(SECOND).contents()).isEqualTo(X);
-        Chest meanwhile = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest meanwhile = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         close(SECOND, meanwhile);
         retries.runAll();
         runWrites();
@@ -312,7 +313,7 @@ class VaultWindowsTest {
     @Test
     void aFailedWriteIsRetriedUntilItLands() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         store.failWrites(2);
 
@@ -328,7 +329,7 @@ class VaultWindowsTest {
     @Test
     void aWriteAppliedWithoutAnAnswerIsRecognisedByItsWriterToken() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         long before = stored(SECOND).stamp().version();
         store.failNextWriteAfterCommit();
@@ -340,7 +341,8 @@ class VaultWindowsTest {
         assertThat(stored(SECOND).stamp().version()).isEqualTo(before + 1);
         assertThat(stored(SECOND).contents()).isEqualTo(Y);
         assertThat(handedBack).isEmpty();
-        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault()).items)
+                .isEqualTo(Y);
     }
 
     /**
@@ -373,7 +375,8 @@ class VaultWindowsTest {
     /** Open, change and close ALEX's vault 2 on {@code server}, writing {@code items} there. */
     private void editOn(VaultWindows<Chest> server, VaultContents expected, VaultContents items) {
         Chest there = new Chest();
-        there.items = server.claim(ALEX, ALEX, openVault.open(ALEX, 2).orElseThrow(), there, old -> old.items)
+        there.items = server.claim(
+                        ALEX, ALEX, openVault.open(ALEX, 2).orElseThrow().vault(), there, old -> old.items)
                 .orElseThrow();
         assertThat(there.items).isEqualTo(expected);
         there.items = items;
@@ -383,7 +386,7 @@ class VaultWindowsTest {
     @Test
     void aRetryNeverWritesOverWhatAnotherServerWroteAfterTheWriteFailed() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y; // X taken out, Y put in on this server
         store.failNextWrite();
         close(SECOND, a);
@@ -399,13 +402,14 @@ class VaultWindowsTest {
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
         assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
         assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isTrue();
-        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault()).items)
+                .isEqualTo(Y);
     }
 
     @Test
     void aWriteAnotherServerMadeWhileThisOneFailedIsNotTakenForThisOne() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         VaultWindows<Chest> survival = anotherServer();
         // The other server's write lands at the moment this server's write is lost.
@@ -424,7 +428,7 @@ class VaultWindowsTest {
     @Test
     void aRetryOfAStoppedInstanceNeverWritesOverTheReloadedInstancesWrite() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         store.failNextWrite();
         close(SECOND, a);
@@ -443,7 +447,7 @@ class VaultWindowsTest {
     @Test
     void theOwnersCloseNeverWritesOverAStaffWriteFromAnotherServerWhileItsWindowWasOpen() {
         vaultHolding(X);
-        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         VaultWindows<Chest> survival = anotherServer();
         Chest staff = staffOn(survival);
         owner.items = Y; // X taken out, Y put in by the owner here
@@ -458,7 +462,8 @@ class VaultWindowsTest {
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("two servers edited"));
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
         assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
-        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault()).items)
+                .isEqualTo(Y);
     }
 
     @Test
@@ -467,7 +472,7 @@ class VaultWindowsTest {
         QuietLog survivalLog = new QuietLog();
         VaultWindows<Chest> survival = anotherServer(survivalLog);
         Chest staff = staffOn(survival);
-        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest owner = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         owner.items = Y;
         staff.items = VaultContents.of(new byte[] {9});
 
@@ -484,7 +489,7 @@ class VaultWindowsTest {
     @Test
     void aWriteThatFailsWhileTheVaultIsGoneHandsTheItemsBackOnce() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         deleteVault.delete(ALEX, 2);
         store.failNextWrite();
@@ -500,7 +505,7 @@ class VaultWindowsTest {
     @Test
     void whenEveryRetryFailsTheItemsStayForAReopenAndGoToTheLog() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
         store.failWrites(100);
 
@@ -512,13 +517,14 @@ class VaultWindowsTest {
         assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("vault_items_unwritten"));
         assertThat(windows.unsettled()).containsExactly(ALEX.uuid() + "#2 (not written)");
         assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isTrue();
-        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow()).items).isEqualTo(Y);
+        assertThat(show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault()).items)
+                .isEqualTo(Y);
     }
 
     @Test
     void theStopWaitsUntilEveryWindowIsClosedAndEveryWriteHasLanded() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         assertThat(windows.awaitIdle(java.time.Duration.ZERO)).isFalse();
 
         close(SECOND, a);
@@ -531,9 +537,9 @@ class VaultWindowsTest {
     @Test
     void aPeersChangeDropsALandedWriteButNeverOneStillOnItsWay() {
         vaultHolding(X);
-        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
         a.items = Y;
-        Vault readBefore = openVault.open(ALEX, 2).orElseThrow();
+        Vault readBefore = openVault.open(ALEX, 2).orElseThrow().vault();
         close(SECOND, a);
 
         windows.forget(SECOND);
@@ -544,7 +550,7 @@ class VaultWindowsTest {
 
     @Test
     void anotherViewerIsRefusedWhileTheVaultIsOpen() {
-        Vault bought = openVault.open(ALEX, 1).orElseThrow();
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         assertThat(tryShow(ALEX, bought)).isPresent();
 
         assertThat(tryShow(SAM, bought)).isEmpty();
@@ -552,12 +558,50 @@ class VaultWindowsTest {
     }
 
     @Test
+    void aViewerWhoLeftWithoutSeeingTheirWindowFreesTheVaultAndItsItemsAreWritten() {
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
+        Chest staff = show(SAM, bought); // the open was refused, so SAM never saw it
+        staff.items = X;
+        assertThat(tryShow(ALEX, bought)).isEmpty();
+
+        windows.releaseLeft(SAM.uuid(), chest -> false, chest -> chest.items).forEach(Runnable::run);
+
+        assertThat(windows.count()).isZero();
+        assertThat(stored(VaultId.of(ALEX, 1)).contents()).isEqualTo(X);
+        Chest owner = show(ALEX, openVault.open(ALEX, 1).orElseThrow().vault());
+        assertThat(owner.items).isEqualTo(X);
+    }
+
+    @Test
+    void aWindowStillLookedAtKeepsItsClaimWhenItsViewerLeaves() {
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
+        show(SAM, bought);
+
+        assertThat(windows.releaseLeft(SAM.uuid(), chest -> true, chest -> chest.items))
+                .isEmpty();
+
+        assertThat(tryShow(ALEX, bought)).isEmpty();
+        assertThat(windows.count()).isEqualTo(1);
+    }
+
+    @Test
+    void onlyTheLeavingViewersWindowsAreReleased() {
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
+        show(ALEX, bought);
+
+        assertThat(windows.releaseLeft(SAM.uuid(), chest -> false, chest -> chest.items))
+                .isEmpty();
+
+        assertThat(tryShow(SAM, bought)).isEmpty();
+    }
+
+    @Test
     void aTakenOverWindowIsNotWrittenOnItsOwn() {
-        Vault bought = openVault.open(ALEX, 1).orElseThrow();
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         Chest a = show(ALEX, bought);
         a.items = X;
 
-        Chest b = show(ALEX, openVault.open(ALEX, 1).orElseThrow());
+        Chest b = show(ALEX, openVault.open(ALEX, 1).orElseThrow().vault());
         close(VaultId.of(ALEX, 1), a);
         assertThat(writes).isEmpty();
         close(VaultId.of(ALEX, 1), b);
@@ -570,7 +614,7 @@ class VaultWindowsTest {
 
     @Test
     void everyHeldWindowIsListedForTheModuleStop() {
-        Chest a = show(ALEX, openVault.open(ALEX, 1).orElseThrow());
+        Chest a = show(ALEX, openVault.open(ALEX, 1).orElseThrow().vault());
         a.items = X;
         deleteVault.delete(ALEX, 1);
 
@@ -585,7 +629,7 @@ class VaultWindowsTest {
 
     @Test
     void aStaffWindowKeepsItsItemsInTheVaultEvenAfterADelete() {
-        Vault bought = openVault.open(ALEX, 1).orElseThrow();
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         Chest staff = show(SAM, bought);
         staff.items = X;
         deleteVault.delete(ALEX, 1);

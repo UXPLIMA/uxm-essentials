@@ -72,7 +72,7 @@ class DeleteVaultTest {
     private Vault buy(int index, VaultChargeSettings costs) {
         OpenVault open = new OpenVault(
                 store, new VaultAmountQuota(permissions, 10), new VaultSizeQuota(permissions, 1), charge(costs), CLOCK);
-        return open.open(ALEX, index).orElseThrow();
+        return open.open(ALEX, index).orElseThrow().vault();
     }
 
     @Test

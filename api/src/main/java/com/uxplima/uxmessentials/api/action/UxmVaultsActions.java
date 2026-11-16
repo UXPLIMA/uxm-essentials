@@ -25,7 +25,10 @@ public interface UxmVaultsActions {
      *
      * <p>{@link UxmFailure#PLAYER_OFFLINE} when they are not here to see it, {@link UxmFailure#REFUSED} when the
      * number is past their quota, {@link UxmFailure#INSUFFICIENT_FUNDS} when they cannot pay a configured open
-     * fee. The player must be online: a window has to be shown to somebody.
+     * fee, and {@link UxmFailure#REFUSED} as well when the window did not come up: the vault is open in another window,
+     * another plugin refused it, or the player stayed asleep or left first. Then any open fee is given back. The
+     * future completes once the window is in front of the player. The player must be online: a window has to be shown
+     * to somebody.
      */
     CompletableFuture<UxmOutcome> open(UUID ownerId, int index);
 
