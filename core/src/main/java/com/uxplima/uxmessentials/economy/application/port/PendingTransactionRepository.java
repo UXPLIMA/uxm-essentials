@@ -16,7 +16,9 @@ public interface PendingTransactionRepository {
     void queueCredit(UUID playerUuid, String currencyId, BigDecimal amount);
 
     /**
-     * Retrieves all pending transactions for the given player and clears them from the database.
+     * Takes the player's pending transactions off the queue and returns them. Each row is handed to exactly one
+     * take: two takes running at once never both return the same row, and a credit queued while a take runs is
+     * either returned by it or left for the next one, never cleared unseen.
      */
     List<PendingTransaction> getAndClearPending(UUID playerUuid);
 
