@@ -21,8 +21,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Builds the moderation context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link ModerationServices}. Collected in one greppable
- * table so the literal/permission pairing matches the permissions reference and the kernel's
- * {@code ModerationCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. The
+ * table so the literal/permission pairing matches the permissions reference and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each. The
  * single-argument verbs ({@code /unmute /unjail /freeze /unfreeze /seen /seenip /warns}) share the
  * {@link SimpleTargetCommand} shape, each binding its own node and use-case action. {@code /alts} is the
  * off-tick alt-detection read on the seen node and {@code /commandspy} is the staff command-watch toggle.

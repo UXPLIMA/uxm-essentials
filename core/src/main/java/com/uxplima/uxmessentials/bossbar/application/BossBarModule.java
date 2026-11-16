@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.bossbar.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -36,11 +35,6 @@ public final class BossBarModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        return BossBarCommandSurface.all();
     }
 
     @Override

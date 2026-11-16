@@ -64,6 +64,17 @@ class OpenWatchTest {
     }
 
     @Test
+    void aWatchGivenItsOwnWaitConfirmsAWindowThatComesWithinIt() {
+        OpenWatch<String> patient = new OpenWatch<>(() -> now, OpenWatch.WAIT.multipliedBy(30));
+        patient.expect(ANN, "shop"::equals, () -> told.add("shop"));
+
+        now += OpenWatch.WAIT.multipliedBy(29).toNanos();
+        patient.decided(ANN, "shop", false);
+
+        assertThat(told).containsExactly("shop");
+    }
+
+    @Test
     void aPlayerWhoLeftIsForgotten() {
         watch.expect(ANN, "shop"::equals, () -> told.add("shop"));
 

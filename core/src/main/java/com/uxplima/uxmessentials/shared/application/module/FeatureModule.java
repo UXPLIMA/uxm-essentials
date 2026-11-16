@@ -10,14 +10,14 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  *
  * <p>Lifecycle: {@link #enabled(ConfigStore)} is consulted first, then {@link #loadCondition()};
  * only a module that is both enabled and loadable is {@link #start(ModuleContext) started},
- * contributes its {@link #commands()} / {@link #listeners()}, and runs its {@link #migrations()}.
+ * contributes its {@link #listeners()}, and runs its {@link #migrations()}.
  * {@link #stop()} must leave zero residual runtime state: drain in-flight async work, cancel every
  * scheduled handle the module opened, drop caches and per-player maps, and deregister commands and
  * listeners. A disabled module instantiates zero adapters, registers zero commands and listeners,
  * runs zero migrations, and holds zero runtime state.
  *
  * <p>Implementations are pure application code: they describe what to wire via the platform-neutral
- * spec records ({@link CommandSpec}, {@link ListenerFactory}, {@link MigrationSet}) and construct
+ * spec records ({@link ListenerFactory}, {@link MigrationSet}) and construct
  * adapters only inside {@code start}.
  */
 public interface FeatureModule {
@@ -27,9 +27,6 @@ public interface FeatureModule {
 
     /** HOCON path this module owns: {@code modules.<id>}, read from {@code modules/<id>/config.conf}. */
     String configRoot();
-
-    /** Brigadier command specs; registered only when enabled. Empty when none. */
-    List<CommandSpec> commands();
 
     /** Bukkit listener factories; registered only when enabled. Empty when none. */
     List<ListenerFactory> listeners();

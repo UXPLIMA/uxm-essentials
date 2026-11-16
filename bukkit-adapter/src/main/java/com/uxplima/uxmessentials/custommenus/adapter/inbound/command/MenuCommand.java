@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.custommenus.adapter.inbound.command;
 
 import java.nio.file.Path;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -263,11 +264,12 @@ public final class MenuCommand implements CommandRegistration {
         }
         PlayerRef executor = sender instanceof Player p ? BukkitRefs.toRef(p) : BukkitRefs.toRef(target);
         String targetName = target.getName();
-        opened.expect(
+        Map<String, Object> passthrough = new HashMap<>(MenuExecutor.attach(executor));
+        passthrough.putAll(opened.expect(
                 target,
                 name,
-                () -> feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", targetName)));
-        menus.open(target, name, null, 0, Map.of(), MenuExecutor.attach(executor));
+                () -> feedback.send(sender, CustomMenusMessageKey.MENU_OPENED_FOR, Map.of("player", targetName))));
+        menus.open(target, name, null, 0, Map.of(), passthrough);
         return Command.SINGLE_SUCCESS;
     }
 

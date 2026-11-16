@@ -29,6 +29,11 @@ import com.uxplima.uxmessentials.vaults.domain.VaultSize;
  * positive, so with economy disabled or unwired every open proceeds for free. A fee the player cannot afford
  * fails the open with {@link VaultError#CANNOT_AFFORD} and writes nothing.
  *
+ * <p>The open fee is taken before the window exists, because the withdrawal reaches the economy and may not run on
+ * the tick, so it comes back as a {@link VaultOpenFee} the adapter spends once the window is showing or gives back
+ * when the window never shows. Taking it only once the window showed would mean a window already in front of a player
+ * who then turns out unable to pay.
+ *
  * <p>This use case is pure: it loads or allocates the {@link Vault} and returns it (or a {@link VaultError}),
  * leaving the GUI open and the {@code VaultOpened} event to the adapter, which knows the live player. The
  * allocation is persisted up front so the vault exists as a row the close-save can update.
@@ -54,8 +59,12 @@ public final class OpenVault {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Resolve {@code owner}'s vault at one-based {@code index}, allocating it within quota when absent. */
-    public Result<Vault, VaultError> open(PlayerRef owner, int index) {
+    /**
+     * Resolve {@code owner}'s vault at one-based {@code index}, allocating it within quota when absent. The open fee is
+     * taken here, and the result carries it for the caller to spend once the window shows or to give back when it
+     * never does.
+     */
+    public Result<OpenedVault, VaultError> open(PlayerRef owner, int index) {
         Objects.requireNonNull(owner, "owner");
         VaultId id = VaultId.of(owner, index);
         VaultSize size = sizeQuota.resolve(owner);
@@ -65,7 +74,7 @@ public final class OpenVault {
                 .orElseGet(() -> allocate(owner, id, index, size));
     }
 
-    private Result<Vault, VaultError> reopen(PlayerRef owner, Vault existing, VaultSize size) {
+    private Result<OpenedVault, VaultError> reopen(PlayerRef owner, Vault existing, VaultSize size) {
         Result<Optional<VaultPayment>, VaultError> charged = charge.chargeOpen(owner);
         if (charged.isErr()) {
             return Result.err(charged.errorOrThrow());
@@ -78,10 +87,10 @@ public final class OpenVault {
             charge.giveBack(owner, charged.orElseThrow());
             return Result.err(VaultError.VAULT_UNKNOWN);
         }
-        return Result.ok(opened);
+        return Result.ok(new OpenedVault(opened, charge.openFee(owner, charged.orElseThrow())));
     }
 
-    private Result<Vault, VaultError> allocate(PlayerRef owner, VaultId id, int index, VaultSize size) {
+    private Result<OpenedVault, VaultError> allocate(PlayerRef owner, VaultId id, int index, VaultSize size) {
         VaultAmount amount = amountQuota.resolve(owner);
         if (!amount.allows(index)) {
             return Result.err(VaultError.AMOUNT_EXCEEDED);
@@ -104,14 +113,15 @@ public final class OpenVault {
             return afterFailedCreate(owner, allocated, paid, size, failure);
         }
         if (created) {
-            return Result.ok(allocated);
+            return Result.ok(new OpenedVault(allocated, openFee(owner, paid)));
         }
         // Another open of the same index stored its vault first. That vault was paid for by that open, so this
         // one gives back everything it took and shows the stored vault without charging again.
         charge.giveBack(owner, paid.taken());
         return repository
                 .find(id)
-                .map(stored -> Result.<Vault, VaultError>ok(stored.openedAt(size)))
+                .map(stored ->
+                        Result.<OpenedVault, VaultError>ok(new OpenedVault(stored.openedAt(size), VaultOpenFee.free())))
                 .orElseGet(() -> Result.err(VaultError.VAULT_UNKNOWN));
     }
 
@@ -123,7 +133,7 @@ public final class OpenVault {
      * for by this open can at worst cost this owner the second fee, never create money. When even the check fails,
      * nothing is refunded for the same reason, and the original failure goes up.
      */
-    private Result<Vault, VaultError> afterFailedCreate(
+    private Result<OpenedVault, VaultError> afterFailedCreate(
             PlayerRef owner, Vault allocated, VaultCharge.Allocation paid, VaultSize size, RuntimeException failure) {
         Optional<Vault> stored;
         try {
@@ -133,10 +143,18 @@ public final class OpenVault {
             throw failure;
         }
         if (stored.isPresent()) {
-            return Result.ok(stored.get().openedAt(size));
+            return Result.ok(new OpenedVault(stored.get().openedAt(size), openFee(owner, paid)));
         }
         // The money left but no vault was stored: give it back before the failure goes up.
         charge.giveBack(owner, paid.taken());
         throw failure;
+    }
+
+    /**
+     * The open fee within a first allocation's withdrawal. Only that part goes back when the window never shows: the
+     * vault was stored, so the create fee bought it whether or not it was looked at.
+     */
+    private VaultOpenFee openFee(PlayerRef owner, VaultCharge.Allocation paid) {
+        return charge.openFee(owner, paid.openFee());
     }
 }

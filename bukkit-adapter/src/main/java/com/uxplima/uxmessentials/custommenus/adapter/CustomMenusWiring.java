@@ -48,6 +48,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
 import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
@@ -99,7 +100,8 @@ public final class CustomMenusWiring {
             Supplier<Theme> theme,
             GuiLayouts guiLayouts,
             TextInput textInput,
-            ManagementGuiRegistry guiRegistry) {
+            ManagementGuiRegistry guiRegistry,
+            FormReportingScreen forms) {
         Objects.requireNonNull(plugin, "plugin");
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(bindings, "bindings");
@@ -112,6 +114,7 @@ public final class CustomMenusWiring {
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
+        Objects.requireNonNull(forms, "forms");
 
         // The custom-placeholder fallback registers here, after every built-in / data / stat / papi family the main
         // wiring registered, so a reserved-prefix custom name is still claimed by its prefix fallback first and a
@@ -305,7 +308,10 @@ public final class CustomMenusWiring {
                 org.bukkit.Material.CHEST,
                 ContentPermissions.MENU_EDITOR,
                 editorView::open));
-        MenuOpenedListener openedListener = new MenuOpenedListener();
+        // A Bedrock target is sent a form, which raises no open event, so the sender hears of it from the form going
+        // out.
+        MenuOpenedListener openedListener = new MenuOpenedListener(scheduler);
+        forms.listen(openedListener::formSent);
         MenuCommand command = new MenuCommand(
                 menus,
                 nameSupplier,

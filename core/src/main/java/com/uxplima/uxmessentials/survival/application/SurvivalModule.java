@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.survival.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -26,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
  * stamp), so the module owns no Flyway location.
  *
  * <p>Like the poses context, the mechanic commands and listeners are contributed through the adapter wiring rather
- * than the declarative {@link #commands()} / {@link #listeners()} lists, so those return empty here; a disabled
+ * than the declarative {@link #listeners()} list, so that returns empty here; a disabled
  * module wires zero either way (the {@code FeatureModule} contract).
  */
 @NullMarked
@@ -44,13 +43,6 @@ public final class SurvivalModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The /treefeller and /veinminer toggles are Bukkit-facing and land through the inbound adapter wiring
-        // (SurvivalWiring), conditionally on each mechanic's config gate; the declarative list stays empty.
-        return List.of();
     }
 
     @Override

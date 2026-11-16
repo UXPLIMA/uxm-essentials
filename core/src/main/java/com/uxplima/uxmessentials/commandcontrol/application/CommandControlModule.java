@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.commandcontrol.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -47,12 +46,6 @@ public final class CommandControlModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The gate is a listener, not a command; the /uxmess cc reload hook lands with the later phases.
-        return List.of();
     }
 
     @Override

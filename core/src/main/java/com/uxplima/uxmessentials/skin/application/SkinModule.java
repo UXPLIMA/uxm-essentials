@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.skin.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -42,12 +41,6 @@ public final class SkinModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The /skin command is Bukkit-facing and is registered by the adapter wiring.
-        return List.of();
     }
 
     @Override

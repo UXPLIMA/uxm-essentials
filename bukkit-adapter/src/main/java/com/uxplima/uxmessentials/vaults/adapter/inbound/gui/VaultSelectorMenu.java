@@ -23,11 +23,11 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.vaults.application.ListVaults;
 import com.uxplima.uxmessentials.vaults.application.OpenVault;
+import com.uxplima.uxmessentials.vaults.application.OpenedVault;
 import com.uxplima.uxmessentials.vaults.application.VaultAmountQuota;
 import com.uxplima.uxmessentials.vaults.application.VaultChargeSettings;
 import com.uxplima.uxmessentials.vaults.application.VaultNotifier;
 import com.uxplima.uxmessentials.vaults.application.VaultSummary;
-import com.uxplima.uxmessentials.vaults.domain.Vault;
 import com.uxplima.uxmessentials.vaults.domain.VaultAmount;
 import com.uxplima.uxmessentials.vaults.domain.VaultError;
 import com.uxplima.uxmessentials.vaults.domain.VaultsMessageKey;
@@ -249,16 +249,27 @@ public final class VaultSelectorMenu {
         org.bukkit.entity.Player player = ctx.player();
         int index = slot.index();
         scheduler.async(() -> {
-            Result<Vault, VaultError> resolved = openVault.open(viewer, index);
+            Result<OpenedVault, VaultError> resolved = openVault.open(viewer, index);
             if (resolved.isErr()) {
                 scheduler.onEntity(viewer, () -> reject(viewer, index, resolved.errorOrThrow()));
                 return;
             }
-            Vault vault = resolved.orElseThrow();
-            scheduler.onEntity(viewer, () -> {
-                player.closeInventory();
-                view.open(player, viewer, viewer, vault, () -> notifier.opened(viewer, index));
-            });
+            OpenedVault opened = resolved.orElseThrow();
+            // A viewer who left before their thread could show the window gets the open fee back.
+            scheduler.onEntity(
+                    viewer,
+                    () -> {
+                        player.closeInventory();
+                        view.open(
+                                player,
+                                viewer,
+                                viewer,
+                                opened.vault(),
+                                opened.fee(),
+                                () -> notifier.opened(viewer, index),
+                                () -> {});
+                    },
+                    () -> view.notOpened(opened.fee()));
         });
     }
 

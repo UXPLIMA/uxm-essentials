@@ -20,7 +20,7 @@ import org.jspecify.annotations.Nullable;
  * {@code /sun /rain /thunder /day /night} aliases), and admin-fun, as
  * {@link CommandRegistration}s over the constructed {@link ItemworldServices} and the group's policies/stores.
  * Collected in one greppable table that mirrors {@link ItemworldGroupACommands}, so the literal/permission
- * pairing matches the permissions reference and the kernel's {@code ItemworldCommandSurface}; the plugin's
+ * pairing matches the permissions reference and its entries in {@code CommandSpecCatalog}; the plugin's
  * {@code LifecycleEvents.COMMANDS} handler registers each on the next fire.
  *
  * <p>Every command here gates on its sub-feature group plus its per-command disable through

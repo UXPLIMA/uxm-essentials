@@ -174,6 +174,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl
 import com.uxplima.uxmessentials.shared.adapter.inbound.cacherefresh.SharedCacheRefreshListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSpecCheck;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
@@ -213,6 +214,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.OnlinePlayerIndex
 import com.uxplima.uxmessentials.shared.adapter.inbound.lookup.PlayerNameRecordingListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.networkpresence.NetworkPresenceListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.playerdata.PlayerDataLifecycleListener;
+import com.uxplima.uxmessentials.shared.adapter.inbound.window.FormReportingScreen;
 import com.uxplima.uxmessentials.shared.adapter.outbound.EngineLog;
 import com.uxplima.uxmessentials.shared.adapter.outbound.IpHashing;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
@@ -699,6 +701,9 @@ public final class PluginModule {
         resources.bedrock(bedrock);
         BedrockScreen bedrockScreen = BedrockScreen.resolving(plugin.getServer());
         resources.bedrockScreen(bedrockScreen);
+        // The engine's menu forms are reported, so /menu open can tell its sender a Bedrock target was shown the menu.
+        FormReportingScreen menuForms = new FormReportingScreen(bedrockScreen);
+        resources.menuForms(menuForms);
         resources
                 .worldPhase()
                 .run("bedrock report", () -> kernel.log().info("event=bedrock_detector backend={}", bedrock.backend()));
@@ -706,7 +711,7 @@ public final class PluginModule {
                 .editorRenderer(menuEditorRenderer)
                 .openRegistries(menuBindings.actions(), menuBindings.conditions())
                 .lastMenu(lastMenu)
-                .bedrock(bedrock, bedrockScreen)
+                .bedrock(bedrock, menuForms)
                 .pagedLists(menuBindings.pagedLists())
                 .build();
         resources.addListener(new LastMenuCleanupListener(lastMenu));
@@ -1052,6 +1057,10 @@ public final class PluginModule {
 
     private static void applyCatalog(
             JavaPlugin plugin, KernelPorts kernel, LocaleResolver resolver, CloseableResources resources) {
+        // The command reference is generated from CommandSpecCatalog, so a registration it does not describe is a
+        // reference that is wrong; say so where a developer starting a server will read it.
+        CommandSpecCheck.problems(resources.registered())
+                .forEach(problem -> kernel.log().warn("command catalogue: {}", problem));
         List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
                 .toList());
@@ -2284,7 +2293,8 @@ public final class PluginModule {
                 engineTheme(resources),
                 guiLayouts,
                 textInput,
-                guiRegistry);
+                guiRegistry,
+                Objects.requireNonNull(resources.menuForms(), "menuForms"));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
         // /uxmess reload runs what /menu reload runs. Without it the module had no live hook, so the reload told an

@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.poses.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -42,13 +41,6 @@ public final class PoseModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The pose verbs (/sit, /lay, /bellyflop, /spin, /crawl, /poses) are Bukkit-facing and land with the inbound
-        // adapter in the later phases; Phase 0 publishes none.
-        return List.of();
     }
 
     @Override

@@ -11,12 +11,20 @@ from the `uxm` catalog.
 ./gradlew build       # everything CI runs
 ./gradlew runServer   # a local server with the plugin, in run/
 ./gradlew :persistence-adapter:realDatabaseTest   # the repository tests on MySQL, MariaDB and PostgreSQL
+./gradlew :core:generateReference   # rewrite the generated pages under docs/user
 ```
 
 A repository test class carries `@EveryBackend` and takes a `TestDatabase` in its `@BeforeEach`. The build runs it
 on SQLite; `mysqlTest`, `mariadbTest` and `postgresqlTest` run it again on that server in a container, with the
 plugin's own pool and migrations, and CI runs each in a job of its own. Without Docker those three tasks skip their
 tests and say why; `-Puxm.requireDocker=true` makes them fail instead, as CI does.
+
+The command, permission and placeholder pages under `docs/user/` (`commands.md`, `permissions-*.md`,
+`placeholders*.md`) are generated from `CommandSpecCatalog`, `PermissionCatalog` and `PlaceholderCatalog`. The build
+fails while a committed page differs from what the catalogues render; change the catalogue, run
+`:core:generateReference` and commit both. A new command also needs its `describe.<id>` line in every messages
+file, which the command page quotes. On enable the plugin warns about any registered command the catalogue does not
+describe, or describes with other aliases or another node.
 
 ## Release
 

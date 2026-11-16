@@ -13,6 +13,7 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -169,6 +170,32 @@ public final class VaultWindows<W> {
      */
     public Optional<Runnable> checkpoint(VaultId id, W window, VaultContents contents) {
         return snapshot(id, window, contents, false);
+    }
+
+    /**
+     * Release every vault {@code viewer} holds in a window they are not looking at, because they left. Returns the
+     * writes to run, as a close would.
+     *
+     * <p>Such a window is one whose open never came up and was not released when it was refused, and its claim would otherwise block every
+     * other viewer of that vault until this viewer came back. Releasing it is safe because nothing can reach its
+     * items any more: its viewer is gone, nobody else ever sees another viewer's window, and the caller has already
+     * decided its open as refused, so a late open is cancelled rather than shown. Its items are written like a
+     * close's, so the next viewer starts from them. A window that {@code seen} reports as still looked at is live
+     * and keeps its claim: releasing it would let a second window be filled from the same row while this one can
+     * still be emptied, and the two writes would duplicate items. Its own close writes it.
+     */
+    public List<Runnable> releaseLeft(UUID viewer, Predicate<W> seen, Function<W, VaultContents> contents) {
+        Objects.requireNonNull(viewer, "viewer");
+        Objects.requireNonNull(seen, "seen");
+        Objects.requireNonNull(contents, "contents");
+        List<Runnable> writes = new ArrayList<>();
+        for (Window<W> held : held()) {
+            W window = held.window();
+            if (held.viewer().uuid().equals(viewer) && !seen.test(window)) {
+                release(held.vault().id(), window, contents.apply(window)).ifPresent(writes::add);
+            }
+        }
+        return writes;
     }
 
     /** True when {@code window} holds {@code id}, so its close is the one that writes the vault back. */

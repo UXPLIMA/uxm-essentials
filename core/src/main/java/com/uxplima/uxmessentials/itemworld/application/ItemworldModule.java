@@ -2,11 +2,9 @@ package com.uxplima.uxmessentials.itemworld.application;
 
 import java.time.Duration;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.uxplima.uxmessentials.itemworld.domain.SubFeatureGroup;
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -57,11 +55,6 @@ public final class ItemworldModule implements FeatureModule {
     }
 
     @Override
-    public List<CommandSpec> commands() {
-        return ItemworldCommandSurface.all();
-    }
-
-    @Override
     public List<ListenerFactory> listeners() {
         // The powertool interact listener and the inventory-close write-back for the cleanup GUIs are
         // Bukkit-facing and land with the inbound adapter; a disabled or not-yet-adapted module registers none here.
@@ -98,11 +91,6 @@ public final class ItemworldModule implements FeatureModule {
     /** True while the module is started; region-touching adapter tasks observe this and exit on stop. */
     public boolean isRunning() {
         return running;
-    }
-
-    /** Resolve a command's owning sub-feature group, for the per-group + per-command disable gate at the boundary. */
-    public Optional<SubFeatureGroup> groupOf(String literal) {
-        return ItemworldCommandSurface.groupOf(literal);
     }
 
     private void awaitDrain() {

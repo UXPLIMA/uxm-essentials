@@ -34,12 +34,6 @@ public abstract class AbstractHudModule implements FeatureModule {
     }
 
     @Override
-    public List<CommandSpec> commands() {
-        // Always-on when enabled: there is no per-player visibility toggle, so a HUD module publishes no command.
-        return List.of();
-    }
-
-    @Override
     public List<ListenerFactory> listeners() {
         // The join/quit connection listener is Bukkit-facing and lands with the inbound adapter; a disabled or
         // not-yet-adapted module registers none here.
