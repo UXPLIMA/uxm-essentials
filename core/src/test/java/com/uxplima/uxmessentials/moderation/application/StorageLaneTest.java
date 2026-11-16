@@ -12,6 +12,7 @@ import java.util.concurrent.RejectedExecutionException;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
@@ -23,6 +24,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.OnlineLookup;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
@@ -31,8 +33,9 @@ import org.junit.jupiter.api.Test;
 
 /**
  * A ban asked for on the server thread is stored on the async lane, and the player is kicked only once it is stored.
- * A player who leaves before then is still banned and cannot log back in. The permission answers the sanction needs
- * are the ones read before it left the server thread, and work about one player is stored in the order it was asked.
+ * A player who leaves before then is still banned and cannot log back in. The staff member's caps are read before the
+ * work leaves their thread, the target's immunity on the target's own thread, and work about one player is stored in
+ * the order it was asked. An immunity that cannot be read keeps the sanction off the target.
  */
 class StorageLaneTest {
 
@@ -47,7 +50,8 @@ class StorageLaneTest {
     private final RecordingLogger log = new RecordingLogger();
     private boolean liveReadable = true;
     private final LanePermissions reader = new LanePermissions(permissions, () -> liveReadable, log);
-    private final StorageLane lane = new StorageLane(scheduler, notifier.notifier(), permissions, log);
+    private final OnlineLookup lookup = new OnlineLookup().with(ALEX, SAM);
+    private final StorageLane lane = new StorageLane(scheduler, notifier.notifier(), permissions, lookup, log);
     private final Ban ban = new Ban(
             records,
             online,
@@ -123,7 +127,7 @@ class StorageLaneTest {
 
     @Test
     void workTheSchedulerRefusesIsLoggedAndFailsTheCallersFuture() {
-        StorageLane closing = new StorageLane(new RefusingScheduler(), notifier.notifier(), permissions, log);
+        StorageLane closing = new StorageLane(new RefusingScheduler(), notifier.notifier(), permissions, lookup, log);
 
         closing.run(ALEX, SAM, () -> {});
         CompletableFuture<String> answer = closing.supply(ALEX, SAM, () -> "stored");
@@ -135,14 +139,96 @@ class StorageLaneTest {
     }
 
     @Test
-    void anExemptTargetStaysExemptWhenTheLiveReadLaterSaysOtherwise() {
+    void onTheTargetsOwnThreadTheirImmunityIsReadWhenAskedAndKept() {
+        StorageLane owning =
+                new StorageLane(new OwningScheduler(scheduler), notifier.notifier(), permissions, lookup, log);
         permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
-        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+        owning.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
         permissions.revoke(SAM, ModerationGuard.EXEMPT_NODE);
 
         scheduler.runAll();
 
         assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+    }
+
+    @Test
+    void fromAThreadThatDoesNotOwnTheTargetTheImmunityIsReadOnTheTargetsThreadBeforeTheBanRuns() {
+        permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+        // Read on the target's thread, which has not run yet: what they hold by then is what counts.
+        permissions.revoke(SAM, ModerationGuard.EXEMPT_NODE);
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isInstanceOf(TempbanState.Active.class);
+    }
+
+    @Test
+    void anExemptTargetInAnotherRegionIsNotBanned() {
+        permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(online.kicked()).isEmpty();
+    }
+
+    @Test
+    void aTargetWhoLeavesBeforeTheirThreadAnswersIsNotSanctionedAndTheStaffMemberIsToldWhy() {
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+        scheduler.leave(SAM);
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(notifier.keys()).contains(ModerationMessageKey.TARGET_EXEMPTION_UNREAD.key());
+        assertThat(log.warnings()).containsExactly("event=moderation_exemption_unread actor={} target={} [Alex, Sam]");
+    }
+
+    @Test
+    void anUnreadImmunityAlsoKeepsAnApiSanctionOffTheTarget() {
+        CompletableFuture<Boolean> banned = lane.supply(
+                ALEX,
+                SAM,
+                () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false).isOk());
+        scheduler.leave(SAM);
+
+        scheduler.runAll();
+
+        assertThat(banned).isCompletedWithValue(false);
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+    }
+
+    @Test
+    void aKickOfEveryoneReadsEachImmunityOnItsOwnThreadAndKeepsTheUnreadOnesOut() {
+        PlayerRef robin = new PlayerRef(java.util.UUID.fromString("00000000-0000-0000-0000-0000000000a3"), "Robin");
+        lookup.with(robin);
+        permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
+        java.util.List<String> exempt = new java.util.ArrayList<>();
+        ModerationGuard guard = new ModerationGuard(reader);
+        lane.run(ALEX, java.util.List.of(SAM, robin), () -> {
+            exempt.add("Sam=" + guard.isExempt(SAM));
+            exempt.add("Robin=" + guard.isExempt(robin));
+        });
+        scheduler.leave(robin);
+        liveReadable = false;
+
+        scheduler.runAll();
+
+        assertThat(exempt).containsExactly("Sam=true", "Robin=true");
+        assertThat(notifier.keys()).containsExactly(ModerationMessageKey.TARGET_EXEMPTION_UNREAD.key());
+    }
+
+    @Test
+    void anOfflineTargetHasNoImmunityToReadAndIsBannedAsBefore() {
+        lookup.leave(SAM);
+        lane.run(ALEX, SAM, () -> ban.ban(ALEX, SAM, Optional.of("cheating"), false));
+
+        scheduler.runAll();
+
+        assertThat(records.loadTempban(SAM)).isInstanceOf(TempbanState.Active.class);
+        assertThat(notifier.keys()).doesNotContain(ModerationMessageKey.TARGET_EXEMPTION_UNREAD.key());
     }
 
     @Test
@@ -177,6 +263,46 @@ class StorageLaneTest {
         scheduler.runAll();
 
         assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
+    }
+
+    /** The queued scheduler, asked from the thread that owns every player: the Paper main thread. */
+    private static final class OwningScheduler implements Scheduler {
+
+        private final Scheduler inner;
+
+        OwningScheduler(Scheduler inner) {
+            this.inner = inner;
+        }
+
+        @Override
+        public boolean ownsEntity(PlayerRef player) {
+            return true;
+        }
+
+        @Override
+        public void onGlobal(Runnable task) {
+            inner.onGlobal(task);
+        }
+
+        @Override
+        public void onRegion(Position position, Runnable task) {
+            inner.onRegion(position, task);
+        }
+
+        @Override
+        public void onEntity(PlayerRef player, Runnable task) {
+            inner.onEntity(player, task);
+        }
+
+        @Override
+        public void async(Runnable task) {
+            inner.async(task);
+        }
+
+        @Override
+        public void asyncAfter(Duration delay, Runnable task) {
+            inner.asyncAfter(delay, task);
+        }
     }
 
     /** A scheduler that is shutting down: it refuses every task. */

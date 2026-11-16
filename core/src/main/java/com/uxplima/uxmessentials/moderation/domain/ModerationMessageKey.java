@@ -223,6 +223,7 @@ public enum ModerationMessageKey implements MessageKey {
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),
+    TARGET_EXEMPTION_UNREAD("moderation.target-exemption-unread"),
     TARGET_ELSEWHERE("moderation.target-elsewhere"),
     BAD_DURATION("moderation.bad-duration"),
     UNKNOWN_TARGET("moderation.unknown-target"),
