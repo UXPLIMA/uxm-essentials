@@ -73,11 +73,7 @@ class VaultWindowsTest {
     /** Open ALEX's {@code vault} for {@code viewer} in a new window the way the GUI does; empty when refused. */
     private Optional<Chest> tryShow(PlayerRef viewer, Vault vault) {
         Chest chest = new Chest();
-        Optional<VaultContents> seed = windows.claim(viewer, ALEX, vault, chest, old -> {
-            VaultContents live = old.items;
-            old.items = VaultContents.empty();
-            return live;
-        });
+        Optional<VaultContents> seed = windows.claim(viewer, ALEX, vault, chest);
         seed.ifPresent(items -> chest.items = items);
         return seed.map(items -> chest);
     }
@@ -86,9 +82,12 @@ class VaultWindowsTest {
         return tryShow(viewer, vault).orElseThrow();
     }
 
-    /** Close {@code chest} the way the GUI's close handler does, queueing its write. */
+    /** Close {@code chest} the way the GUI's close handler does, queueing its write and emptying the window. */
     private void close(VaultId id, Chest chest) {
-        windows.release(id, chest, chest.items).ifPresent(writes::add);
+        windows.release(id, chest, chest.items).ifPresent(write -> {
+            chest.items = VaultContents.empty();
+            writes.add(write);
+        });
         clock.advance(java.time.Duration.ofMillis(5));
     }
 
@@ -182,12 +181,12 @@ class VaultWindowsTest {
         assertThat(deleteVault.delete(ALEX, 2).isOk()).isTrue();
 
         Chest b = show(ALEX, cached);
+        assertThat(b.items).isEqualTo(X);
         runWrites();
         assertThat(handedBack).isEmpty();
         close(SECOND, b);
         runWrites();
 
-        assertThat(b.items).isEqualTo(X);
         assertThat(handedBack).containsExactly("Alex:42");
         assertThat(vaults.find(SECOND)).isEmpty();
     }
@@ -214,13 +213,14 @@ class VaultWindowsTest {
         Vault stale = openVault.open(ALEX, 2).orElseThrow().vault();
         assertThat(deleteVault.delete(ALEX, 2).isOk()).isTrue();
 
+        close(SECOND, a); // the old window closes before the reopen claims, as the GUI does
         Chest b = show(ALEX, stale);
-        close(SECOND, a);
+        assertThat(b.items).isEqualTo(X);
         close(SECOND, b);
         runWrites();
 
-        assertThat(b.items).isEqualTo(X);
         assertThat(a.items).isEqualTo(VaultContents.empty());
+        assertThat(b.items).isEqualTo(VaultContents.empty());
         assertThat(handedBack).containsExactly("Alex:42");
         assertThat(vaults.find(SECOND)).isEmpty();
     }
@@ -277,7 +277,7 @@ class VaultWindowsTest {
         behind.advance(java.time.Duration.ofSeconds(2));
         Chest there = new Chest();
         there.items = survival.claim(
-                        ALEX, ALEX, survivalOpen.open(ALEX, 2).orElseThrow().vault(), there, old -> old.items)
+                        ALEX, ALEX, survivalOpen.open(ALEX, 2).orElseThrow().vault(), there)
                 .orElseThrow();
         assertThat(there.items).isEqualTo(X);
         there.items = VaultContents.empty();
@@ -301,11 +301,11 @@ class VaultWindowsTest {
         runWrites();
         assertThat(stored(SECOND).contents()).isEqualTo(X);
         Chest meanwhile = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
+        assertThat(meanwhile.items).isEqualTo(Y);
         close(SECOND, meanwhile);
         retries.runAll();
         runWrites();
 
-        assertThat(meanwhile.items).isEqualTo(Y);
         assertThat(handedBack).isEmpty();
         assertThat(stored(SECOND).contents()).isEqualTo(Y);
     }
@@ -367,8 +367,7 @@ class VaultWindowsTest {
     /** SAM opens ALEX's vault 2 as staff on {@code server}, from the row as it is now. */
     private Chest staffOn(VaultWindows<Chest> server) {
         Chest staff = new Chest();
-        staff.items =
-                server.claim(SAM, ALEX, stored(SECOND), staff, old -> old.items).orElseThrow();
+        staff.items = server.claim(SAM, ALEX, stored(SECOND), staff).orElseThrow();
         return staff;
     }
 
@@ -376,7 +375,7 @@ class VaultWindowsTest {
     private void editOn(VaultWindows<Chest> server, VaultContents expected, VaultContents items) {
         Chest there = new Chest();
         there.items = server.claim(
-                        ALEX, ALEX, openVault.open(ALEX, 2).orElseThrow().vault(), there, old -> old.items)
+                        ALEX, ALEX, openVault.open(ALEX, 2).orElseThrow().vault(), there)
                 .orElseThrow();
         assertThat(there.items).isEqualTo(expected);
         there.items = items;
@@ -564,7 +563,9 @@ class VaultWindowsTest {
         staff.items = X;
         assertThat(tryShow(ALEX, bought)).isEmpty();
 
-        windows.releaseLeft(SAM.uuid(), chest -> false, chest -> chest.items).forEach(Runnable::run);
+        windows.releaseLeft(
+                        SAM.uuid(), chest -> false, chest -> chest.items, chest -> chest.items = VaultContents.empty())
+                .forEach(Runnable::run);
 
         assertThat(windows.count()).isZero();
         assertThat(stored(VaultId.of(ALEX, 1)).contents()).isEqualTo(X);
@@ -577,7 +578,8 @@ class VaultWindowsTest {
         Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         show(SAM, bought);
 
-        assertThat(windows.releaseLeft(SAM.uuid(), chest -> true, chest -> chest.items))
+        assertThat(windows.releaseLeft(
+                        SAM.uuid(), chest -> true, chest -> chest.items, chest -> chest.items = VaultContents.empty()))
                 .isEmpty();
 
         assertThat(tryShow(ALEX, bought)).isEmpty();
@@ -589,27 +591,62 @@ class VaultWindowsTest {
         Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         show(ALEX, bought);
 
-        assertThat(windows.releaseLeft(SAM.uuid(), chest -> false, chest -> chest.items))
+        assertThat(windows.releaseLeft(
+                        SAM.uuid(), chest -> false, chest -> chest.items, chest -> chest.items = VaultContents.empty()))
                 .isEmpty();
 
         assertThat(tryShow(SAM, bought)).isEmpty();
     }
 
     @Test
-    void aTakenOverWindowIsNotWrittenOnItsOwn() {
+    void theViewerHoldingAVaultCannotOpenASecondWindowOfItWhileTheFirstHoldsIt() {
         Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
         Chest a = show(ALEX, bought);
         a.items = X;
 
-        Chest b = show(ALEX, openVault.open(ALEX, 1).orElseThrow().vault());
-        close(VaultId.of(ALEX, 1), a);
-        assertThat(writes).isEmpty();
-        close(VaultId.of(ALEX, 1), b);
+        assertThat(tryShow(ALEX, openVault.open(ALEX, 1).orElseThrow().vault())).isEmpty();
+
+        assertThat(windows.count()).isEqualTo(1);
+        assertThat(windows.holder(VaultId.of(ALEX, 1)).orElseThrow().window()).isSameAs(a);
+        assertThat(a.items).isEqualTo(X);
+    }
+
+    @Test
+    void reopeningClosesTheOldWindowFirstSoWhatWasPutInItIsInTheNewOneAndWrittenOnce() {
+        VaultId id = VaultId.of(ALEX, 1);
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
+        Chest a = show(ALEX, bought);
+        a.items = X; // put in while the window is open
+        Vault readBeforeTheClose = openVault.open(ALEX, 1).orElseThrow().vault();
+
+        close(id, a); // the old window closes first, as the GUI does before it claims again
+        Chest b = show(ALEX, readBeforeTheClose);
+        runWrites();
+        assertThat(b.items).isEqualTo(X);
+        assertThat(stored(id).contents()).isEqualTo(X);
+
+        b.items = Y; // put in the new window
+        close(id, b);
         runWrites();
 
-        assertThat(b.items).isEqualTo(X);
-        assertThat(stored(VaultId.of(ALEX, 1)).contents()).isEqualTo(X);
+        assertThat(stored(id).contents()).isEqualTo(Y);
+        assertThat(windows.count()).isZero();
         assertThat(handedBack).isEmpty();
+        assertThat(windows.unsettled()).isEmpty();
+    }
+
+    @Test
+    void aWindowReleasedWhenItsViewerLeftIsEmptiedOfWhatWasWritten() {
+        Vault bought = openVault.open(ALEX, 1).orElseThrow().vault();
+        Chest staff = show(SAM, bought);
+        staff.items = X;
+
+        windows.releaseLeft(
+                        SAM.uuid(), chest -> false, chest -> chest.items, chest -> chest.items = VaultContents.empty())
+                .forEach(Runnable::run);
+
+        assertThat(staff.items).isEqualTo(VaultContents.empty());
+        assertThat(stored(VaultId.of(ALEX, 1)).contents()).isEqualTo(X);
     }
 
     @Test

@@ -646,7 +646,8 @@ public final class ModerationWiring {
                 .repository(repository)
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
-                .lane(new StorageLane(kernel.scheduler(), notifier, kernel.permissions(), kernel.log()))
+                .lane(new StorageLane(
+                        kernel.scheduler(), notifier, kernel.permissions(), kernel.playerLookup(), kernel.log()))
                 .build();
     }
 

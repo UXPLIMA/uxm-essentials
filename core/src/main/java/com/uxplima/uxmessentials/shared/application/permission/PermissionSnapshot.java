@@ -61,6 +61,12 @@ public final class PermissionSnapshot {
             return this;
         }
 
+        /** Keep {@code held} as whether {@code who} holds {@code node}, an answer read elsewhere. */
+        public Builder answered(PlayerRef who, String node, boolean held) {
+            this.held.put(new Held(who.uuid(), node), held);
+            return this;
+        }
+
         /** Keep the quota {@code who} resolves to for {@code family}. */
         public Builder quota(PlayerRef who, QuotaFamily family, @Nullable WorldRef world, long configDefault) {
             quotas.put(
