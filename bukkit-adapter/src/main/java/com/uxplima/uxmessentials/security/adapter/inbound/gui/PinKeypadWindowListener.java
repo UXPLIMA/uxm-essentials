@@ -71,6 +71,8 @@ public final class PinKeypadWindowListener implements Listener {
         }
     }
 
+    // Sees cancelled opens too: a refused open is no longer in flight either, so it settles the count like a landed
+    // one.
     @EventHandler
     public void onOpen(InventoryOpenEvent event) {
         if (isKeypad(event.getInventory())) {

@@ -87,7 +87,7 @@ public final class MenuOpenedListener implements Listener {
 
     /**
      * The engine is about to draw a menu for a player. Remembered until the next tick, since a form, if one follows,
-     * is sent on this same thread before then; a refused open forgets what was there.
+     * is sent on this same thread before then; a cancelled open forgets what was there.
      */
     @EventHandler(priority = EventPriority.MONITOR)
     public void onMenuOpen(MenuOpenEvent event) {

@@ -31,7 +31,10 @@ public final class SignedVelocityCommandListener implements Listener {
         this.queue = Objects.requireNonNull(queue, "queue");
     }
 
-    /** Apply the proxy's command ruling for this sender, if one has arrived. */
+    /**
+     * Apply the proxy's command ruling for this sender, if one has arrived. Sees cancelled commands too: the ruling
+     * belongs to this command, and one left in the queue would be applied to the next.
+     */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         queue.poll(event.getPlayer().getUniqueId(), SignedSource.COMMAND)

@@ -16,6 +16,7 @@ import java.util.function.Function;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.HandlerList;
 import org.bukkit.event.Listener;
 import org.bukkit.event.world.WorldLoadEvent;
@@ -90,7 +91,8 @@ public final class GuardWiring {
             service.worldLoaded(event.getWorld().getName());
         }
 
-        @EventHandler
+        /** Last and only when it goes ahead: a world another plugin keeps loaded keeps its rules. */
+        @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
         public void onWorldUnload(WorldUnloadEvent event) {
             service.worldUnloaded(event.getWorld().getName());
         }

@@ -37,6 +37,8 @@ public final class UnlimitedPlacementListener implements Listener {
         this.config = Objects.requireNonNull(config, "config");
     }
 
+    // Last, so only a placement every listener let through is refilled. It changes the player's inventory, never the
+    // event, and an earlier refill on a placement refused later would hand the player a full stack for nothing.
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
         if (!config.commandEnabled(SubFeatureGroup.MOB_ENTITY, "unlimited")) {

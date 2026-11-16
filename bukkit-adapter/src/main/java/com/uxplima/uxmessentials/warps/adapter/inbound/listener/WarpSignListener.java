@@ -94,6 +94,8 @@ public final class WarpSignListener implements Listener {
         feedback.send(player, WarpsMessageKey.WARP_SIGN_CREATED);
     }
 
+    // Sees cancelled clicks too: warp signs usually stand in a protected spawn whose protection cancels every click,
+    // and the sign is meant to work there.
     @EventHandler(priority = EventPriority.NORMAL)
     public void onPlayerInteract(PlayerInteractEvent event) {
         if (event.getAction() != Action.RIGHT_CLICK_BLOCK) {

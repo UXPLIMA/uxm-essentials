@@ -66,7 +66,9 @@ public final class MovementListener implements Listener {
         }
     }
 
-    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
+    // The same rules as a move on foot and at the same priority: ejecting and sending the rider back acts on the move,
+    // which an observer at MONITOR must not do.
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onVehicleMove(VehicleMoveEvent event) {
         for (Entity passenger : event.getVehicle().getPassengers()) {
             if (passenger instanceof Player player) {

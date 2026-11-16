@@ -21,6 +21,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 public final class KitPreviewListener implements Listener {
 
+    // Sees cancelled clicks too: the lock has to hold even when a listener after this one lets the click through.
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         if (holderOf(event.getView().getTopInventory()) == null) {
@@ -35,6 +36,7 @@ public final class KitPreviewListener implements Listener {
         }
     }
 
+    // Sees cancelled drags too, for the reason onClick gives.
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
         Inventory top = event.getView().getTopInventory();

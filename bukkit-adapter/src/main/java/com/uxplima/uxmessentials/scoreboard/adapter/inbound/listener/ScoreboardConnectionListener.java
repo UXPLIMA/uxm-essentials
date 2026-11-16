@@ -69,7 +69,7 @@ public final class ScoreboardConnectionListener implements Listener {
         rerender(event.getPlayer());
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onGameModeChange(PlayerGameModeChangeEvent event) {
         rerender(event.getPlayer());
     }

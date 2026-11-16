@@ -55,7 +55,7 @@ public final class BossBarConnectionListener implements Listener {
         redraw(event.getPlayer());
     }
 
-    @EventHandler(priority = EventPriority.MONITOR)
+    @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onGameModeChange(PlayerGameModeChangeEvent event) {
         redraw(event.getPlayer());
     }

@@ -70,6 +70,7 @@ public final class SnapshotCaptureListener implements Listener {
         this.includeEnderchest = includeEnderchest;
     }
 
+    // Sees cancelled deaths too: an extra restore point costs one row, a missing one can cost a player their items.
     @EventHandler(priority = EventPriority.MONITOR)
     public void onDeath(PlayerDeathEvent event) {
         if (captureOnDeath) {

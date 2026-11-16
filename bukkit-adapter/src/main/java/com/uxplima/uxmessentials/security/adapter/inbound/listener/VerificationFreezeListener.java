@@ -175,6 +175,9 @@ public final class VerificationFreezeListener implements Listener {
      * Keep a frozen player alive. This covers every damage source, mob, player, fall, fire and drowning alike, so
      * nobody dies at a keypad they were not allowed to walk away from. It also catches the outgoing half through
      * {@link EntityDamageByEntityEvent}, so the freeze cannot be used as a place to hit from with impunity.
+     *
+     * <p>The freeze handlers see cancelled events too: the freeze has to hold even when a listener after this one lets
+     * the event through again.
      */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onDamage(EntityDamageEvent event) {
@@ -183,6 +186,7 @@ public final class VerificationFreezeListener implements Listener {
         }
     }
 
+    // Sees cancelled hits too, for the reason onDamage gives.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onDamageDealt(EntityDamageByEntityEvent event) {
         if (dealer(event.getDamager()) instanceof Player player && blocked(player, FreezeRestriction.DAMAGE_DEALT)) {
@@ -190,7 +194,10 @@ public final class VerificationFreezeListener implements Listener {
         }
     }
 
-    /** Stop mobs choosing a frozen player at all, the companion to cancelling the damage they would have dealt. */
+    /**
+     * Stop mobs choosing a frozen player at all, the companion to cancelling the damage they would have dealt. Sees
+     * cancelled targets too, for the reason onDamage gives.
+     */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onTarget(EntityTargetEvent event) {
         if (event.getTarget() instanceof Player player && blocked(player, FreezeRestriction.MOB_TARGETING)) {
@@ -203,6 +210,9 @@ public final class VerificationFreezeListener implements Listener {
      * exception is the module's own move into and out of the holding area, which announces itself beforehand; a
      * teleport event carries a cause and not an author, so being told is the only way to tell those two apart from
      * everybody else's.
+     *
+     * <p>Sees cancelled teleports too: the freeze has to hold if a later listener lets one through, and the module's
+     * own announced move is used up even when another plugin refused it.
      */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onTeleport(PlayerTeleportEvent event) {
@@ -244,7 +254,10 @@ public final class VerificationFreezeListener implements Listener {
         }
     }
 
-    /** Hold the hunger bar still, so a player who has to find their authenticator app does not starve doing it. */
+    /**
+     * Hold the hunger bar still, so a player who has to find their authenticator app does not starve doing it. Sees
+     * cancelled changes too, for the reason onDamage gives.
+     */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onHunger(FoodLevelChangeEvent event) {
         if (event.getEntity() instanceof Player player
