@@ -14,6 +14,7 @@ import java.util.UUID;
  * @param world the uid of the world to land in
  * @param createdAt when it was set, kept to the millisecond
  * @param actor the staff member who set it
+ * @param misses how many joins already tried it and missed, which bounds how long it is kept
  */
 public record PendingRelocation(
         UUID player,
@@ -25,7 +26,8 @@ public record PendingRelocation(
         float yaw,
         float pitch,
         Instant createdAt,
-        UUID actor) {
+        UUID actor,
+        int misses) {
 
     public PendingRelocation {
         Objects.requireNonNull(player, "player");
@@ -33,6 +35,14 @@ public record PendingRelocation(
         Objects.requireNonNull(world, "world");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(actor, "actor");
+        if (misses < 0) {
+            throw new IllegalArgumentException("misses must not be negative: " + misses);
+        }
         createdAt = Instant.ofEpochMilli(createdAt.toEpochMilli());
+    }
+
+    /** The same relocation after one more join tried it and missed. */
+    public PendingRelocation missedOnce() {
+        return new PendingRelocation(player, server, world, x, y, z, yaw, pitch, createdAt, actor, misses + 1);
     }
 }

@@ -84,9 +84,18 @@ public final class TpOfflineCommand extends TeleportCommandSupport implements Co
         return Command.SINGLE_SUCCESS;
     }
 
-    /** Whether {@code player} stands on something, rather than flying, gliding, falling or swimming. */
+    /**
+     * Whether {@code player} stands on solid footing: on the ground, and not flying, gliding, swimming, in water or
+     * lava, or riding something, since a spot taken from any of those would drop or drown the player moved there.
+     */
     private static boolean standing(Player player) {
         Entity body = player;
-        return body.isOnGround() && !player.isFlying() && !player.isGliding();
+        return body.isOnGround()
+                && !player.isFlying()
+                && !player.isGliding()
+                && !player.isSwimming()
+                && !player.isInWater()
+                && !player.isInLava()
+                && !player.isInsideVehicle();
     }
 }

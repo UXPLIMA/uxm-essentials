@@ -48,7 +48,6 @@ import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.RtpMenu;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.gui.TeleportSettingsView;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.ArrivalGraceGuard;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.BiomeHotspotListener;
-import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RelocationJoinListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RequestExpirySweep;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.RespawnListener;
 import com.uxplima.uxmessentials.teleport.adapter.inbound.listener.SpawnJoinListener;
@@ -234,7 +233,12 @@ public final class TeleportWiring {
                 graceGuard,
                 settings::rtpOnRespawnWorlds);
         SpawnJoinListener joinListener = new SpawnJoinListener(
-                settings, services.resolveSpawn(), services.resolveRtp(), services.executor(), kernel.permissions());
+                settings,
+                services.resolveSpawn(),
+                services.resolveRtp(),
+                services.executor(),
+                kernel.permissions(),
+                services.offlineTeleport());
         // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
         // layout loader. It reads and writes the same TeleportFlags the /tptoggle and /tpauto commands do, so
         // /tpsettings, the panel, and the commands all see one switch. The teleport entry on the /uxmess gui hub
@@ -420,6 +424,7 @@ public final class TeleportWiring {
                         kernel.playerLookup(),
                         kernel.worldLookup(),
                         crossServer.visibility(),
+                        jailGate,
                         executor,
                         kernel.scheduler(),
                         notifier,
@@ -659,7 +664,6 @@ public final class TeleportWiring {
                         services.captureBack(),
                         config,
                         services.settings()::backCapturePolicy),
-                new RelocationJoinListener(services.offlineTeleport()),
                 respawnListener,
                 joinListener,
                 graceGuard));

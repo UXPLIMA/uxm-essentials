@@ -13,6 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.WorldLookup;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
+import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import com.uxplima.uxmessentials.teleport.application.port.LogoutPositions;
 import com.uxplima.uxmessentials.teleport.application.port.LogoutPositions.SavedSpot;
 import com.uxplima.uxmessentials.teleport.application.port.PendingRelocations;
@@ -30,19 +31,27 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
  * lane, and moves the staff member on their own thread. {@code /tpofflinehere} never touches that data: it stores a
  * relocation for this backend, which {@link #arrive} applies once the player has joined here, after the server has
  * loaded and placed them. Applying it claims the stored row first, so it happens once however quickly the player
- * joins again, and a hop that misses puts the row back for the next join.
+ * joins again. A hop that misses (the player left again, or another plugin cancelled the teleport) puts the row back
+ * for the next join, up to {@link #MAX_MISSES} times, and then drops it.
  *
- * <p>A player online here is refused: their saved data is stale while they play, and they can be moved directly. A
- * player the staff member may not see because of vanish gets the same answer as a player this server knows nothing
- * of, so the refusal does not give them away.
+ * <p>A jailed player is never moved: the relocation waits, untouched, for a join after their release, through the
+ * same jail gate an accepted request asks.
+ *
+ * <p>A player online here whom the staff member can see is refused: their saved data is stale while they play, and
+ * they can be moved directly. A player the staff member may not see because of vanish is handled exactly as if they
+ * were offline, so no answer gives them away.
  */
 public final class OfflineTeleport {
+
+    /** How many joins may miss a relocation before it is dropped. */
+    public static final int MAX_MISSES = 3;
 
     private final LogoutPositions positions;
     private final PendingRelocations relocations;
     private final PlayerLookup players;
     private final WorldLookup worlds;
     private final RequestVisibility visibility;
+    private final JailGate jail;
     private final TeleportExecutor executor;
     private final Scheduler scheduler;
     private final Notifier notifier;
@@ -56,6 +65,7 @@ public final class OfflineTeleport {
             PlayerLookup players,
             WorldLookup worlds,
             RequestVisibility visibility,
+            JailGate jail,
             TeleportExecutor executor,
             Scheduler scheduler,
             Notifier notifier,
@@ -67,6 +77,7 @@ public final class OfflineTeleport {
         this.players = Objects.requireNonNull(players, "players");
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.visibility = Objects.requireNonNull(visibility, "visibility");
+        this.jail = Objects.requireNonNull(jail, "jail");
         this.executor = Objects.requireNonNull(executor, "executor");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
@@ -84,8 +95,8 @@ public final class OfflineTeleport {
                     try {
                         saved = positions.read(target.uuid());
                     } catch (RuntimeException unreadable) {
-                        log.warn(
-                                "the saved position of {} could not be read: {}", target.name(), unreadable.toString());
+                        // The reader has logged why; the staff member hears that it could not be read, not that it is
+                        // missing.
                         scheduler.onEntity(
                                 actor, () -> tell(actor, TeleportMessageKey.TPOFFLINE_FAILED, target.name()));
                         return;
@@ -112,7 +123,8 @@ public final class OfflineTeleport {
                     here.yaw(),
                     here.pitch(),
                     clock.instant(),
-                    actor.uuid());
+                    actor.uuid(),
+                    0);
             scheduler.async(() -> {
                 TeleportMessageKey reply = TeleportMessageKey.TPOFFLINE_MOVED;
                 try {
@@ -127,35 +139,56 @@ public final class OfflineTeleport {
         });
     }
 
-    /** Apply the relocation waiting for {@code who} on this server, if any. Called once they have joined. */
-    public void arrive(PlayerRef who) {
+    /**
+     * Apply the relocation waiting for {@code who} on this server, once they have joined. When none is applied (there
+     * is none, it waits for a release from jail or for its world, or it could not be read), {@code otherwise} runs on
+     * the player's thread instead: the join's own move, which a relocation replaces, so the two never race.
+     */
+    public void arrive(PlayerRef who, Runnable otherwise) {
         Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(otherwise, "otherwise");
         scheduler.async(() -> {
-            Optional<PendingRelocation> waiting;
-            try {
-                waiting = relocations.find(who.uuid(), server);
-            } catch (RuntimeException failed) {
-                log.error("the relocation of " + who.name() + " could not be read", failed);
+            Optional<PendingRelocation> waiting = waitingFor(who);
+            if (waiting.isEmpty()) {
+                scheduler.onEntity(who, otherwise);
                 return;
             }
-            waiting.ifPresent(relocation -> scheduler.onEntity(who, () -> placeIfLoaded(who, relocation)));
+            if (jail.isJailed(who)) {
+                log.info("event=relocation_held_jailed player={}", who.name());
+                scheduler.onEntity(who, otherwise);
+                return;
+            }
+            PendingRelocation relocation = waiting.get();
+            scheduler.onEntity(who, () -> placeIfLoaded(who, relocation, otherwise));
         });
     }
 
+    private Optional<PendingRelocation> waitingFor(PlayerRef who) {
+        try {
+            return relocations.find(who.uuid(), server);
+        } catch (RuntimeException failed) {
+            log.error("the relocation of " + who.name() + " could not be read", failed);
+            return Optional.empty();
+        }
+    }
+
     /** On the player's thread: a world that is not loaded leaves the row for a later join, when it may be. */
-    private void placeIfLoaded(PlayerRef who, PendingRelocation relocation) {
+    private void placeIfLoaded(PlayerRef who, PendingRelocation relocation, Runnable otherwise) {
         Optional<WorldRef> world = worlds.findByUid(relocation.world());
         if (world.isEmpty()) {
+            log.info("event=relocation_world_missing player={} world={}", who.name(), relocation.world());
+            otherwise.run();
             return;
         }
         Position at = new Position(
                 world.get(), relocation.x(), relocation.y(), relocation.z(), relocation.yaw(), relocation.pitch());
         scheduler.async(() -> {
             if (!claimed(relocation)) {
+                scheduler.onEntity(who, otherwise);
                 return;
             }
             executor.teleport(
-                    who, Destination.at(at), TeleportKind.ADMIN, OfflineTeleport::landed, () -> putBack(relocation));
+                    who, Destination.at(at), TeleportKind.ADMIN, OfflineTeleport::landed, () -> missed(relocation));
         });
     }
 
@@ -168,11 +201,23 @@ public final class OfflineTeleport {
         }
     }
 
-    /** A hop that missed after the claim (the player left again) keeps the relocation for their next join. */
-    private void putBack(PendingRelocation relocation) {
+    /**
+     * A hop that missed after the claim keeps the relocation for the next join, counting the miss; one that keeps
+     * missing, as a teleport another plugin always cancels does, is dropped rather than tried on every join.
+     */
+    private void missed(PendingRelocation relocation) {
+        PendingRelocation again = relocation.missedOnce();
+        if (again.misses() >= MAX_MISSES) {
+            log.warn(
+                    "event=relocation_dropped player={} misses={} reason=the teleport kept missing",
+                    relocation.player(),
+                    again.misses());
+            return;
+        }
+        log.warn("event=relocation_missed player={} misses={} of={}", relocation.player(), again.misses(), MAX_MISSES);
         scheduler.async(() -> {
             try {
-                relocations.restore(relocation);
+                relocations.restore(again);
             } catch (RuntimeException failed) {
                 log.error("the relocation of " + relocation.player() + " could not be put back", failed);
             }
@@ -184,8 +229,8 @@ public final class OfflineTeleport {
     }
 
     /**
-     * The named player when this server knows them and they are not online here; otherwise the actor is told why
-     * not. A player online here whom the actor may not see reads as unknown.
+     * The named player when this server knows them and they are not online here as far as the actor can see;
+     * otherwise the actor is told why not. A player online here whom the actor may not see is handled as offline.
      */
     private Optional<PlayerRef> offline(PlayerRef actor, String name) {
         Objects.requireNonNull(name, "name");
@@ -195,12 +240,8 @@ public final class OfflineTeleport {
             return Optional.empty();
         }
         PlayerRef found = target.get();
-        if (players.isOnline(found.uuid())) {
-            if (visibility.hides(found, actor, visibility.seeLevel(actor))) {
-                tell(actor, TeleportMessageKey.TPOFFLINE_UNKNOWN, name);
-            } else {
-                tell(actor, TeleportMessageKey.TPOFFLINE_ONLINE, found.name());
-            }
+        if (players.isOnline(found.uuid()) && !visibility.hides(found, actor, visibility.seeLevel(actor))) {
+            tell(actor, TeleportMessageKey.TPOFFLINE_ONLINE, found.name());
             return Optional.empty();
         }
         return target;
@@ -212,7 +253,7 @@ public final class OfflineTeleport {
             return;
         }
         SavedSpot spot = saved.get();
-        Optional<WorldRef> world = worlds.findByUid(spot.worldUid());
+        Optional<WorldRef> world = worldOf(spot);
         if (world.isEmpty()) {
             tell(actor, TeleportMessageKey.TPOFFLINE_WORLD_MISSING, target.name());
             return;
@@ -220,6 +261,16 @@ public final class OfflineTeleport {
         Position at = new Position(world.get(), spot.x(), spot.y(), spot.z(), spot.yaw(), spot.pitch());
         executor.teleport(actor, Destination.at(at), TeleportKind.ADMIN);
         notifier.send(actor, TeleportMessageKey.TP_DONE);
+    }
+
+    /** The world a saved position names: by uid when the data has one, otherwise by its dimension key. */
+    private Optional<WorldRef> worldOf(SavedSpot spot) {
+        java.util.UUID uid = spot.worldUid();
+        if (uid != null) {
+            return worlds.findByUid(uid);
+        }
+        String dimension = spot.dimension();
+        return dimension == null ? Optional.empty() : worlds.findByKey(dimension);
     }
 
     private void tell(PlayerRef actor, TeleportMessageKey key, String player) {

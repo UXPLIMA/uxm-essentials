@@ -22,12 +22,19 @@ import org.junit.jupiter.api.io.TempDir;
 
 /**
  * The saved position read from a compressed player data file laid out as the server writes it: an unnamed root
- * compound holding the position, the facing and the world uid among the rest of the player's data.
+ * compound holding the position, the facing and the world among the rest of the player's data, of every tag type.
  */
 class PlayerDataLogoutPositionsTest {
 
     private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-000000000005");
     private static final UUID WORLD = UUID.fromString("00000000-0000-0000-0000-00000000aaaa");
+
+    private static final int LONG = 4;
+    private static final int FLOAT = 5;
+    private static final int DOUBLE = 6;
+    private static final int STRING = 8;
+    private static final int LIST = 9;
+    private static final int COMPOUND = 10;
 
     @TempDir
     Path players;
@@ -40,24 +47,32 @@ class PlayerDataLogoutPositionsTest {
 
     @Test
     void thePositionTheServerSavedIsReadBackWithItsWorld() throws IOException {
-        save(playerData(true));
+        save(playerData(true, true));
 
-        assertThat(positions().read(SAM)).contains(new SavedSpot(WORLD, 12.5, 64, -80.25, 90f, -15f));
+        assertThat(positions().read(SAM)).contains(SavedSpot.inWorld(WORLD, 12.5, 64, -80.25, 90f, -15f));
         assertThat(log.errors).isEmpty();
     }
 
     @Test
-    void aPlayerWithNoFileOrNoWorldHasNoSavedPosition() throws IOException {
+    void dataWithoutAWorldUidFallsBackToItsDimension() throws IOException {
+        save(playerData(false, true));
+
+        assertThat(positions().read(SAM))
+                .contains(SavedSpot.inDimension("minecraft:the_nether", 12.5, 64, -80.25, 90f, -15f));
+    }
+
+    @Test
+    void aPlayerWithNoFileOrNoWorldAtAllHasNoSavedPosition() throws IOException {
         assertThat(positions().read(SAM)).isEmpty();
 
-        save(playerData(false));
+        save(playerData(false, false));
         assertThat(positions().read(SAM)).isEmpty();
         assertThat(log.errors).isEmpty();
     }
 
     @Test
     void aFileCutShortWhileItIsWrittenIsUnreadableNotMissing() throws IOException {
-        byte[] whole = playerData(true);
+        byte[] whole = playerData(true, true);
         save(Arrays.copyOf(whole, whole.length / 2));
 
         assertThatThrownBy(() -> positions().read(SAM)).isInstanceOf(LogoutPositions.Unreadable.class);
@@ -68,53 +83,103 @@ class PlayerDataLogoutPositionsTest {
         Files.write(players.resolve(SAM + ".dat"), compressed);
     }
 
-    /** A player's data as the server stores it, the world uid left out when {@code withWorld} is false. */
-    private static byte[] playerData(boolean withWorld) throws IOException {
+    /**
+     * A player's data as the server stores it, with arrays, nested lists and compounds around the fields read. The
+     * world uid and the dimension are left out when asked.
+     */
+    private static byte[] playerData(boolean withWorldUid, boolean withDimension) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
         try (DataOutputStream out = new DataOutputStream(new GZIPOutputStream(bytes))) {
-            out.writeByte(10);
+            out.writeByte(COMPOUND);
             out.writeUTF("");
             named(out, 3, "DataVersion");
             out.writeInt(4671);
-            named(out, 9, "Inventory");
-            out.writeByte(10);
-            out.writeInt(1);
-            named(out, 8, "id");
-            out.writeUTF("minecraft:diamond");
-            named(out, 1, "Slot");
-            out.writeByte(0);
-            out.writeByte(0);
+            named(out, 1, "OnGround");
+            out.writeByte(1);
+            named(out, 2, "Air");
+            out.writeShort(300);
+            named(out, 7, "Seed");
+            out.writeInt(3);
+            out.write(new byte[] {1, 2, 3});
             named(out, 11, "UUID");
             out.writeInt(4);
             for (int part = 0; part < 4; part++) {
                 out.writeInt(part);
             }
-            named(out, 9, "Pos");
-            out.writeByte(6);
+            named(out, 12, "Pairs");
+            out.writeInt(2);
+            out.writeLong(7L);
+            out.writeLong(9L);
+            inventory(out);
+            nestedLists(out);
+            named(out, LIST, "Pos");
+            out.writeByte(DOUBLE);
             out.writeInt(3);
             out.writeDouble(12.5);
             out.writeDouble(64);
             out.writeDouble(-80.25);
-            named(out, 9, "Rotation");
-            out.writeByte(5);
+            named(out, LIST, "Rotation");
+            out.writeByte(FLOAT);
             out.writeInt(2);
             out.writeFloat(90f);
             out.writeFloat(-15f);
-            named(out, 8, "Dimension");
-            out.writeUTF("minecraft:overworld");
-            if (withWorld) {
-                named(out, 4, "WorldUUIDLeast");
+            if (withDimension) {
+                named(out, STRING, "Dimension");
+                out.writeUTF("minecraft:the_nether");
+            }
+            if (withWorldUid) {
+                named(out, LONG, "WorldUUIDLeast");
                 out.writeLong(WORLD.getLeastSignificantBits());
-                named(out, 4, "WorldUUIDMost");
+                named(out, LONG, "WorldUUIDMost");
                 out.writeLong(WORLD.getMostSignificantBits());
             }
-            named(out, 10, "bukkit");
-            named(out, 4, "lastPlayed");
+            named(out, COMPOUND, "bukkit");
+            named(out, LONG, "lastPlayed");
             out.writeLong(1_900_000_000_000L);
             out.writeByte(0);
             out.writeByte(0);
         }
         return bytes.toByteArray();
+    }
+
+    /** A list of item compounds, one of which carries its own compound of components. */
+    private static void inventory(DataOutputStream out) throws IOException {
+        named(out, LIST, "Inventory");
+        out.writeByte(COMPOUND);
+        out.writeInt(2);
+        named(out, STRING, "id");
+        out.writeUTF("minecraft:diamond");
+        named(out, 1, "Slot");
+        out.writeByte(0);
+        out.writeByte(0);
+        named(out, STRING, "id");
+        out.writeUTF("minecraft:written_book");
+        named(out, COMPOUND, "components");
+        named(out, LIST, "pages");
+        out.writeByte(STRING);
+        out.writeInt(2);
+        out.writeUTF("one");
+        out.writeUTF("two");
+        out.writeByte(0);
+        out.writeByte(0);
+    }
+
+    /** A list of lists of longs and an empty list, as the server writes a list with nothing in it. */
+    private static void nestedLists(DataOutputStream out) throws IOException {
+        named(out, LIST, "Nested");
+        out.writeByte(LIST);
+        out.writeInt(2);
+        out.writeByte(LONG);
+        out.writeInt(2);
+        out.writeLong(1L);
+        out.writeLong(2L);
+        out.writeByte(12);
+        out.writeInt(1);
+        out.writeInt(1);
+        out.writeLong(3L);
+        named(out, LIST, "Empty");
+        out.writeByte(0);
+        out.writeInt(0);
     }
 
     private static void named(DataOutputStream out, int type, String name) throws IOException {

@@ -25,7 +25,8 @@ import net.minecraft.world.level.storage.LevelResource;
  * position and reads first on login. Read only: nothing here writes the file.
  *
  * <p>The file is the server's compressed NBT, read here with a small reader that takes {@code Pos},
- * {@code Rotation} and the world uid from the root compound and steps over everything else, so reading needs none
+ * {@code Rotation} and the world uid (or, in data without one, the {@code Dimension} key) from the root compound
+ * and steps over everything else, so reading needs none
  * of the server's internals; only {@link #ofServer} asks them where the directory is. The file may be written while
  * it is read (offline {@code /invsee} saves it in place), so a file that is cut short or malformed is reported as
  * {@link LogoutPositions.Unreadable}, never as a missing position.
@@ -36,6 +37,7 @@ public final class PlayerDataLogoutPositions implements LogoutPositions {
     private static final String ROTATION = "Rotation";
     private static final String WORLD_MOST = "WorldUUIDMost";
     private static final String WORLD_LEAST = "WorldUUIDLeast";
+    private static final String DIMENSION = "Dimension";
 
     private static final byte END = 0;
     private static final byte BYTE = 1;
@@ -97,6 +99,7 @@ public final class PlayerDataLogoutPositions implements LogoutPositions {
         float[] rotation = null;
         Long most = null;
         Long least = null;
+        String dimension = null;
         for (byte type = in.readByte(); type != END; type = in.readByte()) {
             String name = in.readUTF();
             if (type == LIST && name.equals(POSITION)) {
@@ -107,16 +110,26 @@ public final class PlayerDataLogoutPositions implements LogoutPositions {
                 most = in.readLong();
             } else if (type == LONG && name.equals(WORLD_LEAST)) {
                 least = in.readLong();
+            } else if (type == STRING && name.equals(DIMENSION)) {
+                dimension = in.readUTF();
             } else {
                 skip(in, type, 0);
             }
         }
-        if (position == null || most == null || least == null) {
+        if (position == null) {
             return Optional.empty();
         }
         float yaw = rotation == null ? 0f : rotation[0];
         float pitch = rotation == null ? 0f : rotation[1];
-        return Optional.of(new SavedSpot(new UUID(most, least), position[0], position[1], position[2], yaw, pitch));
+        if (most != null && least != null) {
+            return Optional.of(
+                    SavedSpot.inWorld(new UUID(most, least), position[0], position[1], position[2], yaw, pitch));
+        }
+        // Data from before the server stored the world uid names only the dimension, which the server falls back to.
+        if (dimension != null) {
+            return Optional.of(SavedSpot.inDimension(dimension, position[0], position[1], position[2], yaw, pitch));
+        }
+        return Optional.empty();
     }
 
     private static double[] doubles(DataInput in, int count) throws IOException {

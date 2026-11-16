@@ -49,6 +49,9 @@ class OfflineTeleportTest {
     private final Moves moves = new Moves();
     private final QueuedScheduler scheduler = new QueuedScheduler();
     private final RecordingNotifier notifier = new RecordingNotifier();
+    private final QuietLog log = new QuietLog();
+    private boolean jailed;
+    private int joinMoves;
 
     private OfflineTeleport on(String server) {
         return new OfflineTeleport(
@@ -57,19 +60,20 @@ class OfflineTeleportTest {
                 players,
                 new Worlds(),
                 hidden,
+                who -> jailed,
                 moves,
                 scheduler,
                 notifier.notifier(),
                 new MutableClock(NOW),
                 server,
-                new QuietLog());
+                log);
     }
 
     private final OfflineTeleport offline = on(SURVIVAL);
 
     @Test
     void staffLandWhereTheOfflinePlayerLeftThisServer() {
-        saved.spots.put(SAM.uuid(), new LogoutPositions.SavedSpot(WORLD.uid(), 12.5, 64, 80.5, 90f, 5f));
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(WORLD.uid(), 12.5, 64, 80.5, 90f, 5f));
 
         offline.goTo(ALEX, "Sam");
         scheduler.runAll();
@@ -104,7 +108,7 @@ class OfflineTeleportTest {
 
     @Test
     void aPlayerSavedInAWorldThatIsGoneMovesNobody() {
-        saved.spots.put(SAM.uuid(), new LogoutPositions.SavedSpot(UUID.randomUUID(), 0, 64, 0, 0f, 0f));
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(UUID.randomUUID(), 0, 64, 0, 0f, 0f));
 
         offline.goTo(ALEX, "Sam");
         scheduler.runAll();
@@ -121,8 +125,8 @@ class OfflineTeleportTest {
         assertThat(notifier.sent())
                 .containsExactly(new RecordingNotifier.Sent(ALEX, "teleport.tpoffline.moved", Map.of("player", "Sam")));
 
-        offline.arrive(SAM);
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
 
         assertThat(moves.moved).containsExactly(new Move(SAM, HERE));
@@ -137,7 +141,7 @@ class OfflineTeleportTest {
         offline.bring(ALEX, "Sam", later);
         scheduler.runAll();
 
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
 
         assertThat(moves.moved).containsExactly(new Move(SAM, later));
@@ -148,11 +152,11 @@ class OfflineTeleportTest {
         on("lobby").bring(ALEX, "Sam", HERE);
         scheduler.runAll();
 
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
         assertThat(moves.moved).isEmpty();
 
-        on("lobby").arrive(SAM);
+        on("lobby").arrive(SAM, this::joinMove);
         scheduler.runAll();
         assertThat(moves.moved).containsExactly(new Move(SAM, HERE));
     }
@@ -162,7 +166,7 @@ class OfflineTeleportTest {
         offline.bring(ALEX, "Sam", new Position(new WorldRef(UUID.randomUUID(), "nether"), 0, 64, 0, 0f, 0f));
         scheduler.runAll();
 
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
 
         assertThat(moves.moved).isEmpty();
@@ -175,12 +179,12 @@ class OfflineTeleportTest {
         scheduler.runAll();
         moves.misses = true;
 
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
         assertThat(relocations.stored).hasSize(1);
 
         moves.misses = false;
-        offline.arrive(SAM);
+        offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
         assertThat(moves.moved).containsExactly(new Move(SAM, HERE));
         assertThat(relocations.stored).isEmpty();
@@ -188,7 +192,7 @@ class OfflineTeleportTest {
 
     @Test
     void aPlayerOnlineHereIsNeitherReadNorStored() {
-        saved.spots.put(SAM.uuid(), new LogoutPositions.SavedSpot(WORLD.uid(), 0, 64, 0, 0f, 0f));
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(WORLD.uid(), 0, 64, 0, 0f, 0f));
         players.online.add(SAM.uuid());
 
         offline.goTo(ALEX, "Sam");
@@ -201,19 +205,75 @@ class OfflineTeleportTest {
     }
 
     @Test
-    void aVanishedPlayerOnlineHereReadsAsUnknownToStaffWhoCannotSeeThem() {
+    void aVanishedPlayerOnlineHereIsHandledAsOfflineForStaffWhoCannotSeeThem() {
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inWorld(WORLD.uid(), 1.5, 64, 1.5, 0f, 0f));
         players.online.add(SAM.uuid());
         hidden.fromAlex.add(SAM);
 
-        offline.goTo(ALEX, "sam");
-        offline.bring(ALEX, "sam", HERE);
+        offline.goTo(ALEX, "Sam");
+        offline.bring(ALEX, "Sam", HERE);
         scheduler.runAll();
 
+        assertThat(moves.moved).containsExactly(new Move(ALEX, at(1.5, 64, 1.5, 0f, 0f)));
+        assertThat(relocations.stored).hasSize(1);
+        assertThat(notifier.keys()).containsExactly("teleport.tp.done", "teleport.tpoffline.moved");
+    }
+
+    @Test
+    void aJailedPlayerIsNotMovedAndTheMoveWaitsForTheirRelease() {
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+        jailed = true;
+
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(moves.moved).isEmpty();
+        assertThat(relocations.stored).hasSize(1);
+
+        jailed = false;
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(moves.moved).containsExactly(new Move(SAM, HERE));
+    }
+
+    @Test
+    void aMoveThatKeepsMissingIsDroppedAfterABoundedNumberOfJoins() {
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+        moves.misses = true;
+
+        for (int join = 0; join < OfflineTeleport.MAX_MISSES + 2; join++) {
+            offline.arrive(SAM, this::joinMove);
+            scheduler.runAll();
+        }
+
         assertThat(relocations.stored).isEmpty();
-        assertThat(notifier.sent())
-                .containsExactly(
-                        new RecordingNotifier.Sent(ALEX, "teleport.tpoffline.unknown", Map.of("player", "sam")),
-                        new RecordingNotifier.Sent(ALEX, "teleport.tpoffline.unknown", Map.of("player", "sam")));
+        assertThat(moves.tries).isEqualTo(OfflineTeleport.MAX_MISSES);
+        assertThat(log.warnings()).hasSize(OfflineTeleport.MAX_MISSES);
+    }
+
+    @Test
+    void theJoinsOwnMoveRunsOnlyWhenNoRelocationIsApplied() {
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(joinMoves).isEqualTo(1);
+
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(joinMoves).isEqualTo(1);
+        assertThat(moves.moved).containsExactly(new Move(SAM, HERE));
+    }
+
+    @Test
+    void savedDataWithoutAWorldUidLandsInTheWorldOfItsDimension() {
+        saved.spots.put(SAM.uuid(), LogoutPositions.SavedSpot.inDimension("minecraft:overworld", 3.5, 70, 3.5, 0f, 0f));
+
+        offline.goTo(ALEX, "Sam");
+        scheduler.runAll();
+
+        assertThat(moves.moved).containsExactly(new Move(ALEX, at(3.5, 70, 3.5, 0f, 0f)));
     }
 
     @Test
@@ -225,6 +285,10 @@ class OfflineTeleportTest {
         assertThat(notifier.sent())
                 .containsExactly(
                         new RecordingNotifier.Sent(ALEX, "teleport.tpoffline.unknown", Map.of("player", "Nobody")));
+    }
+
+    private void joinMove() {
+        joinMoves++;
     }
 
     private static Position at(double x, double y, double z, float yaw, float pitch) {
@@ -343,6 +407,11 @@ class OfflineTeleportTest {
         public Optional<WorldRef> findByUid(UUID uid) {
             return WORLD.uid().equals(uid) ? Optional.of(WORLD) : Optional.empty();
         }
+
+        @Override
+        public Optional<WorldRef> findByKey(String key) {
+            return "minecraft:overworld".equals(key) ? Optional.of(WORLD) : Optional.empty();
+        }
     }
 
     /** Keeps where each player was sent, or misses every hop as a player who left again would. */
@@ -350,6 +419,7 @@ class OfflineTeleportTest {
 
         final List<Move> moved = new ArrayList<>();
         boolean misses;
+        int tries;
 
         @Override
         public void teleport(PlayerRef who, Destination destination, TeleportKind kind) {
@@ -359,6 +429,7 @@ class OfflineTeleportTest {
         @Override
         public void teleport(
                 PlayerRef who, Destination destination, TeleportKind kind, Runnable onLanded, Runnable onFailed) {
+            tries++;
             if (misses) {
                 onFailed.run();
                 return;

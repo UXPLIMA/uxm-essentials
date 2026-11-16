@@ -42,6 +42,7 @@ final class JooqPendingRelocations extends JooqRepository implements PendingRelo
                 .set(TELEPORT_RELOCATIONS.PITCH, row.getPitch())
                 .set(TELEPORT_RELOCATIONS.CREATED_AT, row.getCreatedAt())
                 .set(TELEPORT_RELOCATIONS.ACTOR, row.getActor())
+                .set(TELEPORT_RELOCATIONS.MISSES, row.getMisses())
                 .execute());
     }
 
@@ -90,6 +91,7 @@ final class JooqPendingRelocations extends JooqRepository implements PendingRelo
         row.setPitch(relocation.pitch());
         row.setCreatedAt(relocation.createdAt().toEpochMilli());
         row.setActor(relocation.actor().toString());
+        row.setMisses(relocation.misses());
         return row;
     }
 
@@ -104,6 +106,7 @@ final class JooqPendingRelocations extends JooqRepository implements PendingRelo
                 row.getYaw(),
                 row.getPitch(),
                 Instant.ofEpochMilli(row.getCreatedAt()),
-                UUID.fromString(row.getActor()));
+                UUID.fromString(row.getActor()),
+                row.getMisses());
     }
 }

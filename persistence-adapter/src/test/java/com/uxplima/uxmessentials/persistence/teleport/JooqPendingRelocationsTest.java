@@ -39,7 +39,7 @@ class JooqPendingRelocationsTest {
     }
 
     private static PendingRelocation to(String server, double x, Instant at) {
-        return new PendingRelocation(SAM, server, WORLD, x, 64.5, -3.25, 90f, -12.5f, at, ALEX);
+        return new PendingRelocation(SAM, server, WORLD, x, 64.5, -3.25, 90f, -12.5f, at, ALEX, 0);
     }
 
     @Test
@@ -82,5 +82,16 @@ class JooqPendingRelocationsTest {
         store.save(to("survival", 20.5, SET.plusSeconds(5)));
         store.restore(to("survival", 10.5, SET));
         assertThat(store.find(SAM, "survival")).contains(to("survival", 20.5, SET.plusSeconds(5)));
+    }
+
+    @Test
+    void aRestoredRowKeepsItsCountOfMisses() {
+        PendingRelocation missedTwice = to("survival", 10.5, SET).missedOnce().missedOnce();
+        store.save(to("survival", 10.5, SET));
+        store.claim(to("survival", 10.5, SET));
+
+        store.restore(missedTwice);
+
+        assertThat(store.find(SAM, "survival")).contains(missedTwice);
     }
 }
