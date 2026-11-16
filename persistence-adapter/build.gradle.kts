@@ -26,6 +26,7 @@ dependencies {
     // jOOQ's render settings carry XML binding annotations. The compiler reads them and warns, under -Werror,
     // that the annotation types are missing. Nothing runs them.
     compileOnly(libs.jakarta.xml.bind)
+    testCompileOnly(libs.jakarta.xml.bind)
 
     // The code generator parses the DDL through jOOQ's meta-extensions DDLDatabase, on the codegen classpath only.
     jooqCodegen(libs.jooq.meta.ext)
