@@ -18,6 +18,7 @@ final class InMemoryPlayerRanks implements PlayerRankRepository {
     private int reads;
     private boolean readsFail;
     private boolean savesFail;
+    private boolean savesDie;
 
     void put(UUID playerId, String rankId, int prestige) {
         rows.put(playerId, new PlayerRank(RankId.of(rankId), new Prestige(prestige)));
@@ -44,6 +45,11 @@ final class InMemoryPlayerRanks implements PlayerRankRepository {
         this.savesFail = fail;
     }
 
+    /** Make every save die with an {@link Error}, the way a thread that ran out of memory does. */
+    void dieOnSaves(boolean die) {
+        this.savesDie = die;
+    }
+
     @Override
     public Optional<PlayerRank> find(UUID playerId) {
         reads++;
@@ -60,6 +66,9 @@ final class InMemoryPlayerRanks implements PlayerRankRepository {
 
     @Override
     public void save(UUID playerId, RankId rankId, Prestige prestige) {
+        if (savesDie) {
+            throw new AssertionError("storage thread died");
+        }
         if (savesFail) {
             throw new IllegalStateException("database unavailable");
         }

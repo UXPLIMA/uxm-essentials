@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
@@ -37,7 +38,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *   <li><b>Commit</b>, on the async lane: the requirements that read storage (playtime, balance) are checked, then
  *       the cost is charged, then the pointer is saved. A failed requirement or a refused debit ends the attempt
  *       with nothing moved. A save that throws refunds the charge, so a player never pays for a rank they did not
- *       get.</li>
+ *       get. A refund the economy refuses or fails is queued as owed
+ *       ({@link OwedCredits}) in the same currency and paid on the next join.</li>
  *   <li><b>Finish</b>, back on the player's thread: the rank's actions run and the {@link PlayerRankedUp} event is
  *       published, both only after the advance is durable.</li>
  * </ol>
@@ -64,6 +66,7 @@ public final class Rankup {
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
     private final Logger log;
+    private final ChargeRefunds refunds;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     public Rankup(
@@ -73,6 +76,7 @@ public final class Rankup {
             RankRequirementEvaluator requirements,
             RankActionRunner actions,
             Optional<RankEconomy> economy,
+            Optional<OwedCredits> owed,
             DomainEventPublisher events,
             Scheduler scheduler,
             Logger log) {
@@ -85,6 +89,7 @@ public final class Rankup {
         this.events = Objects.requireNonNull(events, "events");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.refunds = new ChargeRefunds(economy, owed, log);
     }
 
     /** Attempt to advance {@code who} one rank up the ladder, charging the next rank's cost. */
@@ -111,6 +116,9 @@ public final class Rankup {
         } catch (RuntimeException failure) {
             log.error("rankup check failed for player " + id, failure);
             answer.complete(RankupResult.failed());
+        } catch (Error error) {
+            answer.complete(RankupResult.failed());
+            throw error;
         }
         return released;
     }
@@ -139,11 +147,24 @@ public final class Rankup {
 
     /** Check stored requirements, charge and save on the async lane, then hop back to the player's thread. */
     private void commit(Advance advance, CompletableFuture<RankupResult> answer) {
-        RankupResult result = chargeAndSave(advance);
-        scheduler.onEntity(
-                advance.who(),
-                () -> finish(advance, result, true, answer),
-                () -> finish(advance, result, false, answer));
+        RankupResult result = RankupResult.failed();
+        boolean handedOff = false;
+        try {
+            result = chargeAndSave(advance);
+            RankupResult settled = result;
+            scheduler.onEntity(
+                    advance.who(),
+                    () -> finish(advance, settled, true, answer),
+                    () -> finish(advance, settled, false, answer));
+            handedOff = true;
+        } finally {
+            // Last resort: an Error, or a scheduler that refuses the hop while the plugin shuts down, must still
+            // answer, or the in-flight guard would refuse this player's every later rankup. The answer is what the
+            // commit decided (a saved rankup is durable), or failed when the commit did not finish.
+            if (!handedOff) {
+                answer.complete(result);
+            }
+        }
     }
 
     private RankupResult chargeAndSave(Advance advance) {
@@ -167,26 +188,17 @@ public final class Rankup {
                 refund(advance);
             }
             return RankupResult.failed();
+        } catch (Error error) {
+            // A dying thread still gives back what it took: the save did not answer, so nothing was granted.
+            if (charged) {
+                refund(advance);
+            }
+            throw error;
         }
     }
 
     private void refund(Advance advance) {
-        PlayerRef who = advance.who();
-        try {
-            if (economy.orElseThrow().deposit(who, advance.cost(), DEFAULT_CURRENCY)) {
-                return;
-            }
-            log.warn(
-                    "event=rankup_refund_refused player={} amount={} currency={}",
-                    who.uuid(),
-                    advance.cost(),
-                    DEFAULT_CURRENCY);
-        } catch (RuntimeException failure) {
-            log.error(
-                    "rankup refund of " + advance.cost() + " failed for player " + who.uuid()
-                            + "; the player is owed that amount",
-                    failure);
-        }
+        refunds.giveBack(advance.who(), advance.cost(), DEFAULT_CURRENCY, "rankup");
     }
 
     /**

@@ -152,6 +152,7 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceQueries;
 import com.uxplima.uxmessentials.ranks.adapter.RanksWiring;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksActions;
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RanksQueries;
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.scoreboard.adapter.ScoreboardWiring;
 import com.uxplima.uxmessentials.security.adapter.OperatorLock;
@@ -2080,11 +2081,19 @@ public final class PluginModule {
         // config-gated /ranks ladder panel registers its spec and bindings into the shared menu engine when on.
         var provider = links.economyProvider;
         var currency = links.economyCurrency;
-        Optional<RankEconomy> economy = provider != null && currency != null
-                ? Optional.of(new ProviderRankEconomy(provider, currency, receipts(ctx)))
+        // A refund the economy refuses is queued as owed on the economy's pending queue, paid on the next join.
+        Optional<ProviderRankEconomy> bridge = provider != null && currency != null
+                ? Optional.of(new ProviderRankEconomy(
+                        provider,
+                        currency,
+                        receipts(ctx),
+                        com.uxplima.uxmessentials.persistence.economy.WalletRepositories.pendingTransactionRepository(
+                                persistence)))
                 : Optional.empty();
+        Optional<RankEconomy> economy = bridge.map(RankEconomy.class::cast);
+        Optional<OwedCredits> owed = bridge.map(OwedCredits.class::cast);
         RanksWiring.Wired wired =
-                RanksWiring.wire(plugin, ctx, persistence, economy, bus, guiRegistry, menus, menuBindings);
+                RanksWiring.wire(plugin, ctx, persistence, economy, owed, bus, guiRegistry, menus, menuBindings);
         wired.commands().forEach(resources::addCommand);
         // Registered before the online players are loaded, so a quit in between cannot leave a stale entry behind.
         resources.addListener(wired.cacheListener());

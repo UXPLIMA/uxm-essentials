@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.ranks.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.ranks.application.PrestigeResult.Status;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig.PrestigeSettings;
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
@@ -48,6 +50,7 @@ class PrestigeTest {
     private final Requirements requirements = new Requirements(scheduler);
     private final Actions actions = new Actions();
     private final Purse purse = new Purse();
+    private final Owed owed = new Owed();
     private final RecordingEvents events = new RecordingEvents();
     private final Prestige prestige = new Prestige(
             new CurrentRank(cache, LADDER),
@@ -56,6 +59,7 @@ class PrestigeTest {
             requirements,
             actions,
             Optional.of(purse),
+            Optional.of(owed),
             SETTINGS,
             events,
             scheduler,
@@ -142,6 +146,7 @@ class PrestigeTest {
         assertThat(result.join().status()).isEqualTo(Status.FAILED);
         assertThat(purse.balance).isEqualTo(50);
         assertThat(log.warnings()).anyMatch(line -> line.startsWith("event=prestige_refund_refused"));
+        assertThat(owed.queued).containsExactly("50:default");
     }
 
     @Test
@@ -221,6 +226,7 @@ class PrestigeTest {
         final Map<RankRequirementType, Boolean> checkedOnAsync = new EnumMap<>(RankRequirementType.class);
         private final ManualScheduler scheduler;
         boolean storedPass = true;
+        boolean storedDies;
 
         Requirements(ManualScheduler scheduler) {
             this.scheduler = scheduler;
@@ -228,6 +234,9 @@ class PrestigeTest {
 
         @Override
         public boolean passes(PlayerRef who, RankRequirement requirement) {
+            if (storedDies && readsStorage(requirement)) {
+                throw new AssertionError("evaluator thread died");
+            }
             checkedOnAsync.put(requirement.type(), scheduler.isRunningAsync());
             return !readsStorage(requirement) || storedPass;
         }
@@ -235,6 +244,77 @@ class PrestigeTest {
         @Override
         public boolean readsStorage(RankRequirement requirement) {
             return requirement.type() == RankRequirementType.PLAYTIME;
+        }
+    }
+
+    @Test
+    void aRefundThatThrowsIsQueuedAsOwed() {
+        purse.balance = 100;
+        purse.failDeposits = true;
+        onTopRank(ALEX);
+        rows.failSaves(true);
+
+        CompletableFuture<PrestigeResult> result = prestige.prestige(ALEX);
+        scheduler.runAsync();
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(owed.queued).containsExactly("50:default");
+    }
+
+    @Test
+    void aHopTheSchedulerRefusesStillAnswersAndFreesThePlayer() {
+        purse.balance = 200;
+        onTopRank(ALEX);
+        scheduler.shutDown();
+
+        CompletableFuture<PrestigeResult> result = prestige.prestige(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(IllegalStateException.class);
+
+        assertThat(result).isDone();
+        assertThat(result.join().status()).isEqualTo(Status.PRESTIGED);
+        CompletableFuture<PrestigeResult> next = prestige.prestige(ALEX);
+        assertThat(next.isDone() && next.join().status() == Status.BUSY).isFalse();
+    }
+
+    @Test
+    void anErrorOnTheAsyncLaneStillAnswersAndFreesThePlayer() {
+        purse.balance = 200;
+        onTopRank(ALEX);
+        requirements.storedDies = true;
+
+        CompletableFuture<PrestigeResult> result = prestige.prestige(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(AssertionError.class);
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(purse.balance).isEqualTo(200);
+        requirements.storedDies = false;
+        CompletableFuture<PrestigeResult> next = prestige.prestige(ALEX);
+        scheduler.runAsync();
+        assertThat(next.join().status()).isEqualTo(Status.PRESTIGED);
+    }
+
+    @Test
+    void aSaveThatDiesWithAnErrorRefundsTheChargeAndFreesThePlayer() {
+        purse.balance = 100;
+        onTopRank(ALEX);
+        rows.dieOnSaves(true);
+
+        CompletableFuture<PrestigeResult> result = prestige.prestige(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(AssertionError.class);
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(purse.balance).isEqualTo(100);
+        assertThat(actions.ran).isEmpty();
+    }
+
+    /** Refunds the economy would not take, queued for the next join as {@code amount:currency}. */
+    private static final class Owed implements OwedCredits {
+
+        final List<String> queued = new ArrayList<>();
+
+        @Override
+        public void owe(PlayerRef who, BigDecimal amount, String currencyId) {
+            queued.add(amount.toPlainString() + ":" + currencyId);
         }
     }
 
@@ -254,6 +334,7 @@ class PrestigeTest {
         final List<String> currencies = new ArrayList<>();
         long balance;
         boolean refuseDeposits;
+        boolean failDeposits;
 
         @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
@@ -273,6 +354,9 @@ class PrestigeTest {
 
         @Override
         public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (failDeposits) {
+                throw new IllegalStateException("economy storage is down");
+            }
             if (refuseDeposits) {
                 return false;
             }

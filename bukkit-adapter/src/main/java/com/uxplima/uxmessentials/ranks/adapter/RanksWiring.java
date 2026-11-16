@@ -29,6 +29,7 @@ import com.uxplima.uxmessentials.ranks.application.RankLadders;
 import com.uxplima.uxmessentials.ranks.application.RanksConfig;
 import com.uxplima.uxmessentials.ranks.application.Rankup;
 import com.uxplima.uxmessentials.ranks.application.SetRank;
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
@@ -66,7 +67,8 @@ import org.jspecify.annotations.NullMarked;
  * {@code /ranks setrank} subcommand (which the top-level {@code /setrank} alias also publishes).
  *
  * <p>The rank cost is charged through the {@link RankEconomy} seam bridged in the economy context and handed in
- * here as an {@link Optional}: empty when economy is disabled, in which case a priced rank is free. The rank
+ * here as an {@link Optional}: empty when economy is disabled, in which case a priced rank is free. A refund the
+ * economy refuses goes to {@link OwedCredits}, bridged by the same economy adapter. The rank
  * action runner is wired with no click-action economy of its own: a rank's paywall is its {@code cost}, so its
  * actions are effects and commands, never a second charge.
  */
@@ -84,6 +86,7 @@ public final class RanksWiring {
             ModuleContext ctx,
             Persistence persistence,
             Optional<RankEconomy> economy,
+            Optional<OwedCredits> owed,
             Bus bus,
             ManagementGuiRegistry guiRegistry,
             Menus menus,
@@ -92,6 +95,7 @@ public final class RanksWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(economy, "economy");
+        Objects.requireNonNull(owed, "owed");
         Objects.requireNonNull(bus, "bus");
         Objects.requireNonNull(guiRegistry, "guiRegistry");
         Objects.requireNonNull(menus, "menus");
@@ -118,6 +122,7 @@ public final class RanksWiring {
                 requirements,
                 actions,
                 economy,
+                owed,
                 kernel.events(),
                 kernel.scheduler(),
                 kernel.log());
@@ -148,6 +153,7 @@ public final class RanksWiring {
                     requirements,
                     actions,
                     economy,
+                    owed,
                     config.prestige(),
                     kernel.events(),
                     kernel.scheduler(),

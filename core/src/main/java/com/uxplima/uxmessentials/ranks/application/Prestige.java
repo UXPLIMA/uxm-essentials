@@ -10,6 +10,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.ranks.application.RanksConfig.PrestigeSettings;
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
@@ -40,7 +41,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *   <li><b>Commit</b>, on the async lane: the requirements that read storage (playtime, balance) are checked, then
  *       the cost is charged in the default currency, then the pointer is reset to {@link RankLadder#first()} at the
  *       next level in one {@code save}. A save that throws refunds the charge in the same currency, so a player
- *       never pays for a prestige they did not get, and the answer is {@link PrestigeResult#failed()}.</li>
+ *       never pays for a prestige they did not get, and the answer is {@link PrestigeResult#failed()}. A refund the economy refuses or fails is queued as owed
+ *       ({@link OwedCredits}) in the same currency and paid on the next join.</li>
  *   <li><b>Finish</b>, back on the player's thread: the prestige actions run and {@link PlayerPrestiged} is
  *       published, both only after the reset is durable.</li>
  * </ol>
@@ -67,6 +69,7 @@ public final class Prestige {
     private final DomainEventPublisher events;
     private final Scheduler scheduler;
     private final Logger log;
+    private final ChargeRefunds refunds;
     private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     public Prestige(
@@ -76,6 +79,7 @@ public final class Prestige {
             RankRequirementEvaluator requirements,
             RankActionRunner actions,
             Optional<RankEconomy> economy,
+            Optional<OwedCredits> owed,
             PrestigeSettings settings,
             DomainEventPublisher events,
             Scheduler scheduler,
@@ -90,6 +94,7 @@ public final class Prestige {
         this.events = Objects.requireNonNull(events, "events");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.log = Objects.requireNonNull(log, "log");
+        this.refunds = new ChargeRefunds(economy, owed, log);
     }
 
     /**
@@ -110,6 +115,9 @@ public final class Prestige {
         } catch (RuntimeException failure) {
             log.error("prestige check failed for player " + id, failure);
             answer.complete(PrestigeResult.failed());
+        } catch (Error error) {
+            answer.complete(PrestigeResult.failed());
+            throw error;
         }
         return released;
     }
@@ -141,9 +149,24 @@ public final class Prestige {
 
     /** Check stored requirements, charge and save on the async lane, then hop back to the player's thread. */
     private void commit(Reset reset, CompletableFuture<PrestigeResult> answer) {
-        PrestigeResult result = chargeAndSave(reset);
-        scheduler.onEntity(
-                reset.who(), () -> finish(reset, result, true, answer), () -> finish(reset, result, false, answer));
+        PrestigeResult result = PrestigeResult.failed();
+        boolean handedOff = false;
+        try {
+            result = chargeAndSave(reset);
+            PrestigeResult settled = result;
+            scheduler.onEntity(
+                    reset.who(),
+                    () -> finish(reset, settled, true, answer),
+                    () -> finish(reset, settled, false, answer));
+            handedOff = true;
+        } finally {
+            // Last resort: an Error, or a scheduler that refuses the hop while the plugin shuts down, must still
+            // answer, or the in-flight guard would refuse this player's every later prestige. The answer is what the
+            // commit decided (a saved prestige is durable), or failed when the commit did not finish.
+            if (!handedOff) {
+                answer.complete(result);
+            }
+        }
     }
 
     private PrestigeResult chargeAndSave(Reset reset) {
@@ -167,26 +190,17 @@ public final class Prestige {
                 refund(reset);
             }
             return PrestigeResult.failed();
+        } catch (Error error) {
+            // A dying thread still gives back what it took: the save did not answer, so nothing was granted.
+            if (charged) {
+                refund(reset);
+            }
+            throw error;
         }
     }
 
     private void refund(Reset reset) {
-        PlayerRef who = reset.who();
-        try {
-            if (economy.orElseThrow().deposit(who, reset.cost(), DEFAULT_CURRENCY)) {
-                return;
-            }
-            log.warn(
-                    "event=prestige_refund_refused player={} amount={} currency={}",
-                    who.uuid(),
-                    reset.cost(),
-                    DEFAULT_CURRENCY);
-        } catch (RuntimeException failure) {
-            log.error(
-                    "prestige refund of " + reset.cost() + " failed for player " + who.uuid()
-                            + "; the player is owed that amount",
-                    failure);
-        }
+        refunds.giveBack(reset.who(), reset.cost(), DEFAULT_CURRENCY, "prestige");
     }
 
     /**
