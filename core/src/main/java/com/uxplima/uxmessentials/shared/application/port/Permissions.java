@@ -21,6 +21,16 @@ public interface Permissions {
     boolean has(PlayerRef who, String node);
 
     /**
+     * Whether {@code who} holds {@code node}, or empty when that could not be read: their permissions belong to a
+     * thread that could not answer here (another region's, one that did not answer in time, a stopping server).
+     * {@link #has} answers {@code false} then, which is right for a grant and wrong for an immunity; a caller to whom
+     * a missed {@code true} costs more reads this. An offline player answers {@code false}, as with {@link #has}.
+     */
+    default Optional<Boolean> read(PlayerRef who, String node) {
+        return Optional.of(has(who, node));
+    }
+
+    /**
      * Resolve a value-bearing quota for {@code who} under {@code family}, optionally scoped to
      * {@code world}, applying the uniform numeric reducer.
      *

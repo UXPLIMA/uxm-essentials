@@ -16,9 +16,10 @@ import org.jspecify.annotations.Nullable;
  * The permission reader behind the punishment immunity check and the duration cap, which mostly run on the
  * {@link StorageLane}'s worker threads where the live permission plugin cannot be read safely.
  *
- * <p>An answer the lane read before it left the server thread wins. On the server thread, with nothing captured,
- * the live reader answers as it always has. Off the server thread with nothing captured there is no safe answer,
- * so this one refuses: the target counts as immune and the cap as zero, and the miss is logged so it can be found.
+ * <p>An answer the lane read before the work started wins. On the server thread, with nothing captured, the live
+ * reader answers when it can; on Folia that is only on the region thread that owns the player. Off the server thread,
+ * or on another region's thread, with nothing captured there is no safe answer, so this one refuses: the target counts
+ * as immune and the cap as zero, and the miss is logged so it can be found.
  * Every node asked through here is an immunity node and every quota a duration cap, which is why "held" and "zero"
  * are the refusing answers.
  *
@@ -49,7 +50,12 @@ public final class LanePermissions implements Permissions {
             return kept.get();
         }
         if (onServerThread.getAsBoolean()) {
-            return live.has(who, node);
+            // On Folia this thread may belong to another region than the player's, where their permissions cannot be
+            // read; an immunity that cannot be read is held.
+            Optional<Boolean> read = live.read(who, node);
+            if (read.isPresent()) {
+                return read.get();
+            }
         }
         log.warn("event=moderation_permission_unread player={} node={} answer=held", who.name(), node);
         return true;
@@ -75,19 +81,17 @@ public final class LanePermissions implements Permissions {
     }
 
     /**
-     * The answers a sanction by {@code actor} on {@code target} will ask for, read now from the live reader: whether
-     * the target is immune and how long the actor may ban or mute for. Call it on the server thread.
+     * The answers a sanction by {@code actor} will ask about the actor, read now from the live reader: how long they
+     * may ban or mute for. Call it on the actor's thread. The target's immunity is read on the target's own thread
+     * ({@link TargetExemption}) and added to the snapshot once it is known.
      */
-    static PermissionSnapshot capture(Permissions live, PlayerRef actor, @Nullable PlayerRef target) {
+    static PermissionSnapshot.Builder capture(Permissions live, PlayerRef actor) {
         PermissionSnapshot.Builder snapshot = PermissionSnapshot.from(live);
         if (!actor.isSystem()) {
             for (String kind : SanctionDurationLimit.KINDS) {
                 snapshot.quota(actor, SanctionDurationLimit.family(kind), null, SanctionDurationLimit.NO_NODE_FALLBACK);
             }
         }
-        if (target != null && !target.isSystem()) {
-            snapshot.has(target, ModerationGuard.EXEMPT_NODE);
-        }
-        return snapshot.build();
+        return snapshot;
     }
 }

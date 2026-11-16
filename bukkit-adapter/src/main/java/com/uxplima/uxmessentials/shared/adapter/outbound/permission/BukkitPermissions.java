@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.shared.adapter.outbound.permission;
 
 import java.util.Objects;
+import java.util.Optional;
 import java.util.OptionalLong;
 
 import org.bukkit.Bukkit;
@@ -48,6 +49,13 @@ public final class BukkitPermissions implements Permissions {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
         return reads.forPlayer(who, () -> hasNow(who, node), false, false);
+    }
+
+    @Override
+    public Optional<Boolean> read(PlayerRef who, String node) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(node, "node");
+        return reads.forPlayer(who, () -> Optional.of(hasNow(who, node)), Optional.of(false), Optional.empty());
     }
 
     private static boolean hasNow(PlayerRef who, String node) {

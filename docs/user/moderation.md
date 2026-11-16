@@ -76,7 +76,9 @@ template: a capped staff member's permanent ban becomes a timed ban of the cappe
 A player holding `uxmessentials.bypass.punishment` cannot be banned, tempbanned, muted, warned, kicked, jailed or
 frozen, by anyone: the command refuses and says so. The node defaults to operators. A holder is also left online by
 `/kickall` and by an IP ban on their address, may still log in from a banned address, and is not stopped in chat or
-by `muted-blocked-commands` while muted.
+by `muted-blocked-commands` while muted. The node is read on the player's own thread; when that read gets no answer
+(they left on the way, or on Folia their region did not answer within two seconds) the player is treated as exempt
+and the staff member is told to try again. A player who is offline is not exempt.
 
 ## Bans
 

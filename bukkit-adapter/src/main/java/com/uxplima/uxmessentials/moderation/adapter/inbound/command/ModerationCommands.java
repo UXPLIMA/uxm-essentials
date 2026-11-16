@@ -123,7 +123,9 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.freeze().freeze(a, t)),
+                        // The target's immunity is read on their own thread, which the lane waits for.
+                        (a, t) -> services.lane()
+                                .run(a, t, () -> services.freeze().freeze(a, t))),
                 target(
                         "unfreeze",
                         EnforcementPermissions.MODERATION_FREEZE,

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.command;
 
+import java.util.List;
 import java.util.Optional;
 
 import io.papermc.paper.command.brigadier.CommandSourceStack;
@@ -48,7 +49,10 @@ public final class KickallCommand extends ModerationCommandSupport implements Co
 
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
-        services.kickAll().kickAll(actor, reason);
+        // Each player's immunity is theirs to read, on their own thread, so the kick waits on the lane for every
+        // answer.
+        List<PlayerRef> everyone = services.kickAll().online();
+        services.lane().run(actor, everyone, () -> services.kickAll().kickAll(actor, everyone, reason));
         return Command.SINGLE_SUCCESS;
     }
 }
