@@ -36,7 +36,8 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>Two tracks for the same player at once would both read no earlier row, the second write would replace the
  * first unseen, and the first hop's timer would then find nothing to claim and keep its charge. So while one track
  * is between its read and its write, a second one for that player on this backend is refused and refunded there;
- * the first goes ahead. Once a row is written, a later track reads it and replaces it as above.
+ * the first goes ahead. Either refusal tells the player {@link HopNotice#BUSY}: their other move is still under way,
+ * and the new destination's server is fine. Once a row is written, a later track reads it and replaces it as above.
  *
  * <p>The claim and the refund are IO, so {@link #track} is called off the tick thread and the TTL check runs on the
  * {@link Scheduler}'s async lane.
@@ -86,13 +87,15 @@ public final class HopWatchdog {
             // Nothing of this hop was written, so this refund is the only one its charge can get. The kind's failure
             // hook is not told: the hop never started, and the first one is still on its way.
             log.debug("event=cross_server_hop_refused player={} reason=concurrent_hop", who.uuid());
-            charges.tell(resolver, who, HopNotice.UNAVAILABLE, Map.of("server", pending.targetServer()), label);
+            charges.tell(resolver, who, HopNotice.BUSY, Map.of(), label);
             charges.refund(resolver, who, pending.charge(), label);
             return false;
         }
         try {
             if (!replaceEarlier(who)) {
-                unreachable(resolver, who, pending, label);
+                // The earlier row is a hop still under way that this backend cannot settle, not a target that is
+                // down, so the player is told their other move is pending.
+                charges.fail(resolver, who, pending.charge(), HopNotice.BUSY, Map.of(), label);
                 return false;
             }
             store.record(pending);

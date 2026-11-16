@@ -279,7 +279,8 @@ class CrossServerHopTest {
 
         assertThat(connects).containsExactly("Alex->survival");
         assertThat(ledger.wallet).isEqualByComparingTo("90");
-        assertThat(notifier.keys()).containsSubsequence("home.hop.unavailable", "home.hop.refunded");
+        // The first hop is still on its way, so the second is told so rather than that the server is down.
+        assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.refunded", "home.hop.sending");
 
         scheduler.advance(TTL);
         assertThat(ledger.wallet).isEqualByComparingTo(START);
@@ -293,7 +294,7 @@ class CrossServerHopTest {
         goHome();
 
         assertThat(connects).containsExactly("Alex->survival");
-        assertThat(notifier.keys()).contains("home.hop.unavailable");
+        assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.sending");
         assertThat(ledger.refunds).isZero();
     }
 
@@ -353,7 +354,7 @@ class CrossServerHopTest {
         assertThat(store.find(ALEX.uuid()).map(PendingHop::kind)).contains(HopKind.JAIL);
         assertThat(connects).isEmpty();
         assertThat(ledger.wallet).isEqualByComparingTo(START);
-        assertThat(notifier.keys()).containsExactly("home.hop.unavailable", "home.hop.refunded");
+        assertThat(notifier.keys()).containsExactly("home.hop.busy", "home.hop.refunded");
     }
 
     @Test

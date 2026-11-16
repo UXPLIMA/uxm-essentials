@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolver;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The jail side of the shared cross-server hop. A hop's target is the jail's name; on the target the jail is read
@@ -42,6 +43,7 @@ public final class JailHopResolver implements HopResolver {
                     HopNotice.MISROUTED, ModerationMessageKey.JAIL_HOP_FAILED,
                     HopNotice.FAILED, ModerationMessageKey.JAIL_HOP_FAILED,
                     HopNotice.UNAVAILABLE, ModerationMessageKey.JAIL_HOP_FAILED,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     // Never sent: a jail hop is never charged, so it is never refunded.
                     HopNotice.REFUNDED, ModerationMessageKey.JAIL_HOP_FAILED));
 

@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 
 /**
  * The home side of the shared cross-server hop. A hop's target is the home's owner and slot. On the target the home
@@ -57,6 +58,7 @@ public final class HomeHopResolver implements HopResolver {
                     HopNotice.MISROUTED, HomesMessageKey.HOME_CROSS_SERVER_MISROUTED,
                     HopNotice.FAILED, HomesMessageKey.HOME_CROSS_SERVER_FAILED,
                     HopNotice.UNAVAILABLE, HomesMessageKey.HOME_CROSS_SERVER_UNAVAILABLE,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     HopNotice.REFUNDED, HomesMessageKey.HOME_CROSS_SERVER_REFUNDED));
 
     private final HomeRepository repository;

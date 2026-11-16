@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.teleport.application.port.RequestVisibility;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
@@ -51,6 +52,7 @@ public final class PlayerHopResolver implements HopResolver {
                     HopNotice.MISROUTED, TeleportMessageKey.CROSS_SERVER_MISROUTED,
                     HopNotice.FAILED, TeleportMessageKey.CROSS_SERVER_FAILED,
                     HopNotice.UNAVAILABLE, TeleportMessageKey.CROSS_SERVER_UNAVAILABLE,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     HopNotice.REFUNDED, TeleportMessageKey.CROSS_SERVER_REFUNDED));
 
     private final HopKind kind;
