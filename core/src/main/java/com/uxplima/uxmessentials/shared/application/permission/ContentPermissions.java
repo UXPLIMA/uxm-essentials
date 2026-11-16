@@ -575,7 +575,7 @@ public final class ContentPermissions {
                         VILLAGERS),
                 PermissionSpec.of(
                         VILLAGERS_MANAGER,
-                        "/villager manager: open and edit the trades of the villager you are looking at.",
+                        "/villager manager (and the villagers entry on the /uxmess gui hub): open and edit the trades of the villager you are looking at.",
                         PermissionDefault.OP,
                         VILLAGERS),
                 PermissionSpec.of(

@@ -55,7 +55,8 @@ public final class ModerationModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The ban-on-login (PlayerLoginEvent HIGHEST) and the jail/freeze join listeners are Bukkit-facing
+        // The ban-on-login (read at pre-login, decided at PlayerLoginEvent HIGHEST) and the jail/freeze join listeners
+        // are Bukkit-facing
         // and land with the inbound adapter; a disabled or not-yet-adapted module registers none here.
         return List.of();
     }

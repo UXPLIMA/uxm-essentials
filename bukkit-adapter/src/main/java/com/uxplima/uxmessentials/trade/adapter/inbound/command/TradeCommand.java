@@ -147,14 +147,24 @@ public final class TradeCommand implements CommandRegistration {
         if (sender == null) {
             return 0;
         }
-        String name = StringArgumentType.getString(ctx, "player");
+        request(sender, StringArgumentType.getString(ctx, "player"));
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Ask {@code name} to trade with {@code sender}: a player on this backend gets a local request, anyone else a
+     * cross-server one. Public so the {@code /uxmess gui} hub tile sends exactly what {@code /trade <player>} sends,
+     * from the sender's own region thread.
+     */
+    public void request(Player sender, String name) {
+        Objects.requireNonNull(sender, "sender");
+        Objects.requireNonNull(name, "name");
         Player local = Bukkit.getPlayerExact(name);
         if (local != null) {
             send(sender, local);
         } else {
             sendRemote(sender, name);
         }
-        return Command.SINGLE_SUCCESS;
     }
 
     /**

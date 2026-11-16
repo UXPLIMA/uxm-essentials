@@ -21,7 +21,7 @@ Nothing else is required: uxmLib is inside the jar. Vault and PlaceholderAPI are
 
 ## What it does
 
-<img src="docs/images/management-hub.jpg" alt="The management hub: one tile for each module, each opening its own panel" width="100%">
+<img src="docs/images/management-hub.jpg" alt="The management hub: a tile for each module panel, each opening that panel" width="100%">
 
 | Area | Modules |
 |---|---|
@@ -32,6 +32,9 @@ Nothing else is required: uxmLib is inside the jar. Vault and PlaceholderAPI are
 | **The server's look** | Scoreboard, tab list, boss bar, name tags, holograms, NPCs, poses, skins, custom menus and commands |
 | **Protection** | Guard: regions with rules per action and role, templates and a WorldGuard importer |
 | **Player state** | `/fly`, `/heal`, `/feed`, `/gamemode`, `/speed`, `/endersee` and the rest of the classics |
+
+`/uxmess gui` opens the hub above: a tile for each module panel, shown to whoever holds that panel's own
+node. [docs/user/management-hub.md](docs/user/management-hub.md) lists every tile and the modules that have no panel.
 
 ### Holograms and NPCs without another plugin
 

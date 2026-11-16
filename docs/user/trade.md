@@ -58,9 +58,9 @@ A kept row whose data cannot be read is skipped, logged as `event=trade_return_r
 the player's other batches are still handed over. If the database cannot be written when items are kept, the log has
 `event=trade_return_keep_failed` with the player and the items, so an operator can give them back by hand.
 
-On MySQL and MariaDB a kept batch is a `TEXT` column, as in the vault tables, which holds up to 64 KB: a full trade
-offer of ordinary items fits, but a batch of many filled shulker boxes can exceed it and fail to be kept, with the
-same log line.
+A kept batch has no size limit of its own on any database. On MySQL and MariaDB it is a `LONGTEXT` column, so what
+bounds one write is the server's `max_allowed_packet` (16 MB by default on MariaDB, 64 MB on MySQL 8), far above a
+full trade offer of filled shulker boxes.
 
 On Folia the plugin only stops when the server does. The stopping thread owns no region, so it does not empty the
 open trade windows before it keeps their stacks; the windows are never saved and go away with the server.

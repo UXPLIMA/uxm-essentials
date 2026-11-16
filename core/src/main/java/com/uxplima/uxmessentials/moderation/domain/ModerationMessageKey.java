@@ -193,6 +193,10 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_LOCKDOWN_DISABLED_SELF("moderation.lockdown.disabled-self"),
     MOD_LOCKDOWN_KICK("moderation.lockdown.kick"),
 
+    // The login refusal when the ban check could not be made: storage failed at pre-login, or the login found no
+    // pre-login read to decide on. It asks the player to join again rather than barring them.
+    MOD_LOGIN_UNCHECKED("moderation.login.unchecked"),
+
     // /seen, /seenip
     SEEN_REPORT("moderation.seen.report"),
     SEEN_NEVER("moderation.seen.never"),

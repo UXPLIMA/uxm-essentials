@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -184,7 +185,7 @@ public final class TradeWiring {
         }
         TradeCommand command =
                 new TradeCommand(requests, cooldown, config, sessions, view::open, kernel.messages(), crossView);
-        return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view, crossView);
+        return new Wired(List.of(command), List.copyOf(listeners), config, sessions, view, crossView, command::request);
     }
 
     /**
@@ -295,6 +296,7 @@ public final class TradeWiring {
      * @param sessions the in-memory registry of live trades
      * @param view the trade-window view that opens and drives sessions
      * @param crossView the cross-server trade window to drain on stop, or {@code null} when cross-server trading is off
+     * @param request sends a trade request by name, as {@code /trade <player>} does, for the {@code /uxmess gui} hub
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -302,7 +304,8 @@ public final class TradeWiring {
             TradeConfig config,
             TradeSessions sessions,
             TradeView view,
-            @Nullable CrossServerTradeView crossView) {
+            @Nullable CrossServerTradeView crossView,
+            BiConsumer<Player, String> request) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -310,6 +313,7 @@ public final class TradeWiring {
             Objects.requireNonNull(config, "config");
             Objects.requireNonNull(sessions, "sessions");
             Objects.requireNonNull(view, "view");
+            Objects.requireNonNull(request, "request");
         }
 
         /** Open a trade window between two online players. */

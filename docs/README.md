@@ -2,6 +2,7 @@
 
 - [Reference](user/reference.md): commands, placeholders and files.
 - [Permissions: gameplay](user/permissions-gameplay.md), [staff and server](user/permissions-server.md) and [item and world tools](user/permissions-items.md): every node with its default.
+- [Management hub](user/management-hub.md): the `/uxmess gui` tiles, the node each needs, and the modules without one.
 - [Network](user/network.md): the server name, the shared database, Velocity or Redis, and what each module shares
   or does across servers.
 - [Homes](user/homes.md): the home grid, limits, costs and claims.

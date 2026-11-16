@@ -278,7 +278,7 @@ reads as offline to `/msg` and `/seen`.
 Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks
 the player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
 messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
-mutes again once a minute). `/kick` and
+mutes again once a minute, and again after `/uxmess import`). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
 reach them. A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
 frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
@@ -288,6 +288,9 @@ reloads its moderation module, holds no freeze any more, and the proxy lets go o
 server has a player online to carry the news. `/lockdown` is one row in the shared database, so it
 closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
 staff broadcasts stay on one server.
+The shared database holds bans (a permanent ban is stored as one that ends far in the future), mutes, warnings, jails
+and the jails made with `/setjail`, IP bans, last-seen records and the address history, the sanction history and the
+lockdown flag.
 
 ### Kits, ranks and vaults
 

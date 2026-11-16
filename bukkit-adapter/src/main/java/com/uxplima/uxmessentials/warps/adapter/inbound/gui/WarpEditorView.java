@@ -69,6 +69,7 @@ public final class WarpEditorView {
     private final Menus menus;
     private final Messages messages;
     private final Scheduler scheduler;
+    private final SerialWarpEdits edits;
     private final WarpRepository warpRepository;
     private final TextInput textInput;
     private final UseWarp useWarp;
@@ -103,6 +104,7 @@ public final class WarpEditorView {
                 Objects.requireNonNull(playerWarpRepositoryHandle, "playerWarpRepositoryHandle");
         this.playerWarpGoTo = Objects.requireNonNull(playerWarpGoTo, "playerWarpGoTo");
         this.loader = new EditableWarpLoader(warpRepository, this);
+        this.edits = new SerialWarpEdits(this.scheduler);
     }
 
     public @Nullable PlayerWarpRepository playerWarpRepository() {
@@ -263,15 +265,13 @@ public final class WarpEditorView {
             reopen(ctx, target);
             return;
         }
-        mutate(target, warp -> warp.setIconMaterial(Optional.of(hand.name())));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> warp.setIconMaterial(Optional.of(hand.name())));
     }
 
     /** Clear the warp's icon, then save and re-open. */
     private void clearIcon(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, warp -> warp.setIconMaterial(Optional.empty()));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> warp.setIconMaterial(Optional.empty()));
     }
 
     /** Open the engine category selector for a server warp; choosing a category saves it and re-opens the editor. */
@@ -285,24 +285,21 @@ public final class WarpEditorView {
     /** Toggle the warp's locked state, then save and re-open. */
     private void toggleLock(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, warp -> warp.setLocked(!warp.isLocked()));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> warp.setLocked(!warp.isLocked()));
     }
 
     /** Capture a password through the input seam, then save it and re-open; cancel re-opens unchanged. */
     private void promptPassword(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
         prompt(ctx, "warp.password", WarpsMessageKey.WARP_EDITOR_PASSWORD_PROMPT, target, input -> {
-            mutate(target, warp -> warp.setPassword(Optional.of(input)));
-            reopen(ctx, target);
+            mutateThenReopen(ctx, target, warp -> warp.setPassword(Optional.of(input)));
         });
     }
 
     /** Clear the warp's password, then save and re-open. */
     private void clearPassword(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, warp -> warp.setPassword(Optional.empty()));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> warp.setPassword(Optional.empty()));
     }
 
     /** Open the engine welcome-messages list for this warp. */
@@ -329,8 +326,7 @@ public final class WarpEditorView {
     /** Clear both sound sides, then save and re-open. */
     private void clearSounds(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, EditableWarp::clearSounds);
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, EditableWarp::clearSounds);
     }
 
     /** Open the engine particle selector for the departure or arrival side. */
@@ -345,8 +341,7 @@ public final class WarpEditorView {
     /** Clear both particle sides, then save and re-open. */
     private void clearParticles(MenuActionContext ctx) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, EditableWarp::clearParticles);
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, EditableWarp::clearParticles);
     }
 
     /** Capture a warmup or cooldown override in seconds through the input seam; cancel re-opens unchanged. */
@@ -369,15 +364,13 @@ public final class WarpEditorView {
             return;
         }
         Optional<Double> seconds = Optional.of(parsed);
-        mutate(target, warp -> setDuration(warp, warmup, seconds));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> setDuration(warp, warmup, seconds));
     }
 
     /** Clear the warmup or cooldown override, then save and re-open. */
     private void clearDuration(MenuActionContext ctx, boolean warmup) {
         WarpEditTarget target = subject(ctx);
-        mutate(target, warp -> setDuration(warp, warmup, Optional.empty()));
-        reopen(ctx, target);
+        mutateThenReopen(ctx, target, warp -> setDuration(warp, warmup, Optional.empty()));
     }
 
     private static void setDuration(EditableWarp warp, boolean warmup, Optional<Double> seconds) {
@@ -400,12 +393,36 @@ public final class WarpEditorView {
         textInput.prompt(player, InputRequest.of(inputKey, promptKey.key()), action, () -> reopen(ctx, target));
     }
 
-    /** Apply a mutation to the edited warp through the shared loader; a stale warp is a no-op the re-open catches. */
-    private void mutate(WarpEditTarget target, java.util.function.Consumer<EditableWarp> change) {
-        EditableWarp warp = loader.load(target.warpName(), target.owner());
-        if (warp != null) {
-            change.accept(warp);
-        }
+    /** Apply a mutation to the edited warp, then re-open the editor so the operator sees the result. */
+    private void mutateThenReopen(
+            MenuActionContext ctx, WarpEditTarget target, java.util.function.Consumer<EditableWarp> change) {
+        Player player = ctx.player();
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        edit(target.warpName(), target.owner(), change, () -> open(player, viewer, target.warpName(), target.owner()));
+    }
+
+    /**
+     * Load the warp, apply {@code change} and save it on the async lane, since the save writes the database, then run
+     * {@code then}. Edits of one warp run one after another; a stale warp is a no-op the re-open catches. {@code then}
+     * runs even when the save fails, so the operator is never left without the menu.
+     */
+    void edit(
+            String warpName,
+            @Nullable PlayerRef warpOwner,
+            java.util.function.Consumer<EditableWarp> change,
+            Runnable then) {
+        String key = (warpOwner == null ? "server" : warpOwner.uuid().toString()) + ":"
+                + warpName.toLowerCase(java.util.Locale.ROOT);
+        edits.run(key, () -> {
+            try {
+                EditableWarp warp = loader.load(warpName, warpOwner);
+                if (warp != null) {
+                    change.accept(warp);
+                }
+            } finally {
+                then.run();
+            }
+        });
     }
 
     /** Re-open the editor after a mutation so the operator sees the result with a fresh subject snapshot. */
