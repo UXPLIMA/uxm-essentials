@@ -131,6 +131,32 @@ class RunCustomCommandWarmupTest {
     }
 
     @Test
+    void aPendingWarmupDoesNotCountAgainstAnUnrelatedCommandAtDepthOne() {
+        ChainDepth depth = new ChainDepth(1);
+        RunCustomCommand runner = runner(depth);
+        runner.run(REWARD, ALEX, false, Map.of());
+
+        assertThat(runner.run(HUB, ALEX, false, Map.of())).isInstanceOf(RunOutcome.Ok.class);
+        warmups.completeAll();
+
+        assertThat(feedback.reported).containsExactly("WarmupStarted", "Ok", "Ok");
+        assertThat(purse.charged).isEqualTo(REWARD_PRICE);
+        assertThat(depth.tracked()).isZero();
+    }
+
+    @Test
+    void aCommandDispatchedInsideAnotherIsStillRefusedPastTheDepth() {
+        ChainDepth depth = new ChainDepth(1);
+        RunCustomCommand runner = runner(depth);
+
+        runner.run(HUB, ALEX, false, RUN_KIT_THEN_REWARD);
+
+        assertThat(feedback.reported).containsExactly("DepthExceeded", "DepthExceeded", "Ok");
+        assertThat(purse.charged).isZero();
+        assertThat(depth.tracked()).isZero();
+    }
+
+    @Test
     void aChainRunningTwoWarmupCommandsAtTheDefaultDepthLeavesOnlyTheLastWaiting() {
         ChainDepth depth = new ChainDepth(5);
         RunCustomCommand runner = runner(depth);

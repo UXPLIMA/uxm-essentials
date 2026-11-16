@@ -32,27 +32,13 @@ public final class ChainDepth {
      * claim consumes nothing, so the caller must not call {@link #exit} for it.
      */
     public boolean enter(UUID who) {
-        return enter(who, max);
-    }
-
-    /**
-     * Claim one level for a run that ends another run of {@code who}'s, one that still holds a level, before it needs
-     * its own. One level past the ceiling is allowed for that moment, so the replacement is never refused for the
-     * level of the run it ends; once that run releases, the count is back within the ceiling. A refused claim consumes
-     * nothing, as with {@link #enter}.
-     */
-    public boolean enterReplacing(UUID who) {
-        return enter(who, max + 1);
-    }
-
-    private boolean enter(UUID who, int ceiling) {
         Objects.requireNonNull(who, "who");
         // compute reports the value after the update, not whether it changed, so the decision is carried out of
         // the remapping function. The flag is written inside the map's own lock, so two threads cannot both win.
         AtomicBoolean granted = new AtomicBoolean();
         depth.compute(who, (key, current) -> {
             int now = current == null ? 0 : current;
-            if (now >= ceiling) {
+            if (now >= max) {
                 return now;
             }
             granted.set(true);
