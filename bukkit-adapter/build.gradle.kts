@@ -1,6 +1,6 @@
 plugins {
     id("uxm.paper-plugin")
-    // Offline /invsee reads player-data NBT through Mojang-mapped server internals.
+    // Offline /invsee reads player-data NBT, and /tpoffline finds it, through Mojang-mapped server internals.
     id("io.papermc.paperweight.userdev")
 }
 
@@ -24,8 +24,8 @@ dependencies {
     api(project(":bukkit-api"))
 
     // The Mojang-mapped dev bundle supplies the Paper API and the server internals (net.minecraft,
-    // org.bukkit.craftbukkit) the offline-inventory adapter needs. Paper's plugin remapper maps the shipped jar back
-    // to the server's mappings at load.
+    // org.bukkit.craftbukkit) the offline-inventory and offline-position adapters need. Paper's plugin remapper maps
+    // the shipped jar back to the server's mappings at load.
     paperweight.paperDevBundle(uxm.versions.paper.get())
     compileOnly(libs.bundles.adventure)
     compileOnly(libs.luckperms.api)

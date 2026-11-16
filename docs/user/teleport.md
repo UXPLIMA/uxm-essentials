@@ -33,7 +33,8 @@ requests or blocked the requester. It waits `request-ttl-seconds` (60) for an an
 requests queue and `/tpaccept` takes the oldest.
 
 On accept, the player who moves (the requester for `/tpa`, the target for `/tpahere`) stands through the warmup and
-is then moved to where the other player stands at that moment. A request is not refused for a cooldown; the accepted
+is then moved to where the other player stands at that moment. A mover who is jailed or combat tagged at that point is
+told why and stays put; the request is used up. A request is not refused for a cooldown; the accepted
 teleport starts one (see [Cooldowns](#cooldowns)). Requests cost nothing.
 
 `/tptoggle` and `/tpauto` are kept in the player's data on that server and survive a relog. The `/tpblock` list is
@@ -49,14 +50,38 @@ kept in memory and empties on a restart.
 | `/tp <x> <y> <z> [world]` | `uxmessentials.tp.use` and `uxmessentials.tp.position` | Teleports you to a position. |
 | `/tp at <player> <world> <x> <y> <z> [yaw pitch]` | `uxmessentials.tp.use` and `uxmessentials.tp.position` | Teleports a player to a position; works from the console. |
 | `/tppos <x> <y> <z> [world]` | `uxmessentials.tp.position` | Teleports you to a position. |
-| `/tpo`, `/tpohere` | `uxmessentials.tp.others` | The same as `/tp <player>` and `/tphere`, under their own node. |
+| `/tpo`, `/tpohere` | `uxmessentials.tp.others` | `/tp <player>` and `/tphere` that also reach a player who refuses teleports. |
 | `/tpall` | `uxmessentials.tp.all` | Pulls every other player on this server to you. |
 | `/tprandomplayer` | `uxmessentials.tp.use` | Teleports you to a random player you can see. Alias `/tprp`. |
 | `/top`, `/bottom`, `/jump`, `/up`, `/down`, `/ascend`, `/descend`, `/thru` | `uxmessentials.tp.vertical` | Moves you up, down, to the block you look at, or through a wall. |
-| `/tpoffline`, `/tpofflinehere` | `uxmessentials.tp.offline` | Not working yet: replies that the location cannot be found. |
+| `/tpoffline <player>` | `uxmessentials.tp.offline` | Teleports you to where an offline player left this server. |
+| `/tpofflinehere <player>` | `uxmessentials.tp.offline` | Moves an offline player to where you stand when they next join this server. |
 
-Staff teleports have no warmup, cooldown, cost, jail or combat check, and ignore `/tptoggle`. A position keeps your
-facing. When uxmParkour is installed it owns `/jump`.
+Staff teleports have no warmup, cooldown, cost, jail or combat check. `/tp`, `/tphere`, `/goto` and `/bring` stop
+at a player who refuses teleports with `/tptoggle` and tell you to use `/tpo` or `/tpohere`, which go through; with
+`/tp <player> <destination>`, both players are asked. The position forms move only the named player and are not
+stopped. A position keeps your facing. When uxmParkour is installed it owns `/jump`.
+
+`/tpoffline` reads the position this server saved in the player's data when they left it, so on a network it is
+where they left this server. Data saved before the server recorded the world uid falls back to its dimension. An
+ender pearl the player had in flight is saved with them and lands only after they join again, so the saved position
+does not include where it would have taken them.
+
+`/tpofflinehere` does not touch the player's data. It stores your spot in the database for this server, and once the
+player has joined this server they are teleported there, a moment after the join. A later `/tpofflinehere` replaces
+an earlier one, and a move left on one server waits for a join on that server. The teleport takes them off any mount
+or vehicle, which stays where they logged out with everything on it. You must stand on solid ground: not flying,
+gliding, swimming, in water or lava, or riding, since the spot is used exactly as it is. An ender pearl the player had
+in flight comes back with them and can still carry them off when it lands.
+
+The move waits, untouched, while the player is jailed, and while its world is not loaded; it is applied at a later
+join. While a move waits for a player, their join's own move (first-join RTP or spawn, every-join spawn) runs a moment
+after the join, and only if the waiting move is not applied. When the teleport misses, because the player left again
+or another plugin cancelled it, the move is kept for the next join; after 3 misses it is dropped and the console says
+so.
+
+Both refuse a player online on this server whom you can see: use `/tp` or `/tphere`. A player hidden from you by
+vanish is handled as if offline, so the answer does not give them away.
 
 ## /back
 
@@ -86,7 +111,9 @@ falls back to, and `server`, `server:<id>` or `set:<name>` write that scope's.
 The `spawn` block sends new players to spawn (`first-join`), every player on login (`every-join`), and handles death
 respawns (`respawn`) through `respawn-chain`, whose steps are `home`, `bed`, `anchor`, `spawn`, `warp:<name>` and
 `rtp`. `respawn.chain.<world>` overrides the chain for deaths in one world, and an empty list there gives that world
-vanilla respawns. `uxmessentials.bypass.join-spawn` leaves a player where they logged out.
+vanilla respawns. `uxmessentials.bypass.join-spawn` leaves a player where they logged out. A jailed player gets no
+join move: their jail decides where they go. A player with a [`/tpofflinehere`](#staff-teleports) move waiting gets it
+instead of the join move.
 
 ## Random teleport
 
@@ -128,7 +155,7 @@ A warp can set its own warmup in its editor.
 | `warmup.move-threshold` | `0.0` | Blocks of drift allowed before a move cancels. |
 | `warmup.cancel-on-damage` | `false` | Taking damage cancels. |
 | `warmup.cancel-on-interact` | `false` | Clicking cancels. |
-| `warmup.cancel-on-rotate` | `false` | Read, but nothing acts on it: turning never cancels. |
+| `warmup.cancel-on-rotate` | `false` | Turning your head cancels. |
 
 A player has one warmup at a time. A new teleport replaces the waiting one, which never lands, and the player is told
 it was replaced. Logging off ends it too.
@@ -191,7 +218,8 @@ network bus and a proxy; see [network](network.md).
 - **The move.** Once accepted, the server the mover is on checks jail and combat, runs the warmup there, then sends
   them through the proxy. The target server places them where the other player stands when they arrive. For
   `/tpahere`, the target's server first asks the requester's server whether the request still stands.
-- **Staff.** The server the moved player is on moves them, with no checks and no warmup. A player vanished above the
+- **Staff.** The server the moved player is on moves them, with no checks and no warmup; a player on another server
+  is not stopped by their `/tptoggle`. A player vanished above the
   staff member's see level reads as offline, and nobody is moved.
 
 Requests and staff teleports carry no money, so nothing is refunded. The arrival delay and the time a move may take
