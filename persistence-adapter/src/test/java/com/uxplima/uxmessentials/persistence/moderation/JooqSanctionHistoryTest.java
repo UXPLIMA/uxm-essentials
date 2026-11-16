@@ -4,7 +4,6 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSancti
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.util.EnumMap;
 import java.util.List;
@@ -18,21 +17,20 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
 import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.jooq.impl.DSL;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * A history row is written whole even when its reason is longer than the column: the sanction it records is already
  * stored, so the reason is fitted to the column's width rather than failing the write on a backend that enforces it.
  */
+@EveryBackend
 class JooqSanctionHistoryTest {
 
     private static final PlayerRef ALEX =
@@ -43,8 +41,12 @@ class JooqSanctionHistoryTest {
     private static final PlayerRef BEA = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000a4"), "Bea");
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
 
-    @TempDir
-    Path folder;
+    private DSLContext dsl;
+
+    @BeforeEach
+    void open(TestDatabase database) {
+        dsl = database.dsl();
+    }
 
     @Test
     void aReasonLongerThanTheColumnIsStoredFittedToIt() {
@@ -175,7 +177,6 @@ class JooqSanctionHistoryTest {
 
     @Test
     void aKeyAnotherWriterTookFirstIsTakenAgainAndTheRowKept() {
-        DSLContext dsl = openDsl();
         SanctionHistory first = new JooqSanctionHistory(dsl);
         first.append(row(SanctionAction.WARN, SAM, Optional.empty(), NOW));
         // The second writer read the maximum before the first committed, so its first key is already taken.
@@ -191,7 +192,6 @@ class JooqSanctionHistoryTest {
 
     @Test
     void aKeyThatStaysTakenGivesUpAfterTheLastAttempt() {
-        DSLContext dsl = openDsl();
         new JooqSanctionHistory(dsl).append(row(SanctionAction.WARN, SAM, Optional.empty(), NOW));
         AtomicInteger reads = new AtomicInteger();
         SanctionHistory alwaysStale = new JooqSanctionHistory(dsl, ignored -> {
@@ -225,13 +225,6 @@ class JooqSanctionHistoryTest {
     }
 
     private SanctionHistory openStore() {
-        return new JooqSanctionHistory(openDsl());
-    }
-
-    private DSLContext openDsl() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        return DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+        return new JooqSanctionHistory(dsl);
     }
 }

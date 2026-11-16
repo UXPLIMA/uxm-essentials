@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.persistence.guard;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -27,17 +26,15 @@ import com.uxplima.uxmessentials.guard.domain.RoleName;
 import com.uxplima.uxmessentials.guard.domain.Rule;
 import com.uxplima.uxmessentials.guard.domain.Shape;
 import com.uxplima.uxmessentials.guard.domain.Target;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.ServerScope;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /** Regions, history and denials through the real migrations on a SQLite file. */
+@EveryBackend
 class JooqGuardStoreTest {
 
     private static final ServerScope LOBBY = ServerScope.server("lobby");
@@ -45,18 +42,12 @@ class JooqGuardStoreTest {
     private static final RegionKey SPAWN = new RegionKey("world", RegionId.of("spawn"));
     private static final UUID OWNER = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
 
-    @TempDir
-    Path folder;
-
     private GuardStore store;
     private final List<String> warnings = new ArrayList<>();
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         store = new JooqGuardStore(
                 dsl, Clock.fixed(Instant.parse("2030-01-01T00:00:00Z"), ZoneOffset.UTC), warnings::add);
     }

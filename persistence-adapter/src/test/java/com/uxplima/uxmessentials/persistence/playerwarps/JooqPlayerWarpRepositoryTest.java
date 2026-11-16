@@ -5,16 +5,14 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.PlayerWarps.PLAY
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.playerwarps.application.port.RentArchiveCursor;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
@@ -27,10 +25,9 @@ import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /** The player warp queries the rent sweep deletes by, through the real migrations on a SQLite file. */
+@EveryBackend
 class JooqPlayerWarpRepositoryTest {
 
     private static final PlayerRef SAM = new PlayerRef(UUID.fromString("00000000-0000-0000-0000-000000000005"), "Sam");
@@ -39,18 +36,12 @@ class JooqPlayerWarpRepositoryTest {
     private static final Instant NOW = Instant.parse("2030-01-01T12:00:00Z");
     private static final Instant CUTOFF = NOW.minus(Duration.ofDays(30));
 
-    @TempDir
-    Path folder;
-
     private DSLContext dsl;
     private JooqPlayerWarpRepository repository;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         repository = new JooqPlayerWarpRepository(dsl);
     }
 

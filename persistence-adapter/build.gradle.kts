@@ -35,9 +35,14 @@ dependencies {
     implementation(uxm.uxmlib.common) { isTransitive = false }
     implementation(uxm.uxmlib.storage) { isTransitive = false }
 
-    // The store tests run the real migrations on a SQLite file.
+    // The store tests run the real migrations on a SQLite file in every build, and on MySQL, MariaDB and
+    // PostgreSQL in a container under the real-database tasks below. The network drivers and their Flyway
+    // modules are the ones the plugin loader fetches for an operator, so a test opens the database the same way.
     testImplementation(libs.bundles.db)
+    testImplementation(libs.bundles.db.mysql)
+    testImplementation(libs.bundles.db.pg)
     testImplementation(libs.gson)
+    testImplementation(uxm.uxmlib.storage.testing)
 }
 
 jooq {
@@ -134,4 +139,29 @@ spotless {
 // method call unless the test JVM grants native access.
 tasks.named<Test>("test") {
     jvmArgs("--enable-native-access=ALL-UNNAMED")
+}
+
+// The repository tests carry @EveryBackend, which tags them real-database. The test task above runs them on SQLite
+// with the rest; each task here runs only them again, on one server started in a container by uxmlib's shared test
+// databases. They are apart from the build because they need Docker; CI runs them in their own job with
+// -Puxm.requireDocker=true, so a missing Docker fails the job instead of skipping the tests.
+val realDatabaseTests =
+    listOf("mysql", "mariadb", "postgresql").map { backend ->
+        tasks.register<Test>("${backend}Test") {
+            description = "Runs the repository tests on $backend in a container."
+            group = "verification"
+            testClassesDirs = sourceSets["test"].output.classesDirs
+            classpath = sourceSets["test"].runtimeClasspath
+            useJUnitPlatform { includeTags("real-database") }
+            systemProperty("uxm.backend", backend)
+            systemProperty("uxm.requireDocker", providers.gradleProperty("uxm.requireDocker").getOrElse("false"))
+            jvmArgs("--enable-native-access=ALL-UNNAMED")
+            shouldRunAfter(tasks.named("test"))
+        }
+    }
+
+tasks.register("realDatabaseTest") {
+    description = "Runs the repository tests on MySQL, MariaDB and PostgreSQL in containers."
+    group = "verification"
+    dependsOn(realDatabaseTests)
 }

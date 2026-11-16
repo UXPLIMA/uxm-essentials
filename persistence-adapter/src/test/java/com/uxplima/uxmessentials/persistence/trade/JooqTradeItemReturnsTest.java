@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.trade;
 import static com.uxplima.uxmessentials.persistence.jooq.tables.TradeItemReturns.TRADE_ITEM_RETURNS;
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -14,22 +13,21 @@ import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.trade.application.port.TradeItemReturns;
 import com.uxplima.uxmessentials.vaults.domain.VaultContents;
 import org.jooq.DSLContext;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * Kept trade items come back byte for byte, and a batch is handed out under one claim at a time: a second server
  * cannot take it while the first holds it, and only the holder can remove it. A claim nobody finishes goes stale and
  * can be taken again, so a crash between the claim and the hand-over loses nothing.
  */
+@EveryBackend
 class JooqTradeItemReturnsTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
@@ -41,12 +39,15 @@ class JooqTradeItemReturnsTest {
     private final MovingClock clock = new MovingClock();
     private final List<String> errors = new ArrayList<>();
 
-    @TempDir
-    Path folder;
+    private DSLContext dsl;
+
+    @BeforeEach
+    void open(TestDatabase database) {
+        dsl = database.dsl();
+    }
 
     @Test
     void keptItemsComeBackUnchangedOldestFirstAndOnlyForTheirOwner() {
-        DSLContext dsl = openDsl();
         VaultContents shulker = VaultContents.of(new byte[] {9, 8, 7});
         TradeItemReturns returns = store(dsl);
         returns.keep(ALEX, SWORD);
@@ -61,7 +62,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aBatchIsClaimedByOneServerAndRemovedOnlyByThatClaim() {
-        DSLContext dsl = openDsl();
         TradeItemReturns lobby = store(dsl);
         TradeItemReturns survival = store(dsl);
         lobby.keep(ALEX, SWORD);
@@ -80,7 +80,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aReleasedClaimLeavesTheBatchWholeForTheNextJoin() {
-        DSLContext dsl = openDsl();
         TradeItemReturns returns = store(dsl);
         returns.keep(ALEX, SWORD);
         String id = returns.claimable(ALEX).get(0).id();
@@ -96,7 +95,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void whatDidNotFitReplacesTheBatchAndIsFreeToClaimAgain() {
-        DSLContext dsl = openDsl();
         TradeItemReturns returns = store(dsl);
         returns.keep(ALEX, SWORD);
         String id = returns.claimable(ALEX).get(0).id();
@@ -112,7 +110,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aClaimNobodyFinishedCanBeTakenAgainOnceItIsStale() {
-        DSLContext dsl = openDsl();
         TradeItemReturns returns = store(dsl);
         returns.keep(ALEX, SWORD);
         String id = returns.claimable(ALEX).get(0).id();
@@ -133,7 +130,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aRowThatCannotBeReadIsSkippedAndKeptWhileTheRestAreHandedOut() {
-        DSLContext dsl = openDsl();
         TradeItemReturns returns = store(dsl);
         dsl.insertInto(TRADE_ITEM_RETURNS)
                 .set(TRADE_ITEM_RETURNS.ID, "broken")
@@ -152,7 +148,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void aBatchFarLargerThanAMysqlTextColumnComesBackWhole() {
-        DSLContext dsl = openDsl();
         byte[] bytes = new byte[1 << 20];
         new Random(7).nextBytes(bytes);
         VaultContents shulkers = VaultContents.of(bytes);
@@ -166,7 +161,6 @@ class JooqTradeItemReturnsTest {
 
     @Test
     void nothingIsKeptForAnEmptyBatch() {
-        DSLContext dsl = openDsl();
 
         store(dsl).keep(ALEX, VaultContents.empty());
 
@@ -193,13 +187,6 @@ class JooqTradeItemReturnsTest {
 
     private static int rows(DSLContext dsl) {
         return dsl.fetchCount(TRADE_ITEM_RETURNS);
-    }
-
-    private DSLContext openDsl() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        return DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
     }
 
     /** A clock the test moves by hand. */

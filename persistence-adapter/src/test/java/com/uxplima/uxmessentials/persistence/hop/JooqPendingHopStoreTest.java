@@ -5,15 +5,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopKind;
 import com.uxplima.uxmessentials.shared.application.hop.HopSettlement;
@@ -22,28 +19,21 @@ import com.uxplima.uxmessentials.shared.application.hop.port.PendingHopStore;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /** The pending cross-server hop row of every kind through the real migrations on a SQLite file. */
+@EveryBackend
 class JooqPendingHopStoreTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-000000000a1e");
     private static final Instant ASKED = Instant.parse("2030-01-01T12:00:00.123456789Z");
     private static final Optional<HopSettlement> TO_THE_WARP = Optional.of(new HopSettlement("7"));
 
-    @TempDir
-    Path folder;
-
     private PendingHopStore store;
     private DSLContext dsl;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         store = new JooqPendingHopStore(dsl);
     }
 

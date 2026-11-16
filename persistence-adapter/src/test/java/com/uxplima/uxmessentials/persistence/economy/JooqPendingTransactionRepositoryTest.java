@@ -3,7 +3,6 @@ package com.uxplima.uxmessentials.persistence.economy;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.math.BigDecimal;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -13,37 +12,27 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.uxplima.uxmessentials.economy.application.port.PendingTransactionRepository.PendingTransaction;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import org.jooq.DSLContext;
 import org.jooq.ExecuteContext;
 import org.jooq.ExecuteListener;
 import org.jooq.ExecuteType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /** Queued credits through the real migrations on a SQLite file: each row is paid by exactly one take. */
+@EveryBackend
 class JooqPendingTransactionRepositoryTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
-
-    @TempDir
-    Path folder;
 
     private DSLContext dsl;
     private JooqPendingTransactionRepository repository;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        data.setJournalMode("WAL");
-        data.setBusyTimeout(5000);
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         repository = new JooqPendingTransactionRepository(dsl);
     }
 

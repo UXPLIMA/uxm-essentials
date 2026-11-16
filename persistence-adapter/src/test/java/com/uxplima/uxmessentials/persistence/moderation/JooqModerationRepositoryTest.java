@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.persistence.moderation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -15,21 +14,19 @@ import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /**
  * A conditional ban, mute or IP ban write through the real migrations on a SQLite file: it lands only while the row
  * is still the one the caller read, so a sanction written by another server in between is never overwritten by a
  * decision made without it.
  */
+@EveryBackend
 class JooqModerationRepositoryTest {
 
     private static final PlayerRef ALEX =
@@ -38,14 +35,13 @@ class JooqModerationRepositoryTest {
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
     private static final String ADDRESS = "203.0.113.7";
 
-    @TempDir
-    Path folder;
-
+    private DSLContext dsl;
     private ModerationRepository first;
     private ModerationRepository second;
 
     @BeforeEach
-    void open() {
+    void open(TestDatabase database) {
+        dsl = database.dsl();
         first = openStore();
         second = openStore();
         first.ensureUserExists(SAM, NOW);
@@ -230,10 +226,6 @@ class JooqModerationRepositoryTest {
     }
 
     private ModerationRepository openStore() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
         return new JooqModerationRepository(dsl);
     }
 }

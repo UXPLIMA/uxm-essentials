@@ -2,41 +2,31 @@ package com.uxplima.uxmessentials.persistence.ledger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
-import com.uxplima.uxmessentials.persistence.runtime.DslContextProvider;
-import com.uxplima.uxmessentials.persistence.runtime.FlywayMigrationRunner;
+import com.uxplima.uxmessentials.persistence.testing.EveryBackend;
+import com.uxplima.uxmessentials.persistence.testing.TestDatabase;
 import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger.Claims;
 import org.jooq.DSLContext;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import org.sqlite.SQLiteDataSource;
 
 /** The shared kit claims, cooldowns and daily reward stamps through the real migrations on a SQLite file. */
+@EveryBackend
 class JooqClaimLedgersTest {
 
     private static final UUID ALEX = UUID.fromString("00000000-0000-0000-0000-0000000000a1");
     private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
     private static final long DAY = 86_400_000L;
 
-    @TempDir
-    Path folder;
-
     private JooqPlayerClaimLedger claims;
     private JooqDailyRewardLedger daily;
 
     @BeforeEach
-    void open() {
-        SQLiteDataSource data = new SQLiteDataSource();
-        data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
-        new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
+    void open(TestDatabase database) {
+        DSLContext dsl = database.dsl();
         claims = new JooqPlayerClaimLedger(dsl);
         daily = new JooqDailyRewardLedger(dsl);
     }
