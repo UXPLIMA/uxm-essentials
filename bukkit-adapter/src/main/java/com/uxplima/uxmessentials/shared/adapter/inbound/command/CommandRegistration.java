@@ -34,6 +34,15 @@ public interface CommandRegistration {
         return build().getLiteral();
     }
 
+    /**
+     * Whether this command is part of the shipped surface, which {@code CommandSpecCatalog} lists and the command
+     * reference documents. A command built from a file an operator writes (a custom command, an info page, a menu's
+     * open command) answers {@code false}, since no catalogue can know its name ahead of time.
+     */
+    default boolean declared() {
+        return true;
+    }
+
     /** The code-side primary name; equal to {@link #commandId()} until an override renames it. */
     default String defaultName() {
         return commandId();

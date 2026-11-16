@@ -91,6 +91,12 @@ public final class CustomCommandRegistration implements CommandRegistration {
         return command.literal().aliases();
     }
 
+    /** Built from an operator's file, so no catalogue lists it. */
+    @Override
+    public boolean declared() {
+        return false;
+    }
+
     @Override
     public String description() {
         return command.usage().orElseGet(command::description);

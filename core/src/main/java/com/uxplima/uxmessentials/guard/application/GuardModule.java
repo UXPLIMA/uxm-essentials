@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.guard.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -35,12 +34,6 @@ public final class GuardModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // /guard (and /bolge, /rg) are contributed by the adapter wiring, like every Bukkit facing command tree.
-        return List.of();
     }
 
     @Override

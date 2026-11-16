@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.invrollback.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -43,13 +42,6 @@ public final class InvrollbackModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The /invrestore staff command is Bukkit-facing and lands with the inbound adapter in Phase 2; this
-        // phase publishes none.
-        return List.of();
     }
 
     @Override

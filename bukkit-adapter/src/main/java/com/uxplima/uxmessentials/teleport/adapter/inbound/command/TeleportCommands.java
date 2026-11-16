@@ -15,8 +15,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Builds the teleport context's full Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link TeleportServices}. Collected in one greppable
- * table so the literal/permission pairing matches the permissions reference and the kernel's
- * {@code TeleportCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
+ * table so the literal/permission pairing matches the permissions reference and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
  */
 @NullMarked
 public final class TeleportCommands {

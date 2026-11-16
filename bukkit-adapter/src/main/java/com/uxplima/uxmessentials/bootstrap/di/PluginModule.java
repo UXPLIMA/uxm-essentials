@@ -174,6 +174,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.api.UxmEssentialsApiImpl
 import com.uxplima.uxmessentials.shared.adapter.inbound.cacherefresh.SharedCacheRefreshListener;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CatalogBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
+import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSpecCheck;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GateBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.GuiRootBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.LocaleBinding;
@@ -1050,6 +1051,10 @@ public final class PluginModule {
 
     private static void applyCatalog(
             JavaPlugin plugin, KernelPorts kernel, LocaleResolver resolver, CloseableResources resources) {
+        // The command reference is generated from CommandSpecCatalog, so a registration it does not describe is a
+        // reference that is wrong; say so where a developer starting a server will read it.
+        CommandSpecCheck.problems(resources.registered())
+                .forEach(problem -> kernel.log().warn("command catalogue: {}", problem));
         List<CommandDefinition> defs = CommandAliasDefaults.augment(resources.registered().stream()
                 .map(r -> new CommandDefinition(new CommandId(r.commandId()), r.defaultName(), r.defaultAliases()))
                 .toList());

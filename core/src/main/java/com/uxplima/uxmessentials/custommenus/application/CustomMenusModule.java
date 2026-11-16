@@ -3,16 +3,12 @@ package com.uxplima.uxmessentials.custommenus.application;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Function;
 
-import com.uxplima.uxmessentials.shared.application.module.BrigadierCommand;
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.module.ModuleId;
-import com.uxplima.uxmessentials.shared.application.permission.ContentPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
@@ -29,8 +25,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The {@code /menu} command depends on the shared menu engine ({@code Menus} / the {@code CustomMenuLoader}),
  * which live in the bukkit-adapter rather than the kernel ports, so, as with worlds and warps, the real Brigadier
- * node is constructed in the adapter wiring. The {@link CommandSpec} published here is the catalog/drift descriptor
- * that names the literal and its base node; the lifecycle bookkeeping keeps {@code stop()} honest.
+ * node is constructed in the adapter wiring; the lifecycle bookkeeping keeps {@code stop()} honest.
  */
 @NullMarked
 public final class CustomMenusModule implements FeatureModule {
@@ -49,13 +44,6 @@ public final class CustomMenusModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // The real /menu node is built in the adapter wiring over the menu engine; this descriptor names the literal
-        // and its base node so the command catalog and the feature-module drift guard see the context's surface.
-        return List.of(spec("menu", ContentPermissions.MENU_USE, descriptor("menu", "Open operator custom menus")));
     }
 
     @Override
@@ -103,16 +91,4 @@ public final class CustomMenusModule implements FeatureModule {
             Thread.onSpinWait();
         }
     }
-
-    private static CommandSpec spec(String literal, String permission, BrigadierCommand command) {
-        Function<ModuleContext, BrigadierCommand> factory = ctx -> command;
-        return new CommandSpec(literal, permission, factory);
-    }
-
-    private static BrigadierCommand descriptor(String literal, String description) {
-        return new MenuCommandDescriptor(literal, description);
-    }
-
-    /** Platform-neutral handle naming the {@code /menu} literal for the catalog; the adapter builds the real node. */
-    private record MenuCommandDescriptor(String literal, String description) implements BrigadierCommand {}
 }

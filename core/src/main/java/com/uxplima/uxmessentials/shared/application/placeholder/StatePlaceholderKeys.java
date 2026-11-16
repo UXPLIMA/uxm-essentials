@@ -28,65 +28,101 @@ final class StatePlaceholderKeys {
     private static List<PlaceholderSpec> playerstate() {
         return List.of(
                 PlaceholderSpec.of(
-                        "playerstate_gamemode", "The player's game mode.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_gamemode",
+                        "The player's game mode.",
+                        "creative",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_fly",
                         "Whether the player may fly (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_flying",
                         "Whether the player is flying right now (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_god",
                         "Whether the player takes no damage (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_speed",
                         "The speed that applies to how the player is moving: fly speed while flying, walk speed otherwise.",
+                        "0.2",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_walk_speed", "The player's walk speed.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_walk_speed",
+                        "The player's walk speed.",
+                        "0.2",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_fly_speed", "The player's fly speed.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_fly_speed",
+                        "The player's fly speed.",
+                        "0.1",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_health", "The player's current health.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_health",
+                        "The player's current health.",
+                        "18.0",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_max_health",
                         "The player's maximum health.",
+                        "20.0",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_food", "The player's food level.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_food", "The player's food level.", "17", PlaceholderScope.SESSION, PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_level", "The player's experience level.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_level",
+                        "The player's experience level.",
+                        "30",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_xp",
                         "How far the player is through the current experience level, from 0 to 1.",
+                        "0.45",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
-                        "playerstate_world", "The world the player is in.", PlaceholderScope.SESSION, PLAYERSTATE),
-                PlaceholderSpec.of("playerstate_x", "The player's block x.", PlaceholderScope.SESSION, PLAYERSTATE),
-                PlaceholderSpec.of("playerstate_y", "The player's block y.", PlaceholderScope.SESSION, PLAYERSTATE),
-                PlaceholderSpec.of("playerstate_z", "The player's block z.", PlaceholderScope.SESSION, PLAYERSTATE),
+                        "playerstate_world",
+                        "The world the player is in.",
+                        "world",
+                        PlaceholderScope.SESSION,
+                        PLAYERSTATE),
+                PlaceholderSpec.of(
+                        "playerstate_x", "The player's block x.", "128", PlaceholderScope.SESSION, PLAYERSTATE),
+                PlaceholderSpec.of(
+                        "playerstate_y", "The player's block y.", "64", PlaceholderScope.SESSION, PLAYERSTATE),
+                PlaceholderSpec.of(
+                        "playerstate_z", "The player's block z.", "-240", PlaceholderScope.SESSION, PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_biome",
                         "The biome the player is standing in.",
+                        "plains",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_playtime",
                         "How long the player has played, in whole hours.",
+                        "135",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE),
                 PlaceholderSpec.of(
                         "playerstate_playtime_formatted",
                         "How long the player has played, in the compact 1d2h form.",
+                        "5d15h",
                         PlaceholderScope.SESSION,
                         PLAYERSTATE));
     }
@@ -94,20 +130,27 @@ final class StatePlaceholderKeys {
     private static List<PlaceholderSpec> poses() {
         return List.of(
                 PlaceholderSpec.of(
-                        "poses_sitting", "Whether the player is sitting (yes/no).", PlaceholderScope.SESSION, POSES),
+                        "poses_sitting",
+                        "Whether the player is sitting (yes/no).",
+                        "yes",
+                        PlaceholderScope.SESSION,
+                        POSES),
                 PlaceholderSpec.of(
                         "poses_posing",
                         "Whether the player holds a free pose: lay, bellyflop or spin (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         POSES),
                 PlaceholderSpec.of(
                         "poses_pose",
                         "The pose the player holds: sit, lay, bellyflop, spin or none.",
+                        "sit",
                         PlaceholderScope.SESSION,
                         POSES),
                 PlaceholderSpec.of(
                         "poses_toggle",
                         "Whether the player lets others sit on them: allow or refuse.",
+                        "allow",
                         PlaceholderScope.SESSION,
                         POSES));
     }
@@ -117,55 +160,65 @@ final class StatePlaceholderKeys {
                 PlaceholderSpec.of(
                         "scoreboard_visible",
                         "Whether the player has the sidebar showing (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         SCOREBOARD),
                 PlaceholderSpec.of(
                         "scoreboard_board",
                         "The board the player's sidebar is drawn from, or a dash when they are shown none.",
+                        "default",
                         PlaceholderScope.SESSION,
                         SCOREBOARD),
                 PlaceholderSpec.of(
                         "bossbar_visible",
                         "Whether the player has their boss bars showing (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         BOSSBAR),
                 PlaceholderSpec.of(
                         "bossbar_shown",
                         "The ids of the boss bars on the player's screen, top first, or a dash when they see none.",
+                        "event, restart",
                         PlaceholderScope.SESSION,
                         BOSSBAR),
                 PlaceholderSpec.of(
                         "bossbar_count",
                         "How many boss bars are on the player's screen.",
+                        "2",
                         PlaceholderScope.SESSION,
                         BOSSBAR),
                 PlaceholderSpec.family(
                         "bossbar_remaining_<bar>",
                         "The time left on a timed or announced bar for the player, in their words (5d 8h 52m), or a dash when it has no clock running.",
+                        "5d 8h 52m",
                         PlaceholderScope.SESSION,
                         BOSSBAR),
                 PlaceholderSpec.of(
                         "tablist_format",
                         "The tablist format the player's tab is drawn from, or a dash when they are drawn none.",
+                        "default",
                         PlaceholderScope.SESSION,
                         TABLIST),
                 PlaceholderSpec.of(
                         "tablist_shown",
                         "Whether the player's tab is being drawn from a format at all (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         TABLIST),
                 PlaceholderSpec.of(
                         "nametags_format",
                         "The nametag format the player wears, or a dash when they wear none.",
+                        "staff",
                         PlaceholderScope.SESSION,
                         NAMETAGS),
                 PlaceholderSpec.of(
                         "nametags_shown",
                         "Whether the player wears a nametag at all (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         NAMETAGS),
                 PlaceholderSpec.of(
-                        "holograms_count", "How many holograms are placed.", PlaceholderScope.GLOBAL, HOLOGRAMS));
+                        "holograms_count", "How many holograms are placed.", "12", PlaceholderScope.GLOBAL, HOLOGRAMS));
     }
 
     private static List<PlaceholderSpec> menus() {
@@ -173,28 +226,33 @@ final class StatePlaceholderKeys {
                 PlaceholderSpec.of(
                         "menu_is_in_menu",
                         "Whether the player has a plugin menu open (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         CUSTOMMENUS),
                 PlaceholderSpec.of(
                         "menu_opened",
                         "The id of the menu the player has open.",
+                        "shop",
                         PlaceholderScope.SESSION,
                         CUSTOMMENUS),
                 PlaceholderSpec.of(
                         "menu_last",
                         "The id of the last menu the player opened, which survives the menu closing.",
+                        "shop",
                         PlaceholderScope.SESSION,
                         CUSTOMMENUS),
                 PlaceholderSpec.of(
                         "menu_page",
                         "The page the open menu is showing, counting from 1.",
+                        "2",
                         PlaceholderScope.SESSION,
                         CUSTOMMENUS),
                 PlaceholderSpec.of(
-                        "menu_rows", "How many rows the open menu has.", PlaceholderScope.SESSION, CUSTOMMENUS),
+                        "menu_rows", "How many rows the open menu has.", "6", PlaceholderScope.SESSION, CUSTOMMENUS),
                 PlaceholderSpec.family(
                         "menu_argument_<name>",
                         "The value of one named argument the open menu was called with.",
+                        "diamond",
                         PlaceholderScope.SESSION,
                         CUSTOMMENUS));
     }

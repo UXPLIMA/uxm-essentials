@@ -10,7 +10,15 @@ from the `uxm` catalog.
 ```sh
 ./gradlew build       # everything CI runs
 ./gradlew runServer   # a local server with the plugin, in run/
+./gradlew :core:generateReference   # rewrite the generated pages under docs/user
 ```
+
+The command, permission and placeholder pages under `docs/user/` (`commands.md`, `permissions-*.md`,
+`placeholders*.md`) are generated from `CommandSpecCatalog`, `PermissionCatalog` and `PlaceholderCatalog`. The build
+fails while a committed page differs from what the catalogues render; change the catalogue, run
+`:core:generateReference` and commit both. A new command also needs its `describe.<id>` line in every messages
+file, which the command page quotes. On enable the plugin warns about any registered command the catalogue does not
+describe, or describes with other aliases or another node.
 
 ## Release
 

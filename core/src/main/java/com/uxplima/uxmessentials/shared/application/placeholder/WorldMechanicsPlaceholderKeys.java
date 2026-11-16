@@ -61,11 +61,13 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "survival_" + key,
                         "Whether the player has " + name + " switched on (yes/no), the mechanic that " + what + ".",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         SURVIVAL),
                 PlaceholderSpec.of(
                         "survival_" + key + "_enabled",
                         "Whether this server runs " + name + " at all (yes/no), the mechanic that " + what + ".",
+                        "yes",
                         PlaceholderScope.GLOBAL,
                         SURVIVAL));
     }
@@ -75,39 +77,49 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "itemworld_powertool",
                         "The commands bound to the item in the player's hand, comma separated.",
+                        "spawn, heal",
                         PlaceholderScope.SESSION,
                         ITEMWORLD),
                 PlaceholderSpec.of(
                         "itemworld_powertool_bound",
                         "Whether the held item runs anything on click (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         ITEMWORLD),
                 PlaceholderSpec.of(
                         "itemworld_powertool_count",
                         "How many commands the held item is bound to.",
+                        "2",
                         PlaceholderScope.SESSION,
                         ITEMWORLD),
                 PlaceholderSpec.of(
                         "itemworld_powertool_enabled",
                         "Whether the player currently lets their powertool bindings fire (yes/no).",
+                        "yes",
                         PlaceholderScope.PLAYER,
                         ITEMWORLD),
                 PlaceholderSpec.of(
                         "itemworld_unlimited",
                         "Whether the player is placing blocks without consuming them (yes/no).",
+                        "no",
                         PlaceholderScope.PLAYER,
                         ITEMWORLD));
     }
 
     private static List<PlaceholderSpec> npc() {
         return List.of(
-                PlaceholderSpec.of("npc_total", "How many NPCs the server holds.", PlaceholderScope.GLOBAL, NPC),
-                PlaceholderSpec.of("npc_owned", "How many NPCs the player owns.", PlaceholderScope.PLAYER, NPC),
+                PlaceholderSpec.of("npc_total", "How many NPCs the server holds.", "8", PlaceholderScope.GLOBAL, NPC),
+                PlaceholderSpec.of("npc_owned", "How many NPCs the player owns.", "1", PlaceholderScope.PLAYER, NPC),
                 PlaceholderSpec.of(
-                        "npc_limit", "How many NPCs the player may own, or unlimited.", PlaceholderScope.PLAYER, NPC),
+                        "npc_limit",
+                        "How many NPCs the player may own, or unlimited.",
+                        "3",
+                        PlaceholderScope.PLAYER,
+                        NPC),
                 PlaceholderSpec.of(
                         "npc_remaining",
                         "How many more NPCs the player may create, or unlimited.",
+                        "2",
                         PlaceholderScope.PLAYER,
                         NPC));
     }
@@ -117,51 +129,61 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "regions_available",
                         "Whether the guard module is on (yes/no). Every regions_ placeholder is also readable as guard_.",
+                        "yes",
                         PlaceholderScope.GLOBAL,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_inside",
                         "Whether the player is standing in a protected region (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_here",
                         "The region the player is standing in, highest priority first when they overlap.",
+                        "spawn",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_here_priority",
                         "That region's priority, which is what decides an overlap.",
+                        "10",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_here_owners",
                         "Who owns the region the player is standing in, comma separated.",
+                        "Alex",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_here_members",
                         "Who may build in the region the player is standing in, comma separated.",
+                        "Steve, Notch",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_here_role",
                         "The player's role in the region they stand in (owner, manager, member, guest), or empty.",
+                        "member",
                         PlaceholderScope.SESSION,
                         REGIONS),
-                PlaceholderSpec.of(
+                PlaceholderSpec.family(
                         "regions_allowed_<action>",
                         "Whether the player may do a guard action where they stand, such as regions_allowed_break.",
+                        "no",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_count",
                         "How many regions cover the player at once.",
+                        "2",
                         PlaceholderScope.SESSION,
                         REGIONS),
                 PlaceholderSpec.of(
                         "regions_world_count",
                         "How many regions are defined in the world the player is in.",
+                        "17",
                         PlaceholderScope.SESSION,
                         REGIONS));
     }
@@ -171,11 +193,13 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "security_verifying",
                         "Whether the player has an open verification challenge they have not answered (yes/no).",
+                        "no",
                         PlaceholderScope.SESSION,
                         SECURITY),
                 PlaceholderSpec.of(
                         "security_enforced",
                         "Whether the server asks players to verify on join at all (yes/no).",
+                        "yes",
                         PlaceholderScope.GLOBAL,
                         SECURITY));
     }
@@ -185,11 +209,13 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "villagers_following",
                         "How many villagers are walking after the player right now.",
+                        "2",
                         PlaceholderScope.SESSION,
                         VILLAGERS),
                 PlaceholderSpec.of(
                         "villagers_has_follower",
                         "Whether any villager is following the player (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         VILLAGERS));
     }
@@ -198,6 +224,7 @@ final class WorldMechanicsPlaceholderKeys {
         return List.of(PlaceholderSpec.of(
                 "servertweaks_brand",
                 "The server brand reported to clients on the F3 screen, or a dash when the tweak is off.",
+                "uxmEssentials",
                 PlaceholderScope.GLOBAL,
                 SERVERTWEAKS));
     }
@@ -207,6 +234,7 @@ final class WorldMechanicsPlaceholderKeys {
                 "commandcontrol_allowed_<command>",
                 "Whether the player may run that command where they stand (yes/no), answered from the rules the "
                         + "gate uses.",
+                "yes",
                 PlaceholderScope.SESSION,
                 COMMANDCONTROL));
     }
@@ -220,16 +248,19 @@ final class WorldMechanicsPlaceholderKeys {
                 PlaceholderSpec.of(
                         "invrollback_last_capture",
                         "How long ago this server last snapshotted the player's inventory, since the last restart.",
+                        "4m",
                         PlaceholderScope.SESSION,
                         INVROLLBACK),
                 PlaceholderSpec.of(
                         "invrollback_last_cause",
                         "What caused that snapshot: death or logout.",
+                        "death",
                         PlaceholderScope.SESSION,
                         INVROLLBACK),
                 PlaceholderSpec.of(
                         "invrollback_captured",
                         "Whether any snapshot has been taken for the player since the last restart (yes/no).",
+                        "yes",
                         PlaceholderScope.SESSION,
                         INVROLLBACK));
     }

@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.vanish.application;
 
 import java.util.List;
 
-import com.uxplima.uxmessentials.shared.application.module.CommandSpec;
 import com.uxplima.uxmessentials.shared.application.module.FeatureModule;
 import com.uxplima.uxmessentials.shared.application.module.ListenerFactory;
 import com.uxplima.uxmessentials.shared.application.module.MigrationSet;
@@ -40,12 +39,6 @@ public final class VanishModule implements FeatureModule {
     @Override
     public String configRoot() {
         return ID.configRoot();
-    }
-
-    @Override
-    public List<CommandSpec> commands() {
-        // /vanish is Bukkit-facing and registered by the adapter wiring as a CommandRegistration; no CommandSpec here.
-        return List.of();
     }
 
     @Override

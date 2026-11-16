@@ -144,6 +144,12 @@ public final class UsageBinding {
         }
 
         @Override
+        public boolean declared() {
+
+            return delegate.declared();
+        }
+
+        @Override
         public Optional<Command<CommandSourceStack>> guiRoot() {
             return delegate.guiRoot();
         }

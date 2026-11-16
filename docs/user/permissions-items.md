@@ -1,5 +1,7 @@
 # Permissions: item and world tools
 
+<!-- Generated from the code catalogues by ./gradlew :core:generateReference. Edit the catalogue, not this page. -->
+
 Every node the itemworld module checks, with the default it gets when no permission plugin grants it: `true` for every player, `op` for operators, `false` for nobody. A node ending in `<enchantment>`, `<item>` or `<mob>` takes the name of one. The gameplay modules are in [permissions-gameplay.md](permissions-gameplay.md), and the staff and server modules and the plugin-wide nodes are in [permissions-server.md](permissions-server.md). `/uxmess permissions export` writes the same catalogue from the running build to `permissions.md` in the plugin folder.
 
 ## itemworld

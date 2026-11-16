@@ -16,7 +16,7 @@ import org.jspecify.annotations.Nullable;
  * {@code /list}, {@code /realname <player>}, {@code /whois <player>}, {@code /gc}, and
  * {@code /staff}. Collected in one
  * greppable table so the literal/permission pairing matches the permissions
- * reference and the kernel's {@code PresenceCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS}
+ * reference and its entries in {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS}
  * handler registers each. {@code /vanish} moved to the dedicated {@code vanish} context.
  */
 @NullMarked

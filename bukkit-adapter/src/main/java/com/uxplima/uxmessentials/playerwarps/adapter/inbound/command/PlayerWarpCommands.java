@@ -10,8 +10,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Builds the player-warps context's Brigadier command surface as
  * {@link CommandRegistration}s over the constructed {@link PlayerWarpServices}. Collected in one greppable
- * table so the literal/permission pairing matches the permissions reference and the kernel's
- * {@code PlayerWarpCommandSurface}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
+ * table so the literal/permission pairing matches the permissions reference and its entries in
+ * {@code CommandSpecCatalog}; the plugin's {@code LifecycleEvents.COMMANDS} handler registers each.
  */
 @NullMarked
 public final class PlayerWarpCommands {
