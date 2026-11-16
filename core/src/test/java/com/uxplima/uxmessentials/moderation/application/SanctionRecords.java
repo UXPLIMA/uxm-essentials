@@ -23,7 +23,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The warn, mute, tempban and IP ban rows of the moderation store, plus the lockdown switch. Like the real store, the
+ * The warn, mute, tempban and IP ban rows of the moderation store, plus the lockdown switch; no player is jailed. Like the real store, the
  * count a new warning returns leaves out warnings that had lapsed when it was issued.
  */
 final class SanctionRecords implements ModerationRepository {
@@ -166,7 +166,7 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public ModerationProfile load(PlayerRef target) {
-        throw new UnsupportedOperationException();
+        return new ModerationProfile(target, loadMute(target), JailState.none(), loadTempban(target));
     }
 
     @Override
@@ -181,7 +181,13 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public List<BanEntry> activeBans(Instant now, int limit) {
-        throw new UnsupportedOperationException();
+        List<BanEntry> active = new ArrayList<>();
+        tempbans.forEach((target, state) -> {
+            if (state instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
+                active.add(new BanEntry(target, ban.issuer(), ban.reason(), ban.until(), ban.issuedAt()));
+            }
+        });
+        return active.stream().limit(limit).toList();
     }
 
     @Override

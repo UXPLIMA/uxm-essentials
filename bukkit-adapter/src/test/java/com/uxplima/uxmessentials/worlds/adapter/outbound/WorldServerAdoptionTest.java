@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.worlds.adapter.outbound;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -12,11 +13,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.worlds.WorldServerClaimer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.worlds.domain.WorldName;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -30,27 +33,30 @@ class WorldServerAdoptionTest {
     private final AtomicReference<Boolean> reconciledAfterClaim = new AtomicReference<>();
 
     private void start(Map<String, String> loaded, Disk disk, boolean adoptLoaded) {
-        new WorldServerAdoption(
-                        new Inline(),
-                        log,
-                        LOBBY,
-                        true,
-                        LOBBY,
-                        table,
-                        new WorldServerAdoption.Worlds() {
-                            @Override
-                            public Map<String, String> loadedUids() {
-                                return loaded;
-                            }
+        adoption(loaded, disk, adoptLoaded).claimThen(reconciledAfterClaim::set);
+    }
 
-                            @Override
-                            public Map<String, Optional<String>> onDisk() {
-                                return disk.scan();
-                            }
-                        },
-                        world -> table.changes++,
-                        () -> adoptLoaded)
-                .claimThen(reconciledAfterClaim::set);
+    private WorldServerAdoption adoption(Map<String, String> loaded, Disk disk, boolean adoptLoaded) {
+        return new WorldServerAdoption(
+                new Inline(),
+                log,
+                LOBBY,
+                true,
+                LOBBY,
+                table,
+                new WorldServerAdoption.Worlds() {
+                    @Override
+                    public Map<String, String> loadedUids() {
+                        return loaded;
+                    }
+
+                    @Override
+                    public Map<String, Optional<String>> onDisk() {
+                        return disk.scan();
+                    }
+                },
+                world -> table.changes++,
+                () -> adoptLoaded);
     }
 
     @Test
@@ -92,13 +98,92 @@ class WorldServerAdoptionTest {
         assertThat(table.adoptedWith).isNull();
     }
 
+    @Test
+    void copiesTheClaimCommittedReachTheCacheEvenWhenTheAdoptAfterItFails() {
+        table.claims = new WorldServerClaimer.Claims(true, List.of("world"), List.of());
+        table.adoptFailure = new PersistenceException("database gone");
+
+        start(Map.of("world", "uid-1"), Map::of, true);
+
+        assertThat(table.changes).isOne();
+        assertThat(reconciledAfterClaim.get()).isFalse();
+        assertThat(log.errors)
+                .singleElement()
+                .satisfies(line -> assertThat(line)
+                        .contains("event=world_server_claim_failed")
+                        .contains("reason=adopt"));
+    }
+
+    @Test
+    void aWorldAdoptedFromTheTemplateOfAnotherWorldOfItsNameIsWarnedAbout() {
+        table.adoptConflicts = List.of("arena");
+
+        start(Map.of("arena", "uid-2"), Map::of, true);
+
+        assertThat(log.warnings)
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("event=world_server_claim_conflict"));
+    }
+
+    @Test
+    void aClaimByNameWhoseWriteFailedButLeftTheWorldHereIsLoggedAndReachesTheCache() {
+        table.claimNamedFailure = new PersistenceException("connection lost at commit");
+        table.kept = true;
+
+        boolean claimed = adoption(Map.of(), Map::of, false).claim(WorldName.of("arena"));
+
+        assertThat(claimed).isFalse();
+        assertThat(table.changes).isOne();
+        assertThat(log.errors)
+                .singleElement()
+                .satisfies(line -> assertThat(line).contains("event=world_server_claim_uncertain"));
+    }
+
+    @Test
+    void aClaimByNameWhoseWriteFailedAndLeftNothingFails() {
+        PersistenceException failure = new PersistenceException("database gone");
+        table.claimNamedFailure = failure;
+
+        assertThatThrownBy(() -> adoption(Map.of(), Map::of, false).claim(WorldName.of("arena")))
+                .isSameAs(failure);
+        assertThat(table.changes).isZero();
+    }
+
+    @Test
+    void aClaimByNameWhoseWriteAndFollowUpReadBothFailReportsTheWriteFailure() {
+        PersistenceException failure = new PersistenceException("database gone");
+        PersistenceException unreadable = new PersistenceException("still gone");
+        table.claimNamedFailure = failure;
+        table.keepsFailure = unreadable;
+
+        assertThatThrownBy(() -> adoption(Map.of(), Map::of, false).claim(WorldName.of("arena")))
+                .isSameAs(failure)
+                .satisfies(thrown -> assertThat(thrown.getSuppressed()).containsExactly(unreadable));
+        assertThat(table.changes).isZero();
+    }
+
     @FunctionalInterface
     private interface Disk {
         Map<String, Optional<String>> scan();
     }
 
-    /** A world table whose start-up claim has run already and whose adopt copies every loaded world it is given. */
+    /**
+     * A world table whose start-up claim has run already unless told otherwise, and whose adopt copies every loaded
+     * world it is given.
+     */
     private static final class Table implements WorldServerAdoption.Store {
+
+        WorldServerClaimer.Claims claims = new WorldServerClaimer.Claims(false, List.of(), List.of());
+
+        List<String> adoptConflicts = List.of();
+
+        @Nullable RuntimeException adoptFailure;
+
+        @Nullable RuntimeException claimNamedFailure;
+
+        boolean kept;
+
+        @Nullable RuntimeException keepsFailure;
 
         @Nullable Collection<String> claimedWith;
 
@@ -113,18 +198,32 @@ class WorldServerAdoptionTest {
                 String server, Collection<String> present, Map<String, String> uids) {
             claimedWith = List.copyOf(present);
             uidsWith = Map.copyOf(uids);
-            return new WorldServerClaimer.Claims(false, List.of(), List.of());
+            return claims;
         }
 
         @Override
-        public List<String> adoptLoaded(String server, Map<String, String> loadedUids) {
+        public WorldServerClaimer.Claims adoptLoaded(String server, Map<String, String> loadedUids) {
+            if (adoptFailure != null) {
+                throw adoptFailure;
+            }
             adoptedWith = Map.copyOf(loadedUids);
-            return List.copyOf(loadedUids.keySet());
+            return new WorldServerClaimer.Claims(true, List.copyOf(loadedUids.keySet()), adoptConflicts);
         }
 
         @Override
         public boolean claimNamed(String server, String name) {
+            if (claimNamedFailure != null) {
+                throw claimNamedFailure;
+            }
             return false;
+        }
+
+        @Override
+        public boolean keeps(String server, String name) {
+            if (keepsFailure != null) {
+                throw keepsFailure;
+            }
+            return kept;
         }
 
         @Override
@@ -137,6 +236,8 @@ class WorldServerAdoptionTest {
 
         final List<String> warnings = new ArrayList<>();
 
+        final List<String> errors = new ArrayList<>();
+
         @Override
         public void info(String message, Object... args) {}
 
@@ -146,7 +247,9 @@ class WorldServerAdoptionTest {
         }
 
         @Override
-        public void error(String message, Throwable cause) {}
+        public void error(String message, Throwable cause) {
+            errors.add(message);
+        }
 
         @Override
         public void debug(String message, Object... args) {}

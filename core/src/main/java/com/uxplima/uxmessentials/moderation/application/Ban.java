@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
+import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
@@ -53,10 +54,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 public final class Ban {
 
     /**
-     * The far-future span that makes a tempban effectively permanent without overflowing the stored expiry.
-     *
-     * <p>Public because it is the only way to tell the two apart after the fact: a ban stored with this span is a
-     * permanent one, and anything reporting bans outward (the published API, for one) has to say so.
+     * The far-future span that makes a tempban effectively permanent without overflowing the stored expiry. A ban
+     * stored with this span is a permanent one; read it back with {@link #endOf}, not by comparing dates.
      */
     public static final Duration PERMANENT_SPAN = Duration.ofDays(365_000L);
 
@@ -103,6 +102,21 @@ public final class Ban {
         this.strictness = Objects.requireNonNull(strictness, "strictness");
         this.ipHistory = Objects.requireNonNull(ipHistory, "ipHistory");
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /**
+     * When {@code ban} ends, or empty for a permanent ban. Anything that shows a ban outside this package (the
+     * published API, a placeholder) reads it here, so a permanent ban never surfaces as a date a thousand years
+     * out.
+     */
+    public static Optional<Instant> endOf(TempbanState.Active ban) {
+        return SanctionStrength.endOf(ban);
+    }
+
+    /** {@link #endOf(TempbanState.Active)} for a row of the active-ban list. */
+    public static Optional<Instant> endOf(BanEntry ban) {
+        Objects.requireNonNull(ban, "ban");
+        return SanctionStrength.endOf(ban.issuedAt(), ban.until());
     }
 
     /**
@@ -183,7 +197,7 @@ public final class Ban {
     }
 
     private static boolean capped(TempbanState.Active ban) {
-        return spanOf(ban).compareTo(PERMANENT_SPAN) < 0;
+        return SanctionStrength.endOf(ban).isPresent();
     }
 
     private static String label(TempbanState.Active ban) {
@@ -202,7 +216,7 @@ public final class Ban {
         Duration effective = spanOf(ban);
         Instant expiry = ban.until();
         history.ban(actor, target, reason, capped ? Optional.of(expiry) : Optional.empty());
-        kickNow(target, capped, effective, reason);
+        BanScreen.of(ban, now).kick(sanctions, notifier, target);
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, label(ban), true, reason);
         notifier.send(actor, ModerationMessageKey.BAN_APPLIED, Map.of("player", target.name()));
@@ -244,18 +258,6 @@ public final class Ban {
             audit.ipBanned(actor, ip, Optional.of(target.uuid()), durationLabel, true, reason);
         }
         notifier.send(actor, ModerationMessageKey.MOD_BAN_STRICT_IP, Map.of("count", Integer.toString(ips.size())));
-    }
-
-    private void kickNow(PlayerRef target, boolean capped, Duration effective, Optional<String> reason) {
-        if (capped) {
-            MessageKey key = ModerationMessageKey.TEMPBAN_KICK;
-            Map<String, String> ph =
-                    Map.of("duration", SanctionDuration.format(effective), "reason", reason.orElse(""));
-            sanctions.kick(target, key, notifier.render(target, key, ph));
-            return;
-        }
-        MessageKey key = ModerationMessageKey.BAN_KICK;
-        sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
     }
 
     private static MessageKey broadcastKey(boolean capped) {

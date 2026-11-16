@@ -7,6 +7,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -28,17 +29,14 @@ import org.jspecify.annotations.NullMarked;
  * <p>Every "active" read is clock-gated with the injected {@link Clock} exactly as {@code CheckBan}/
  * {@code CheckMute} are ({@code state.isActiveAt(clock.instant())}), so an expired tempban or timed mute reads
  * as not banned/muted even before the sweep removes its row. A permanent {@code /ban} is recorded as a tempban
- * with a far-future expiry, so a remaining wait beyond {@link #PERMANENT_THRESHOLD} is rendered as permanent
- * (empty remaining), matching the permanent {@code /mute} shape.
+ * with a far-future expiry, read back through {@link Ban#endOf} and rendered as permanent (empty remaining), matching
+ * the permanent {@code /mute} shape.
  *
  * <p>When the moderation module is disabled this adapter is never registered; the resolver degrades the
  * boolean keys to "no" and the rest to the dash when the seam is absent.
  */
 @NullMarked
 public final class GateModerationPlaceholders implements ModerationPlaceholders {
-
-    /** A remaining wait beyond a century is a permanent {@code /ban}'s far-future row, not a real tempban. */
-    private static final Duration PERMANENT_THRESHOLD = Duration.ofDays(36_500L);
 
     private final MutePolicy mutePolicy;
     private final JailGate jailGate;
@@ -85,7 +83,8 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
         Objects.requireNonNull(who, "who");
         Instant now = clock.instant();
         if (repository.loadTempban(who) instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
-            return Optional.of(view(banRemaining(now, ban.until()), ban.reason(), ban.issuer()));
+            Optional<Duration> remaining = Ban.endOf(ban).map(end -> positive(Duration.between(now, end)));
+            return Optional.of(view(remaining, ban.reason(), ban.issuer()));
         }
         return Optional.empty();
     }
@@ -132,12 +131,6 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
             return Optional.of(positive(jail.remaining().get()));
         }
         return jail.until().map(until -> positive(Duration.between(now, until)));
-    }
-
-    /** A ban's remaining wait, or empty when its far-future expiry marks it permanent. */
-    private static Optional<Duration> banRemaining(Instant now, Instant until) {
-        Duration remaining = positive(Duration.between(now, until));
-        return remaining.compareTo(PERMANENT_THRESHOLD) >= 0 ? Optional.empty() : Optional.of(remaining);
     }
 
     private static SanctionView view(Optional<Duration> remaining, Optional<String> reason, Issuer issuer) {

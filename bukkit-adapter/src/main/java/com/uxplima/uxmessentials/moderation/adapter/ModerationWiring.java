@@ -718,7 +718,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(apiWrites, "apiWrites");
         }
 
-        /** Drop the session-scoped freeze and commandspy sets. Called on module stop. */
+        /** Drop the in-memory freeze and commandspy sets. Called on module stop. */
         public void stop() {
             sanctions.clear();
             commandSpyStore.clear();

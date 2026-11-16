@@ -22,11 +22,11 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * {@code /tempban <player> <duration> [reason]}: ban a player until a wall-clock expiry. Unlike a mute or
- * jail there is no permanent form (a permanent ban is {@code /ban}) so a blank/malformed/zero duration is refused.
+ * jail there is no permanent form (a permanent ban is {@code /ban}) so a blank/malformed/zero duration is refused, and
+ * so is one as long as the far-future span a permanent ban is stored with ({@link Ban#PERMANENT_SPAN}).
  * The exempt target is refused, and so is a target whose running ban would outlast this one. On success the ban
  * row is stored ({@link GuardedBanWrite}, so a ban landing at the same moment elsewhere is never overwritten
  * blindly), an online target is kicked immediately via {@link Sanctions}, {@code PlayerTempbanned} is
@@ -94,6 +94,9 @@ public final class TempBan {
             // A tempban must be timed: a permanent or malformed input is BAD_DURATION (no permanent tempban).
             return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
+        if (tooLong(requested.get())) {
+            return rejectTooLong(actor, target, rawDuration, reason);
+        }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
         TempbanState.Active ban = proposal(actor, span, reason, now);
@@ -135,6 +138,9 @@ public final class TempBan {
         if (requested.isEmpty()) {
             return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
+        if (tooLong(requested.get())) {
+            return rejectTooLong(actor, target, rawDuration, reason);
+        }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
         TempbanState.Active ban = proposal(actor, span, reason, now);
@@ -165,7 +171,7 @@ public final class TempBan {
             boolean silent,
             Instant now) {
         history.ban(actor, target, reason, Optional.of(ban.until()));
-        kickNow(target, span, reason);
+        BanScreen.of(ban, now).kick(sanctions, notifier, target);
         // The local kick removed the target here; this wakes peers that have them online (a no-op with no bus).
         sync.banChanged(target);
         events.publish(new PlayerTempbanned(target, ban, now));
@@ -194,10 +200,20 @@ public final class TempBan {
         notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
     }
 
-    private void kickNow(PlayerRef target, Duration span, Optional<String> reason) {
-        Map<String, String> ph = Map.of("duration", SanctionDuration.format(span), "reason", reason.orElse(""));
-        MessageKey key = ModerationMessageKey.TEMPBAN_KICK;
-        sanctions.kick(target, key, notifier.render(target, key, ph));
+    /**
+     * True for a span that reaches the far-future stand-in a permanent ban is stored with: stored, it would read as a
+     * permanent ban everywhere it is shown, while its own messages, history and audit called it a tempban.
+     */
+    private static boolean tooLong(Duration span) {
+        return span.compareTo(Ban.PERMANENT_SPAN) >= 0;
+    }
+
+    /** Refuse a span too long for a tempban, pointing the actor at {@code /ban}. */
+    private <T> Result<T, ModerationError> rejectTooLong(
+            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason) {
+        audit.tempbanned(actor, target, rawDuration, false, reason);
+        notifier.send(actor, ModerationMessageKey.TEMPBAN_TOO_LONG);
+        return Result.err(ModerationError.BAD_DURATION);
     }
 
     private <T> Result<T, ModerationError> reject(

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -44,17 +45,24 @@ public final class ListBans {
             return;
         }
         notifier.send(actor, ModerationMessageKey.BANLIST_HEADER, Map.of("count", Integer.toString(bans.size())));
-        bans.forEach(ban -> notifier.send(actor, ModerationMessageKey.BANLIST_ENTRY, entry(ban)));
+        bans.forEach(ban -> notifier.send(actor, ModerationMessageKey.BANLIST_ENTRY, entry(actor, ban)));
     }
 
-    private Map<String, String> entry(BanEntry ban) {
+    private Map<String, String> entry(PlayerRef viewer, BanEntry ban) {
         String name = players.findByUuid(ban.target())
                 .map(PlayerRef::name)
                 .orElseGet(() -> ban.target().toString());
         return Map.of(
-                "player", name,
-                "issuer", ban.issuer().name(),
-                "reason", ban.reason().orElse(""),
-                "expires", ban.until().toString());
+                "player",
+                name,
+                "issuer",
+                ban.issuer().name(),
+                "reason",
+                ban.reason().orElse(""),
+                "expires",
+                Ban.endOf(ban)
+                        .map(Instant::toString)
+                        .orElseGet(
+                                () -> notifier.render(viewer, ModerationMessageKey.MOD_GUI_VALUE_PERMANENT, Map.of())));
     }
 }

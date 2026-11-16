@@ -21,6 +21,12 @@ public enum HopNotice {
     /** The hop could not be started at all. */
     UNAVAILABLE,
 
+    /**
+     * The hop was not started because another hop of the same player is still under way. The destination is fine,
+     * so this must not read like {@link #UNAVAILABLE}.
+     */
+    BUSY,
+
     /** The charge went back. */
     REFUNDED
 }

@@ -38,7 +38,8 @@ public final class ClaimWorld {
             try {
                 answer = claims.claim(name) ? WorldsMessageKey.WORLD_CLAIMED : WorldsMessageKey.WORLD_CLAIM_NONE;
             } catch (RuntimeException failed) {
-                // The write rolled back, so nothing was claimed; the requester still hears back.
+                // The claim failed and the world could not be confirmed as kept here, so whether it was claimed is
+                // uncertain; the requester still hears back.
                 log.error("event=world_server_claim_failed by=command world=" + name.value(), failed);
                 answer = WorldsMessageKey.WORLD_IO_ERROR;
             }
