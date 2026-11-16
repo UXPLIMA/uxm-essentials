@@ -44,6 +44,9 @@ public enum VillagersMessageKey implements MessageKey {
     // Trade manager: the info/help item explaining how to edit, add and remove trades.
     VILLAGERS_MANAGER_HELP("villagers.manager.help"),
 
+    // Trade manager: the /uxmess gui hub tile, which opens the manager for the villager in reach.
+    VILLAGERS_MANAGER_HUB_TILE("villagers.manager.hub-tile"),
+
     // Protection: /villager protect could not find a villager the player is looking at (or within reach).
     VILLAGERS_PROTECT_NO_TARGET("villagers.protect.no-target"),
 

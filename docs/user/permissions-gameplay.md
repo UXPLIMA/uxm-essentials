@@ -105,16 +105,16 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.biome.use` | /biome to show the biome you are standing in. | true |
 | `uxmessentials.depth.use` | /depth to show your height relative to sea level. | true |
 | `uxmessentials.dimension.use` | /dimension to show the dimension you are standing in. | true |
-| `uxmessentials.endersee.use` | /endersee [player] to view a player's ender chest. | op |
+| `uxmessentials.endersee.use` | /endersee [player] (and the endersee entry on the /uxmess gui hub) to view a player's ender chest. | op |
 | `uxmessentials.getpos.use` | /getpos (/coords /whereami) to show a player's coordinates. | op |
 | `uxmessentials.invsee.modify` | Edit a player's inventory through the /invsee menu (without this it is view-only). | op |
-| `uxmessentials.invsee.use` | /invsee [player] to view a player's inventory. | op |
+| `uxmessentials.invsee.use` | /invsee [player] (and the invsee entry on the /uxmess gui hub) to view a player's inventory. | op |
 | `uxmessentials.near.use` | /near [radius] to list nearby players. | op |
 | `uxmessentials.ping.use` | /ping to show a player's round-trip latency. | true |
 | `uxmessentials.playtime.import` | /playtime import <player>\|all to bring the server's vanilla playtime into the tracked total (naming another player also needs uxmessentials.playerstate.others). | op |
 | `uxmessentials.playtime.reset` | /playtime reset [player] to wipe a player's tracked playtime (resetting others also needs uxmessentials.playerstate.others). | op |
 | `uxmessentials.playtime.set` | /playtime set\|add\|take <player> <time> to correct a player's all-time playtime (naming another player also needs uxmessentials.playerstate.others). | op |
-| `uxmessentials.playtime.use` | /playtime [player] to show a player's playtime breakdown (active/afk, today/week/month/all-time). | op |
+| `uxmessentials.playtime.use` | /playtime [player] (and your own panel from the /uxmess gui hub) to show a player's playtime breakdown (active/afk, today/week/month/all-time). | op |
 | `uxmessentials.seed.use` | /seed to show the seed of the world you are standing in. | true |
 | `uxmessentials.bypass.blocked-commands.world` | Run commands a world blocks through its per-world command list. | op |
 | `uxmessentials.world.use` | /world to show the world you are standing in, and /worlds to reach the world manager. | true |
@@ -265,7 +265,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.module.trade` | Hot-reload / inspect the trade module. | op |
-| `uxmessentials.trade.use` | /trade: request a trade with another player and accept or deny requests. | true |
+| `uxmessentials.trade.use` | /trade (and the trade entry on the /uxmess gui hub): request a trade with another player and accept or deny requests. | true |
 
 ## vaults
 
@@ -290,7 +290,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.villagers.bucket` | Sneak-right-click a villager to pick it up into a captured-villager item, and place it back later. | op |
 | `uxmessentials.villagers.follow` | /villager follow: toggle whether the villager you are looking at pathfinds after you. | op |
 | `uxmessentials.villagers.leash` | Right-click a villager with a lead to leash it, when leashing is enabled. | op |
-| `uxmessentials.villagers.manager` | /villager manager: open and edit the trades of the villager you are looking at. | op |
+| `uxmessentials.villagers.manager` | /villager manager (and the villagers entry on the /uxmess gui hub): open and edit the trades of the villager you are looking at. | op |
 | `uxmessentials.villagers.protect` | /villager protect: toggle whether the villager you are looking at is protected from death and despawn. | op |
 | `uxmessentials.villagers.trade` | Open a villager's trade window directly on right-click, when click-to-trade is enabled. | op |
 | `uxmessentials.villagers.use` | /villager: the root command's base node; its subcommands each gate further on their own node. | op |

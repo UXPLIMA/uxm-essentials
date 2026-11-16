@@ -55,7 +55,11 @@ public enum InvrollbackMessageKey implements MessageKey {
     INVROLLBACK_GUI_SHULKER_NAME("invrollback.gui.shulker-name"),
     INVROLLBACK_GUI_SHULKER_LORE("invrollback.gui.shulker-lore"),
     INVROLLBACK_GUI_PREV("invrollback.gui.prev"),
-    INVROLLBACK_GUI_NEXT("invrollback.gui.next");
+    INVROLLBACK_GUI_NEXT("invrollback.gui.next"),
+
+    // The /uxmess gui hub tile: its name, and the title of the player picker it opens before the snapshot list.
+    INVROLLBACK_GUI_HUB_TILE("invrollback.gui.hub-tile"),
+    INVROLLBACK_GUI_PICK_TITLE("invrollback.gui.pick-title");
 
     private final String key;
 

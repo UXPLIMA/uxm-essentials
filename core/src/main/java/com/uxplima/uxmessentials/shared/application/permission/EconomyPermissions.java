@@ -341,7 +341,7 @@ public final class EconomyPermissions {
                 PermissionSpec.of(MODULE_TRADE, "Hot-reload / inspect the trade module.", PermissionDefault.OP, TRADE),
                 PermissionSpec.of(
                         TRADE_USE,
-                        "/trade: request a trade with another player and accept or deny requests.",
+                        "/trade (and the trade entry on the /uxmess gui hub): request a trade with another player and accept or deny requests.",
                         PermissionDefault.TRUE,
                         TRADE));
     }

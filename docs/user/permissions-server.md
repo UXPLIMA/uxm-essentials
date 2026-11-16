@@ -117,7 +117,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | Permission | What it allows | Default |
 |---|---|---|
 | `uxmessentials.invrollback.export` | /invrestore export <player> <index> packs a snapshot into shulker boxes and gives them to you. | op |
-| `uxmessentials.invrollback.restore` | /invrestore <player> opens the inventory-snapshot restore GUI for a player. | op |
+| `uxmessentials.invrollback.restore` | /invrestore <player> (and the invrollback entry on the /uxmess gui hub) opens the inventory-snapshot restore GUI for a player. | op |
 | `uxmessentials.invrollback.teleport` | /invrestore tp <player> <index> teleports you to where the snapshot was captured. | op |
 | `uxmessentials.module.invrollback` | Hot-reload / inspect the invrollback module (inventory snapshots and restore). | op |
 
