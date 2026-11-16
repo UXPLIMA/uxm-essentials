@@ -181,6 +181,7 @@ public final class NetworkMessageCodec {
                 // Written last: a peer on the older layout stops reading after the level and never sees it.
                 out.writeBoolean(vanish.departed());
                 out.writeLong(vanish.run());
+                out.writeLong(vanish.sequence());
             }
             case GuardChanged guard -> {
                 out.writeUTF(guard.scope());
@@ -326,7 +327,8 @@ public final class NetworkMessageCodec {
                         in.readBoolean(),
                         in.readInt(),
                         readOptionalBoolean(in),
-                        readOptionalLong(in, ServerPing.NO_NONCE));
+                        readOptionalLong(in, ServerPing.NO_NONCE),
+                        readOptionalLong(in, VanishStateChanged.NO_SEQUENCE));
             case GUARD_CHANGED -> new GuardChanged(origin, in.readUTF(), in.readUTF(), in.readUTF());
             case IP_BAN_CHANGED -> new IpBanChanged(origin, in.readUTF());
             case RANK_CHANGED -> new RankChanged(origin, readUuid(in));

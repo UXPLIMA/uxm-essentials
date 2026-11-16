@@ -88,8 +88,11 @@ Plugin messages ride a player's connection, which sets the limits:
   when its first player joins, and warps, spawns, worlds, NPCs, holograms (with who may see them) and the vote
   counter also reload every `network.cache-refresh-seconds` (default 300; `0` turns the timer off). Balances, homes
   and other per-player data expire on their own after a few minutes.
-- Frames waiting for a player are kept in a queue of `network.bus.outbound-queue-size` (default 256). When it is
-  full the oldest frame is dropped.
+- Frames waiting for a player are kept in a queue of `network.bus.outbound-queue-size` (default 256). Only the
+  newest heartbeat waits. When the queue is full, a frame is dropped in this order: the waiting heartbeat, then the
+  oldest ordinary change (warps, homes, holograms and the like), and only when nothing else is waiting the oldest
+  balance, vault, ban, mute, jail, freeze or vanish change. The log reports drops, at most once a minute with the
+  running count. Redis has no such queue: `transport = redis` sends each frame at once.
 - A frame larger than 32767 bytes is never sent; the log reports the drop, at most once a minute.
 - `network.bus-channel` must match the proxy. Leave it as shipped.
 

@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
  * @param enabled whether this backend participates in network sync; {@code false} runs purely local
  * @param serverId this backend's unique id; two backends sharing it corrupt origin routing
  * @param channel the plugin-messaging channel the proxy broker registers
- * @param outboundQueueSize the cap on buffered outbound frames before the oldest are dropped
+ * @param outboundQueueSize the cap on buffered outbound frames before one is dropped
  * @param heartbeatSeconds how often this backend announces its presence with a {@code ServerPing}; a peer
  *     ages out of the {@code /uxmess doctor} count after a few missed beats
  * @param transport which carrier(s) move the bus: the proxy plugin-messaging path, Redis pub/sub, or both
