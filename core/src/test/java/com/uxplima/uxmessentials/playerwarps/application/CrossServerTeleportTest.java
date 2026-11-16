@@ -86,6 +86,9 @@ class CrossServerTeleportTest {
     private static final Duration TTL = Duration.ofSeconds(30);
     private static final Duration SETTLE = Duration.ofSeconds(1);
     private static final WarpCost PRICE = WarpCost.of(new BigDecimal("25.50"), "gold");
+    /** What the charging server's "default" currency is; the landing server must never read "default" itself. */
+    private static final String CHARGING_DEFAULT = "coins";
+
     private static final HopCharge CHARGE = new HopCharge(new BigDecimal("25.50"), "gold");
     private static final Optional<HopSettlement> TO_MARKET = Optional.of(new HopSettlement("7"));
     private static final BigDecimal START = new BigDecimal("100");
@@ -472,6 +475,32 @@ class CrossServerTeleportTest {
         assertThat(moves.made).isEmpty();
         assertThat(wallet()).isEqualByComparingTo(START);
         assertThat(vault()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void theOwnerIsPaidInTheCurrencyTheChargeTookNotInTheLandingServersDefault() {
+        warps.put(marketOn(SURVIVAL).withPrice(WarpCost.of(new BigDecimal("25.50"), "default"), NOW));
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        assertThat(moves.made).containsExactly("Alex->market");
+        assertThat(purse.accruedIn).containsExactly(CHARGING_DEFAULT);
+        assertThat(purse.refundedIn).isEmpty();
+    }
+
+    @Test
+    void aVisitorTheLandingRefusesIsRefundedInTheCurrencyTheChargeTook() {
+        warps.put(marketOn(SURVIVAL).withPrice(WarpCost.of(new BigDecimal("25.50"), "default"), NOW));
+        lobbyGate().useFor(ALEX, MARKET_NAME);
+        moves.refuses = true;
+
+        survival.onArrival(ALEX);
+        scheduler.advance(SETTLE);
+
+        assertThat(purse.refundedIn).containsExactly(CHARGING_DEFAULT);
+        assertThat(purse.accruedIn).isEmpty();
     }
 
     @Test
@@ -946,16 +975,21 @@ class CrossServerTeleportTest {
         private int refunds;
         private boolean accrualFails;
         private boolean refundFails;
+        /** The currency each owner share and each refund was paid in. */
+        private final List<String> accruedIn = new ArrayList<>();
 
+        private final List<String> refundedIn = new ArrayList<>();
+
+        /** Answers the currency taken, with "default" resolved to the charging server's, as the real economy does. */
         @Override
-        public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
+        public Result<String, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
             BigDecimal balance = wallets.getOrDefault(payer.uuid(), BigDecimal.ZERO);
             if (balance.compareTo(price) < 0) {
                 return Result.err(ChargeError.INSUFFICIENT_FUNDS);
             }
             wallets.put(payer.uuid(), balance.subtract(price));
             charges++;
-            return Result.ok();
+            return Result.ok(currencyId.equalsIgnoreCase("default") ? CHARGING_DEFAULT : currencyId);
         }
 
         @Override
@@ -964,6 +998,7 @@ class CrossServerTeleportTest {
                 return Result.err(ChargeError.ACCRUAL_FAILED);
             }
             vaults.merge(warp, price, BigDecimal::add);
+            accruedIn.add(currencyId);
             return Result.ok();
         }
 
@@ -974,6 +1009,7 @@ class CrossServerTeleportTest {
             }
             wallets.merge(to.uuid(), amount, BigDecimal::add);
             refunds++;
+            refundedIn.add(currencyId);
             return Result.ok();
         }
 

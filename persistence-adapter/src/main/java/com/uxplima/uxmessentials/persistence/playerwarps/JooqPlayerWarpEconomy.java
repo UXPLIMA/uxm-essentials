@@ -6,6 +6,7 @@ import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackend;
 import com.uxplima.uxmessentials.economy.application.port.CurrencyBackendRegistry;
@@ -23,6 +24,7 @@ import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import org.jooq.DSLContext;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -66,6 +68,9 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     private final CurrencyRegistry currencies;
     private final CurrencyBackendRegistry backends;
     private final PayoutConfig config;
+    /** Whether a player is on this server, where a currency that cannot be written offline can still reach them. */
+    private final Predicate<UUID> online;
+
     private final Logger log;
 
     public JooqPlayerWarpEconomy(
@@ -74,8 +79,21 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
             CurrencyRegistry currencies,
             CurrencyBackendRegistry backends,
             PayoutConfig config,
+            Predicate<UUID> online,
             Logger log) {
-        super(persistence.dsl());
+        this(persistence.dsl(), economy, currencies, backends, config, online, log);
+    }
+
+    JooqPlayerWarpEconomy(
+            DSLContext dsl,
+            EconomyProvider economy,
+            CurrencyRegistry currencies,
+            CurrencyBackendRegistry backends,
+            PayoutConfig config,
+            Predicate<UUID> online,
+            Logger log) {
+        super(dsl);
+        this.online = Objects.requireNonNull(online, "online");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.currencies = Objects.requireNonNull(currencies, "currencies");
         this.backends = Objects.requireNonNull(backends, "backends");
@@ -84,11 +102,14 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     }
 
     @Override
-    public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
+    public Result<String, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
         Objects.requireNonNull(payer, "payer");
         Objects.requireNonNull(price, "price");
         Objects.requireNonNull(currencyId, "currencyId");
-        return economy.debit(payer, Money.of(resolve(currencyId), price)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
+        Currency currency = resolve(currencyId);
+        return economy.debit(payer, Money.of(currency, price))
+                .map(taken -> currency.id().value())
+                .mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
     }
 
     @Override
@@ -96,11 +117,16 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         Objects.requireNonNull(warp, "warp");
         Objects.requireNonNull(price, "price");
         Objects.requireNonNull(currencyId, "currencyId");
-        Currency currency = resolve(currencyId);
+        Optional<Currency> named = exact(currencyId);
+        if (named.isEmpty()) {
+            log.warn("event=playerwarp_accrue_unknown_currency warp={} currency={}", warp.value(), currencyId);
+            return Result.err(ChargeError.PROVIDER_ERROR);
+        }
+        Currency currency = named.get();
         BigDecimal net = netOf(currency, Money.of(currency, price).amount());
         try {
-            if (bumpBank(warp, net, currency.id().value()) == 0) {
-                return Result.err(ChargeError.ACCRUAL_FAILED);
+            if (bumpBankIn(warp, net, currency.id().value()) == 0) {
+                return payOwnerDirectly(warp, currency, net);
             }
         } catch (RuntimeException accrualFailure) {
             log.error(
@@ -111,6 +137,45 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         }
         autoPayout(warp, currency);
         return Result.ok();
+    }
+
+    /**
+     * The owner's share when the bank could not take it: the warp is gone, or its bank holds money in another
+     * currency, which adding to would relabel. The share then goes straight to the owner in the currency charged;
+     * when it cannot reach them, nothing is paid and the caller gives the visitor's charge back.
+     */
+    private Result<Unit, ChargeError> payOwnerDirectly(PlayerWarpId warp, Currency currency, BigDecimal net) {
+        Money share = Money.of(currency, net);
+        if (payOwner(warp, share)) {
+            log.info(
+                    "event=playerwarp_accrue_paid_direct warp={} currency={} amount={} reason=bank_holds_other_currency",
+                    warp.value(),
+                    currency.id().value(),
+                    net);
+            return Result.ok();
+        }
+        log.warn(
+                "event=playerwarp_accrue_refused warp={} currency={} amount={} reason=bank_currency_mismatch_not_offline",
+                warp.value(),
+                currency.id().value(),
+                net);
+        return Result.err(ChargeError.ACCRUAL_FAILED);
+    }
+
+    /**
+     * Pay money the bank cannot hold straight to the warp's owner. The owner must be on this server unless the
+     * currency can be written for an offline player, since a credit to an absent player in such a currency is lost.
+     * False when the warp is gone or the money could not reach the owner.
+     */
+    private boolean payOwner(PlayerWarpId warp, Money money) {
+        Optional<PlayerRef> owner = ownerOf(warp);
+        if (owner.isEmpty()) {
+            return false;
+        }
+        if (!worksOffline(money.currency()) && !online.test(owner.get().uuid())) {
+            return false;
+        }
+        return economy.credit(owner.get(), money).isOk();
     }
 
     @Override
@@ -125,7 +190,7 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         Currency currency = resolve(bank.currencyId());
         // The guarded zero is the concurrency point: only the withdraw whose read still matches wins, so a
         // concurrent second withdraw updates zero rows and pays nothing rather than double-crediting the owner.
-        if (zeroBank(warp, bank.amount()) == 0) {
+        if (zeroBank(warp, bank.amount(), bank.currencyId()) == 0) {
             return Result.ok();
         }
         Money payout = Money.of(currency, bank.amount());
@@ -187,15 +252,20 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
             return BigDecimal.ZERO;
         }
         BigDecimal use = bank.amount().min(due);
-        return deductBankGuarded(warp, bank.amount(), use) == 0 ? BigDecimal.ZERO : use;
+        return deductBankGuarded(warp, bank.amount(), bank.currencyId(), use) == 0 ? BigDecimal.ZERO : use;
     }
 
-    /** Subtract {@code delta} from the bank only if it still holds exactly {@code expected}; the row count says who won. */
-    private int deductBankGuarded(PlayerWarpId warp, BigDecimal expected, BigDecimal delta) {
+    /**
+     * Subtract {@code delta} from the bank only if it still holds exactly {@code expected} in {@code currencyId}; the
+     * row count says who won. The currency is part of the guard because a bank can empty and refill to the same
+     * amount in another currency between the read and this write.
+     */
+    private int deductBankGuarded(PlayerWarpId warp, BigDecimal expected, String currencyId, BigDecimal delta) {
         return write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, PLAYER_WARPS.EARNED_AMOUNT.sub(delta))
                 .where(PLAYER_WARPS.ID.eq(warp.value()))
                 .and(PLAYER_WARPS.EARNED_AMOUNT.eq(expected))
+                .and(PLAYER_WARPS.EARNED_CURRENCY.eq(currencyId))
                 .execute());
     }
 
@@ -221,8 +291,12 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         Objects.requireNonNull(to, "to");
         Objects.requireNonNull(amount, "amount");
         Objects.requireNonNull(currencyId, "currencyId");
-        Currency currency = resolve(currencyId);
-        return economy.credit(to, Money.of(currency, amount)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
+        Optional<Currency> named = exact(currencyId);
+        if (named.isEmpty()) {
+            log.warn("event=playerwarp_refund_unknown_currency player={} currency={}", to.uuid(), currencyId);
+            return Result.err(ChargeError.PROVIDER_ERROR);
+        }
+        return economy.credit(to, Money.of(named.get(), amount)).mapErr(JooqPlayerWarpEconomy::chargeErrorFor);
     }
 
     @Override
@@ -252,24 +326,32 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
     }
 
     /**
-     * Accrue {@code delta} onto the warp bank as one guarded PK update, recording the currency it now holds, and
-     * return the affected-row count. A {@code 0} means the warp row is gone (a concurrent delete/purge) so nothing
-     * was banked: callers treat that as a failed accrue, not a silent success.
+     * Add {@code delta} to the warp bank as one guarded PK update, recording the currency it now holds, and return the
+     * affected-row count. Only a bank that is empty or already holds {@code currencyId} takes it, so money of one
+     * currency is never added to, and relabelled as, money of another. A {@code 0} means the warp row is gone (a
+     * concurrent delete or purge) or its bank holds another currency: nothing was banked, and callers never treat
+     * that as a silent success.
      */
-    private int bumpBank(PlayerWarpId warp, BigDecimal delta, String currencyId) {
+    private int bumpBankIn(PlayerWarpId warp, BigDecimal delta, String currencyId) {
         return write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, PLAYER_WARPS.EARNED_AMOUNT.add(delta))
                 .set(PLAYER_WARPS.EARNED_CURRENCY, currencyId)
                 .where(PLAYER_WARPS.ID.eq(warp.value()))
+                .and(PLAYER_WARPS.EARNED_AMOUNT.eq(BigDecimal.ZERO).or(PLAYER_WARPS.EARNED_CURRENCY.eq(currencyId)))
                 .execute());
     }
 
-    /** Zero the bank only if it still holds exactly {@code expected}; the row count says whether this call won. */
-    private int zeroBank(PlayerWarpId warp, BigDecimal expected) {
+    /**
+     * Zero the bank only if it still holds exactly {@code expected} in {@code currencyId}; the row count says whether
+     * this call won. The currency is part of the guard, so a bank that emptied and refilled to the same amount in
+     * another currency is not paid out in the one first read.
+     */
+    private int zeroBank(PlayerWarpId warp, BigDecimal expected, String currencyId) {
         return write(dsl -> dsl.update(PLAYER_WARPS)
                 .set(PLAYER_WARPS.EARNED_AMOUNT, BigDecimal.ZERO)
                 .where(PLAYER_WARPS.ID.eq(warp.value()))
                 .and(PLAYER_WARPS.EARNED_AMOUNT.eq(expected))
+                .and(PLAYER_WARPS.EARNED_CURRENCY.eq(currencyId))
                 .execute());
     }
 
@@ -284,17 +366,21 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
         return Result.err(ChargeError.PROVIDER_ERROR);
     }
 
-    /** Best-effort return of a failed payout to the bank; a re-accrue that itself throws is logged, not thrown. */
+    /**
+     * Best-effort return of a failed payout or an unused rent deduction to the bank; a re-accrue that itself throws
+     * is logged, not thrown. The bank takes it back only while it is empty or holds the same currency; when it has
+     * since filled with another one, the money goes straight to the owner instead.
+     */
     private void reAccrue(PlayerWarpId warp, Money payout) {
         try {
-            if (bumpBank(warp, payout.amount(), payout.currency().id().value()) == 0) {
-                // The warp was deleted after its bank had been zeroed, so the money cannot go back onto a row that
-                // no longer exists: it is genuinely lost from the bank. Surface it as an operator-visible
-                // discrepancy rather than discarding the row count and losing it silently.
+            if (bumpBankIn(warp, payout.amount(), payout.currency().id().value()) == 0 && !payOwner(warp, payout)) {
+                // The warp is gone, or its bank holds another currency and the owner cannot be paid directly, so the
+                // money has nowhere to go. Surface it as an operator-visible discrepancy with what was lost.
                 log.error(
                         "event=playerwarp_reaccrue_lost warp=" + warp.value() + " currency="
                                 + payout.currency().id().value() + " amount=" + payout.amount(),
-                        new IllegalStateException("re-accrue affected 0 rows: warp no longer exists"));
+                        new IllegalStateException(
+                                "re-accrue affected 0 rows: warp gone or bank holds another currency"));
             }
         } catch (RuntimeException reAccrualFailure) {
             log.error(
@@ -347,6 +433,20 @@ public final class JooqPlayerWarpEconomy extends JooqRepository implements Playe
                 .filter(currency -> currency.id().value().equalsIgnoreCase(currencyId))
                 .findFirst()
                 .orElse(currencies.defaultCurrency());
+    }
+
+    /**
+     * The currency {@code currencyId} names, and no other: the id a charge answered, so a refund or the owner's share
+     * is paid in the currency taken. {@code "default"} is this server's default, the only reading a record written
+     * before charges resolved it can have. Empty for an id this server does not know.
+     */
+    private Optional<Currency> exact(String currencyId) {
+        if (currencyId.equalsIgnoreCase("default")) {
+            return Optional.of(currencies.defaultCurrency());
+        }
+        return currencies.all().stream()
+                .filter(currency -> currency.id().value().equalsIgnoreCase(currencyId))
+                .findFirst();
     }
 
     private Optional<PlayerRef> ownerOf(PlayerWarpId warp) {

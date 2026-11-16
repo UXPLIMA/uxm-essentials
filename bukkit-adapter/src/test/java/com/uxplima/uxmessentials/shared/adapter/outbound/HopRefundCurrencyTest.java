@@ -80,6 +80,18 @@ class HopRefundCurrencyTest {
     }
 
     @Test
+    void aChargeRecordedAsDefaultBeforeChargesResolvedItIsRefundedInTheRefundingServersDefault() {
+        ProviderWarpEconomy warps = new ProviderWarpEconomy(bank, GEMS, Optional.empty());
+        ProviderHomeEconomy homes = new ProviderHomeEconomy(bank, GEMS, Optional.empty());
+
+        assertThat(warps.refund(ALEX, FEE, "default")).isTrue();
+        assertThat(homes.refund(ALEX, FEE, "default")).isTrue();
+
+        assertThat(bank.balance(ALEX, GEMS).amount()).isEqualByComparingTo("20");
+        assertThat(bank.balance(ALEX, COINS).amount()).isEqualByComparingTo("0");
+    }
+
+    @Test
     void aChargeThePlayerCannotAffordTakesNothingAndNamesNoCurrency() {
         ProviderWarpEconomy warps = new ProviderWarpEconomy(bank, COINS, Optional.empty());
 

@@ -38,14 +38,22 @@ public interface PlayerWarpEconomy {
      * is written later by {@link #accrue}, only once the visitor has actually landed, so a use that is refunded never
      * leaves the owner paid for it. There is no check-then-charge: it either takes in full or reports
      * {@link ChargeError#INSUFFICIENT_FUNDS}.
+     *
+     * <p>Answers the id of the currency the money left in, with {@code "default"} resolved to this server's
+     * currency. The refund and the owner's share name that id, so they are paid in the currency taken even on a
+     * server whose default is another one.
      */
-    Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId);
+    Result<String, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId);
 
     /**
      * Bank the owner's share of {@code price} (the price minus the configured cut) on {@code warp}, for a use whose
      * visitor {@link #charge} debited and who has now landed, here or on another backend. Reports
      * {@link ChargeError#ACCRUAL_FAILED} when nothing was banked (the warp row is gone or the write failed), and the
      * caller then gives the visitor's charge back.
+     *
+     * <p>{@code currencyId} is the id {@link #charge} answered, and the owner is paid in exactly that currency: a bank
+     * that holds another one is paid straight to the owner instead, and an id this server does not know reports
+     * {@link ChargeError#PROVIDER_ERROR} rather than paying in another currency.
      */
     Result<Unit, ChargeError> accrue(PlayerWarpId warp, BigDecimal price, String currencyId);
 
@@ -84,7 +92,11 @@ public interface PlayerWarpEconomy {
      */
     Result<Unit, ChargeError> collectRent(PlayerWarpId warp, PlayerRef owner, BigDecimal amount, String currencyId);
 
-    /** Credit {@code amount} of {@code currencyId} back to {@code to}, used by the refund paths in P7. */
+    /**
+     * Credit {@code amount} of {@code currencyId} back to {@code to}: the refund of a use, with the id {@link #charge}
+     * answered, or a rating reward. Only the currency the id names is credited; an id this server does not know
+     * reports {@link ChargeError#PROVIDER_ERROR}. {@code "default"} is this server's currency.
+     */
     Result<Unit, ChargeError> refund(PlayerRef to, BigDecimal amount, String currencyId);
 
     /**

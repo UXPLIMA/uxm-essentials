@@ -671,6 +671,7 @@ public final class PlayerwarpsWiring {
                 economyCurrencies,
                 economyBackends,
                 new JooqPlayerWarpEconomy.PayoutConfig(cutPercent, autoPayout),
+                kernel.playerLookup()::isOnline,
                 kernel.log());
         return Optional.of(new ReceiptedPlayerWarpEconomy(
                 economy, economyCurrencies, new ChargeReceipts(kernel.messages(), kernel.messageSink())));

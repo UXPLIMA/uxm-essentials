@@ -209,6 +209,10 @@ Both keys are in the root `config.conf` and read on start.
   on wherever a move can land. A player warp's fee goes to its owner only when the visitor arrives.
 - **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
   that has its world.
+- **Currencies.** Define the same currency ids on every server. A paid hop records the currency it was taken in,
+  `default` resolved on the server that charged it, and is refunded, or paid to a player warp's owner, in exactly
+  that one. A server that does not know it neither refunds it nor pays it in another currency: it logs
+  `event=cross_server_hop_refund_failed` with the player, the amount and the currency.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with
   no warmup. An accepted teleport request runs the usual warmup on the mover's server first. Sending a player
   replaces a warmup still running on the server they leave, as a new local teleport does, and refunds it if it was

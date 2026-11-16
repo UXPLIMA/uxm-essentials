@@ -398,9 +398,14 @@ public final class UsePlayerWarp {
         // Either route can still be refunded after this charge (a local warmup can be cancelled, a remote hop can
         // miss), so the owner is paid only once the visitor has landed: the outcome of a local teleport settles it,
         // the cross-server hop settles a remote one.
-        Result<Unit, ChargeError> charged =
+        Result<String, ChargeError> charged =
                 economy.get().charge(actor, warp.price().amount(), warp.price().currencyId());
-        return charged.isErr() ? Admission.refused(PlayerWarpError.CANNOT_AFFORD) : Admission.paid(warp.price());
+        if (charged.isErr()) {
+            return Admission.refused(PlayerWarpError.CANNOT_AFFORD);
+        }
+        // The currency it was taken in, never "default": the owner and a refund on another server must not read
+        // that as their own default currency.
+        return Admission.paid(WarpCost.of(warp.price().amount(), charged.orElseThrow()));
     }
 
     private Result<Unit, PlayerWarpError> refuse(PlayerRef actor, PlayerWarp warp, PlayerWarpError error) {

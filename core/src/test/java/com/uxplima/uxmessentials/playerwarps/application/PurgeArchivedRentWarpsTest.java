@@ -453,7 +453,7 @@ class PurgeArchivedRentWarpsTest {
         }
 
         @Override
-        public Result<Unit, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
+        public Result<String, ChargeError> charge(PlayerRef payer, BigDecimal price, String currencyId) {
             throw new UnsupportedOperationException();
         }
 
