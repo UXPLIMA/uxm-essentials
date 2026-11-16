@@ -30,13 +30,26 @@ public interface NetworkVanishStore {
     long UNKNOWN_RUN = 0L;
 
     /**
-     * Apply a change reported by run {@code run} of peer {@code origin}: record the player vanished, or drop them on a
-     * reveal. A change from a run that already ended is ignored.
+     * The sequence of a frame from a peer that does not number its vanish frames. Such a frame is never older than
+     * another: it is applied in the order it arrives.
      */
-    void apply(String origin, long run, VanishSync change);
+    long UNKNOWN_SEQUENCE = 0L;
 
-    /** Peer {@code origin} says {@code player} left it; their entry from that backend becomes a departure. */
-    void depart(String origin, UUID player);
+    /**
+     * Apply a change reported by run {@code run} of peer {@code origin} as its frame number {@code sequence}: record
+     * the player vanished, or drop them on a reveal. A change from a run that already ended is ignored, and so is one
+     * no newer than the last change or departure of the same player that run reported.
+     *
+     * @return whether the change was applied; a caller acts on it only then
+     */
+    boolean apply(String origin, long run, long sequence, VanishSync change);
+
+    /**
+     * Peer {@code origin} says, in frame number {@code sequence} of its run {@code run}, that {@code player} left it;
+     * their entry from that backend becomes a departure. A departure older than the last frame applied for that player
+     * from the same run is ignored, and a newer one makes any older frame of the run that arrives later count as old.
+     */
+    void depart(String origin, long run, long sequence, UUID player);
 
     /**
      * Run {@code run} of peer {@code origin} sent a heartbeat. When it is the first of a new run ({@code newRun}), every
@@ -69,12 +82,13 @@ public interface NetworkVanishStore {
         INSTANCE;
 
         @Override
-        public void apply(String origin, long run, VanishSync change) {
-            // Nothing to track with cross-server off.
+        public boolean apply(String origin, long run, long sequence, VanishSync change) {
+            // Nothing to track with cross-server off, and nothing to order the change against.
+            return true;
         }
 
         @Override
-        public void depart(String origin, UUID player) {
+        public void depart(String origin, long run, long sequence, UUID player) {
             // Nothing tracked, so nothing to drop.
         }
 

@@ -109,24 +109,24 @@ public final class WarpsWiring {
         Objects.requireNonNull(menus, "menus");
         Objects.requireNonNull(menuBindings, "menuBindings");
         KernelPorts kernel = ctx.kernel();
-        // The cached repository is the read accelerator; the bus listener drops the cached set when a peer
-        // reports a change, and the broadcasting decorator announces this backend's own writes to peers.
+        // The cached repository is the read accelerator; the bus listener reloads the cached set off the tick when a
+        // peer reports a change, and the broadcasting decorator announces this backend's own writes to peers.
         CachedWarpRepository cached = WarpRepositories.cachedConcrete(
                 persistence,
                 com.uxplima.uxmessentials.shared.adapter.outbound.lookup.PlayerNames.resolver(kernel.playerLookup()));
         var categoryRepository = WarpRepositories.categoriesConcrete(persistence);
-        bus.registry().register(WarpSync.listener(cached));
-        // A peer's warp change can also reassign categories, so the same WarpChanged signal that drops the cached
-        // warp set also drops the cached category set; with the bus disabled this listener is never invoked.
+        bus.registry().register(WarpSync.listener(cached, kernel.scheduler()));
+        // A peer's warp change can also reassign categories, so the same WarpChanged signal that reloads the cached
+        // warp set also reloads the cached category set, off the tick and without emptying it, so the warp menu never
+        // loads the categories on its own thread; with the bus disabled this listener is never invoked.
         bus.registry().register(message -> {
             if (message instanceof com.uxplima.uxmessentials.shared.network.WarpChanged) {
-                categoryRepository.invalidateAll();
+                kernel.scheduler().async(() -> categoryRepository.reloadAll());
             }
         });
         // Warm the in-memory warp set once on enable so every later /warp resolve, gate, and tab-complete is
         // served from memory: never a synchronous SQLite read on the command thread. This is the only load on
-        // the single-server path; the cross-server bus listener drops the set on a peer's change and the next
-        // read lazily reloads.
+        // the single-server path; the cross-server bus listener reloads the set off the tick on a peer's change.
         cached.all();
         bus.registry().registerResync(() -> {
             cached.reloadAll();

@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.persistence.warps.CachedWarpRepository;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.network.WarpChanged;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
@@ -19,16 +20,15 @@ import org.jspecify.annotations.NullMarked;
  *   <li><b>Outbound</b>: {@link #repository(CachedWarpRepository, BusPublisher)} wraps the cached repository
  *       so every local warp write ({@code /setwarp}, {@code /delwarp}, move) publishes a {@link WarpChanged}
  *       frame after the durable write commits: peers learn the warp set changed.
- *   <li><b>Inbound</b>: {@link #listener(CachedWarpRepository)} returns a {@link RemoteSyncListener} that, on a
- *       remote {@code WarpChanged}, drops the cached set so the next {@code /warp} on this backend resolves the
- *       fresh rows from the shared DB.
+ *   <li><b>Inbound</b>: {@link #listener(CachedWarpRepository, Scheduler)} returns a {@link RemoteSyncListener}
+ *       that, on a remote {@code WarpChanged}, loads the whole set again on the async lane and swaps it in.
  * </ul>
  *
- * <p>Warps are server-wide rather than per-owner, so the whole set is the invalidation unit: the cache holds
- * the warps under one sentinel key and the listener calls {@link CachedWarpRepository#invalidateAll()}. The
- * frame still carries the changed name for audit context. The decorator wraps the <em>same</em> cache the warp
- * commands read, so the loop closes: a write here emits a frame, the peer's listener drops its cached set
- * there.
+ * <p>Warps are server-wide rather than per-owner, so the whole set is the reload unit, and the listener uses
+ * {@link CachedWarpRepository#reloadAll()}, as the periodic resync does, rather than dropping the set: readers keep
+ * the old set until the fresh one is in, so no {@code /warp} or tab complete loads the warps on the tick. The frame
+ * still carries the changed name for audit context. The decorator wraps the <em>same</em> cache the warp commands
+ * read, so the loop closes: a write here emits a frame, the peer's listener reloads its set there.
  */
 @NullMarked
 public final class WarpSync {
@@ -42,12 +42,13 @@ public final class WarpSync {
         return new Broadcasting(delegate, bus);
     }
 
-    /** A listener that drops the cached warp set on a remote {@link WarpChanged}. */
-    public static RemoteSyncListener listener(CachedWarpRepository cache) {
+    /** A listener that reloads the cached warp set on the async lane on a remote {@link WarpChanged}. */
+    public static RemoteSyncListener listener(CachedWarpRepository cache, Scheduler scheduler) {
         Objects.requireNonNull(cache, "cache");
+        Objects.requireNonNull(scheduler, "scheduler");
         return message -> {
             if (message instanceof WarpChanged) {
-                cache.invalidateAll();
+                scheduler.async(() -> cache.reloadAll());
             }
         };
     }

@@ -20,6 +20,11 @@ import java.util.UUID;
  * backend reported and nothing else. It still carries {@code vanished = true}: a peer that predates the flag then keeps
  * the player hidden instead of reading the departure as a reveal.
  *
+ * <p>Frames can reach a peer late or out of order (the plugin-messaging transport hands each one to its own task, and
+ * the {@code both} transport delivers every frame twice), so each carries a {@code sequence} that grows with every
+ * vanish frame the origin's run sends. A peer applies a frame about a player only when it is newer than the last one
+ * it applied from that origin and run, so an old reveal arriving after a newer vanish cannot show the player.
+ *
  * @param originServer the backend that produced the change
  * @param player the player whose vanish state changed
  * @param playerName the player's name at the moment of the change, for a network-wide roster render
@@ -28,10 +33,22 @@ import java.util.UUID;
  * @param departed {@code true} when the player left the origin backend rather than changed their vanish
  * @param run the boot nonce of the origin's run that sent the frame, the same one its heartbeats carry, so a peer can
  *     drop what an earlier run reported once a new run starts; {@link ServerPing#NO_NONCE} from a peer that predates it
+ * @param sequence the position of this frame among the vanish frames of {@code run}, from 1 up; {@link #NO_SEQUENCE}
+ *     from a peer that predates it
  */
 public record VanishStateChanged(
-        String originServer, UUID player, String playerName, boolean vanished, int level, boolean departed, long run)
+        String originServer,
+        UUID player,
+        String playerName,
+        boolean vanished,
+        int level,
+        boolean departed,
+        long run,
+        long sequence)
         implements NetworkMessage {
+
+    /** The sequence of a frame from a peer that predates it; such a frame is applied in the order it arrives. */
+    public static final long NO_SEQUENCE = 0L;
 
     public VanishStateChanged {
         Objects.requireNonNull(originServer, "originServer");
@@ -50,7 +67,7 @@ public record VanishStateChanged(
 
     /** A change of the player's vanish, not a departure, from a run that names no nonce. */
     public VanishStateChanged(String originServer, UUID player, String playerName, boolean vanished, int level) {
-        this(originServer, player, playerName, vanished, level, false, ServerPing.NO_NONCE);
+        this(originServer, player, playerName, vanished, level, false, ServerPing.NO_NONCE, NO_SEQUENCE);
     }
 
     @Override
