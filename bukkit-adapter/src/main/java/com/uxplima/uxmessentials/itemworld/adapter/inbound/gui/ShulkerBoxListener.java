@@ -70,6 +70,7 @@ public final class ShulkerBoxListener implements Listener {
         view.open(player, BukkitRefs.toRef(player));
     }
 
+    // Sees cancelled clicks too: the lock has to hold even when a listener after this one lets the click through.
     @EventHandler
     public void onClick(InventoryClickEvent event) {
         ShulkerBoxHolder holder = holderOf(event.getView().getTopInventory());
@@ -78,6 +79,7 @@ public final class ShulkerBoxListener implements Listener {
         }
     }
 
+    // Sees cancelled drags too, for the reason onClick gives.
     @EventHandler
     public void onDrag(InventoryDragEvent event) {
         ShulkerBoxHolder holder = holderOf(event.getView().getTopInventory());

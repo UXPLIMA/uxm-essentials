@@ -45,6 +45,9 @@ import org.jspecify.annotations.NullMarked;
  * drops the rider as a passenger, but the rider's {@link PoseSession} would linger unless it is ended too. The quit
  * handler stops each of the carrier's direct riders, so no rider is left with a stuck session once its carrier is
  * gone (a rider stacked on that rider is in turn stopped when its own carrier's session ends).
+ *
+ * <p>The exits see cancelled events too. A pose ends on the attempt: a player who pressed sneak or was hit wants up
+ * whether or not another plugin refused the move, and a refused dismount must not leave them held on a seat.
  */
 @NullMarked
 public final class PoseCancelListener implements Listener {
@@ -69,11 +72,13 @@ public final class PoseCancelListener implements Listener {
         }
     }
 
+    // Sees cancelled teleports too, as the class comment says.
     @EventHandler
     public void onTeleport(PlayerTeleportEvent event) {
         endIfPosing(event.getPlayer(), false);
     }
 
+    // Sees cancelled deaths too, as the class comment says.
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
         // A crawler has no seat to be dismounted from on death (that path ends a sit), so end any pose here and
@@ -88,6 +93,7 @@ public final class PoseCancelListener implements Listener {
         endIfPosing(event.getPlayer(), false);
     }
 
+    // Sees cancelled hits too, as the class comment says.
     @EventHandler
     public void onDamage(EntityDamageEvent event) {
         if (event.getEntity() instanceof Player player) {
@@ -95,6 +101,7 @@ public final class PoseCancelListener implements Listener {
         }
     }
 
+    // Sees cancelled dismounts too, as the class comment says.
     @EventHandler
     public void onDismount(EntityDismountEvent event) {
         if (event.getEntity() instanceof Player player) {
@@ -102,6 +109,7 @@ public final class PoseCancelListener implements Listener {
         }
     }
 
+    // Sees cancelled sneaks too, as the class comment says.
     @EventHandler
     public void onSneak(PlayerToggleSneakEvent event) {
         if (event.isSneaking()) {

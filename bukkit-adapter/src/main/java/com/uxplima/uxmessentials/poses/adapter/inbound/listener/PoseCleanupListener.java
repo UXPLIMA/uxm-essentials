@@ -40,6 +40,8 @@ public final class PoseCleanupListener implements Listener {
         seats.removeSeatsIn(event.getChunk());
     }
 
+    // Sees a cancelled unload too: standing sitters up early is harmless, while a seat left in a world that does
+    // unload is saved with it.
     @EventHandler
     public void onWorldUnload(WorldUnloadEvent event) {
         seats.removeSeatsIn(event.getWorld());

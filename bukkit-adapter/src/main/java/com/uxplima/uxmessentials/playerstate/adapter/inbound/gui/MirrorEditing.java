@@ -188,6 +188,7 @@ public final class MirrorEditing implements Listener {
         }
     }
 
+    // Sees cancelled clicks too: a click in the air arrives cancelled, and its item use still has to be denied.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onInteract(PlayerInteractEvent event) {
         if (edits.holding(event.getPlayer().getUniqueId())) {

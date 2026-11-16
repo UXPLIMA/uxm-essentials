@@ -23,6 +23,7 @@ public final class InspectListener implements Listener {
         this.guard = Objects.requireNonNull(guard, "guard");
     }
 
+    // Sees cancelled clicks too: the inspect tool has to work where another protection already refused the click.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onClick(PlayerInteractEvent event) {
         Block block = event.getClickedBlock();

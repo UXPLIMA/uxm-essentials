@@ -32,6 +32,7 @@ public final class WandListener implements Listener {
         this.selections = Objects.requireNonNull(selections, "selections");
     }
 
+    // Sees cancelled clicks too: the wand has to select blocks where another protection already refused the click.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onClick(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND || !GuardWand.is(event.getItem())) {

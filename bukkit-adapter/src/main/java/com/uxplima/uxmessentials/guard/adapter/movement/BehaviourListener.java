@@ -89,6 +89,7 @@ public final class BehaviourListener implements Listener {
         }
     }
 
+    // Sees cancelled deaths too: the rule is written on the event, so a death a later listener lets through keeps it.
     @EventHandler(priority = EventPriority.HIGH)
     public void onMobExp(EntityDeathEvent event) {
         if (!(event.getEntity() instanceof Player)
@@ -98,6 +99,8 @@ public final class BehaviourListener implements Listener {
         }
     }
 
+    // Sees cancelled deaths too: the keep rules are written on the event, so a death a later listener lets through
+    // keeps them.
     @EventHandler(priority = EventPriority.HIGH)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();

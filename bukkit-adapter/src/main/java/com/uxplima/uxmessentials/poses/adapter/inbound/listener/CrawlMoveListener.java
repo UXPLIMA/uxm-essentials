@@ -42,6 +42,8 @@ public final class CrawlMoveListener implements Listener {
         this.stopPose = Objects.requireNonNull(stopPose, "stopPose");
     }
 
+    // Sees cancelled moves too: a ceiling held over a spot the crawler did not reach is redrawn on the next move, while
+    // a move a later listener lets through and this one skipped would stand the crawler up.
     @EventHandler
     public void onMove(PlayerMoveEvent event) {
         Location from = event.getFrom();

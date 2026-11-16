@@ -31,6 +31,8 @@ public final class CommandNormalizationListener implements Listener {
         this.state = Objects.requireNonNull(state, "state");
     }
 
+    // Sees cancelled commands too: one spelling of the label is what a listener that lets a refused command through
+    // again has to see.
     @EventHandler(priority = EventPriority.LOWEST)
     public void onCommand(PlayerCommandPreprocessEvent event) {
         if (!state.current().config().autoLowercaseBaseCommands()) {

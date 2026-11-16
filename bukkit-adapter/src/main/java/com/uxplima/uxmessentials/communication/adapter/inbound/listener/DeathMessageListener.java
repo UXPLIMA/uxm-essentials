@@ -69,7 +69,7 @@ public final class DeathMessageListener implements Listener {
         this.leftToChat = Objects.requireNonNull(leftToChat, "leftToChat");
     }
 
-    @EventHandler(priority = EventPriority.HIGH)
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onDeath(PlayerDeathEvent event) {
         Player player = event.getEntity();
         if (leftToChat.getAsBoolean()) {

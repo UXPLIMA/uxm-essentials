@@ -42,6 +42,8 @@ public final class InteractListener implements Listener {
         this.guard = Objects.requireNonNull(guard, "guard");
     }
 
+    // Sees cancelled clicks too: a click is judged on its own result fields, since a click in the air arrives
+    // cancelled and a block use another plugin denied can still let the item through.
     @EventHandler(priority = EventPriority.LOW)
     public void onInteract(PlayerInteractEvent event) {
         Block block = event.getClickedBlock();

@@ -36,7 +36,10 @@ public final class SignedVelocityChatListener implements Listener {
         this.queue = Objects.requireNonNull(queue, "queue");
     }
 
-    /** Apply the proxy's chat ruling for this speaker, if one has arrived. */
+    /**
+     * Apply the proxy's chat ruling for this speaker, if one has arrived. Sees cancelled messages too: the ruling
+     * belongs to this message, and one left in the queue would be applied to the next.
+     */
     @EventHandler(priority = EventPriority.LOWEST)
     public void onChat(AsyncChatEvent event) {
         queue.poll(event.getPlayer().getUniqueId(), SignedSource.CHAT).ifPresent(directive -> apply(event, directive));

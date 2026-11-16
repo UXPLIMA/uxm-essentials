@@ -31,6 +31,7 @@ public final class BanknoteListener implements Listener {
         this.redeemer = Objects.requireNonNull(redeemer, "redeemer");
     }
 
+    // Sees cancelled clicks too: the server fires a click in the air already cancelled, and a note is redeemed there.
     @EventHandler(priority = EventPriority.HIGH)
     public void onInteract(PlayerInteractEvent event) {
         if (event.getHand() != EquipmentSlot.HAND) {
