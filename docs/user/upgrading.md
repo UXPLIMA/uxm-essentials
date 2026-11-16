@@ -2,6 +2,24 @@
 
 What an operator edits when a release renames something an operator's own files or permission grants depend on.
 
+## Server warps are open to every player
+
+`uxmessentials.warp.use.<warp>` is asked for every server warp. It is meant to default to every player, but the
+server was never told about the node, so it answered operators only and a player who was not an operator could use
+no server warp and saw none in `/warp list`. A node like it that nobody granted or denied now takes the default the
+permission pages list, so every server warp is open to every player after the upgrade.
+
+To keep a warp closed:
+
+- give the warp a required permission, a node of your own (the `required_permission` column, see
+  [warps.md](warps.md#costs-and-refunds)); not one under `uxmessentials.warp.use.`, which every player holds;
+- or set `uxmessentials.warp.use.<warp>` to false for the groups that must stay out;
+- or set `uxmessentials.warp.use.*` to false and grant single warps back.
+
+A node completed from a name, such as a warp, a kit or a world, now takes its listed default even where the permission
+plugin does not resolve wildcards, and a `.*` above it that you set still decides first. Without a permission plugin
+that resolves wildcards, a literal `uxmessentials.*` grant therefore reaches every such named node but no fixed node.
+
 ## Exemptions and placeholders follow the shared names
 
 Every exemption node now starts with `uxmessentials.bypass.`, and every placeholder reads `%uxm_essentials_<key>%`,

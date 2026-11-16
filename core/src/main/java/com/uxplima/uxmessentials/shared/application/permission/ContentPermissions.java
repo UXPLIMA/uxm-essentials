@@ -689,7 +689,9 @@ public final class ContentPermissions {
                 PermissionSpec.family(
                         kit("<kit>"),
                         "Claim a kit whose file sets permission = true.",
-                        PermissionDefault.TRUE,
+                        // The node is only asked for a kit its file reserves, so a default that every player holds
+                        // would leave the reservation granting nothing.
+                        PermissionDefault.OP,
                         PermissionShape.LABEL,
                         KITS),
                 PermissionSpec.family(
@@ -863,7 +865,9 @@ public final class ContentPermissions {
                 PermissionSpec.family(
                         skinName("<skin>"),
                         "Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone.",
-                        PermissionDefault.TRUE,
+                        // Only a restricted skin asks for its node, so a default every player holds would undo the
+                        // restriction.
+                        PermissionDefault.OP,
                         PermissionShape.LABEL,
                         SKIN),
                 PermissionSpec.family(

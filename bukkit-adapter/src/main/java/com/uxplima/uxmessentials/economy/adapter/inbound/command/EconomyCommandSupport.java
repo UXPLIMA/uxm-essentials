@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandFeedback;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandSuggestions;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -182,8 +183,8 @@ abstract class EconomyCommandSupport {
      */
     final boolean currencyPermitted(Player sender, Currency currency) {
         if (!currency.permissionRequired()
-                || sender.hasPermission(
-                        EconomyPermissions.currency(currency.id().value()))) {
+                || CatalogPermissionCheck.has(
+                        sender, EconomyPermissions.currency(currency.id().value()))) {
             return true;
         }
         services.notifier().send(ref(sender), EconomyMessageKey.CURRENCY_NO_PERMISSION, Map.of());

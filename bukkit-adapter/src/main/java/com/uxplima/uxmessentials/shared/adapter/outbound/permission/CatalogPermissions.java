@@ -23,7 +23,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Only the fixed nodes are registered. A family is a shape completed at runtime from a number or a name
  * ({@code uxmessentials.home.limit.<n>}), so there is nothing finite to hand over; those live in the catalogue for the
- * in-game listing and its export, and the server never needs to know them.
+ * in-game listing and its export. The server answers an unregistered node as operators only, so a family's default
+ * is applied at check time instead, by {@link CatalogPermissionCheck}.
  *
  * <p>Every node is registered, including those of a disabled module, because an operator sets permissions up before
  * they switch a module on, not after. A node another plugin already registered is left alone rather than replaced:

@@ -62,7 +62,7 @@ Contents: [shared](#shared) · [bossbar](#bossbar) · [commandcontrol](#commandc
 | `uxmessentials.communication.clearchat` | /clearchat (alias /chatclear) to flush the chat for online players. | op |
 | `uxmessentials.bypass.clear-chat` | Keep your chat scrollback when staff run /clearchat. | false |
 | `uxmessentials.communication.gui` | Open the communication admin panel (/communication gui and on the /uxmess gui hub). | op |
-| `uxmessentials.communication.info.<page>` | Read one information page, such as /motd or /rules. | true |
+| `uxmessentials.communication.info.<page>` | Read one information page an operator added, such as /discord; the shipped info, motd and rules pages have nodes of their own that every player holds. | op |
 | `uxmessentials.communication.info.info` | /info to read the shipped welcome / quick-start info page. | true |
 | `uxmessentials.communication.info.motd` | /motd to read the shipped message-of-the-day info page. | true |
 | `uxmessentials.communication.info.rules` | /rules to read the shipped server-rules info page. | true |
@@ -275,7 +275,7 @@ The add-on is a separate jar, so its node is kept with the shared ones: in game 
 | `uxmessentials.skin.drop` | /skin drop <player>: delete a stored skin, so their next join derives one afresh. | op |
 | `uxmessentials.skin.info` | /skin info <player>: which skin somebody wears, from where, and when it was set. | op |
 | `uxmessentials.skin.purge` | /skin purge <name>: forget a cached texture so the next lookup goes back to the source. | op |
-| `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | true |
+| `uxmessentials.skin.name.<skin>` | Wear one skin listed under limits.restricted-skins; a skin nobody restricted is open to everyone. | op |
 | `uxmessentials.skin.cooldown.<seconds>` | The wait between skin changes, in seconds; the shortest tier held wins and 0 removes it. | true |
 
 ## staff
