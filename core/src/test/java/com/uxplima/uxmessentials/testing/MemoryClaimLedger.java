@@ -39,6 +39,11 @@ public final class MemoryClaimLedger implements PlayerClaimLedger {
     }
 
     @Override
+    public Set<String> kits(UUID player) {
+        return load(player, Long.MAX_VALUE).kits();
+    }
+
+    @Override
     public boolean claimKit(UUID player, String kit, long claimedAt) {
         return kits.add(player + "/" + kit);
     }

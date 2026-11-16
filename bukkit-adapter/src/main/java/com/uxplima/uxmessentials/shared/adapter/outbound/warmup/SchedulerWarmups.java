@@ -2,11 +2,13 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.warmup;
 
 import java.time.Duration;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
@@ -42,6 +44,17 @@ public final class SchedulerWarmups implements Warmups {
     @Override
     public WarmupHandle begin(
             PlayerRef who, WarmupKind kind, Runnable onComplete, Runnable onCancel, Runnable onSuperseded) {
+        Objects.requireNonNull(onCancel, "onCancel");
+        return begin(who, kind, onComplete, (CancelCause cause) -> onCancel.run(), onSuperseded);
+    }
+
+    @Override
+    public WarmupHandle begin(
+            PlayerRef who,
+            WarmupKind kind,
+            Runnable onComplete,
+            Consumer<CancelCause> onCancel,
+            Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(onComplete, "onComplete");
@@ -59,11 +72,14 @@ public final class SchedulerWarmups implements Warmups {
 
     private void fire(PlayerRef who, PendingWarmup handle) {
         if (handle.isCancelled()) {
-            return; // the owning context already cancelled this warmup; onCancel ran at cancel time
+            // The owning context already cancelled this warmup, a quit included, and onCancel ran at cancel time. The
+            // player is reached by uuid below, so without this check a warmup cancelled on quit would still land on
+            // the same player after a fast relog.
+            return;
         }
         // A player who left during the countdown is gone by the time it ends. Their warmup ends as a cancel rather
         // than silently, so the owner of the warmup can undo what it set up for it, a charge taken up front included.
-        scheduler.onEntity(who, handle::complete, handle::cancel);
+        scheduler.onEntity(who, handle::complete, () -> handle.cancel(CancelCause.QUIT));
     }
 
     private Duration resolveDuration(PlayerRef who, WarmupKind kind) {

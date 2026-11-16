@@ -13,9 +13,11 @@ import com.uxplima.uxmessentials.migration.RecordOutcome;
 import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.convert.SourceId;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedModeration;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
+import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -53,8 +55,8 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
         RecordOutcome outcome = result.outcome();
         switch (rec) {
             case ImportRecord.UserRecord user -> recordUser(source, user, result);
-            case ImportRecord.WarpRecord warp -> recordWarp(source, warp, outcome);
-            case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, outcome);
+            case ImportRecord.WarpRecord warp -> recordWarp(source, warp, result);
+            case ImportRecord.PlayerWarpRecord warp -> recordPlayerWarp(source, warp, result);
             case ImportRecord.KitRecord kit -> recordKit(source, kit, outcome);
             case ImportRecord.ModerationRecord moderation -> recordModeration(source, moderation, outcome);
             case ImportRecord.BanRecord ban -> recordBan(source, ban, outcome);
@@ -105,23 +107,26 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
         return result.notes().isEmpty() ? "" : " " + String.join(" ", result.notes());
     }
 
-    private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordOutcome outcome) {
+    // The notes after ok= say why a warp was held back, such as a world on world-blacklist.
+    private void recordPlayerWarp(SourceId source, ImportRecord.PlayerWarpRecord rec, RecordResult result) {
         audit.info(
-                "event=migration_import_player_warp source={} warp={} owner={} conflict={} ok={}",
+                "event=migration_import_player_warp source={} warp={} owner={} conflict={} ok={}{}",
                 source,
                 rec.warp().name(),
                 rec.warp().owner(),
-                outcome.token(),
-                outcome.ok());
+                result.outcome().token(),
+                result.outcome().ok(),
+                notes(result));
     }
 
-    private void recordWarp(SourceId source, ImportRecord.WarpRecord rec, RecordOutcome outcome) {
+    private void recordWarp(SourceId source, ImportRecord.WarpRecord rec, RecordResult result) {
         audit.info(
-                "event=migration_import_warp source={} warp={} conflict={} ok={}",
+                "event=migration_import_warp source={} warp={} conflict={} ok={}{}",
                 source,
                 rec.warp().warp().name().value(),
-                outcome.token(),
-                outcome.ok());
+                result.outcome().token(),
+                result.outcome().ok(),
+                notes(result));
     }
 
     private void recordKit(SourceId source, ImportRecord.KitRecord rec, RecordOutcome outcome) {
@@ -170,7 +175,7 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
                 "event=migration_import_ban source={} uuid={} until={} conflict={} ok={}",
                 source,
                 rec.target().uuid(),
-                until(rec.ban().expiry()),
+                until(banEnd(rec.ban())),
                 outcome.token(),
                 outcome.ok());
     }
@@ -201,6 +206,11 @@ public final class AuditChannelMigrationAudit implements MigrationAudit {
 
     private static String jailUntil(ModerationProfile profile) {
         return profile.jail() instanceof JailState.Active active ? until(active.until()) : "permanent";
+    }
+
+    /** When an imported ban ends, empty for a permanent one rather than its far-future stored expiry. */
+    private static Optional<Instant> banEnd(TempbanState ban) {
+        return ban instanceof TempbanState.Active active ? Ban.endOf(active) : ban.expiry();
     }
 
     private static String until(Optional<Instant> expiry) {

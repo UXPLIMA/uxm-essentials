@@ -30,16 +30,15 @@ import org.jspecify.annotations.NullMarked;
  * the act-on-sanction nodes so the power to mass-revoke is granted deliberately.
  *
  * <p>The staff member resolves online-first, then from the profile cache, so a since-logged-off (or rogue,
- * already-removed) account is still reachable. The {@code limit} defaults to {@link #DEFAULT_LIMIT} and is
- * clamped to {@link #MAX_LIMIT} so the bounded history scan stays within budget; the whole rollback is hopped off
- * the tick thread through the {@link Scheduler} port since it issues a string of DB writes.
+ * already-removed) account is still reachable. The {@code limit} defaults to {@link #DEFAULT_LIMIT}; the use case
+ * lowers one above its maximum and says so. The whole rollback is hopped off the tick thread through the
+ * {@link Scheduler} port since it issues a string of DB writes.
  */
 @NullMarked
 public final class StaffRollbackCommand extends ModerationCommandSupport implements CommandRegistration {
 
     private static final String PERMISSION = EnforcementPermissions.MODERATION_STAFFROLLBACK;
     private static final int DEFAULT_LIMIT = 100;
-    private static final int MAX_LIMIT = 500;
 
     private final Scheduler scheduler;
 
@@ -67,8 +66,7 @@ public final class StaffRollbackCommand extends ModerationCommandSupport impleme
     private int run(CommandContext<CommandSourceStack> ctx, int requested) {
         PlayerRef actor = actor(ctx);
         Optional<PlayerRef> staff = targetByName(ctx, ctx.getArgument("staff", String.class));
-        int limit = Math.min(requested, MAX_LIMIT);
-        staff.ifPresent(member -> scheduler.async(() -> services.staffRollback().rollback(actor, member, limit)));
+        staff.ifPresent(member -> scheduler.async(() -> services.staffRollback().rollback(actor, member, requested)));
         return Command.SINGLE_SUCCESS;
     }
 }

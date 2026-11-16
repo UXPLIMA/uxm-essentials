@@ -19,6 +19,9 @@ public interface PlayerClaimLedger {
     /** The kits {@code player} has claimed and every cooldown of theirs that is still running at {@code now}. */
     Claims load(UUID player, long now);
 
+    /** The ids of the one-time kits {@code player} has claimed, read without changing anything. */
+    Set<String> kits(UUID player);
+
     /**
      * Record that {@code player} claimed the one-time kit {@code kit}, only if nobody recorded it first. True only
      * for the call whose insert landed; every later call for the same player and kit answers false.

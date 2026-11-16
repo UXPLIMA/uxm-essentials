@@ -1,9 +1,11 @@
 package com.uxplima.uxmessentials.warps.domain;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
@@ -205,6 +207,15 @@ public record Warp(
         return toBuilder()
                 .server(Optional.of(Objects.requireNonNull(onServer, "onServer")))
                 .build();
+    }
+
+    /**
+     * The cooldown this warp sets in its editor, on a clock of its own named after the warp, so a warp with a long
+     * wait never holds back another warp that sets a short one.
+     */
+    public Optional<OwnCooldown> ownCooldown() {
+        return cooldownOverrideSeconds.map(
+                seconds -> new OwnCooldown("warp." + name.value(), Duration.ofMillis((long) (seconds * 1000))));
     }
 
     /** True when the warp is known to live on a backend other than {@code localServer}. */

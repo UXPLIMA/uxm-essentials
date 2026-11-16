@@ -11,6 +11,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -163,7 +164,8 @@ class TeleportWarmupCooldownTest {
     @Test
     void aDestinationCooldownOverrideRunsOnItsOwnClock() {
         TeleportEngine engine = engine();
-        Destination shop = Destination.at(HOME, Optional.empty(), Optional.of(Duration.ofSeconds(5)));
+        Destination shop = Destination.at(
+                HOME, Optional.empty(), Optional.of(new OwnCooldown("warp.shop", Duration.ofSeconds(5))));
         engine.launch(ALEX, shop, TeleportKind.WARP);
         warmups.finish();
 

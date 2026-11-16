@@ -28,9 +28,10 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /tempmute <player> <duration> [-s] [reason]}: the explicit-duration alias of {@code /mute}. The
- * duration is mandatory here; otherwise it shares the {@code Mute} use case and the same {@code moderation.mute}
- * node. A leading {@code -s} in the reason suppresses the staff broadcast.
+ * {@code /tempmute <player> <duration> [-s] [reason]}: the timed form of {@code /mute}. The duration is
+ * mandatory and must be a real span: {@code perm} is refused, as {@code /tempban} refuses it. Otherwise it shares
+ * the {@code Mute} use case and the same {@code moderation.mute} node. A leading {@code -s} in the reason
+ * suppresses the staff broadcast.
  *
  * <p>Bare {@code /tempmute} (no arguments) opens the player-picker → duration-picker → confirm GUI flow when the
  * command's catalog {@code gui} flag is on: {@link #guiRoot()} returns the opener and the shared
@@ -91,7 +92,8 @@ public final class TempmuteCommand extends ModerationCommandSupport implements C
         String duration = ctx.getArgument("duration", String.class);
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.mute().mute(actor, to, duration, parsed.reason(), parsed.silent()));
+        target.ifPresent(to -> offTick(
+                actor, to, () -> services.mute().tempmute(actor, to, duration, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

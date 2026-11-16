@@ -33,6 +33,14 @@ public final class QueuedScheduler implements Scheduler {
         gone.add(player.uuid());
     }
 
+    /** Run the next queued task only, leaving whatever it queues for later. */
+    public void runNext() {
+        Runnable next = lastFirst ? tasks.pollLast() : tasks.pollFirst();
+        if (next != null) {
+            next.run();
+        }
+    }
+
     /** Run queued tasks, and the tasks they queue, until none are left. */
     public void runAll() {
         while (!tasks.isEmpty()) {

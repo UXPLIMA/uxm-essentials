@@ -99,7 +99,7 @@ public final class HomeHops {
 
     /**
      * The hop to {@code home}: owner and slot as the reference, and no cooldown override, so the origin's gate checks
-     * the home cooldown key the landing stamps.
+     * the home cooldown key the target stamps, whichever phase the stamp happens at.
      */
     static HopDeparture departureOf(Home home) {
         return new HopDeparture(

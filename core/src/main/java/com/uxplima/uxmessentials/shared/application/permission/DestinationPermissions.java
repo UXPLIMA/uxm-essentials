@@ -132,6 +132,14 @@ public final class DestinationPermissions {
         return WARP_USE_PREFIX + warp;
     }
 
+    /**
+     * The head of the player-warp quota in one world; the number held is appended to it. It caps the owner's warps in
+     * {@code world} only, beside the {@link #PWARP_LIMIT} cap on all of them.
+     */
+    public static String pwarpWorldLimit(String world) {
+        return PWARP_LIMIT + "." + world;
+    }
+
     /** The node a player needs to enter {@code world} when it is restricted. */
     public static String worldEnter(String world) {
         return WORLD_PREFIX + world + ".enter";
@@ -219,18 +227,19 @@ public final class DestinationPermissions {
                         "Use a warp whose destination fails the safety check.",
                         PermissionDefault.OP,
                         WARPS),
-                PermissionSpec.of(WARP_DELETE, "/delwarp <name> to remove a warp.", PermissionDefault.OP, WARPS),
+                PermissionSpec.of(WARP_DELETE, "/warp del <name> to remove a warp.", PermissionDefault.OP, WARPS),
                 PermissionSpec.of(
                         WARP_EDIT,
-                        "/warp editor <name> to open the warp editor (cost, gates, effects, welcome message, icon).",
+                        "/warp editor [name] to open the warp manager, or one warp's editor (icon, category, lock, password, welcome messages, sounds, particles, warmup and cooldown).",
                         PermissionDefault.OP,
                         WARPS),
                 PermissionSpec.of(
                         WARP_INFO,
-                        "/warpinfo <name> to show a warp's owner, creation time and cost.",
+                        "/warp info <name> to show a warp's owner, creation time, cost and required permission.",
                         PermissionDefault.TRUE,
                         WARPS),
-                PermissionSpec.of(WARP_LIST, "/warps to list the warps you may use.", PermissionDefault.TRUE, WARPS),
+                PermissionSpec.of(
+                        WARP_LIST, "/warp list to list the warps you may use.", PermissionDefault.TRUE, WARPS),
                 PermissionSpec.of(
                         WARP_LOCK,
                         "/warp lock <name> to lock or unlock a warp against use.",
@@ -238,7 +247,7 @@ public final class DestinationPermissions {
                         WARPS),
                 PermissionSpec.of(
                         WARP_MOVE,
-                        "/movewarp <name> to move an existing warp to your current location.",
+                        "/warp move <name> to move an existing warp to your current location, or to a given one with at.",
                         PermissionDefault.OP,
                         WARPS),
                 PermissionSpec.of(
@@ -248,11 +257,14 @@ public final class DestinationPermissions {
                         WARPS),
                 PermissionSpec.of(
                         WARP_PASSWORD,
-                        "/warp password <name> to set or clear a warp's access password.",
+                        "/warp password <name> [password] to set a warp's access password, or clear it when none is given.",
                         PermissionDefault.OP,
                         WARPS),
                 PermissionSpec.of(
-                        WARP_SET, "/setwarp <name> to create or move a server-wide warp.", PermissionDefault.OP, WARPS),
+                        WARP_SET,
+                        "/warp create <name> to create a server-wide warp, or move one that exists, at your location or a given one.",
+                        PermissionDefault.OP,
+                        WARPS),
                 PermissionSpec.of(
                         WARP_SETSERVER,
                         "/warp setserver <name|all> [server] to record which server a warp lives on without moving it.",
@@ -325,7 +337,13 @@ public final class DestinationPermissions {
                         PLAYERWARPS),
                 PermissionSpec.family(
                         PWARP_LIMIT + ".<n>",
-                        "How many player warps you may own; the largest tier held wins.",
+                        "How many player warps you may own across every world; the largest tier held wins.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.QUOTA,
+                        PLAYERWARPS),
+                PermissionSpec.family(
+                        pwarpWorldLimit("<world>") + ".<n>",
+                        "How many player warps you may own in one world, counting only your warps there; the largest tier held wins. The limit across every world still applies.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
                         PLAYERWARPS),
@@ -447,7 +465,7 @@ public final class DestinationPermissions {
                         PLAYERWARPS),
                 PermissionSpec.of(
                         PWARP_USE,
-                        "/pwarp <name> [owner] to teleport to your own or a player's public warp.",
+                        "/pwarp <name> [password] to teleport to a player warp you may enter; a password warp takes its password.",
                         PermissionDefault.TRUE,
                         PLAYERWARPS));
     }

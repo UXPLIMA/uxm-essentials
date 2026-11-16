@@ -8,13 +8,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * The target-side immunity check every sanction consults: a target holding the exempt node
- * ({@code uxmessentials.bypass.punishment}) cannot be muted, jailed, tempbanned, kicked, warned, IP-banned or
- * frozen by lower staff. Centralised here so every use case applies the exact same
+ * ({@code uxmessentials.bypass.punishment}) cannot be banned, muted, jailed, tempbanned, kicked, warned, IP-banned or
+ * frozen by anyone. Centralised here so every use case applies the exact same
  * gate and the node name lives in one place.
  *
  * <p>The check is intentionally a plain node lookup through the kernel {@link Permissions} port: there is no
- * staff-rank ladder in scope (warn-escalation ladders are explicitly out of charter), so "lower staff" means
- * "anyone; the exempt holder is simply immune". A future rank model would refine this one method.
+ * staff-rank ladder in scope (warn-escalation ladders are explicitly out of charter), so the exempt holder is
+ * immune to every actor, the console included. A future rank model would refine this one method.
  */
 public final class ModerationGuard {
 

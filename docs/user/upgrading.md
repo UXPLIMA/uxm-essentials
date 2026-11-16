@@ -21,6 +21,24 @@ names the key and `/uxmess doctor` reads `proxy OFF`. Redis is not affected.
 Keep the clocks of the backends in time: a frame signed more than 60 seconds away from the receiving clock is
 refused. See [signed frames](network.md#signed-frames).
 
+## Database kit claims apply on a single server
+
+On a single server (`network.enabled = false`), the one-time kit claims the database holds for a player are now
+copied into the player's data when they join. Such rows come from an EssentialsX import, or are left from a time the
+server ran with the network on: a one-time kit claimed then now stays claimed after the network is turned off,
+where it could be claimed again before. On a single server `/kit reset` now also deletes those rows, so a reset claim
+does not come back on the next join. See [kits.md](kits.md#on-a-network).
+
+## Staff teleports stop at /tptoggle
+
+`/tp`, `/tphere`, `/goto` and `/bring` no longer reach a player who refuses teleports with `/tptoggle`. The staff
+member is told to use `/tpo` or `/tpohere`, which still go through. Grant `uxmessentials.tp.others` to the staff
+who must keep moving such players. The position forms of `/tp`, and players on another server, are not stopped. See
+[teleport.md](teleport.md#staff-teleports).
+
+The console and automation are stopped too: a script or a plugin that runs `/tp <player> <destination>` must run
+`/tpo <player> <destination>` to keep reaching a player with `/tptoggle` off.
+
 ## Server warps are open to every player
 
 `uxmessentials.warp.use.<warp>` is asked for every server warp. It is meant to default to every player, but the
@@ -63,6 +81,27 @@ to 5. Before the upgrade everyone waited 5 seconds; after it every rank that inh
 What to check, for each group (`lp group <group> permission info`, starting with `default`) and for single players:
 look for `cooldown.<seconds>` nodes longer than the config value of their feature. Lower the node or remove it, and
 let the config value apply again.
+
+## RTP radius tiers stay inside max-radius
+
+A `uxmessentials.rtp.radius.<blocks>` node used to replace `max-radius` of `rtp.conf` for `/rtp biome`, and the
+config value took part in the "largest wins" fold, so a node could only widen the search, up to beyond `max-radius`.
+A node now only narrows it: the largest node held is the outer edge when it is smaller than `max-radius`, and a node
+at or above `max-radius` changes nothing ([teleport](teleport.md#random-teleport)).
+
+To keep a reach a node gave beyond `max-radius`, raise `max-radius` to that reach and give everyone who should search
+less a lower node instead: for example `max-radius = 20000`, `uxmessentials.rtp.radius.20000` for the rank that had
+it, and `uxmessentials.rtp.radius.5000` for the `default` group. Plain `/rtp` serves from the shared ready spots,
+which follow `max-radius` for everyone, so a larger `max-radius` widens it for every player.
+
+## Player warp world limits no longer lift the overall limit
+
+`uxmessentials.pwarp.limit.<world>.<n>` used to be folded into the overall limit when a warp was set in that world and
+compared with the owner's warps in every world, so a large world node raised the overall cap there. It now counts only
+the owner's warps in that world, and the overall limit (`default-limit` or `uxmessentials.pwarp.limit.<n>`) still
+caps all of them ([warps](warps.md#limits-and-categories)). A player who relied on a world node to own more warps in
+total needs a larger `uxmessentials.pwarp.limit.<n>` as well. Warps set before the upgrade are kept; only a new warp,
+or a warp moved into the world, is refused.
 
 ## Exemptions and placeholders follow the shared names
 

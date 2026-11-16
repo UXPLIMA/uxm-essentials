@@ -7,10 +7,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.AddressStrictness;
@@ -22,13 +25,16 @@ import com.uxplima.uxmessentials.moderation.domain.PunishmentTemplate;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
+import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaResult;
+import com.uxplima.uxmessentials.shared.domain.IpAssociation;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -129,6 +135,28 @@ class TempBanTest {
 
         clock.advance(Duration.ofMillis(1));
         assertThat(letsIn(SAM)).isTrue();
+    }
+
+    @Test
+    void aTempbanAsLongAsAPermanentBanIsRefusedAndPointsAtBan() {
+        String span = Ban.PERMANENT_SPAN.toDays() + "d";
+
+        assertThat(tempBan.tempban(ALEX, SAM, span, Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.BAD_DURATION);
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(online.kicked()).isEmpty();
+        assertThat(broadcasts).isEmpty();
+        assertThat(toldAlex().getLast().key()).isEqualTo(ModerationMessageKey.TEMPBAN_TOO_LONG.key());
+    }
+
+    @Test
+    void aTempbanJustShortOfThePermanentSpanIsStillATempban() {
+        String span = Ban.PERMANENT_SPAN.minusDays(1).toDays() + "d";
+
+        tempBan.tempban(ALEX, SAM, span, Optional.empty(), false).orElseThrow();
+
+        assertThat(Ban.endOf(stored())).contains(NOW.plus(Ban.PERMANENT_SPAN.minusDays(1)));
     }
 
     @Test
@@ -404,5 +432,85 @@ class TempBanTest {
                 .isTrue();
 
         assertThat(stored().until()).isEqualTo(NOW.plus(Duration.ofDays(1)));
+    }
+
+    @Test
+    void aCappedStrictBanLeavesAPermanentIpBanOnThePlayersAddressPermanent() {
+        records.saveIpBan(
+                new IpBan(ADDRESS, Optional.empty(), Optional.of("alts"), Optional.empty(), Issuer.of(ALEX), NOW));
+        permissions.quota(CAP_NODE, QuotaResult.limited(Duration.ofDays(1).toSeconds()));
+
+        assertThat(strictBan().ban(ALEX, SAM, Optional.of("cheating"), false).isOk())
+                .isTrue();
+
+        assertThat(stored().until()).isEqualTo(NOW.plus(Duration.ofDays(1)));
+        assertThat(records.loadIpBan(ADDRESS)).hasValueSatisfying(ipBan -> {
+            assertThat(ipBan.until()).isEmpty();
+            assertThat(ipBan.reason()).contains("alts");
+        });
+        assertThat(toldAlex()).noneMatch(line -> line.key().equals(ModerationMessageKey.MOD_BAN_STRICT_IP.key()));
+    }
+
+    @Test
+    void aPermanentStrictBanMakesATimedIpBanOnThePlayersAddressPermanent() {
+        records.saveIpBan(new IpBan(
+                ADDRESS,
+                Optional.of(NOW.plus(Duration.ofHours(1))),
+                Optional.empty(),
+                Optional.empty(),
+                Issuer.of(ALEX),
+                NOW));
+
+        strictBan().ban(ALEX, SAM, Optional.of("cheating"), false);
+
+        assertThat(records.loadIpBan(ADDRESS)).hasValueSatisfying(ipBan -> {
+            assertThat(ipBan.until()).isEmpty();
+            assertThat(ipBan.reason()).contains("cheating");
+        });
+        assertThat(toldAlex())
+                .contains(new RecordingNotifier.Sent(
+                        ALEX, ModerationMessageKey.MOD_BAN_STRICT_IP.key(), Map.of("count", "1")));
+    }
+
+    /** A {@code /ban} under STRICT, where Sam is known to have connected from {@link #ADDRESS}. */
+    private Ban strictBan() {
+        return new Ban(
+                records,
+                online,
+                new ModerationGuard(permissions),
+                notifier.notifier(),
+                new SilentAudit(),
+                events,
+                new SanctionHistoryRecorder(new DiscardedHistory(), clock),
+                new SanctionDurationLimit(permissions),
+                (key, placeholders) -> broadcasts.add(key),
+                sync,
+                AddressStrictness.STRICT,
+                new SamsAddress(),
+                clock);
+    }
+
+    /** An IP history that knows one address, the one Sam connected from. */
+    private static final class SamsAddress implements IpHistoryStore {
+
+        @Override
+        public void record(UUID account, String ipToken, @Nullable String address, Instant seenAt) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public Set<UUID> accountsOnToken(String ipToken) {
+            return Set.of();
+        }
+
+        @Override
+        public List<IpAssociation> sharingTokenWith(UUID account) {
+            return List.of();
+        }
+
+        @Override
+        public Set<String> addressesOf(UUID account) {
+            return account.equals(SAM.uuid()) ? Set.of(ADDRESS) : Set.of();
+        }
     }
 }

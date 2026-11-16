@@ -16,6 +16,7 @@ import com.uxplima.uxmessentials.teleport.application.CaptureBack;
 import com.uxplima.uxmessentials.teleport.application.CrossServerRequests;
 import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
+import com.uxplima.uxmessentials.teleport.application.OfflineTeleport;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
 import com.uxplima.uxmessentials.teleport.application.ResolveBiomeRtp;
 import com.uxplima.uxmessentials.teleport.application.ResolveRtp;
@@ -58,6 +59,7 @@ public final class TeleportServices {
     private final Scheduler scheduler;
     private final CrossServerRequests crossServerRequests;
     private final CrossServerStaffTeleport crossServerStaff;
+    private final OfflineTeleport offlineTeleport;
 
     public TeleportServices(Builder builder) {
         this.requestTeleport = Objects.requireNonNull(builder.requestTeleport, "requestTeleport");
@@ -82,6 +84,7 @@ public final class TeleportServices {
         this.scheduler = Objects.requireNonNull(builder.scheduler, "scheduler");
         this.crossServerRequests = Objects.requireNonNull(builder.crossServerRequests, "crossServerRequests");
         this.crossServerStaff = Objects.requireNonNull(builder.crossServerStaff, "crossServerStaff");
+        this.offlineTeleport = Objects.requireNonNull(builder.offlineTeleport, "offlineTeleport");
     }
 
     public RequestTeleport requestTeleport() {
@@ -177,6 +180,11 @@ public final class TeleportServices {
         return crossServerStaff;
     }
 
+    /** {@code /tpoffline} and {@code /tpofflinehere}, through the position this server saved for a player. */
+    public OfflineTeleport offlineTeleport() {
+        return offlineTeleport;
+    }
+
     /** Release every in-memory store and queue this context holds. Called on module stop. */
     public void drain() {
         warmupTracker.clear();
@@ -210,6 +218,7 @@ public final class TeleportServices {
         private @org.jspecify.annotations.Nullable Scheduler scheduler;
         private @org.jspecify.annotations.Nullable CrossServerRequests crossServerRequests;
         private @org.jspecify.annotations.Nullable CrossServerStaffTeleport crossServerStaff;
+        private @org.jspecify.annotations.Nullable OfflineTeleport offlineTeleport;
 
         public Builder requestTeleport(RequestTeleport value) {
             this.requestTeleport = value;
@@ -318,6 +327,11 @@ public final class TeleportServices {
 
         public Builder crossServerStaff(CrossServerStaffTeleport value) {
             this.crossServerStaff = value;
+            return this;
+        }
+
+        public Builder offlineTeleport(OfflineTeleport value) {
+            this.offlineTeleport = value;
             return this;
         }
 

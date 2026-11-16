@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.kits.adapter;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -25,6 +26,7 @@ import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewListener;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitPreviewView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.gui.KitSettingsView;
 import com.uxplima.uxmessentials.kits.adapter.inbound.listener.KitsJoinListener;
+import com.uxplima.uxmessentials.kits.adapter.inbound.listener.LocalKitClaimsListener;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitActionRunner;
 import com.uxplima.uxmessentials.kits.adapter.outbound.BukkitKitGranter;
 import com.uxplima.uxmessentials.kits.adapter.outbound.ConfigurateKitCategoryRepository;
@@ -40,6 +42,7 @@ import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.application.KitEditor;
 import com.uxplima.uxmessentials.kits.application.KitReset;
 import com.uxplima.uxmessentials.kits.application.ListKits;
+import com.uxplima.uxmessentials.kits.application.LocalKitClaims;
 import com.uxplima.uxmessentials.kits.application.NetworkKitClaims;
 import com.uxplima.uxmessentials.kits.application.ShowKit;
 import com.uxplima.uxmessentials.kits.application.port.KitActionRunner;
@@ -59,6 +62,7 @@ import com.uxplima.uxmessentials.shared.application.ledger.NetworkClaims;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -85,29 +89,20 @@ public final class KitsWiring {
 
     private KitsWiring() {}
 
-    /** Build the kits adapters and use cases with no economy bridge (a recorded kit cost is not charged). */
-    public static Wired wire(
-            Plugin plugin,
-            ModuleContext ctx,
-            GuiLayouts guiLayouts,
-            TextInput textInput,
-            Menus menus,
-            MenuBindings menuBindings) {
-        return wire(plugin, ctx, Optional.empty(), Optional.empty(), guiLayouts, textInput, menus, menuBindings);
-    }
-
     /**
      * Build the kits context, charging a recorded per-kit cost through {@code economy} when present. The
      * economy context lands before kits in the registry, so its {@link KitEconomy} bridge is captured during
      * economy wiring and handed in here; when it is empty (economy disabled), a priced kit's cost is recorded
      * but not charged: the soft coupling the kits context owns. With {@code networkClaims} (the network is on) the
-     * one-time claims live in the shared database instead of each player's PDC.
+     * one-time claims live in the shared database instead of each player's PDC; without it they stay in PDC, and the
+     * claims {@code ledger} records for a player (an import's) are stamped into it as the player joins.
      */
     public static Wired wire(
             Plugin plugin,
             ModuleContext ctx,
             Optional<KitEconomy> economy,
             Optional<NetworkClaims> networkClaims,
+            PlayerClaimLedger ledger,
             GuiLayouts guiLayouts,
             TextInput textInput,
             Menus menus,
@@ -116,6 +111,7 @@ public final class KitsWiring {
         Objects.requireNonNull(ctx, "ctx");
         Objects.requireNonNull(economy, "economy");
         Objects.requireNonNull(networkClaims, "networkClaims");
+        Objects.requireNonNull(ledger, "ledger");
         Objects.requireNonNull(guiLayouts, "guiLayouts");
         Objects.requireNonNull(textInput, "textInput");
         Objects.requireNonNull(menus, "menus");
@@ -127,8 +123,11 @@ public final class KitsWiring {
         KitRepository repository = ConfigurateKitRepository.load(kitsDir, legacy, kernel.log());
         Path categoriesDir = dataFolder.resolve("modules").resolve("kits").resolve("categories");
         KitCategoryRepository categoryRepository = ConfigurateKitCategoryRepository.load(categoriesDir, kernel.log());
+        Optional<LocalKitClaims> localClaims = networkClaims.isPresent()
+                ? Optional.empty()
+                : Optional.of(new LocalKitClaims(new PdcKitClaims(plugin), ledger, kernel.scheduler(), kernel.log()));
         KitClaimStore claims =
-                networkClaims.<KitClaimStore>map(NetworkKitClaims::new).orElseGet(() -> new PdcKitClaims(plugin));
+                networkClaims.<KitClaimStore>map(NetworkKitClaims::new).orElseGet(localClaims::orElseThrow);
         KitUnlockStore unlocks = new PdcKitUnlocks(plugin);
         KitGranter granter = new BukkitKitGranter(kernel.log());
         KitActionRunner actionRunner = new BukkitKitActionRunner(kernel.scheduler(), kernel.log());
@@ -241,11 +240,16 @@ public final class KitsWiring {
                 () -> ListDisplayMode.from(ctx.config(), SHOWKIT_DISPLAY_KEY),
                 kernel.scheduler());
 
-        List<Listener> listeners = List.of(
+        List<Listener> listeners = new ArrayList<>(List.of(
                 new KitPreviewListener(),
                 new KitEditorListener(services.kitEditorView()),
                 new KitsJoinListener(new com.uxplima.uxmessentials.kits.application.GrantFirstJoinKits(
-                        repository, granter, access, kernel.log())));
+                        repository, granter, access, kernel.log()))));
+        localClaims.ifPresent(local -> {
+            LocalKitClaimsListener listener = new LocalKitClaimsListener(local);
+            listeners.add(listener);
+            listener.adoptOnline(plugin.getServer().getOnlinePlayers());
+        });
 
         // The kit's claim/deny effects (sound, particles, title, firework, commands, the wait-ticks delay) now run
         // through the KitActionRunner inside ClaimKit, ordered around the item grant, so there is no longer a
@@ -261,7 +265,8 @@ public final class KitsWiring {
                 services.kitMenu(),
                 () -> {},
                 granter,
-                services.claimKit());
+                services.claimKit(),
+                localClaims);
     }
 
     private static KitServices assemble(
@@ -353,6 +358,8 @@ public final class KitsWiring {
      * @param listKits the {@code /kit list} filter the usable-kit-list placeholder reads
      * @param kitMenu the browse menu the {@code /kit} command and the management hub both open
      * @param stopAction extra teardown to run on module stop
+     * @param localClaims the single server's one-time claim store, which an import stamps online players through;
+     *     empty on a network, where the claims are the shared database's
      */
     public record Wired(
             List<CommandRegistration> commands,
@@ -364,7 +371,8 @@ public final class KitsWiring {
             KitBrowseMenu kitMenu,
             Runnable stopAction,
             KitGranter granter,
-            ClaimKit claimKit) {
+            ClaimKit claimKit,
+            Optional<LocalKitClaims> localClaims) {
 
         public Wired {
             commands = List.copyOf(commands);
@@ -377,6 +385,7 @@ public final class KitsWiring {
             Objects.requireNonNull(stopAction, "stopAction");
             Objects.requireNonNull(granter, "granter");
             Objects.requireNonNull(claimKit, "claimKit");
+            Objects.requireNonNull(localClaims, "localClaims");
         }
 
         /**

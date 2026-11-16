@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmlib.command.Args;
@@ -65,7 +66,9 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
             return 0;
         }
         String name = ctx.getArgument("name", String.class);
-        services.setJail().set(actor(ctx), name, position(sender));
+        PlayerRef actor = actor(ctx);
+        Position at = position(sender);
+        offTick(actor, () -> services.setJail().set(actor, name, at));
         return Command.SINGLE_SUCCESS;
     }
 
@@ -101,11 +104,10 @@ public final class SetJailCommand extends ModerationCommandSupport implements Co
             notify(ctx, SharedMessageKey.COMMAND_INVALID_POSITION, Map.of());
             return 0;
         }
-        services.setJail()
-                .set(
-                        actor(ctx),
-                        StringArgumentType.getString(ctx, "name"),
-                        new Position(BukkitRefs.toRef(world), x, y, z, yaw, pitch));
+        PlayerRef actor = actor(ctx);
+        String name = StringArgumentType.getString(ctx, "name");
+        Position at = new Position(BukkitRefs.toRef(world), x, y, z, yaw, pitch);
+        offTick(actor, () -> services.setJail().set(actor, name, at));
         return Command.SINGLE_SUCCESS;
     }
 

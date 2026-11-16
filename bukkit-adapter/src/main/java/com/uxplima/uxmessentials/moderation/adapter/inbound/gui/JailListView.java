@@ -177,10 +177,7 @@ public final class JailListView {
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
         String name = ctx.subject(JailEdit.class).name();
-        scheduler.onEntity(viewer, () -> {
-            services.setJail().set(viewer, name, position(player));
-            open(player, viewer);
-        });
+        scheduler.onEntity(viewer, () -> save(player, viewer, name, position(player)));
     }
 
     /**
@@ -192,15 +189,20 @@ public final class JailListView {
      */
     private void goTo(MenuActionContext ctx) {
         ctx.player().closeInventory();
-        sanctions.sendToJail(
-                BukkitRefs.toRef(ctx.viewer()), ctx.subject(JailEdit.class).name());
+        PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
+        String name = ctx.subject(JailEdit.class).name();
+        // The jail is looked up in the database before the hop to the viewer's thread, so off the server thread.
+        services.lane().run(viewer, () -> sanctions.sendToJail(viewer, name));
     }
 
     private void delete(MenuActionContext ctx) {
         Player player = ctx.player();
         PlayerRef viewer = BukkitRefs.toRef(ctx.viewer());
-        services.delJail().delete(viewer, ctx.subject(JailEdit.class).name());
-        open(player, viewer);
+        String name = ctx.subject(JailEdit.class).name();
+        services.lane().run(viewer, () -> {
+            services.delJail().delete(viewer, name);
+            open(player, viewer);
+        });
     }
 
     /** Prompt for a new jail name; a submission saves it at the viewer's current location, a cancel reopens the list. */
@@ -224,8 +226,13 @@ public final class JailListView {
      * Package-private so the create path is unit-tested without driving a live prompt submission.
      */
     void createJail(Player player, PlayerRef viewer, String name) {
-        scheduler.onEntity(viewer, () -> {
-            services.setJail().set(viewer, name, position(player));
+        scheduler.onEntity(viewer, () -> save(player, viewer, name, position(player)));
+    }
+
+    /** Store the jail on the async lane, then reopen the list, which reads the jails again there too. */
+    private void save(Player player, PlayerRef viewer, String name, Position at) {
+        services.lane().run(viewer, () -> {
+            services.setJail().set(viewer, name, at);
             open(player, viewer);
         });
     }

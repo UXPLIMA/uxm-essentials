@@ -86,11 +86,66 @@ Each `userdata/<uuid>.yml` gives one player:
   recorded as `EssentialsX` and the issue time is unknown.
 - **Jail sentence.** A jailed player stays jailed in the jail of the same name: until the same time, for the same
   online time left, or for good.
+- **One-time kit claims.** A player who already took a kit whose `delay` is negative keeps it claimed, with the time
+  in `timestamps.kits` of their file. Claims of repeatable kits and of kits `kits.yml` no longer has are not read. The
+  claim goes into the database whatever `on-conflict` says, and never twice; it is written even when `skip` keeps an
+  existing kit of the same name. With the network on, a server that loaded the player before the import may still
+  show the kit in their menu until they log in again, but refuses the claim. On a single server the claim reaches the
+  player's data when they next join, or at once if they are online during the import; `/kit reset` clears it again.
 
 Each `warps/<name>.yml` becomes a warp of that name, free and open to everyone. Each entry of `kits.yml` becomes a
 kit (see [What is not imported](#what-is-not-imported) for what a kit loses). An unreadable file, a warp in a world
 that is not loaded, and a kit that cannot be converted are each skipped with a warning naming them; the rest of the
-import goes on.
+import goes on. A warp in a world on the warps module's `world-blacklist` is skipped too (see
+[Reading the result](#reading-the-result)).
+
+### Kit permissions
+
+EssentialsX hands a kit only to players with `essentials.kits.<name>`. Every imported kit keeps that gate: its file
+gets `permission = true`, so claiming it needs `uxmessentials.kit.<name>` (the name in lower case) on top of
+`uxmessentials.kit.use`. Operators hold every `uxmessentials.kit.<name>` node by default and nobody else does, so after
+the import only operators can claim the kits until the new nodes are granted.
+
+| EssentialsX node | uxmEssentials node |
+|---|---|
+| `essentials.kit` | `uxmessentials.kit.use` (everyone by default) |
+| `essentials.kits.<name>` | `uxmessentials.kit.<name>` (operators by default) |
+
+A kit whose name is also one of the plugin's own kit nodes (`use`, `edit`, `others`, `preview` or `reset`) would sit
+behind that node, so it keeps `essentials.kits.<name>` as its `permission-node` instead, and the import log names it.
+
+Grant each kit to the groups that held its EssentialsX node, with LuckPerms for example:
+
+```
+/lp group default permission set uxmessentials.kit.starter true
+/lp group vip permission set uxmessentials.kit.vip true
+```
+
+To move the existing grants of one kit in a single step, contexts and expiry included, rename the node with a bulk
+update from the server console (LuckPerms takes bulk updates from the console only) and confirm it with the command
+LuckPerms prints. Back up first with `/lp export`. The update renames rather than copies, so run it only once
+EssentialsX is gone from every server that shares this LuckPerms storage, and once per kit:
+
+```
+/lp export before-kit-nodes
+/lp bulkupdate all update permission uxmessentials.kit.vip "permission == essentials.kits.vip"
+```
+
+Do not replace `essentials.kits.*` with `uxmessentials.kit.*`: that wildcard also grants the staff nodes under it,
+such as `uxmessentials.kit.edit`, `uxmessentials.kit.others` and `uxmessentials.kit.reset`, and every
+`uxmessentials.kit.cooldown.<group>` wait. Grant the kits one by one. To keep using the EssentialsX node for a kit
+instead, set `permission-node = "essentials.kits.<name>"` in its file.
+
+A kit file with `permission = false` is open to every player with `uxmessentials.kit.use`. With
+`on-conflict = "skip"` an import keeps such a kit as it is and names it in the log. To find these kits:
+
+```
+grep -lE 'permission\s*=\s*false' plugins/uxmEssentials/modules/kits/kits/*.conf
+```
+
+Set `permission = true` in each file and restart the server: kit files are read at startup, and `/uxmess reload` does
+not read them again. The permission button in `/kit editor` changes the flag without a restart. Importing again with
+`overwrite` also gates them, but replaces each kit and any change made to it since.
 
 ## LiteBans
 
@@ -128,7 +183,8 @@ Prices are recorded in the default currency. Athelion and Olzie do not store the
 the name this server knows the owner by. An owner who has not joined this server yet is shown by uuid until they
 join, and then by name. A warp name is turned into a valid player warp name (lowercase letters, digits, `_` and `-`,
 3 to 32 characters); when another player already owns that name, the warp gets `name2`, `name3` and so on. A warp
-whose world is not loaded or that names no owner account is left out.
+whose world is not loaded or that names no owner account is left out. A warp in a world on the playerwarps module's
+`world-blacklist` is skipped, as `/setpwarp` would refuse it there.
 
 ## Holograms
 
@@ -185,9 +241,9 @@ Some records ignore both settings:
 ## Running it again
 
 Every write is keyed (a home by player and slot, a warp, kit, hologram or world by name, a ban by player or
-address), so running the same import again with the default policies adds nothing and changes nothing, and an
-import that stopped part way can simply be run again. Balances are set, never added, so they cannot be counted
-twice.
+address, a kit claim by player and kit), so running the same import again with the default policies adds nothing
+and changes nothing, and an import that stopped part way can simply be run again. Balances are set, never added, so
+they cannot be counted twice. A kit claim cleared with `/kit reset` since the last run is recorded again.
 
 Homes are matched by slot, not by name. Each run places a player's homes in alphabetical order from slot 1, and
 with `skip` a home is written only when its slot is empty. Importing a second EssentialsX folder for the same
@@ -208,8 +264,11 @@ server log:
 Each record line has `ok=`, and every one but the `jail` and `mute` lines has `conflict=` (`written`, `skipped`,
 `overwritten`, `partial` or `failed`). A `user` line also says which parts landed: `homes_written`, `homes_kept`,
 `balance` (`written`, `kept` or `none`), `mail_written`, `mail_kept`, and when they apply `mail_expired`,
-`mail_past_retention` and `mail_skipped=messaging_disabled`. `partial` means some of the player's parts were kept
-back. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
+`mail_past_retention` and `mail_skipped=messaging_disabled`, and for a player with one-time kit claims
+`kit_claims_written` and `kit_claims_kept` (already recorded). `partial` means some of the player's parts were kept
+back. A `warp` or `player_warp` line with `conflict=skipped held_back=world_blacklist world=<name>` is a warp in a
+world its module's `world-blacklist` names: it is not written, and a dry run reports it the same way. Such a warp
+counts in `skipped`. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
 `partial` and `failed`; player warps, holograms and worlds appear only on their own record lines. One record that
 fails is counted and the run goes on. A run that cannot continue logs `migration import failed for source <source>`.
 
@@ -220,10 +279,8 @@ matter.
 
 ## What is not imported
 
-- **Kit claims and kit permissions.** EssentialsX records which players claimed a kit and when; that is not read,
-  so every player can claim an imported one-time kit once more and no cooldown is running. Imported kits do not
-  require a permission: anyone with `uxmessentials.kit.use` can claim them. Set `permission = true` in the kit's file
-  to gate a kit with `uxmessentials.kit.<name>` (see [kits.md](kits.md)).
+- **Kit cooldowns.** Only the claims of one-time kits are read, so no cooldown of a repeatable kit is running after
+  the import.
 - **Kit contents beyond plain items.** A kit keeps its name, its `delay` as the cooldown (a negative delay becomes
   `one-time = true`) and its items with amount, damage and enchantments. Item names, lore and other item data are
   dropped; money lines, command lines and items whose material does not exist are left out without a warning.
@@ -268,10 +325,11 @@ their `-group`. `greeting`, `farewell`, their `-title` forms, `entry-deny-messag
 ## On a network
 
 With a shared database, run each import once, from one server. Homes, balances, mail, warps, moderation, player
-warps and holograms go into the shared database and every server sees them. Once a live import ends, the importing
-server tells the others: warps reload at once, holograms reload by name over the following minutes (16 every 10
-seconds), and homes, balances and player warps are picked up as each server's cache refreshes. A good time to
-import is before players join.
+warps, holograms and one-time kit claims go into the shared database and every server sees them; a server that
+loaded a player before the import may still list an imported claimed kit to them, but refuses it. Once a live import
+ends, the importing server tells the others: warps reload at once, holograms reload by name over the following
+minutes (16 every 10 seconds), and homes, balances and player warps are picked up as each server's cache refreshes.
+A good time to import is before players join.
 
 Three kinds of data stay with one server:
 

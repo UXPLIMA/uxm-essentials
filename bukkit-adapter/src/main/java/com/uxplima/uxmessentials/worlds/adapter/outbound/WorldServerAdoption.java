@@ -4,7 +4,6 @@ import java.io.UncheckedIOException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,6 +12,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.worlds.CachedWorldRepository;
 import com.uxplima.uxmessentials.persistence.worlds.WorldServerClaimer;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
@@ -52,9 +52,16 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
 
         WorldServerClaimer.Claims claimPresent(String server, Collection<String> present, Map<String, String> uids);
 
-        List<String> adoptLoaded(String server, Map<String, String> loadedUids);
+        WorldServerClaimer.Claims adoptLoaded(String server, Map<String, String> loadedUids);
 
+        /**
+         * Copies the unclaimed world {@code name}; throws {@link PersistenceException} on a failed write, which may
+         * have gone through.
+         */
         boolean claimNamed(String server, String name);
+
+        /** Whether {@code server} keeps {@code name}; throws {@link PersistenceException} on a failed read. */
+        boolean keeps(String server, String name);
 
         int rename(String from, String to);
     }
@@ -150,13 +157,18 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
             }
 
             @Override
-            public List<String> adoptLoaded(String server, Map<String, String> loadedUids) {
+            public WorldServerClaimer.Claims adoptLoaded(String server, Map<String, String> loadedUids) {
                 return WorldServerClaimer.adoptLoaded(persistence, server, loadedUids);
             }
 
             @Override
             public boolean claimNamed(String server, String name) {
                 return WorldServerClaimer.claimNamed(persistence, server, name);
+            }
+
+            @Override
+            public boolean keeps(String server, String name) {
+                return WorldServerClaimer.keeps(persistence, server, name);
             }
 
             @Override
@@ -208,6 +220,7 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
             skipped();
             return true;
         }
+        WorldServerClaimer.Claims claims;
         try {
             Map<String, Optional<String>> disk;
             try {
@@ -228,19 +241,27 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
             disk.forEach((name, uid) -> uid.ifPresent(value -> uids.put(name, value)));
             // The live world is the authority for a loaded one, whatever its folder last recorded.
             uids.putAll(loaded);
-            WorldServerClaimer.Claims claims = store.claimPresent(scope, present, uids);
-            boolean took = report(claims);
-            if (adoptLoaded.getAsBoolean()) {
-                took |= adoptFromTemplates(loaded);
-            }
-            if (took) {
-                changed.accept(WorldChanged.SEVERAL);
-            }
-            return true;
+            claims = store.claimPresent(scope, present, uids);
         } catch (RuntimeException unclaimed) {
             // The worlds stay unclaimed and listed as such, and this start adopts nothing beside them; the next start
             // claims again.
-            log.error("event=world_server_claim_failed server=" + scope, unclaimed);
+            log.error("event=world_server_claim_failed server=" + scope + " reason=claim", unclaimed);
+            return false;
+        }
+        try {
+            if (report(claims)) {
+                // The copies are committed, so they reach the cache before the adopt runs: an adopt that fails would
+                // otherwise leave them out of the reconcile's auto-load until the next start.
+                changed.accept(WorldChanged.SEVERAL);
+            }
+            if (adoptLoaded.getAsBoolean() && adoptFromTemplates(loaded)) {
+                changed.accept(WorldChanged.SEVERAL);
+            }
+            return true;
+        } catch (RuntimeException unadopted) {
+            // The claim and its once-per-server marker are committed, so the next start skips the claim and runs only
+            // the adopt again. This start adopts nothing, so no blank row lands beside a template the adopt would copy.
+            log.error("event=world_server_claim_failed server=" + scope + " reason=adopt", unadopted);
             return false;
         }
     }
@@ -263,29 +284,36 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
                 scope,
                 claims.claimed().size(),
                 String.join(",", claims.claimed()));
-        if (!claims.conflicting().isEmpty()) {
-            log.warn(
-                    "event=world_server_claim_conflict server={} worlds={} reason=the shared row recorded another"
-                            + " uid than the world of that name here, so two different worlds shared one row and its"
-                            + " settings before servers were recorded; this server keeps its own copy, check its"
-                            + " settings",
-                    scope,
-                    String.join(",", claims.conflicting()));
-        }
+        conflicts(claims);
         return true;
+    }
+
+    /** Warn about the copied rows whose template held the settings of another world of the same name. */
+    private void conflicts(WorldServerClaimer.Claims claims) {
+        if (claims.conflicting().isEmpty()) {
+            return;
+        }
+        log.warn(
+                "event=world_server_claim_conflict server={} worlds={} reason=the shared row recorded another"
+                        + " uid than the world of that name here, so two different worlds shared one row and its"
+                        + " settings before servers were recorded; this server keeps its own copy, check its"
+                        + " settings",
+                scope,
+                String.join(",", claims.conflicting()));
     }
 
     /** Adopt each loaded world that has a template from it, answering whether any was. */
     private boolean adoptFromTemplates(Map<String, String> loaded) {
-        List<String> adopted = store.adoptLoaded(scope, loaded);
+        WorldServerClaimer.Claims adopted = store.adoptLoaded(scope, loaded);
         if (adopted.isEmpty()) {
             return false;
         }
         log.info(
                 "event=world_server_claim server={} claimed={} worlds={} by=adopt",
                 scope,
-                adopted.size(),
-                String.join(",", adopted));
+                adopted.claimed().size(),
+                String.join(",", adopted.claimed()));
+        conflicts(adopted);
         return true;
     }
 
@@ -312,12 +340,43 @@ public final class WorldServerAdoption implements WorldClaims, WorldServers {
         if (scope.equals(NetworkWorld.UNSCOPED)) {
             return false;
         }
-        boolean claimed = store.claimNamed(scope, name.value());
+        boolean claimed;
+        try {
+            claimed = store.claimNamed(scope, name.value());
+        } catch (PersistenceException failed) {
+            if (!keepsAfter(failed, name)) {
+                throw failed;
+            }
+            // The world is kept here although the write failed: another claim of it won the race, or this commit went
+            // through before the failure. Either way the cache has to see the row.
+            log.error(
+                    "event=world_server_claim_uncertain server=" + scope + " world=" + name.value()
+                            + " reason=the write failed but this server keeps the world, so another claim of it ran at"
+                            + " the same time or the commit went through; it is in /worlds list now",
+                    failed);
+            try {
+                changed.accept(name.value());
+            } catch (RuntimeException unreloaded) {
+                unreloaded.addSuppressed(failed);
+                throw unreloaded;
+            }
+            return false;
+        }
         if (claimed) {
             log.info("event=world_server_claim server={} claimed=1 worlds={} by=command", scope, name.value());
             changed.accept(name.value());
         }
         return claimed;
+    }
+
+    /** Whether this server keeps {@code name} after its claim failed; a read that fails too joins that failure. */
+    private boolean keepsAfter(PersistenceException failed, WorldName name) {
+        try {
+            return store.keeps(scope, name.value());
+        } catch (PersistenceException unreadable) {
+            failed.addSuppressed(unreadable);
+            return false;
+        }
     }
 
     @Override

@@ -106,12 +106,14 @@ public final class JailCommand extends ModerationCommandSupport implements Comma
         PlayerRef actor = actor(ctx);
         String jail = ctx.getArgument("jail", String.class);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.jail().jail(actor, to, jail, duration, reason));
+        target.ifPresent(to -> offTick(actor, to, () -> services.jail().jail(actor, to, jail, duration, reason)));
         return Command.SINGLE_SUCCESS;
     }
 
     private int runDelete(CommandContext<CommandSourceStack> ctx) {
-        services.delJail().delete(actor(ctx), ctx.getArgument("name", String.class));
+        PlayerRef actor = actor(ctx);
+        String name = ctx.getArgument("name", String.class);
+        offTick(actor, () -> services.delJail().delete(actor, name));
         return Command.SINGLE_SUCCESS;
     }
 }

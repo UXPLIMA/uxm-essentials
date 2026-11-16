@@ -24,12 +24,12 @@ import org.jspecify.annotations.NullMarked;
  *       the bus, so a successful {@code /ban}/{@code /tempban} publishes a {@link BanChanged} and a successful
  *       {@code /mute} publishes a {@link MuteChanged}, and a successful {@code /banip}/{@code /tempbanip} an
  *       {@link IpBanChanged}, each stamped with this backend's origin.
- *   <li><b>Inbound</b>: {@link #listener(Consumer, Consumer)} returns a {@link RemoteSyncListener} that, on a
+ *   <li><b>Inbound</b>: {@link #listener(Consumer, Consumer, Consumer)} returns a {@link RemoteSyncListener} that, on a
  *       remote {@code BanChanged}, hands the target UUID to the wired re-enforcement action (the
  *       {@code EnforceRemoteBan} use case) which re-evaluates that target's ban here and kicks them if it is in
  *       effect and they are online, and on a remote {@code IpBanChanged} hands the address to
- *       {@code EnforceRemoteIpBan}, which kicks everyone here on it. A {@code MuteChanged} is a no-op: the messaging mute gate re-reads the
- *       shared DB on the next chat attempt, so there is no in-memory mute state to refresh.
+ *       {@code EnforceRemoteIpBan}, which kicks everyone here on it. A remote {@code MuteChanged} hands the target
+ *       to the in-memory mute of connected players, which reads it again.
  * </ul>
  *
  * <p>A jail is live too: {@link #jailPublisher(BusPublisher)} announces a jail or release and a jail hop that
@@ -56,20 +56,24 @@ public final class ModerationSync {
     /**
      * A listener that hands a remote {@link BanChanged}'s target to {@code onRemoteBan} (the re-enforcement
      * action that kicks an online, still-banned target) and a remote {@link IpBanChanged}'s address to
-     * {@code onRemoteIpBan} (which kicks everyone here on that address); a {@link MuteChanged} is a no-op. The action is a
+     * {@code onRemoteIpBan} (which kicks everyone here on that address), and a remote {@link MuteChanged}'s target to
+     * {@code onRemoteMute} (which reads that player's mute again). The action is a
      * {@code Consumer<UUID>} so the wiring passes {@code enforce::onRemoteBan} and this seam stays trivially
      * testable without the use case's port graph.
      */
-    public static RemoteSyncListener listener(Consumer<UUID> onRemoteBan, Consumer<String> onRemoteIpBan) {
+    public static RemoteSyncListener listener(
+            Consumer<UUID> onRemoteBan, Consumer<String> onRemoteIpBan, Consumer<UUID> onRemoteMute) {
         Objects.requireNonNull(onRemoteBan, "onRemoteBan");
         Objects.requireNonNull(onRemoteIpBan, "onRemoteIpBan");
+        Objects.requireNonNull(onRemoteMute, "onRemoteMute");
         return message -> {
             if (message instanceof BanChanged changed) {
                 onRemoteBan.accept(changed.target());
             } else if (message instanceof IpBanChanged ipBan) {
                 onRemoteIpBan.accept(ipBan.ip());
+            } else if (message instanceof MuteChanged mute) {
+                onRemoteMute.accept(mute.target());
             }
-            // MuteChanged: no in-memory mute cache to refresh: the mute gate re-reads the shared DB on next chat.
         };
     }
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import org.bukkit.plugin.Plugin;
 
@@ -22,6 +23,7 @@ import com.uxplima.uxmessentials.kits.application.port.KitRepository;
 import com.uxplima.uxmessentials.messaging.adapter.MessagingSettings;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.migration.BackupSnapshot;
+import com.uxplima.uxmessentials.migration.BlacklistedWorldSkip;
 import com.uxplima.uxmessentials.migration.ImportData;
 import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
@@ -50,12 +52,14 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
+import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.warps.WarpRepositories;
 import com.uxplima.uxmessentials.persistence.worlds.WorldRepositories;
+import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.BusPublisher;
 import com.uxplima.uxmessentials.shared.adapter.outbound.log.AuditChannel;
@@ -63,9 +67,12 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLook
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
+import com.uxplima.uxmessentials.warps.adapter.WarpsWiring;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.worlds.application.port.WorldRepository;
 import org.jspecify.annotations.NullMarked;
@@ -93,6 +100,10 @@ public final class MigrationWiring {
      * @param persistence the shared persistence DSL the writers upsert through
      * @param migrationConfig the {@code modules.migration} config subtree (source path, conflict and balance policies)
      * @param economyConfig the {@code modules.economy} config subtree (the default currency)
+     * @param warpsConfig the {@code modules.warps} config subtree, whose {@code world-blacklist} an imported server
+     *     warp is held to
+     * @param playerwarpsConfig the {@code modules.playerwarps} config subtree, whose {@code world-blacklist} an imported
+     *     player warp is held to
      * @param scheduler the off-tick dispatch port
      * @param log operator diagnostics
      * @param enabled the {@link MigrationModule} enable gate (ships disabled)
@@ -108,6 +119,8 @@ public final class MigrationWiring {
             Persistence persistence,
             ConfigStore migrationConfig,
             ConfigStore economyConfig,
+            ConfigStore warpsConfig,
+            ConfigStore playerwarpsConfig,
             Scheduler scheduler,
             Logger log,
             AuditChannel auditChannel,
@@ -120,6 +133,8 @@ public final class MigrationWiring {
         Objects.requireNonNull(persistence, "persistence");
         Objects.requireNonNull(migrationConfig, "migrationConfig");
         Objects.requireNonNull(economyConfig, "economyConfig");
+        Objects.requireNonNull(warpsConfig, "warpsConfig");
+        Objects.requireNonNull(playerwarpsConfig, "playerwarpsConfig");
         Objects.requireNonNull(scheduler, "scheduler");
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(targets, "targets");
@@ -130,7 +145,7 @@ public final class MigrationWiring {
         Writers writers = writers(
                 targets,
                 new DatabaseStores(plugin, persistence, economyConfig, log, worldScope),
-                ports(persistence, economyConfig, log, messagingConfig),
+                ports(persistence, economyConfig, warpsConfig, playerwarpsConfig, log, messagingConfig),
                 publisher,
                 scheduler);
         ImportOptions options = options(plugin, migrationConfig, log);
@@ -252,19 +267,41 @@ public final class MigrationWiring {
                 homes,
                 wallets,
                 ports.mail(),
+                new LedgerKitClaimTarget(ports.kitClaims(), targets.kitClaims()),
                 ports.mailRetention(),
                 StyledText::escape,
                 ports.defaultCurrency(),
                 ports.clock());
         RecordWriter repositories = new RepositoryRecordWriter(
-                users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
+                users,
+                warps,
+                ports.moderation(),
+                kits,
+                holograms,
+                worldRegistry,
+                playerWarps,
+                ports.clock(),
+                ports.log());
         RecordWriter dryRun = new DryRunRecordWriter(
                 users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
-        return new Writers(new AnnouncingRecordWriter(repositories, publisher, scheduler), dryRun);
+        // Both writers hold back a warp in a barred world the same way, so a dry run reports what a live run skips.
+        return new Writers(
+                new AnnouncingRecordWriter(
+                        heldToWorldBlacklists(repositories, ports), publisher, scheduler, targets::mutesImported),
+                heldToWorldBlacklists(dryRun, ports));
+    }
+
+    private static RecordWriter heldToWorldBlacklists(RecordWriter writer, WriterPorts ports) {
+        return new BlacklistedWorldSkip(writer, ports.warpWorlds(), ports.playerWarpWorlds());
     }
 
     private static WriterPorts ports(
-            Persistence persistence, ConfigStore economyConfig, Logger log, Optional<ConfigStore> messagingConfig) {
+            Persistence persistence,
+            ConfigStore economyConfig,
+            ConfigStore warpsConfig,
+            ConfigStore playerwarpsConfig,
+            Logger log,
+            Optional<ConfigStore> messagingConfig) {
         Clock clock = Clock.systemUTC();
         // The mail table ships with every install, but a disabled messaging module means the operator does not want
         // mail, so the import leaves it out rather than filling a mailbox nobody can open.
@@ -279,8 +316,13 @@ public final class MigrationWiring {
                 repository -> playerWarpWriter(repository, persistence, clock, log),
                 mail,
                 mailRetention,
+                ClaimLedgers.claims(persistence),
                 new EconomyConfig(economyConfig).currencies().defaultCurrency(),
-                clock);
+                // Read on every record from the live config, which a reload swaps whole, so it is safe off the tick.
+                () -> WarpsWiring.worldBlacklist(warpsConfig),
+                () -> PlayerwarpsWiring.worldBlacklist(playerwarpsConfig),
+                clock,
+                log);
     }
 
     /**
@@ -414,8 +456,12 @@ public final class MigrationWiring {
             Function<PlayerWarpRepository, PlayerWarpRecordWriter> playerWarps,
             Optional<MailRepository> mail,
             Duration mailRetention,
+            PlayerClaimLedger kitClaims,
             Currency defaultCurrency,
-            Clock clock) {}
+            Supplier<WorldBlacklist> warpWorlds,
+            Supplier<WorldBlacklist> playerWarpWorlds,
+            Clock clock,
+            Logger log) {}
 
     /** The live writer, which announces what an import changed, and the dry-run writer. */
     record Writers(AnnouncingRecordWriter live, RecordWriter dryRun) {}

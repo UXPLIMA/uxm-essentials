@@ -158,7 +158,8 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.pwarp.description` | /pwarp description <name> [text] to set or clear a player warp's description. | true |
 | `uxmessentials.pwarp.displayname` | /pwarp displayname <name> [text] to set or clear a player warp's display name. | true |
 | `uxmessentials.pwarp.icon` | /pwarp icon <name> [icon] to set or clear a player warp's browse icon. | true |
-| `uxmessentials.pwarp.limit.<n>` | How many player warps you may own; the largest tier held wins. | true |
+| `uxmessentials.pwarp.limit.<n>` | How many player warps you may own across every world; the largest tier held wins. | true |
+| `uxmessentials.pwarp.limit.<world>.<n>` | How many player warps you may own in one world, counting only your warps there; the largest tier held wins. The limit across every world still applies. | true |
 | `uxmessentials.pwarp.members` | /pwarp members <name> add\|remove <player> to grant or revoke a co-owner or manager on one of your warps. | true |
 | `uxmessentials.pwarp.move` | /pwarp move <name> to re-anchor one of your player warps at your location. | true |
 | `uxmessentials.pwarp.password` | /pwarp password <name> <password>\|clear to set or clear a player warp's password. | true |
@@ -181,7 +182,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.pwarp.info` | /pwarp info <name> to show a player warp's owner, access, price, visits, and rating. | true |
 | `uxmessentials.pwarp.list` | /pwarps [player] to list your warps or a player's public warps. | true |
 | `uxmessentials.pwarp.rate` | /pwarp rate <name> <1-5> to award a player warp a star rating. | true |
-| `uxmessentials.pwarp.use` | /pwarp <name> [owner] to teleport to your own or a player's public warp. | true |
+| `uxmessentials.pwarp.use` | /pwarp <name> [password] to teleport to a player warp you may enter; a password warp takes its password. | true |
 
 ## poses
 
@@ -229,7 +230,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.tpa.auto` | /tpauto to auto-accept incoming teleport requests. | true |
 | `uxmessentials.tpa.block` | /tpblock / /tpunblock to block a player's requests. | true |
 | `uxmessentials.tpa.cancel` | /tpcancel / /tpacancel to withdraw your outgoing request. | true |
-| `uxmessentials.tpa.toggle` | /tptoggle to refuse all incoming teleport requests. | true |
+| `uxmessentials.tpa.toggle` | /tptoggle to refuse incoming teleport requests and staff /tp and /tphere; /tpo and /tpohere still pass. | true |
 | `uxmessentials.tpa.use` | /tpa, /tpaccept, /tpdeny to request and resolve a teleport. | true |
 | `uxmessentials.tpahere.use` | /tpahere to ask a player to come to you. | true |
 | `uxmessentials.tpsettings.use` | /tpsettings opens your personal teleport settings panel. | true |
@@ -240,7 +241,7 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.rtp.gui` | /rtp gui to open the random-teleport world picker. | true |
 | `uxmessentials.rtp.others` | /rtp <player> to force another online player to random teleport (staff). | op |
 | `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. | true |
-| `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp may drop you; the largest tier held wins. | true |
+| `uxmessentials.rtp.radius.<blocks>` | How far from the world centre /rtp biome may search; the largest tier held wins. It only narrows rtp.max-radius, never widens it. | true |
 | `uxmessentials.rtp.use` | /rtp random teleport from the pre-warmed safe-location queue. | true |
 | `uxmessentials.bypass.join-spawn` | Exempt the player from automatic first-join/every-join spawn movement. | false |
 | `uxmessentials.spawn.named` | /spawn <name> to teleport to a named spawn. | true |
@@ -301,15 +302,15 @@ Contents: [economy](#economy) · [homes](#homes) · [kits](#kits) · [playerstat
 | `uxmessentials.bypass.lock.warp` | Use a locked warp regardless of its lock state. | op |
 | `uxmessentials.bypass.password.warp` | Use a password-protected warp without entering its password. | op |
 | `uxmessentials.bypass.safety.warp` | Use a warp whose destination fails the safety check. | op |
-| `uxmessentials.warp.delete` | /delwarp <name> to remove a warp. | op |
-| `uxmessentials.warp.edit` | /warp editor <name> to open the warp editor (cost, gates, effects, welcome message, icon). | op |
-| `uxmessentials.warp.info` | /warpinfo <name> to show a warp's owner, creation time and cost. | true |
-| `uxmessentials.warp.list` | /warps to list the warps you may use. | true |
+| `uxmessentials.warp.delete` | /warp del <name> to remove a warp. | op |
+| `uxmessentials.warp.edit` | /warp editor [name] to open the warp manager, or one warp's editor (icon, category, lock, password, welcome messages, sounds, particles, warmup and cooldown). | op |
+| `uxmessentials.warp.info` | /warp info <name> to show a warp's owner, creation time, cost and required permission. | true |
+| `uxmessentials.warp.list` | /warp list to list the warps you may use. | true |
 | `uxmessentials.warp.lock` | /warp lock <name> to lock or unlock a warp against use. | op |
-| `uxmessentials.warp.move` | /movewarp <name> to move an existing warp to your current location. | op |
+| `uxmessentials.warp.move` | /warp move <name> to move an existing warp to your current location, or to a given one with at. | op |
 | `uxmessentials.warp.others` | /warp <name> <player> to send another player to a warp. | op |
-| `uxmessentials.warp.password` | /warp password <name> to set or clear a warp's access password. | op |
-| `uxmessentials.warp.set` | /setwarp <name> to create or move a server-wide warp. | op |
+| `uxmessentials.warp.password` | /warp password <name> [password] to set a warp's access password, or clear it when none is given. | op |
+| `uxmessentials.warp.set` | /warp create <name> to create a server-wide warp, or move one that exists, at your location or a given one. | op |
 | `uxmessentials.warp.setserver` | /warp setserver <name\|all> [server] to record which server a warp lives on without moving it. | op |
 | `uxmessentials.warp.sign.create` | Create a [warp] sign that teleports players to a warp on click. | op |
 | `uxmessentials.warp.sign.use` | Use a [warp] sign to teleport to its warp. | true |

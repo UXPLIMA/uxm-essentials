@@ -12,7 +12,7 @@ package com.uxplima.uxmessentials.moderation.domain;
  */
 public enum ModerationError {
 
-    /** The target holds the exempt node and cannot be sanctioned by lower staff. */
+    /** The target holds the exempt node and cannot be sanctioned by anyone. */
     TARGET_EXEMPT(ModerationMessageKey.TARGET_EXEMPT),
 
     /**
@@ -30,8 +30,14 @@ public enum ModerationError {
     /** The named jail is not configured in {@code moderation.conf}. */
     UNKNOWN_JAIL(ModerationMessageKey.JAIL_UNKNOWN),
 
-    /** The target is already muted (a re-mute without a changed duration is a no-op). */
-    ALREADY_MUTED(ModerationMessageKey.MUTE_ALREADY),
+    /**
+     * The target is already muted, and a running mute is only changed by lifting it first. The refusal names the
+     * running mute, so the use case sends it with its placeholders itself.
+     */
+    ALREADY_MUTED(ModerationMessageKey.MUTE_ALREADY_TIMED),
+
+    /** The target is not online on any server, so a live action such as a kick had nobody to act on. */
+    TARGET_OFFLINE(ModerationMessageKey.KICK_OFFLINE),
 
     /** The {@code /unmute} target was not muted. */
     NOT_MUTED(ModerationMessageKey.UNMUTE_NOT_MUTED),
@@ -49,8 +55,8 @@ public enum ModerationError {
     NOT_BANNED(ModerationMessageKey.BAN_NOT_BANNED),
 
     /**
-     * A ban already in force lasts longer than the requested one, which would cut it short. The refusal names the
-     * running ban, so the use case sends it with its placeholders itself.
+     * A ban already in force, on the player or on the address, lasts longer than the requested one, which would cut
+     * it short. The refusal names the running ban, so the use case sends it with its placeholders itself.
      */
     LONGER_BAN_RUNNING(ModerationMessageKey.BAN_ALREADY_LONGER),
 

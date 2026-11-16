@@ -27,7 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * exempt node is never stopped, as {@link MutedCommandListener} does.
  *
  * <p>Runs at {@link EventPriority#LOW}, before a chat formatter or a bridge at NORMAL reads the line. The event is
- * asynchronous, so the policy's database read stays off the tick.
+ * asynchronous, so the policy's database read stays off the tick. The mute is asked first, so the exempt node is only
+ * read for a player who is muted; that read is the live one, which Paper allows on the chat thread.
  */
 @NullMarked
 public final class MutedChatListener implements Listener {
@@ -47,7 +48,7 @@ public final class MutedChatListener implements Listener {
     @EventHandler(priority = EventPriority.LOW, ignoreCancelled = true)
     public void onChat(AsyncChatEvent event) {
         PlayerRef speaker = BukkitRefs.toRef(event.getPlayer());
-        if (exempt.test(speaker) || !mutes.isMuted(speaker)) {
+        if (!mutes.isMuted(speaker) || exempt.test(speaker)) {
             return;
         }
         event.setCancelled(true);

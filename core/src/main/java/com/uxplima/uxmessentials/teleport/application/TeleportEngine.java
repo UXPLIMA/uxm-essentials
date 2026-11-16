@@ -4,12 +4,14 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownScope;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
@@ -17,9 +19,11 @@ import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.application.port.DomainGate;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Warmups;
+import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupKind;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -43,9 +47,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The cooldown/warmup machinery every cooldowned teleport flows through. It owns three steps in order:
  * (1) gate the shared teleport cooldown, (2) begin a move-cancellable warmup through the {@link Warmups}
- * port, and (3) on completion issue the async hop via {@link TeleportExecutor} and, under the
- * {@code teleport} start phase. Stamp the cooldown only then, so a denied, cancelled, or move-cancelled
- * teleport never burns it (the cooldown is added <em>after</em> the warmup).
+ * port, and (3) on completion issue the async hop via {@link TeleportExecutor}. Under the {@code teleport} start
+ * phase the cooldown is stamped only on landing, so a denied, cancelled, or move-cancelled teleport never burns it;
+ * under {@code request} and {@code accept} it is stamped once the checks pass and the warmup begins.
  *
  * <p>The move-cancels-warmup invariant is enforced by the adapter's {@code PlayerMoveEvent} listener
  * flipping the {@link WarmupHandle}; this engine wires the warmup's {@code onComplete}/{@code onCancel}
@@ -236,8 +240,8 @@ public final class TeleportEngine {
     }
 
     /**
-     * The checks an accepted request's mover passes before a hop to another backend: jail and combat tag, each told to
-     * the player. No cooldown, since a local accepted request never checks one either; it only stamps.
+     * The checks an accepted request's mover passes, on this backend or before a hop to another: jail and combat tag,
+     * each told to the player. No cooldown, since an accepted request never checks one; it only stamps.
      */
     public Result<Unit, TeleportError> gateAcceptedRequest(PlayerRef mover) {
         Objects.requireNonNull(mover, "mover");
@@ -363,8 +367,10 @@ public final class TeleportEngine {
     /**
      * Begin the move-cancellable warmup for an already-gated {@code /rtp}. When the warmup ends the cost (if any)
      * is withdrawn before the hop, so a player who spent their balance while standing still is refused with the
-     * same line the gate uses and does not move. A hop that then misses gives the money back. The cooldown stamp
-     * and the arrival grace wait for a real landing, so a move-cancelled warmup costs nothing at all.
+     * same line the gate uses and does not move. A hop that then misses gives the money back. The arrival grace waits
+     * for a real landing, and so does the cooldown under the {@code teleport} phase; under {@code request} and
+     * {@code accept} the cooldown starts as the warmup begins and stays when it is cancelled. A cancelled warmup is
+     * never charged.
      */
     public void launchRandom(PlayerRef who, Destination destination) {
         Objects.requireNonNull(who, "who");
@@ -400,7 +406,8 @@ public final class TeleportEngine {
      * warmup and no cooldown check, since the origin ran {@link #gateHop} before it charged and the player has
      * just joined. A jailed or combat-tagged player is still refused, and so is a hop the veto gate stops, each with
      * its notice. The landing goes through the same path as a local teleport's, so a {@code teleport}-phase
-     * cooldown is stamped once the player stands at the destination. Exactly one of {@code onLanded} and
+     * cooldown is stamped once the player stands at the destination, and a {@code request} or {@code accept}-phase one
+     * as the move starts, on the clock the origin's {@link #gateHop} checked. Exactly one of {@code onLanded} and
      * {@code onFailed} runs for a hop that was issued; a refusal runs neither and returns the error, so the caller
      * can give the money back.
      */
@@ -422,6 +429,12 @@ public final class TeleportEngine {
         if (!gate.allows(new PlayerTeleporting(mover, kind, destination.position()))) {
             notifier.send(mover, TeleportError.VETOED.messageKey());
             return Result.err(TeleportError.VETOED);
+        }
+        try {
+            startClock(mover, destination, kind);
+        } catch (RuntimeException stampFailure) {
+            // The player has paid and waited for this hop, so a stamp that fails lets them through and is logged.
+            log.error("cooldown stamp for the cross-server hop of " + mover.name() + " failed", stampFailure);
         }
         executor.teleport(mover, destination, kind, () -> landArrival(mover, destination, kind, onLanded), onFailed);
         return Result.ok();
@@ -632,6 +645,12 @@ public final class TeleportEngine {
             }
             return new Warmups.RefusedWarmup();
         }
+        try {
+            startClock(mover, destination, kind);
+        } catch (RuntimeException stampFailure) {
+            // The checks have passed, so a stamp that fails lets the teleport go ahead and is logged.
+            log.error("cooldown stamp for the teleport of " + mover.name() + " failed", stampFailure);
+        }
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);
@@ -644,10 +663,33 @@ public final class TeleportEngine {
                 mover,
                 warmupKind,
                 onComplete,
+                (CancelCause cause) ->
+                        onWarmupCancelled(mover, kind, reasonOf(cause), reported, TeleportOutcome.CANCELLED),
                 () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_CANCELLED, reported, TeleportOutcome.CANCELLED),
-                () -> onWarmupCancelled(
-                        mover, kind, TeleportMessageKey.WARMUP_REPLACED, reported, TeleportOutcome.SUPERSEDED));
+                        mover, kind, WarmupCancelReason.SUPERSEDED, reported, TeleportOutcome.SUPERSEDED));
+    }
+
+    private static WarmupCancelReason reasonOf(CancelCause cause) {
+        return switch (cause) {
+            case MOVED -> WarmupCancelReason.MOVED;
+            case ROTATED -> WarmupCancelReason.ROTATED;
+            case DAMAGED -> WarmupCancelReason.DAMAGED;
+            case INTERACTED -> WarmupCancelReason.INTERACTED;
+            case QUIT -> WarmupCancelReason.QUIT;
+            case ABORTED -> WarmupCancelReason.ABORTED;
+        };
+    }
+
+    private static TeleportMessageKey noticeOf(WarmupCancelReason reason) {
+        return switch (reason) {
+            case MOVED -> TeleportMessageKey.WARMUP_CANCELLED;
+            case ROTATED -> TeleportMessageKey.WARMUP_ROTATED;
+            case DAMAGED -> TeleportMessageKey.WARMUP_DAMAGED;
+            case INTERACTED -> TeleportMessageKey.WARMUP_INTERACTED;
+            case QUIT -> TeleportMessageKey.WARMUP_QUIT;
+            case SUPERSEDED -> TeleportMessageKey.WARMUP_REPLACED;
+            case ABORTED -> TeleportMessageKey.WARMUP_ABORTED;
+        };
     }
 
     private void hop(
@@ -675,23 +717,39 @@ public final class TeleportEngine {
         postArrival.run();
     }
 
+    /**
+     * Start the cooldown as a teleport is let through, under the {@code request} and {@code accept} phases. A teleport
+     * that is not a player request has no request or accept step of its own, so both phases mean the moment every
+     * check has passed: its warmup starting, or, for a hop from another server, its move starting here. The stamp
+     * stays when the warmup is then cancelled or the hop misses, as a denied request keeps a {@code request}-phase
+     * stamp: what sets these phases apart from {@code teleport} is that trying is what costs the wait. A player
+     * request stamps at its own request and accept moments instead, through {@link #stampForPhase}.
+     */
+    private void startClock(PlayerRef mover, Destination destination, TeleportKind kind) {
+        if (settings.cooldownStartPhase() != CooldownStartPhase.TELEPORT && kind != TeleportKind.REQUEST) {
+            cooldowns.stamp(mover, cooldownKind(kind, destination));
+        }
+    }
+
     private void onWarmupCancelled(
-            PlayerRef mover, TeleportKind kind, TeleportMessageKey notice, OneOutcome reported, TeleportOutcome ended) {
-        // A warmup stopped by a move and one replaced by the player's next teleport both end here and differ only in
-        // what the player is told, so whatever a cancel has to undo is done once, whichever way it was stopped. The
-        // outcome is reported even when the notice fails, since a caller gives a charge back on it.
+            PlayerRef mover, TeleportKind kind, WarmupCancelReason reason, OneOutcome reported, TeleportOutcome ended) {
+        // Every way a warmup is stopped (a move, a hit, the player leaving, the player's next teleport) ends here and
+        // differs only in what the player and listeners are told, so whatever a cancel has to undo is done once,
+        // whichever way it was stopped. The outcome is reported even when the notice fails, since a caller gives a
+        // charge back on it.
         try {
-            notifier.send(mover, notice);
-            events.publish(new WarmupCancelled(mover, kind, WarmupCancelReason.ABORTED));
+            notifier.send(mover, noticeOf(reason));
+            events.publish(new WarmupCancelled(mover, kind, reason));
         } finally {
             reported.report(ended);
         }
     }
 
     /**
-     * Stamp the cooldown for an earlier phase ({@code request}/{@code accept}) when configured. This is the
-     * {@code tpa} path, so the kind is {@link TeleportKind#REQUEST}; tpa carries no per-verb override and
-     * stamps under the shared {@code tp} scope, matching its prior single-cooldown behaviour.
+     * Stamp a player request's cooldown at {@code atPhase} when that is the configured phase: {@code request} once a
+     * {@code /tpa} or {@code /tpahere} is open, for the player who sent it, and {@code accept} when it is accepted,
+     * for the player who moves. The kind is {@link TeleportKind#REQUEST}, which carries no per-verb override and
+     * stamps under the shared {@code tp} scope.
      */
     public void stampForPhase(PlayerRef mover, CooldownStartPhase atPhase) {
         if (settings.cooldownStartPhase() == atPhase && atPhase != CooldownStartPhase.TELEPORT) {
@@ -713,20 +771,25 @@ public final class TeleportEngine {
      * resolves the shared {@code uxmessentials.tp.cooldown.<n>} permission tiers. A verb whose config
      * override is set ({@code cooldowns.<verb> >= 0}) gets its own stamp scope ({@code tp.<verb>}) so it
      * rate-limits independently, with the override as its fallback default; a verb left at {@code -1}
-     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. On the
-     * shared clock a held tier sets the wait; a verb or destination with its own value keeps that value as a ceiling
-     * the tier can only lower ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
+     * keeps the shared {@code tp} stamp and the shared {@code default-cooldown}, preserving prior behaviour. A
+     * destination with its own cooldown (a warp's editor value) stamps under its own clock ({@code tp.<clock>}), so
+     * two warps that each set one never hold each other back. On the shared clock a held tier sets the wait; a verb
+     * or destination with its own value keeps that value as a ceiling the tier can only lower
+     * ({@link Cooldowns.TierRule#CAP}), since one tier spans all those values.
      */
     private CooldownKind cooldownKind(TeleportKind kind, Destination destination) {
-        if (kind == TeleportKind.RANDOM && destination.cooldownOverride().isEmpty()) {
+        Optional<OwnCooldown> own = destination.ownCooldown();
+        if (kind == TeleportKind.RANDOM && own.isEmpty()) {
             // A random teleport carries no destination-level override, so its stamp resolves the same rtp-specific
             // tier the pre-search gate checked: keeping gateRandom's check and onLanded's stamp on one node.
             return randomCooldownKind();
         }
-        if (destination.cooldownOverride().isPresent()) {
-            long seconds = destination.cooldownOverride().get().toSeconds();
+        if (own.isPresent()) {
             return CooldownKind.scoped(
-                    FEATURE, FEATURE + "." + verbScope(kind), seconds, mapPhase(settings.cooldownStartPhase()));
+                    FEATURE,
+                    FEATURE + "." + CooldownScope.distinct(own.get().clock()),
+                    own.get().length().toSeconds(),
+                    mapPhase(settings.cooldownStartPhase()));
         }
         long override = settings.verbCooldownOverrideSeconds(kind);
         Cooldowns.CooldownStartPhase phase = mapPhase(settings.cooldownStartPhase());

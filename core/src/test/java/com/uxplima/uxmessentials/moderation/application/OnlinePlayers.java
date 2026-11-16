@@ -23,6 +23,11 @@ final class OnlinePlayers implements Sanctions {
         return this;
     }
 
+    /** {@code player} disconnects on their own. */
+    void leave(PlayerRef player) {
+        addresses.remove(player);
+    }
+
     /** Each kicked player and the screen text they read. */
     Map<PlayerRef, String> kicked() {
         return Map.copyOf(kicked);

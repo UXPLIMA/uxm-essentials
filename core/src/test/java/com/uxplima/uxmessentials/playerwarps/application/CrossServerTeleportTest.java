@@ -23,22 +23,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpEconomy;
-import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpPasswordStore;
-import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpRepository;
 import com.uxplima.uxmessentials.playerwarps.application.port.PlayerWarpTeleporter;
-import com.uxplima.uxmessentials.playerwarps.application.port.WarpBanStore;
-import com.uxplima.uxmessentials.playerwarps.application.port.WarpMemberStore;
-import com.uxplima.uxmessentials.playerwarps.application.port.WarpWhitelistStore;
-import com.uxplima.uxmessentials.playerwarps.domain.BanRecord;
 import com.uxplima.uxmessentials.playerwarps.domain.ChargeError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarp;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
-import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
-import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
-import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
 import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
@@ -101,7 +92,7 @@ class CrossServerTeleportTest {
     private final MutableClock clock = new MutableClock(NOW);
     private final SteppedScheduler scheduler = new SteppedScheduler(clock);
     private final MemoryHopStore store = new MemoryHopStore();
-    private final Warps warps = new Warps();
+    private final PlayerWarpFakes.Warps warps = new PlayerWarpFakes.Warps();
     private final Purse purse = new Purse();
     private final Moves moves = new Moves();
     private final RecordingLogger log = new RecordingLogger();
@@ -121,8 +112,10 @@ class CrossServerTeleportTest {
     private final HopWatchdog lobby = new HopWatchdog(store, lobbyResolvers, charges, scheduler, log, TTL, clock);
     private final HopArrival survival = arrivalOn(SURVIVAL);
 
+    private final PlayerWarpFakes.Passwords passwords = new PlayerWarpFakes.Passwords();
     private HopGate gate = HopGate.OPEN;
     private boolean tagged;
+    private boolean jailed;
 
     CrossServerTeleportTest() {
         warps.put(marketOn(SURVIVAL));
@@ -184,14 +177,14 @@ class CrossServerTeleportTest {
                 notifier.notifier(),
                 safetyOn(LOBBY),
                 permissions,
-                new NoBans(),
-                new NoMembers(),
-                new NoWhitelist(),
-                new NoPasswords(),
-                cooldowns,
+                new PlayerWarpFakes.NoBans(),
+                new PlayerWarpFakes.NoMembers(),
+                new PlayerWarpFakes.NoWhitelist(),
+                passwords,
+                PasswordAttempts.defaults(clock),
                 Optional.of(purse),
                 LOBBY,
-                new PlayerWarpHops(departures, charges, resolverOn(LOBBY)),
+                new PlayerWarpHops(departures, charges, resolverOn(LOBBY), notifier.notifier()),
                 clock,
                 new PaidTeleports(scheduler, log),
                 log);
@@ -215,7 +208,7 @@ class CrossServerTeleportTest {
                 notifier.notifier(),
                 new RecordingEvents(),
                 new TeleportSettings(new Defaults()),
-                who -> false,
+                who -> jailed,
                 who -> tagged);
     }
 
@@ -302,12 +295,54 @@ class CrossServerTeleportTest {
     }
 
     @Test
-    void aUseWithTheCrossServerRouteOffIsRefundedAndLeavesTheOwnerUnpaid() {
-        lobbyGate(false).useFor(ALEX, MARKET_NAME);
+    void aUseWithTheCrossServerRouteOffIsRefusedBeforeAnythingIsCharged() {
+        Result<Unit, PlayerWarpError> used = lobbyGate(false).useFor(ALEX, MARKET_NAME);
 
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(purse.charges).isZero();
+        assertThat(purse.refunds).isZero();
         assertThat(wallet()).isEqualByComparingTo(START);
         assertThat(vault()).isEqualByComparingTo("0");
-        assertThat(notifier.keys()).containsExactly("pwarp.cross-server.unavailable", "pwarp.cross-server.refunded");
+        assertThat(connects).isEmpty();
+        assertThat(notifier.sent())
+                .containsExactly(new RecordingNotifier.Sent(
+                        ALEX, "pwarp.cross-server.off", Map.of("warp", "market", "server", SURVIVAL)));
+    }
+
+    @Test
+    void aUseWithTheCrossServerRouteOffIsRefusedBeforeTheTeleportRulesAreAsked() {
+        gate = new TeleportHopGate(engine());
+        tagged = true;
+
+        Result<Unit, PlayerWarpError> used = lobbyGate(false).useFor(ALEX, MARKET_NAME);
+
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(wallet()).isEqualByComparingTo(START);
+        assertThat(notifier.keys()).containsExactly("pwarp.cross-server.off");
+    }
+
+    @Test
+    void aPasswordWarpOnAnotherServerWithTheRouteOffIsRefusedBeforeThePasswordIsAsked() {
+        warps.put(marketOn(SURVIVAL).withAccess(WarpAccess.PASSWORD, NOW));
+
+        Result<Unit, PlayerWarpError> used = lobbyGate(false).useFor(ALEX, MARKET_NAME, Optional.of("guess"));
+
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(passwords.checks).isZero();
+        assertThat(notifier.keys()).containsExactly("pwarp.cross-server.off");
+    }
+
+    @Test
+    void aJailedPlayerIsRefusedACrossServerWarpBeforeAnythingIsCharged() {
+        jailed = true;
+        gate = new TeleportHopGate(engine());
+
+        Result<Unit, PlayerWarpError> used = lobbyGate().useFor(ALEX, MARKET_NAME);
+
+        assertThat(used.asError()).contains(PlayerWarpError.TELEPORT_REFUSED);
+        assertThat(purse.charges).isZero();
+        assertThat(connects).isEmpty();
+        assertThat(notifier.keys()).containsExactly("teleport.jailed");
     }
 
     @Test
@@ -557,6 +592,22 @@ class CrossServerTeleportTest {
 
         assertThat(purse.refunds).isOne();
         assertThat(notifier.keys()).containsExactly("pwarp.cross-server.unavailable", "pwarp.cross-server.refunded");
+    }
+
+    @Test
+    void aRequestThatRacesAnotherIsRefundedOnceAndToldTheOtherMoveIsUnderWay() {
+        // The second request starts while the first has read no earlier row and not yet written its own.
+        store.afterNextFind(() -> assertThat(track(Optional.of(CHARGE))).isFalse());
+
+        assertThat(track(Optional.of(CHARGE))).isTrue();
+
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("common.hop-busy", "pwarp.cross-server.refunded");
+
+        // The first request is the one in the store, refunded by its own timer and by nothing else.
+        scheduler.advance(TTL);
+        assertThat(purse.refunds).isEqualTo(2);
+        assertThat(store.rows()).isEmpty();
     }
 
     @Test
@@ -856,7 +907,7 @@ class CrossServerTeleportTest {
                 notifier.notifier(),
                 new RecordingEvents(),
                 new TeleportSettings(new Defaults()),
-                who -> false,
+                who -> jailed,
                 who -> tagged);
     }
 
@@ -885,77 +936,12 @@ class CrossServerTeleportTest {
         assertThat(wallet()).isEqualByComparingTo("49.00");
     }
 
-    private static final class Warps implements PlayerWarpRepository {
-
-        private final Map<PlayerWarpId, PlayerWarp> byId = new HashMap<>();
-
-        void put(PlayerWarp warp) {
-            byId.put(warp.id().orElseThrow(), warp);
-        }
-
-        @Override
-        public Optional<PlayerWarp> findByName(PlayerWarpName name) {
-            return byId.values().stream().filter(w -> w.name().equals(name)).findFirst();
-        }
-
-        @Override
-        public Optional<PlayerWarp> findById(PlayerWarpId id) {
-            return Optional.ofNullable(byId.get(id));
-        }
-
-        @Override
-        public List<PlayerWarp> ownedBy(PlayerRef owner) {
-            return byId.values().stream().filter(w -> w.owner().equals(owner)).toList();
-        }
-
-        @Override
-        public List<PlayerWarp> publicOwnedBy(PlayerRef owner) {
-            return ownedBy(owner);
-        }
-
-        @Override
-        public int count(PlayerRef owner) {
-            return ownedBy(owner).size();
-        }
-
-        @Override
-        public boolean existsByName(PlayerWarpName name) {
-            return findByName(name).isPresent();
-        }
-
-        @Override
-        public PlayerWarpId save(PlayerWarp warp) {
-            put(warp);
-            return warp.id().orElseThrow();
-        }
-
-        @Override
-        public void deleteById(PlayerWarpId id) {
-            byId.remove(id);
-        }
-
-        /** Make the visit counter's write fail, as a database fault would. */
-        private boolean visitFails;
-
-        @Override
-        public void recordVisit(PlayerWarpId id) {
-            if (visitFails) {
-                throw new IllegalStateException("the visit write failed");
-            }
-        }
-
-        @Override
-        public void updateRating(PlayerWarpId id, RatingSummary summary) {}
-
-        @Override
-        public void refreshFavouriteCount(PlayerWarpId id) {}
-    }
-
     /** Wallets per player and each warp's vault, with no cut, so every amount can be followed exactly. */
     private static final class Purse implements PlayerWarpEconomy {
 
         private final Map<UUID, BigDecimal> wallets = new HashMap<>();
         private final Map<PlayerWarpId, BigDecimal> vaults = new HashMap<>();
+        private int charges;
         private int refunds;
         private boolean accrualFails;
         private boolean refundFails;
@@ -967,6 +953,7 @@ class CrossServerTeleportTest {
                 return Result.err(ChargeError.INSUFFICIENT_FUNDS);
             }
             wallets.put(payer.uuid(), balance.subtract(price));
+            charges++;
             return Result.ok();
         }
 
@@ -1039,9 +1026,7 @@ class CrossServerTeleportTest {
                     || through.gateHop(
                                     who,
                                     Destination.at(
-                                            warp.location(),
-                                            warp.timing().warmup(),
-                                            warp.timing().cooldown()),
+                                            warp.location(), warp.timing().warmup(), warp.ownCooldown()),
                                     TeleportKind.WARP)
                             .isOk();
         }
@@ -1062,8 +1047,8 @@ class CrossServerTeleportTest {
                 outcome.complete(TeleportOutcome.LANDED);
                 return outcome;
             }
-            Destination destination = Destination.at(
-                    warp.location(), warp.timing().warmup(), warp.timing().cooldown());
+            Destination destination =
+                    Destination.at(warp.location(), warp.timing().warmup(), warp.ownCooldown());
             if (through.launch(who, destination, TeleportKind.WARP, outcome::complete)
                     .isOk()) {
                 made.add(who.name() + "->" + warp.name().value());
@@ -1091,8 +1076,8 @@ class CrossServerTeleportTest {
                 onLanded.run();
                 return;
             }
-            Destination destination = Destination.at(
-                    warp.location(), warp.timing().warmup(), warp.timing().cooldown());
+            Destination destination =
+                    Destination.at(warp.location(), warp.timing().warmup(), warp.ownCooldown());
             Runnable landed = () -> {
                 made.add(who.name() + "->" + warp.name().value());
                 onLanded.run();
@@ -1120,77 +1105,6 @@ class CrossServerTeleportTest {
         @Override
         public int getInt(String path, int fallback) {
             return fallback;
-        }
-    }
-
-    private static final class NoBans implements WarpBanStore {
-
-        @Override
-        public void ban(PlayerWarpId warp, BanRecord record) {}
-
-        @Override
-        public void unban(PlayerWarpId warp, UUID player) {}
-
-        @Override
-        public Optional<BanRecord> find(PlayerWarpId warp, UUID player) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<BanRecord> list(PlayerWarpId warp) {
-            return List.of();
-        }
-    }
-
-    private static final class NoMembers implements WarpMemberStore {
-
-        @Override
-        public void put(PlayerWarpId warp, WarpMember member) {}
-
-        @Override
-        public void remove(PlayerWarpId warp, UUID player) {}
-
-        @Override
-        public Optional<WarpRole> roleOf(PlayerWarpId warp, UUID player) {
-            return Optional.empty();
-        }
-
-        @Override
-        public List<WarpMember> list(PlayerWarpId warp) {
-            return List.of();
-        }
-    }
-
-    private static final class NoWhitelist implements WarpWhitelistStore {
-
-        @Override
-        public void add(PlayerWarpId warp, UUID player) {}
-
-        @Override
-        public void remove(PlayerWarpId warp, UUID player) {}
-
-        @Override
-        public boolean contains(PlayerWarpId warp, UUID player) {
-            return false;
-        }
-
-        @Override
-        public List<UUID> list(PlayerWarpId warp) {
-            return List.of();
-        }
-    }
-
-    private static final class NoPasswords implements PlayerWarpPasswordStore {
-
-        @Override
-        public void set(PlayerWarpId warp, String plaintext) {}
-
-        @Override
-        public void clear(PlayerWarpId warp) {}
-
-        @Override
-        public boolean matches(PlayerWarpId warp, String plaintext) {
-            return false;
         }
     }
 }

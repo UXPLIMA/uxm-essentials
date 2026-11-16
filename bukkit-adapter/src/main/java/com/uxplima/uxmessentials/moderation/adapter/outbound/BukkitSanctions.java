@@ -37,9 +37,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The {@link Sanctions} adapter: the live-player side of a sanction on top of the Paper {@link Server} and the
  * kernel {@link Scheduler}. Every per-player action hops to the player's entity thread through the scheduler
- * (Folia-valid) and silently no-ops when the player is offline. The frozen set is session-scoped runtime
- * state owned here (a {@code ConcurrentHashMap}-backed UUID set the move listener consults) so a relog
- * clears a freeze; it is not DB-backed.
+ * (Folia-valid) and silently no-ops when the player is offline. The frozen set is in-memory runtime state owned
+ * here (a {@code ConcurrentHashMap}-backed UUID set the move listener consults), not DB-backed. Nothing removes a
+ * player from it on quit, so a relog does not escape a freeze; {@link #unfreeze} and the module stop do.
  *
  * <p>The jail teleport resolves the named jail's location store-first. The DB-backed {@link JailLocationStore}
  * an operator fills with {@code /setjail}, falling back to {@link ModerationSettings} (the {@code
@@ -146,9 +146,13 @@ public final class BukkitSanctions implements Sanctions, JailCells {
     public void sendToJail(PlayerRef target, String jail) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(jail, "jail");
-        Optional<Location> location = jailLocation(jail);
-        location.ifPresent(loc ->
-                scheduler.onEntity(target, () -> withPlayer(target, player -> teleport(player, loc))));
+        // The stored jail is a database read, done here on the caller's thread; the world it names is looked up on
+        // the player's own thread, the only one allowed to read the world list on Folia.
+        Optional<Position> stored =
+                jailLocations.find(StoredJail.normalise(jail)).map(StoredJail::location);
+        scheduler.onEntity(
+                target,
+                () -> withPlayer(target, player -> jailLocation(stored, jail).ifPresent(loc -> teleport(player, loc))));
     }
 
     @Override
@@ -185,18 +189,15 @@ public final class BukkitSanctions implements Sanctions, JailCells {
         return server.getWorld(world.uid()) != null;
     }
 
-    private Optional<Location> jailLocation(String jail) {
-        Optional<Location> stored = storedJailLocation(jail);
-        return stored.isPresent() ? stored : configJailLocation(jail);
+    private Optional<Location> jailLocation(Optional<Position> stored, String jail) {
+        Optional<Location> fromStore = stored.flatMap(this::location);
+        return fromStore.isPresent() ? fromStore : configJailLocation(jail);
     }
 
-    private Optional<Location> storedJailLocation(String jail) {
-        return jailLocations.find(StoredJail.normalise(jail)).flatMap(stored -> {
-            Position at = stored.location();
-            World world = server.getWorld(at.world().uid());
-            World byName = world == null ? server.getWorld(at.world().name()) : world;
-            return byName == null ? Optional.empty() : Optional.of(BukkitRefs.toLocation(byName, at));
-        });
+    private Optional<Location> location(Position at) {
+        World world = server.getWorld(at.world().uid());
+        World byName = world == null ? server.getWorld(at.world().name()) : world;
+        return byName == null ? Optional.empty() : Optional.of(BukkitRefs.toLocation(byName, at));
     }
 
     private Optional<Location> configJailLocation(String jail) {

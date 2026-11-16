@@ -14,6 +14,7 @@ import org.bukkit.plugin.Plugin;
 
 import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.teleport.CachedSpawnDirectory;
+import com.uxplima.uxmessentials.persistence.teleport.PendingRelocationStores;
 import com.uxplima.uxmessentials.persistence.teleport.RtpPoolStores;
 import com.uxplima.uxmessentials.persistence.teleport.SpawnDirectories;
 import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistration;
@@ -70,6 +71,7 @@ import com.uxplima.uxmessentials.teleport.adapter.outbound.TeleportArrivalHud;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.TrackingWarmups;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.VanillaFallbackSpawnDirectory;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.WorldGuardRegions;
+import com.uxplima.uxmessentials.teleport.adapter.outbound.nms.PlayerDataLogoutPositions;
 import com.uxplima.uxmessentials.teleport.application.AcceptTeleport;
 import com.uxplima.uxmessentials.teleport.application.AsyncSafeLocationFinder;
 import com.uxplima.uxmessentials.teleport.application.BiomePoolSlice;
@@ -82,6 +84,7 @@ import com.uxplima.uxmessentials.teleport.application.CrossServerRequests;
 import com.uxplima.uxmessentials.teleport.application.CrossServerStaffTeleport;
 import com.uxplima.uxmessentials.teleport.application.HotspotBiasedSampler;
 import com.uxplima.uxmessentials.teleport.application.ListPendingRequests;
+import com.uxplima.uxmessentials.teleport.application.OfflineTeleport;
 import com.uxplima.uxmessentials.teleport.application.PlayerHopResolver;
 import com.uxplima.uxmessentials.teleport.application.PlayerHops;
 import com.uxplima.uxmessentials.teleport.application.RequestTeleport;
@@ -100,6 +103,8 @@ import com.uxplima.uxmessentials.teleport.application.port.ArrivalGrace;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeCatalog;
 import com.uxplima.uxmessentials.teleport.application.port.BiomeHotspots;
 import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
+import com.uxplima.uxmessentials.teleport.application.port.LogoutPositions;
+import com.uxplima.uxmessentials.teleport.application.port.PendingRelocations;
 import com.uxplima.uxmessentials.teleport.application.port.ProtectedLand;
 import com.uxplima.uxmessentials.teleport.application.port.RtpPoolStore;
 import com.uxplima.uxmessentials.teleport.application.port.SpawnDirectory;
@@ -181,6 +186,9 @@ public final class TeleportWiring {
         TeleportSettings settings = new TeleportSettings(config);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WarmupTracker warmupTracker = new WarmupTracker();
+        // A home, warp or any other hop to another backend is a new teleport, so it replaces a warmup running here,
+        // whichever context sends it.
+        hops.bindLocalWarmups(who -> warmupTracker.supersede(who.uuid()));
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
         // Reads an installed combat plugin's tag so a losing fight cannot be escaped with /home or /tpa. We own
@@ -214,7 +222,8 @@ public final class TeleportWiring {
                 rtp,
                 fee,
                 graceGuard,
-                crossServer);
+                crossServer,
+                PendingRelocationStores.of(persistence));
         RequestExpirySweep sweep = new RequestExpirySweep(
                 kernel.scheduler(), services.requests(), services.acceptTeleport(), kernel.log(), running::get);
         RespawnListener respawnListener = new RespawnListener(
@@ -226,8 +235,16 @@ public final class TeleportWiring {
                 services.rtpQueue(),
                 graceGuard,
                 settings::rtpOnRespawnWorlds);
+        // Which players have a /tpofflinehere move waiting here is read once, off the tick, so a join without one reads
+        // nothing and keeps its join move on the join tick.
+        services.offlineTeleport().loadIndex();
         SpawnJoinListener joinListener = new SpawnJoinListener(
-                settings, services.resolveSpawn(), services.resolveRtp(), services.executor(), kernel.permissions());
+                settings,
+                services.resolveSpawn(),
+                services.resolveRtp(),
+                services.executor(),
+                kernel.permissions(),
+                services.offlineTeleport());
         // The per-player settings panel reuses the SP0 GUI framework over the shared catalog and the data-folder
         // layout loader. It reads and writes the same TeleportFlags the /tptoggle and /tpauto commands do, so
         // /tpsettings, the panel, and the commands all see one switch. The teleport entry on the /uxmess gui hub
@@ -292,7 +309,8 @@ public final class TeleportWiring {
             RtpBundle rtp,
             TeleportFee fee,
             ArrivalGrace grace,
-            CrossServer crossServer) {
+            CrossServer crossServer,
+            PendingRelocations relocations) {
         InMemoryBackLocationStore backStore = new InMemoryBackLocationStore();
         InMemoryRequestRegistry requests = new InMemoryRequestRegistry(settings.singleRequestDisplace());
         PdcTeleportFlags flags = new PdcTeleportFlags(plugin);
@@ -343,8 +361,8 @@ public final class TeleportWiring {
                 notifier,
                 kernel.scheduler(),
                 new RtpRadiusTier(kernel.permissions()));
-        RequestTeleport requestTeleport =
-                new RequestTeleport(requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, clock);
+        RequestTeleport requestTeleport = new RequestTeleport(
+                requests, flags, notifier, kernel.events(), settings, jailGate, combatGate, engine, clock);
         PlayerHops playerHops = PlayerHops.off();
         if (crossServer.enabled()) {
             for (HopKind kind : List.of(HopKind.PLAYER_REQUEST, HopKind.PLAYER_STAFF)) {
@@ -406,6 +424,19 @@ public final class TeleportWiring {
         return new TeleportServices.Builder()
                 .crossServerRequests(crossServerRequests)
                 .crossServerStaff(crossServerStaff)
+                .offlineTeleport(new OfflineTeleport(
+                        logoutPositions(kernel.log()),
+                        relocations,
+                        kernel.playerLookup(),
+                        kernel.worldLookup(),
+                        crossServer.visibility(),
+                        jailGate,
+                        executor,
+                        kernel.scheduler(),
+                        notifier,
+                        clock,
+                        network.localServer().serverId(),
+                        kernel.log()))
                 .engine(engine)
                 .notifier(notifier)
                 .settings(settings)
@@ -574,6 +605,19 @@ public final class TeleportWiring {
             BiomeCatalog biomeCatalog,
             BiomeTargetedSearch biomeSearch,
             @Nullable Listener hotspotListener) {}
+
+    /**
+     * The saved player data {@code /tpoffline} reads, through the server's internals. When those moved in a server
+     * update, {@code /tpoffline} answers that the position could not be read and the rest of the module still starts.
+     */
+    private static LogoutPositions logoutPositions(Logger log) {
+        try {
+            return PlayerDataLogoutPositions.ofServer(log);
+        } catch (LinkageError | RuntimeException unavailable) {
+            log.warn("event=tpoffline_unavailable cause={}", unavailable.toString());
+            return LogoutPositions.UNAVAILABLE;
+        }
+    }
 
     /**
      * The scope a plain {@code /setmainspawn} writes: this server's own on a network, so one backend's spawn leaves

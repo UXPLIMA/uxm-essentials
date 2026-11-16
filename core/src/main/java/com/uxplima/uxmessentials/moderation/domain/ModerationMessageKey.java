@@ -17,7 +17,9 @@ public enum ModerationMessageKey implements MessageKey {
     MUTE_APPLIED("moderation.mute.applied"),
     MUTE_APPLIED_TIMED("moderation.mute.applied-timed"),
     MUTE_NOTIFY_TARGET("moderation.mute.notify-target"),
-    MUTE_ALREADY("moderation.mute.already"),
+    // a /mute on a player already muted is refused, naming the mute that runs
+    MUTE_ALREADY_PERMANENT("moderation.mute.already-permanent"),
+    MUTE_ALREADY_TIMED("moderation.mute.already-timed"),
     UNMUTE_APPLIED("moderation.unmute.applied"),
     UNMUTE_NOT_MUTED("moderation.unmute.not-muted"),
 
@@ -26,6 +28,10 @@ public enum ModerationMessageKey implements MessageKey {
     JAIL_APPLIED_TIMED("moderation.jail.applied-timed"),
     JAIL_NOTIFY_TARGET("moderation.jail.notify-target"),
     JAIL_UNKNOWN("moderation.jail.unknown-jail"),
+    // /togglejail with no jail name and no default-jail: the jails to choose from
+    TOGGLEJAIL_NAME_NEEDED("moderation.togglejail.name-needed"),
+    // /togglejail with no jail name whose default-jail names no jail
+    TOGGLEJAIL_DEFAULT_MISSING("moderation.togglejail.default-missing"),
     JAIL_ALREADY("moderation.jail.already"),
     JAIL_HOP_SENDING("moderation.jail.cross-server.sending"),
     JAIL_HOP_ARRIVED("moderation.jail.cross-server.arrived"),
@@ -60,6 +66,8 @@ public enum ModerationMessageKey implements MessageKey {
     // /tempban
     TEMPBAN_APPLIED("moderation.tempban.applied"),
     TEMPBAN_KICK("moderation.tempban.kick"),
+    // a /tempban as long as the span a permanent ban is stored with is refused; /ban is the permanent ban
+    TEMPBAN_TOO_LONG("moderation.tempban.too-long"),
 
     // /ban, /unban, permanent UUID ban and its lift
     BAN_APPLIED("moderation.ban.applied"),
@@ -105,6 +113,8 @@ public enum ModerationMessageKey implements MessageKey {
     // /staffrollback. Revoke a staff member's still-active sanctions
     MOD_STAFFROLLBACK_SUMMARY("moderation.staffrollback.summary"),
     MOD_STAFFROLLBACK_NONE("moderation.staffrollback.none"),
+    // a limit above the most a rollback reads was lowered to it
+    MOD_STAFFROLLBACK_CAPPED("moderation.staffrollback.capped"),
 
     // /modstats. Staff punishment analytics: the server-wide leaderboard and a single-staff breakdown, each
     // with an all-time and a windowed variant so the time frame is stated in the line rather than an inline literal
@@ -124,6 +134,7 @@ public enum ModerationMessageKey implements MessageKey {
 
     // /kick, /kickall
     KICK_APPLIED("moderation.kick.applied"),
+    KICK_OFFLINE("moderation.kick.offline"),
     KICK_KICKED("moderation.kick.kicked"),
     KICKALL_APPLIED("moderation.kickall.applied"),
 
@@ -145,6 +156,9 @@ public enum ModerationMessageKey implements MessageKey {
     BANIP_INVALID_IP("moderation.banip.invalid-ip"),
     UNBANIP_APPLIED("moderation.unbanip.applied"),
     UNBANIP_NOT_BANNED("moderation.unbanip.not-banned"),
+    // a /banip or /tempbanip that would cut short the IP ban already in force is refused, naming that ban
+    BANIP_ALREADY_PERMANENT("moderation.banip.already-permanent"),
+    BANIP_ALREADY_LONGER("moderation.banip.already-longer"),
 
     // /freeze, /unfreeze
     FREEZE_APPLIED("moderation.freeze.applied"),
@@ -199,6 +213,9 @@ public enum ModerationMessageKey implements MessageKey {
     MOD_WARN_ESCALATED_EXTENDED("moderation.warn-escalated-extended"),
     MOD_WARN_ESCALATED_HELD("moderation.warn-escalated-held"),
     MOD_WARN_ESCALATION_FAILED("moderation.warn-escalation-failed"),
+    // the reason stored with a ladder sanction: the warning count that tripped the step, and that warning's reason
+    MOD_WARN_ESCALATION_REASON("moderation.warn-escalation-reason"),
+    MOD_WARN_ESCALATION_REASON_BARE("moderation.warn-escalation-reason-bare"),
 
     // shared moderation failures
     TARGET_EXEMPT("moderation.target-exempt"),

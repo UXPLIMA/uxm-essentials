@@ -5,6 +5,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.CLOCK;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
+import com.uxplima.uxmessentials.moderation.domain.IpBan;
+import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -20,7 +23,10 @@ import com.uxplima.uxmessentials.testing.RecordingEvents;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
-/** An IP ban removes everyone on the address at once, here and on every other server. */
+/**
+ * An IP ban removes everyone on the address at once, here and on every other server, and never cuts short an IP ban
+ * already running on the address.
+ */
 class BanIpTest {
 
     private static final PlayerRef STAFF =
@@ -101,6 +107,58 @@ class BanIpTest {
 
         assertThat(online.kicked()).isEmpty();
         assertThat(peers.ipBans).isEmpty();
+    }
+
+    @Test
+    void aTimedIpBanOnAPermanentlyBannedAddressIsRefusedAndThePermanentBanStays() {
+        banIp().banIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "", Optional.of("griefing"));
+
+        assertThat(tempBanIp()
+                        .tempBanIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "1d", Optional.empty())
+                        .errorOrThrow())
+                .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
+
+        assertThat(repository.loadIpBan(BANNED)).hasValueSatisfying(ban -> {
+            assertThat(ban.until()).isEmpty();
+            assertThat(ban.reason()).contains("griefing");
+        });
+        assertThat(notifier.sent())
+                .last()
+                .isEqualTo(new RecordingNotifier.Sent(
+                        STAFF, ModerationMessageKey.BANIP_ALREADY_PERMANENT.key(), Map.of("ip", BANNED)));
+        assertThat(peers.ipBans).containsExactly(BANNED);
+    }
+
+    @Test
+    void aShorterIpBanIsRefusedWithTheTimeTheRunningOneStillHas() {
+        tempBanIp().tempBanIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "7d", Optional.empty());
+
+        assertThat(banIp().banIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "1d", Optional.empty())
+                        .errorOrThrow())
+                .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
+
+        assertThat(repository.loadIpBan(BANNED).flatMap(IpBan::until))
+                .contains(CLOCK.instant().plus(Duration.ofDays(7)));
+        assertThat(notifier.sent())
+                .last()
+                .isEqualTo(new RecordingNotifier.Sent(
+                        STAFF,
+                        ModerationMessageKey.BANIP_ALREADY_LONGER.key(),
+                        Map.of("ip", BANNED, "remaining", "1w")));
+    }
+
+    @Test
+    void aPermanentIpBanReplacesATimedOne() {
+        tempBanIp().tempBanIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "1h", Optional.empty());
+
+        assertThat(banIp().banIp(STAFF, new BanIp.Target(BANNED, Optional.empty()), "", Optional.of("alts"))
+                        .isErr())
+                .isFalse();
+
+        assertThat(repository.loadIpBan(BANNED)).hasValueSatisfying(ban -> {
+            assertThat(ban.until()).isEmpty();
+            assertThat(ban.reason()).contains("alts");
+        });
     }
 
     private static IpAlts noAlts() {

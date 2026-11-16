@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * {@code /togglejail <player> [jail] [reason]}: release the target when they are jailed, otherwise jail them in
- * the named jail (or the first configured jail when the name is omitted). A convenience wrapper for staff who
+ * the named jail (or the {@code default-jail} when the name is omitted). A convenience wrapper for staff who
  * do not want to check first whether a player is jailed: the direction is decided by the current jail row.
  * The exempt / unknown-jail gating, the audit lines and the teleport are the {@code ToggleJail} use case's
  * job (which reuses {@code Jail}/{@code Unjail}); this handler only maps the name, the optional jail and the
@@ -61,7 +61,7 @@ public final class ToggleJailCommand extends ModerationCommandSupport implements
     private int run(CommandContext<CommandSourceStack> ctx, String jail, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.toggleJail().toggle(actor, to, jail, reason));
+        target.ifPresent(to -> offTick(actor, to, () -> services.toggleJail().toggle(actor, to, jail, reason)));
         return Command.SINGLE_SUCCESS;
     }
 }

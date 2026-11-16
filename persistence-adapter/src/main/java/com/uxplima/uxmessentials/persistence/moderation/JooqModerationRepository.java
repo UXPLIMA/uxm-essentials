@@ -9,9 +9,14 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempba
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.MODERATION_WARNS;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -40,6 +45,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class JooqModerationRepository extends JooqRepository implements ModerationRepository {
 
+    /** Players per mute query in {@link #loadMutes}. */
+    static final int MUTE_BATCH = 500;
+
     public JooqModerationRepository(DSLContext dsl) {
         super(dsl);
     }
@@ -58,6 +66,26 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
                         .fetchOne())
                 .map(ModerationRows::toMute)
                 .orElseGet(MuteState::none));
+    }
+
+    /** One query per {@value #MUTE_BATCH} players, so a full server's refresh stays within any database's IN list. */
+    @Override
+    public Map<UUID, MuteState> loadMutes(Collection<PlayerRef> targets) {
+        Objects.requireNonNull(targets, "targets");
+        Map<UUID, MuteState> mutes = new HashMap<>();
+        List<String> ids = new ArrayList<>();
+        for (PlayerRef target : targets) {
+            mutes.put(target.uuid(), MuteState.none());
+            ids.add(target.uuid().toString());
+        }
+        for (int from = 0; from < ids.size(); from += MUTE_BATCH) {
+            List<String> batch = ids.subList(from, Math.min(from + MUTE_BATCH, ids.size()));
+            read(dsl -> dsl.selectFrom(MODERATION_MUTES)
+                            .where(MODERATION_MUTES.TARGET.in(batch))
+                            .fetch())
+                    .forEach(row -> mutes.put(UUID.fromString(row.getTarget()), ModerationRows.toMute(row)));
+        }
+        return mutes;
     }
 
     @Override
@@ -121,6 +149,17 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     }
 
     @Override
+    public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        if (replacement instanceof MuteState.None) {
+            throw new IllegalArgumentException("a guarded mute write stores a mute, it does not lift one");
+        }
+        return write(dsl -> ModerationWrites.replaceMute(dsl, target, expected, replacement));
+    }
+
+    @Override
     public void saveJail(PlayerRef target, JailState jail) {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(jail, "jail");
@@ -179,6 +218,25 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
     public void saveIpBan(IpBan ban) {
         Objects.requireNonNull(ban, "ban");
         write(dsl -> ModerationWrites.saveIpBan(dsl, ban));
+    }
+
+    @Override
+    public Optional<IpBan> loadIpBan(String ip) {
+        Objects.requireNonNull(ip, "ip");
+        return read(dsl -> Optional.ofNullable(dsl.selectFrom(MODERATION_IP_BANS)
+                        .where(MODERATION_IP_BANS.IP.eq(ip))
+                        .fetchOne())
+                .map(ModerationRows.IpBanMapper::toIpBan));
+    }
+
+    @Override
+    public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+        Objects.requireNonNull(expected, "expected");
+        Objects.requireNonNull(replacement, "replacement");
+        if (expected.isPresent() && !expected.get().ip().equals(replacement.ip())) {
+            throw new IllegalArgumentException("a guarded ip ban write replaces the row of its own address");
+        }
+        return write(dsl -> ModerationWrites.replaceIpBan(dsl, expected, replacement));
     }
 
     @Override

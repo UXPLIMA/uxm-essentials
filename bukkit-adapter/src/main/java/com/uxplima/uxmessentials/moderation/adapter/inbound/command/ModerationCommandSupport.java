@@ -115,6 +115,24 @@ abstract class ModerationCommandSupport {
         sink.deliver(actor(ctx), messages.resolve(actor(ctx), key, placeholders));
     }
 
+    /** Send {@code key} to {@code actor}, from any thread: the sink delivers on the reader's own thread. */
+    final void tell(PlayerRef actor, MessageKey key, Map<String, String> placeholders) {
+        sink.deliver(actor, messages.resolve(actor, key, placeholders));
+    }
+
+    /**
+     * Run {@code work} for {@code actor} on the async lane, so the database work a sanction does never holds up the
+     * server thread. Everything the server must do itself (the target, the sender's name) is read before this call.
+     */
+    final void offTick(PlayerRef actor, Runnable work) {
+        services.lane().run(actor, work);
+    }
+
+    /** {@link #offTick(PlayerRef, Runnable)} for work about {@code target}, kept in order behind earlier work. */
+    final void offTick(PlayerRef actor, PlayerRef target, Runnable work) {
+        services.lane().run(actor, target, work);
+    }
+
     /** The live player behind {@code target}, if connected: for a command that must act on a session. */
     static @Nullable Player onlinePlayer(CommandContext<CommandSourceStack> ctx, PlayerRef target) {
         return Sender.audience(ctx.getSource()).getServer().getPlayer(target.uuid());

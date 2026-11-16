@@ -34,7 +34,9 @@ public interface WarpTeleporter {
     /**
      * On {@code who}'s region thread: move them to {@code warp} at once, the landing of a cross-server hop. The
      * origin already ran the jail, combat and cooldown checks before it charged, so there is no warmup and no
-     * cooldown check here; the landing stamps the warp cooldown under the key the origin checked. Exactly one of
+     * cooldown check here; the warp cooldown is stamped under the key the origin checked, at the configured
+     * {@code cooldown-start-phase}: as the move starts under {@code request} and {@code accept}, on landing under
+     * {@code teleport}. Exactly one of
      * {@code onLanded} and {@code onMissed} runs, {@code onLanded} only once the player stands at the warp.
      */
     void arrive(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed);

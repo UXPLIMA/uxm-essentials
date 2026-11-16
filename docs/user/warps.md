@@ -29,7 +29,7 @@ out of the box.
 | `/warp create <name> at <world> <x> <y> <z>` | `uxmessentials.warp.set` | The same at a given position; also `/warp createat <name> <world> <x> <y> <z>`. |
 | `/warp move <name>` | `uxmessentials.warp.move` | Moves a warp to your position; `move <name> at <world> <x> <y> <z>` or `moveat` for a given one. |
 | `/warp del <name>` | `uxmessentials.warp.delete` | Deletes a warp. |
-| `/warp info <name>` | `uxmessentials.warp.info` | Shows the owner, creation time and cost. |
+| `/warp info <name>` | `uxmessentials.warp.info` | Shows the owner, creation time, cost and required permission. |
 | `/warp lock <name>` | `uxmessentials.warp.lock` | Locks or unlocks a warp. |
 | `/warp password <name> [password]` | `uxmessentials.warp.password` | Sets a password, or clears it when none is given. |
 | `/warp rate <name> <1-5>` | `uxmessentials.warp.use` | Rates a warp. |
@@ -48,7 +48,8 @@ themselves and pays the cost.
 
 `/warp editor <name>` opens one warp: teleport there, set the icon from your main hand, file it under a category,
 lock it, set a password, write welcome messages, pick departure and arrival sounds and particles, and give the warp
-its own warmup and cooldown in seconds. `/warp editor` alone opens the manager, which lists every warp, creates new
+its own warmup and cooldown in seconds. A warp's own cooldown runs on a clock of its own: using a warp with a long
+cooldown never holds back another warp. See [teleport](teleport.md#cooldowns). `/warp editor` alone opens the manager, which lists every warp, creates new
 ones and manages categories. A category can sit inside another one, and the warp menu groups warps by category.
 
 When the editor sets no sound or particle, the `effects` block of the config plays. The two pickers offer the
@@ -107,9 +108,7 @@ under the old one.
 | `effects.sound.departure.type`, `effects.sound.arrival.type` | `ENTITY_ENDERMAN_TELEPORT` | The sound when the editor set none. |
 | `effects.particle.departure.type`, `effects.particle.arrival.type` | `PORTAL` | The particle when the editor set none. |
 | `selector-presets.particles`, `selector-presets.sounds` | 14 each | What the editor's pickers offer. |
-
-`world-blacklist`, a list of world names, is read but not in the shipped file: `/warp create` refuses a warp in one
-of those worlds.
+| `world-blacklist` | `[]` | World names, matched exactly, where `/warp create`, `/warp move` and the manager refuse to create or move a warp, and an import skips one. |
 
 ## Warps on a network
 
@@ -200,7 +199,8 @@ A visit runs these checks in order:
 2. The player is not banned, unless they hold `uxmessentials.bypass.ban.pwarp`.
 3. A member skips the next step and the fee.
 4. Access: `PUBLIC` lets everyone in, `PASSWORD` needs the password (`uxmessentials.bypass.password.pwarp` skips
-   it), `WHITELIST` needs the guest list (`uxmessentials.bypass.whitelist.pwarp`), `PRIVATE` refuses.
+   it), `WHITELIST` needs the guest list (`uxmessentials.bypass.whitelist.pwarp`), `PRIVATE` refuses. Wrong
+   passwords are limited, see below.
 5. The destination is safe, members included, unless the player holds `uxmessentials.bypass.safety.pwarp`.
 6. The teleport module's jail, combat and cooldown checks.
 7. The entry fee, unless the player holds `uxmessentials.bypass.cost.pwarp` or no economy is available.
@@ -212,11 +212,27 @@ landing whose owner share cannot be banked gives the fee back too. Earnings wait
 `/pwarp withdraw`, which pays the owner even when a co-owner runs it. With `payout.auto-payout = true` the owner is
 paid at once, in a currency that can be paid to an offline player.
 
+A player who gets a warp's password wrong `password-attempts.max-attempts` times (3) within
+`password-attempts.lockout-seconds` (60) is locked out of that warp's password for `lockout-seconds`, the right
+password included. A right password starts the count again, and other warps are not affected. No permission tier
+changes this limit; only `uxmessentials.bypass.password.pwarp`, which skips the password, gets past it. Tries sent at
+the same moment are counted before their password is checked, so they cannot slip past the limit together. Each
+server counts the attempts typed on it, and a restart starts the count again. `lockout-seconds = 0` turns the limit
+off.
+
+A player warp can set its own cooldown in its editor. Like a server warp's, it runs on a clock of its own, which
+follows the warp through a rename.
+
 ### Limits and categories
 
-A player owns up to `default-limit` warps (3). `uxmessentials.pwarp.limit.<n>` raises it, the largest node held
-wins, and `-1` removes the limit. `uxmessentials.pwarp.limit.<world>.<n>` sets the limit used when the new warp is
-in that world, but it is compared with all of the owner's warps, in every world, not only those in that world.
+A player owns up to `default-limit` warps (3) across every world. `uxmessentials.pwarp.limit.<n>` raises it, the
+largest node held wins, and `-1` removes the limit. `uxmessentials.pwarp.limit.<world>.<n>` adds a limit for one
+world: it counts only the owner's warps in that world, the largest node held wins, and `-1` removes it. It applies to
+a new warp and to a warp moved into the world, by `/setpwarp`, `/pwarp move` or the menus. Both limits apply, so a
+world node larger than the limit across every world does not lift that one. A world with no node of its own is held
+only by the limit across every world. A world is told apart by its uid, not its name: on a network each server's
+world counts on its own even when two share a name, and after a world is reset (a new uid) the warps left in the old
+one count only toward the limit across every world.
 
 Categories come from the warp categories made in `/warp editor`. While none exist, the browser offers `building`,
 `shop`, `pvp`, `farm`, `redstone` and `misc`. The browser sorts by name, age, visits, unique visitors, rating,
@@ -228,7 +244,10 @@ server's average are added to each warp, so a single five-star vote does not top
 | Key | Default | Meaning |
 |---|---|---|
 | `enabled` | `true` | Switches the module and its commands on or off. |
-| `default-limit` | `3` | Warps per player without a `limit` node. |
+| `default-limit` | `3` | Warps per player across every world without a `limit` node. |
+| `world-blacklist` | `[]` | World names, matched exactly, where `/setpwarp`, `/pwarp set`, `/pwarp move` and the menus refuse to create or move a warp, and an import skips one. |
+| `password-attempts.max-attempts` | `3` | Wrong passwords allowed on one warp before the lockout, at least 1. |
+| `password-attempts.lockout-seconds` | `60` | How long wrong passwords count and how long the lockout lasts; 0 turns the limit off. |
 | `payout.cut-percent` | `10` | The server's share of each entry fee, 0 to 100. |
 | `payout.auto-payout` | `false` | Pays the owner at once instead of banking for `/pwarp withdraw`. |
 | `ratings.confidence` | `10` | How strongly few votes are pulled toward the average. |
@@ -253,8 +272,8 @@ is not loaded there, or if the spot is unsafe and the visitor lacks `uxmessentia
 checked on the warp's server, so with per-server permissions (LuckPerms server contexts) grant it there. A refused
 visitor stays on the warp's server, where the proxy put them, not at the warp.
 
-With the switch off, a visit to a warp of another server is refused as unavailable. The fee is taken first and given
-straight back, and the jail, combat and cooldown checks do not run for it.
+With the switch off, a visit to a warp of another server is refused before anything else: the visitor reads that
+the warp is on another server this one does not send players to, and no fee is taken.
 
 ## Other permissions
 

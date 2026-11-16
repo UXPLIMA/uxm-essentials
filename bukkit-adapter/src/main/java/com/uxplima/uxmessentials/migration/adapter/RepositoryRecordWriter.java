@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.moderation.domain.ModerationProfile;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.Warn;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.warps.application.port.WarpRepository;
 import com.uxplima.uxmessentials.warps.domain.Warp;
@@ -59,6 +60,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
     private final WorldRepository worlds;
     private final PlayerWarpRecordWriter playerWarps;
     private final Clock clock;
+    private final Logger log;
 
     public RepositoryRecordWriter(
             UserRecordWriter users,
@@ -68,7 +70,8 @@ public final class RepositoryRecordWriter implements RecordWriter {
             HologramRepository holograms,
             WorldRepository worlds,
             PlayerWarpRecordWriter playerWarps,
-            Clock clock) {
+            Clock clock,
+            Logger log) {
         this.users = Objects.requireNonNull(users, "users");
         this.warps = Objects.requireNonNull(warps, "warps");
         this.moderation = Objects.requireNonNull(moderation, "moderation");
@@ -77,6 +80,7 @@ public final class RepositoryRecordWriter implements RecordWriter {
         this.worlds = Objects.requireNonNull(worlds, "worlds");
         this.playerWarps = Objects.requireNonNull(playerWarps, "playerWarps");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     @Override
@@ -133,6 +137,14 @@ public final class RepositoryRecordWriter implements RecordWriter {
         KitDefinition raw = imported.definition();
         boolean existed = kits.exists(raw.id());
         if (existed && options.onConflict() == ConflictPolicy.SKIP) {
+            // An imported kit is always reserved; a kept one that is not stays open to every player, which the
+            // operator likely did not mean if it came from an earlier import.
+            kits.find(raw.id())
+                    .filter(kept -> !kept.requiresPermission())
+                    .ifPresent(kept -> log.warn(
+                            "kit {} was kept as it is and needs no permission; set permission = true in its file to"
+                                    + " reserve it",
+                            kept.id().value()));
             return RecordOutcome.SKIPPED;
         }
         // The mapper carried each EssentialsX item as its raw descriptor; the bukkit side resolves it to a stack

@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.listener;
 
 import java.util.Objects;
+import java.util.UUID;
 import java.util.function.Supplier;
 
 import org.bukkit.entity.Player;
@@ -28,8 +29,9 @@ import org.jspecify.annotations.NullMarked;
  * return. They own the <b>move-cancels-warmup</b> invariant ({@link PlayerMoveEvent} compares block
  * coordinates and flips the pending warmup), the optional damage- and interact-cancel axes, the
  * {@code /back} capture for both deaths and vanilla teleports (gated by the {@link BackCapturePolicy} so
- * an ender pearl does not clobber the return point), and the per-player cleanup on quit. Each handler is
- * cheap-rejection-first: a move within the same block never touches the tracker.
+ * an ender pearl does not clobber the return point), and cancelling a warmup on quit. Each handler is
+ * cheap-rejection-first: a move by a player with no warmup, or within the same block without a turn that
+ * rotate-cancel would act on, never reaches the tracker.
  *
  * <p>Events fire on the player's region thread, so the warmup tracker's {@code computeIfPresent} and the
  * {@code /back} capture run where the live position is valid: no scheduler hop is needed here.
@@ -55,10 +57,15 @@ public final class TeleportListeners implements Listener {
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
     public void onMove(PlayerMoveEvent event) {
-        if (event.getTo() == null || sameBlock(event)) {
-            return; // sub-block jitter (look-only or within-block) never cancels a warmup
+        UUID who = event.getPlayer().getUniqueId();
+        if (event.getTo() == null || !warmupTracker.isTracking(who)) {
+            return; // nobody is warming up: the common case costs one map lookup and allocates nothing
         }
-        warmupTracker.onMove(event.getPlayer().getUniqueId(), BukkitRefs.toPosition(event.getTo()));
+        if (sameBlock(event)
+                && (!event.hasChangedOrientation() || !config.getBoolean("warmup.cancel-on-rotate", false))) {
+            return; // within-block jitter never cancels; a turn matters only while rotate-cancel is on
+        }
+        warmupTracker.onMove(who, BukkitRefs.toPosition(event.getTo()));
     }
 
     @EventHandler(priority = EventPriority.MONITOR, ignoreCancelled = true)
@@ -100,7 +107,7 @@ public final class TeleportListeners implements Listener {
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        warmupTracker.forget(event.getPlayer().getUniqueId());
+        warmupTracker.quit(event.getPlayer().getUniqueId());
     }
 
     private static TeleportCauseCategory categoryOf(PlayerTeleportEvent.TeleportCause cause) {

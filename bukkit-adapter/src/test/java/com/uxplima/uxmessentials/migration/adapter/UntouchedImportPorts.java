@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.migration.adapter;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
@@ -39,6 +40,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.RatingSummary;
 import com.uxplima.uxmessentials.playerwarps.domain.RatingTally;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpMember;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
@@ -238,6 +240,21 @@ final class UntouchedImportPorts {
         }
 
         @Override
+        public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
+            throw touched();
+        }
+
+        @Override
+        public Optional<IpBan> loadIpBan(String ip) {
+            throw touched();
+        }
+
+        @Override
+        public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+            throw touched();
+        }
+
+        @Override
         public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
             throw touched();
         }
@@ -427,6 +444,40 @@ final class UntouchedImportPorts {
 
         @Override
         public double globalMean() {
+            throw touched();
+        }
+    }
+
+    /** The kit claim table, which an import of players without kit claims never reads or writes. */
+    static final class KitClaims implements PlayerClaimLedger {
+
+        @Override
+        public Claims load(UUID player, long now) {
+            throw touched();
+        }
+
+        @Override
+        public Set<String> kits(UUID player) {
+            throw touched();
+        }
+
+        @Override
+        public boolean claimKit(UUID player, String kit, long claimedAt) {
+            throw touched();
+        }
+
+        @Override
+        public void releaseKit(UUID player, String kit) {
+            throw touched();
+        }
+
+        @Override
+        public void releaseAllKits(UUID player) {
+            throw touched();
+        }
+
+        @Override
+        public void saveCooldown(UUID player, String scope, long readyAt) {
             throw touched();
         }
     }

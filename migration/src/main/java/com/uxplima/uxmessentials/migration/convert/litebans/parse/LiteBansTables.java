@@ -26,7 +26,7 @@ public final class LiteBansTables {
     /**
      * Build the table set for {@code tablePrefix}.
      *
-     * @param tablePrefix the LiteBans table prefix, sanitised to {@code [a-z0-9_]+}
+     * @param tablePrefix the LiteBans table prefix, which must match {@code [a-z0-9_]+}
      * @throws IllegalArgumentException when the prefix contains anything outside the whitelist
      */
     public LiteBansTables(String tablePrefix) {
@@ -42,7 +42,7 @@ public final class LiteBansTables {
         this.warnings = prefix + "warnings";
     }
 
-    /** The {@code SELECT} over the bans table. The prefix is sanitised; the table name is not user data. */
+    /** The {@code SELECT} over the bans table. The prefix was validated; the table name is not user data. */
     public String selectBans() {
         return select(bans);
     }

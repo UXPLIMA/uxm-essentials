@@ -53,8 +53,8 @@ Where a duration is optional (`/mute` and `/jail`), `perm` or `permanent` means 
 /jail Alex spawnjail 30m
 ```
 
-`/tempban`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. `/tempmute <player> perm` is
-accepted and gives a permanent mute, the same as `/mute <player> perm`.
+`/tempban`, `/tempmute`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. A permanent mute is
+`/mute <player>` or `/mute <player> perm`.
 
 The reason is everything after the last argument, spaces included. It is stored with the sanction, shown to the
 player and written to the history.
@@ -83,34 +83,52 @@ by `muted-blocked-commands` while muted.
 `/ban` and `/tempban` kick the player at once and refuse every later login until the ban ends or `/unban` lifts it.
 The player sees the reason, and for a timed ban how long is left, on the kick screen.
 
-A player ban never cuts short one that is already running on that player. A `/tempban`, a capped `/ban`, a
-`/punish` template or an API call whose ban would end before the running one is refused, and the staff member is
-told which ban is in force and how long it still runs. A capped staff member is also told their ban was capped. To
-shorten a ban, `/unban` first. A ban that ends later, or a second permanent ban, replaces the old one. When two
-servers of a network ban the same player at the same moment, the longer ban is the one kept. IP bans
-(`/banip`, `/tempbanip`) do not follow this rule yet: a new IP ban on an address replaces the old one.
+A ban never cuts short one that is already running on that player or address. A `/tempban`, a capped `/ban`, a
+`/punish` template, a `/banip` or `/tempbanip`, or an API call whose ban would end before the running one is refused,
+and the staff member is told which ban is in force and how long it still runs. A capped staff member is also told
+their ban was capped. To shorten a ban, `/unban` or `/unbanip` first. A ban that ends later, or a second permanent
+ban, replaces the old one. When two servers of a network ban the same player or address at the same moment, the
+longer ban is the one kept.
 
-A permanent ban is stored as a ban that ends very far in the future. The kick at the moment of `/ban` uses the
-`moderation.ban.kick` screen, but every later login refusal, and the kick on another server of a network, use the
-`moderation.tempban.kick` screen, which then shows a time left of about 365000 days. This is a known issue.
+A permanently banned player sees the `moderation.ban.kick` screen, with no time left on it, when the ban kicks them,
+when they are kicked on another server of a network and every time they try to log in again. A timed ban, including
+a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
+lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
+permanent.
+A `/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
 account. STRICT catches anyone else on those addresses too (a household, a school network), so leave it off unless
-you want that. If the ban was shortened by a duration cap, the IP bans end with it.
+you want that. If the ban was shortened by a duration cap, the IP bans end with it. An address that is already
+banned at least as long keeps its own ban, so a capped `/ban` never shortens a permanent `/banip`.
 
 ## Mutes
 
 A muted player cannot chat, and cannot use this plugin's private messages, mail or helpop. The commands in
 `muted-blocked-commands` are also refused while muted, which covers other plugins' and the game's own message
-commands. Write each as the bare command word. A namespaced form such as `/minecraft:msg` or `/essentials:msg` is a
-different word and must be listed on its own:
+commands. Write each as the bare command word. It also stops the namespaced forms, such as `/minecraft:msg` and
+`/essentials:msg`. An entry blocks whatever command owns that word, under all of its names, whichever plugin
+registered it: if a ticket plugin's `/ticketreply` also answers to `/reply`, the entry `reply` blocks `/ticketreply`
+too. The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the
+default does.
+
+`muted-allowed-commands` lists words a muted player may always run. It is checked first and matches only the word
+written (with or without a namespace), never the command's other names, so it frees exactly that word:
 
 ```
 muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply"]
+muted-allowed-commands = ["ticketreply"]
 ```
 
-`/mute` refuses a player who is already muted; `/unmute` first to change a mute. A timed mute ends on its own.
+With that, a muted player can run `/ticketreply` but not `/reply`. The names of the listed commands are read from
+the server once and again after a plugin is enabled or disabled, the server finishes starting, `/minecraft:reload`
+or `/uxmess reload`. A command another plugin adds while the server runs without being enabled again (a script
+reload, for example) is only seen after `/uxmess reload`.
+
+`/mute` refuses a player who is already muted and says how long that mute still runs; `/unmute` first to change a
+mute. When two servers of a network mute the same player at the same moment, the first mute stays and the second is
+refused the same way. A timed mute ends on its own.
 
 ## Warnings and the escalation ladder
 
@@ -145,13 +163,23 @@ A step never weakens what is already running. A mute or ban step leaves the play
 sanction and the running one of that kind ends later: a permanent one beats any timed one, and a tie keeps the
 running one. So a `tempmute:10m` step extends a mute that has five minutes left, while a `tempban:1d` step on a
 permanently banned player leaves the permanent ban in place. A step that is held back this way is written to the
-audit log as not applied (`held_by_stronger`).
+audit log as not applied (`held_by_stronger`). A staff mute or ban that lands while a step is being written is kept
+by the same rule.
+
+The sanction a step applies is stored with a reason that names the warning count that tripped it and the reason of
+that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The reason is written once,
+when the step fires, and cut to 256 characters. Its language is the punished player's `/lang` choice when they made
+one, otherwise usually the language of the staff member who gave the warning. The staff member reads what the
+sanction itself reports, such as the mute confirmation or why it could not be applied, followed by a line on how the
+step landed.
 
 ## Kicks
 
 `/kick` disconnects a player on this server with an optional reason. On a network, a player connected to another
-server cannot be kicked from here; the command says which server they are on. `/kickall` kicks everyone on this
-server but you and exempt players.
+server cannot be kicked from here; the command says which server they are on. A player who is not online anywhere
+is not kicked, and the command says so. `/kickall` kicks everyone on this server but you and exempt players, and
+writes a kick to the history of each player it kicked, the same row `/kick` writes. The kicks and the answer never
+wait for the database: the history is written afterwards in one go, and if that fails the log says so.
 
 ## Jail
 
@@ -174,8 +202,17 @@ jail {
 ```
 
 `/jails` lists both kinds. When both have the same name, the one made with `/setjail` wins. A config jail is removed
-by editing the file. `/togglejail` without a jail name uses the config jail whose name comes first in alphabetical
-order, and never a jail made with `/setjail`; with no config jail it is refused as an unknown jail.
+by editing the file.
+
+`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`.
+With `default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so
+nobody is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that
+names no jail is refused the same way, saying the configured default does not exist, and the log warns about it at
+startup.
+
+```
+default-jail = "spawnjail"
+```
 
 ### Time
 
@@ -233,8 +270,10 @@ A frozen player cannot move to another block; they can still look around, chat a
 when they try to walk, at most once every `freeze.notice-interval-seconds` (3 by default; 0 sends nothing).
 
 A freeze is kept in memory on the server it was given on. It lasts until `/unfreeze` or until the server restarts
-or the module reloads, it is not stored in the database, and it does not follow the player to another server. On a
-network you can only freeze a player connected to your server.
+or the module reloads, and it is not stored in the database. Logging out does not lift it: a frozen player who
+logs back in to the same server is still frozen. It does not follow the player to another server, though: on a
+network a frozen player who switches server can move freely there, and is frozen again when they come back to the
+server that froze them. You can only freeze a player connected to your server.
 
 ## Lockdown
 
@@ -281,7 +320,8 @@ Discord bridge forwards. Without the bridge the line only lands in the audit log
 ## History and lookups
 
 Every ban, tempban, IP ban, unban, mute, unmute, warning and kick is written to a history that is never edited. Jails
-are not in it, and neither are the kicks of `/kickall` or the IP bans a STRICT `/ban` adds.
+are not in it. `/kickall` writes one kick for each player it kicked. A STRICT `/ban` writes one IP ban for each address
+it banned, naming the player; an address that kept its own longer ban gets no row.
 
 | Command | Permission | What it shows |
 |---|---|---|
@@ -292,8 +332,8 @@ are not in it, and neither are the kicks of `/kickall` or the IP bans a STRICT `
 | `/checkban <player>`, `/checkmute <player>` | `uxmessentials.moderation.check` | Whether the player is banned or muted now. |
 | `/banlist`, `/mutelist` | `uxmessentials.moderation.banlist`, `uxmessentials.moderation.mutelist` | Bans and mutes in effect (up to 50). |
 | `/staffhistory <staff>` | `uxmessentials.moderation.staffhistory` | What one staff member has issued. |
-| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given, at most 500. A sanction since replaced by another staff member's is left alone. |
-| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. |
+| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 player bans, mutes and warnings unless a limit is given (kicks, lifts and IP bans are not read and do not count), at most 500; a larger limit is lowered to 500 and the command says so. A sanction since replaced by another staff member's is left alone. |
+| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown, counted over the whole window. A `/banip` or `/tempbanip` counts as a ban, the addresses a STRICT `/ban` adds do not (the ban counts once), and a `/kickall` counts as one kick. |
 | `/seen <player>` | `uxmessentials.moderation.seen` | First join and last seen, or the server the player is on now. |
 | `/seenip <player>`, `/alts <player>` | `uxmessentials.moderation.seen` | The last address and the accounts that share it; every account that shared any of the player's addresses. |
 | `/commandspy` (`/cspy`) | `uxmessentials.moderation.commandspy` | Shows you the commands other players run. |
@@ -312,8 +352,7 @@ confirmation, `/jail` opens the jail menu, `/jails` the jail manager, `/jailedpl
 The plugin has no appeal system. The ban, IP ban, kick and lockdown screens are messages (`moderation.ban.kick`,
 `moderation.tempban.kick`, `moderation.banip.kick`, `moderation.kick.kicked`, `moderation.lockdown.kick`) in
 `messages/messages_<language>.conf`. Add your appeal link or Discord invite there, in both `moderation.ban.kick`
-and `moderation.tempban.kick`: a permanently banned player who logs in again sees the tempban screen (see
-[Bans](#bans)).
+(permanent bans) and `moderation.tempban.kick` (timed bans).
 
 ## On a network
 
@@ -322,7 +361,10 @@ shared database, so:
 
 - A ban kicks the player from whichever server they are on, and every server refuses their login.
 - An IP ban kicks everyone on that address on every server, exempt players aside.
-- A mute is read from the database at every chat line and command, so it applies everywhere at once.
+- A mute is read from the database at every chat line, so it applies everywhere at once. Private messages, mail,
+  helpop and `muted-blocked-commands` use a copy of each connected player's mute, read when they join and updated
+  when a mute or unmute lands, on another server through the bus. The copy is also read again every minute and
+  after `/uxmess import`, so a change that came with no bus message still arrives.
 - A jail sends the player to the jail's server, as described in [Jails on a network](#jails-on-a-network).
 - `/kick` and `/freeze` act only on players connected to your server.
 
@@ -338,8 +380,10 @@ EssentialsX and LiteBans.
 |---|---|---|
 | `enabled` | `true` | Switches the module on or off. |
 | `jails` | `[]` | The config jails, each placed in the `jail` block. |
+| `default-jail` | `""` | The jail `/togglejail` uses when no jail is named; empty refuses and lists the jails. |
 | `jail-countdown` | `"online-only"` | How timed jails count down: `online-only` or `wall-clock`. |
 | `muted-blocked-commands` | see [Mutes](#mutes) | Commands a muted player cannot run. |
+| `muted-allowed-commands` | `[]` | Words a muted player may always run, checked first. |
 | `warnings.actions` | `["3:tempmute:1h", "5:tempban:1d"]` | The escalation ladder. |
 | `broadcast.silent-by-default` | `false` | Makes every sanction silent. |
 | `freeze.notice-interval-seconds` | `3` | Seconds between "you are frozen" notices; 0 is none. |

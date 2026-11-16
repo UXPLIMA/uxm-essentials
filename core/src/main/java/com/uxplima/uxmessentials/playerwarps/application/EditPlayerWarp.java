@@ -54,6 +54,7 @@ public final class EditPlayerWarp {
     private final PlayerWarpPasswordStore passwords;
     private final Clock clock;
     private final Optional<String> recordedServer;
+    private final PlayerWarpWorldLimit worldLimit;
 
     public EditPlayerWarp(
             PlayerWarpRepository repository,
@@ -61,13 +62,15 @@ public final class EditPlayerWarp {
             Notifier notifier,
             PlayerWarpPasswordStore passwords,
             Clock clock,
-            Optional<String> recordedServer) {
+            Optional<String> recordedServer,
+            PlayerWarpWorldLimit worldLimit) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.passwords = Objects.requireNonNull(passwords, "passwords");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.recordedServer = Objects.requireNonNull(recordedServer, "recordedServer");
+        this.worldLimit = Objects.requireNonNull(worldLimit, "worldLimit");
     }
 
     /** Set (or clear, with an empty value) {@code name}'s display name. Gate {@link WarpCapability#EDIT_METADATA}. */
@@ -173,15 +176,22 @@ public final class EditPlayerWarp {
         });
     }
 
-    /** Re-anchor {@code name} at {@code at}. Gate {@link WarpCapability#MOVE}. */
+    /**
+     * Re-anchor {@code name} at {@code at}. Gate {@link WarpCapability#MOVE}. A move into a world on
+     * {@code world-blacklist} is refused ({@link PlayerWarpError#WORLD_BLACKLISTED}), and so is a move into another
+     * world when the owner's warps there have reached that world's limit ({@link PlayerWarpError#LIMIT_REACHED}).
+     */
     public Result<Unit, PlayerWarpError> moveHere(PlayerRef actor, PlayerWarpName name, Position at) {
         Objects.requireNonNull(at, "at");
-        return transition(
-                actor,
-                name,
-                WarpCapability.MOVE,
-                warp -> warp.movedTo(at, recordedServer, clock.instant()),
-                PlayerwarpsMessageKey.PWARP_MOVED);
+        return gate(actor, name, WarpCapability.MOVE, warp -> {
+            Optional<PlayerWarpError> refused = worldLimit.refusesMove(actor, warp, at.world());
+            if (refused.isPresent()) {
+                return Result.err(refused.get());
+            }
+            repository.save(warp.movedTo(at, recordedServer, clock.instant()));
+            notifier.send(actor, PlayerwarpsMessageKey.PWARP_MOVED, Map.of("warp", name.value()));
+            return Result.ok();
+        });
     }
 
     /**

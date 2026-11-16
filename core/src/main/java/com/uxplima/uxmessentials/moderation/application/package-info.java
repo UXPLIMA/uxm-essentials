@@ -7,7 +7,7 @@
  * IssueWarn}, {@code BanIp}, {@code Freeze}, {@code Seen}, …) returning a {@code Result} for its modelled
  * failures rather than throwing; the exempt-node check, the duration grammar and the audit emission are
  * shared. This layer also <em>provides</em> the cross-context gates the other contexts consume, {@link
- * com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy} for messaging and {@link
+ * com.uxplima.uxmessentials.moderation.application.OnlineMutes} for messaging and {@link
  * com.uxplima.uxmessentials.moderation.application.RepositoryJailGate} for teleport, implemented against the
  * consuming contexts' ports so the soft couple stays a contract.
  *

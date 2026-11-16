@@ -182,6 +182,8 @@ public final class TeleportEventBridges {
             case DAMAGED -> UxmWarmupCancelReason.DAMAGED;
             case INTERACTED -> UxmWarmupCancelReason.INTERACTED;
             case ABORTED -> UxmWarmupCancelReason.ABORTED;
+            case QUIT -> UxmWarmupCancelReason.QUIT;
+            case SUPERSEDED -> UxmWarmupCancelReason.SUPERSEDED;
         };
     }
 

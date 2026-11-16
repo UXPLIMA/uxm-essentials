@@ -55,11 +55,11 @@ public final class TpaAllCommand extends TeleportCommandSupport implements Comma
             return 0;
         }
         PlayerRef requester = ref(sender);
-        for (Player online : List.copyOf(Bukkit.getOnlinePlayers())) {
-            if (!online.getUniqueId().equals(sender.getUniqueId())) {
-                services.requestTeleport().request(requester, ref(online), RequestDirection.TO_REQUESTER);
-            }
-        }
+        List<PlayerRef> targets = List.copyOf(Bukkit.getOnlinePlayers()).stream()
+                .filter(online -> !online.getUniqueId().equals(sender.getUniqueId()))
+                .map(TeleportCommandSupport::ref)
+                .toList();
+        services.requestTeleport().requestEach(requester, targets, RequestDirection.TO_REQUESTER);
         return Command.SINGLE_SUCCESS;
     }
 }

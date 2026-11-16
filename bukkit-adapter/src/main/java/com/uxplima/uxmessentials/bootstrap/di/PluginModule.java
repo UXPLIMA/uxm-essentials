@@ -380,6 +380,9 @@ public final class PluginModule {
      */
     private static final int DEFAULT_NAME_INDEX_SIZE = 50_000;
 
+    /** How often a connected player's mute is read again from the database. */
+    private static final java.time.Duration MUTE_REFRESH = java.time.Duration.ofSeconds(60);
+
     private PluginModule() {}
 
     /** The theme the engine draws in, recorded during wiring; a module wired before it is a composition-root defect. */
@@ -1106,6 +1109,8 @@ public final class PluginModule {
                 persistence,
                 config.scoped(module.id().configRoot()),
                 config.scoped(ModuleId.of("economy").configRoot()),
+                config.scoped(ModuleId.of("warps").configRoot()),
+                config.scoped(ModuleId.of("playerwarps").configRoot()),
                 kernel.scheduler(),
                 kernel.log(),
                 auditChannel,
@@ -1259,6 +1264,7 @@ public final class PluginModule {
         ContextLinks links = new ContextLinks(auditChannel, queries, actions, presence, hops, importTargets, network);
         links.networkClaims = networkClaims;
         links.dailyRewards = networkClaims.map(claims -> ClaimLedgers.dailyRewards(persistence));
+        links.claimLedger = ClaimLedgers.claims(persistence);
         links.livePeers = livePeers;
         links.networked = NetworkConfig.from(config).enabled();
         // Install uxmLib's single menu listener once, before any GUI-using module (vaults, itemworld) wires,
@@ -2671,6 +2677,7 @@ public final class PluginModule {
                 ctx,
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
+                Objects.requireNonNull(links.claimLedger, "claimLedger"),
                 guiLayouts,
                 textInput,
                 menus,
@@ -2679,6 +2686,7 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.onClose(links.importTargets.kits(wired.repository()));
+        wired.localClaims().ifPresent(local -> resources.onClose(links.importTargets.kitClaims(local)));
         links.placeholders.kits(new KitAccessPlaceholders(wired.repository(), wired.access(), wired.listKits()));
         links.queries.register(
                 UxmKitsQuery.class,
@@ -2928,6 +2936,29 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
+        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent moderation) {
+                wired.mutePolicy().onEvent(moderation);
+            }
+        });
+        // Connected players' mutes are read again every minute, and after an import that stored sanctions, so a
+        // change that reached the database without a bus frame still reaches the in-memory copy.
+        AutoCloseable muteRefresh =
+                ctx.kernel().scheduler().repeatGlobal(wired.mutePolicy()::refreshAll, MUTE_REFRESH, MUTE_REFRESH);
+        resources.onClose(() -> {
+            try {
+                muteRefresh.close();
+            } catch (Exception failure) {
+                ctx.kernel().log().error("event=online_mute_refresh_stop_failed", failure);
+            }
+        });
+        resources.onClose(links.importTargets.mutes(wired.mutePolicy()::refreshAll));
+        // A reload can rename or add command aliases, so the muted-command list reads its commands' names again.
+        resources.addReloadTask(ReloadTask.kernel(
+                "muted commands",
+                wired.mutedCommands()::forgetCommandNames,
+                "names of the blocked commands re-read on next use"));
         links.placeholders.moderation(new GateModerationPlaceholders(
                 wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
         links.queries.register(
@@ -3778,6 +3809,10 @@ public final class PluginModule {
                 Optional.empty();
         private Optional<com.uxplima.uxmessentials.economy.application.port.DailyRewardLedger> dailyRewards =
                 Optional.empty();
+        // The database record of one-time kit claims. On a single server the kits module stamps the claims it holds
+        // for a player (an import's) into their PDC as they join.
+        private com.uxplima.uxmessentials.shared.application.port.@org.jspecify.annotations.Nullable PlayerClaimLedger
+                claimLedger;
         private @org.jspecify.annotations.Nullable HomeEconomy homeEconomy;
         private com.uxplima.uxmessentials.vaults.application.port.@org.jspecify.annotations.Nullable VaultEconomy
                 vaultEconomy;

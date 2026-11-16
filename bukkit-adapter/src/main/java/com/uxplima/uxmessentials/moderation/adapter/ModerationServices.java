@@ -34,6 +34,7 @@ import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.StaffRollback;
+import com.uxplima.uxmessentials.moderation.application.StorageLane;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -98,6 +99,7 @@ public final class ModerationServices {
     private final ModerationRepository repository;
     private final PlayerLookup players;
     private final TargetResolver targets;
+    private final StorageLane lane;
 
     ModerationServices(Builder builder) {
         this.mute = Objects.requireNonNull(builder.mute, "mute");
@@ -143,6 +145,7 @@ public final class ModerationServices {
         this.repository = Objects.requireNonNull(builder.repository, "repository");
         this.players = Objects.requireNonNull(builder.players, "players");
         this.targets = Objects.requireNonNull(builder.targets, "targets");
+        this.lane = Objects.requireNonNull(builder.lane, "lane");
     }
 
     public Mute mute() {
@@ -317,6 +320,11 @@ public final class ModerationServices {
         return targets;
     }
 
+    /** Where a command or menu click runs its storage work: the async lane, never the server thread. */
+    public StorageLane lane() {
+        return lane;
+    }
+
     /** Step builder so {@link ModerationWiring} assembles the bundle field-by-field without a 17-arg call. */
     @NullMarked
     static final class Builder {
@@ -363,6 +371,7 @@ public final class ModerationServices {
         private @org.jspecify.annotations.Nullable ModerationRepository repository;
         private @org.jspecify.annotations.Nullable PlayerLookup players;
         private @org.jspecify.annotations.Nullable TargetResolver targets;
+        private @org.jspecify.annotations.Nullable StorageLane lane;
 
         Builder mute(Mute value) {
             this.mute = value;
@@ -576,6 +585,11 @@ public final class ModerationServices {
 
         Builder targets(TargetResolver value) {
             this.targets = value;
+            return this;
+        }
+
+        Builder lane(StorageLane value) {
+            this.lane = value;
             return this;
         }
 

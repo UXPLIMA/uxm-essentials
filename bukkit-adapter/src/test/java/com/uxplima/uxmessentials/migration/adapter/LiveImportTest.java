@@ -32,13 +32,17 @@ import com.uxplima.uxmessentials.holograms.domain.HologramLine;
 import com.uxplima.uxmessentials.holograms.domain.HologramName;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.kits.application.port.KitRepository;
+import com.uxplima.uxmessentials.kits.domain.KitDefinition;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.migration.BalancePolicy;
 import com.uxplima.uxmessentials.migration.ConflictPolicy;
 import com.uxplima.uxmessentials.migration.ImportMode;
 import com.uxplima.uxmessentials.migration.ImportOptions;
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.RecordOutcome;
+import com.uxplima.uxmessentials.migration.RecordResult;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedHologram;
+import com.uxplima.uxmessentials.migration.convert.map.ImportedKit;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedUser;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWarp;
 import com.uxplima.uxmessentials.migration.convert.map.ImportedWorld;
@@ -57,6 +61,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldBlacklist;
 import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.network.HologramChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
@@ -101,6 +106,7 @@ class LiveImportTest {
     private final Databases databases = new Databases();
     private final RecordingBus bus = new RecordingBus();
     private final DeferringScheduler scheduler = new DeferringScheduler();
+    private WorldBlacklist warpWorlds = WorldBlacklist.none();
 
     private MigrationWiring.Writers writers() {
         return MigrationWiring.writers(
@@ -111,8 +117,12 @@ class LiveImportTest {
                         UntouchedImportPorts::playerWarpWriter,
                         Optional.empty(),
                         Duration.ZERO,
+                        new UntouchedImportPorts.KitClaims(),
                         COINS,
-                        CLOCK),
+                        () -> warpWorlds,
+                        WorldBlacklist::none,
+                        CLOCK,
+                        log),
                 bus,
                 scheduler);
     }
@@ -142,6 +152,28 @@ class LiveImportTest {
     }
 
     @Test
+    void underSkipAKitKeptOpenToEveryPlayerIsNamedToTheOperator() {
+        MemoryKits live = new MemoryKits();
+        live.save(KitDefinition.repeatable(KitId.of("vip"), List.of(), Duration.ZERO));
+        live.save(KitDefinition.repeatable(KitId.of("starter"), List.of(), Duration.ZERO)
+                .withPermission(true));
+        targets.kits(live);
+        ImportedKit vip = new ImportedKit(KitDefinition.repeatable(KitId.of("vip"), List.of(), Duration.ZERO)
+                .withPermission(true));
+        ImportedKit starter = new ImportedKit(KitDefinition.repeatable(KitId.of("starter"), List.of(), Duration.ZERO)
+                .withPermission(true));
+
+        RecordOutcome outcome =
+                writers().live().write(new ImportRecord.KitRecord(vip), SKIP).outcome();
+        writers().live().write(new ImportRecord.KitRecord(starter), SKIP);
+
+        assertThat(outcome).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(live.find(KitId.of("vip")).orElseThrow().requiresPermission())
+                .isFalse();
+        assertThat(log.warnings).hasSize(1).first().asString().contains("vip", "permission = true");
+    }
+
+    @Test
     void anImportedWarpIsServedByTheRunningWarpsModuleWithoutARestart() {
         CachedWarpRepository live = liveWarps();
         Warp imported = warp("market", FOUNDER, 10);
@@ -151,6 +183,24 @@ class LiveImportTest {
 
         assertThat(outcome).isEqualTo(RecordOutcome.WRITTEN);
         assertThat(live.find(WarpName.of("market"))).contains(imported);
+    }
+
+    @Test
+    void aWarpInAWorldTheWarpsModuleBarsIsSkippedByTheLiveAndTheDryRunWriter() {
+        CachedWarpRepository live = liveWarps();
+        warpWorlds = WorldBlacklist.of(List.of(WORLD.name()));
+        ImportRecord barred = warpRecord(warp("market", FOUNDER, 10));
+        AnnouncingRecordWriter writer = writers().live();
+
+        RecordResult fromLive = writer.write(barred, OVERWRITE);
+        RecordResult fromDryRun = writers().dryRun().write(barred, OVERWRITE);
+        writer.announce();
+
+        assertThat(fromLive.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(fromLive.notes()).contains("held_back=world_blacklist");
+        assertThat(fromDryRun).isEqualTo(fromLive);
+        assertThat(live.find(WarpName.of("market"))).isEmpty();
+        assertThat(bus.published).as("nothing changed, so nothing is announced").isEmpty();
     }
 
     @Test
@@ -191,7 +241,7 @@ class LiveImportTest {
                 new Notifier((viewer, key, placeholders) -> key.key(), (viewer, text) -> {}),
                 events,
                 Clock.fixed(NOW.plusSeconds(60), ZoneOffset.UTC),
-                List.of(),
+                WorldBlacklist.none(),
                 Optional.of("lobby"));
         Position moved = Position.of(WORLD, 50, 70, 50);
 
@@ -433,6 +483,37 @@ class LiveImportTest {
         public void asyncAfter(Duration delay, Runnable task) {
             delays.add(delay);
             delayed.add(task);
+        }
+    }
+
+    /** The kits module's catalog in memory. */
+    private static final class MemoryKits implements KitRepository {
+
+        private final Map<KitId, KitDefinition> kits = new LinkedHashMap<>();
+
+        @Override
+        public Optional<KitDefinition> find(KitId id) {
+            return Optional.ofNullable(kits.get(id));
+        }
+
+        @Override
+        public List<KitDefinition> all() {
+            return List.copyOf(kits.values());
+        }
+
+        @Override
+        public boolean exists(KitId id) {
+            return kits.containsKey(id);
+        }
+
+        @Override
+        public void save(KitDefinition definition) {
+            kits.put(definition.id(), definition);
+        }
+
+        @Override
+        public void delete(KitId id) {
+            kits.remove(id);
         }
     }
 

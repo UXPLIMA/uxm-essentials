@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.warps.application;
 
-import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -62,14 +61,12 @@ public final class WarpHops {
      * the landing stamps.
      */
     static HopDeparture departureOf(Warp warp) {
-        Optional<Duration> cooldown =
-                warp.cooldownOverrideSeconds().map(seconds -> Duration.ofMillis((long) (seconds * 1000)));
         return new HopDeparture(
                 HopKind.WARP,
                 warp.name().value(),
                 warp.knownServer().orElseThrow(),
                 warp.name().value(),
                 warp.location(),
-                cooldown);
+                warp.ownCooldown());
     }
 }

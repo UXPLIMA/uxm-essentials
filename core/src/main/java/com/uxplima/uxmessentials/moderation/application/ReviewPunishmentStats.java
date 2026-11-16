@@ -4,7 +4,6 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -13,26 +12,22 @@ import java.util.OptionalInt;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.PunishmentReport;
-import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.StaffPunishmentCount;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * {@code /modstats [staff] [days]}: render staff punishment analytics. The server-wide view scans the recent
- * history across every actor and renders a most-active-staff leaderboard; the per-staff view scans one staff
- * member's actions and renders their breakdown. Both fold an optional {@code days} window through the injected
- * {@link Clock}, hand the fetched rows to the pure {@link PunishmentStats} aggregation, and render the result
- * through the {@link Notifier}. The read is bounded ({@link #SCAN_LIMIT}) and the command runs it off
- * the tick thread.
+ * {@code /modstats [staff] [days]}: render staff punishment analytics. The server-wide view renders a
+ * most-active-staff leaderboard; the per-staff view renders one staff member's breakdown. Both turn an optional
+ * {@code days} window into a threshold through the injected {@link Clock}, ask the store to count each staff member's
+ * actions since then ({@link SanctionHistory#countsSince}), fold the counts with {@link PunishmentStats} and render
+ * the result through the {@link Notifier}. The store counts every row in the window, so a busy history never crowds
+ * one staff member's actions out of a bounded scan; the command runs it off the tick thread.
  *
  * <p>The all-time and windowed renderings use distinct catalog keys so the time frame is phrased in the catalog
  * rather than interpolated as a Java literal; an empty result renders the matching empty notice.
  */
 public final class ReviewPunishmentStats {
-
-    /** The bounded scan the server-wide and per-staff reads cap at, so the analytics query stays within budget. */
-    static final int SCAN_LIMIT = 1000;
 
     private final SanctionHistory history;
     private final PunishmentStats stats;
@@ -50,9 +45,7 @@ public final class ReviewPunishmentStats {
     public void showServerWide(PlayerRef viewer, OptionalInt days) {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(days, "days");
-        Optional<Instant> since = window(days);
-        List<SanctionHistoryEntry> rows = history.allSince(since.orElse(Instant.EPOCH), SCAN_LIMIT);
-        renderServerWide(viewer, stats.aggregate(rows, since), days);
+        renderServerWide(viewer, stats.aggregate(history.countsSince(since(days), Optional.empty())), days);
     }
 
     /** Render {@code staff}'s own punishment breakdown to {@code viewer}, optionally over the last {@code days}. */
@@ -60,15 +53,13 @@ public final class ReviewPunishmentStats {
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(staff, "staff");
         Objects.requireNonNull(days, "days");
-        Optional<Instant> since = window(days);
-        List<SanctionHistoryEntry> rows = history.recentByActor(staff.uuid(), SCAN_LIMIT);
-        renderForStaff(viewer, staff, stats.aggregate(rows, since), days);
+        renderForStaff(
+                viewer, staff, stats.aggregate(history.countsSince(since(days), Optional.of(staff.uuid()))), days);
     }
 
-    private Optional<Instant> window(OptionalInt days) {
-        return days.isPresent()
-                ? Optional.of(clock.instant().minus(Duration.ofDays(days.getAsInt())))
-                : Optional.empty();
+    /** The start of the {@code days} window, or the start of the history when no window is given. */
+    private Instant since(OptionalInt days) {
+        return days.isPresent() ? clock.instant().minus(Duration.ofDays(days.getAsInt())) : Instant.EPOCH;
     }
 
     private void renderServerWide(PlayerRef viewer, PunishmentReport report, OptionalInt days) {

@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerUnjailEven
 import com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerUnmuteEvent;
 import com.uxplima.uxmessentials.api.bukkit.event.moderation.UxmPlayerWarnEvent;
 import com.uxplima.uxmessentials.api.view.UxmIssuer;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.event.AltDetected;
@@ -92,6 +93,7 @@ public final class ModerationEventBridges {
                         issuer(fact.ban().issuer()),
                         fact.ban().reason(),
                         fact.ban().until(),
+                        Ban.endOf(fact.ban()).isEmpty(),
                         fact.at()),
                 fact -> Region.entity(fact.target()));
         registry.register(

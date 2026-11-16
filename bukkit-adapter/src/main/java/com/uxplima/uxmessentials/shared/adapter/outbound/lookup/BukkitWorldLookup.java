@@ -5,6 +5,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import org.bukkit.Bukkit;
+import org.bukkit.NamespacedKey;
 import org.bukkit.World;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
@@ -30,6 +31,14 @@ public final class BukkitWorldLookup implements WorldLookup {
     public Optional<WorldRef> findByUid(UUID uid) {
         Objects.requireNonNull(uid, "uid");
         World world = Bukkit.getWorld(uid);
+        return world == null ? Optional.empty() : Optional.of(BukkitRefs.toRef(world));
+    }
+
+    @Override
+    public Optional<WorldRef> findByKey(String key) {
+        Objects.requireNonNull(key, "key");
+        NamespacedKey parsed = NamespacedKey.fromString(key);
+        World world = parsed == null ? null : Bukkit.getWorld(parsed);
         return world == null ? Optional.empty() : Optional.of(BukkitRefs.toRef(world));
     }
 }

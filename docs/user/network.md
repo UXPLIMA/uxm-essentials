@@ -207,7 +207,9 @@ Both keys are in the root `config.conf` and read on start.
 - **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
   that has its world.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with
-  no warmup. An accepted teleport request runs the usual warmup on the mover's server first.
+  no warmup. An accepted teleport request runs the usual warmup on the mover's server first. Sending a player
+  replaces a warmup still running on the server they leave, as a new local teleport does, and refunds it if it was
+  paid.
 - **Switches.** Turn each module's `cross-server` switch on on every backend. With it off, a warp or home is used on
   the server it is opened from, only this server's worlds can be reached, and a player warp of another server is
   refused. Staff `/tp` and `/tphere` across servers follow the teleport switch and run no checks and no warmup.
@@ -250,7 +252,9 @@ reads as offline to `/msg` and `/seen`.
 ### Moderation
 
 Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks
-the player, or everyone on that address, wherever they are; a mute is read on the next chat line. `/kick` and
+the player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
+messages and blocked commands through the bus (without a bus carrier, within a minute: every server reads its players'
+mutes again once a minute). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
 reach them; `/unfreeze` always runs. `/lockdown` is one row in the shared database, so it closes every server on
 it to new joins, but its announcement goes only to the server it was run on. Freeze, command spy and staff

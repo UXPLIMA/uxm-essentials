@@ -1,8 +1,12 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -34,6 +38,18 @@ public interface ModerationRepository {
     /** The current mute alone, for the {@code MutePolicy} hot path (no jail/tempban read). */
     MuteState loadMute(PlayerRef target);
 
+    /**
+     * The current mute of each of {@code targets}, keyed by UUID, with {@link MuteState#none()} for one who has none.
+     * A store that can answer for many players in one read overrides this.
+     */
+    default Map<UUID, MuteState> loadMutes(Collection<PlayerRef> targets) {
+        Map<UUID, MuteState> mutes = new HashMap<>();
+        for (PlayerRef target : targets) {
+            mutes.put(target.uuid(), loadMute(target));
+        }
+        return mutes;
+    }
+
     /** The current jail alone, for the {@code JailGate} hot path and the online-only tick. */
     JailState loadJail(PlayerRef target);
 
@@ -63,6 +79,14 @@ public interface ModerationRepository {
 
     /** Upsert {@code target}'s mute. {@link MuteState.None} deletes the row. */
     void saveMute(PlayerRef target, MuteState mute);
+
+    /**
+     * Store {@code replacement}, which is never {@link MuteState.None}, as {@code target}'s mute only while their row
+     * is still {@code expected}, the state the caller read and decided on ({@link MuteState.None} meaning no row at
+     * all). Returns false and writes nothing when another write changed the row in between, so a mute decided on a
+     * stale read never overwrites one that landed since.
+     */
+    boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement);
 
     /** Upsert {@code target}'s jail. {@link JailState.None} deletes the row. */
     void saveJail(PlayerRef target, JailState jail);
@@ -101,6 +125,17 @@ public interface ModerationRepository {
 
     /** Upsert an IP ban (keyed by address); a re-ban of the same address overwrites. */
     void saveIpBan(IpBan ban);
+
+    /** The IP ban row for {@code ip} as stored, a lapsed one included; empty when the address has no row. */
+    Optional<IpBan> loadIpBan(String ip);
+
+    /**
+     * Store {@code replacement} as the IP ban of its address only while that address's row is still
+     * {@code expected}, the row the caller read and decided on (empty meaning no row at all). Returns false and
+     * writes nothing when another write changed the row in between, so a weaker IP ban decided on a stale read never
+     * overwrites a stronger one that landed since.
+     */
+    boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement);
 
     /** Remove the IP ban for {@code ip}; returns true when a row was removed. */
     boolean removeIpBan(String ip);

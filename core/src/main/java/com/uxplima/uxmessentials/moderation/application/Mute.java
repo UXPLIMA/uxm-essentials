@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -26,8 +27,9 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * {@code /mute <player> [duration] [reason]} and {@code /tempmute <player> <duration> [reason]}: gag a
  * player's outbound messaging. With no duration the mute is permanent; with one it expires after the parsed
  * span. The exempt target is refused, a malformed duration is refused, and the result is audit-logged either
- * way. On success the mute row is upserted, the target (if online) is told, {@code PlayerMuted} is published,
- * and the messaging context's {@code MutePolicy} starts seeing the new state on its next read.
+ * way. A mute already in force is refused, never replaced. On success the mute row is stored by compare and set,
+ * the target (if online) is told, {@code PlayerMuted} is published, and the messaging context's {@code MutePolicy}
+ * starts seeing the new state on its next read.
  *
  * <p>The span is clamped to the actor's {@code mute.maxduration} tier ({@link SanctionDurationLimit}): a timed
  * mute over the cap, or a permanent mute by an actor whose cap is finite, is reduced to the cap and the actor
@@ -70,28 +72,65 @@ public final class Mute {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Mute {@code target}: permanent when {@code rawDuration} is blank, timed otherwise. */
+    /**
+     * Mute {@code target}: permanent when {@code rawDuration} is blank, timed otherwise. A mute already in force is
+     * never replaced from here, longer or shorter: the request is refused with {@link ModerationError#ALREADY_MUTED}
+     * and the actor is told which mute runs and for how long, so changing a mute takes an explicit {@code /unmute}
+     * first. The write is compare and set, so a mute that lands elsewhere between the read and the write is refused
+     * the same way instead of being overwritten.
+     */
     public Result<MuteState, ModerationError> mute(
             PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
-            return reject(actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
         }
         SanctionDuration.Parsed parsed = SanctionDuration.parse(rawDuration);
         if (parsed.malformed()) {
-            return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
-        // A sentence already in force is not replaced in silence. ALREADY_MUTED was declared, the public API
-        // promised ALREADY_IN_STATE for it and nothing ever returned it, so a second /mute overwrote the first
-        // and moderation.mute.already shipped in twelve languages unsent. An expired mute is not in force, so
-        // it is not this refusal: unmute first to change a live one.
         Instant now = clock.instant();
-        if (repository.loadMute(target).isActiveAt(now)) {
-            return reject(actor, target, rawDuration, reason, ModerationError.ALREADY_MUTED);
+        Plan plan = plan(actor, parsed);
+        MuteState mute = proposal(actor, plan, reason, now);
+        return switch (GuardedWrite.storeMute(repository, target, mute, now, running -> true)) {
+            case GuardedWrite.Kept<MuteState> kept -> {
+                audit.muted(actor, target, label(rawDuration), false, reason);
+                GuardedWrite.tellKept(
+                        notifier,
+                        actor,
+                        kept.running().expiry(),
+                        now,
+                        ModerationMessageKey.MUTE_ALREADY_PERMANENT,
+                        ModerationMessageKey.MUTE_ALREADY_TIMED,
+                        Map.of("player", target.name()));
+                yield Result.err(ModerationError.ALREADY_MUTED);
+            }
+            case GuardedWrite.Stored<MuteState> stored -> {
+                announce(actor, actor, target, mute, plan, reason, silent, now);
+                yield Result.ok(mute);
+            }
+        };
+    }
+
+    /**
+     * {@code /tempmute}: {@link #mute} with a duration that must be a real span. A permanent ({@code perm}) or
+     * malformed duration is refused with {@link ModerationError#BAD_DURATION}, the way {@code /tempban} refuses
+     * one, so a command named for a timed mute never leaves a permanent one. An exempt target is still refused as
+     * exempt first, as {@code /tempban} does.
+     */
+    public Result<MuteState, ModerationError> tempmute(
+            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(target, "target");
+        Objects.requireNonNull(rawDuration, "rawDuration");
+        Objects.requireNonNull(reason, "reason");
+        if (!guard.isExempt(target)
+                && SanctionDuration.parse(rawDuration).duration().isEmpty()) {
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
-        return apply(actor, target, plan(actor, parsed), reason, silent, now);
+        return mute(actor, target, rawDuration, reason, silent);
     }
 
     /**
@@ -100,32 +139,43 @@ public final class Mute {
      * every warning that reaches it and the earlier rung's mute is usually still running. A rung that lasts
      * longer replaces the running mute as a fresh one (stored, recorded, announced and synced like any mute);
      * a running mute that ends at the same instant or later, or a permanent one, is kept and the rung is
-     * audited as held. Only the caller is told the outcome, since the actor here is the server rule, not a
-     * person.
+     * audited as held. The write is compare and set, so a staff mute landing while the rung is written is kept
+     * by the same rule. The mute is issued under {@code actor}, the server rule, while what the use case says
+     * about it goes to {@code told}, the staff member whose warning set it off.
      */
     Result<EscalationOutcome, ModerationError> escalate(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            String rawDuration,
+            Optional<String> reason,
+            boolean silent) {
         Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(told, "told");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
-            return reject(actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
+            return reject(actor, told, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
         }
         SanctionDuration.Parsed parsed = SanctionDuration.parse(rawDuration);
         if (parsed.malformed()) {
-            return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
+            return reject(actor, told, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
         Instant now = clock.instant();
         Plan plan = plan(actor, parsed);
-        MuteState current = repository.loadMute(target);
-        if (!current.isActiveAt(now)) {
-            return apply(actor, target, plan, reason, silent, now).map(mute -> EscalationOutcome.APPLIED);
-        }
-        if (!SanctionStrength.outlasts(plan.effective().map(now::plus), current.expiry())) {
-            audit.muted(actor, target, plan.effective().map(SanctionDuration::format), false, SanctionStrength.HELD);
-            return Result.ok(EscalationOutcome.ALREADY_STRONGER);
-        }
-        return apply(actor, target, plan, reason, silent, now).map(mute -> EscalationOutcome.EXTENDED);
+        MuteState mute = proposal(actor, plan, reason, now);
+        Predicate<MuteState> atLeastAsLong = GuardedWrite.notOutlastedBy(mute.expiry(), MuteState::expiry);
+        return switch (GuardedWrite.storeMute(repository, target, mute, now, atLeastAsLong)) {
+            case GuardedWrite.Kept<MuteState> kept -> {
+                audit.muted(
+                        actor, target, plan.effective().map(SanctionDuration::format), false, SanctionStrength.HELD);
+                yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
+            }
+            case GuardedWrite.Stored<MuteState> stored -> {
+                announce(actor, told, target, mute, plan, reason, silent, now);
+                yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
+            }
+        };
     }
 
     /**
@@ -148,15 +198,24 @@ public final class Mute {
         }
     }
 
-    private Result<MuteState, ModerationError> apply(
-            PlayerRef actor, PlayerRef target, Plan plan, Optional<String> reason, boolean silent, Instant now) {
+    private static MuteState proposal(PlayerRef actor, Plan plan, Optional<String> reason, Instant now) {
         Issuer issuer = Issuer.of(actor);
-        Duration span = plan.span();
-        MuteState mute = plan.timed()
-                ? MuteState.timed(now.plus(span), issuer, reason, now)
+        return plan.timed()
+                ? MuteState.timed(now.plus(plan.span()), issuer, reason, now)
                 : MuteState.permanent(issuer, reason, now);
-        repository.ensureUserExists(target, now);
-        repository.saveMute(target, mute);
+    }
+
+    /** Everything a stored mute sets off: the history row, the target's notice, the sync, the event and the notices. */
+    private void announce(
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            MuteState mute,
+            Plan plan,
+            Optional<String> reason,
+            boolean silent,
+            Instant now) {
+        Duration span = plan.span();
         Optional<Duration> effective = plan.effective();
         history.mute(actor, target, reason, effective.map(now::plus));
         notifyTarget(target, effective, reason);
@@ -166,14 +225,12 @@ public final class Mute {
         events.publish(new PlayerMuted(target, mute, now));
         audit.muted(actor, target, effective.map(SanctionDuration::format), true, reason);
         if (plan.capped()) {
-            notifier.send(
-                    actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
+            notifier.send(told, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
         }
-        confirmToActor(actor, target, effective);
+        confirmToActor(told, target, effective);
         if (!silent) {
-            announce(actor, target, reason, effective);
+            broadcastMute(actor, target, reason, effective);
         }
-        return Result.ok(mute);
     }
 
     /**
@@ -191,7 +248,8 @@ public final class Mute {
                 () -> notifier.send(actor, ModerationMessageKey.MUTE_APPLIED, Map.of("player", target.name())));
     }
 
-    private void announce(PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Duration> effective) {
+    private void broadcastMute(
+            PlayerRef actor, PlayerRef target, Optional<String> reason, Optional<Duration> effective) {
         broadcast.announce(
                 ModerationMessageKey.MOD_BROADCAST_MUTE,
                 Map.of(
@@ -214,10 +272,19 @@ public final class Mute {
     }
 
     private <T> Result<T, ModerationError> reject(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, ModerationError error) {
-        Optional<String> label = rawDuration.isBlank() ? Optional.empty() : Optional.of(rawDuration);
-        audit.muted(actor, target, label, false, reason);
-        notifier.send(actor, error.messageKey());
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            String rawDuration,
+            Optional<String> reason,
+            ModerationError error) {
+        audit.muted(actor, target, label(rawDuration), false, reason);
+        notifier.send(told, error.messageKey());
         return Result.err(error);
+    }
+
+    /** The duration a refused mute is audited with: what was typed, or none for a permanent request. */
+    private static Optional<String> label(String rawDuration) {
+        return rawDuration.isBlank() ? Optional.empty() : Optional.of(rawDuration);
     }
 }

@@ -1,11 +1,11 @@
 package com.uxplima.uxmessentials.migration.convert.litebans.map;
 
-import java.time.Duration;
 import java.time.Instant;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.migration.ImportRecord;
 import com.uxplima.uxmessentials.migration.convert.litebans.parse.LiteBansRow;
+import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
@@ -25,10 +25,6 @@ import org.jspecify.annotations.NullMarked;
  */
 @NullMarked
 public final class LiteBansBanMapper {
-
-    // Mirrors moderation.application.Ban.PERMANENT_SPAN (Duration.ofDays(365_000)), which is package-private
-    // to :core, so the importer cannot reference it directly. A permanent ban's expiry is issuedAt + this.
-    private static final Duration PERMANENT_SPAN = Duration.ofDays(365_000L);
 
     /** Map a bans-table row to a ban record, or empty when the row is skipped (wildcard / sentinel target). */
     public Optional<ImportRecord> map(LiteBansRow row) {
@@ -69,6 +65,6 @@ public final class LiteBansBanMapper {
     }
 
     private static Instant expiry(LiteBansRow row, Instant issuedAt) {
-        return row.isPermanent() ? issuedAt.plus(PERMANENT_SPAN) : Instant.ofEpochMilli(row.until());
+        return row.isPermanent() ? issuedAt.plus(Ban.PERMANENT_SPAN) : Instant.ofEpochMilli(row.until());
     }
 }
