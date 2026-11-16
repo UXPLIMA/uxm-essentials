@@ -22,7 +22,6 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Result;
-import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * {@code /tempban <player> <duration> [reason]}: ban a player until a wall-clock expiry. Unlike a mute or
@@ -165,7 +164,7 @@ public final class TempBan {
             boolean silent,
             Instant now) {
         history.ban(actor, target, reason, Optional.of(ban.until()));
-        kickNow(target, span, reason);
+        BanScreen.of(ban, now).kick(sanctions, notifier, target);
         // The local kick removed the target here; this wakes peers that have them online (a no-op with no bus).
         sync.banChanged(target);
         events.publish(new PlayerTempbanned(target, ban, now));
@@ -192,12 +191,6 @@ public final class TempBan {
 
     private void tellCapped(PlayerRef actor, Duration span) {
         notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
-    }
-
-    private void kickNow(PlayerRef target, Duration span, Optional<String> reason) {
-        Map<String, String> ph = Map.of("duration", SanctionDuration.format(span), "reason", reason.orElse(""));
-        MessageKey key = ModerationMessageKey.TEMPBAN_KICK;
-        sanctions.kick(target, key, notifier.render(target, key, ph));
     }
 
     private <T> Result<T, ModerationError> reject(
