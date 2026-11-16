@@ -436,7 +436,8 @@ public final class EconomyWiring {
                         kernel.scheduler(),
                         kernel.log(),
                         Clock.systemUTC(),
-                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitPlayerLastSeen(),
+                        new com.uxplima.uxmessentials.economy.adapter.outbound.BukkitPlayerLastSeen(
+                                kernel.playerLookup()),
                         settings.maintenanceEnabled(),
                         settings.maintenanceInterval(),
                         settings.maintenancePurgeInactiveDays(),
