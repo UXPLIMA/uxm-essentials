@@ -39,6 +39,20 @@ final class InMemoryIpBans implements ModerationRepository {
     }
 
     @Override
+    public Optional<IpBan> loadIpBan(String ip) {
+        return Optional.ofNullable(ipBans.get(ip));
+    }
+
+    @Override
+    public boolean replaceIpBan(Optional<IpBan> expected, IpBan replacement) {
+        if (!loadIpBan(replacement.ip()).equals(expected)) {
+            return false;
+        }
+        ipBans.put(replacement.ip(), replacement);
+        return true;
+    }
+
+    @Override
     public boolean removeIpBan(String ip) {
         return ipBans.remove(ip) != null;
     }
@@ -85,6 +99,11 @@ final class InMemoryIpBans implements ModerationRepository {
 
     @Override
     public void saveMute(PlayerRef target, MuteState mute) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean replaceMute(PlayerRef target, MuteState expected, MuteState replacement) {
         throw new UnsupportedOperationException();
     }
 

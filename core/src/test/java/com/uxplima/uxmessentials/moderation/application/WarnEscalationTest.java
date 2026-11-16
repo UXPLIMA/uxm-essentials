@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationStep;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -355,7 +356,11 @@ class WarnEscalationTest {
         assertThat(broadcasts).containsOnlyOnce(ModerationMessageKey.MOD_BROADCAST_MUTE);
         assertThat(audit.lines)
                 .containsExactly(
-                        new AuditLine("mute", Optional.of("1d"), true, Optional.empty()),
+                        new AuditLine(
+                                "mute",
+                                Optional.of("1d"),
+                                true,
+                                Optional.of(ModerationMessageKey.MOD_WARN_ESCALATION_REASON.key())),
                         new AuditLine("mute", Optional.of("10m"), false, Optional.of("held_by_stronger")));
     }
 
@@ -503,7 +508,11 @@ class WarnEscalationTest {
         assertThat(sync.bansChanged).isEqualTo(1);
         assertThat(audit.lines)
                 .containsExactly(
-                        new AuditLine("tempban", Optional.of("1d"), true, Optional.empty()),
+                        new AuditLine(
+                                "tempban",
+                                Optional.of("1d"),
+                                true,
+                                Optional.of(ModerationMessageKey.MOD_WARN_ESCALATION_REASON.key())),
                         new AuditLine("tempban", Optional.of("1h"), false, Optional.of("held_by_stronger")));
     }
 
@@ -576,6 +585,139 @@ class WarnEscalationTest {
 
         assertThat(online.kicked()).isEmpty();
         assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATION_FAILED.key());
+        assertThat(keysToldAlex()).contains(ModerationMessageKey.TARGET_ELSEWHERE.key());
+    }
+
+    @Test
+    void aKickRungOnAPlayerWhoIsOnNoServerIsReportedAsFailedAndSaysWhy() {
+        IssueWarn kicking = warnUnder(ladder(rung(1, EscalationAction.KICK)));
+
+        warnTimes(kicking, 1);
+
+        assertThat(online.kicked()).isEmpty();
+        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATION_FAILED.key());
+        assertThat(keysToldAlex()).contains(ModerationMessageKey.KICK_OFFLINE.key());
+        assertThat(keysToldAlex()).doesNotContain(ModerationMessageKey.KICK_APPLIED.key());
+    }
+
+    @Test
+    void aKickRungOnAPlayerHereKicksAndTellsTheStaffMember() {
+        IssueWarn kicking = warnUnder(ladder(rung(1, EscalationAction.KICK)));
+        backends.connect(SAM, "survival");
+
+        warnTimes(kicking, 1);
+
+        assertThat(online.kicked()).containsOnlyKeys(SAM);
+        assertThat(keysToldAlex())
+                .containsSubsequence(
+                        ModerationMessageKey.KICK_APPLIED.key(), ModerationMessageKey.MOD_WARN_ESCALATED.key());
+    }
+
+    @Test
+    void aRungsSanctionNamesTheWarningCountAndTheWarningThatTrippedIt() {
+        warnTimes(3, false);
+
+        assertThat(records.loadMute(SAM)).isInstanceOfSatisfying(MuteState.Timed.class, timed -> {
+            assertThat(timed.issuer().name()).isEqualTo("system");
+            assertThat(timed.reason()).contains(ModerationMessageKey.MOD_WARN_ESCALATION_REASON.key());
+        });
+        assertThat(notifier.sent())
+                .contains(new RecordingNotifier.Sent(
+                        SAM,
+                        ModerationMessageKey.MOD_WARN_ESCALATION_REASON.key(),
+                        Map.of("count", "3", "reason", "spam")));
+    }
+
+    @Test
+    void aRungTrippedByAWarningWithoutAReasonStillNamesTheCount() {
+        IssueWarn banning = warnUnder(ladder(rung(2, EscalationAction.TEMPBAN, Duration.ofDays(1))));
+        banning.warn(ALEX, SAM, Optional.of("spam"), false);
+        banning.warn(ALEX, SAM, Optional.empty(), false);
+
+        assertThat(records.loadTempban(SAM))
+                .isInstanceOfSatisfying(
+                        TempbanState.Active.class,
+                        active -> assertThat(active.reason())
+                                .contains(ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE.key()));
+        assertThat(notifier.sent())
+                .contains(new RecordingNotifier.Sent(
+                        SAM, ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE.key(), Map.of("count", "2")));
+    }
+
+    @Test
+    void whatTheMuteRungSaysReachesTheStaffMemberAndNotTheServerRule() {
+        warnTimes(3, false);
+
+        assertThat(keysToldAlex())
+                .containsSubsequence(
+                        ModerationMessageKey.MUTE_APPLIED_TIMED.key(), ModerationMessageKey.MOD_WARN_ESCALATED.key());
+        assertThat(notifier.sent()).noneMatch(line -> line.viewer().name().equals("system"));
+    }
+
+    @Test
+    void whatTheBanRungSaysReachesTheStaffMember() {
+        warnTimes(5, false);
+
+        assertThat(keysToldAlex()).contains(ModerationMessageKey.TEMPBAN_APPLIED.key());
+        assertThat(notifier.sent()).noneMatch(line -> line.viewer().name().equals("system"));
+    }
+
+    @Test
+    void aStaffPermanentMuteLandingWhileAMuteRungIsWrittenIsKept() {
+        warnTimes(2, false);
+        records.beforeNextReplace(() -> mute.mute(ALEX, SAM, "", Optional.of("slurs"), false));
+
+        warnTimes(1, false);
+
+        assertThat(records.loadMute(SAM)).isInstanceOfSatisfying(MuteState.Permanent.class, permanent -> {
+            assertThat(permanent.issuer().name()).isEqualTo("Alex");
+            assertThat(permanent.reason()).contains("slurs");
+        });
+        assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
+        assertThat(sync.mutesChanged).isEqualTo(1);
+    }
+
+    @Test
+    void aLongWarningReasonGivesTheRungAReasonThatFitsItsRow() {
+        Notifier filling = new Notifier(
+                (viewer, key, placeholders) -> key.equals(ModerationMessageKey.MOD_WARN_ESCALATION_REASON)
+                        ? "reached " + placeholders.get("count") + " warnings, the last for: "
+                                + placeholders.get("reason")
+                        : key.key(),
+                (viewer, text) -> {});
+        Mute muting = new Mute(
+                records, guard, filling, audit, events, history, limit, (key, placeholders) -> {}, sync, clock);
+        IssueWarn warning = new IssueWarn(
+                records,
+                guard,
+                filling,
+                audit,
+                events,
+                history,
+                (key, placeholders) -> {},
+                new WarnEscalator(LADDER, muting, tempBan, ban, kick, filling),
+                clock);
+        String essay = "x".repeat(240);
+
+        for (int i = 0; i < 3; i++) {
+            warning.warn(ALEX, SAM, Optional.of(essay), false);
+        }
+
+        assertThat(records.loadMute(SAM))
+                .isInstanceOfSatisfying(
+                        MuteState.Timed.class,
+                        timed -> assertThat(timed.reason()).hasValueSatisfying(reason -> {
+                            assertThat(reason).hasSize(WarnEscalator.MAX_REASON);
+                            assertThat(reason).startsWith("reached 3 warnings, the last for: xxx");
+                        }));
+    }
+
+    /** Every line the staff member who gave the warnings was told, in order. */
+    private List<String> keysToldAlex() {
+        return notifier.sent().stream()
+                .filter(line -> line.viewer().equals(ALEX))
+                .map(RecordingNotifier.Sent::key)
+                .toList();
     }
 
     /** One mute or ban line the audit log was given: its kind, the span label, whether it landed, and why. */

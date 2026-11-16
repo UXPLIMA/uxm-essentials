@@ -24,7 +24,9 @@ import org.jspecify.annotations.NullMarked;
  * inserted into and read back: never updated. The family reads scope to a family by {@code action} and read
  * newest-first off the {@code (target, ts DESC)} index; the unified {@link #recentForTarget} read drops the
  * action filter so every kind folds into one timeline; {@link #recentByActor} scopes by {@code actor} (V28
- * index) for {@code /staffhistory}. Every read caps at the supplied limit. Every statement is typed jOOQ DSL
+ * index) for {@code /staffhistory}. Every read caps at the supplied limit. The free-text columns are fitted to their
+ * width before the insert: the sanction this row records is already stored, so a reason too long for the column must
+ * not fail the history write on a backend that enforces the width. Every statement is typed jOOQ DSL
  * no SQL is ever string-concatenated, and writes go through the transactional {@code write} seam.
  */
 @NullMarked
@@ -41,7 +43,11 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
                 .set(MODERATION_SANCTION_HISTORY.ID, nextId(dsl))
                 .set(MODERATION_SANCTION_HISTORY.ACTION, entry.action().name())
                 .set(MODERATION_SANCTION_HISTORY.TARGET, entry.target().toString())
-                .set(MODERATION_SANCTION_HISTORY.REASON, entry.reason().orElse(null))
+                .set(
+                        MODERATION_SANCTION_HISTORY.REASON,
+                        entry.reason()
+                                .map(reason -> fit(MODERATION_SANCTION_HISTORY.REASON, reason))
+                                .orElse(null))
                 .set(MODERATION_SANCTION_HISTORY.ACTOR, actorUuid(entry))
                 .set(
                         MODERATION_SANCTION_HISTORY.ACTOR_NAME,
