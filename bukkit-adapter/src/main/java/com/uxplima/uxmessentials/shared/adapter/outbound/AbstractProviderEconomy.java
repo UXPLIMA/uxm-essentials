@@ -58,15 +58,42 @@ public abstract class AbstractProviderEconomy {
      * about the money, so without the receipt the charge is invisible until someone checks their balance.
      */
     public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+        return debit(who, amount, currencyId).isPresent();
+    }
+
+    /**
+     * {@link #withdraw}, answering the id of the currency the money left in ({@code "default"} resolved to this
+     * server's), or empty when the funds did not suffice. A seam that may refund later records this id, so the refund
+     * names the currency itself rather than whatever {@code "default"} means where and when it runs.
+     */
+    public Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(amount, "amount");
         Currency target = resolve(currencyId);
         Money charge = Money.of(target, amount);
         if (economy.debit(who, charge).isErr()) {
-            return false;
+            return Optional.empty();
         }
         receipts.ifPresent(receipt -> receipt.charged(who, charge, chargeLabel()));
-        return true;
+        return Optional.of(target.id().value());
+    }
+
+    /**
+     * Give {@code amount} back to {@code who} in exactly the currency {@code currencyId} names, the id {@link #debit}
+     * answered. False when this server knows no such currency, so the money is never credited in another one. A
+     * charge recorded as {@code "default"} by a release that did not resolve it is given back in this server's
+     * default, the only reading such a record has.
+     */
+    protected boolean refundExactly(PlayerRef who, BigDecimal amount, String currencyId) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(amount, "amount");
+        Objects.requireNonNull(currencyId, "currencyId");
+        Optional<Currency> target = currencyId.equalsIgnoreCase("default")
+                ? Optional.of(currency)
+                : economy.currencies().stream()
+                        .filter(c -> c.id().value().equalsIgnoreCase(currencyId))
+                        .findFirst();
+        return target.map(c -> economy.credit(who, Money.of(c, amount)).isOk()).orElse(false);
     }
 
     /**

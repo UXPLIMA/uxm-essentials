@@ -1,13 +1,11 @@
 package com.uxplima.uxmessentials.homes.adapter.outbound;
 
 import java.math.BigDecimal;
-import java.util.Objects;
 import java.util.Optional;
 
 import com.uxplima.uxmessentials.economy.application.port.EconomyProvider;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.EconomyMessageKey;
-import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.homes.application.port.HomeEconomy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.AbstractProviderEconomy;
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
@@ -32,9 +30,7 @@ public final class ProviderHomeEconomy extends AbstractProviderEconomy implement
 
     @Override
     public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
-        Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(amount, "amount");
-        return economy().credit(who, Money.of(resolve(currencyId), amount)).isOk();
+        return refundExactly(who, amount, currencyId);
     }
 
     @Override

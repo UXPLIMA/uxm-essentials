@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.homes.application.port;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -22,14 +23,16 @@ public interface HomeEconomy {
     boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId);
 
     /**
-     * Withdraw {@code amount} of {@code currencyId} from {@code who}'s balance, returning {@code true} on
-     * success and {@code false} when the balance was insufficient.
+     * Withdraw {@code amount} of {@code currencyId} from {@code who}'s balance. Answers the id of the currency the
+     * money left in, with {@code "default"} resolved to this server's currency, so a refund later, on this server or
+     * another, gives it back in that same currency; empty when the balance was insufficient.
      */
-    boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId);
+    Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId);
 
     /**
-     * Give {@code amount} of {@code currencyId} back to {@code who}, for a cross-server home teleport that was charged
-     * and never moved the player. Returns {@code true} once the credit has landed.
+     * Give {@code amount} of {@code currencyId}, the id {@link #debit} answered, back to {@code who}, for a home
+     * teleport that was charged and never moved the player. Returns {@code true} once the credit has landed, and
+     * {@code false} when this server knows no such currency: the money is never credited in another one.
      */
     boolean refund(PlayerRef who, BigDecimal amount, String currencyId);
 }

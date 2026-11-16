@@ -72,10 +72,13 @@ public final class WarpAccess {
             return Result.ok(Optional.empty());
         }
         WarpCost cost = warp.cost();
-        if (!economy.get().withdraw(who, cost.amount(), cost.currencyId())) {
+        Optional<String> takenIn = economy.get().debit(who, cost.amount(), cost.currencyId());
+        if (takenIn.isEmpty()) {
             return Result.err(WarpError.CANNOT_AFFORD);
         }
-        return Result.ok(Optional.of(cost));
+        // The currency it was taken in, never "default": a refund on another server, or after a reload, must not
+        // read that as its own default currency.
+        return Result.ok(Optional.of(WarpCost.of(cost.amount(), takenIn.get())));
     }
 
     /**

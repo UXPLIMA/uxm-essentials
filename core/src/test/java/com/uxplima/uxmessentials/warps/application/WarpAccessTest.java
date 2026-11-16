@@ -159,9 +159,9 @@ class WarpAccessTest {
             }
 
             @Override
-            public boolean withdraw(PlayerRef who, BigDecimal amount, String currencyId) {
+            public Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId) {
                 payers.add(who.name());
-                return purse.withdraw(who, amount, currencyId);
+                return purse.debit(who, amount, currencyId);
             }
 
             @Override
@@ -204,5 +204,36 @@ class WarpAccessTest {
         assertThat(useWarp().use(ALEX, VAULT).isOk()).isTrue();
 
         assertThat(purse.charges).isZero();
+    }
+
+    @Test
+    void aChargeRecordsTheCurrencyTheEconomyTookItInSoTheRefundNamesIt() {
+        List<String> refundedIn = new ArrayList<>();
+        WarpEconomy resolving = new WarpEconomy() {
+            @Override
+            public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
+                return true;
+            }
+
+            @Override
+            public Optional<String> debit(PlayerRef who, BigDecimal amount, String currencyId) {
+                return Optional.of(currencyId.equals("default") ? "coins" : currencyId);
+            }
+
+            @Override
+            public boolean refund(PlayerRef who, BigDecimal amount, String currencyId) {
+                refundedIn.add(currencyId);
+                return true;
+            }
+        };
+        WarpAccess access = new WarpAccess(permissions, Optional.of(resolving));
+        Warp priced = Warp.create(
+                VAULT, at(5, 64, 5), SAM, NOW, WarpCost.of(new BigDecimal("25"), "default"), Optional.empty());
+
+        WarpCost charged = access.charge(ALEX, priced).orElseThrow().orElseThrow();
+        access.refund(ALEX, charged);
+
+        assertThat(charged.currencyId()).isEqualTo("coins");
+        assertThat(refundedIn).containsExactly("coins");
     }
 }
