@@ -146,6 +146,53 @@ class CrossServerHopTest {
     }
 
     @Test
+    void aHopClaimedButNotMovedWhenTheServerStopsIsRefundedOnce() {
+        landing = Landing.DROPPED;
+        goHome();
+        join(survival);
+        assertThat(store.rows())
+                .as("claimed, so no other backend can refund it")
+                .isEmpty();
+
+        survival.stop();
+        survival.stop();
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+        assertThat(ledger.keeper).isEqualByComparingTo("0");
+        assertThat(ledger.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("home.hop.sending", "home.hop.refunded");
+    }
+
+    @Test
+    void aHopThatLandedBeforeTheStopKeepsItsSettlement() {
+        goHome();
+        join(survival);
+
+        survival.stop();
+
+        assertThat(moved).containsExactly("Alex->base");
+        assertThat(ledger.refunds).isZero();
+        assertThat(ledger.keeper).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void aStoppedBackendClaimsNothingAndLeavesTheRowForTheWatchdog() {
+        goHome();
+        survival.onArrival(ALEX);
+
+        survival.stop();
+        scheduler.advance(SETTLE);
+        assertThat(store.rows()).containsKey(ALEX.uuid());
+        scheduler.advance(TTL);
+
+        assertThat(moved).isEmpty();
+        assertThat(ledger.refunds).isOne();
+        assertThat(ledger.wallet).isEqualByComparingTo(START);
+    }
+
+    @Test
     void aHopTheGateRefusesChargesNothingRecordsNothingAndConnectsNobody() {
         gateRefuses = true;
 
@@ -396,7 +443,9 @@ class CrossServerHopTest {
     private enum Landing {
         LAND,
         // Reports the miss and then throws as well, the worst case for refunding exactly once.
-        MISS_THEN_THROW
+        MISS_THEN_THROW,
+        // Its region task is dropped by a stopping server, so it never reports anything.
+        DROPPED
     }
 
     /** The player's wallet, the keeper's account and the homes that exist, with where each lives. */
@@ -449,6 +498,9 @@ class CrossServerHopTest {
                 return HopResolution.unreachable(hop.target());
             }
             return HopResolution.landsAt(hop.target(), (who, onLanded, onMissed) -> {
+                if (landing == Landing.DROPPED) {
+                    return;
+                }
                 if (landing == Landing.MISS_THEN_THROW) {
                     onMissed.run();
                     throw new IllegalStateException("the move broke after reporting its miss");

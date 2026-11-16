@@ -203,7 +203,8 @@ Both keys are in the root `config.conf` and read on start.
 - **Money.** If the player is not moved within `cross-server.request-ttl-seconds` (default 30), the origin gives the
   money back. If the target refuses them on arrival (the warp or home is gone, the world is full or will not load,
   the spot is unsafe), the server they reached gives it back, in the currency it was taken in; keep the economy module
-  on wherever a move can land. A player warp's fee goes to its owner only when the visitor arrives.
+  on wherever a move can land. A server that stops after taking the player in but before moving them gives the money
+  back as it stops. A player warp's fee goes to its owner only when the visitor arrives.
 - **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
   that has its world.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with

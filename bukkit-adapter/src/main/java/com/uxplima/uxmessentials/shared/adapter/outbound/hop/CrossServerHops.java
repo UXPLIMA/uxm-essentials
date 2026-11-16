@@ -95,6 +95,11 @@ public final class CrossServerHops {
         localWarmups = Objects.requireNonNull(warmups, "warmups");
     }
 
+    /** Refund every hop this backend claimed and has not moved yet, as the plugin stops; see {@link HopArrival#stop}. */
+    public void stopArrivals() {
+        arrival.stop();
+    }
+
     /** The join listener that ends a hop on this backend. */
     public Listener arrivalListener() {
         return new HopArrivalListener(arrival, resolvers);

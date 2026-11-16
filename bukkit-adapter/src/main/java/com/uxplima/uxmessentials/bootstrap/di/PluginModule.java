@@ -1392,6 +1392,9 @@ public final class PluginModule {
         // exactly when the answer is no: an operator's own template reads it to hide a line rather than print a
         // dash at every player. Wired last, from what the loop above recorded.
         links.placeholders.modules(new RegistryModulesPlaceholders(wiredModules));
+        // Registered after every module, so it runs before any of them stops: a hop this backend claimed and has not
+        // moved yet is refunded while the economies that pay it back are still up.
+        resources.onClose(hops::stopArrivals);
         return links.placeholders.build();
     }
 
