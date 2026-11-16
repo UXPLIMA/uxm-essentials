@@ -27,6 +27,11 @@ public final class FakePermissions implements Permissions {
         return this;
     }
 
+    public FakePermissions revoke(PlayerRef who, String node) {
+        granted.remove(who.uuid() + "|" + node);
+        return this;
+    }
+
     public FakePermissions quota(String node, QuotaResult result) {
         quotas.put(node, result);
         return this;

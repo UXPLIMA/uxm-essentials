@@ -154,6 +154,7 @@ public final class JailGuiFlow {
                             services.lane()
                                     .run(
                                             viewerRef,
+                                            target,
                                             () -> services.jail()
                                                     .jail(viewerRef, target, jail, duration, Optional.empty()));
                         },

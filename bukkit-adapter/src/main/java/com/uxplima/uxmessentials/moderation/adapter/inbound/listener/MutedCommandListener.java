@@ -31,9 +31,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but
  * the dispatch is stopped before the vanilla/dispatcher handler. The mute is the one kept in memory for every
  * connected player, so the server thread never waits on the database here, and an expired timed mute no longer
- * blocks; a player holding
- * the moderation exempt node is never blocked. When the configured list is empty the listener short-circuits
- * before any mute lookup, so an operator who leaves the list blank pays nothing.
+ * blocks. A player holding the moderation exempt node is never blocked. When the configured list is empty the
+ * listener short-circuits before any mute lookup, so an operator who leaves the list blank pays nothing.
  */
 @NullMarked
 public final class MutedCommandListener implements Listener {

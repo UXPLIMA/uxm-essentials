@@ -9,9 +9,14 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationTempba
 import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationWarns.MODERATION_WARNS;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
@@ -40,6 +45,9 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class JooqModerationRepository extends JooqRepository implements ModerationRepository {
 
+    /** Players per mute query in {@link #loadMutes}. */
+    static final int MUTE_BATCH = 500;
+
     public JooqModerationRepository(DSLContext dsl) {
         super(dsl);
     }
@@ -58,6 +66,26 @@ public final class JooqModerationRepository extends JooqRepository implements Mo
                         .fetchOne())
                 .map(ModerationRows::toMute)
                 .orElseGet(MuteState::none));
+    }
+
+    /** One query per {@value #MUTE_BATCH} players, so a full server's refresh stays within any database's IN list. */
+    @Override
+    public Map<UUID, MuteState> loadMutes(Collection<PlayerRef> targets) {
+        Objects.requireNonNull(targets, "targets");
+        Map<UUID, MuteState> mutes = new HashMap<>();
+        List<String> ids = new ArrayList<>();
+        for (PlayerRef target : targets) {
+            mutes.put(target.uuid(), MuteState.none());
+            ids.add(target.uuid().toString());
+        }
+        for (int from = 0; from < ids.size(); from += MUTE_BATCH) {
+            List<String> batch = ids.subList(from, Math.min(from + MUTE_BATCH, ids.size()));
+            read(dsl -> dsl.selectFrom(MODERATION_MUTES)
+                            .where(MODERATION_MUTES.TARGET.in(batch))
+                            .fetch())
+                    .forEach(row -> mutes.put(UUID.fromString(row.getTarget()), ModerationRows.toMute(row)));
+        }
+        return mutes;
     }
 
     @Override

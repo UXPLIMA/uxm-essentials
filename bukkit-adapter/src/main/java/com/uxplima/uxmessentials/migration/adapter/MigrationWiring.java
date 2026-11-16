@@ -271,7 +271,8 @@ public final class MigrationWiring {
                 ports.log());
         RecordWriter dryRun = new DryRunRecordWriter(
                 users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
-        return new Writers(new AnnouncingRecordWriter(repositories, publisher, scheduler), dryRun);
+        return new Writers(
+                new AnnouncingRecordWriter(repositories, publisher, scheduler, targets::mutesImported), dryRun);
     }
 
     private static WriterPorts ports(

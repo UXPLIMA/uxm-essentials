@@ -55,6 +55,7 @@ import com.uxplima.uxmessentials.moderation.application.JailHopResolver;
 import com.uxplima.uxmessentials.moderation.application.JailTransfer;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.LanePermissions;
 import com.uxplima.uxmessentials.moderation.application.ListAlts;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
@@ -123,6 +124,7 @@ import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -209,7 +211,7 @@ public final class ModerationWiring {
         SanctionHistoryRecorder historyRecorder = new SanctionHistoryRecorder(sanctionHistory, clock);
         BukkitSanctions sanctions =
                 new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings, jailLocations);
-        ModerationGuard guard = new ModerationGuard(kernel.permissions());
+        ModerationGuard guard = new ModerationGuard(lanePermissions(plugin, kernel));
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
         JailNetwork jailNetwork = jailNetwork(
@@ -242,7 +244,7 @@ public final class ModerationWiring {
                 repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         // A connected player's mute is kept in memory for the checks on the server thread; a peer's change to it is
         // read again here.
-        OnlineMutes mutePolicy = new OnlineMutes(repository, kernel.scheduler(), clock);
+        OnlineMutes mutePolicy = new OnlineMutes(repository, kernel.scheduler(), clock, kernel.log());
         bus.registry()
                 .register(ModerationSync.listener(
                         enforce::onRemoteBan, enforceIp::onRemoteIpBan, mutePolicy::changedElsewhere));
@@ -383,7 +385,8 @@ public final class ModerationWiring {
                         services.kick(),
                         services.warn(),
                         services.jail(),
-                        services.unjail()));
+                        services.unjail(),
+                        services.lane()));
     }
 
     /**
@@ -499,7 +502,7 @@ public final class ModerationWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 broadcastPrefix(kernel));
-        SanctionDurationLimit limit = new SanctionDurationLimit(kernel.permissions());
+        SanctionDurationLimit limit = new SanctionDurationLimit(lanePermissions(plugin, kernel));
         // The escalated sanctions a warning auto-applies run through their own use cases, never back through a
         // warn, so escalation cannot recurse; they are built first so the escalator can drive them.
         Mute mute =
@@ -619,8 +622,16 @@ public final class ModerationWiring {
                 .repository(repository)
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
-                .lane(new StorageLane(kernel.scheduler(), notifier))
+                .lane(new StorageLane(kernel.scheduler(), notifier, kernel.permissions(), kernel.log()))
                 .build();
+    }
+
+    /**
+     * The permission reader for punishment immunity and duration caps: the answers the storage lane read before the
+     * work left the server thread, or the live reader on the server thread.
+     */
+    private static Permissions lanePermissions(Plugin plugin, KernelPorts kernel) {
+        return new LanePermissions(kernel.permissions(), plugin.getServer()::isPrimaryThread, kernel.log());
     }
 
     /**

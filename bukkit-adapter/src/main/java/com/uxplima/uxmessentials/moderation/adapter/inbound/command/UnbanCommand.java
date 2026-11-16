@@ -48,7 +48,7 @@ public final class UnbanCommand extends ModerationCommandSupport implements Comm
     private int run(CommandContext<CommandSourceStack> ctx) {
         PlayerRef actor = actor(ctx);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> offTick(actor, () -> services.unban().unban(actor, to)));
+        target.ifPresent(to -> offTick(actor, to, () -> services.unban().unban(actor, to)));
         return Command.SINGLE_SUCCESS;
     }
 }

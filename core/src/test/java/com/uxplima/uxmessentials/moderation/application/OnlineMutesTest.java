@@ -19,20 +19,22 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
+import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
 import org.junit.jupiter.api.Test;
 
 /**
  * A connected player's mute is kept in memory, so the checks on the server thread answer without the database: read
- * at join on the async lane, changed by a mute or unmute here as it lands, read again when another server changes it,
- * and over once its time is up.
+ * at join on the async lane, changed by a mute or unmute here as it lands, read again when another server changes it
+ * and every so often, and over once its time is up.
  */
 class OnlineMutesTest {
 
     private final MutableClock clock = new MutableClock(NOW);
     private final QueuedScheduler scheduler = new QueuedScheduler();
     private final SanctionRecords records = new SanctionRecords();
-    private final OnlineMutes mutes = new OnlineMutes(records, scheduler, clock);
+    private final RecordingLogger log = new RecordingLogger();
+    private final OnlineMutes mutes = new OnlineMutes(records, scheduler, clock, log);
 
     private MuteState permanent() {
         return MuteState.permanent(Issuer.of(ALEX), Optional.empty(), NOW);
@@ -114,6 +116,67 @@ class OnlineMutesTest {
         mutes.changedElsewhere(SAM.uuid());
         mutes.onEvent(new PlayerUnmuted(SAM, NOW));
 
+        assertThat(mutes.isMuted(SAM)).isTrue();
+    }
+
+    @Test
+    void aJoinReadThatFailsIsLoggedAndTriedAgainUntilItLands() {
+        records.saveMute(SAM, permanent());
+        records.failMuteReads(2);
+        mutes.joined(SAM);
+
+        scheduler.runAll();
+        records.saveMute(SAM, MuteState.none());
+
+        assertThat(log.errors())
+                .containsExactly(
+                        "event=online_mute_read_failed player=Sam attempt=1",
+                        "event=online_mute_read_failed player=Sam attempt=2");
+        assertThat(mutes.isMuted(SAM)).isTrue();
+    }
+
+    @Test
+    void aJoinReadThatKeepsFailingLeavesTheDatabaseAnswering() {
+        records.failMuteReads(OnlineMutes.READ_ATTEMPTS);
+        mutes.joined(SAM);
+
+        scheduler.runAll();
+        records.saveMute(SAM, permanent());
+
+        assertThat(log.errors()).hasSize(OnlineMutes.READ_ATTEMPTS);
+        assertThat(mutes.isMuted(SAM)).isTrue();
+    }
+
+    @Test
+    void theRegularReadPicksUpAChangeThatCameWithNoFrame() {
+        mutes.joined(SAM);
+        mutes.joined(ALEX);
+        scheduler.runAll();
+        records.saveMute(SAM, permanent());
+
+        mutes.refreshAll();
+        scheduler.runAll();
+        records.saveMute(SAM, MuteState.none());
+
+        assertThat(mutes.isMuted(SAM)).isTrue();
+        assertThat(mutes.isMuted(ALEX)).isFalse();
+    }
+
+    @Test
+    void aSlowReadFromAnEarlierVisitDoesNotOverwriteTheNewOne() {
+        mutes.joined(SAM);
+        // While the first visit's read is in flight (it has already read "not muted"), Sam leaves, is muted from
+        // elsewhere and comes back.
+        records.duringNextMuteRead(() -> {
+            mutes.left(SAM);
+            records.saveMute(SAM, permanent());
+            mutes.joined(SAM);
+        });
+
+        scheduler.runNext();
+
+        assertThat(mutes.isMuted(SAM)).isTrue();
+        scheduler.runAll();
         assertThat(mutes.isMuted(SAM)).isTrue();
     }
 

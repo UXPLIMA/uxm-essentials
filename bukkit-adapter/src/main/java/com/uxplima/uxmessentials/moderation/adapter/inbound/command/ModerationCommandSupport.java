@@ -128,6 +128,11 @@ abstract class ModerationCommandSupport {
         services.lane().run(actor, work);
     }
 
+    /** {@link #offTick(PlayerRef, Runnable)} for work about {@code target}, kept in order behind earlier work. */
+    final void offTick(PlayerRef actor, PlayerRef target, Runnable work) {
+        services.lane().run(actor, target, work);
+    }
+
     /** The live player behind {@code target}, if connected: for a command that must act on a session. */
     static @Nullable Player onlinePlayer(CommandContext<CommandSourceStack> ctx, PlayerRef target) {
         return Sender.audience(ctx.getSource()).getServer().getPlayer(target.uuid());

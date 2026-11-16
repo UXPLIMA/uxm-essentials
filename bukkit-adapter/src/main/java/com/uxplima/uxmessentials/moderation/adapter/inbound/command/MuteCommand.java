@@ -94,7 +94,7 @@ public final class MuteCommand extends ModerationCommandSupport implements Comma
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
         target.ifPresent(to ->
-                offTick(actor, () -> services.mute().mute(actor, to, duration, parsed.reason(), parsed.silent())));
+                offTick(actor, to, () -> services.mute().mute(actor, to, duration, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

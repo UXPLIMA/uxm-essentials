@@ -32,6 +32,9 @@ import org.jspecify.annotations.Nullable;
  *       apart, because a peer reloads and redraws a hologram by name.
  * </ul>
  *
+ * <p>Mutes are not sent anywhere, but this server keeps its connected players' mutes in memory, so an import that
+ * stored a sanction has it read them again when it ends.
+ *
  * <p>Homes, balances and player warps send nothing: a peer's cache of those expires on its own and is reloaded
  * when a backend fills again, and an import has no frame that says "everything changed" for them.
  */
@@ -47,14 +50,22 @@ public final class AnnouncingRecordWriter implements RecordWriter {
     private final RecordWriter delegate;
     private final BusPublisher bus;
     private final Scheduler scheduler;
+    private final Runnable mutesWritten;
     private final Object lock = new Object();
+    private boolean storedSanction;
     private @Nullable String changedWarp;
     private final Set<String> changedHolograms = new TreeSet<>();
 
     public AnnouncingRecordWriter(RecordWriter delegate, BusPublisher bus, Scheduler scheduler) {
+        this(delegate, bus, scheduler, () -> {});
+    }
+
+    /** @param mutesWritten run when an import that stored a sanction ends */
+    public AnnouncingRecordWriter(RecordWriter delegate, BusPublisher bus, Scheduler scheduler, Runnable mutesWritten) {
         this.delegate = Objects.requireNonNull(delegate, "delegate");
         this.bus = Objects.requireNonNull(bus, "bus");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.mutesWritten = Objects.requireNonNull(mutesWritten, "mutesWritten");
     }
 
     @Override
@@ -73,11 +84,17 @@ public final class AnnouncingRecordWriter implements RecordWriter {
     public void announce() {
         String warp;
         List<String> holograms;
+        boolean sanctions;
         synchronized (lock) {
             warp = changedWarp;
             holograms = new ArrayList<>(changedHolograms);
+            sanctions = storedSanction;
             changedWarp = null;
             changedHolograms.clear();
+            storedSanction = false;
+        }
+        if (sanctions) {
+            mutesWritten.run();
         }
         if (warp != null) {
             bus.publish(new WarpChanged(bus.serverId(), warp));
@@ -101,6 +118,8 @@ public final class AnnouncingRecordWriter implements RecordWriter {
                 changedWarp = warp.warp().warp().name().value();
             } else if (record instanceof ImportRecord.HologramRecord hologram) {
                 changedHolograms.add(hologram.hologram().hologram().name().value());
+            } else if (record instanceof ImportRecord.ModerationRecord) {
+                storedSanction = true;
             }
         }
     }

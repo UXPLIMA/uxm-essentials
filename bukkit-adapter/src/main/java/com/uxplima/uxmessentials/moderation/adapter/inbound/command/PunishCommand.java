@@ -59,7 +59,8 @@ public final class PunishCommand extends ModerationCommandSupport implements Com
         PlayerRef actor = actor(ctx);
         String template = ctx.getArgument("template", String.class);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> offTick(actor, () -> services.punish().punish(actor, to, template, silentByDefault)));
+        target.ifPresent(
+                to -> offTick(actor, to, () -> services.punish().punish(actor, to, template, silentByDefault)));
         return Command.SINGLE_SUCCESS;
     }
 }

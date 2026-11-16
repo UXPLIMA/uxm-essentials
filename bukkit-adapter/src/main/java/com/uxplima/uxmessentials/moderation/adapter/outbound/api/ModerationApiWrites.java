@@ -7,6 +7,7 @@ import com.uxplima.uxmessentials.moderation.application.IssueWarn;
 import com.uxplima.uxmessentials.moderation.application.Jail;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.Mute;
+import com.uxplima.uxmessentials.moderation.application.StorageLane;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.Unban;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
@@ -29,6 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * @param warn the warning, escalation rules included
  * @param jail the jail sentence
  * @param unjail the release
+ * @param lane the async lane they run on, the one the commands use
  */
 @NullMarked
 public record ModerationApiWrites(
@@ -40,7 +42,8 @@ public record ModerationApiWrites(
         Kick kick,
         IssueWarn warn,
         Jail jail,
-        Unjail unjail) {
+        Unjail unjail,
+        StorageLane lane) {
 
     public ModerationApiWrites {
         Objects.requireNonNull(ban, "ban");
@@ -52,5 +55,6 @@ public record ModerationApiWrites(
         Objects.requireNonNull(warn, "warn");
         Objects.requireNonNull(jail, "jail");
         Objects.requireNonNull(unjail, "unjail");
+        Objects.requireNonNull(lane, "lane");
     }
 }

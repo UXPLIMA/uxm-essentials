@@ -93,7 +93,7 @@ public final class TempbanCommand extends ModerationCommandSupport implements Co
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
         target.ifPresent(to -> offTick(
-                actor, () -> services.tempBan().tempban(actor, to, duration, parsed.reason(), parsed.silent())));
+                actor, to, () -> services.tempBan().tempban(actor, to, duration, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

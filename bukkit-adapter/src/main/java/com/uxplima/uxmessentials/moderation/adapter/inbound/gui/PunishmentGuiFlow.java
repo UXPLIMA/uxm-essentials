@@ -131,7 +131,7 @@ public final class PunishmentGuiFlow {
     private PunishmentAction.Executor executor(PunishmentAction action, String duration) {
         PunishmentAction.Executor call = sanction(action, duration);
         return (actor, target, reason, silent) ->
-                services.lane().run(actor, () -> call.execute(actor, target, reason, silent));
+                services.lane().run(actor, target, () -> call.execute(actor, target, reason, silent));
     }
 
     private PunishmentAction.Executor sanction(PunishmentAction action, String duration) {

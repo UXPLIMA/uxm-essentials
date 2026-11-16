@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Duration;
+import java.util.List;
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
@@ -33,7 +34,10 @@ public final class SanctionDurationLimit {
      * fold to a real node, so a held cap wins, while a player with no node still resolves to this negative
      * fallback and is treated as unlimited.
      */
-    private static final long NO_NODE_FALLBACK = Long.MIN_VALUE;
+    static final long NO_NODE_FALLBACK = Long.MIN_VALUE;
+
+    /** The sanction kinds that carry a duration cap. */
+    static final List<String> KINDS = List.of("ban", "mute");
 
     private final Permissions permissions;
 
@@ -49,8 +53,7 @@ public final class SanctionDurationLimit {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(kind, "kind");
         Objects.requireNonNull(requested, "requested");
-        QuotaFamily family = QuotaFamily.quota(EnforcementPermissions.maxDuration(kind));
-        QuotaResult resolved = permissions.resolveQuota(actor, family, null, NO_NODE_FALLBACK);
+        QuotaResult resolved = permissions.resolveQuota(actor, family(kind), null, NO_NODE_FALLBACK);
         if (resolved.isUnlimited()) {
             return requested;
         }
@@ -61,5 +64,10 @@ public final class SanctionDurationLimit {
         }
         Duration cap = Duration.ofSeconds(capSeconds);
         return requested.compareTo(cap) > 0 ? cap : requested;
+    }
+
+    /** The quota family holding the {@code kind} cap. */
+    static QuotaFamily family(String kind) {
+        return QuotaFamily.quota(EnforcementPermissions.maxDuration(kind));
     }
 }

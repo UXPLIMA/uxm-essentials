@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * Starts and stops keeping a player's mute in memory as they join and leave. The join handler runs first so the read
- * on the async lane starts as early as it can; until it finishes the mute checks ask the database as before.
+ * on the async lane starts as early as it can; until it succeeds the mute checks ask the database.
  */
 @NullMarked
 public final class OnlineMutesListener implements Listener {

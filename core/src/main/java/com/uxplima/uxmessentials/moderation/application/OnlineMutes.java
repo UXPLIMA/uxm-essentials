@@ -1,6 +1,9 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
+import java.time.Duration;
+import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,6 +16,7 @@ import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerMuted;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -24,24 +28,34 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>A player's mute is read on the async lane when they join and dropped when they leave. A mute or unmute issued on
  * this server is taken from the use case's own event as it lands; one issued on another server arrives as its bus
  * frame and is read again on the async lane. A timed mute ends on its own, since the expiry is checked against the
- * clock at every question. Until the read at join completes, and for a player not connected here, the answer comes
- * from the database as before.
+ * clock at every question. Every connected player's mute is also read again now and then ({@link #refreshAll}), so a
+ * change that reached the database with no frame (a peer with no bus carrier, an import) is picked up while they
+ * stay. Until the read at join succeeds, and for a player not connected here, the answer comes from the database.
+ * A read at join that fails is tried again a couple of times, a little later each time.
  *
  * <p>Each change is numbered, and a read finishing late never replaces a change numbered after it began, so a mute that
  * lands while a peer's frame is being read again is not undone by that older read.
  */
 public final class OnlineMutes implements MutePolicy {
 
+    /** How many times a player's mute is read before the database answer is left in place until the next refresh. */
+    static final int READ_ATTEMPTS = 3;
+
+    /** The wait before the second read; each later one waits that much longer again. */
+    static final Duration RETRY_AFTER = Duration.ofSeconds(2);
+
     private final ModerationRepository repository;
     private final Scheduler scheduler;
     private final Clock clock;
+    private final Logger log;
     private final AtomicLong changes = new AtomicLong();
     private final ConcurrentHashMap<UUID, Known> known = new ConcurrentHashMap<>();
 
-    public OnlineMutes(ModerationRepository repository, Scheduler scheduler, Clock clock) {
+    public OnlineMutes(ModerationRepository repository, Scheduler scheduler, Clock clock, Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     /** {@code player} connected here: keep their mute from now on, read on the async lane. */
@@ -49,7 +63,7 @@ public final class OnlineMutes implements MutePolicy {
         Objects.requireNonNull(player, "player");
         long change = changes.incrementAndGet();
         known.put(player.uuid(), new Known(player, change, Optional.empty()));
-        scheduler.async(() -> read(player.uuid(), change));
+        scheduler.async(() -> read(player.uuid(), change, 1));
     }
 
     /** {@code player} left: nothing is kept for them. */
@@ -73,8 +87,27 @@ public final class OnlineMutes implements MutePolicy {
         Objects.requireNonNull(player, "player");
         if (known.containsKey(player)) {
             long change = changes.incrementAndGet();
-            scheduler.async(() -> read(player, change));
+            scheduler.async(() -> read(player, change, 1));
         }
+    }
+
+    /** Read every connected player's mute again on the async lane, in one read where the store can. */
+    public void refreshAll() {
+        List<PlayerRef> players = known.values().stream().map(Known::player).toList();
+        if (players.isEmpty()) {
+            return;
+        }
+        long change = changes.incrementAndGet();
+        scheduler.async(() -> {
+            Map<UUID, MuteState> mutes;
+            try {
+                mutes = repository.loadMutes(players);
+            } catch (RuntimeException failure) {
+                log.error("event=online_mute_refresh_failed players=" + players.size(), failure);
+                return;
+            }
+            mutes.forEach((player, mute) -> keep(player, change, mute));
+        });
     }
 
     @Override
@@ -92,12 +125,26 @@ public final class OnlineMutes implements MutePolicy {
         known.computeIfPresent(player.uuid(), (uuid, old) -> new Known(old.player(), change, Optional.of(mute)));
     }
 
-    private void read(UUID player, long change) {
+    private void read(UUID player, long change, int attempt) {
         Known entry = known.get(player);
         if (entry == null) {
             return;
         }
-        MuteState mute = repository.loadMute(entry.player());
+        MuteState mute;
+        try {
+            mute = repository.loadMute(entry.player());
+        } catch (RuntimeException failure) {
+            log.error("event=online_mute_read_failed player=" + entry.player().name() + " attempt=" + attempt, failure);
+            if (attempt < READ_ATTEMPTS) {
+                scheduler.asyncAfter(RETRY_AFTER.multipliedBy(attempt), () -> read(player, change, attempt + 1));
+            }
+            return;
+        }
+        keep(player, change, mute);
+    }
+
+    /** Keep {@code mute} unless a change numbered after {@code change} has been kept since. */
+    private void keep(UUID player, long change, MuteState mute) {
         known.computeIfPresent(
                 player,
                 (uuid, old) -> old.change() <= change ? new Known(old.player(), change, Optional.of(mute)) : old);

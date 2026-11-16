@@ -47,6 +47,7 @@ public final class ImportTargets {
     private @Nullable HologramRepository holograms;
     private @Nullable WorldRepository worlds;
     private @Nullable PlayerWarpRepository playerWarps;
+    private volatile @Nullable Runnable mutesWritten;
 
     /** @param log where a hologram that was imported but could not be drawn is reported */
     public ImportTargets(Logger log) {
@@ -181,6 +182,28 @@ public final class ImportTargets {
     /** The worlds module's register, or {@code store} when the module is not running. */
     public WorldRepository worldsOr(Supplier<WorldRepository> store) {
         return orElse(worlds, store);
+    }
+
+    /**
+     * What the moderation module does when an import wrote mutes: it reads its connected players' mutes again, since
+     * it keeps them in memory. Read when the import ends, on the import's thread, hence volatile.
+     */
+    public Runnable mutes(Runnable refresh) {
+        Runnable registered = Objects.requireNonNull(refresh, "refresh");
+        this.mutesWritten = registered;
+        return () -> {
+            if (mutesWritten == registered) {
+                mutesWritten = null;
+            }
+        };
+    }
+
+    /** Tell the moderation module, if it is running, that an import wrote mutes. */
+    public void mutesImported() {
+        Runnable refresh = mutesWritten;
+        if (refresh != null) {
+            refresh.run();
+        }
     }
 
     /** The player-warps module's cache, or {@code store} when the module is not running. */

@@ -90,7 +90,8 @@ public final class BanCommand extends ModerationCommandSupport implements Comman
         PlayerRef actor = actor(ctx);
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> offTick(actor, () -> services.ban().ban(actor, to, parsed.reason(), parsed.silent())));
+        target.ifPresent(to ->
+                offTick(actor, to, () -> services.ban().ban(actor, to, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

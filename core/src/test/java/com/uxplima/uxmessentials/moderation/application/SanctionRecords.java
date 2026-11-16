@@ -37,10 +37,22 @@ final class SanctionRecords implements ModerationRepository {
     private boolean lockedDown;
     private @Nullable Runnable racingWrite;
     private boolean losingEveryRace;
+    private int failingMuteReads;
+    private @Nullable Runnable duringMuteRead;
 
     /** Every warning row of {@code target}, lapsed ones included. */
     List<Warn> allWarns(PlayerRef target) {
         return List.copyOf(warns.getOrDefault(target.uuid(), List.of()));
+    }
+
+    /** Let the next {@code times} reads of a single mute fail, as a database that is briefly unreachable does. */
+    void failMuteReads(int times) {
+        failingMuteReads = times;
+    }
+
+    /** Run {@code meanwhile} once, inside the next read of a single mute, after the row was read. */
+    void duringNextMuteRead(Runnable meanwhile) {
+        duringMuteRead = meanwhile;
     }
 
     /** Whose logins were recorded, in order. */
@@ -77,7 +89,17 @@ final class SanctionRecords implements ModerationRepository {
 
     @Override
     public MuteState loadMute(PlayerRef target) {
-        return mutes.getOrDefault(target.uuid(), MuteState.none());
+        if (failingMuteReads > 0) {
+            failingMuteReads--;
+            throw new IllegalStateException("the database is unreachable");
+        }
+        MuteState read = mutes.getOrDefault(target.uuid(), MuteState.none());
+        Runnable meanwhile = duringMuteRead;
+        duringMuteRead = null;
+        if (meanwhile != null) {
+            meanwhile.run();
+        }
+        return read;
     }
 
     @Override
