@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
@@ -28,7 +29,7 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * jail there is no permanent form (a permanent ban is {@code /ban}) so a blank/malformed/zero duration is refused, and
  * so is one as long as the far-future span a permanent ban is stored with ({@link Ban#PERMANENT_SPAN}).
  * The exempt target is refused, and so is a target whose running ban would outlast this one. On success the ban
- * row is stored ({@link GuardedBanWrite}, so a ban landing at the same moment elsewhere is never overwritten
+ * row is stored ({@link GuardedWrite}, so a ban landing at the same moment elsewhere is never overwritten
  * blindly), an online target is kicked immediately via {@link Sanctions}, {@code PlayerTempbanned} is
  * published, and the ban-on-login listener bars their reconnection until the expiry passes.
  *
@@ -87,32 +88,34 @@ public final class TempBan {
         Objects.requireNonNull(rawDuration, "rawDuration");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
-            return reject(actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
         }
         Optional<Duration> requested = SanctionDuration.parse(rawDuration).duration();
         if (requested.isEmpty()) {
             // A tempban must be timed: a permanent or malformed input is BAD_DURATION (no permanent tempban).
-            return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
+            return reject(actor, actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
         if (tooLong(requested.get())) {
-            return rejectTooLong(actor, target, rawDuration, reason);
+            return rejectTooLong(actor, actor, target, rawDuration, reason);
         }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
         TempbanState.Active ban = proposal(actor, span, reason, now);
-        return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.outlasting(ban))) {
-            case GuardedBanWrite.Kept kept -> {
+        Predicate<TempbanState.Active> longer =
+                GuardedWrite.outlasting(SanctionStrength.endOf(ban), SanctionStrength::endOf);
+        return switch (GuardedWrite.storeBan(repository, target, ban, now, longer)) {
+            case GuardedWrite.Kept<TempbanState.Active> kept -> {
                 audit.tempbanned(actor, target, SanctionDuration.format(span), false, SanctionStrength.HELD);
                 // A capped request may have been longer than the running ban; without this line the refusal would
                 // read as if the staff member had asked for a shorter one.
                 if (span.compareTo(requested.get()) < 0) {
                     tellCapped(actor, span);
                 }
-                GuardedBanWrite.tellKept(notifier, actor, target, kept.running(), now);
+                GuardedWrite.tellBanKept(notifier, actor, target, kept.running(), now);
                 yield Result.err(ModerationError.LONGER_BAN_RUNNING);
             }
-            case GuardedBanWrite.Stored stored -> {
-                announce(actor, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
+            case GuardedWrite.Stored<TempbanState.Active> stored -> {
+                announce(actor, actor, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
                 yield Result.ok(ban);
             }
         };
@@ -122,35 +125,43 @@ public final class TempBan {
      * Leave {@code target} banned for at least the parsed span: the warn escalation's way in. A ban already in
      * force that ends sooner is replaced by this one as a fresh tempban (stored, recorded, announced and synced
      * like any tempban); one that ends at the same instant or later, a permanent ban above all, is kept and the
-     * rung is audited as held, so a rung can never shorten a ban. Only the caller is told the outcome, since the
-     * actor here is the server rule, not a person.
+     * rung is audited as held, so a rung can never shorten a ban. The ban is issued under {@code actor}, the server
+     * rule, while what the use case says about it goes to {@code told}, the staff member whose warning set it off.
      */
     Result<EscalationOutcome, ModerationError> escalate(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            String rawDuration,
+            Optional<String> reason,
+            boolean silent) {
         Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(told, "told");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(rawDuration, "rawDuration");
         Objects.requireNonNull(reason, "reason");
         if (guard.isExempt(target)) {
-            return reject(actor, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
+            return reject(actor, told, target, rawDuration, reason, ModerationError.TARGET_EXEMPT);
         }
         Optional<Duration> requested = SanctionDuration.parse(rawDuration).duration();
         if (requested.isEmpty()) {
-            return reject(actor, target, rawDuration, reason, ModerationError.BAD_DURATION);
+            return reject(actor, told, target, rawDuration, reason, ModerationError.BAD_DURATION);
         }
         if (tooLong(requested.get())) {
-            return rejectTooLong(actor, target, rawDuration, reason);
+            return rejectTooLong(actor, told, target, rawDuration, reason);
         }
         Instant now = clock.instant();
         Duration span = limit.cap(actor, "ban", requested.get());
         TempbanState.Active ban = proposal(actor, span, reason, now);
-        return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.notOutlastedBy(ban))) {
-            case GuardedBanWrite.Kept kept -> {
+        Predicate<TempbanState.Active> atLeastAsLong =
+                GuardedWrite.notOutlastedBy(SanctionStrength.endOf(ban), SanctionStrength::endOf);
+        return switch (GuardedWrite.storeBan(repository, target, ban, now, atLeastAsLong)) {
+            case GuardedWrite.Kept<TempbanState.Active> kept -> {
                 audit.tempbanned(actor, target, SanctionDuration.format(span), false, SanctionStrength.HELD);
                 yield Result.ok(EscalationOutcome.ALREADY_STRONGER);
             }
-            case GuardedBanWrite.Stored stored -> {
-                announce(actor, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
+            case GuardedWrite.Stored<TempbanState.Active> stored -> {
+                announce(actor, told, target, ban, span, span.compareTo(requested.get()) < 0, reason, silent, now);
                 yield Result.ok(stored.replacedRunning() ? EscalationOutcome.EXTENDED : EscalationOutcome.APPLIED);
             }
         };
@@ -163,6 +174,7 @@ public final class TempBan {
     /** Everything a stored tempban sets off: the history row, the kick, the sync, the event and every notice. */
     private void announce(
             PlayerRef actor,
+            PlayerRef told,
             PlayerRef target,
             TempbanState.Active ban,
             Duration span,
@@ -177,12 +189,12 @@ public final class TempBan {
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, SanctionDuration.format(span), true, reason);
         if (capped) {
-            tellCapped(actor, span);
+            tellCapped(told, span);
         }
         // The answer to the person who ran the command, separate from the staff channel and never suppressed
         // with it: a silent tempban hides the sanction from the channel, not from the operator.
         notifier.send(
-                actor,
+                told,
                 ModerationMessageKey.TEMPBAN_APPLIED,
                 Map.of("player", target.name(), "duration", SanctionDuration.format(span)));
         if (!silent) {
@@ -210,17 +222,22 @@ public final class TempBan {
 
     /** Refuse a span too long for a tempban, pointing the actor at {@code /ban}. */
     private <T> Result<T, ModerationError> rejectTooLong(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason) {
+            PlayerRef actor, PlayerRef told, PlayerRef target, String rawDuration, Optional<String> reason) {
         audit.tempbanned(actor, target, rawDuration, false, reason);
-        notifier.send(actor, ModerationMessageKey.TEMPBAN_TOO_LONG);
+        notifier.send(told, ModerationMessageKey.TEMPBAN_TOO_LONG);
         return Result.err(ModerationError.BAD_DURATION);
     }
 
     private <T> Result<T, ModerationError> reject(
-            PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, ModerationError error) {
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            String rawDuration,
+            Optional<String> reason,
+            ModerationError error) {
         Optional<String> label = rawDuration.isBlank() ? Optional.empty() : Optional.of(rawDuration);
         audit.tempbanned(actor, target, label.orElse(""), false, reason);
-        notifier.send(actor, error.messageKey());
+        notifier.send(told, error.messageKey());
         return Result.err(error);
     }
 }

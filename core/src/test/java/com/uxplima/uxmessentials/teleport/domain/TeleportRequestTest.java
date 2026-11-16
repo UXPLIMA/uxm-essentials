@@ -10,6 +10,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.time.Duration;
 import java.time.Instant;
 
+import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.testing.Fixtures;
 import org.junit.jupiter.api.Test;
 
 class TeleportRequestTest {
@@ -83,5 +85,40 @@ class TeleportRequestTest {
         assertThat(pending.onAction(WarmupCancelReason.DAMAGED).didCancel()).isFalse();
         assertThat(pending.onAction(WarmupCancelReason.ABORTED).cancel()).contains(WarmupCancelReason.ABORTED);
         assertThat(pending.onMovement(at(5, 64, 0)).cancel()).contains(WarmupCancelReason.MOVED);
+    }
+
+    @Test
+    void turningCancelsAWarmupOnlyWhenRotationIsArmed() {
+        Position facingNorth = looking(180f, 0f);
+        PendingTeleport calm = PendingTeleport.arm(
+                ALEX, TeleportKind.HOME, facingNorth, Destination.at(at(10, 64, 10)), WarmupCancelToggles.defaults());
+        PendingTeleport strict = PendingTeleport.arm(
+                ALEX,
+                TeleportKind.HOME,
+                facingNorth,
+                Destination.at(at(10, 64, 10)),
+                new WarmupCancelToggles(true, true, false, false, 0.0));
+
+        assertThat(calm.onMovement(looking(90f, 0f)).didCancel()).isFalse();
+        assertThat(strict.onMovement(looking(180f, 0f)).didCancel()).isFalse();
+        assertThat(strict.onMovement(looking(180f, 30f)).cancel()).contains(WarmupCancelReason.ROTATED);
+        assertThat(strict.onMovement(looking(90f, 0f)).cancel()).contains(WarmupCancelReason.ROTATED);
+    }
+
+    @Test
+    void aYawThatWrapsAroundIsNotATurn() {
+        PendingTeleport strict = PendingTeleport.arm(
+                ALEX,
+                TeleportKind.HOME,
+                looking(-90f, 0f),
+                Destination.at(at(10, 64, 10)),
+                new WarmupCancelToggles(false, true, false, false, 0.0));
+
+        assertThat(strict.onMovement(looking(270f, 0f)).didCancel()).isFalse();
+        assertThat(strict.onMovement(looking(630f, 0f)).didCancel()).isFalse();
+    }
+
+    private static Position looking(float yaw, float pitch) {
+        return new Position(Fixtures.WORLD, 0.5, 64, 0.5, yaw, pitch);
     }
 }

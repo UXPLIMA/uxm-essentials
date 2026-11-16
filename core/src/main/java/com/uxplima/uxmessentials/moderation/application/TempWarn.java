@@ -107,7 +107,7 @@ public final class TempWarn {
                     ModerationMessageKey.MOD_BROADCAST_WARN,
                     Map.of("actor", actor.name(), "target", target.name(), "reason", reason.orElse("")));
         }
-        escalator.escalate(actor, target, total, silent);
+        escalator.escalate(actor, target, total, reason, silent);
         return Result.ok(event);
     }
 

@@ -560,6 +560,22 @@ class CrossServerTeleportTest {
     }
 
     @Test
+    void aRequestThatRacesAnotherIsRefundedOnceAndToldTheOtherMoveIsUnderWay() {
+        // The second request starts while the first has read no earlier row and not yet written its own.
+        store.afterNextFind(() -> assertThat(track(Optional.of(CHARGE))).isFalse());
+
+        assertThat(track(Optional.of(CHARGE))).isTrue();
+
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsExactly("common.hop-busy", "pwarp.cross-server.refunded");
+
+        // The first request is the one in the store, refunded by its own timer and by nothing else.
+        scheduler.advance(TTL);
+        assertThat(purse.refunds).isEqualTo(2);
+        assertThat(store.rows()).isEmpty();
+    }
+
+    @Test
     void aCrossServerUseIsNotJudgedByTheOriginWhichHasNoneOfTheWarpsBlocks() {
         unsafeOn.add(LOBBY);
 

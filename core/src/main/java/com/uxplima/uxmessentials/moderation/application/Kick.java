@@ -27,7 +27,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * surfaces in {@code /history} and {@code /staffhistory}: a kick carries no expiry.
  *
  * <p>A target connected to another backend is refused with that backend's name before anything is written: this
- * backend cannot disconnect them, and a kick recorded and announced without happening would mislead staff.
+ * backend cannot disconnect them, and a kick recorded and announced without happening would mislead staff. A target
+ * who is on no server at all is refused as offline for the same reason.
  */
 public final class Kick {
 
@@ -37,6 +38,7 @@ public final class Kick {
     private final ModerationAudit audit;
     private final SanctionHistoryRecorder history;
     private final SanctionBroadcast broadcast;
+    private final NetworkPresence presence;
     private final LiveTargetCheck live;
 
     public Kick(
@@ -53,28 +55,44 @@ public final class Kick {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.history = Objects.requireNonNull(history, "history");
         this.broadcast = Objects.requireNonNull(broadcast, "broadcast");
+        this.presence = Objects.requireNonNull(presence, "presence");
         this.live = new LiveTargetCheck(presence, this.notifier);
     }
 
-    /** Kick {@code target} with an optional reason, or refuse an exempt target. */
+    /** Kick {@code target} with an optional reason, or refuse an exempt, offline or elsewhere target. */
     public Result<Unit, ModerationError> kick(
             PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
+        return kick(actor, actor, target, reason, silent);
+    }
+
+    /**
+     * {@link #kick(PlayerRef, PlayerRef, Optional, boolean)} issued under {@code actor} while what the use case says
+     * about it goes to {@code told}: the warn escalation kicks under the server rule and tells the staff member whose
+     * warning set it off.
+     */
+    Result<Unit, ModerationError> kick(
+            PlayerRef actor, PlayerRef told, PlayerRef target, Optional<String> reason, boolean silent) {
         Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(told, "told");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
-        if (live.refusedElsewhere(actor, target)) {
+        if (live.refusedElsewhere(told, target)) {
             return Result.err(ModerationError.TARGET_ELSEWHERE);
+        }
+        if (!presence.isOnline(target.uuid())) {
+            notifier.send(told, ModerationMessageKey.KICK_OFFLINE, Map.of("player", target.name()));
+            return Result.err(ModerationError.TARGET_OFFLINE);
         }
         if (guard.isExempt(target)) {
             audit.kicked(actor, target, false, reason);
-            notifier.send(actor, ModerationError.TARGET_EXEMPT.messageKey());
+            notifier.send(told, ModerationError.TARGET_EXEMPT.messageKey());
             return Result.err(ModerationError.TARGET_EXEMPT);
         }
         MessageKey key = ModerationMessageKey.KICK_KICKED;
         sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
         history.kick(actor, target, reason);
         audit.kicked(actor, target, true, reason);
-        notifier.send(actor, ModerationMessageKey.KICK_APPLIED, Map.of("player", target.name()));
+        notifier.send(told, ModerationMessageKey.KICK_APPLIED, Map.of("player", target.name()));
         if (!silent) {
             broadcast.announce(
                     ModerationMessageKey.MOD_BROADCAST_KICK,
