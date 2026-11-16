@@ -17,8 +17,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * template name through {@link ResolveTemplate}, then dispatches to the existing sanction use case: a timed
  * template lands a {@link TempBan}, a permanent one a {@link Ban}, so the exempt gate, the kick, the audit
  * line, the history row, the duration cap, the broadcast and the refusal to cut short a longer running ban are
- * all the underlying use case's job, never duplicated here. An unknown template name is refused with {@link ModerationError#UNKNOWN_TEMPLATE} rendered
- * to the actor.
+ * all the underlying use case's job, never duplicated here. An unknown template name is refused with
+ * {@link ModerationError#UNKNOWN_TEMPLATE} rendered to the actor.
  */
 public final class Punish {
 

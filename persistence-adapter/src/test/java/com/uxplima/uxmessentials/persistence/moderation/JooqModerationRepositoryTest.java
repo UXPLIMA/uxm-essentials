@@ -95,6 +95,21 @@ class JooqModerationRepositoryTest {
         assertThat(first.loadTempban(SAM)).isEqualTo(permanent);
     }
 
+    @Test
+    void aReasonTooLongForTheColumnIsFittedTheSameWayOnBothPaths() {
+        String essay = "x".repeat(300);
+        TempbanState.Active fresh = ban(Duration.ofHours(1), essay, NOW);
+        assertThat(first.replaceTempban(SAM, TempbanState.none(), fresh)).isTrue();
+        TempbanState.Active inserted = (TempbanState.Active) first.loadTempban(SAM);
+
+        assertThat(first.replaceTempban(SAM, inserted, ban(Duration.ofDays(1), essay, NOW.plusSeconds(1))))
+                .isTrue();
+        TempbanState.Active updated = (TempbanState.Active) first.loadTempban(SAM);
+
+        assertThat(inserted.reason()).contains("x".repeat(256));
+        assertThat(updated.reason()).contains("x".repeat(256));
+    }
+
     private ModerationRepository openStore() {
         SQLiteDataSource data = new SQLiteDataSource();
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));

@@ -4,6 +4,7 @@ import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static com.uxplima.uxmessentials.testing.Fixtures.NOW;
 import static com.uxplima.uxmessentials.testing.Fixtures.SAM;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.Duration;
 import java.util.ArrayList;
@@ -49,17 +50,31 @@ class TempBanTest {
     private final FakePermissions permissions = new FakePermissions();
     private final RecordingNotifier notifier = new RecordingNotifier();
     private final List<MessageKey> broadcasts = new ArrayList<>();
+    private final RecordingEvents events = new RecordingEvents();
+    private final List<PlayerRef> syncedBans = new ArrayList<>();
+    private final SanctionSync sync = new SanctionSync() {
+        @Override
+        public void banChanged(PlayerRef target) {
+            syncedBans.add(target);
+        }
+
+        @Override
+        public void muteChanged(PlayerRef target) {}
+
+        @Override
+        public void ipBanChanged(String ip) {}
+    };
     private final TempBan tempBan = new TempBan(
             records,
             online,
             new ModerationGuard(permissions),
             notifier.notifier(),
             new SilentAudit(),
-            new RecordingEvents(),
+            events,
             new SanctionHistoryRecorder(new DiscardedHistory(), clock),
             new SanctionDurationLimit(permissions),
             (key, placeholders) -> broadcasts.add(key),
-            SanctionSync.NONE,
+            sync,
             clock);
     private final Ban ban = new Ban(
             records,
@@ -67,11 +82,11 @@ class TempBanTest {
             new ModerationGuard(permissions),
             notifier.notifier(),
             new SilentAudit(),
-            new RecordingEvents(),
+            events,
             new SanctionHistoryRecorder(new DiscardedHistory(), clock),
             new SanctionDurationLimit(permissions),
             (key, placeholders) -> broadcasts.add(key),
-            SanctionSync.NONE,
+            sync,
             AddressStrictness.NORMAL,
             new NoIpHistory(),
             clock);
@@ -287,11 +302,77 @@ class TempBanTest {
     void aCappedStaffBanDoesNotShortenALongerTempban() {
         tempBan.tempban(ALEX, SAM, "30d", Optional.empty(), false);
         permissions.quota(CAP_NODE, QuotaResult.limited(Duration.ofDays(1).toSeconds()));
+        int before = toldAlex().size();
 
         assertThat(ban.ban(ALEX, SAM, Optional.empty(), false).errorOrThrow())
                 .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
 
         assertThat(stored().until()).isEqualTo(NOW.plus(Duration.ofDays(30)));
+        assertThat(toldAlex().subList(before, toldAlex().size()))
+                .extracting(RecordingNotifier.Sent::key)
+                .containsExactly(
+                        ModerationMessageKey.MOD_DURATION_CAPPED.key(), ModerationMessageKey.BAN_ALREADY_LONGER.key());
+    }
+
+    @Test
+    void aCappedStaffMemberAskingForLongerIsToldTheirBanWasCapped() {
+        tempBan.tempban(ALEX, SAM, "7d", Optional.empty(), false);
+        permissions.quota(CAP_NODE, QuotaResult.limited(Duration.ofDays(1).toSeconds()));
+        int before = toldAlex().size();
+
+        assertThat(tempBan.tempban(ALEX, SAM, "30d", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
+
+        assertThat(toldAlex().subList(before, toldAlex().size()))
+                .containsExactly(
+                        new RecordingNotifier.Sent(
+                                ALEX, ModerationMessageKey.MOD_DURATION_CAPPED.key(), Map.of("cap", "1d")),
+                        new RecordingNotifier.Sent(
+                                ALEX,
+                                ModerationMessageKey.BAN_ALREADY_LONGER.key(),
+                                Map.of("player", SAM.name(), "remaining", "1w")));
+    }
+
+    @Test
+    void aRefusedBanKicksPublishesSyncsAndAnnouncesNothing() {
+        records.saveTempban(
+                SAM, TempbanState.active(NOW.plus(Ban.PERMANENT_SPAN), Issuer.of(ALEX), Optional.empty(), NOW));
+
+        permissions.quota(CAP_NODE, QuotaResult.limited(Duration.ofDays(1).toSeconds()));
+
+        assertThat(tempBan.tempban(ALEX, SAM, "1d", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
+        assertThat(ban.ban(ALEX, SAM, Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.LONGER_BAN_RUNNING);
+
+        assertThat(online.kicked()).isEmpty();
+        assertThat(events.published()).isEmpty();
+        assertThat(syncedBans).isEmpty();
+        assertThat(broadcasts).isEmpty();
+    }
+
+    @Test
+    void theTimeLeftIsRoundedUpToAWholeMinute() {
+        tempBan.tempban(ALEX, SAM, "7d", Optional.empty(), false);
+        clock.advance(Duration.ofSeconds(2));
+
+        tempBan.tempban(ALEX, SAM, "1d", Optional.empty(), false);
+
+        assertThat(toldAlex().getLast().placeholders()).containsEntry("remaining", "1w");
+    }
+
+    @Test
+    void aWriteThatLosesEveryRaceGivesUpAndChangesNothing() {
+        records.loseEveryReplace();
+
+        assertThatThrownBy(() -> tempBan.tempban(ALEX, SAM, "1d", Optional.empty(), false))
+                .isInstanceOf(IllegalStateException.class);
+
+        assertThat(records.loadTempban(SAM)).isEqualTo(TempbanState.none());
+        assertThat(online.kicked()).isEmpty();
+        assertThat(events.published()).isEmpty();
+        assertThat(syncedBans).isEmpty();
+        assertThat(broadcasts).isEmpty();
     }
 
     @Test

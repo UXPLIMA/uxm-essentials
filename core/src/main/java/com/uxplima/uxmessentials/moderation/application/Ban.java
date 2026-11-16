@@ -123,6 +123,10 @@ public final class Ban {
         return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.outlasting(ban))) {
             case GuardedBanWrite.Kept kept -> {
                 audit.tempbanned(actor, target, label(ban), false, SanctionStrength.HELD);
+                // A capped permanent ban became a timed one; say so, or the refusal reads as a request to shorten.
+                if (capped(ban)) {
+                    notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(spanOf(ban)));
+                }
                 GuardedBanWrite.tellKept(notifier, actor, target, kept.running(), now);
                 yield Result.err(ModerationError.LONGER_BAN_RUNNING);
             }

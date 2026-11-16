@@ -83,10 +83,12 @@ by `muted-blocked-commands` while muted.
 `/ban` and `/tempban` kick the player at once and refuse every later login until the ban ends or `/unban` lifts it.
 The player sees the reason, and for a timed ban how long is left, on the kick screen.
 
-A ban never cuts short one that is already running. A `/tempban`, a capped `/ban`, a `/punish` template or an API
-call whose ban would end before the running one is refused, and the staff member is told which ban is in force and
-how long it still runs. To shorten a ban, `/unban` first. A ban that ends later, or a second permanent ban, replaces
-the old one. When two servers of a network ban the same player at the same moment, the longer ban is the one kept.
+A player ban never cuts short one that is already running on that player. A `/tempban`, a capped `/ban`, a
+`/punish` template or an API call whose ban would end before the running one is refused, and the staff member is
+told which ban is in force and how long it still runs. A capped staff member is also told their ban was capped. To
+shorten a ban, `/unban` first. A ban that ends later, or a second permanent ban, replaces the old one. When two
+servers of a network ban the same player at the same moment, the longer ban is the one kept. IP bans
+(`/banip`, `/tempbanip`) do not follow this rule yet: a new IP ban on an address replaces the old one.
 
 A permanent ban is stored as a ban that ends very far in the future. The kick at the moment of `/ban` uses the
 `moderation.ban.kick` screen, but every later login refusal, and the kick on another server of a network, use the

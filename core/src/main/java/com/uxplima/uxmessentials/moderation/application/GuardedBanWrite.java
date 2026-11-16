@@ -113,6 +113,15 @@ final class GuardedBanWrite {
                 ModerationMessageKey.BAN_ALREADY_LONGER,
                 Map.of(
                         "player", target.name(),
-                        "remaining", SanctionDuration.format(Duration.between(now, end.get()))));
+                        "remaining", SanctionDuration.format(wholeMinutes(Duration.between(now, end.get())))));
+    }
+
+    /**
+     * {@code left} rounded up to a whole minute: the read and the clock are a moment apart, so seconds would only
+     * turn a seven day ban into "6d23h59m58s", and rounding up never claims less than is left.
+     */
+    private static Duration wholeMinutes(Duration left) {
+        long minutes = (left.toSeconds() + 59) / 60;
+        return Duration.ofMinutes(minutes);
     }
 }

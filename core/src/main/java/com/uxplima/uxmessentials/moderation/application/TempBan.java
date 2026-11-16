@@ -100,6 +100,11 @@ public final class TempBan {
         return switch (GuardedBanWrite.store(repository, target, ban, now, GuardedBanWrite.outlasting(ban))) {
             case GuardedBanWrite.Kept kept -> {
                 audit.tempbanned(actor, target, SanctionDuration.format(span), false, SanctionStrength.HELD);
+                // A capped request may have been longer than the running ban; without this line the refusal would
+                // read as if the staff member had asked for a shorter one.
+                if (span.compareTo(requested.get()) < 0) {
+                    tellCapped(actor, span);
+                }
                 GuardedBanWrite.tellKept(notifier, actor, target, kept.running(), now);
                 yield Result.err(ModerationError.LONGER_BAN_RUNNING);
             }
@@ -166,8 +171,7 @@ public final class TempBan {
         events.publish(new PlayerTempbanned(target, ban, now));
         audit.tempbanned(actor, target, SanctionDuration.format(span), true, reason);
         if (capped) {
-            notifier.send(
-                    actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
+            tellCapped(actor, span);
         }
         // The answer to the person who ran the command, separate from the staff channel and never suppressed
         // with it: a silent tempban hides the sanction from the channel, not from the operator.
@@ -184,6 +188,10 @@ public final class TempBan {
                             "reason", reason.orElse(""),
                             "duration", SanctionDuration.format(span)));
         }
+    }
+
+    private void tellCapped(PlayerRef actor, Duration span) {
+        notifier.send(actor, ModerationMessageKey.MOD_DURATION_CAPPED, Map.of("cap", SanctionDuration.format(span)));
     }
 
     private void kickNow(PlayerRef target, Duration span, Optional<String> reason) {

@@ -35,6 +35,7 @@ final class SanctionRecords implements ModerationRepository {
     private final List<UUID> seen = new ArrayList<>();
     private boolean lockedDown;
     private @Nullable Runnable racingWrite;
+    private boolean losingEveryRace;
 
     /** Every warning row of {@code target}, lapsed ones included. */
     List<Warn> allWarns(PlayerRef target) {
@@ -101,12 +102,20 @@ final class SanctionRecords implements ModerationRepository {
         racingWrite = write;
     }
 
+    /** Make every conditional ban write lose its race and write nothing, as if the row changed each time. */
+    void loseEveryReplace() {
+        losingEveryRace = true;
+    }
+
     @Override
     public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
         Runnable racing = racingWrite;
         racingWrite = null;
         if (racing != null) {
             racing.run();
+        }
+        if (losingEveryRace) {
+            return false;
         }
         if (!loadTempban(target).equals(expected)) {
             return false;

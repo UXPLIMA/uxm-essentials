@@ -29,8 +29,9 @@ import org.jspecify.annotations.Nullable;
  * the dependent sanction write commit or roll back together.
  *
  * <p>Each {@code save} is a delete-then-insert keyed by target: a {@code None} state leaves only the delete
- * (so {@code /unmute} clears the row), and a present state re-inserts the single keyed row. This is portable
- * across SQLite/MySQL/PostgreSQL without a dialect-specific {@code ON CONFLICT}/{@code ON DUPLICATE KEY}.
+ * (so {@code /unmute} clears the row), and a present state re-inserts the single keyed row. The conditional ban
+ * write is the exception: its insert is jOOQ's {@code ON CONFLICT DO NOTHING}, which jOOQ renders per dialect
+ * ({@code INSERT IGNORE} on MySQL/MariaDB), so the database itself refuses a row that appeared since the read.
  */
 final class ModerationWrites {
 
@@ -107,8 +108,9 @@ final class ModerationWrites {
     /**
      * Write {@code replacement} only while {@code target}'s row is still {@code expected}. Each branch is one
      * statement that the database checks and applies atomically: the update names the row by its expiry and issue
-     * instant, which a ban written in between changes, and the insert does nothing when a row appeared since. Both
-     * forms are portable across SQLite, MySQL and PostgreSQL.
+     * instant, which a ban written in between changes, and the insert does nothing when a row appeared since. On
+     * MySQL/MariaDB that insert is {@code INSERT IGNORE}, which also turns a too-long value into a silent truncation
+     * instead of an error, so every text column is fitted first and both branches store the same row.
      */
     static boolean replaceTempban(
             DSLContext dsl, PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
@@ -136,7 +138,9 @@ final class ModerationWrites {
         ModerationTempbansRecord row = new ModerationTempbansRecord();
         row.setTarget(key);
         row.setUntil(ban.until().toEpochMilli());
-        row.setReason(ban.reason().orElse(null));
+        row.setReason(ban.reason()
+                .map(reason -> fit(MODERATION_TEMPBANS.REASON, reason))
+                .orElse(null));
         row.setBannedBy(issuerUuid(ban.issuer()));
         row.setBannedByName(fit(MODERATION_TEMPBANS.BANNED_BY_NAME, ban.issuer().name()));
         row.setCreatedAt(ban.issuedAt().toEpochMilli());
