@@ -44,7 +44,8 @@ import org.jspecify.annotations.NullMarked;
  *   <li><b>Password.</b> A plaintext password is hashed through the {@link PlayerWarpPasswordStore} (PBKDF2 behind
  *       that seam) and only the digest is written; the plaintext never leaves this method and is never logged.
  *   <li><b>Owner name.</b> A source that never stored the owner's name leaves it to the server, which knows every
- *       player who joined it. Only an owner the server never saw is shown by uuid, as a live warp of such an owner is.
+ *       player who joined it. An owner the server never saw gets the uuid string, the shared "name unknown" fallback,
+ *       which storage keeps as no name and resolves again on every read.
  *   <li><b>The rest.</b> Access, category, description, icon, price, earnings, the rating and visit rollups, and
  *       {@code createdAt} carry across; {@code status} is {@link WarpStatus#ACTIVE} and {@code server_id} is left
  *       local (NULL). The members / whitelist / bans / favourites / per-vote ratings go into their side stores.
@@ -193,6 +194,7 @@ public final class PlayerWarpRecordWriter {
         return imported.ownerName()
                 .filter(name -> !name.isBlank())
                 .or(() -> knownNames.apply(imported.owner()))
+                // Storage keeps this fallback as no name, so the owner's name shows once the server knows them.
                 .orElseGet(() -> imported.owner().toString());
     }
 

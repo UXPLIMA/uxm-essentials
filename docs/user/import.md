@@ -125,9 +125,10 @@ All three sources write through the same path as `/setpwarp`:
 | OlziePlayerWarps | owner, location, category, cost, access (password, whitelist, locked or public), ratings, whitelist, managers as warp members, bans with their reason, favourites, visit counts |
 
 Prices are recorded in the default currency. Athelion and Olzie do not store the owner's name, so those warps take
-the name the server knows the owner by. An owner who never joined this server is shown by uuid. A warp name is turned into a valid player warp name (lowercase letters,
-digits, `_` and `-`, 3 to 32 characters); when another player already owns that name, the warp gets `name2`,
-`name3` and so on. A warp whose world is not loaded or whose owner is unknown is left out.
+the name this server knows the owner by. An owner who has not joined this server yet is shown by uuid until they
+join, and then by name. A warp name is turned into a valid player warp name (lowercase letters, digits, `_` and `-`,
+3 to 32 characters); when another player already owns that name, the warp gets `name2`, `name3` and so on. A warp
+whose world is not loaded or that names no owner account is left out.
 
 ## Holograms
 

@@ -124,10 +124,11 @@ Backend commands are gated by the `commandcontrol` module on each backend.
 `/uxmess doctor` on a backend shows:
 
 - the bus line: disabled, or one verdict per carrier. Velocity reads connected only while frames come back through
-  the proxy plugin, at least once in three heartbeats; until then it reads `NOT ANSWERING` and names the missing
-  `uxmEssentials-velocity`. Frames ride a player's connection, so with nobody online on the backend it reads
-  `NOT ANSWERING` too. Redis reads connected while its connection is up, `DISCONNECTED` otherwise. With `both`
-  either carrier not working is a warning, since the backends reached only through it are cut off;
+  the proxy plugin, at least once in three heartbeats. Frames ride a player's connection, so with nobody online on
+  the backend it reads `idle` and says so. Otherwise it reads `NOT ANSWERING`: install `uxmEssentials-velocity`, or
+  update it to the same release, since an older proxy jar does not answer. Redis reads connected while its
+  connection is up, `DISCONNECTED` otherwise. A carrier not working is a warning, since the backends reached only
+  through it are cut off. Idle is a warning on Velocity alone, but not with `both` while Redis is connected;
 - the peers line: how many other backends sent a heartbeat recently (`network.heartbeat-seconds`, default 30; a peer
   drops out after three missed beats) and how long ago. This is the line that shows frames arrive: on a working
   network it counts every other backend that has players (or every other backend, with Redis);

@@ -20,7 +20,9 @@ import org.jspecify.annotations.NullMarked;
  * the proxy relays them, so a proxy without the broker would otherwise read connected while nothing syncs. The
  * broker returns each heartbeat to its sender, so a backend alone behind the proxy still sees the answer. The Redis
  * carrier is connected while its subscribe connection is up. With {@code transport = both} each carrier gets its
- * own verdict, and either one silent is a {@code WARN}: the backends reached only through it are cut off.
+ * own verdict, and either one silent is a {@code WARN}: the backends reached only through it are cut off. The one
+ * exception is a proxy that is quiet only because no player is online here to carry a frame: that reason is given
+ * first, and it is a {@code WARN} on the proxy alone but not while Redis carries the bus.
  *
  * <p>Every read is an in-memory volatile read, never a blocking connect, so the check is safe on the doctor thread.
  */
@@ -49,41 +51,54 @@ public final class BusTransportHealthCheck implements HealthCheck {
         if (!bus.enabled()) {
             return HealthResult.ok("disabled (network.enabled = false); running local-only");
         }
+        long now = clock.getAsLong();
         List<String> parts = new ArrayList<>();
-        boolean working = true;
+        boolean proxyWorking = true;
+        boolean proxyIdle = false;
         if (bus.proxy().isPresent()) {
             BusHealth.ProxyLink link = bus.proxy().get();
-            parts.add(proxyLine(link));
-            working = link.answeredWithin(clock.getAsLong(), bus.answerWindow());
+            proxyWorking = link.answeredWithin(now, bus.answerWindow());
+            proxyIdle = !proxyWorking && link.registered() && link.waitingForPlayer();
+            parts.add(proxyLine(link, now));
         }
+        boolean redisWorking = true;
         if (bus.redisConnected().isPresent()) {
-            boolean up = bus.redisConnected().get();
+            redisWorking = bus.redisConnected().get();
             parts.add(
-                    up
+                    redisWorking
                             ? "redis connected"
                             : "redis DISCONNECTED. Check network.redis and that uxmEssentials-redis is in plugins/");
-            working &= up;
         }
+        // A proxy that is quiet only because nobody here can carry a frame is not a fault while Redis carries the bus;
+        // on the proxy alone nothing travels, so it stays a warning.
+        boolean redisCarries = bus.redisConnected().isPresent() && redisWorking;
+        boolean working = (proxyWorking || (proxyIdle && redisCarries)) && redisWorking;
         String message = "enabled, transport=" + bus.transport() + ", " + String.join("; ", parts);
         return working ? HealthResult.ok(message) : HealthResult.warn(message);
     }
 
-    private String proxyLine(BusHealth.ProxyLink link) {
+    private String proxyLine(BusHealth.ProxyLink link, long now) {
         if (!link.registered()) {
             return "proxy channel not registered yet (the bus starts on the first tick)";
         }
+        if (link.answeredWithin(now, bus.answerWindow())) {
+            return "proxy connected, last answer " + secondsSince(link, now) + "s ago";
+        }
+        if (link.waitingForPlayer()) {
+            return "proxy idle: no player online on this backend to carry frames, so the proxy cannot answer until one"
+                    + " joins";
+        }
         if (link.lastAnswerMillis().isEmpty()) {
             return "proxy NOT ANSWERING: no frame has come back through the proxy. Install uxmEssentials-velocity on"
-                    + " the Velocity proxy (BungeeCord does not relay the bus; use Redis there). Frames also need a"
-                    + " player online on this backend to travel";
+                    + " the Velocity proxy, or update it to the same release as this plugin (an older proxy jar does"
+                    + " not answer). BungeeCord does not relay the bus; use Redis there";
         }
-        long now = clock.getAsLong();
-        long ago = Duration.ofMillis(Math.max(0, now - link.lastAnswerMillis().getAsLong()))
+        return "proxy NOT ANSWERING for " + secondsSince(link, now) + "s. Check that uxmEssentials-velocity is on the"
+                + " proxy and on the same release as this plugin";
+    }
+
+    private static long secondsSince(BusHealth.ProxyLink link, long now) {
+        return Duration.ofMillis(Math.max(0, now - link.lastAnswerMillis().orElse(now)))
                 .toSeconds();
-        if (link.answeredWithin(now, bus.answerWindow())) {
-            return "proxy connected, last answer " + ago + "s ago";
-        }
-        return "proxy NOT ANSWERING for " + ago + "s. Frames need a player online on this backend to travel; with"
-                + " players on, check uxmEssentials-velocity on the proxy";
     }
 }

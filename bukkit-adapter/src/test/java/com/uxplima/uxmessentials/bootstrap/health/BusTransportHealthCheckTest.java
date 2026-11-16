@@ -17,11 +17,13 @@ class BusTransportHealthCheckTest {
     private static final long NOW = 1_700_000_000_000L;
     private static final Duration WINDOW = Duration.ofSeconds(90);
 
-    private static final BusHealth.ProxyLink NOT_STARTED = new BusHealth.ProxyLink(false, OptionalLong.empty());
-    private static final BusHealth.ProxyLink NEVER_ANSWERED = new BusHealth.ProxyLink(true, OptionalLong.empty());
+    private static final BusHealth.ProxyLink NOT_STARTED = new BusHealth.ProxyLink(false, OptionalLong.empty(), false);
+    private static final BusHealth.ProxyLink NEVER_ANSWERED =
+            new BusHealth.ProxyLink(true, OptionalLong.empty(), false);
+    private static final BusHealth.ProxyLink NOBODY_ONLINE = new BusHealth.ProxyLink(true, OptionalLong.empty(), true);
 
     private static BusHealth.ProxyLink answered(long millisAgo) {
-        return new BusHealth.ProxyLink(true, OptionalLong.of(NOW - millisAgo));
+        return new BusHealth.ProxyLink(true, OptionalLong.of(NOW - millisAgo), false);
     }
 
     private static HealthResult check(String transport, Optional<BusHealth.ProxyLink> proxy, Optional<Boolean> redis) {
@@ -44,7 +46,29 @@ class BusTransportHealthCheckTest {
         HealthResult result = check("velocity", Optional.of(NEVER_ANSWERED), Optional.empty());
 
         assertThat(result.status()).isEqualTo(HealthStatus.WARN);
-        assertThat(result.message()).contains("uxmEssentials-velocity").doesNotContain("connected");
+        assertThat(result.message())
+                .contains("uxmEssentials-velocity", "update it to the same release")
+                .doesNotContain("connected");
+    }
+
+    @Test
+    void onTheProxyAloneNobodyOnlineIsAWarningThatSaysSoFirst() {
+        HealthResult result = check("velocity", Optional.of(NOBODY_ONLINE), Optional.empty());
+
+        assertThat(result.status()).isEqualTo(HealthStatus.WARN);
+        assertThat(result.message())
+                .startsWith("enabled, transport=velocity, proxy idle: no player online")
+                .doesNotContain("uxmEssentials-velocity");
+    }
+
+    @Test
+    void withBothCarriersAProxyIdleForWantOfAPlayerIsNoFaultWhileRedisCarries() {
+        HealthResult carried = check("both", Optional.of(NOBODY_ONLINE), Optional.of(true));
+        HealthResult uncarried = check("both", Optional.of(NOBODY_ONLINE), Optional.of(false));
+
+        assertThat(carried.status()).isEqualTo(HealthStatus.OK);
+        assertThat(carried.message()).contains("proxy idle: no player online", "redis connected");
+        assertThat(uncarried.status()).isEqualTo(HealthStatus.WARN);
     }
 
     @Test

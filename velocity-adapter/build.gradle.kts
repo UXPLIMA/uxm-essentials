@@ -18,6 +18,8 @@ dependencies {
     // The proxy supplies these at runtime; the tests read the message files and render lines without one.
     testImplementation(uxm.configurate.hocon)
     testImplementation(libs.bundles.adventure)
+    // The broker test builds the proxy's plugin message event and fakes the server types it touches.
+    testImplementation(libs.velocity.api)
 }
 
 // The velocity-api annotation processor generates its own velocity-plugin.json from the @Plugin annotation. The
