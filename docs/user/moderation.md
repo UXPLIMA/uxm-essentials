@@ -361,7 +361,9 @@ shared database, so:
 
 - A ban kicks the player from whichever server they are on, and every server refuses their login.
 - An IP ban kicks everyone on that address on every server, exempt players aside.
-- A mute is read from the database at every chat line and command, so it applies everywhere at once.
+- A mute is read from the database at every chat line, so it applies everywhere at once. Private messages, mail,
+  helpop and `muted-blocked-commands` use a copy of each connected player's mute, read when they join and updated
+  when a mute or unmute lands, on another server through the bus.
 - A jail sends the player to the jail's server, as described in [Jails on a network](#jails-on-a-network).
 - `/kick` and `/freeze` act only on players connected to your server.
 

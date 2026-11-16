@@ -219,7 +219,8 @@ reads as offline to `/msg` and `/seen`.
 ### Moderation
 
 Bans, mutes, warnings and IP bans are in the shared database and enforced on every server. A ban or an IP ban kicks
-the player, or everyone on that address, wherever they are; a mute is read on the next chat line. `/kick` and
+the player, or everyone on that address, wherever they are; a mute is read on the next chat line, and reaches private
+messages and blocked commands through the bus (without a bus carrier, at the player's next join). `/kick` and
 `/freeze` on a player connected to another server are refused with that server's name, since this server cannot
 reach them; `/unfreeze` always runs. `/lockdown` is one row in the shared database, so it closes every server on
 it to new joins, but its announcement goes only to the server it was run on. Freeze, command spy and staff

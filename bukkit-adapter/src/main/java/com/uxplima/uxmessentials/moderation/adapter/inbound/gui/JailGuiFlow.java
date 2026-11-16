@@ -151,7 +151,11 @@ public final class JailGuiFlow {
                             // Close before applying so a rapid double-click on the same preset can't fire a second
                             // jail (a duplicate audit line + event), matching the sanction confirm flow's guard.
                             viewer.closeInventory();
-                            services.jail().jail(viewerRef, target, jail, duration, Optional.empty());
+                            services.lane()
+                                    .run(
+                                            viewerRef,
+                                            () -> services.jail()
+                                                    .jail(viewerRef, target, jail, duration, Optional.empty()));
                         },
                         JailGuiFlow::isJailDuration,
                         ModerationMessageKey.MOD_GUI_JAIL_DURATION_REJECT,

@@ -36,9 +36,9 @@ import org.jspecify.annotations.NullMarked;
  * would name a staff member: the stored issuer, the history line, the operator audit. Nothing else about the write
  * changes, which is the point: a punishment is one thing on this server however it was asked for.
  *
- * <p>All of it runs on the server's own thread rather than a worker, because these use cases reach past the
- * database into the running server: a ban disconnects the player it just banned, and a punishment announces
- * itself. The caller still gets a future and never has to know which thread it was on when it asked.
+ * <p>All of it runs on the async lane, like the commands: the use cases read and write the database there, and the
+ * few things they do to the running server (disconnecting the player a ban just banned, announcing the punishment)
+ * hop to the right thread themselves. The caller gets a future that completes once the change is stored.
  */
 @NullMarked
 public final class ModerationActions implements UxmModerationActions {
@@ -90,7 +90,7 @@ public final class ModerationActions implements UxmModerationActions {
     @Override
     public CompletableFuture<UxmOutcome> unban(UUID targetId) {
         PlayerRef target = subject(targetId);
-        return onServer(() -> outcome(writes.unban().unban(actor(), target)));
+        return offServer(() -> outcome(writes.unban().unban(actor(), target)));
     }
 
     @Override
@@ -116,7 +116,7 @@ public final class ModerationActions implements UxmModerationActions {
     @Override
     public CompletableFuture<UxmOutcome> unmute(UUID targetId) {
         PlayerRef target = subject(targetId);
-        return onServer(() -> outcome(writes.unmute().unmute(actor(), target)));
+        return offServer(() -> outcome(writes.unmute().unmute(actor(), target)));
     }
 
     @Override
@@ -133,7 +133,7 @@ public final class ModerationActions implements UxmModerationActions {
     public CompletableFuture<UxmResult<UxmWarn>> warn(UUID targetId, String reason) {
         PlayerRef target = subject(targetId);
         Optional<String> given = Optional.of(Objects.requireNonNull(reason, "reason"));
-        return onServer(() -> {
+        return offServer(() -> {
             Result<PlayerWarned, ModerationError> result = writes.warn().warn(actor(), target, given, silent);
             if (result.isErr()) {
                 return UxmResult.failed(failure(result.errorOrThrow()));
@@ -156,24 +156,24 @@ public final class ModerationActions implements UxmModerationActions {
     @Override
     public CompletableFuture<UxmOutcome> unjail(UUID targetId) {
         PlayerRef target = subject(targetId);
-        return onServer(() -> outcome(writes.unjail().unjail(actor(), target)));
+        return offServer(() -> outcome(writes.unjail().unjail(actor(), target)));
     }
 
     private CompletableFuture<UxmResult<UxmSanction>> banning(UUID targetId, Optional<String> reason) {
         PlayerRef target = subject(targetId);
-        return onServer(() -> sanction(targetId, writes.ban().ban(actor(), target, reason, silent)));
+        return offServer(() -> sanction(targetId, writes.ban().ban(actor(), target, reason, silent)));
     }
 
     private CompletableFuture<UxmResult<UxmSanction>> tempBanning(
             UUID targetId, Duration duration, Optional<String> reason) {
         PlayerRef target = subject(targetId);
         String raw = span(duration);
-        return onServer(() -> sanction(targetId, writes.tempBan().tempban(actor(), target, raw, reason, silent)));
+        return offServer(() -> sanction(targetId, writes.tempBan().tempban(actor(), target, raw, reason, silent)));
     }
 
     private CompletableFuture<UxmResult<UxmSanction>> muting(UUID targetId, String raw, Optional<String> reason) {
         PlayerRef target = subject(targetId);
-        return onServer(() -> {
+        return offServer(() -> {
             Result<MuteState, ModerationError> result = writes.mute().mute(actor(), target, raw, reason, silent);
             if (result.isErr()) {
                 return UxmResult.failed(failure(result.errorOrThrow()));
@@ -193,14 +193,14 @@ public final class ModerationActions implements UxmModerationActions {
                     UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player is not online"));
         }
         PlayerRef target = subject(targetId);
-        return onServer(() -> outcome(writes.kick().kick(actor(), target, reason, silent)));
+        return offServer(() -> outcome(writes.kick().kick(actor(), target, reason, silent)));
     }
 
     private CompletableFuture<UxmResult<UxmSanction>> jailing(
             UUID targetId, String jail, String raw, Optional<String> reason) {
         PlayerRef target = subject(targetId);
         String named = Objects.requireNonNull(jail, "jail");
-        return onServer(() -> {
+        return offServer(() -> {
             Result<JailState.Active, ModerationError> result = writes.jail().jail(actor(), target, named, raw, reason);
             return result.isErr()
                     ? UxmResult.failed(failure(result.errorOrThrow()))
@@ -214,8 +214,8 @@ public final class ModerationActions implements UxmModerationActions {
                 : UxmResult.ok(ModerationQueries.view(targetId, result.orElseThrow()));
     }
 
-    private <T> CompletableFuture<T> onServer(Supplier<T> write) {
-        return AsyncActions.onServer(scheduler, write);
+    private <T> CompletableFuture<T> offServer(Supplier<T> write) {
+        return AsyncActions.perform(scheduler, write);
     }
 
     /** Which published code a moderation refusal is. */

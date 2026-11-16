@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationL
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandNamesRefresh;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.OnlineMutesListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitCommandNames;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
@@ -64,6 +65,7 @@ import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
+import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
 import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
@@ -81,6 +83,7 @@ import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.StaffRollback;
+import com.uxplima.uxmessentials.moderation.application.StorageLane;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -237,7 +240,12 @@ public final class ModerationWiring {
                 repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
                 repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
-        bus.registry().register(ModerationSync.listener(enforce::onRemoteBan, enforceIp::onRemoteIpBan));
+        // A connected player's mute is kept in memory for the checks on the server thread; a peer's change to it is
+        // read again here.
+        OnlineMutes mutePolicy = new OnlineMutes(repository, kernel.scheduler(), clock);
+        bus.registry()
+                .register(ModerationSync.listener(
+                        enforce::onRemoteBan, enforceIp::onRemoteIpBan, mutePolicy::changedElsewhere));
         // The live jail: a peer's jail or release is applied to a player connected here, and a jail hop a peer saw
         // fail is told to the staff here. With the network off this listener is never invoked.
         ApplyRemoteJail applyJail = new ApplyRemoteJail(
@@ -258,7 +266,6 @@ public final class ModerationWiring {
                 jailNetwork.alerts().failedOnPeer(frameId, target, targetName, jail);
             }
         }));
-        RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
@@ -353,6 +360,7 @@ public final class ModerationWiring {
                         guard,
                         commandSpyStore,
                         mutedCommands,
+                        mutePolicy,
                         clock),
                 new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
@@ -529,7 +537,7 @@ public final class ModerationWiring {
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         // The revoke use cases are built as named locals so /staffrollback drives the same instances the
         // standalone /unmute, /unban and /unwarn commands do: one audited path, no parallel rollback logic.
-        Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, clock);
+        Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, sync, clock);
         Unban unban = new Unban(repository, notifier, audit, history);
         ClearWarns clearWarns = new ClearWarns(repository, notifier, audit);
         StaffRollback staffRollback =
@@ -611,6 +619,7 @@ public final class ModerationWiring {
                 .repository(repository)
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
+                .lane(new StorageLane(kernel.scheduler(), notifier))
                 .build();
     }
 
@@ -644,8 +653,10 @@ public final class ModerationWiring {
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             MutedCommandPolicy mutedCommands,
+            OnlineMutes mutes,
             Clock clock) {
         return List.of(
+                new OnlineMutesListener(mutes),
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
                 new FreezeMoveListener(
@@ -654,8 +665,7 @@ public final class ModerationWiring {
                         kernel.messageSink(),
                         clock,
                         settings.freezeNoticeInterval()),
-                new MutedCommandListener(
-                        repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
+                new MutedCommandListener(mutes, mutedCommands, guard, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
                 new MutedChatListener(
                         new RepositoryMutePolicy(repository, clock),
@@ -730,7 +740,7 @@ public final class ModerationWiring {
             Runnable jailServerAdoption,
             BukkitSanctions sanctions,
             InMemoryCommandSpyStore commandSpyStore,
-            RepositoryMutePolicy mutePolicy,
+            OnlineMutes mutePolicy,
             RepositoryJailGate jailGate,
             Freeze freeze,
             TempBan tempBan,

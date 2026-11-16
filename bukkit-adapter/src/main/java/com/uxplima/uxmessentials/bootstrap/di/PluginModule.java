@@ -2928,6 +2928,12 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
+        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent moderation) {
+                wired.mutePolicy().onEvent(moderation);
+            }
+        });
         // A reload can rename or add command aliases, so the muted-command list reads its commands' names again.
         resources.addReloadTask(ReloadTask.kernel(
                 "muted commands",

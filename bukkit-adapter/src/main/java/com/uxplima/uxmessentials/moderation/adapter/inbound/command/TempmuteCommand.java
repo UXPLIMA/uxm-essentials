@@ -92,7 +92,8 @@ public final class TempmuteCommand extends ModerationCommandSupport implements C
         String duration = ctx.getArgument("duration", String.class);
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.mute().tempmute(actor, to, duration, parsed.reason(), parsed.silent()));
+        target.ifPresent(to ->
+                offTick(actor, () -> services.mute().tempmute(actor, to, duration, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

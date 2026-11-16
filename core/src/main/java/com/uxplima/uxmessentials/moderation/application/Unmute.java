@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
@@ -20,7 +21,8 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 /**
  * {@code /unmute <player>}: lift a player's mute. A target who is not muted is refused (audit-logged with the
  * reason); a muted target's mute row is deleted, {@code PlayerUnmuted} is published, and the messaging
- * context's {@code MutePolicy} stops gagging them on its next read.
+ * context's {@code MutePolicy} stops gagging them on its next read. Peers are told too, so a server that keeps the
+ * mute of a player connected to it drops it at once.
  */
 public final class Unmute {
 
@@ -29,6 +31,7 @@ public final class Unmute {
     private final ModerationAudit audit;
     private final DomainEventPublisher events;
     private final SanctionHistoryRecorder history;
+    private final SanctionSync sync;
     private final Clock clock;
 
     public Unmute(
@@ -37,12 +40,14 @@ public final class Unmute {
             ModerationAudit audit,
             DomainEventPublisher events,
             SanctionHistoryRecorder history,
+            SanctionSync sync,
             Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.audit = Objects.requireNonNull(audit, "audit");
         this.events = Objects.requireNonNull(events, "events");
         this.history = Objects.requireNonNull(history, "history");
+        this.sync = Objects.requireNonNull(sync, "sync");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -59,6 +64,7 @@ public final class Unmute {
         repository.saveMute(target, MuteState.none());
         history.unmute(actor, target);
         events.publish(new PlayerUnmuted(target, now));
+        sync.muteChanged(target);
         audit.unmuted(actor, target, true, Optional.empty());
         notifier.send(actor, ModerationMessageKey.UNMUTE_APPLIED);
         return Result.ok();

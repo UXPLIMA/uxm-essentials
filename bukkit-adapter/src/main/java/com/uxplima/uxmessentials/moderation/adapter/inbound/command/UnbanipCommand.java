@@ -11,6 +11,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.CommandRegistrat
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmlib.command.Args;
 import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
@@ -45,7 +46,9 @@ public final class UnbanipCommand extends ModerationCommandSupport implements Co
         String typed = ctx.getArgument("ip", String.class);
         // Bans are stored in canonical form, so the typed spelling is canonicalised too; text that is not an
         // address passes unchanged so a row stored verbatim before canonical storage can still be lifted.
-        services.unbanIp().unbanIp(actor(ctx), IpLiteral.canonical(typed).orElse(typed));
+        PlayerRef actor = actor(ctx);
+        String ip = IpLiteral.canonical(typed).orElse(typed);
+        offTick(actor, () -> services.unbanIp().unbanIp(actor, ip));
         return Command.SINGLE_SUCCESS;
     }
 }

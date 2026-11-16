@@ -61,7 +61,7 @@ public final class ToggleJailCommand extends ModerationCommandSupport implements
     private int run(CommandContext<CommandSourceStack> ctx, String jail, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.toggleJail().toggle(actor, to, jail, reason));
+        target.ifPresent(to -> offTick(actor, () -> services.toggleJail().toggle(actor, to, jail, reason)));
         return Command.SINGLE_SUCCESS;
     }
 }

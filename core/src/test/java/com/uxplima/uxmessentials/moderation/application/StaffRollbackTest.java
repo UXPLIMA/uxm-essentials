@@ -7,6 +7,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.util.Map;
 
+import com.uxplima.uxmessentials.moderation.application.port.SanctionSync;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.testing.MutableClock;
 import com.uxplima.uxmessentials.testing.RecordingEvents;
@@ -29,7 +30,8 @@ class StaffRollbackTest {
                 history,
                 records,
                 new Unban(records, notifier.notifier(), audit, recorder),
-                new Unmute(records, notifier.notifier(), audit, new RecordingEvents(), recorder, clock),
+                new Unmute(
+                        records, notifier.notifier(), audit, new RecordingEvents(), recorder, SanctionSync.NONE, clock),
                 notifier.notifier(),
                 audit,
                 clock);

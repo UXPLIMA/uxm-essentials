@@ -48,7 +48,7 @@ public final class UnwarnCommand extends ModerationCommandSupport implements Com
     private int run(CommandContext<CommandSourceStack> ctx) {
         PlayerRef actor = actor(ctx);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.clearWarns().clear(actor, to));
+        target.ifPresent(to -> offTick(actor, () -> services.clearWarns().clear(actor, to)));
         return Command.SINGLE_SUCCESS;
     }
 }
