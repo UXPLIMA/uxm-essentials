@@ -18,6 +18,7 @@ ender chest window is always editable. Either way the window opens view only whe
   a container at a time, so two staff cannot take the same items.
 - the saved data was written by an older server version, or holds an item this server cannot read. The server
   converts old data when the player next joins; the window is editable after that.
+- the staff member's previous edit is still being saved. Opening it again a moment later makes it editable.
 
 An offline window does not open at all while the player is joining, when they have no saved data on this server,
 or when the file cannot be read. The staff member is told which.
@@ -28,7 +29,9 @@ Only the slots the staff member changed are written, and only where the containe
 opened with. Everything else in the player's data, and every slot the window did not change, stays exactly as it
 is, including anything the player or another edit changed in the meantime.
 
-A slot that changed in the meantime is a conflict and is never written over. What happens then:
+A slot that changed in the meantime is a conflict and is never written over. On an online player this is common
+for tools and armour they are using: a pickaxe that lost durability while the window was open is a changed slot.
+What happens then:
 
 - The staff member's change to that slot is undone: what they took out of it is taken back from their inventory,
   and what they put into it is returned to them.
@@ -40,8 +43,13 @@ The same happens, for every changed slot, when nothing can be saved: the player 
 while the window was open, or the file could not be written. Nothing is ever kept open waiting for the staff
 member to put things back.
 
-While an editable window is open, and until its save comes back, the staff member cannot drop items, by key or by
-clicking outside the window. That keeps what may have to be taken back in their inventory.
+While an editable window is open, and until its save comes back, the staff member's items stay where they are:
+they cannot drop items, open another inventory, place, use or eat items, or use their crafting grid, and if they
+die they keep their inventory. That keeps what may have to be taken back in their inventory. The one exception is a
+drop of an item that would not fit back into a full inventory, such as what the window hands back on close: it is
+let through so the item is not lost, and logged.
+
+If another plugin stops the window from opening, nothing is edited and the container is free for the next editor.
 
 ## When the window closes by itself
 
@@ -68,6 +76,10 @@ file as it was. `<uuid>.dat_old` is the file as it was before the last save, by 
 - `event=offline_edit_not_saved`: the staff member left before the outcome of their save came back, so nothing
   could be taken back. `viewer_holds_extra` lists what they still hold that the player was not given, and
   `viewer_is_owed` what they put in that the player did not get.
+- `event=mirror_drop_let_through`: a staff member with an edit open dropped an item that had no room to go back
+  into their inventory. The line has the item's full data.
+- `event=mirror_edit_save_failed`: a save threw an error. The edit is undone like any other failed save; the line
+  has the stack trace.
 - `event=player_data_busy`: a login was refused because a save of the player's file did not finish in time.
 - `event=offline_inventories_unavailable`: this server version's internals could not be reached, so offline
   windows are off. Online windows still work.

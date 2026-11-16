@@ -125,7 +125,7 @@ public final class PlayerDataLoginListener implements Listener {
         if (event.isAllowed()) {
             presence.validated(player);
         } else {
-            presence.refused(player);
+            presence.turnedAway(player);
         }
     }
 

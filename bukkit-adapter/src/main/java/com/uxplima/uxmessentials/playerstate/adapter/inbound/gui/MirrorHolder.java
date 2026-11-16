@@ -38,9 +38,17 @@ final class MirrorHolder {
         return edit.target();
     }
 
-    /** Whether the viewer may change the container; a view-only window refuses every movement in its region. */
+    /** The edit this window shows. */
+    MirrorEdits.Edit<ItemStack> edit() {
+        return edit;
+    }
+
+    /**
+     * Whether the viewer may move items in the window now. A view-only window refuses every movement in its region,
+     * and so does one whose edit is no longer open.
+     */
     boolean editable() {
-        return edit.editable();
+        return edit.accepting();
     }
 
     /** Which container is mirrored. */

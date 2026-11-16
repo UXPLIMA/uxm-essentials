@@ -240,6 +240,131 @@ class MirrorEditsTest {
         assertThat(edits.holding(ANN.uuid())).isFalse();
     }
 
+    @Test
+    void aDropIsRefusedOnlyWhenTheItemFitsBackIntoTheInventory() {
+        files.put(SAM, slots(DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+        takeOut(ann, 0);
+        close(ann, MirrorEdits.Cause.CLOSED);
+
+        assertThat(edits.refusesDrop(ANN, APPLE)).isTrue();
+
+        world.full.add(ANN.uuid());
+        assertThat(edits.refusesDrop(ANN, APPLE))
+                .as("a refused drop goes back into the inventory, so refusing one that cannot would delete it")
+                .isFalse();
+        assertThat(warnings).singleElement().asString().contains("event=mirror_drop_let_through", "apple x1");
+
+        scheduler.runAsync();
+        world.full.clear();
+        assertThat(edits.refusesDrop(ANN, APPLE)).as("the edit is settled").isFalse();
+    }
+
+    @Test
+    void aViewerWithASaveUnderWayOpensTheNextWindowViewOnly() {
+        files.put(SAM, slots(DIAMONDS));
+        files.put(BEN, slots(GOLD));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+        takeOut(ann, 0);
+        close(ann, MirrorEdits.Cause.CLOSED);
+
+        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true);
+        scheduler.runLastAsync();
+
+        assertThat(world.opened(ANN).target()).isEqualTo(BEN);
+        assertThat(world.opened(ANN).editable()).isFalse();
+        assertThat(told).containsExactly("Ann: playerstate.mirror.view-only-saving");
+
+        scheduler.runAsync();
+        assertThat(files.slots(SAM)).containsExactly((Stack) null);
+        edits.openOffline(ANN, BEN, MirrorKind.INVENTORY, true);
+        scheduler.runAsync();
+        assertThat(world.opened(ANN).editable())
+                .as("the view-only window took no editor slot")
+                .isTrue();
+    }
+
+    // ---- a window that never appears ---------------------------------------------------------------------------
+
+    @Test
+    void aWindowAnotherPluginRefusedFreesItsEditorSlot() {
+        files.put(SAM, slots(DIAMONDS));
+        world.showing = false;
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true);
+        scheduler.runAsync();
+
+        edits.notShown(world.opened(ANN));
+
+        assertThat(edits.holding(ANN.uuid())).isFalse();
+        assertThat(edits.openCount()).isZero();
+        assertThat(openOffline(BEN, true).editable()).isTrue();
+    }
+
+    @Test
+    void aWindowThatNeverAppearsIsGivenUpAndRefusedIfItTurnsUpLate() {
+        files.put(SAM, slots(DIAMONDS));
+        world.showing = false;
+        edits.openOffline(ANN, SAM, MirrorKind.INVENTORY, true);
+        scheduler.runAsync();
+        MirrorEdits.Edit<Stack> ann = world.opened(ANN);
+        assertThat(edits.opening(ann)).isTrue();
+
+        scheduler.runLater();
+
+        assertThat(edits.holding(ANN.uuid())).isFalse();
+        assertThat(edits.opening(ann))
+                .as("a window turning up now would move items nothing saves")
+                .isFalse();
+        assertThat(ann.accepting()).isFalse();
+        assertThat(openOffline(BEN, true).editable()).isTrue();
+    }
+
+    @Test
+    void aWindowThatAppearedIsKeptWhenTheWaitIsOver() {
+        files.put(SAM, slots(DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+
+        scheduler.runLater();
+
+        assertThat(edits.holding(ANN.uuid())).isTrue();
+        assertThat(ann.accepting()).isTrue();
+    }
+
+    // ---- a save that throws ------------------------------------------------------------------------------------
+
+    @Test
+    void aSaveThatThrowsIsSettledAsFailedAndUndone() {
+        files.put(SAM, slots(DIAMONDS));
+        MirrorEdits.Edit<Stack> ann = openOffline(ANN, true);
+        takeOut(ann, 0);
+        files.throwing = true;
+
+        close(ann, MirrorEdits.Cause.CLOSED);
+        scheduler.runAsync();
+
+        assertThat(world.inventory(ANN)).isEmpty();
+        assertThat(told).containsExactly("Ann: playerstate.mirror.undone-failed");
+        assertThat(warnings).singleElement().asString().startsWith("event=mirror_edit_save_failed");
+        assertThat(edits.holding(ANN.uuid())).isFalse();
+        files.throwing = false;
+        assertThat(openOffline(BEN, true).editable()).isTrue();
+    }
+
+    @Test
+    void aLiveSaveThatThrowsMidwayCountsAsSavedForTheSlotsItWrote() {
+        world.join(SAM, slots(DIAMONDS, GOLD));
+        MirrorEdits.Edit<Stack> ann = openOnline(ANN, true);
+        takeOut(ann, 0);
+        takeOut(ann, 1);
+        world.failingSlot = 1;
+
+        close(ann, MirrorEdits.Cause.CLOSED);
+
+        assertThat(world.live(SAM)).containsExactly(null, GOLD);
+        assertThat(world.inventory(ANN)).containsExactly(DIAMONDS);
+        assertThat(told).containsExactly("Ann: playerstate.mirror.partly-saved");
+    }
+
     // ---- closes that cannot wait -------------------------------------------------------------------------------
 
     @Test
@@ -329,12 +454,20 @@ class MirrorEditsTest {
     private MirrorEdits.Edit<Stack> openOffline(PlayerRef viewer, boolean wantsEdit) {
         edits.openOffline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit);
         scheduler.runAsync();
-        return world.opened(viewer);
+        return appeared(world.opened(viewer));
     }
 
     private MirrorEdits.Edit<Stack> openOnline(PlayerRef viewer, boolean wantsEdit) {
         edits.openOnline(viewer, SAM, MirrorKind.INVENTORY, wantsEdit);
-        return world.opened(viewer);
+        return appeared(world.opened(viewer));
+    }
+
+    /** The window appears, as the server reports it. */
+    private MirrorEdits.Edit<Stack> appeared(MirrorEdits.Edit<Stack> edit) {
+        if (world.windows.containsKey(edit)) {
+            edits.shown(edit);
+        }
+        return edit;
     }
 
     /** The viewer takes a slot's items out of the window into their own inventory. */
@@ -407,6 +540,9 @@ class MirrorEditsTest {
         private final Map<UUID, MirrorEdits.Edit<Stack>> opened = new HashMap<>();
         private final Map<MirrorEdits.Edit<Stack>, List<@Nullable Stack>> windows = new HashMap<>();
         private final List<MirrorEdits.Edit<Stack>> closedByServer = new ArrayList<>();
+        private final Set<UUID> full = new HashSet<>();
+        private boolean showing = true;
+        private int failingSlot = -1;
 
         void join(PlayerRef player, List<@Nullable Stack> container) {
             online.add(player.uuid());
@@ -450,6 +586,9 @@ class MirrorEditsTest {
 
         @Override
         public void set(PlayerRef target, MirrorKind kind, int slot, @Nullable Stack item) {
+            if (slot == failingSlot) {
+                throw new IllegalStateException("the slot cannot be set");
+            }
             live(target).set(slot, item);
         }
 
@@ -485,9 +624,16 @@ class MirrorEditsTest {
         }
 
         @Override
+        public boolean fits(PlayerRef viewer, Stack item) {
+            return !full.contains(viewer.uuid());
+        }
+
+        @Override
         public void open(MirrorEdits.Edit<Stack> edit) {
             opened.put(edit.viewer().uuid(), edit);
-            windows.put(edit, new ArrayList<>(edit.base()));
+            if (showing) {
+                windows.put(edit, new ArrayList<>(edit.base()));
+            }
         }
 
         @Override
@@ -497,8 +643,9 @@ class MirrorEditsTest {
 
         @Override
         public void close(MirrorEdits.Edit<Stack> edit) {
-            windows.remove(edit);
-            closedByServer.add(edit);
+            if (windows.remove(edit) != null) {
+                closedByServer.add(edit);
+            }
         }
     }
 
@@ -507,6 +654,7 @@ class MirrorEditsTest {
 
         private final Map<UUID, List<@Nullable Stack>> stored = new HashMap<>();
         private boolean failing;
+        private boolean throwing;
         private int saves;
 
         void put(PlayerRef player, List<@Nullable Stack> container) {
@@ -533,6 +681,9 @@ class MirrorEditsTest {
                 Map<Integer, @Nullable Stack> changes,
                 Predicate<Set<Integer>> partly) {
             saves++;
+            if (throwing) {
+                throw new IllegalStateException("the disk is gone");
+            }
             if (failing) {
                 return SaveResult.of(SaveOutcome.FAILED);
             }
@@ -563,11 +714,25 @@ class MirrorEditsTest {
     private static final class ManualScheduler implements Scheduler {
 
         private final Deque<Runnable> async = new ArrayDeque<>();
+        private final Deque<Runnable> later = new ArrayDeque<>();
         private final Set<UUID> gone = new HashSet<>();
 
         void runAsync() {
             Runnable next;
             while ((next = async.pollFirst()) != null) {
+                next.run();
+            }
+        }
+
+        /** Run only the async task queued last, ahead of those queued before it. */
+        void runLastAsync() {
+            Objects.requireNonNull(async.pollLast()).run();
+        }
+
+        /** Run what was put off for later, as if the delay has passed. */
+        void runLater() {
+            Runnable next;
+            while ((next = later.pollFirst()) != null) {
                 next.run();
             }
         }
@@ -612,6 +777,11 @@ class MirrorEditsTest {
         }
 
         @Override
+        public void laterEntity(PlayerRef player, java.time.Duration delay, Runnable task) {
+            later.add(() -> onEntity(player, task));
+        }
+
+        @Override
         public void async(Runnable task) {
             async.add(task);
         }
@@ -637,7 +807,9 @@ class MirrorEditsTest {
         }
 
         @Override
-        public void error(String message, Throwable cause) {}
+        public void error(String message, Throwable cause) {
+            lines.add(message);
+        }
 
         @Override
         public void debug(String message, Object... args) {}

@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
+import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
@@ -20,6 +21,7 @@ import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import com.uxplima.uxmlib.menu.providers.ContentRegions;
 import com.uxplima.uxmlib.menu.runtime.MenuContext;
+import com.uxplima.uxmlib.menu.runtime.MenuHolder;
 import com.uxplima.uxmlib.menu.spec.MenuSpec;
 import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
@@ -101,17 +103,29 @@ public final class MirrorWindow {
     Optional<@Nullable ItemStack[]> contents(MirrorHolder holder) {
         // Both kinds are loaded in the constructor, so a missing entry would mean the window was never built.
         List<Integer> region = Objects.requireNonNull(slots.get(holder.kind()));
-        return LivePlayers.of(holder.viewer())
-                .flatMap(viewer -> menus.openWindow(viewer, holder.kind().specId()))
-                .map(inv -> ContentRegions.read(inv, region));
+        return windowOf(holder).map(inv -> ContentRegions.read(inv, region));
     }
 
     /** Close {@code holder}'s window, if its viewer still has it open. Run on the viewer's thread. */
     void close(MirrorHolder holder) {
-        LivePlayers.of(holder.viewer())
-                .filter(viewer ->
-                        menus.openWindow(viewer, holder.kind().specId()).isPresent())
-                .ifPresent(viewer -> viewer.closeInventory());
+        if (windowOf(holder).isPresent()) {
+            LivePlayers.of(holder.viewer()).ifPresent(viewer -> viewer.closeInventory());
+        }
+    }
+
+    /** The open window of {@code holder} itself, not another mirror window of the same kind. */
+    private Optional<Inventory> windowOf(MirrorHolder holder) {
+        return LivePlayers.of(holder.viewer())
+                .flatMap(viewer -> menus.openWindow(viewer, holder.kind().specId()))
+                .filter(inv -> of(inv) == holder);
+    }
+
+    /** The mirror window {@code inventory} is, or {@code null} when it is not one. */
+    static @Nullable MirrorHolder of(Inventory inventory) {
+        return inventory.getHolder(false) instanceof MenuHolder menu
+                        && menu.ctx().subjectRaw().orElse(null) instanceof MirrorHolder mirror
+                ? mirror
+                : null;
     }
 
     /** How many slots the window of {@code kind} mirrors; the array a write-back reconciles is this long. */

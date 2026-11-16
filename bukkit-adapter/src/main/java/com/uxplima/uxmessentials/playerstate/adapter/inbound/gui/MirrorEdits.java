@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,11 +54,15 @@ import org.jspecify.annotations.Nullable;
  *       are still saved only when the staff member is known to hold everything that has to be taken back: a move from
  *       a conflicting slot to another slot of the window holds nothing, so writing its other half would copy the
  *       item. What cannot be taken back is logged with the full item data.
- *   <li><b>Items stay put while an edit is open.</b> {@link #holding} tells the item guard to refuse drops by the
- *       staff member from the open until the edit is settled, so what may have to be taken back is still there.
+ *   <li><b>Items stay put while an edit is open.</b> {@link #holding} tells the item guard to keep the staff
+ *       member's items where they are from the open until the edit is settled, so what may have to be taken back is
+ *       still there. A drop is only refused when the item fits back into their inventory ({@link #refusesDrop}).
+ *   <li><b>A window that never appears edits nothing.</b> The menu builds a window off the tick, and another plugin
+ *       may refuse it. Until it appears the edit is pending; one refused, or not there after {@link #OPEN_WAIT}, is
+ *       dropped and frees its editor slot, and a window that turns up after that is refused.
  *   <li><b>Some closes cannot wait.</b> When the staff member disconnects the server saves their inventory right
  *       after the window closes, and when the module stops nothing scheduled runs any more. In both cases the save
- *       and the taking back happen at once, on the closing thread.
+ *       and the taking back happen at once, on the closing thread. A save that throws is settled as failed.
  * </ul>
  *
  * @param <I> the item type
@@ -67,6 +72,12 @@ final class MirrorEdits<I> {
 
     /** How long a reopen waits for the same container's save, and a leaving staff member for theirs. */
     static final Duration WAIT = Duration.ofSeconds(3);
+
+    /**
+     * How long a window may take to appear. The menu builds it off the tick, so it shows up a little after it is
+     * asked for; one that has not appeared by then never will, or another plugin refused it.
+     */
+    static final Duration OPEN_WAIT = Duration.ofSeconds(10);
 
     /** Why a window closed. */
     enum Cause {
@@ -121,13 +132,16 @@ final class MirrorEdits<I> {
         /** Give {@code items} to the viewer, dropping at their feet what does not fit. */
         void give(PlayerRef viewer, List<I> items);
 
-        /** Show {@code edit}'s window to its viewer. */
+        /** Whether {@code item} fits into the viewer's inventory as it is now. */
+        boolean fits(PlayerRef viewer, I item);
+
+        /** Ask for {@code edit}'s window to be shown to its viewer; it may appear later, or never. */
         void open(Edit<I> edit);
 
         /** What {@code edit}'s window holds now, or empty when the viewer does not have it open. */
         Optional<List<@Nullable I>> window(Edit<I> edit);
 
-        /** Close {@code edit}'s window. */
+        /** Close {@code edit}'s window if it is open, and forget it. */
         void close(Edit<I> edit);
     }
 
@@ -145,6 +159,8 @@ final class MirrorEdits<I> {
     }
 
     private enum State {
+        /** The window was asked for and has not appeared yet. */
+        PENDING,
         OPEN,
         SAVING,
         DONE
@@ -173,12 +189,13 @@ final class MirrorEdits<I> {
         private final List<@Nullable I> base;
         private final @Nullable OfflineSnapshot<I> stored;
         private final @Nullable Lease lease;
-        private final AtomicReference<State> state = new AtomicReference<>(State.OPEN);
+        private final AtomicReference<State> state = new AtomicReference<>(State.PENDING);
         private final AtomicBoolean started = new AtomicBoolean();
         private final CompletableFuture<SaveResult> result = new CompletableFuture<>();
         private volatile @Nullable Supplier<SaveResult> work;
         private volatile List<@Nullable I> contents = List.of();
         private volatile List<Integer> changed = List.of();
+        private final Set<Integer> written = ConcurrentHashMap.newKeySet();
 
         private Edit(
                 PlayerRef viewer,
@@ -212,9 +229,19 @@ final class MirrorEdits<I> {
             return base;
         }
 
-        /** Whether the window may change the container; a view-only window refuses every move. */
+        /** Whether the window was opened to change the container; a view-only window refuses every move. */
         boolean editable() {
             return lease != null;
+        }
+
+        /** Whether the window may still be changed: it is editable and its contents have not been handed over. */
+        boolean accepting() {
+            State now = state.get();
+            return editable() && (now == State.PENDING || now == State.OPEN);
+        }
+
+        private Edit<I> viewOnly() {
+            return new Edit<>(viewer, target, kind, base, stored, null);
         }
     }
 
@@ -292,9 +319,21 @@ final class MirrorEdits<I> {
                         release(container, edit.lease);
                         return;
                     }
-                    edits.add(edit);
-                    viewers.open(edit);
-                    if (heldBy != null) {
+                    // A second editable window while the last edit is still being saved could take in what that
+                    // save may have to take back.
+                    boolean settling = edit.editable() && settling(edit.viewer.uuid());
+                    Edit<I> shown = edit;
+                    if (settling) {
+                        release(container, edit.lease);
+                        shown = edit.viewOnly();
+                    }
+                    edits.add(shown);
+                    viewers.open(shown);
+                    Edit<I> asked = shown;
+                    scheduler.laterEntity(edit.viewer, OPEN_WAIT, () -> unlessShown(asked));
+                    if (settling) {
+                        notifier.send(edit.viewer, PlayerstateMessageKey.MIRROR_VIEW_ONLY_SAVING, Map.of());
+                    } else if (heldBy != null) {
                         notifier.send(
                                 edit.viewer,
                                 PlayerstateMessageKey.MIRROR_VIEW_ONLY_EDITED,
@@ -302,6 +341,54 @@ final class MirrorEdits<I> {
                     }
                 },
                 () -> release(container, edit.lease));
+    }
+
+    /**
+     * Whether the window of {@code edit} may appear now. A window that turns up after its edit was given up on would
+     * let items move that nothing saves, so it is refused.
+     */
+    boolean opening(Edit<I> edit) {
+        State now = edit.state.get();
+        return now == State.PENDING || now == State.OPEN;
+    }
+
+    /** The window of {@code edit} appeared. */
+    void shown(Edit<I> edit) {
+        edit.state.compareAndSet(State.PENDING, State.OPEN);
+    }
+
+    /** The window of {@code edit} was refused, by another plugin or by {@link #opening}: nothing was edited. */
+    void notShown(Edit<I> edit) {
+        if (edit.state.compareAndSet(State.PENDING, State.DONE)) {
+            forget(edit);
+        }
+    }
+
+    private void unlessShown(Edit<I> edit) {
+        if (edit.state.get() != State.PENDING) {
+            return;
+        }
+        if (viewers.window(edit).isPresent()) {
+            shown(edit);
+        } else {
+            notShown(edit);
+        }
+    }
+
+    /** Drop an edit that never handed anything over: its editor slot is free again. */
+    private void forget(Edit<I> edit) {
+        edits.remove(edit);
+        release(new Container(edit.target.uuid(), edit.kind), edit.lease);
+        viewers.close(edit);
+    }
+
+    private boolean settling(UUID viewer) {
+        for (Edit<I> edit : edits) {
+            if (edit.viewer.uuid().equals(viewer) && edit.editable() && edit.state.get() == State.SAVING) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private @Nullable Lease lease(Container container, PlayerRef viewer) {
@@ -353,7 +440,8 @@ final class MirrorEdits<I> {
      * call for the same window does nothing.
      */
     void closed(Edit<I> edit, List<@Nullable I> contents, Cause cause) {
-        if (!edit.state.compareAndSet(State.OPEN, State.SAVING)) {
+        if (!edit.state.compareAndSet(State.OPEN, State.SAVING)
+                && !edit.state.compareAndSet(State.PENDING, State.SAVING)) {
             return;
         }
         Container container = new Container(edit.target.uuid(), edit.kind);
@@ -373,7 +461,7 @@ final class MirrorEdits<I> {
                         edit,
                         container,
                         scheduler.ownsEntity(edit.target)
-                                ? applyLive(edit)
+                                ? run(edit, () -> applyLive(edit))
                                 : SaveResult.of(SaveOutcome.PLAYER_PRESENT));
                 conclude(edit);
             } else {
@@ -394,7 +482,7 @@ final class MirrorEdits<I> {
                     edit.target.uuid(), edit.kind, base, changes(edit), conflicts -> partly(edit, conflicts));
             if (now) {
                 edit.started.set(true);
-                deliver(edit, container, Objects.requireNonNull(edit.work).get());
+                deliver(edit, container, run(edit, Objects.requireNonNull(edit.work)));
                 conclude(edit);
             } else {
                 scheduler.async(() -> runOnce(edit, container));
@@ -405,9 +493,31 @@ final class MirrorEdits<I> {
     /** Run the edit's save once, wherever it is first asked for, then hand the outcome to the viewer's thread. */
     private void runOnce(Edit<I> edit, Container container) {
         if (edit.started.compareAndSet(false, true)) {
-            deliver(edit, container, Objects.requireNonNull(edit.work).get());
+            deliver(edit, container, run(edit, Objects.requireNonNull(edit.work)));
         }
         afterResult(edit);
+    }
+
+    /**
+     * Run a save. One that throws still has an outcome, so the edit is settled and its editor slot freed; a live save
+     * that wrote some slots before it threw counts as saved for those.
+     */
+    private SaveResult run(Edit<I> edit, Supplier<SaveResult> work) {
+        try {
+            return work.get();
+        } catch (RuntimeException | LinkageError failure) {
+            log.error(
+                    "event=mirror_edit_save_failed viewer=" + edit.viewer.name() + " target=" + edit.target.name()
+                            + " container=" + edit.kind.label(),
+                    failure);
+            Set<Integer> written = Set.copyOf(edit.written);
+            if (written.isEmpty()) {
+                return SaveResult.of(SaveOutcome.FAILED);
+            }
+            Set<Integer> unwritten = new HashSet<>(edit.changed);
+            unwritten.removeAll(written);
+            return new SaveResult(SaveOutcome.SAVED, Set.copyOf(unwritten));
+        }
     }
 
     private void afterResult(Edit<I> edit) {
@@ -426,8 +536,14 @@ final class MirrorEdits<I> {
      */
     void quitting(PlayerRef viewer) {
         for (Edit<I> edit : List.copyOf(edits)) {
-            if (edit.viewer.uuid().equals(viewer.uuid()) && edit.state.get() == State.SAVING) {
+            if (!edit.viewer.uuid().equals(viewer.uuid())) {
+                continue;
+            }
+            State now = edit.state.get();
+            if (now == State.SAVING) {
                 finishNow(edit);
+            } else if (now == State.PENDING) {
+                notShown(edit);
             }
         }
     }
@@ -437,7 +553,7 @@ final class MirrorEdits<I> {
         Supplier<SaveResult> work = edit.work;
         boolean live = targets.online(edit.target);
         if (work != null && (!live || scheduler.ownsEntity(edit.target)) && edit.started.compareAndSet(false, true)) {
-            deliver(edit, container, work.get());
+            deliver(edit, container, run(edit, work));
         }
         try {
             edit.result.get(WAIT.toMillis(), TimeUnit.MILLISECONDS);
@@ -458,18 +574,29 @@ final class MirrorEdits<I> {
         stopping = true;
         for (Edit<I> edit : List.copyOf(edits)) {
             Runnable flush = () -> flush(edit);
-            scheduler.onEntity(edit.viewer, flush, flush);
+            // Right here when this thread may touch the viewer: a reload unregisters the item guard as soon as this
+            // returns, so no edit may be left being saved.
+            if (scheduler.ownsEntity(edit.viewer)) {
+                flush.run();
+            } else {
+                scheduler.onEntity(edit.viewer, flush, flush);
+            }
         }
     }
 
     private void flush(Edit<I> edit) {
-        if (edit.state.get() == State.SAVING) {
+        State now = edit.state.get();
+        if (now == State.SAVING) {
             finishNow(edit);
             return;
         }
-        List<@Nullable I> contents = viewers.window(edit).orElse(edit.base);
+        Optional<List<@Nullable I>> window = viewers.window(edit);
+        if (now == State.PENDING && window.isEmpty()) {
+            notShown(edit);
+            return;
+        }
         viewers.close(edit);
-        closed(edit, contents, Cause.STOP);
+        closed(edit, window.orElse(edit.base), Cause.STOP);
     }
 
     // ---- concluding -------------------------------------------------------------------------------------------
@@ -556,6 +683,7 @@ final class MirrorEdits<I> {
         for (int slot : edit.changed) {
             if (!conflicts.contains(slot)) {
                 targets.set(edit.target, edit.kind, slot, edit.contents.get(slot));
+                edit.written.add(slot);
             }
         }
         return new SaveResult(SaveOutcome.SAVED, Set.copyOf(conflicts));
@@ -665,6 +793,25 @@ final class MirrorEdits<I> {
                 return true;
             }
         }
+        return false;
+    }
+
+    /**
+     * Whether a drop of {@code item} by {@code viewer} is refused. Refusing hands the item back into the inventory,
+     * so a drop is only refused when it fits there: the server also drops what a closing window hands back to a full
+     * inventory, and refusing that would delete it. A drop let through while an edit is open is logged.
+     */
+    boolean refusesDrop(PlayerRef viewer, I item) {
+        if (!holding(viewer.uuid())) {
+            return false;
+        }
+        if (viewers.fits(viewer, item)) {
+            return true;
+        }
+        log.warn(
+                "event=mirror_drop_let_through viewer={} item=[{}]; the inventory had no room to take it back",
+                viewer.name(),
+                items.describe(item));
         return false;
     }
 

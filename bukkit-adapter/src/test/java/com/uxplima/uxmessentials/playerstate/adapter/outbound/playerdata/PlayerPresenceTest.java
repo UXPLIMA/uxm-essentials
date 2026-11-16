@@ -98,6 +98,22 @@ class PlayerPresenceTest {
     }
 
     @Test
+    void aSecondLoginRefusedAtValidationDoesNotUncountThePlayerWhoIsOnline() {
+        presence.joining(SAM);
+        presence.validated(SAM);
+        presence.joining(SAM);
+
+        presence.turnedAway(SAM);
+        presence.closed(SAM);
+
+        assertThat(presence.present(SAM))
+                .as("the refused connection closing leaves the open one counted")
+                .isTrue();
+        presence.closed(SAM);
+        assertThat(presence.present(SAM)).isFalse();
+    }
+
+    @Test
     void aPlayerAdoptedAgainAfterAReloadIsNotCountedTwice() {
         presence.adopt(SAM);
         presence.adopt(SAM);

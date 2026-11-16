@@ -15,14 +15,21 @@ import java.util.function.Predicate;
 
 import org.bukkit.entity.HumanEntity;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.inventory.InventoryAction;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryOpenEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.PlayerDropItemEvent;
+import org.bukkit.event.player.PlayerInteractEntityEvent;
+import org.bukkit.event.player.PlayerInteractEvent;
+import org.bukkit.event.player.PlayerItemConsumeEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.PlayerInventory;
@@ -45,10 +52,12 @@ import org.jspecify.annotations.Nullable;
  * players, windows are the {@link MirrorWindow} menus and stored containers are the {@link OfflinePlayerStorage}.
  * One instance serves the online and offline views together, which is what makes their editor slot shared.
  *
- * <p>It is also the listener that keeps an edit's items where they are: while a staff member has an editable window
- * open, or its save has not come back, they cannot drop items, by key or by clicking outside a window. It records
- * why a window closed, so a close by disconnecting is saved before the server saves the staff member, and it lets a
- * staff member who leaves with a save still under way finish it first.
+ * <p>It is also the listener that keeps an edit's items where they are. While a staff member has an editable window
+ * open, or its save has not come back, they cannot drop items (unless the item would not fit back into their
+ * inventory), open another inventory, use, place or eat items, use their crafting grid, or lose their items on death.
+ * It tells the rules when a window appears or is refused. It records why a window closed, so a close by disconnecting
+ * is saved before the server saves the staff member, and it lets a staff member who leaves with a save still under
+ * way finish it first.
  */
 @NullMarked
 public final class MirrorEditing implements Listener {
@@ -103,9 +112,44 @@ public final class MirrorEditing implements Listener {
         leaving.remove(event.getPlayer().getUniqueId());
     }
 
+    /**
+     * A mirror window turning up after its edit was given up on is refused; any other inventory is refused while an
+     * edit is open or being saved, so nothing can be put away into it meanwhile.
+     */
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onOpening(InventoryOpenEvent event) {
+        MirrorHolder mirror = MirrorWindow.of(event.getInventory());
+        if (mirror != null) {
+            if (!edits.opening(mirror.edit())) {
+                event.setCancelled(true);
+            }
+        } else if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Last, cancelled or not, so the rules know whether a window really appeared. */
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onOpened(InventoryOpenEvent event) {
+        MirrorHolder mirror = MirrorWindow.of(event.getInventory());
+        if (mirror == null) {
+            return;
+        }
+        if (event.isCancelled()) {
+            edits.notShown(mirror.edit());
+        } else {
+            edits.shown(mirror.edit());
+        }
+    }
+
+    /**
+     * Refused only when the item fits back into the inventory, which is where a refused drop goes; the server also
+     * drops what a closing window hands back to a full inventory, and refusing that would delete the item.
+     */
     @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
     public void onDrop(PlayerDropItemEvent event) {
-        if (edits.holding(event.getPlayer().getUniqueId())) {
+        if (edits.refusesDrop(
+                BukkitRefs.toRef(event.getPlayer()), event.getItemDrop().getItemStack())) {
             event.setCancelled(true);
         }
     }
@@ -120,8 +164,47 @@ public final class MirrorEditing implements Listener {
                 || action == InventoryAction.DROP_ONE_CURSOR
                 || action == InventoryAction.DROP_ALL_SLOT
                 || action == InventoryAction.DROP_ONE_SLOT;
-        if (drops || event.getSlotType() == InventoryType.SlotType.OUTSIDE) {
+        InventoryType.SlotType type = event.getSlotType();
+        if (drops || type == InventoryType.SlotType.OUTSIDE || type == InventoryType.SlotType.CRAFTING) {
             event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST)
+    public void onInteract(PlayerInteractEvent event) {
+        if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setUseInteractedBlock(Event.Result.DENY);
+            event.setUseItemInHand(Event.Result.DENY);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onInteractEntity(PlayerInteractEntityEvent event) {
+        if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onPlace(BlockPlaceEvent event) {
+        if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    @EventHandler(priority = EventPriority.LOWEST, ignoreCancelled = true)
+    public void onConsume(PlayerItemConsumeEvent event) {
+        if (edits.holding(event.getPlayer().getUniqueId())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /** Late, so another plugin's drops do not undo it: a staff member who dies mid edit keeps what may be taken back. */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = true)
+    public void onDeath(PlayerDeathEvent event) {
+        if (edits.holding(event.getEntity().getUniqueId())) {
+            event.setKeepInventory(true);
+            event.getDrops().clear();
         }
     }
 
@@ -297,6 +380,28 @@ public final class MirrorEditing implements Listener {
                 stacks.add(stack);
             }
             return stacks;
+        }
+
+        @Override
+        public boolean fits(PlayerRef viewer, ItemStack item) {
+            Player player = LivePlayers.of(viewer).orElse(null);
+            if (player == null) {
+                return false;
+            }
+            PlayerInventory inventory = player.getInventory();
+            int max = Math.max(1, Math.min(item.getMaxStackSize(), inventory.getMaxStackSize()));
+            int room = 0;
+            for (ItemStack held : inventory.getStorageContents()) {
+                if (held == null || held.getType().isAir()) {
+                    room += max;
+                } else if (held.isSimilar(item)) {
+                    room += Math.max(0, max - held.getAmount());
+                }
+                if (room >= item.getAmount()) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         @Override

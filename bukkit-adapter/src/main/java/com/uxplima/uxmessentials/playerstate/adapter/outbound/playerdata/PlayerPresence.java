@@ -18,6 +18,11 @@ import java.util.concurrent.ConcurrentHashMap;
  * lapses after {@link #JOINING_FOR}. A validated login is <em>connected</em> until its connection closes, which the
  * server reports after it saved the player's data.
  *
+ * <p>The server reports a connection closing by player, not by connection, and also for a login refused at
+ * validation, which never counted. So a refusal there makes the next close of that player count for nothing, and
+ * the player who is connected keeps counting. Which of the two closes is skipped does not matter: once both have
+ * closed, nobody counts.
+ *
  * <p>{@link #shared()} is the one record the plugin keeps, so a module reload does not forget who is in the middle of
  * a login.
  */
@@ -31,6 +36,7 @@ public final class PlayerPresence {
     private final Clock clock;
     private final Map<UUID, Instant> joining = new ConcurrentHashMap<>();
     private final Map<UUID, Integer> connected = new ConcurrentHashMap<>();
+    private final Map<UUID, Integer> uncounted = new ConcurrentHashMap<>();
 
     public PlayerPresence(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -57,9 +63,22 @@ public final class PlayerPresence {
         joining.remove(player);
     }
 
-    /** One of {@code player}'s validated connections closed, after the server saved their data. */
+    /** A validation refused a login of {@code player}: its connection reports closing, but it never counted. */
+    public void turnedAway(UUID player) {
+        joining.remove(player);
+        uncounted.merge(player, 1, Integer::sum);
+    }
+
+    /** One of {@code player}'s connections closed; a validated one is reported after the server saved their data. */
     public void closed(UUID player) {
-        connected.computeIfPresent(player, (id, connections) -> connections > 1 ? connections - 1 : null);
+        boolean[] skipped = {false};
+        uncounted.computeIfPresent(player, (id, closes) -> {
+            skipped[0] = true;
+            return closes > 1 ? closes - 1 : null;
+        });
+        if (!skipped[0]) {
+            connected.computeIfPresent(player, (id, connections) -> connections > 1 ? connections - 1 : null);
+        }
     }
 
     /** {@code player} was already connected when this started; counting them twice is avoided. */
