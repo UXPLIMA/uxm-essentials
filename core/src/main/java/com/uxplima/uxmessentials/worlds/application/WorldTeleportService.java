@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
@@ -303,8 +304,10 @@ public final class WorldTeleportService {
 
     /**
      * Off the tick: take the entry fee, then launch on the player's thread. The debit writes the balance, so it never
-     * runs on a tick thread, and it comes first so a player who cannot pay is never moved. A launch that is refused,
-     * or a player who left before it, gets the fee back.
+     * runs on a tick thread, and it comes first so a player who cannot pay is never moved. The fee is kept only when
+     * the player lands: a refused launch, a player who left before it, a warmup they walked out of or replaced, and a
+     * hop that missed all get it back, once, whichever of them is heard first. A player who was told the fee was
+     * taken is told it came back.
      */
     private void chargeThenLaunch(PlayerRef who, WorldName target, Position spawn, BigDecimal fee) {
         if (!entryFee.charge(who, fee)) {
@@ -312,27 +315,42 @@ public final class WorldTeleportService {
             return;
         }
         String currency = entryFee.currencyId();
-        Runnable refund = () -> refundOffTick(who, target, fee, currency);
+        AtomicBoolean settled = new AtomicBoolean();
+        AtomicBoolean told = new AtomicBoolean();
+        Runnable refund = () -> {
+            if (settled.compareAndSet(false, true)) {
+                refundOffTick(who, target, fee, currency, told.get());
+            }
+        };
         scheduler.onEntity(
                 who,
                 () -> {
                     boolean accepted;
                     try {
-                        accepted = teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN);
+                        accepted = teleporter.teleport(who, spawn, WorldTeleportCause.SPAWN, ended -> {
+                            if (!ended.landed()) {
+                                refund.run();
+                            }
+                        });
                     } catch (RuntimeException failure) {
                         refund.run();
                         throw failure;
                     }
-                    if (accepted) {
-                        notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
-                    } else {
+                    if (!accepted) {
                         refund.run();
+                        return;
+                    }
+                    // Marked before the check, so a warmup cancelled on another thread meanwhile says the fee came
+                    // back even when it beats the line saying it was taken.
+                    told.set(true);
+                    if (!settled.get()) {
+                        notify(who, WorldsMessageKey.WORLD_ENTER_FEE_CHARGED, feePlaceholders(target, fee));
                     }
                 },
                 refund);
     }
 
-    private void refundOffTick(PlayerRef who, WorldName target, BigDecimal fee, String currency) {
+    private void refundOffTick(PlayerRef who, WorldName target, BigDecimal fee, String currency, boolean tell) {
         Runnable credit = () -> {
             if (!entryFee.refund(who, fee, currency)) {
                 log.warn(
@@ -341,6 +359,8 @@ public final class WorldTeleportService {
                         target.value(),
                         fee.toPlainString(),
                         currency);
+            } else if (tell) {
+                notify(who, WorldsMessageKey.WORLD_ENTER_FEE_REFUNDED, feePlaceholders(target, fee));
             }
         };
         try {

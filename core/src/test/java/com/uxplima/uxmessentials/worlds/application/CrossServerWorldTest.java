@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Consumer;
 
 import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharges;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
@@ -383,6 +385,36 @@ class CrossServerWorldTest {
     }
 
     @Test
+    void aWarmupWalkedOutOfAfterTheLaunchGivesTheFeeBackOnceAndSaysSo() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        moves.holdsWarmup = true;
+
+        lobby(true).spawn(ALEX, ARENA);
+        assertThat(purse.wallet).isEqualByComparingTo("90");
+        moves.warmupEnds(TeleportOutcome.CANCELLED);
+        moves.warmupEnds(TeleportOutcome.MISSED);
+
+        assertThat(purse.wallet).isEqualByComparingTo(START);
+        assertThat(purse.refunds).isOne();
+        assertThat(notifier.keys()).containsSubsequence("world.enter.fee-charged", "world.enter.fee-refunded");
+    }
+
+    @Test
+    void aWarmupThatLandsKeepsTheFee() {
+        table.put(LOBBY, arena(FEE));
+        lobbyEngine.onDisk(ARENA, true, SPAWN);
+        moves.holdsWarmup = true;
+
+        lobby(true).spawn(ALEX, ARENA);
+        moves.warmupEnds(TeleportOutcome.LANDED);
+
+        assertThat(purse.wallet).isEqualByComparingTo("90");
+        assertThat(purse.refunds).isZero();
+        assertThat(notifier.keys()).doesNotContain("world.enter.fee-refunded");
+    }
+
+    @Test
     void aPlayerWhoLeftBeforeTheirLocalEntryReachedThemIsNotMovedAndGetsTheFeeBack() {
         table.put(LOBBY, arena(FEE));
         lobbyEngine.onDisk(ARENA, true, SPAWN);
@@ -490,14 +522,30 @@ class CrossServerWorldTest {
         final List<String> teleported = new ArrayList<>();
         boolean refuses;
         boolean refusesLaunch;
+        boolean holdsWarmup;
+        Consumer<TeleportOutcome> warming = ended -> {
+            throw new IllegalStateException("no warmup held");
+        };
 
         @Override
-        public boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause) {
+        public boolean teleport(
+                PlayerRef who, Position to, WorldTeleportCause cause, Consumer<TeleportOutcome> outcome) {
             if (refusesLaunch) {
+                outcome.accept(TeleportOutcome.REFUSED);
                 return false;
             }
             teleported.add(who.name() + "->" + to.world().name() + " as " + cause);
+            if (holdsWarmup) {
+                warming = outcome;
+            } else {
+                outcome.accept(TeleportOutcome.LANDED);
+            }
             return true;
+        }
+
+        /** The held warmup ends {@code how}. */
+        void warmupEnds(TeleportOutcome how) {
+            warming.accept(how);
         }
 
         @Override

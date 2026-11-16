@@ -1,5 +1,8 @@
 package com.uxplima.uxmessentials.worlds.application.port;
 
+import java.util.function.Consumer;
+
+import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.worlds.domain.WorldTeleportCause;
@@ -20,7 +23,17 @@ public interface WorldTeleporter {
      *     here means the request was rejected outright (already notified), not that the teleport failed
      *     silently.
      */
-    boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause);
+    default boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause) {
+        return teleport(who, to, cause, ended -> {});
+    }
+
+    /**
+     * {@link #teleport(PlayerRef, Position, WorldTeleportCause)}, reporting how the teleport ended to {@code outcome}
+     * exactly once: {@link TeleportOutcome#LANDED} when the player arrives, and otherwise why they did not (a refused
+     * launch, a warmup cut short, a hop that missed). A paid entry needs it to give the fee back when the player was
+     * never moved.
+     */
+    boolean teleport(PlayerRef who, Position to, WorldTeleportCause cause, Consumer<TeleportOutcome> outcome);
 
     /**
      * On {@code who}'s region thread: finish a hop from another server by moving {@code who} to {@code to} at once,
