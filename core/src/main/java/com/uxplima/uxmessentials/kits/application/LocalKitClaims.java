@@ -68,9 +68,13 @@ public final class LocalKitClaims implements KitClaimStore {
     public void reset(PlayerRef who, KitId kit) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kit, "kit");
-        releasing
-                .computeIfAbsent(who.uuid(), id -> ConcurrentHashMap.newKeySet())
-                .add(kit);
+        // Added inside compute, under the map's lock for this player: a drop of another kit whose delete just landed
+        // can empty and remove the set, and an add after computeIfAbsent returned would land in that discarded set.
+        releasing.compute(who.uuid(), (id, kits) -> {
+            Set<KitId> held = kits == null ? ConcurrentHashMap.newKeySet() : kits;
+            held.add(kit);
+            return held;
+        });
         resets.incrementAndGet();
         stamps.reset(who, kit);
         drop(waiting, who.uuid(), kit);
