@@ -43,3 +43,9 @@ mail:
   timestamp: 1700000900000
   expire: 0
   message: "§a"
+timestamps:
+  lastteleport: 1700000000000
+  kits:
+    welcome: 1700000100000
+    starter: 1700000200000
+    retired: 1700000300000

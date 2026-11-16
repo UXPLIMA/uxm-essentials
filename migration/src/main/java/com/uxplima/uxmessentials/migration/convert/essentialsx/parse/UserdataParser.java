@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -47,7 +48,21 @@ public final class UserdataParser {
                 homes(root.node("homes")),
                 balance(root),
                 mail(root.node("mail")),
-                jailMute.parseUser(root));
+                jailMute.parseUser(root),
+                kitTimestamps(root.node("timestamps", "kits")));
+    }
+
+    private Map<String, Long> kitTimestamps(ConfigurationNode kitsNode) {
+        Map<String, Long> claims = new LinkedHashMap<>();
+        for (Map.Entry<Object, ? extends ConfigurationNode> entry :
+                kitsNode.childrenMap().entrySet()) {
+            // EssentialsX writes 0 for a kit the player never claimed, and looks a kit up by its lower-case name.
+            long claimedAt = entry.getValue().getLong(0L);
+            if (claimedAt > 0L) {
+                claims.put(String.valueOf(entry.getKey()).toLowerCase(Locale.ROOT), claimedAt);
+            }
+        }
+        return claims;
     }
 
     private Map<String, EssXLocation> homes(ConfigurationNode homesNode) {

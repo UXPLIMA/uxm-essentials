@@ -86,6 +86,11 @@ Each `userdata/<uuid>.yml` gives one player:
   recorded as `EssentialsX` and the issue time is unknown.
 - **Jail sentence.** A jailed player stays jailed in the jail of the same name: until the same time, for the same
   online time left, or for good.
+- **One-time kit claims.** A player who already took a kit whose `delay` is negative keeps it claimed, with the time
+  in `timestamps.kits` of their file. Claims of repeatable kits and of kits `kits.yml` no longer has are not read. The
+  claim goes into the database whatever `on-conflict` says, and never twice. With the network on, every server sees
+  it at once. On a single server it reaches the player's data when they next join, or at once if they are online
+  during the import; `/kit reset` clears it again.
 
 Each `warps/<name>.yml` becomes a warp of that name, free and open to everyone. Each entry of `kits.yml` becomes a
 kit (see [What is not imported](#what-is-not-imported) for what a kit loses). An unreadable file, a warp in a world
@@ -233,9 +238,9 @@ Some records ignore both settings:
 ## Running it again
 
 Every write is keyed (a home by player and slot, a warp, kit, hologram or world by name, a ban by player or
-address), so running the same import again with the default policies adds nothing and changes nothing, and an
-import that stopped part way can simply be run again. Balances are set, never added, so they cannot be counted
-twice.
+address, a kit claim by player and kit), so running the same import again with the default policies adds nothing
+and changes nothing, and an import that stopped part way can simply be run again. Balances are set, never added, so
+they cannot be counted twice. A kit claim cleared with `/kit reset` since the last run is recorded again.
 
 Homes are matched by slot, not by name. Each run places a player's homes in alphabetical order from slot 1, and
 with `skip` a home is written only when its slot is empty. Importing a second EssentialsX folder for the same
@@ -256,7 +261,8 @@ server log:
 Each record line has `ok=`, and every one but the `jail` and `mute` lines has `conflict=` (`written`, `skipped`,
 `overwritten`, `partial` or `failed`). A `user` line also says which parts landed: `homes_written`, `homes_kept`,
 `balance` (`written`, `kept` or `none`), `mail_written`, `mail_kept`, and when they apply `mail_expired`,
-`mail_past_retention` and `mail_skipped=messaging_disabled`. `partial` means some of the player's parts were kept
+`mail_past_retention` and `mail_skipped=messaging_disabled`, and for a player with one-time kit claims
+`kit_claims_written` and `kit_claims_kept` (already recorded). `partial` means some of the player's parts were kept
 back. The finish line counts `users`, `warps`, `kits`, `jails`, `mutes`, `bans`, `ip_bans`, `warns`, `skipped`,
 `partial` and `failed`; player warps, holograms and worlds appear only on their own record lines. One record that
 fails is counted and the run goes on. A run that cannot continue logs `migration import failed for source <source>`.
@@ -268,8 +274,8 @@ matter.
 
 ## What is not imported
 
-- **Kit claims.** EssentialsX records which players claimed a kit and when; that is not read, so every player can
-  claim an imported one-time kit once more and no cooldown is running.
+- **Kit cooldowns.** Only the claims of one-time kits are read, so no cooldown of a repeatable kit is running after
+  the import.
 - **Kit contents beyond plain items.** A kit keeps its name, its `delay` as the cooldown (a negative delay becomes
   `one-time = true`) and its items with amount, damage and enchantments. Item names, lore and other item data are
   dropped; money lines, command lines and items whose material does not exist are left out without a warning.
@@ -314,10 +320,10 @@ their `-group`. `greeting`, `farewell`, their `-title` forms, `entry-deny-messag
 ## On a network
 
 With a shared database, run each import once, from one server. Homes, balances, mail, warps, moderation, player
-warps and holograms go into the shared database and every server sees them. Once a live import ends, the importing
-server tells the others: warps reload at once, holograms reload by name over the following minutes (16 every 10
-seconds), and homes, balances and player warps are picked up as each server's cache refreshes. A good time to
-import is before players join.
+warps, holograms and one-time kit claims go into the shared database and every server sees them. Once a live import
+ends, the importing server tells the others: warps reload at once, holograms reload by name over the following
+minutes (16 every 10 seconds), and homes, balances and player warps are picked up as each server's cache refreshes.
+A good time to import is before players join.
 
 Three kinds of data stay with one server:
 

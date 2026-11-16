@@ -50,6 +50,7 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.persistence.economy.WalletRepositories;
 import com.uxplima.uxmessentials.persistence.holograms.HologramRepositories;
 import com.uxplima.uxmessentials.persistence.homes.HomeRepositories;
+import com.uxplima.uxmessentials.persistence.ledger.ClaimLedgers;
 import com.uxplima.uxmessentials.persistence.messaging.MessagingStores;
 import com.uxplima.uxmessentials.persistence.moderation.ModerationStores;
 import com.uxplima.uxmessentials.persistence.playerwarps.PlayerWarpRepositories;
@@ -63,6 +64,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.lookup.BukkitPlayerLook
 import com.uxplima.uxmessentials.shared.adapter.outbound.style.StyledText;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -252,6 +254,7 @@ public final class MigrationWiring {
                 homes,
                 wallets,
                 ports.mail(),
+                new LedgerKitClaimTarget(ports.kitClaims(), targets.kitClaims()),
                 ports.mailRetention(),
                 StyledText::escape,
                 ports.defaultCurrency(),
@@ -287,6 +290,7 @@ public final class MigrationWiring {
                 repository -> playerWarpWriter(repository, persistence, clock, log),
                 mail,
                 mailRetention,
+                ClaimLedgers.claims(persistence),
                 new EconomyConfig(economyConfig).currencies().defaultCurrency(),
                 clock,
                 log);
@@ -423,6 +427,7 @@ public final class MigrationWiring {
             Function<PlayerWarpRepository, PlayerWarpRecordWriter> playerWarps,
             Optional<MailRepository> mail,
             Duration mailRetention,
+            PlayerClaimLedger kitClaims,
             Currency defaultCurrency,
             Clock clock,
             Logger log) {}

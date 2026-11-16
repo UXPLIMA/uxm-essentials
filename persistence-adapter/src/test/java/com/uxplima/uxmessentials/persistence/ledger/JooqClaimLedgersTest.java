@@ -51,6 +51,16 @@ class JooqClaimLedgersTest {
     }
 
     @Test
+    void aPlayersClaimedKitsAreReadWithoutAnotherPlayersClaims() {
+        claims.claimKit(ALEX, "starter", 1_000L);
+        claims.claimKit(ALEX, "welcome", 1_000L);
+        claims.claimKit(SAM, "tools", 1_000L);
+
+        assertThat(claims.kits(ALEX)).containsExactlyInAnyOrder("starter", "welcome");
+        assertThat(claims.kits(SAM)).containsExactly("tools");
+    }
+
+    @Test
     void aReleasedKitCanBeClaimedAgain() {
         claims.claimKit(ALEX, "starter", 1_000L);
         claims.claimKit(ALEX, "tools", 1_000L);
