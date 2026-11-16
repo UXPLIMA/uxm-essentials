@@ -186,6 +186,9 @@ public final class TeleportWiring {
         TeleportSettings settings = new TeleportSettings(config);
         Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         WarmupTracker warmupTracker = new WarmupTracker();
+        // A home, warp or any other hop to another backend is a new teleport, so it replaces a warmup running here,
+        // whichever context sends it.
+        hops.bindLocalWarmups(who -> warmupTracker.supersede(who.uuid()));
         // The jail gate forwards to NEVER until the moderation context lands and rebinds it (soft couple).
         MutableJailGate jailGate = new MutableJailGate();
         // Reads an installed combat plugin's tag so a losing fight cannot be escaped with /home or /tpa. We own

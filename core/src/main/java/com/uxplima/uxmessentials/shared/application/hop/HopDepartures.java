@@ -7,6 +7,7 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
+import com.uxplima.uxmessentials.shared.application.hop.port.LocalWarmups;
 import com.uxplima.uxmessentials.shared.application.hop.port.PendingHop;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -23,6 +24,10 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * register. {@link #send} is called off the tick thread, since the watchdog writes to the store; the connect rides
  * the player's own connection and is marshalled onto their entity region (Folia-safe), skipped if they left in
  * between, which leaves the hop to the watchdog.
+ *
+ * <p>A hop that is sent replaces the player's local warmup, as a new local teleport does, on the same region task
+ * that connects them: a slow or failed transfer must not let the earlier teleport land after the player chose another.
+ * A refused hop leaves it running, as a refused local teleport does.
  */
 public final class HopDepartures {
 
@@ -34,7 +39,9 @@ public final class HopDepartures {
     private final Scheduler scheduler;
     private final String localServerId;
     private final Clock clock;
+    private final LocalWarmups localWarmups;
 
+    /** A departure on a backend with no local warmups to replace. */
     public HopDepartures(
             HopGate gate,
             HopConnector connector,
@@ -44,6 +51,19 @@ public final class HopDepartures {
             Scheduler scheduler,
             String localServerId,
             Clock clock) {
+        this(gate, connector, watchdog, charges, resolvers, scheduler, localServerId, clock, LocalWarmups.NONE);
+    }
+
+    public HopDepartures(
+            HopGate gate,
+            HopConnector connector,
+            HopWatchdog watchdog,
+            HopCharges charges,
+            HopResolvers resolvers,
+            Scheduler scheduler,
+            String localServerId,
+            Clock clock,
+            LocalWarmups localWarmups) {
         this.gate = Objects.requireNonNull(gate, "gate");
         this.connector = Objects.requireNonNull(connector, "connector");
         this.watchdog = Objects.requireNonNull(watchdog, "watchdog");
@@ -52,6 +72,7 @@ public final class HopDepartures {
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.localWarmups = Objects.requireNonNull(localWarmups, "localWarmups");
     }
 
     /**
@@ -99,7 +120,14 @@ public final class HopDepartures {
             return;
         }
         charges.tell(resolver, who, HopNotice.SENDING, Map.of("server", target), departure.label());
-        scheduler.onEntity(who, () -> connector.connect(who, target));
+        scheduler.onEntity(who, () -> {
+            // The player is already charged and tracked, so a fault ending the old warmup must not keep them here.
+            try {
+                localWarmups.supersede(who);
+            } finally {
+                connector.connect(who, target);
+            }
+        });
     }
 
     private HopResolver resolverFor(HopKind kind) {

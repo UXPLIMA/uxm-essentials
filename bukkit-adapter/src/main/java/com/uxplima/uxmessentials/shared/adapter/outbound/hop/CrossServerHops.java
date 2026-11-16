@@ -14,6 +14,7 @@ import com.uxplima.uxmessentials.shared.application.hop.HopResolvers;
 import com.uxplima.uxmessentials.shared.application.hop.HopWatchdog;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopConnector;
 import com.uxplima.uxmessentials.shared.application.hop.port.HopGate;
+import com.uxplima.uxmessentials.shared.application.hop.port.LocalWarmups;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 
 /**
@@ -22,6 +23,10 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
  * is on {@link #register registers} its resolver and takes {@link #departures} over its teleport gate. One whose
  * switch is off registers nothing, so a row of its kind that lands here is left for the origin's watchdog, which
  * can refund it, and a new hop that would overwrite such a row is refused until the row is abandoned.
+ *
+ * <p>Every departure replaces the player's local teleport warmup through {@link #bindLocalWarmups}, which the
+ * teleport context calls when it wires. The hops are built before it, so the binding is read at send time; until it
+ * is bound, or with the teleport context off, there is no warmup to replace.
  */
 public final class CrossServerHops {
 
@@ -33,6 +38,7 @@ public final class CrossServerHops {
     private final Scheduler scheduler;
     private final String server;
     private final Clock clock;
+    private volatile LocalWarmups localWarmups = LocalWarmups.NONE;
 
     /** {@code server} is this backend's network name, stamped as the origin of every hop it sends. */
     public CrossServerHops(
@@ -72,7 +78,21 @@ public final class CrossServerHops {
     /** The send half for a context whose hops pass {@code gate} before they are charged. */
     public HopDepartures departures(HopGate gate) {
         Objects.requireNonNull(gate, "gate");
-        return new HopDepartures(gate, connector, watchdog, charges, resolvers, scheduler, server, clock);
+        return new HopDepartures(
+                gate,
+                connector,
+                watchdog,
+                charges,
+                resolvers,
+                scheduler,
+                server,
+                clock,
+                who -> localWarmups.supersede(who));
+    }
+
+    /** Let every departure replace the warmups {@code warmups} tracks; called once when the teleport context wires. */
+    public void bindLocalWarmups(LocalWarmups warmups) {
+        localWarmups = Objects.requireNonNull(warmups, "warmups");
     }
 
     /** The join listener that ends a hop on this backend. */
