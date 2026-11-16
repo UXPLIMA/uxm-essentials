@@ -191,8 +191,10 @@ public final class VaultWindows<W> {
         List<Runnable> writes = new ArrayList<>();
         for (Window<W> held : held()) {
             W window = held.window();
-            if (held.viewer().uuid().equals(viewer) && !seen.test(window)) {
-                Optional<Runnable> write = release(held.vault().id(), window, contents.apply(window));
+            VaultId id = held.vault().id();
+            // Checked again before the contents are read, since reading them may hand items back to the viewer.
+            if (held.viewer().uuid().equals(viewer) && !seen.test(window) && holds(id, window)) {
+                Optional<Runnable> write = release(id, window, contents.apply(window));
                 if (write.isPresent()) {
                     released.accept(window);
                     writes.add(write.get());

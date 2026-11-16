@@ -82,9 +82,12 @@ class VaultWindowsTest {
         return tryShow(viewer, vault).orElseThrow();
     }
 
-    /** Close {@code chest} the way the GUI's close handler does, queueing its write. */
+    /** Close {@code chest} the way the GUI's close handler does, queueing its write and emptying the window. */
     private void close(VaultId id, Chest chest) {
-        windows.release(id, chest, chest.items).ifPresent(writes::add);
+        windows.release(id, chest, chest.items).ifPresent(write -> {
+            chest.items = VaultContents.empty();
+            writes.add(write);
+        });
         clock.advance(java.time.Duration.ofMillis(5));
     }
 
@@ -178,12 +181,12 @@ class VaultWindowsTest {
         assertThat(deleteVault.delete(ALEX, 2).isOk()).isTrue();
 
         Chest b = show(ALEX, cached);
+        assertThat(b.items).isEqualTo(X);
         runWrites();
         assertThat(handedBack).isEmpty();
         close(SECOND, b);
         runWrites();
 
-        assertThat(b.items).isEqualTo(X);
         assertThat(handedBack).containsExactly("Alex:42");
         assertThat(vaults.find(SECOND)).isEmpty();
     }
@@ -212,10 +215,12 @@ class VaultWindowsTest {
 
         close(SECOND, a); // the old window closes before the reopen claims, as the GUI does
         Chest b = show(ALEX, stale);
+        assertThat(b.items).isEqualTo(X);
         close(SECOND, b);
         runWrites();
 
-        assertThat(b.items).isEqualTo(X);
+        assertThat(a.items).isEqualTo(VaultContents.empty());
+        assertThat(b.items).isEqualTo(VaultContents.empty());
         assertThat(handedBack).containsExactly("Alex:42");
         assertThat(vaults.find(SECOND)).isEmpty();
     }
@@ -296,11 +301,11 @@ class VaultWindowsTest {
         runWrites();
         assertThat(stored(SECOND).contents()).isEqualTo(X);
         Chest meanwhile = show(ALEX, openVault.open(ALEX, 2).orElseThrow().vault());
+        assertThat(meanwhile.items).isEqualTo(Y);
         close(SECOND, meanwhile);
         retries.runAll();
         runWrites();
 
-        assertThat(meanwhile.items).isEqualTo(Y);
         assertThat(handedBack).isEmpty();
         assertThat(stored(SECOND).contents()).isEqualTo(Y);
     }

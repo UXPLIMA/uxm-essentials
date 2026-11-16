@@ -8,7 +8,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Consumer;
 
 import org.bukkit.Sound;
 import org.bukkit.entity.HumanEntity;
@@ -147,8 +149,8 @@ public final class VaultView {
      * already held by another viewer is refused with {@code VAULT_ALREADY_OPEN} and nothing is opened.
      *
      * <p>The open is decided exactly once. When the window is in front of the player, {@code fee} is spent and
-     * {@code shown} runs; when it is refused or never comes, {@code fee} is given back and {@code refused} runs. A
-     * deferred open may be decided a few ticks later, or when the player leaves.
+     * {@code shown} runs; when it is refused or never comes, {@code fee} is given back and {@code notShown} is told
+     * why. A deferred open may be decided a few ticks later, or when the player leaves.
      */
     public void open(
             Player player,
@@ -157,14 +159,14 @@ public final class VaultView {
             Vault vault,
             VaultOpenFee fee,
             Runnable shown,
-            Runnable refused) {
+            Consumer<NotShown> notShown) {
         Objects.requireNonNull(player, "player");
         Objects.requireNonNull(viewer, "viewer");
         Objects.requireNonNull(owner, "owner");
         Objects.requireNonNull(vault, "vault");
         Objects.requireNonNull(fee, "fee");
         Objects.requireNonNull(shown, "shown");
-        Objects.requireNonNull(refused, "refused");
+        Objects.requireNonNull(notShown, "notShown");
         int size = vault.size().slots();
         StorageGui gui = Guis.storage()
                 .title(title(viewer, owner, vault.index()))
@@ -178,7 +180,7 @@ public final class VaultView {
         Optional<VaultContents> seed = windows.claim(viewer, owner, vault, gui);
         if (seed.isEmpty()) {
             giveBack(fee);
-            refused.run();
+            notShown.accept(NotShown.REFUSED);
             notifyAlreadyOpen(viewer, vault.index());
             return;
         }
@@ -193,6 +195,7 @@ public final class VaultView {
             windows.checkpoint(vault.id(), gui, VaultItemCodec.encode(gui.contents()))
                     .ifPresent(this::offTick);
         }
+        AtomicBoolean replaced = new AtomicBoolean();
         WindowOutcome outcome = FeeOutcome.of(
                 fee,
                 () -> {
@@ -202,10 +205,10 @@ public final class VaultView {
                 () -> {
                     pending.remove(gui);
                     releaseUnseen(player, viewer, vault, gui);
-                    refused.run();
+                    notShown.accept(replaced.get() ? NotShown.REPLACED : NotShown.REFUSED);
                 },
                 credit -> refund(fee, credit));
-        pending.put(gui, new Pending(viewer, outcome));
+        pending.put(gui, new Pending(viewer, outcome, replaced));
         gui.onClose(event -> {
             // Only a window that was showing raises a close, so this also settles an open whose check had not run.
             outcome.shown();
@@ -282,7 +285,13 @@ public final class VaultView {
      * Close {@code viewer}'s own window of {@code id}, if one holds it, so a new window of it can be claimed. A pending
      * open is decided first, which releases a refused one. A window still on screen is closed, and its close writes it
      * the way every close does, blacklisted items first. One that holds the vault without being on screen is written
-     * here the same way, and emptied, so nothing in it is ever counted twice.
+     * here the same way, and emptied, so nothing in it is ever counted twice. An older open still undecided is
+     * replaced rather than refused: its fee goes back, since its window never showed, but the player opened again.
+     *
+     * <p>On Folia another viewer, on another region's thread, can claim the vault between this release and the claim
+     * that follows it. Nothing is lost or doubled then, since the old window was written and emptied first: the
+     * reopen is refused as {@code VAULT_ALREADY_OPEN} and its fee given back, the same as any open of a vault held
+     * elsewhere. Holding the claim across the close instead would need the claim to change hands inside the close.
      */
     private void closeOwnOlder(Player player, PlayerRef viewer, VaultId id) {
         Optional<VaultWindows.Window<StorageGui>> held =
@@ -293,6 +302,7 @@ public final class VaultView {
         StorageGui old = held.get().window();
         Pending open = pending.get(old);
         if (open != null) {
+            open.replaced().set(true);
             decide(old, open.outcome());
         }
         List.copyOf(old.getInventory().getViewers()).forEach(HumanEntity::closeInventory);
@@ -302,15 +312,20 @@ public final class VaultView {
         }
     }
 
-    /** Give whatever is in {@code gui} back to {@code closer}, and empty it. */
+    /**
+     * Give whatever is in {@code gui} back to {@code closer}, or drop it at their feet when the closer has no
+     * inventory to take it, and empty the window either way.
+     */
     private void handBackStray(HumanEntity closer, StorageGui gui) {
-        if (!(closer instanceof Player player)) {
-            return;
-        }
         org.bukkit.inventory.Inventory contents = gui.getInventory();
         for (ItemStack stack : contents.getContents()) {
-            if (stack != null && !stack.getType().isAir()) {
+            if (stack == null || stack.getType().isAir()) {
+                continue;
+            }
+            if (closer instanceof Player player) {
                 returnToPlayer(player, stack);
+            } else {
+                closer.getWorld().dropItemNaturally(closer.getLocation(), stack);
             }
         }
         contents.clear();
@@ -559,5 +574,13 @@ public final class VaultView {
     }
 
     /** An open not decided yet: whose it is and its outcome. */
-    private record Pending(PlayerRef viewer, WindowOutcome outcome) {}
+    private record Pending(PlayerRef viewer, WindowOutcome outcome, AtomicBoolean replaced) {}
+
+    /** Why a window did not come up. */
+    public enum NotShown {
+        /** The open was refused or never happened: another plugin, a vault open elsewhere, sleep, or leaving. */
+        REFUSED,
+        /** The player opened the same vault again before this window came up, and the newer window replaced it. */
+        REPLACED
+    }
 }

@@ -149,7 +149,7 @@ public final class VaultActions implements UxmVaultsActions {
                                 opened.vault(),
                                 opened.fee(),
                                 () -> answer.complete(UxmOutcome.ok()),
-                                () -> answer.complete(notShown()));
+                                why -> answer.complete(notShown(why)));
                     } catch (RuntimeException failure) {
                         // An open that broke before it was decided never showed a window to pay for.
                         view.notOpened(opened.fee());
@@ -182,11 +182,19 @@ public final class VaultActions implements UxmVaultsActions {
         return UxmOutcome.failed(UxmFailure.PLAYER_OFFLINE, "the player left before the vault could be opened");
     }
 
-    private static UxmOutcome notShown() {
-        return UxmOutcome.failed(
-                UxmFailure.REFUSED,
-                "the window did not open: the vault is open elsewhere, another plugin refused it, or the player was"
-                        + " asleep or left; any open fee was given back");
+    private static UxmOutcome notShown(VaultView.NotShown why) {
+        return switch (why) {
+            case REFUSED ->
+                UxmOutcome.failed(
+                        UxmFailure.REFUSED,
+                        "the window did not open: the vault is open elsewhere, another plugin refused it, or the player"
+                                + " was asleep or left; any open fee was given back");
+            case REPLACED ->
+                UxmOutcome.failed(
+                        UxmFailure.REFUSED,
+                        "the player opened this vault again before this window came up, and the newer window took its"
+                                + " place; this open's fee was given back");
+        };
     }
 
     private static UxmOutcome refusal(VaultError error) {

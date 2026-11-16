@@ -267,7 +267,7 @@ public final class VaultSelectorMenu {
                                 opened.vault(),
                                 opened.fee(),
                                 () -> notifier.opened(viewer, index),
-                                () -> {});
+                                why -> {});
                     },
                     () -> view.notOpened(opened.fee()));
         });
