@@ -257,9 +257,14 @@ public final class TradeView {
             }
             return;
         }
-        if (exchange == null || !exchange.beginCancel()) {
-            // Another path (a commit, or the counterpart's own close) already owns the settlement, and it emptied
-            // this region before the window closed, so there is nothing here to return.
+        if (exchange == null) {
+            return;
+        }
+        if (!exchange.beginCancel()) {
+            // Another path already owns the settlement. A cancel emptied this region before the window closed, so
+            // there is nothing here. A commit still freezing the windows has not read this one yet: its contents are
+            // this side's final offer, recorded now because the freeze hop would only find the window gone.
+            exchange.freezeSide(holder.side(), toArray(contents));
             return;
         }
         exchange.captureItems(holder.side(), toArray(contents));
@@ -468,7 +473,7 @@ public final class TradeView {
                 viewer,
                 () -> {
                     window.live(viewer).ifPresent(inv -> {
-                        exchange.captureItems(side, window.readOffer(inv));
+                        exchange.freezeSide(side, window.readOffer(inv));
                         window.clearOffer(inv);
                     });
                     closeWindow(viewer);
@@ -477,9 +482,22 @@ public final class TradeView {
                 () -> afterFreeze(exchange, exchange.commitGate().retired()));
     }
 
+    /**
+     * Settle on the async lane. A scheduler that refuses the task (the plugin is disabling) would leave both frozen
+     * offers in memory, so the trade is cancelled instead: nothing settles and each side's offer is returned, or kept
+     * for their next join.
+     */
+    private void settleOffTick(TradeExchange exchange) {
+        try {
+            scheduler.async(() -> settleAndDeliver(exchange));
+        } catch (RuntimeException refused) {
+            finishCancel(exchange);
+        }
+    }
+
     private void afterFreeze(TradeExchange exchange, CommitGate.Decision decision) {
         switch (decision) {
-            case SETTLE -> scheduler.async(() -> settleAndDeliver(exchange));
+            case SETTLE -> settleOffTick(exchange);
             case RETURN -> finishCancel(exchange);
             case WAIT -> {
                 // The other side's freeze, or a stop that took the trade over, ends it.

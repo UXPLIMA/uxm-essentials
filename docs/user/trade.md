@@ -30,8 +30,7 @@ A player who is gone by the time their stacks are handed over does not lose them
 settled, or the server stopped with the trade open. The stacks are kept in the database (`trade_item_returns`) and
 handed over the next time that player joins, on any server that shares the database and has the trade module on.
 They keep everything about them, enchantments, names and a shulker's contents included. The player is told how many
-items came back. A player who left in the moment both sides confirmed gets the offer the trade last recorded for
-them; a stack placed in that same tick is not in it.
+items came back. A player who left in the moment both sides confirmed gets what their window held as it closed.
 
 On that join, what does not fit the inventory stays kept for the join after, instead of being dropped: a join point
 is often a crowded spawn, where a dropped stack can be picked up by someone else or despawn. The player is told how
@@ -42,11 +41,18 @@ inventory, so a player who joins two servers in quick succession gets it once. A
 (the player left again, or the inventory refused it) is released and waits for the next join. A batch kept while the
 player is already online waits for their next join too.
 
-A claim that is never finished, because the server crashed between the claim and the hand-over, counts as abandoned
-after 10 minutes and the batch can be claimed again. That choice trades a duplicate for a loss: a hand-over that
-really took longer than 10 minutes would give the batch twice, while a claim that never expired would strand the items
-for good after a crash. A hand-over takes well under a second, so the duplicate does not happen in practice; if it
-ever does, the log has `event=trade_return_claim_lost`.
+A claim that is never finished counts as abandoned after 10 minutes and the batch can be claimed again. That choice
+trades a duplicate for a loss: a claim that never expired would strand the items for good after a crash between the
+claim and the hand-over. It can duplicate in two ways:
+
+- The items reached the inventory but the database refused to remove the batch afterwards. The removal is tried
+  again a few times over the next half minute; if it still fails, the log has `event=trade_return_finish_failed` and
+  the batch is handed over again once the claim is stale.
+- A hand-over took longer than 10 minutes, which does not happen in practice (it takes well under a second); the log
+  then has `event=trade_return_claim_lost`.
+
+The claim time is written with the claiming server's clock and compared with the reading server's clock, so keep the
+clocks of servers that share the database in time (NTP), as a signed network already needs.
 
 A kept row whose data cannot be read is skipped, logged as `event=trade_return_row_unreadable` and left in the table;
 the player's other batches are still handed over. If the database cannot be written when items are kept, the log has

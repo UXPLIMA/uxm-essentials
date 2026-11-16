@@ -142,6 +142,22 @@ class ReturnTradeItemsTest {
     }
 
     @Test
+    void aFinishThatFailsAFewTimesIsRetriedSoTheBatchIsNotHandedOverTwice() {
+        store.keep(ALEX.uuid(), STAKE);
+        pocket.online(ALEX, 10);
+        store.failFinishes = ReturnTradeItems.FINISH_ATTEMPTS - 1;
+
+        returns().deliverKept(ALEX);
+        scheduler.runAll();
+        store.expireClaims();
+        returns().deliverKept(ALEX);
+        scheduler.runAll();
+
+        assertThat(pocket.held(ALEX)).isEqualTo(ALL);
+        assertThat(store.count(ALEX)).isZero();
+    }
+
+    @Test
     void whatDoesNotFitStaysKeptInPlaceOfTheBatchRatherThanDropped() {
         store.keep(ALEX.uuid(), STAKE);
         pocket.online(ALEX, 1);
@@ -201,6 +217,7 @@ class ReturnTradeItemsTest {
         private final Map<String, Row> rows = new LinkedHashMap<>();
         private int ids;
         boolean failReads;
+        int failFinishes;
 
         private static final class Row {
             final UUID owner;
@@ -272,6 +289,10 @@ class ReturnTradeItemsTest {
 
         @Override
         public boolean finish(String id, String claimant, VaultContents rest) {
+            if (failFinishes > 0) {
+                failFinishes--;
+                throw new IllegalStateException("database unavailable");
+            }
             Row row = rows.get(id);
             if (row == null || !claimant.equals(row.claimedBy)) {
                 return false;

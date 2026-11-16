@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.trade.application;
 
+import java.time.Duration;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +35,14 @@ import com.uxplima.uxmessentials.vaults.domain.VaultContents;
  * more, and storage is written on the calling thread instead; that only happens while the server stops.
  */
 public final class ReturnTradeItems {
+
+    /**
+     * How often finishing a hand-over is tried before giving up. The items are already in the inventory by then, and a
+     * row left claimed is handed over again once its claim goes stale, so each retry is a duplicate avoided.
+     */
+    static final int FINISH_ATTEMPTS = 4;
+
+    private static final Duration FIRST_RETRY = Duration.ofSeconds(2);
 
     private final Scheduler scheduler;
     private final TradeItemReturns returns;
@@ -120,7 +129,7 @@ public final class ReturnTradeItems {
             return;
         }
         TradeItemReceiver.Receipt given = receipt.get();
-        offTick(() -> finish(owner, batch, claimant, given.leftover()));
+        offTick(() -> finish(owner, batch, claimant, given.leftover(), 1));
         if (given.given() > 0) {
             notifier.send(
                     owner, TradeMessageKey.TRADE_RETURNS_DELIVERED, Map.of("count", Integer.toString(given.given())));
@@ -133,15 +142,29 @@ public final class ReturnTradeItems {
         }
     }
 
-    private void finish(PlayerRef owner, TradeItemReturns.Kept batch, String claimant, VaultContents rest) {
+    /**
+     * Remove or shrink the row of a batch that is now in the inventory. A finish that fails is tried again with a
+     * growing delay; that is safe because it applies only under this delivery's claim token. One that still fails
+     * leaves the row claimed, and once that claim goes stale the batch is handed over a second time: a duplicate, which
+     * the log line names.
+     */
+    private void finish(
+            PlayerRef owner, TradeItemReturns.Kept batch, String claimant, VaultContents rest, int attempt) {
         try {
             if (!returns.finish(batch.id(), claimant, rest)) {
                 // The claim went stale and another delivery took it: the batch may reach the player twice.
                 log.warn("event=trade_return_claim_lost player={} id={}", owner.uuid(), batch.id());
             }
         } catch (RuntimeException failure) {
-            // The row stays claimed: once the claim goes stale the batch is handed over again rather than lost.
-            log.error("event=trade_return_finish_failed player=" + owner.uuid() + " id=" + batch.id(), failure);
+            if (attempt < FINISH_ATTEMPTS && running.getAsBoolean()) {
+                Duration delay = FIRST_RETRY.multipliedBy(1L << (attempt - 1));
+                scheduler.asyncAfter(delay, () -> finish(owner, batch, claimant, rest, attempt + 1));
+                return;
+            }
+            log.error(
+                    "event=trade_return_finish_failed player=" + owner.uuid() + " id=" + batch.id()
+                            + "; the batch is handed over again once its claim goes stale, a duplicate",
+                    failure);
         }
     }
 

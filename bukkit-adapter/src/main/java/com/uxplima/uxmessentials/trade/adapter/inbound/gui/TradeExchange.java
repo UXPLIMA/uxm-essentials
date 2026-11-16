@@ -163,7 +163,22 @@ final class TradeExchange {
             return Outcome.IGNORED;
         }
         session = session.ready().commit();
+        commitGate.arm();
         return Outcome.COMMITTED;
+    }
+
+    /**
+     * Record {@code offer} as {@code side}'s final offer while the commit freezes the windows, once per side: the first
+     * of the freeze hop and a closing window wins, so the hop cannot overwrite a closed window's contents with the
+     * empty window it reads afterwards. False, and nothing recorded, when the side was already recorded or no commit
+     * is freezing.
+     */
+    synchronized boolean freezeSide(TradeSide side, @Nullable ItemStack[] offer) {
+        if (!commitGate.claimSide(side)) {
+            return false;
+        }
+        captureItems(side, offer);
+        return true;
     }
 
     /** How a confirmed trade ends once its windows are frozen; meaningful only after {@link #confirm} committed. */
