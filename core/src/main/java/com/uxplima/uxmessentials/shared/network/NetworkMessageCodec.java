@@ -380,8 +380,8 @@ public final class NetworkMessageCodec {
     }
 
     /**
-     * The reach and voters follow the threshold so an older decoder, which stops after the threshold, still reads
-     * the frame it knew.
+     * The reach and voters follow the threshold, and the party id follows them, so an older decoder, which stops
+     * after the fields it knows, still reads the frame it knew.
      */
     private static void writeParty(DataOutputStream out, VotePartyFired party) throws IOException {
         out.writeInt(party.threshold());
@@ -392,18 +392,21 @@ public final class NetworkMessageCodec {
                 writeUuid(out, voter);
             }
         }
+        writeUuid(out, party.partyId());
     }
 
     private static VotePartyFired readParty(DataInputStream in, String origin) throws IOException {
         int threshold = in.readInt();
         if (in.available() == 0) {
             // A frame without the reach byte names nobody for a peer to reward.
-            return new VotePartyFired(origin, threshold, VotePartyFired.Reach.NONE, Set.of());
+            return new VotePartyFired(origin, VotePartyFired.NO_ID, threshold, VotePartyFired.Reach.NONE, Set.of());
         }
         VotePartyFired.Reach reach = VotePartyFired.Reach.fromWireTag(in.readByte());
-        if (reach != VotePartyFired.Reach.VOTERS) {
-            return new VotePartyFired(origin, threshold, reach, Set.of());
-        }
+        Set<UUID> voters = reach == VotePartyFired.Reach.VOTERS ? readVoters(in) : Set.of();
+        return new VotePartyFired(origin, readOptionalUuid(in), threshold, reach, voters);
+    }
+
+    private static Set<UUID> readVoters(DataInputStream in) throws IOException {
         int count = in.readInt();
         if (count < 0) {
             throw new IOException("negative voter count: " + count);
@@ -412,7 +415,12 @@ public final class NetworkMessageCodec {
         for (int i = 0; i < count; i++) {
             voters.add(readUuid(in));
         }
-        return new VotePartyFired(origin, threshold, reach, voters);
+        return voters;
+    }
+
+    /** A trailing id a newer peer appends; a frame from an older peer ends before it and reads as no id. */
+    private static UUID readOptionalUuid(DataInputStream in) throws IOException {
+        return in.available() >= 2 * Long.BYTES ? readUuid(in) : VotePartyFired.NO_ID;
     }
 
     private static PresenceSnapshot readSnapshot(DataInputStream in, String origin) throws IOException {

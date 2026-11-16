@@ -13,11 +13,11 @@ import org.jspecify.annotations.NullMarked;
  * putting each outbound frame on both wires and accepting inbound frames from either.
  *
  * <p>Both members are started with the <em>same</em> {@code onFrame} sink the {@link BusCore} registers, so a
- * frame arriving on either carrier is decoded and dispatched once by the core; the core's self-origin loop
- * sentinel ({@code BusCore#onFrame}) drops this backend's own frame echoed back, and the same sentinel also
- * collapses the case where a single peer is reachable over both carriers and a frame arrives twice, the second
- * copy is a duplicate of an already-applied remote change and a cache invalidation is idempotent, so a
- * re-delivered frame is harmless. {@link #send} fans out to both members; {@link #stop} stops both.
+ * frame arriving on either carrier is decoded and dispatched by the core; the core's self-origin loop sentinel
+ * ({@code BusCore#onFrame}) drops this backend's own frame echoed back. A peer's frame reached over both carriers
+ * is dispatched twice: a cache invalidation is idempotent, and a frame that acts carries an id or a sequence its
+ * listener checks (a {@code RecentIds}, for example), so the second copy does nothing. {@link #send} fans out to
+ * both members; {@link #stop} stops both.
  *
  * <h2>Health rule</h2>
  * {@link #healthy} is true when <em>either</em> member is healthy: with the proxy up but Redis down (or the

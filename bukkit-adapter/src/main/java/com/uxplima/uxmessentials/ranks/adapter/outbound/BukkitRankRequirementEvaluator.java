@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
 import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
 import com.uxplima.uxmessentials.shared.adapter.outbound.papi.PlaceholderApiSupport;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.display.ConditionContext;
@@ -127,7 +128,7 @@ public final class BukkitRankRequirementEvaluator implements RankRequirementEval
             return false;
         }
         ConditionContext ctx = new ConditionContext(
-                player::hasPermission,
+                node -> CatalogPermissionCheck.has(player, node),
                 player.getWorld().getName(),
                 player.getGameMode().name(),
                 PlaceholderApiSupport.messageBridge(who.uuid()));

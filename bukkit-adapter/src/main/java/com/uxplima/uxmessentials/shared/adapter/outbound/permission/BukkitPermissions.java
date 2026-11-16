@@ -17,8 +17,9 @@ import org.jspecify.annotations.Nullable;
  * The {@link Permissions} implementation backed by Bukkit's permission system, with an optional
  * LuckPerms meta path layered on top.
  *
- * <p>Boolean checks ({@link #has}) delegate to the online {@link Player}'s {@code hasPermission},
- * which already folds in vanilla op and whatever permission plugin is installed. Value-bearing nodes
+ * <p>Boolean checks ({@link #has}) read the online {@link Player}'s own setting, which folds in vanilla op and
+ * whatever permission plugin is installed, and fall back to the catalogue's default for a name-family node nobody set
+ * ({@link CatalogPermissionCheck}). Value-bearing nodes
  * ({@link #resolveQuota}) are read by enumerating the player's effective permissions and folding the
  * numbered (and optionally world-scoped) nodes through {@link QuotaNodeReducer}; a LuckPerms meta
  * value, when present, is one more input to the same fold. An offline player cannot be
@@ -45,7 +46,7 @@ public final class BukkitPermissions implements Permissions {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(node, "node");
         Player player = Bukkit.getPlayer(who.uuid());
-        return player != null && player.hasPermission(node);
+        return player != null && CatalogPermissionCheck.has(player, node);
     }
 
     @Override

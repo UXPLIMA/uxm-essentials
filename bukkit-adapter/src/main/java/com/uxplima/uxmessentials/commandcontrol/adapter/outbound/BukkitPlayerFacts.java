@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.bukkit.entity.Player;
 
 import com.uxplima.uxmessentials.commandcontrol.domain.PlayerFacts;
+import com.uxplima.uxmessentials.shared.adapter.outbound.permission.CatalogPermissionCheck;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,6 +42,6 @@ public final class BukkitPlayerFacts implements PlayerFacts {
     @Override
     public boolean hasPermission(String node) {
         Objects.requireNonNull(node, "node");
-        return player.hasPermission(node);
+        return CatalogPermissionCheck.has(player, node);
     }
 }

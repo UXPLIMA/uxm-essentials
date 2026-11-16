@@ -283,8 +283,11 @@ public final class SocialPermissions {
                         COMMUNICATION),
                 PermissionSpec.family(
                         infoPage("<page>"),
-                        "Read one information page, such as /motd or /rules.",
-                        PermissionDefault.TRUE,
+                        "Read one information page an operator added, such as /discord; the shipped info, motd and "
+                                + "rules pages have nodes of their own that every player holds.",
+                        // A page the operator adds may be meant for staff alone, so it stays closed until its node is
+                        // granted; the shipped pages are fixed rows open to everyone.
+                        PermissionDefault.OP,
                         PermissionShape.LABEL,
                         COMMUNICATION),
                 PermissionSpec.of(
