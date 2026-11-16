@@ -119,6 +119,33 @@ final class InvseeLayout {
         live.setItemInOffHand(offhand == null ? new ItemStack(Material.AIR) : offhand);
     }
 
+    /** The item in {@code slot}, as this layout numbers it, of {@code target}'s live inventory. */
+    static @Nullable ItemStack liveSlot(Player target, int slot) {
+        PlayerInventory live = target.getInventory();
+        return switch (slot) {
+            case ARMOUR_START -> live.getBoots();
+            case ARMOUR_START + 1 -> live.getLeggings();
+            case ARMOUR_START + 2 -> live.getChestplate();
+            case ARMOUR_START + 3 -> live.getHelmet();
+            case OFFHAND_SLOT -> live.getItemInOffHand();
+            default -> live.getItem(slot);
+        };
+    }
+
+    /** Put {@code item} in {@code slot}, as this layout numbers it, of {@code target}'s live inventory. */
+    static void setLiveSlot(Player target, int slot, @Nullable ItemStack item) {
+        PlayerInventory live = target.getInventory();
+        ItemStack copy = clone(item);
+        switch (slot) {
+            case ARMOUR_START -> live.setBoots(copy);
+            case ARMOUR_START + 1 -> live.setLeggings(copy);
+            case ARMOUR_START + 2 -> live.setChestplate(copy);
+            case ARMOUR_START + 3 -> live.setHelmet(copy);
+            case OFFHAND_SLOT -> live.setItemInOffHand(copy == null ? new ItemStack(Material.AIR) : copy);
+            default -> live.setItem(slot, copy);
+        }
+    }
+
     private static @Nullable ItemStack at(@Nullable ItemStack[] slots, int index) {
         return index < slots.length ? slots[index] : null;
     }

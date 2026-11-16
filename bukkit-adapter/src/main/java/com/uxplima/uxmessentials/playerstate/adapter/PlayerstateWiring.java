@@ -17,6 +17,7 @@ import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OfflineContainerView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.PlaytimeView;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.NoFlyWorldListener;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerDataLoginListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlayerStateListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.PlaytimeImportListener;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.listener.WorldCommandListener;
@@ -32,7 +33,9 @@ import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflinePlayerStora
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.PdcClearInventoryPreferences;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.PlaytimeSampler;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.VanillaPlaytime;
-import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsOfflinePlayerStorage;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.nms.NmsItemCodec;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.FileOfflinePlayerStorage;
+import com.uxplima.uxmessentials.playerstate.adapter.outbound.playerdata.PlayerDataFiles;
 import com.uxplima.uxmessentials.playerstate.application.AdjustPlaytime;
 import com.uxplima.uxmessentials.playerstate.application.Burn;
 import com.uxplima.uxmessentials.playerstate.application.ClearInventory;
@@ -79,8 +82,10 @@ import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmlib.menu.Menus;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Constructs the playerstate context's adapters and use cases over the injected kernel ports, and produces
@@ -124,12 +129,15 @@ public final class PlayerstateWiring {
         PlayerEffects effects = new BukkitPlayerEffects(kernel.scheduler(), teams);
         InvseeView invseeView = new InvseeView(kernel.scheduler(), mirrorWindow);
         EnderseeView enderseeView = new EnderseeView(kernel.scheduler(), mirrorWindow);
-        OfflinePlayerStorage offlineStorage = new NmsOfflinePlayerStorage(kernel.log());
-        OfflineContainerView offlineView = new OfflineContainerView(kernel.scheduler(), offlineStorage, mirrorWindow);
+        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
+        PlayerDataFiles playerData = playerDataFiles(kernel.log());
+        OfflinePlayerStorage offlineStorage =
+                playerData == null ? OfflinePlayerStorage.unavailable() : offlineStorage(playerData, kernel.log());
+        OfflineContainerView offlineView =
+                new OfflineContainerView(kernel.scheduler(), offlineStorage, mirrorWindow, notifier, kernel.log());
         InventoryViewer inventoryViewer = new BukkitInventoryViewer(invseeView, enderseeView, offlineView);
         NearbyPlayers nearby = new BukkitNearbyPlayers(kernel.scheduler());
         PlayerInfo info = new BukkitPlayerInfo();
-        Notifier notifier = new Notifier(kernel.messages(), kernel.messageSink());
         ClearInventoryPreferences clearPrefs = new PdcClearInventoryPreferences();
 
         Ports ports = new Ports(
@@ -170,6 +178,11 @@ public final class PlayerstateWiring {
         if (settings.playtimeImportOnJoin()) {
             listeners.add(new PlaytimeImportListener(playtimeAdmin));
         }
+        if (playerData != null) {
+            PlayerDataLoginListener logins = new PlayerDataLoginListener(playerData, kernel.messages(), kernel.log());
+            logins.adoptOnline(plugin.getServer().getOnlinePlayers());
+            listeners.add(logins);
+        }
         return new Wired(
                 commands,
                 List.copyOf(listeners),
@@ -181,6 +194,33 @@ public final class PlayerstateWiring {
                 info,
                 sampler,
                 afkStatus);
+    }
+
+    /**
+     * The player data files, or {@code null} when this server's internals could not be reached to find them. The
+     * internals are touched only here and in the item codec, so a server whose internals moved still enables the
+     * module, with offline {@code /invsee} and {@code /endersee} reporting themselves unavailable.
+     */
+    private static @Nullable PlayerDataFiles playerDataFiles(Logger log) {
+        try {
+            return new PlayerDataFiles(NmsItemCodec.playerDataDirectory());
+        } catch (LinkageError | RuntimeException moved) {
+            log.warn(
+                    "event=offline_inventories_unavailable reason={}; offline /invsee and /endersee are off",
+                    String.valueOf(moved));
+            return null;
+        }
+    }
+
+    private static OfflinePlayerStorage offlineStorage(PlayerDataFiles files, Logger log) {
+        try {
+            return new FileOfflinePlayerStorage(files, NmsItemCodec.ofServer(), log);
+        } catch (LinkageError | RuntimeException moved) {
+            log.warn(
+                    "event=offline_inventories_unavailable reason={}; offline /invsee and /endersee are off",
+                    String.valueOf(moved));
+            return OfflinePlayerStorage.unavailable();
+        }
     }
 
     private static PlayerStateServices assemble(KernelPorts kernel, ConfigStore config, Clock clock, Ports ports) {

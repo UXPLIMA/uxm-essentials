@@ -79,6 +79,19 @@ public enum PlayerstateMessageKey implements MessageKey {
     ENDERSEE_OPENED("playerstate.endersee.opened"),
     ENDERSEE_TITLE("playerstate.endersee.title"),
 
+    // /invsee and /endersee of a player who is offline
+    OFFLINE_UNAVAILABLE("playerstate.offline.unavailable"),
+    OFFLINE_NO_DATA("playerstate.offline.no-data"),
+    OFFLINE_READ_FAILED("playerstate.offline.read-failed"),
+    OFFLINE_JOINING("playerstate.offline.joining"),
+    OFFLINE_VIEW_ONLY_EDITED("playerstate.offline.view-only-edited"),
+    OFFLINE_VIEW_ONLY_OLD("playerstate.offline.view-only-old"),
+    OFFLINE_NOT_SAVED_JOINING("playerstate.offline.not-saved-joining"),
+    OFFLINE_NOT_SAVED_CHANGED("playerstate.offline.not-saved-changed"),
+    OFFLINE_NOT_SAVED_FAILED("playerstate.offline.not-saved-failed"),
+    OFFLINE_NOT_SAVED_CLOSED("playerstate.offline.not-saved-closed"),
+    OFFLINE_LOGIN_BUSY("playerstate.offline.login-busy"),
+
     // /suicide
     SUICIDE("playerstate.suicide"),
 

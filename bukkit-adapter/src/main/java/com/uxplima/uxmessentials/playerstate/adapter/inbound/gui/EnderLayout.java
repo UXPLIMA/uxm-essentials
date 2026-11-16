@@ -6,7 +6,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
-import com.uxplima.uxmessentials.playerstate.adapter.outbound.OfflineInventory;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
@@ -20,7 +19,7 @@ import org.jspecify.annotations.Nullable;
 @NullMarked
 final class EnderLayout {
 
-    static final int SIZE = OfflineInventory.ENDER_SIZE;
+    static final int SIZE = 27;
 
     private EnderLayout() {}
 
@@ -69,6 +68,16 @@ final class EnderLayout {
         for (int slot = 0; slot < SIZE && slot < chest.getSize(); slot++) {
             chest.setItem(slot, clone(slot < slots.length ? slots[slot] : null));
         }
+    }
+
+    /** The item in {@code slot} of {@code target}'s live ender chest. Read on the target's own thread. */
+    static @Nullable ItemStack liveSlot(Player target, int slot) {
+        return target.getEnderChest().getItem(slot);
+    }
+
+    /** Put {@code item} in {@code slot} of {@code target}'s live ender chest. Run on the target's own thread. */
+    static void setLiveSlot(Player target, int slot, @Nullable ItemStack item) {
+        target.getEnderChest().setItem(slot, clone(item));
     }
 
     /** Whether {@code slot} is one the viewer may edit; the whole ender chest is editable. */
