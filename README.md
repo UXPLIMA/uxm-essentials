@@ -55,10 +55,11 @@ or the Redis jar with no proxy at all. Optional jars bring a Discord bridge and 
 
 ### Moving in from another plugin
 
-With the migration module switched on, `/uxmess import` reads EssentialsX (homes, balances, mail, warps, kits,
-jails and mutes), LiteBans (bans, mutes and warnings), player warps from AxPlayerWarps, AthelionPlayerWarps and
-OlziePlayerWarps, holograms from DecentHolograms and FancyHolograms, worlds from Multiverse, and balances from
-PlayerPoints or the running Vault economy. Guard imports WorldGuard regions with a dry run and an undo.
+With the migration module switched on, `/uxmess import` reads EssentialsX (homes, balances, mail, warps, kits from
+one merged `kits.yml`, jail sentences and mutes; not the jail locations in `jail.yml`), LiteBans (bans, mutes and
+warnings), player warps from AxPlayerWarps, AthelionPlayerWarps and OlziePlayerWarps, holograms from
+DecentHolograms and FancyHolograms, worlds from Multiverse, and balances from PlayerPoints or the running Vault
+economy. Guard imports WorldGuard regions with a dry run and an undo of the last run.
 [docs/user/import.md](docs/user/import.md) says what each importer reads and what it leaves behind.
 
 Every line a player reads is in `messages/`, in twelve languages: English, Turkish, German, Spanish, French,

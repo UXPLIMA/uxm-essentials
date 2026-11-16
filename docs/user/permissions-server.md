@@ -143,7 +143,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 
 | Permission | What it allows | Default |
 |---|---|---|
-| `uxmessentials.moderation.<sanction>.maxduration.<seconds>` | The longest ban, mute or jail you may hand out, in seconds; the largest tier held wins. | op |
+| `uxmessentials.moderation.<sanction>.maxduration.<seconds>` | The longest ban or mute you may hand out, in seconds: <sanction> is ban (which also caps /tempban) or mute. The largest tier held wins, -1 or no node means no limit, and a jail has no limit. | op |
 | `uxmessentials.moderation.ban` | /ban <player> [reason] and /unban <player>: permanent UUID ban and its lift; /banhistory <player> reviews a player's full ban/unban history. | op |
 | `uxmessentials.moderation.banip` | /banip <player\|ip> [reason] / /unbanip <ip>: IP ban with stored-IP alt detection. | op |
 | `uxmessentials.moderation.banlist` | /banlist to review the players currently banned. | op |
@@ -165,7 +165,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.broadcast.receive` | Receive the staff sanction broadcast: the one-line announcement a non-silent /ban /mute /kick /warn emits. The -s flag (or broadcast.silent-by-default) suppresses it. Holders also read the line when a jailed player could not be taken to a jail on another server, which -s does not suppress. Duration tiers ride numbered nodes: uxmessentials.moderation.ban.maxduration.<seconds> and uxmessentials.moderation.mute.maxduration.<seconds> cap how long a ban/mute that holder may issue (highest held wins; no node = unlimited). | op |
 | `uxmessentials.moderation.check` | /checkban <player> and /checkmute <player>: report whether a player is currently banned or muted. | op |
 | `uxmessentials.moderation.commandspy` | /commandspy (/cspy) to watch the commands other players run. | op |
-| `uxmessentials.bypass.punishment` | Cannot be muted/jailed/tempbanned/kicked/warned/IP-banned/frozen by lower staff. | op |
+| `uxmessentials.bypass.punishment` | Cannot be banned, tempbanned, IP-banned, muted, warned, kicked, jailed or frozen by anyone, whatever their rank; also left online by /kickall and by an IP ban on their address. | op |
 | `uxmessentials.moderation.gui` | /mod opens the moderation management GUI (active punishments + per-player history). | op |
 | `uxmessentials.moderation.history` | /history <player>: review a player's full disciplinary record (ban/mute/warn/kick) newest-first. | op |
 | `uxmessentials.moderation.seen` | /seen, /seenip and /alts <player>: last-seen / last-IP lookup, surfaces alts. | op |
