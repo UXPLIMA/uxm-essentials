@@ -16,6 +16,13 @@ class BusSecretTest {
     }
 
     @Test
+    void aPasswordManagerSecretWithSymbolsOrOnlyDigitsIsUsable() {
+        assertThat(BusSecret.of("q7#Lm<2vR!xP9>dK&w4Z^tB8@nC3$hY6").state()).isEqualTo(BusSecret.State.USABLE);
+        assertThat(BusSecret.of("<q7#Lm2vR!xP9dK&w4Z^tB8@nC3$hY6s").state()).isEqualTo(BusSecret.State.USABLE);
+        assertThat(BusSecret.of("83920174652038194756201938475610").state()).isEqualTo(BusSecret.State.USABLE);
+    }
+
+    @Test
     void theExampleFromTheDocumentationIsNotASecret() {
         assertThat(BusSecret.of("<output of openssl rand -hex 32>").state()).isEqualTo(BusSecret.State.PLACEHOLDER);
         assertThat(BusSecret.of("paste 32 or more random characters here").state())
@@ -28,6 +35,7 @@ class BusSecretTest {
         assertThat(BusSecret.of("a".repeat(64)).state()).isEqualTo(BusSecret.State.WEAK);
         assertThat(BusSecret.of("abcabcabcabcabcabcabcabcabcabcabcabc").state()).isEqualTo(BusSecret.State.WEAK);
         assertThat(BusSecret.of("1234567891234567891234567891234567").state()).isEqualTo(BusSecret.State.WEAK);
+        assertThat(BusSecret.of("abcdefghij".repeat(4)).state()).isEqualTo(BusSecret.State.WEAK);
     }
 
     @Test

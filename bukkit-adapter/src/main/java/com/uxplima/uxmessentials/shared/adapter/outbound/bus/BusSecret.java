@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>Only a secret that is hard to guess is used: a client that sees signed frames (one connected straight to a
  * backend, or behind a proxy that passes the channel on) could try guesses offline. A secret shorter than
- * {@link #MIN_LENGTH} characters is refused, and so is one copied from an example or typed as a run of a few keys,
+ * {@link #MIN_LENGTH} characters is refused, and so is one copied from an example or typed as a short pattern repeated,
  * which is long but guessable. Its text never leaves this class except as key bytes, and {@link #toString()} names only
  * its state, so a record that holds it can be logged.
  */
@@ -25,14 +25,17 @@ public final class BusSecret {
     public static final int MIN_LENGTH = 32;
 
     /**
-     * The fewest different characters a usable secret has. Random hex of {@link #MIN_LENGTH} characters has about
-     * fourteen; a secret made of a few keys pressed over and over has far fewer.
+     * The fewest different characters a usable secret has. Low enough that random digits pass: {@link #MIN_LENGTH} of
+     * them show fewer than eight different ones about once in a thousand tries, random hex far less often.
      */
-    static final int MIN_DISTINCT = 10;
+    static final int MIN_DISTINCT = 8;
 
-    /** Text that marks a value copied from an example rather than generated. */
-    private static final List<String> PLACEHOLDER_MARKS =
-            List.of("<", ">", "openssl", "paste", "changeme", "change-me", "change_me", "example", "placeholder");
+    /** The longest pattern whose repeats count as weak; a random secret never repeats itself this way. */
+    static final int MAX_REPEATED_PATTERN = 16;
+
+    /** Words that mark a value copied from an example rather than generated. */
+    private static final List<String> PLACEHOLDER_WORDS =
+            List.of("openssl", "paste", "changeme", "change-me", "change_me", "example", "placeholder");
 
     private final String value;
     private final State state;
@@ -75,10 +78,23 @@ public final class BusSecret {
             return State.SHORT;
         }
         String folded = value.toLowerCase(Locale.ROOT);
-        if (PLACEHOLDER_MARKS.stream().anyMatch(folded::contains)) {
+        // A value in angle brackets is a template to fill in; a single bracket inside is just a symbol.
+        boolean template = value.startsWith("<") && value.endsWith(">");
+        if (template || PLACEHOLDER_WORDS.stream().anyMatch(folded::contains)) {
             return State.PLACEHOLDER;
         }
-        return value.chars().distinct().count() < MIN_DISTINCT ? State.WEAK : State.USABLE;
+        boolean weak = value.chars().distinct().count() < MIN_DISTINCT || repeatsAShortPattern(value);
+        return weak ? State.WEAK : State.USABLE;
+    }
+
+    /** Whether {@code value} is one pattern of at most {@link #MAX_REPEATED_PATTERN} characters, repeated. */
+    private static boolean repeatsAShortPattern(String value) {
+        for (int period = 1; period <= MAX_REPEATED_PATTERN; period++) {
+            if (value.regionMatches(period, value, 0, value.length() - period)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /** What the written secret is. */
@@ -89,7 +105,10 @@ public final class BusSecret {
         SHORT,
         /** Text from an example, such as the one the documentation shows. */
         PLACEHOLDER,
-        /** Long enough, but made of fewer than {@link #MIN_DISTINCT} different characters. */
+        /**
+         * Long enough, but made of fewer than {@link #MIN_DISTINCT} different characters, or one pattern of at most
+         * {@link #MAX_REPEATED_PATTERN} characters repeated.
+         */
         WEAK,
         /** Good to sign with. */
         USABLE
