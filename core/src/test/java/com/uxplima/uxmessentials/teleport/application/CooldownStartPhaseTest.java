@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -46,6 +47,8 @@ class CooldownStartPhaseTest {
 
     private static final Position THERE = Fixtures.at(40, 64, -12);
     private static final Position SAMS_SPOT = Fixtures.at(100, 70, 100);
+    private static final PlayerRef TAYLOR =
+            new PlayerRef(UUID.fromString("00000000-0000-0000-0000-00000000007a"), "Taylor");
 
     private final MutableClock clock = new MutableClock(NOW);
     private final ClockCooldowns cooldowns = new ClockCooldowns(clock);
@@ -311,6 +314,36 @@ class CooldownStartPhaseTest {
                 .contains(TeleportError.TARGET_TOGGLED_OFF);
 
         assertThat(tpa.onCooldown(ALEX)).isFalse();
+    }
+
+    @Test
+    void underTheRequestPhaseTheMoverOfAnAcceptedTpahereGetsNoCooldownAtAnyStep() {
+        Tpa tpa = new Tpa("request");
+        tpa.request.request(ALEX, SAM, RequestDirection.TO_REQUESTER);
+
+        tpa.accept.accept(SAM, SAMS_SPOT);
+        assertThat(tpa.onCooldown(SAM)).as("after the accept").isFalse();
+        warmups.finish();
+
+        assertThat(hops.landed).containsExactly("Sam:REQUEST");
+        assertThat(tpa.onCooldown(SAM)).as("after the landing").isFalse();
+        assertThat(tpa.onCooldown(ALEX)).isTrue();
+    }
+
+    @Test
+    void underTheRequestPhaseRequestsToEveryoneStartTheSendersClockOnlyWhenOneOpens() {
+        Tpa tpa = new Tpa("request");
+        tpa.flags.refusing.add(SAM);
+        tpa.flags.refusing.add(TAYLOR);
+
+        tpa.request.requestEach(ALEX, List.of(SAM, TAYLOR), RequestDirection.TO_REQUESTER);
+        assertThat(tpa.onCooldown(ALEX)).as("every target refused").isFalse();
+
+        tpa.flags.refusing.remove(TAYLOR);
+        tpa.request.requestEach(ALEX, List.of(SAM, TAYLOR), RequestDirection.TO_REQUESTER);
+
+        assertThat(tpa.registry.pendingFor(TAYLOR)).hasSize(1);
+        assertThat(tpa.onCooldown(ALEX)).isTrue();
     }
 
     @Test

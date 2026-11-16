@@ -367,8 +367,10 @@ public final class TeleportEngine {
     /**
      * Begin the move-cancellable warmup for an already-gated {@code /rtp}. When the warmup ends the cost (if any)
      * is withdrawn before the hop, so a player who spent their balance while standing still is refused with the
-     * same line the gate uses and does not move. A hop that then misses gives the money back. The cooldown stamp
-     * and the arrival grace wait for a real landing, so a move-cancelled warmup costs nothing at all.
+     * same line the gate uses and does not move. A hop that then misses gives the money back. The arrival grace waits
+     * for a real landing, and so does the cooldown under the {@code teleport} phase; under {@code request} and
+     * {@code accept} the cooldown starts as the warmup begins and stays when it is cancelled. A cancelled warmup is
+     * never charged.
      */
     public void launchRandom(PlayerRef who, Destination destination) {
         Objects.requireNonNull(who, "who");
@@ -643,7 +645,12 @@ public final class TeleportEngine {
             }
             return new Warmups.RefusedWarmup();
         }
-        startClock(mover, destination, kind);
+        try {
+            startClock(mover, destination, kind);
+        } catch (RuntimeException stampFailure) {
+            // The checks have passed, so a stamp that fails lets the teleport go ahead and is logged.
+            log.error("cooldown stamp for the teleport of " + mover.name() + " failed", stampFailure);
+        }
         long seconds =
                 destination.warmupOverride().map(Duration::toSeconds).orElseGet(() -> settings.defaultWarmupSeconds());
         WarmupKind warmupKind = new WarmupKind(FEATURE, seconds);

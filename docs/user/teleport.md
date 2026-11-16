@@ -174,7 +174,7 @@ lands. `/rtp` charges after the warmup instead and refunds a failed hop. Details
 
 ## Cooldowns
 
-After a teleport lands the player waits `default-cooldown` seconds (5) before the next one. The jail, combat and
+By default, after a teleport lands, the player waits `default-cooldown` seconds (5) before the next one. The jail, combat and
 cooldown checks run before any charge, so a refused teleport costs nothing.
 
 | Node | Effect |
@@ -200,7 +200,7 @@ The `/rtp` node sets the `/rtp` wait outright.
 
 `cooldown-start-phase` decides what starts the clock:
 
-| Value | Teleport requests | Every other voluntary teleport |
+| Value | Teleport requests | Every other teleport |
 |---|---|---|
 | `teleport` (default) | The landing, for the player who moves. | The landing. |
 | `accept` | The accept, for the player who moves. | Its warmup starting. |
@@ -208,12 +208,21 @@ The `/rtp` node sets the `/rtp` wait outright.
 
 A teleport other than a request has nothing to accept, so `accept` and `request` both start its clock once the jail,
 combat, cooldown and veto checks have passed and the warmup begins. A hop to another server has no warmup; its clock
-starts when the move begins there, on the same clock the origin checked. A request the target refuses, or a teleport
-refused before its warmup, starts nothing.
+starts once the player is on that server and the move begins, on the same clock the origin checked. A hop that never
+arrives (the proxy cannot connect, or no server takes the player in time) starts nothing, and its money comes back. A
+request the target refuses, or a teleport refused before its warmup, starts nothing.
 
-Under `accept` and `request` the clock keeps running when the teleport then does not happen: a denied request, a
-warmup cancelled by moving or a hop that misses still costs the wait, since trying is what starts it. Money follows
-the move instead: a paid teleport that does not land is refunded, and `/rtp` charges only when its warmup ends.
+Under `request` only the sender's clock starts: the player a `/tpahere` moves gets no cooldown from it at any step,
+and a denied or expired request still costs the sender the wait. `/tpaall` starts it once, however many players it
+asks. The request phase does not rate-limit `/tpa` itself, since a request is never refused for a cooldown; the wait
+holds back the sender's other teleports. Under `accept` a denied or expired request starts nothing.
+
+Under `accept` and `request` a teleport that was let through and then does not happen keeps the full wait. That
+covers a warmup cancelled by moving, turning, taking damage, interacting, quitting or a newer teleport, and a hop that
+arrives but fails to move the player. A player hit during the warmup therefore loses the teleport and still waits the
+whole cooldown. A newer teleport on a different clock replaces the warmup and leaves both clocks running; one on the
+same clock is refused for the cooldown while the first warms up, so it replaces nothing. Money follows the move
+instead: a paid teleport that does not land is refunded, and `/rtp` charges only when its warmup ends.
 
 ## Safety
 

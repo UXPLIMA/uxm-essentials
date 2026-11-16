@@ -3,6 +3,8 @@ package com.uxplima.uxmessentials.teleport.application;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -82,6 +84,32 @@ public final class RequestTeleport {
     /** Issue a request in {@code direction} from {@code requester} to {@code target}. */
     public Result<TeleportRequest, TeleportError> request(
             PlayerRef requester, PlayerRef target, RequestDirection direction) {
+        Result<TeleportRequest, TeleportError> opened = open(requester, target, direction);
+        if (opened.isOk()) {
+            engine.stampForPhase(requester, CooldownStartPhase.REQUEST);
+        }
+        return opened;
+    }
+
+    /**
+     * Issue one request in {@code direction} from {@code requester} to each of {@code targets}, as {@code /tpaall}
+     * does. One command is one attempt, so a {@code request}-phase cooldown starts once, when at least one opened.
+     */
+    public List<Result<TeleportRequest, TeleportError>> requestEach(
+            PlayerRef requester, List<PlayerRef> targets, RequestDirection direction) {
+        Objects.requireNonNull(targets, "targets");
+        List<Result<TeleportRequest, TeleportError>> results = new ArrayList<>(targets.size());
+        for (PlayerRef target : targets) {
+            results.add(open(requester, target, direction));
+        }
+        if (results.stream().anyMatch(Result::isOk)) {
+            engine.stampForPhase(requester, CooldownStartPhase.REQUEST);
+        }
+        return results;
+    }
+
+    private Result<TeleportRequest, TeleportError> open(
+            PlayerRef requester, PlayerRef target, RequestDirection direction) {
         Objects.requireNonNull(requester, "requester");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(direction, "direction");
@@ -94,7 +122,6 @@ public final class RequestTeleport {
         requests.store(opened.request());
         events.publish(opened.event());
         announce(opened.request(), direction);
-        engine.stampForPhase(requester, CooldownStartPhase.REQUEST);
         return Result.ok(opened.request());
     }
 
