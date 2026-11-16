@@ -400,6 +400,16 @@ class WorldServerTest {
     }
 
     @Test
+    void aServerKeepsOnlyTheWorldsRecordedUnderItsOwnName() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
+        upgrade();
+        claimer().claimNamed(SURVIVAL, "arena");
+
+        assertThat(claimer().keeps(SURVIVAL, "arena")).isTrue();
+        assertThat(claimer().keeps(LOBBY, "arena")).isFalse();
+    }
+
+    @Test
     void handingAServersWorldsBackToTheClaimReplacesTheirTemplate() {
         oldReleaseRegisters(ARENA, Optional.empty(), "false");
         upgrade();

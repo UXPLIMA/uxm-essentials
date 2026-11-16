@@ -52,7 +52,8 @@ public final class WorldServerClaimer extends JooqRepository {
     /**
      * What one start-up claim or adopt of loaded worlds did.
      *
-     * @param ran false when this server name had already run its start-up claim, so nothing was looked at
+     * @param ran false when this server name had already run its start-up claim, so nothing was looked at; always
+     *     true for an adopt, which runs at every start
      * @param claimed the unclaimed rows this backend got its own copy of
      * @param conflicting the claimed rows whose template recorded another uid than the world this backend has, which
      *     means two different worlds shared one row before servers were recorded

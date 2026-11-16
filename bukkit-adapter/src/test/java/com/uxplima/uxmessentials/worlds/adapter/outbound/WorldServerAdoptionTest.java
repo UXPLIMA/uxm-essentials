@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.persistence.runtime.PersistenceException;
 import com.uxplima.uxmessentials.persistence.worlds.WorldServerClaimer;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
@@ -100,12 +101,17 @@ class WorldServerAdoptionTest {
     @Test
     void copiesTheClaimCommittedReachTheCacheEvenWhenTheAdoptAfterItFails() {
         table.claims = new WorldServerClaimer.Claims(true, List.of("world"), List.of());
-        table.adoptFailure = new IllegalStateException("database gone");
+        table.adoptFailure = new PersistenceException("database gone");
 
         start(Map.of("world", "uid-1"), Map::of, true);
 
         assertThat(table.changes).isOne();
         assertThat(reconciledAfterClaim.get()).isFalse();
+        assertThat(log.errors)
+                .singleElement()
+                .satisfies(line -> assertThat(line)
+                        .contains("event=world_server_claim_failed")
+                        .contains("reason=adopt"));
     }
 
     @Test
@@ -121,25 +127,38 @@ class WorldServerAdoptionTest {
 
     @Test
     void aClaimByNameWhoseWriteFailedButLeftTheWorldHereIsLoggedAndReachesTheCache() {
-        table.claimNamedFailure = new IllegalStateException("connection lost at commit");
+        table.claimNamedFailure = new PersistenceException("connection lost at commit");
         table.kept = true;
 
         boolean claimed = adoption(Map.of(), Map::of, false).claim(WorldName.of("arena"));
 
         assertThat(claimed).isFalse();
         assertThat(table.changes).isOne();
-        assertThat(log.warnings)
+        assertThat(log.errors)
                 .singleElement()
                 .satisfies(line -> assertThat(line).contains("event=world_server_claim_uncertain"));
     }
 
     @Test
     void aClaimByNameWhoseWriteFailedAndLeftNothingFails() {
-        IllegalStateException failure = new IllegalStateException("database gone");
+        PersistenceException failure = new PersistenceException("database gone");
         table.claimNamedFailure = failure;
 
         assertThatThrownBy(() -> adoption(Map.of(), Map::of, false).claim(WorldName.of("arena")))
                 .isSameAs(failure);
+        assertThat(table.changes).isZero();
+    }
+
+    @Test
+    void aClaimByNameWhoseWriteAndFollowUpReadBothFailReportsTheWriteFailure() {
+        PersistenceException failure = new PersistenceException("database gone");
+        PersistenceException unreadable = new PersistenceException("still gone");
+        table.claimNamedFailure = failure;
+        table.keepsFailure = unreadable;
+
+        assertThatThrownBy(() -> adoption(Map.of(), Map::of, false).claim(WorldName.of("arena")))
+                .isSameAs(failure)
+                .satisfies(thrown -> assertThat(thrown.getSuppressed()).containsExactly(unreadable));
         assertThat(table.changes).isZero();
     }
 
@@ -163,6 +182,8 @@ class WorldServerAdoptionTest {
         @Nullable RuntimeException claimNamedFailure;
 
         boolean kept;
+
+        @Nullable RuntimeException keepsFailure;
 
         @Nullable Collection<String> claimedWith;
 
@@ -199,6 +220,9 @@ class WorldServerAdoptionTest {
 
         @Override
         public boolean keeps(String server, String name) {
+            if (keepsFailure != null) {
+                throw keepsFailure;
+            }
             return kept;
         }
 
@@ -212,6 +236,8 @@ class WorldServerAdoptionTest {
 
         final List<String> warnings = new ArrayList<>();
 
+        final List<String> errors = new ArrayList<>();
+
         @Override
         public void info(String message, Object... args) {}
 
@@ -221,7 +247,9 @@ class WorldServerAdoptionTest {
         }
 
         @Override
-        public void error(String message, Throwable cause) {}
+        public void error(String message, Throwable cause) {
+            errors.add(message);
+        }
 
         @Override
         public void debug(String message, Object... args) {}
