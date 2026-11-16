@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.presence.adapter.outbound.api.PresenceEventBrid
 import com.uxplima.uxmessentials.ranks.adapter.outbound.api.RankEventBridges;
 import com.uxplima.uxmessentials.scoreboard.adapter.outbound.api.ScoreboardEventBridges;
 import com.uxplima.uxmessentials.security.adapter.outbound.api.SecurityEventBridges;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinEventBridges;
 import com.uxplima.uxmessentials.staff.adapter.outbound.api.StaffEventBridges;
 import com.uxplima.uxmessentials.teleport.adapter.outbound.api.TeleportEventBridges;
@@ -46,15 +47,19 @@ public final class EventBridges {
 
     private EventBridges() {}
 
-    /** Install every context's bridges into {@code registry}, in context order. */
-    public static void installAll(EventBridgeRegistry registry) {
+    /**
+     * Install every context's bridges into {@code registry}, in context order. {@code messages} draws the text an
+     * event carries that the server wrote from a catalog line, in the server's default language.
+     */
+    public static void installAll(EventBridgeRegistry registry, Messages messages) {
         Objects.requireNonNull(registry, "registry");
+        Objects.requireNonNull(messages, "messages");
         HomeEventBridges.register(registry);
         WarpEventBridges.register(registry);
         PlayerWarpEventBridges.register(registry);
         TeleportEventBridges.register(registry);
         EconomyEventBridges.register(registry);
-        ModerationEventBridges.register(registry);
+        ModerationEventBridges.register(registry, messages);
         PlayerStateEventBridges.register(registry);
         VaultEventBridges.register(registry);
         KitEventBridges.register(registry);

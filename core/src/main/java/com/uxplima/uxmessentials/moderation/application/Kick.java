@@ -7,6 +7,7 @@ import java.util.Optional;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
 import com.uxplima.uxmessentials.moderation.application.port.SanctionBroadcast;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.ModerationError;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -62,20 +63,27 @@ public final class Kick {
     /** Kick {@code target} with an optional reason, or refuse an exempt, offline or elsewhere target. */
     public Result<Unit, ModerationError> kick(
             PlayerRef actor, PlayerRef target, Optional<String> reason, boolean silent) {
-        return kick(actor, actor, target, reason, silent);
+        return kick(actor, actor, target, reason, Optional.empty(), silent);
     }
 
     /**
      * {@link #kick(PlayerRef, PlayerRef, Optional, boolean)} issued under {@code actor} while what the use case says
      * about it goes to {@code told}: the warn escalation kicks under the server rule and tells the staff member whose
-     * warning set it off.
+     * warning set it off. A {@code drawn} reason is the catalog line {@code reason} was drawn from for the target; the
+     * history and the broadcast draw it again for each reader.
      */
     Result<Unit, ModerationError> kick(
-            PlayerRef actor, PlayerRef told, PlayerRef target, Optional<String> reason, boolean silent) {
+            PlayerRef actor,
+            PlayerRef told,
+            PlayerRef target,
+            Optional<String> reason,
+            Optional<DrawnReason> drawn,
+            boolean silent) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(told, "told");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(reason, "reason");
+        Objects.requireNonNull(drawn, "drawn");
         if (live.refusedElsewhere(told, target)) {
             return Result.err(ModerationError.TARGET_ELSEWHERE);
         }
@@ -90,13 +98,14 @@ public final class Kick {
         }
         MessageKey key = ModerationMessageKey.KICK_KICKED;
         sanctions.kick(target, key, notifier.render(target, key, Map.of("reason", reason.orElse(""))));
-        history.kick(actor, target, reason);
+        history.kick(actor, target, reason, drawn);
         audit.kicked(actor, target, true, reason);
         notifier.send(told, ModerationMessageKey.KICK_APPLIED, Map.of("player", target.name()));
         if (!silent) {
             broadcast.announce(
                     ModerationMessageKey.MOD_BROADCAST_KICK,
-                    Map.of("actor", actor.name(), "target", target.name(), "reason", reason.orElse("")));
+                    Map.of("actor", actor.name(), "target", target.name(), "reason", reason.orElse("")),
+                    drawn);
         }
         return Result.ok();
     }

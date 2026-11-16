@@ -14,6 +14,15 @@ On a network, a paid hop is now refunded, and a player warp owner paid, in exact
 Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
 in its own default. See [network.md](network.md).
 
+## Ladder reasons follow each reader's language
+
+The update adds two nullable columns, `reason_key` and `reason_args`, to `moderation_mutes`, `moderation_tempbans`,
+`moderation_ip_bans` and `moderation_sanction_history`. The first server to start on the new release adds them to the
+shared database; nothing needs editing. A sanction the warn ladder gives from then on keeps its reason as the catalog
+line, so staff read it in their own language. Sanctions already stored keep the text they were written with. A server
+still on the previous release reads the same rows and shows that text. See
+[moderation.md](moderation.md#warnings-and-the-escalation-ladder).
+
 ## Trades keep items for a player who left
 
 The update adds one table, `trade_item_returns`. The first server to start on the new release creates it in the

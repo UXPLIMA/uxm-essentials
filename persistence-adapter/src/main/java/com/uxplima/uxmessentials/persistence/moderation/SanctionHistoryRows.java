@@ -29,7 +29,8 @@ final class SanctionHistoryRows {
                 Optional.ofNullable(row.getReason()),
                 Instant.ofEpochMilli(row.getTs()),
                 Optional.ofNullable(row.getExpiresAt()).map(Instant::ofEpochMilli),
-                Optional.ofNullable(row.getIp()));
+                Optional.ofNullable(row.getIp()),
+                ReasonLines.read(row.getReasonKey(), row.getReasonArgs()));
     }
 
     private static Issuer issuer(@Nullable String uuid, String name) {

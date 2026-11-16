@@ -707,7 +707,7 @@ class WarnEscalationTest {
                 .isInstanceOfSatisfying(
                         MuteState.Timed.class,
                         timed -> assertThat(timed.reason()).hasValueSatisfying(reason -> {
-                            assertThat(reason).hasSize(WarnEscalator.MAX_REASON);
+                            assertThat(reason).hasSize(SanctionReasons.MAX_REASON);
                             assertThat(reason).startsWith("reached 3 warnings, the last for: xxx");
                         }));
     }

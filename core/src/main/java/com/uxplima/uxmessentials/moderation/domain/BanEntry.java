@@ -16,8 +16,15 @@ import java.util.Optional;
  * @param reason the optional free-text reason
  * @param until the wall-clock expiry (a far-future instant for a permanent {@code /ban})
  * @param issuedAt when the ban was issued, which a permanent ban's far-future expiry is measured from
+ * @param drawnReason the catalog line {@code reason} was drawn from, when the server wrote it
  */
-public record BanEntry(java.util.UUID target, Issuer issuer, Optional<String> reason, Instant until, Instant issuedAt) {
+public record BanEntry(
+        java.util.UUID target,
+        Issuer issuer,
+        Optional<String> reason,
+        Instant until,
+        Instant issuedAt,
+        Optional<DrawnReason> drawnReason) {
 
     public BanEntry {
         Objects.requireNonNull(target, "target");
@@ -25,5 +32,11 @@ public record BanEntry(java.util.UUID target, Issuer issuer, Optional<String> re
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(until, "until");
         Objects.requireNonNull(issuedAt, "issuedAt");
+        Objects.requireNonNull(drawnReason, "drawnReason");
+    }
+
+    /** A ban whose reason a staff member gave. */
+    public BanEntry(java.util.UUID target, Issuer issuer, Optional<String> reason, Instant until, Instant issuedAt) {
+        this(target, issuer, reason, until, issuedAt, Optional.empty());
     }
 }

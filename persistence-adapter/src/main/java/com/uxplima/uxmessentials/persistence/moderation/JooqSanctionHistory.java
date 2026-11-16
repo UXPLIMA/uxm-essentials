@@ -219,6 +219,8 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
         row.setReason(entry.reason()
                 .map(reason -> fit(MODERATION_SANCTION_HISTORY.REASON, reason))
                 .orElse(null));
+        row.setReasonKey(ReasonLines.key(entry.drawnReason()));
+        row.setReasonArgs(ReasonLines.args(entry.drawnReason()));
         row.setActor(actorUuid(entry));
         row.setActorName(
                 fit(MODERATION_SANCTION_HISTORY.ACTOR_NAME, entry.actor().name()));

@@ -102,7 +102,10 @@ public final class LoginEnforcement {
         return render(
                 who,
                 ModerationMessageKey.BANIP_KICK,
-                Map.of("reason", ban.reason().orElse("")));
+                Map.of(
+                        "reason",
+                        SanctionReasons.read(notifier::render, who, ban.reason(), ban.drawnReason())
+                                .orElse("")));
     }
 
     private String render(PlayerRef who, MessageKey key, Map<String, String> ph) {

@@ -60,7 +60,8 @@ public final class ListMutes {
                 "issuer",
                 mute.issuer().name(),
                 "reason",
-                mute.reason().orElse(""),
+                SanctionReasons.read(notifier::render, viewer, mute.reason(), mute.drawnReason())
+                        .orElse(""),
                 "expires",
                 expires);
     }

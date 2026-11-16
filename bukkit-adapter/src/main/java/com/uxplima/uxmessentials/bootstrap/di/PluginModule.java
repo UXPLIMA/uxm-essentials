@@ -635,7 +635,7 @@ public final class PluginModule {
         // Every domain fact the plugin publishes becomes a Bukkit event for whoever is listening. One subscriber for
         // all twenty contexts, and it costs a map lookup when nobody is listening, which is the ordinary case.
         EventBridgeRegistry bridgeRegistry = new EventBridgeRegistry();
-        EventBridges.installAll(bridgeRegistry);
+        EventBridges.installAll(bridgeRegistry, kernel.messages());
         BukkitEventBridge bridge = new BukkitEventBridge(
                 bridgeRegistry, kernel.scheduler(), plugin.getServer().getPluginManager(), kernel.log());
         InProcessDomainEventPublisher publishedEvents = (InProcessDomainEventPublisher) kernel.events();
@@ -2974,7 +2974,12 @@ public final class PluginModule {
                 wired.mutedCommands()::forgetCommandNames,
                 "names of the blocked commands re-read on next use"));
         links.placeholders.moderation(new GateModerationPlaceholders(
-                wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
+                wired.mutePolicy(),
+                wired.jailGate(),
+                wired.repository(),
+                wired.sanctions(),
+                ctx.kernel().messages(),
+                wired.clock()));
         links.queries.register(
                 UxmModerationQuery.class,
                 new ModerationQueries(
@@ -2982,6 +2987,7 @@ public final class PluginModule {
                         wired.sanctionHistory(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler(),
+                        ctx.kernel().messages(),
                         wired.clock()));
         links.actions.register(
                 com.uxplima.uxmessentials.api.action.UxmModerationActions.class,
@@ -2989,6 +2995,7 @@ public final class PluginModule {
                         wired.apiWrites(),
                         ctx.kernel().playerLookup(),
                         ctx.kernel().scheduler(),
+                        ctx.kernel().messages(),
                         source));
         // Register the moderation management GUI on the /uxmess gui hub, gated by the moderation GUI node.
         guiRegistry.register(new com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry(

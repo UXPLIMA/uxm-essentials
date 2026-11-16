@@ -46,7 +46,10 @@ public final class CheckBan {
                     Map.of(
                             "player", target.name(),
                             "actor", active.issuer().name(),
-                            "reason", active.reason().orElse(""),
+                            "reason",
+                                    SanctionReasons.read(
+                                                    notifier::render, viewer, active.reason(), active.drawnReason())
+                                            .orElse(""),
                             "expiry", expiry(viewer, active)));
             return;
         }

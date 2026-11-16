@@ -15,13 +15,25 @@ import java.util.Optional;
  * @param issuer who issued the mute
  * @param reason the optional free-text reason
  * @param until the wall-clock expiry for a timed mute, or empty for a permanent mute
+ * @param drawnReason the catalog line {@code reason} was drawn from, when the server wrote it
  */
-public record MuteEntry(java.util.UUID target, Issuer issuer, Optional<String> reason, Optional<Instant> until) {
+public record MuteEntry(
+        java.util.UUID target,
+        Issuer issuer,
+        Optional<String> reason,
+        Optional<Instant> until,
+        Optional<DrawnReason> drawnReason) {
 
     public MuteEntry {
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(issuer, "issuer");
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(until, "until");
+        Objects.requireNonNull(drawnReason, "drawnReason");
+    }
+
+    /** A mute whose reason a staff member gave. */
+    public MuteEntry(java.util.UUID target, Issuer issuer, Optional<String> reason, Optional<Instant> until) {
+        this(target, issuer, reason, until, Optional.empty());
     }
 }
