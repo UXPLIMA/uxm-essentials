@@ -166,6 +166,54 @@ class CrossServerJailTest {
     }
 
     @Test
+    void aJailHopThatRacesAnotherTransferIsTriedAgainWithoutAlertingStaff() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        // A second transfer starts while the first has read no earlier row and not yet written its own.
+        hops.afterNextFind(() -> lobby.transfer.send(ALEX, "cell"));
+
+        jailAlex();
+
+        assertThat(connects).containsExactly("Alex->prison");
+        assertThat(lobby.read).contains("Alex common.hop-busy-ordered").doesNotContain("Alex common.hop-busy");
+        assertThat(staffLines()).isEmpty();
+
+        // The turned-away transfer is tried again on its own, before the first hop's timer could report anything.
+        scheduler.advance(JailTransfer.FIRST_RETRY);
+        assertThat(connects).containsExactly("Alex->prison", "Alex->prison");
+        assertThat(staffLines()).isEmpty();
+    }
+
+    @Test
+    void aJailHopBlockedByAnotherMoveThisServerCannotSettleIsTriedAgainUntilThatMoveIsGone() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        // A fresh hop of a kind this backend has no resolver for, which its own origin is still watching.
+        hops.record(new PendingHop(
+                ALEX.uuid(),
+                HopKind.HOME,
+                "base",
+                SURVIVAL,
+                SURVIVAL,
+                clock.instant(),
+                Optional.empty(),
+                Optional.empty()));
+
+        jailAlex();
+
+        assertThat(connects).isEmpty();
+        assertThat(lobby.read).contains("Alex common.hop-busy-ordered");
+        assertThat(staffLines()).isEmpty();
+
+        // The other row blocks until it is past twice the TTL; the retries keep going and send the player then.
+        scheduler.advance(JailTransfer.FIRST_RETRY);
+        assertThat(connects).isEmpty();
+        scheduler.advance(JailTransfer.FIRST_RETRY.multipliedBy(2));
+        assertThat(connects).containsExactly("Alex->prison");
+        assertThat(staffLines()).isEmpty();
+    }
+
+    @Test
     void aPrisonerDroppedWhileTheJailServerIsDownIsSentThereOnceItIsBackWithoutRelogging() {
         jailSetOn(PRISON);
         network.live.remove(PRISON);
@@ -381,6 +429,7 @@ class CrossServerJailTest {
         final List<String> read = new ArrayList<>();
         final JailHopAlerts alerts;
         final HopArrival arrival;
+        final JailTransfer transfer;
         final Jail jail;
         final Unjail unjail;
         final JailCountdown countdown;
@@ -406,7 +455,7 @@ class CrossServerJailTest {
                         new HopDepartures(HopGate.OPEN, proxy, watchdog, charges, resolvers, scheduler, name, clock));
             }
             this.arrival = new HopArrival(hops, resolvers, charges, scheduler, log, name, SETTLE, TTL, clock);
-            JailTransfer transfer = new JailTransfer(
+            this.transfer = new JailTransfer(
                     records,
                     locations,
                     live,

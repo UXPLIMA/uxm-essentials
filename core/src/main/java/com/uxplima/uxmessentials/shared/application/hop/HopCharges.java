@@ -52,8 +52,25 @@ public final class HopCharges {
         report(resolver, who, reason, label);
     }
 
+    /**
+     * Give back what {@code who} paid for a hop that was not started because another of theirs is still under way,
+     * then tell them so, with the refund line when money went back. The kind is not told here: the caller reports it
+     * through {@link #report} when the kind must hear of it.
+     */
+    public void turnAway(HopResolver resolver, PlayerRef who, Optional<HopCharge> charge, String label) {
+        Objects.requireNonNull(resolver, "resolver");
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(charge, "charge");
+        Objects.requireNonNull(label, "label");
+        boolean credited = credit(resolver, who, charge);
+        tell(resolver, who, HopNotice.BUSY, Map.of(), label);
+        if (credited) {
+            tell(resolver, who, HopNotice.REFUNDED, Map.of(), label);
+        }
+    }
+
     /** Let the kind hear about the failure; a failing report is logged, never thrown, like a failing line. */
-    private void report(HopResolver resolver, PlayerRef who, HopNotice reason, String label) {
+    void report(HopResolver resolver, PlayerRef who, HopNotice reason, String label) {
         try {
             resolver.failed(who, label, reason);
         } catch (RuntimeException reportFailure) {

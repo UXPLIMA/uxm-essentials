@@ -19,6 +19,7 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.worlds.application.port.SpawnSafety;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEngine;
 import com.uxplima.uxmessentials.worlds.application.port.WorldEntryFee;
@@ -51,6 +52,7 @@ public final class WorldHopResolver implements HopResolver {
                     HopNotice.MISROUTED, WorldsMessageKey.WORLD_CROSS_SERVER_MISROUTED,
                     HopNotice.FAILED, WorldsMessageKey.WORLD_CROSS_SERVER_FAILED,
                     HopNotice.UNAVAILABLE, WorldsMessageKey.WORLD_CROSS_SERVER_UNAVAILABLE,
+                    HopNotice.BUSY, SharedMessageKey.COMMON_HOP_BUSY,
                     HopNotice.REFUNDED, WorldsMessageKey.WORLD_CROSS_SERVER_REFUNDED));
 
     private final WorldRepository repository;
