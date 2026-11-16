@@ -18,3 +18,11 @@ kits:
   tools:
     items:
     - iron_axe 0
+  VIP:
+    delay: 3600
+    items:
+    - diamond 2
+  use:
+    delay: 0
+    items:
+    - stick 1

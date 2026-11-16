@@ -257,7 +257,15 @@ public final class MigrationWiring {
                 ports.defaultCurrency(),
                 ports.clock());
         RecordWriter repositories = new RepositoryRecordWriter(
-                users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
+                users,
+                warps,
+                ports.moderation(),
+                kits,
+                holograms,
+                worldRegistry,
+                playerWarps,
+                ports.clock(),
+                ports.log());
         RecordWriter dryRun = new DryRunRecordWriter(
                 users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
         return new Writers(new AnnouncingRecordWriter(repositories, publisher, scheduler), dryRun);
@@ -280,7 +288,8 @@ public final class MigrationWiring {
                 mail,
                 mailRetention,
                 new EconomyConfig(economyConfig).currencies().defaultCurrency(),
-                clock);
+                clock,
+                log);
     }
 
     /**
@@ -415,7 +424,8 @@ public final class MigrationWiring {
             Optional<MailRepository> mail,
             Duration mailRetention,
             Currency defaultCurrency,
-            Clock clock) {}
+            Clock clock,
+            Logger log) {}
 
     /** The live writer, which announces what an import changed, and the dry-run writer. */
     record Writers(AnnouncingRecordWriter live, RecordWriter dryRun) {}

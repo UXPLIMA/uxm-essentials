@@ -46,7 +46,7 @@ public final class EssentialsXConvert implements Convert {
         this.log = Objects.requireNonNull(log, "log");
         this.userMapper = new UserdataMapper(worlds);
         this.warpMapper = new WarpMapper(worlds);
-        this.kitMapper = new KitMapper();
+        this.kitMapper = new KitMapper(log);
         this.jailMuteMapper = new JailMuteMapper();
     }
 

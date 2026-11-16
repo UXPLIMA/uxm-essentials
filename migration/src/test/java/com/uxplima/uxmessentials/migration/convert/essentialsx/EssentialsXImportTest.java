@@ -17,6 +17,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeLabel;
+import com.uxplima.uxmessentials.kits.application.KitAccess;
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.kits.domain.KitItem;
@@ -161,10 +162,34 @@ class EssentialsXImportTest {
     }
 
     @Test
+    void everyKitStaysReservedBehindItsOwnLowerCaseKitNodeAsEssentialsXGatedItBehindItsKitPermission() {
+        assertThat(only(records, ImportRecord.KitRecord.class))
+                .extracting(rec -> rec.kit().definition())
+                .allSatisfy(kit -> assertThat(kit.requiresPermission())
+                        .as("kit %s is reserved", kit.id())
+                        .isTrue())
+                .extracting(KitAccess::permissionNode)
+                .contains(
+                        "uxmessentials.kit.starter",
+                        "uxmessentials.kit.welcome",
+                        "uxmessentials.kit.tools",
+                        "uxmessentials.kit.vip");
+    }
+
+    @Test
+    void aKitNamedLikeOneOfThePluginsOwnKitNodesKeepsItsEssentialsXNodeAndTheOperatorIsTold() {
+        // uxmessentials.kit.use is the /kit command node every player holds; behind it the kit would open to all.
+        assertThat(KitAccess.permissionNode(kit("use"))).isEqualTo("essentials.kits.use");
+        assertThat(log.warnings())
+                .anySatisfy(line -> assertThat(line).contains("use", "uxmessentials.kit.use", "essentials.kits.use"));
+    }
+
+    @Test
     void aKitThatCannotBeImportedIsLeftOutWithoutTakingTheOtherKitsOrTheRestOfTheImportWithIt() {
         assertThat(only(records, ImportRecord.KitRecord.class))
                 .extracting(rec -> rec.kit().definition().id())
-                .containsExactlyInAnyOrder(KitId.of("starter"), KitId.of("welcome"), KitId.of("tools"));
+                .containsExactlyInAnyOrder(
+                        KitId.of("starter"), KitId.of("welcome"), KitId.of("tools"), KitId.of("vip"), KitId.of("use"));
         assertThat(users()).hasSize(3);
     }
 

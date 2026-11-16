@@ -268,7 +268,8 @@ class DryRunImportTest {
                     new Holograms(),
                     new Worlds(),
                     UntouchedImportPorts.playerWarpWriter(new UntouchedImportPorts.PlayerWarps()),
-                    CLOCK);
+                    CLOCK,
+                    new QuietLog());
         }
 
         private UserRecordWriter users() {
@@ -638,5 +639,21 @@ class DryRunImportTest {
                 throw UntouchedImportPorts.touched();
             }
         }
+    }
+
+    /** The live writer's diagnostics, which these comparisons do not read. */
+    private static final class QuietLog implements com.uxplima.uxmessentials.shared.application.port.Logger {
+
+        @Override
+        public void info(String message, Object... args) {}
+
+        @Override
+        public void warn(String message, Object... args) {}
+
+        @Override
+        public void error(String message, Throwable cause) {}
+
+        @Override
+        public void debug(String message, Object... args) {}
     }
 }
