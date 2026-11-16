@@ -30,6 +30,7 @@ class JooqSanctionHistoryTest {
     private static final PlayerRef ALEX =
             new PlayerRef(UUID.fromString("00000000-0000-0000-0000-0000000000a1"), "Alex");
     private static final UUID SAM = UUID.fromString("00000000-0000-0000-0000-0000000000a2");
+    private static final UUID ROBIN = UUID.fromString("00000000-0000-0000-0000-0000000000a3");
     private static final Instant NOW = Instant.parse("2030-01-01T00:00:00Z");
 
     @TempDir
@@ -56,6 +57,42 @@ class JooqSanctionHistoryTest {
                     assertThat(kept).hasSizeLessThanOrEqualTo(256);
                     assertThat(reason).startsWith(kept);
                 }));
+    }
+
+    @Test
+    void aBatchIsStoredWholeWithKeysAfterTheRowsAlreadyThere() {
+        SanctionHistory history = openStore();
+        history.append(row(SanctionAction.WARN, SAM, Optional.empty(), NOW));
+
+        history.appendAll(List.of(
+                row(SanctionAction.KICK, SAM, Optional.empty(), NOW.plusSeconds(1)),
+                row(SanctionAction.KICK, ROBIN, Optional.empty(), NOW.plusSeconds(1))));
+
+        assertThat(history.recentForTarget(SAM, 10))
+                .extracting(SanctionHistoryEntry::action)
+                .containsExactly(SanctionAction.KICK, SanctionAction.WARN);
+        assertThat(history.recentForTarget(ROBIN, 10)).hasSize(1);
+        assertThat(history.recentByActor(ALEX.uuid(), 10)).hasSize(3);
+    }
+
+    @Test
+    void theRevocableReadSkipsKicksLiftsAndIpRowsBeforeTheLimit() {
+        SanctionHistory history = openStore();
+        history.append(row(SanctionAction.BAN, SAM, Optional.empty(), NOW));
+        history.append(row(SanctionAction.MUTE, ROBIN, Optional.empty(), NOW.plusSeconds(1)));
+        history.append(row(SanctionAction.BAN, SAM, Optional.of("198.51.100.9"), NOW.plusSeconds(2)));
+        history.append(row(SanctionAction.UNMUTE, ROBIN, Optional.empty(), NOW.plusSeconds(3)));
+        history.appendAll(List.of(
+                row(SanctionAction.KICK, SAM, Optional.empty(), NOW.plusSeconds(4)),
+                row(SanctionAction.KICK, ROBIN, Optional.empty(), NOW.plusSeconds(4))));
+
+        assertThat(history.revocableByActor(ALEX.uuid(), 2))
+                .extracting(SanctionHistoryEntry::action)
+                .containsExactly(SanctionAction.MUTE, SanctionAction.BAN);
+    }
+
+    private static SanctionHistoryEntry row(SanctionAction action, UUID target, Optional<String> ip, Instant at) {
+        return new SanctionHistoryEntry(action, target, Issuer.of(ALEX), Optional.empty(), at, Optional.empty(), ip);
     }
 
     private SanctionHistory openStore() {

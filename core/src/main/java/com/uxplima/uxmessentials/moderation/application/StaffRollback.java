@@ -15,7 +15,6 @@ import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
-import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -40,12 +39,13 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * cleared, never another staff member's.
  *
  * <p>Targets are deduped per action through a {@link Set} of UUIDs: a target the staff member banned twice (or
- * banned then re-banned) is un-banned once. {@link SanctionAction#UNBAN}, {@link SanctionAction#UNMUTE} and
- * {@link SanctionAction#KICK} rows are skipped. A kick is a live disconnect with nothing to undo, and a lift is
- * itself not a sanction. The {@code limit} caps how far back the history read reaches (newest-first), so an
- * operator can scope a rollback to a staff member's recent activity. A limit above {@link #MAX_LIMIT} is lowered
- * to it so the history scan stays bounded, and the actor is told, so a rollback that read fewer rows than asked
- * never passes for a complete one. The result is a {@link RollbackSummary} of the counts undone, reported to the
+ * banned then re-banned) is un-banned once. Only player bans, mutes and warnings are read
+ * ({@link SanctionHistory#revocableByActor}): a kick is a live disconnect with nothing to undo, a lift is itself not
+ * a sanction, and an IP ban row is not a player's ban, so none of them uses up the limit. The {@code limit} caps how
+ * far back the history read reaches (newest-first), so an operator can scope a rollback to a staff member's recent
+ * activity. A limit above {@link #MAX_LIMIT} is lowered to it so the history scan stays bounded, and the actor is
+ * told, so a rollback that read fewer rows than asked never passes for a complete one. The result is a
+ * {@link RollbackSummary} of the counts undone, reported to the
  * actor; when nothing was in effect the actor is told so instead.
  */
 public final class StaffRollback {
@@ -93,7 +93,7 @@ public final class StaffRollback {
                     Map.of("requested", Integer.toString(requested), "limit", Integer.toString(limit)));
         }
         Instant now = clock.instant();
-        List<SanctionHistoryEntry> rows = history.recentByActor(staff.uuid(), limit);
+        List<SanctionHistoryEntry> rows = history.revocableByActor(staff.uuid(), limit);
         Set<UUID> unbanned = new HashSet<>();
         Set<UUID> unmuted = new HashSet<>();
         Set<UUID> cleared = new HashSet<>();

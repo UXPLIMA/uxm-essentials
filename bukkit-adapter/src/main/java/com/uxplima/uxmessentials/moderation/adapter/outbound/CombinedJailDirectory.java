@@ -53,8 +53,9 @@ public final class CombinedJailDirectory implements JailDirectory {
 
     @Override
     public List<String> peekNames() {
-        // Config-only union deliberately, so tab-completion stays non-blocking; the DB-backed store.names()
-        // can hit the database and only the off-tick names() pays that cost.
+        // Config-only deliberately, so tab-completion stays non-blocking: store.names() can hit the database. That
+        // cost is names()'s alone, and not every caller is off the tick yet: /jails is, but /togglejail's refusal
+        // still reads names() on the command thread with the rest of its storage work.
         return config.peekNames();
     }
 }

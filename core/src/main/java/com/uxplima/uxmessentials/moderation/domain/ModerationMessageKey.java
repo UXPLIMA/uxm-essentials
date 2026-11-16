@@ -30,6 +30,8 @@ public enum ModerationMessageKey implements MessageKey {
     JAIL_UNKNOWN("moderation.jail.unknown-jail"),
     // /togglejail with no jail name and no default-jail: the jails to choose from
     TOGGLEJAIL_NAME_NEEDED("moderation.togglejail.name-needed"),
+    // /togglejail with no jail name whose default-jail names no jail
+    TOGGLEJAIL_DEFAULT_MISSING("moderation.togglejail.default-missing"),
     JAIL_ALREADY("moderation.jail.already"),
     JAIL_HOP_SENDING("moderation.jail.cross-server.sending"),
     JAIL_HOP_ARRIVED("moderation.jail.cross-server.arrived"),

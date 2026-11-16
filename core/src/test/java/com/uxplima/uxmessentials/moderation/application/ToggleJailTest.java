@@ -99,6 +99,20 @@ class ToggleJailTest {
     }
 
     @Test
+    void aDefaultJailThatDoesNotExistIsNamedAndTheJailsListed() {
+        setJail("cell");
+
+        toggleJail(Optional.of("oldcell")).toggle(SAM, ALEX, "", Optional.empty());
+
+        assertThat(records.loadJail(ALEX)).isEqualTo(JailState.none());
+        assertThat(notifier.sent())
+                .containsExactly(new RecordingNotifier.Sent(
+                        SAM,
+                        ModerationMessageKey.TOGGLEJAIL_DEFAULT_MISSING.key(),
+                        Map.of("jail", "oldcell", "jails", "cell")));
+    }
+
+    @Test
     void withNoJailAtAllTheCommandSaysThereIsNone() {
         toggleJail(Optional.empty()).toggle(SAM, ALEX, "", Optional.empty());
 

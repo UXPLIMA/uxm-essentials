@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJ
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandNamesRefresh;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitCommandNames;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
@@ -89,7 +90,6 @@ import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
-import com.uxplima.uxmessentials.moderation.application.port.CommandNames;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
@@ -338,6 +338,10 @@ public final class ModerationWiring {
                 textInput,
                 jailGui));
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
+        MutedCommandPolicy mutedCommands = new MutedCommandPolicy(
+                settings.mutedBlockedCommands(),
+                settings.mutedAllowedCommands(),
+                new BukkitCommandNames(plugin.getServer().getCommandMap()));
         return new Wired(
                 commands,
                 listeners(
@@ -348,7 +352,7 @@ public final class ModerationWiring {
                         settings,
                         guard,
                         commandSpyStore,
-                        new BukkitCommandNames(plugin.getServer().getCommandMap()),
+                        mutedCommands,
                         clock),
                 new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
@@ -361,6 +365,7 @@ public final class ModerationWiring {
                 sanctionHistory,
                 clock,
                 guiViews,
+                mutedCommands,
                 new ModerationApiWrites(
                         services.ban(),
                         services.tempBan(),
@@ -466,6 +471,7 @@ public final class ModerationWiring {
         ModerationAudit audit = new DiscordPunishmentAudit(
                 new LoggingModerationAudit(auditChannel.logger()), auditChannel.logger(), settings.discordNotify());
         CombinedJailDirectory jails = new CombinedJailDirectory(new ConfigJailDirectory(settings), jailLocations);
+        settings.defaultJail().ifPresent(name -> warnIfNoSuchJail(kernel, jails, name));
         Sanctions sanctionPort = sanctions;
         Jail jail = new Jail(
                 repository,
@@ -539,7 +545,7 @@ public final class ModerationWiring {
                 .punish(punish)
                 .unban(unban)
                 .kick(kick)
-                .kickAll(new KickAll(sanctionPort, guard, notifier, audit, history))
+                .kickAll(new KickAll(sanctionPort, guard, notifier, audit, history, kernel.scheduler(), kernel.log()))
                 .warn(new IssueWarn(
                         repository, guard, notifier, audit, kernel.events(), history, broadcast, escalator, clock))
                 .tempWarn(new TempWarn(
@@ -608,6 +614,27 @@ public final class ModerationWiring {
                 .build();
     }
 
+    /**
+     * Tell the operator at startup when {@code default-jail} names no jail, rather than leaving the first
+     * {@code /togglejail} to find out. The {@code /setjail} jails live in the database, so the check runs async.
+     */
+    private static void warnIfNoSuchJail(KernelPorts kernel, CombinedJailDirectory jails, String name) {
+        kernel.scheduler().async(() -> {
+            try {
+                if (!jails.exists(name)) {
+                    kernel.log()
+                            .warn(
+                                    "moderation config.conf: default-jail \"{}\" is neither a config jail nor a /setjail"
+                                            + " jail, so /togglejail without a jail name refuses. Set it to a name /jails"
+                                            + " lists, or leave it empty.",
+                                    name);
+                }
+            } catch (RuntimeException unreadable) {
+                kernel.log().error("event=default_jail_check_failed jail=" + name, unreadable);
+            }
+        });
+    }
+
     private static List<Listener> listeners(
             ModerationServices services,
             BukkitSanctions sanctions,
@@ -616,9 +643,8 @@ public final class ModerationWiring {
             ModerationSettings settings,
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
-            CommandNames commandNames,
+            MutedCommandPolicy mutedCommands,
             Clock clock) {
-        MutedCommandPolicy mutedCommands = new MutedCommandPolicy(settings.mutedBlockedCommands(), commandNames);
         return List.of(
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
@@ -630,6 +656,7 @@ public final class ModerationWiring {
                         settings.freezeNoticeInterval()),
                 new MutedCommandListener(
                         repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
+                new MutedCommandNamesRefresh(mutedCommands),
                 new MutedChatListener(
                         new RepositoryMutePolicy(repository, clock),
                         guard::isExempt,
@@ -711,6 +738,7 @@ public final class ModerationWiring {
             SanctionHistory sanctionHistory,
             Clock clock,
             ModerationGuiViews guiViews,
+            MutedCommandPolicy mutedCommands,
             ModerationApiWrites apiWrites) {
 
         public Wired {
@@ -727,6 +755,7 @@ public final class ModerationWiring {
             Objects.requireNonNull(sanctionHistory, "sanctionHistory");
             Objects.requireNonNull(clock, "clock");
             Objects.requireNonNull(guiViews, "guiViews");
+            Objects.requireNonNull(mutedCommands, "mutedCommands");
             Objects.requireNonNull(apiWrites, "apiWrites");
         }
 

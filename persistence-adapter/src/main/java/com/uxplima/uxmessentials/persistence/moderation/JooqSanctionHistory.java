@@ -4,6 +4,7 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationSancti
 import static com.uxplima.uxmessentials.persistence.runtime.ColumnFit.fit;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -40,26 +41,28 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
     public void append(SanctionHistoryEntry entry) {
         Objects.requireNonNull(entry, "entry");
         write(dsl -> dsl.insertInto(MODERATION_SANCTION_HISTORY)
-                .set(MODERATION_SANCTION_HISTORY.ID, nextId(dsl))
-                .set(MODERATION_SANCTION_HISTORY.ACTION, entry.action().name())
-                .set(MODERATION_SANCTION_HISTORY.TARGET, entry.target().toString())
-                .set(
-                        MODERATION_SANCTION_HISTORY.REASON,
-                        entry.reason()
-                                .map(reason -> fit(MODERATION_SANCTION_HISTORY.REASON, reason))
-                                .orElse(null))
-                .set(MODERATION_SANCTION_HISTORY.ACTOR, actorUuid(entry))
-                .set(
-                        MODERATION_SANCTION_HISTORY.ACTOR_NAME,
-                        fit(
-                                MODERATION_SANCTION_HISTORY.ACTOR_NAME,
-                                entry.actor().name()))
-                .set(MODERATION_SANCTION_HISTORY.IP, entry.ip().orElse(null))
-                .set(
-                        MODERATION_SANCTION_HISTORY.EXPIRES_AT,
-                        entry.expiry().map(Instant::toEpochMilli).orElse(null))
-                .set(MODERATION_SANCTION_HISTORY.TS, entry.at().toEpochMilli())
+                .set(row(entry, nextId(dsl)))
                 .execute());
+    }
+
+    /**
+     * One transaction for the whole batch: the keys are taken as one block after the current maximum, and the rows go
+     * in as one JDBC batch, so a {@code /kickall} of hundreds of players is one write rather than one per player.
+     */
+    @Override
+    public void appendAll(List<SanctionHistoryEntry> entries) {
+        Objects.requireNonNull(entries, "entries");
+        if (entries.isEmpty()) {
+            return;
+        }
+        write(dsl -> {
+            long first = nextId(dsl);
+            List<ModerationSanctionHistoryRecord> rows = new ArrayList<>(entries.size());
+            for (int index = 0; index < entries.size(); index++) {
+                rows.add(row(entries.get(index), first + index));
+            }
+            return dsl.batchInsert(rows).execute();
+        });
     }
 
     @Override
@@ -84,6 +87,20 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
     public List<SanctionHistoryEntry> recentByActor(UUID actor, int limit) {
         Objects.requireNonNull(actor, "actor");
         return recentBy(MODERATION_SANCTION_HISTORY.ACTOR, actor, limit);
+    }
+
+    @Override
+    public List<SanctionHistoryEntry> revocableByActor(UUID actor, int limit) {
+        Objects.requireNonNull(actor, "actor");
+        return read(dsl -> dsl.selectFrom(MODERATION_SANCTION_HISTORY)
+                .where(MODERATION_SANCTION_HISTORY.ACTOR.eq(actor.toString()))
+                .and(MODERATION_SANCTION_HISTORY.ACTION.in(
+                        SanctionAction.BAN.name(), SanctionAction.MUTE.name(), SanctionAction.WARN.name()))
+                .and(MODERATION_SANCTION_HISTORY.IP.isNull())
+                .orderBy(MODERATION_SANCTION_HISTORY.TS.desc(), MODERATION_SANCTION_HISTORY.ID.desc())
+                .limit(Math.max(0, limit))
+                .fetch()
+                .map(SanctionHistoryRows::toEntry));
     }
 
     @Override
@@ -115,6 +132,24 @@ public final class JooqSanctionHistory extends JooqRepository implements Sanctio
                 .limit(Math.max(0, limit))
                 .fetch()
                 .map(SanctionHistoryRows::toEntry));
+    }
+
+    /** The stored form of {@code entry} under key {@code id}, its free text fitted to the column widths. */
+    private static ModerationSanctionHistoryRecord row(SanctionHistoryEntry entry, long id) {
+        ModerationSanctionHistoryRecord row = new ModerationSanctionHistoryRecord();
+        row.setId(id);
+        row.setAction(entry.action().name());
+        row.setTarget(entry.target().toString());
+        row.setReason(entry.reason()
+                .map(reason -> fit(MODERATION_SANCTION_HISTORY.REASON, reason))
+                .orElse(null));
+        row.setActor(actorUuid(entry));
+        row.setActorName(
+                fit(MODERATION_SANCTION_HISTORY.ACTOR_NAME, entry.actor().name()));
+        row.setIp(entry.ip().orElse(null));
+        row.setExpiresAt(entry.expiry().map(Instant::toEpochMilli).orElse(null));
+        row.setTs(entry.at().toEpochMilli());
+        return row;
     }
 
     private static long nextId(DSLContext dsl) {

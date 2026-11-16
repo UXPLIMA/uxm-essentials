@@ -23,6 +23,14 @@ public interface SanctionHistory {
     /** Append one history row. The store assigns the row's synthetic key; the row is never updated after. */
     void append(SanctionHistoryEntry entry);
 
+    /**
+     * Append several rows in one transaction, for a command that sanctions many players at once ({@code /kickall}).
+     * The store assigns the keys for the whole batch, so a large batch costs one write rather than one per row.
+     */
+    default void appendAll(List<SanctionHistoryEntry> entries) {
+        entries.forEach(this::append);
+    }
+
     /** {@code target}'s ban-family rows (ban and unban) newest-first, capped at {@code limit}. */
     List<SanctionHistoryEntry> banHistory(UUID target, int limit);
 
@@ -34,6 +42,13 @@ public interface SanctionHistory {
 
     /** Rows of every kind issued by {@code actor} ({@code /staffhistory}) newest-first, capped at {@code limit}. */
     List<SanctionHistoryEntry> recentByActor(UUID actor, int limit);
+
+    /**
+     * The player bans, mutes and warnings {@code actor} issued, newest-first, capped at {@code limit}: the rows
+     * {@code /staffrollback} can undo. IP-scoped rows, kicks and lifts are left out by the read itself, so they
+     * never use up the limit.
+     */
+    List<SanctionHistoryEntry> revocableByActor(UUID actor, int limit);
 
     /**
      * Every row (any kind, any target, any actor) applied at or after {@code threshold}, newest-first, capped at

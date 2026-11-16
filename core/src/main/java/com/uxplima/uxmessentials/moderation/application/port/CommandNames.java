@@ -14,7 +14,8 @@ public interface CommandNames {
     /**
      * Every name of the command {@code word} runs: its own name, the label it was registered under and the aliases
      * it lists, lower case and without a {@code plugin:} namespace. Empty when no command answers to {@code word}.
-     * Called on the thread of the player who typed the command, so it must be a cheap in-memory read.
+     * Called on the thread of the player who typed the command, once per typed command, so it must not do I/O. On
+     * Paper a lookup is not free: it walks the command tree and allocates, which is why the policy keeps what it can.
      *
      * @param word the command word as typed, lower case, with or without a namespace
      */

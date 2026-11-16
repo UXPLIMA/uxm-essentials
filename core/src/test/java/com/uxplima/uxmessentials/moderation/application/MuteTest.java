@@ -175,4 +175,15 @@ class MuteTest {
 
         assertThat(records.loadMute(SAM)).isInstanceOf(MuteState.Permanent.class);
     }
+
+    @Test
+    void aTempmuteOfAnExemptPlayerIsRefusedAsExemptBeforeTheDuration() {
+        permissions.grant(SAM, ModerationGuard.EXEMPT_NODE);
+
+        assertThat(mute.tempmute(ALEX, SAM, "perm", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.TARGET_EXEMPT);
+
+        assertThat(lastToldTo(ALEX).key()).isEqualTo(ModerationMessageKey.TARGET_EXEMPT.key());
+        assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
+    }
 }

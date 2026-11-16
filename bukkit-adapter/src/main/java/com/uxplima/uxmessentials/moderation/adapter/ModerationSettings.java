@@ -46,6 +46,7 @@ public final class ModerationSettings {
     private final Optional<String> defaultJail;
     private final boolean wallClockDefault;
     private final Set<String> mutedBlockedCommands;
+    private final Set<String> mutedAllowedCommands;
     private final WarnEscalation warnEscalation;
     private final boolean silentByDefault;
     private final AddressStrictness addressStrictness;
@@ -66,6 +67,9 @@ public final class ModerationSettings {
         this.mutedBlockedCommands = config.getStringList("muted-blocked-commands", DEFAULT_BLOCKED_COMMANDS).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
+        this.mutedAllowedCommands = config.getStringList("muted-allowed-commands", List.of()).stream()
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
         this.warnEscalation = parseEscalation(config.getStringList("warnings.actions", DEFAULT_ESCALATION), log);
         this.silentByDefault = config.getBoolean("broadcast.silent-by-default", false);
         this.addressStrictness = AddressStrictness.parse(config.getString("address-strictness", "NORMAL"));
@@ -77,6 +81,11 @@ public final class ModerationSettings {
     /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
     public Set<String> mutedBlockedCommands() {
         return mutedBlockedCommands;
+    }
+
+    /** The command words a muted player may always run, checked before the blocked list, case-folded. */
+    public Set<String> mutedAllowedCommands() {
+        return mutedAllowedCommands;
     }
 
     /** The configured warn-escalation ladder ({@code count:action:duration} rungs), parsed at wire time. */

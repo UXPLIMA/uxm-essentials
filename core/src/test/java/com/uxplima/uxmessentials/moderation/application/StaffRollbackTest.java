@@ -39,7 +39,7 @@ class StaffRollbackTest {
     void aLimitAboveTheMostIsLoweredAndTheStaffMemberIsTold() {
         rollback.rollback(ALEX, SAM, 2_000);
 
-        assertThat(history.actorReadLimits()).containsExactly(StaffRollback.MAX_LIMIT);
+        assertThat(history.revocableReadLimits()).containsExactly(StaffRollback.MAX_LIMIT);
         assertThat(notifier.sent())
                 .contains(new RecordingNotifier.Sent(
                         ALEX,
@@ -51,7 +51,7 @@ class StaffRollbackTest {
     void aLimitWithinTheMostIsReadAsGivenWithoutANotice() {
         rollback.rollback(ALEX, SAM, StaffRollback.MAX_LIMIT);
 
-        assertThat(history.actorReadLimits()).containsExactly(StaffRollback.MAX_LIMIT);
+        assertThat(history.revocableReadLimits()).containsExactly(StaffRollback.MAX_LIMIT);
         assertThat(notifier.keys()).containsExactly(ModerationMessageKey.MOD_STAFFROLLBACK_NONE.key());
     }
 }

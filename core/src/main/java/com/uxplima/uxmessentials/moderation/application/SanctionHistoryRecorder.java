@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -82,6 +83,22 @@ public final class SanctionHistoryRecorder {
     public void kick(PlayerRef actor, PlayerRef target, Optional<String> reason) {
         Objects.requireNonNull(target, "target");
         append(SanctionAction.KICK, target.uuid(), actor, reason, Optional.empty(), Optional.empty());
+    }
+
+    /**
+     * Record one kick per player of {@code targets} in one batch, every row stamped with the same instant: the rows
+     * of one {@code /kickall} share it, which is how {@link PunishmentStats} counts them as one action.
+     */
+    public void kicks(PlayerRef actor, List<PlayerRef> targets, Optional<String> reason) {
+        Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(targets, "targets");
+        Objects.requireNonNull(reason, "reason");
+        Instant at = clock.instant();
+        Issuer issuer = Issuer.of(actor);
+        store.appendAll(targets.stream()
+                .map(target -> new SanctionHistoryEntry(
+                        SanctionAction.KICK, target.uuid(), issuer, reason, at, Optional.empty(), Optional.empty()))
+                .toList());
     }
 
     private void append(

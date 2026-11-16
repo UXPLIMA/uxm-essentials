@@ -108,13 +108,21 @@ banned at least as long keeps its own ban, so a capped `/ban` never shortens a p
 A muted player cannot chat, and cannot use this plugin's private messages, mail or helpop. The commands in
 `muted-blocked-commands` are also refused while muted, which covers other plugins' and the game's own message
 commands. Write each as the bare command word. It also stops the namespaced forms, such as `/minecraft:msg` and
-`/essentials:msg`, and the other names the server lists for that command, such as an alias another plugin gave it.
-The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the default
-does:
+`/essentials:msg`. An entry blocks whatever command owns that word, under all of its names, whichever plugin
+registered it: if a ticket plugin's `/ticketreply` also answers to `/reply`, the entry `reply` blocks `/ticketreply`
+too. The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the
+default does.
+
+`muted-allowed-commands` lists words a muted player may always run. It is checked first and matches only the word
+written (with or without a namespace), never the command's other names, so it frees exactly that word:
 
 ```
 muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply"]
+muted-allowed-commands = ["ticketreply"]
 ```
+
+With that, a muted player can run `/ticketreply` but not `/reply`. The names of the listed commands are read from
+the server once and again after a plugin is enabled or disabled, the server finishes starting, or `/uxmess reload`.
 
 `/mute` refuses a player who is already muted and says how long that mute still runs; `/unmute` first to change a
 mute. When two servers of a network mute the same player at the same moment, the first mute stays and the second is
@@ -168,7 +176,8 @@ step landed.
 `/kick` disconnects a player on this server with an optional reason. On a network, a player connected to another
 server cannot be kicked from here; the command says which server they are on. A player who is not online anywhere
 is not kicked, and the command says so. `/kickall` kicks everyone on this server but you and exempt players, and
-writes a kick to the history of each player it kicked, the same row `/kick` writes.
+writes a kick to the history of each player it kicked, the same row `/kick` writes. The kicks and the answer never
+wait for the database: the history is written afterwards in one go, and if that fails the log says so.
 
 ## Jail
 
@@ -195,7 +204,9 @@ by editing the file.
 
 `/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`.
 With `default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so
-nobody is sent to a jail no one chose. A jailed player is released without naming a jail.
+nobody is sent to a jail no one chose. A jailed player is released without naming a jail. A `default-jail` that
+names no jail is refused the same way, saying the configured default does not exist, and the log warns about it at
+startup.
 
 ```
 default-jail = "spawnjail"
@@ -319,8 +330,8 @@ it banned, naming the player; an address that kept its own longer ban gets no ro
 | `/checkban <player>`, `/checkmute <player>` | `uxmessentials.moderation.check` | Whether the player is banned or muted now. |
 | `/banlist`, `/mutelist` | `uxmessentials.moderation.banlist`, `uxmessentials.moderation.mutelist` | Bans and mutes in effect (up to 50). |
 | `/staffhistory <staff>` | `uxmessentials.moderation.staffhistory` | What one staff member has issued. |
-| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given, at most 500; a larger limit is lowered to 500 and the command says so. A sanction since replaced by another staff member's is left alone. |
-| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. |
+| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 player bans, mutes and warnings unless a limit is given (kicks, lifts and IP bans are not read and do not count), at most 500; a larger limit is lowered to 500 and the command says so. A sanction since replaced by another staff member's is left alone. |
+| `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. Bans are player bans (IP bans are not counted), and a `/kickall` counts as one kick. |
 | `/seen <player>` | `uxmessentials.moderation.seen` | First join and last seen, or the server the player is on now. |
 | `/seenip <player>`, `/alts <player>` | `uxmessentials.moderation.seen` | The last address and the accounts that share it; every account that shared any of the player's addresses. |
 | `/commandspy` (`/cspy`) | `uxmessentials.moderation.commandspy` | Shows you the commands other players run. |
@@ -367,6 +378,7 @@ EssentialsX and LiteBans.
 | `default-jail` | `""` | The jail `/togglejail` uses when no jail is named; empty refuses and lists the jails. |
 | `jail-countdown` | `"online-only"` | How timed jails count down: `online-only` or `wall-clock`. |
 | `muted-blocked-commands` | see [Mutes](#mutes) | Commands a muted player cannot run. |
+| `muted-allowed-commands` | `[]` | Words a muted player may always run, checked first. |
 | `warnings.actions` | `["3:tempmute:1h", "5:tempban:1d"]` | The escalation ladder. |
 | `broadcast.silent-by-default` | `false` | Makes every sanction silent. |
 | `freeze.notice-interval-seconds` | `3` | Seconds between "you are frozen" notices; 0 is none. |

@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.moderation.application;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,6 +12,7 @@ import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 
 /**
  * {@code /togglejail <player> [jail] [reason]}: a convenience wrapper that releases a jailed target or jails a
@@ -22,7 +24,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * <p>Without a jail name a free target goes to the operator's {@code default-jail}. With none set the command is
  * refused and the actor is shown the jails {@code /jail} accepts, the config jails and the {@code /setjail} ones
  * alike, read from the same directory {@code /jail} validates against. Picking one of several jails on the
- * operator's behalf would put a player somewhere nobody chose.
+ * operator's behalf would put a player somewhere nobody chose. A {@code default-jail} that names no jail is refused
+ * the same way, saying the configured default does not exist, rather than as an unknown jail the staff member never
+ * typed.
  */
 public final class ToggleJail {
 
@@ -61,20 +65,31 @@ public final class ToggleJail {
             unjail.unjail(actor, target);
             return;
         }
-        Optional<String> chosen = jailName.isBlank() ? defaultJail : Optional.of(jailName);
-        if (chosen.isEmpty()) {
-            askForJail(actor);
+        if (!jailName.isBlank()) {
+            jail.jail(actor, target, jailName, "", reason);
             return;
         }
-        jail.jail(actor, target, chosen.get(), "", reason);
+        if (defaultJail.isEmpty()) {
+            askForJail(actor, ModerationMessageKey.TOGGLEJAIL_NAME_NEEDED, Map.of());
+            return;
+        }
+        String fallback = defaultJail.get();
+        if (!jails.exists(fallback)) {
+            askForJail(actor, ModerationMessageKey.TOGGLEJAIL_DEFAULT_MISSING, Map.of("jail", fallback));
+            return;
+        }
+        jail.jail(actor, target, fallback, "", reason);
     }
 
-    private void askForJail(PlayerRef actor) {
+    /** Refuse with {@code key} and the jails to choose from, or say there is no jail at all. */
+    private void askForJail(PlayerRef actor, MessageKey key, Map<String, String> placeholders) {
         List<String> names = jails.names();
         if (names.isEmpty()) {
             notifier.send(actor, ModerationMessageKey.JAILS_EMPTY);
             return;
         }
-        notifier.send(actor, ModerationMessageKey.TOGGLEJAIL_NAME_NEEDED, Map.of("jails", String.join(", ", names)));
+        Map<String, String> withJails = new HashMap<>(placeholders);
+        withJails.put("jails", String.join(", ", names));
+        notifier.send(actor, key, withJails);
     }
 }

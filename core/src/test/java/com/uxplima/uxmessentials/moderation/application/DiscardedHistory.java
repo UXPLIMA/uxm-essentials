@@ -36,6 +36,11 @@ final class DiscardedHistory implements SanctionHistory {
     }
 
     @Override
+    public List<SanctionHistoryEntry> revocableByActor(UUID actor, int limit) {
+        return List.of();
+    }
+
+    @Override
     public List<SanctionHistoryEntry> allSince(Instant threshold, int limit) {
         return List.of();
     }

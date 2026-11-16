@@ -2,12 +2,14 @@ package com.uxplima.uxmessentials.moderation.application;
 
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
@@ -26,7 +28,10 @@ import com.uxplima.uxmessentials.moderation.domain.StaffPunishmentCount;
  *
  * <p>The lifts ({@link SanctionAction#UNBAN}, {@link SanctionAction#UNMUTE}) are reversals rather than
  * punishments, so they are never counted; a staff member who only lifted sanctions therefore does not appear
- * in the leaderboard. Grouping is by issuer identity, the UUID when present, else a console key derived from
+ * in the leaderboard. The bans counted are player bans: an IP ban row ({@code /banip}, {@code /tempbanip} and the
+ * addresses a STRICT {@code /ban} adds) is left out, so one STRICT ban counts once however many addresses it reached.
+ * The kicks of one {@code /kickall} are written with one shared instant and count as one kick, so clearing a server
+ * does not read as hundreds of punishments. Grouping is by issuer identity, the UUID when present, else a console key derived from
  * the name, and each group's display name is taken from its most recent row, so a since-renamed staff member
  * shows their current name. The leaderboard orders by total punishments descending, breaking ties by name so
  * the ordering is stable.
@@ -42,7 +47,7 @@ public final class PunishmentStats {
         Objects.requireNonNull(since, "since");
         Map<String, Accumulator> byStaff = new LinkedHashMap<>();
         for (SanctionHistoryEntry row : rows) {
-            if (withinWindow(row, since) && isPunishment(row.action())) {
+            if (withinWindow(row, since) && isPunishment(row)) {
                 accumulate(byStaff, row);
             }
         }
@@ -53,9 +58,10 @@ public final class PunishmentStats {
         return since.map(threshold -> !row.at().isBefore(threshold)).orElse(true);
     }
 
-    private static boolean isPunishment(SanctionAction action) {
-        return switch (action) {
-            case BAN, MUTE, WARN, KICK -> true;
+    private static boolean isPunishment(SanctionHistoryEntry row) {
+        return switch (row.action()) {
+            case BAN -> row.ip().isEmpty();
+            case MUTE, WARN, KICK -> true;
             case UNBAN, UNMUTE -> false;
         };
     }
@@ -63,7 +69,7 @@ public final class PunishmentStats {
     private static void accumulate(Map<String, Accumulator> byStaff, SanctionHistoryEntry row) {
         Accumulator accumulator = byStaff.computeIfAbsent(identity(row.actor()), key -> new Accumulator(row.actor()));
         accumulator.observe(row.actor(), row.at());
-        accumulator.count(row.action());
+        accumulator.count(row.action(), row.at());
     }
 
     /** The grouping key: the issuer UUID when present, else a console key so console rows fold together by name. */
@@ -91,6 +97,7 @@ public final class PunishmentStats {
         private int mutes;
         private int warns;
         private int kicks;
+        private final Set<Instant> kickedAt = new HashSet<>();
 
         Accumulator(Issuer issuer) {
             this.uuid = issuer.uuid();
@@ -106,12 +113,17 @@ public final class PunishmentStats {
             }
         }
 
-        void count(SanctionAction action) {
+        void count(SanctionAction action, Instant at) {
             switch (action) {
                 case BAN -> bans++;
                 case MUTE -> mutes++;
                 case WARN -> warns++;
-                case KICK -> kicks++;
+                case KICK -> {
+                    // The rows of one /kickall share their instant; the first counts for the whole command.
+                    if (kickedAt.add(at)) {
+                        kicks++;
+                    }
+                }
                 case UNBAN, UNMUTE -> {
                     // Lifts are filtered before this method; the exhaustive switch keeps the compiler honest.
                 }

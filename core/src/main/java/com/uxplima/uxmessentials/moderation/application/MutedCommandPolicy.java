@@ -1,12 +1,14 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.moderation.application.port.CommandNames;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The pure rule that closes the mute-bypass via chat-adjacent commands: a muted player can still type
@@ -18,34 +20,39 @@ import com.uxplima.uxmessentials.moderation.application.port.CommandNames;
  *
  * <p>The match ignores case, a leading slash and a {@code plugin:} namespace, so the entry {@code msg} also stops
  * {@code /minecraft:msg} and {@code /essentials:msg}: a list that had to name every namespaced form would leave a
- * gap for each plugin that registers one. An entry also stops every other name of the same command, as far as the
- * server's command list tells them apart. On Paper an alias can be its own entry that knows nothing of the command
- * it points at while the command lists its aliases, so names are compared both ways. The cheap checks run first:
- * the typed word against the list, then the typed command's names, and only then the names of each listed entry,
- * a handful of in-memory lookups for a command that passed the first two.
+ * gap for each plugin that registers one. An entry also stops every name of the command that owns the word, as far
+ * as the server's command list tells them apart. On Paper an alias can be its own entry that knows nothing of the
+ * command it points at while the command lists its aliases, so names are compared both ways.
  *
- * <p>The domain never reads the live mute state or the wall clock; the adapter consults
- * {@link com.uxplima.uxmessentials.moderation.domain.MuteState} after this policy says the label is blocked.
+ * <p>That reach can catch a command the operator meant to leave alone (a ticket plugin's {@code /ticketreply} that
+ * lists {@code reply} as an alias), so {@code muted-allowed-commands} is checked first: a typed word on it always
+ * runs. That list matches the typed word alone, without the namespace and without looking up other names, so it
+ * frees exactly the word written and nothing else.
+ *
+ * <p>This runs for every command any player types, before the mute is read. The names of the listed entries do not
+ * depend on what was typed, so they are resolved once and kept until {@link #forgetCommandNames} (a plugin was
+ * enabled or disabled, the server finished loading, or the plugin reloaded); a check is then string set lookups
+ * and one lookup of the typed command. The domain never reads the live mute state or the wall clock; the adapter
+ * consults {@link com.uxplima.uxmessentials.moderation.domain.MuteState} after this policy says the label is blocked.
  */
 public final class MutedCommandPolicy {
 
     private final Set<String> blocked;
+    private final Set<String> allowed;
     private final CommandNames names;
+    private volatile @Nullable Set<String> listedNames;
 
     /**
      * @param blockedCommands the configured command words a muted player may not run, in any case; a leading
      *     slash or a namespace on an entry is tolerated and stripped, so {@code "/me"}, {@code "minecraft:me"} and
      *     {@code "me"} are equivalent
+     * @param allowedCommands the configured words a muted player may always run, written and stripped the same way
      * @param names how the server knows a command word
      */
-    public MutedCommandPolicy(Set<String> blockedCommands, CommandNames names) {
-        Objects.requireNonNull(blockedCommands, "blockedCommands");
+    public MutedCommandPolicy(Set<String> blockedCommands, Set<String> allowedCommands, CommandNames names) {
+        this.blocked = words(Objects.requireNonNull(blockedCommands, "blockedCommands"));
+        this.allowed = words(Objects.requireNonNull(allowedCommands, "allowedCommands"));
         this.names = Objects.requireNonNull(names, "names");
-        this.blocked = blockedCommands.stream()
-                .filter(Objects::nonNull)
-                .map(entry -> bare(word(entry)))
-                .filter(label -> !label.isEmpty())
-                .collect(Collectors.toUnmodifiableSet());
     }
 
     /** True when {@code label}, the command word as typed, is a command a muted player is forbidden to run. */
@@ -53,23 +60,45 @@ public final class MutedCommandPolicy {
         Objects.requireNonNull(label, "label");
         String typed = word(label);
         String bare = bare(typed);
-        if (bare.isEmpty()) {
+        if (bare.isEmpty() || blocked.isEmpty() || allowed.contains(bare)) {
             return false;
         }
-        if (blocked.contains(bare) || !Collections.disjoint(names.namesOf(typed), blocked)) {
+        if (blocked.contains(bare) || listedNames().contains(bare)) {
             return true;
         }
-        for (String entry : blocked) {
-            if (names.namesOf(entry).contains(bare)) {
-                return true;
-            }
-        }
-        return false;
+        return !Collections.disjoint(names.namesOf(typed), blocked);
     }
 
     /** True when no command is blocked, so the adapter can skip the mute lookup entirely. */
     public boolean isEmpty() {
         return blocked.isEmpty();
+    }
+
+    /** Drop the resolved names of the listed entries, so the next check reads them from the server again. */
+    public void forgetCommandNames() {
+        listedNames = null;
+    }
+
+    /** Every name of every listed entry's command; resolved on first use and kept until forgotten. */
+    private Set<String> listedNames() {
+        Set<String> known = listedNames;
+        if (known == null) {
+            Set<String> resolved = new HashSet<>();
+            for (String entry : blocked) {
+                resolved.addAll(names.namesOf(entry));
+            }
+            known = Set.copyOf(resolved);
+            listedNames = known;
+        }
+        return known;
+    }
+
+    private static Set<String> words(Set<String> entries) {
+        return entries.stream()
+                .filter(Objects::nonNull)
+                .map(entry -> bare(word(entry)))
+                .filter(label -> !label.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     /** The command word without a leading slash, in lower case. */
