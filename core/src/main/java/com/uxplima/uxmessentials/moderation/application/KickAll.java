@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.moderation.application;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -55,13 +56,27 @@ public final class KickAll {
         this.log = Objects.requireNonNull(log, "log");
     }
 
+    /**
+     * Everyone online now. Read it on the server thread, then hand it to the kick on the moderation lane, which reads
+     * each one's immunity on their own thread first.
+     */
+    public List<PlayerRef> online() {
+        return List.copyOf(sanctions.onlinePlayers());
+    }
+
     /** Kick every online player but {@code actor} and the exempt; return the number kicked. */
     public int kickAll(PlayerRef actor, Optional<String> reason) {
+        return kickAll(actor, sanctions.onlinePlayers(), reason);
+    }
+
+    /** Kick each of {@code targets} but {@code actor} and the exempt; return the number kicked. */
+    public int kickAll(PlayerRef actor, Collection<PlayerRef> targets, Optional<String> reason) {
         Objects.requireNonNull(actor, "actor");
+        Objects.requireNonNull(targets, "targets");
         Objects.requireNonNull(reason, "reason");
         MessageKey key = ModerationMessageKey.KICK_KICKED;
         List<PlayerRef> kicked = new ArrayList<>();
-        for (PlayerRef target : sanctions.onlinePlayers()) {
+        for (PlayerRef target : targets) {
             if (target.equals(actor) || guard.isExempt(target)) {
                 continue;
             }

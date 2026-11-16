@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.testing.FakePermissions;
 import com.uxplima.uxmessentials.testing.MutableClock;
+import com.uxplima.uxmessentials.testing.OnlineLookup;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
 import com.uxplima.uxmessentials.testing.RecordingLogger;
 import com.uxplima.uxmessentials.testing.RecordingNotifier;
@@ -42,7 +43,7 @@ class LoginGateTest {
                     notifier.notifier(),
                     new SilentAudit(),
                     clock),
-            new StorageLane(scheduler, notifier.notifier(), new FakePermissions(), log),
+            new StorageLane(scheduler, notifier.notifier(), new FakePermissions(), new OnlineLookup(), log),
             notifier.notifier(),
             log,
             clock);
