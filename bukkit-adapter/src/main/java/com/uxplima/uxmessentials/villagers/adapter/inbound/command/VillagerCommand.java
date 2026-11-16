@@ -116,19 +116,29 @@ public final class VillagerCommand implements CommandRegistration {
     }
 
     private int openManager(CommandContext<CommandSourceStack> ctx) {
-        VillagerManagerView view = Objects.requireNonNull(managerView, "managerView");
         CommandSender sender = Sender.audience(ctx.getSource());
         if (!(sender instanceof Player player)) {
             feedback.send(sender, SharedMessageKey.COMMAND_PLAYERS_ONLY);
             return 0;
         }
+        openManager(player);
+        return Command.SINGLE_SUCCESS;
+    }
+
+    /**
+     * Open the trade manager on the villager {@code player} looks at, else the nearest one in reach, or say there is
+     * none. Public so the {@code /uxmess gui} hub tile finds its villager exactly as {@code /villager manager} does.
+     * Runs on the player's own region thread, where the reach scan is legal.
+     */
+    public void openManager(Player player) {
+        Objects.requireNonNull(player, "player");
+        VillagerManagerView view = Objects.requireNonNull(managerView, "managerView");
         Villager target = targetVillager(player);
         if (target == null) {
             feedback.send(player, VillagersMessageKey.VILLAGERS_MANAGER_NO_TARGET);
-            return Command.SINGLE_SUCCESS;
+            return;
         }
         view.open(player, BukkitRefs.toRef(player), target);
-        return Command.SINGLE_SUCCESS;
     }
 
     private int toggleProtect(CommandContext<CommandSourceStack> ctx) {

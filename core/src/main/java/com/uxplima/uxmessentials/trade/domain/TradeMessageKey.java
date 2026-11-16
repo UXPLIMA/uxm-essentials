@@ -81,7 +81,11 @@ public enum TradeMessageKey implements MessageKey {
     TRADE_RETURNS_KEPT("trade.returns-kept"),
 
     // The bare /trade root's usage line, shown to a sender who ran it without a target or subcommand.
-    TRADE_USAGE("trade.usage");
+    TRADE_USAGE("trade.usage"),
+
+    // The /uxmess gui hub tile, and the title of the player picker it opens to choose who to send a request to.
+    TRADE_HUB_TILE("trade.hub-tile"),
+    TRADE_PICK_TITLE("trade.pick-title");
 
     private final String key;
 

@@ -74,10 +74,16 @@ public enum PlayerstateMessageKey implements MessageKey {
     // /invsee
     INVSEE_OPENED("playerstate.invsee.opened"),
     INVSEE_TITLE("playerstate.invsee.title"),
+    // The /uxmess gui hub tile and the player picker it opens first.
+    INVSEE_HUB_TILE("playerstate.invsee.hub-tile"),
+    INVSEE_PICK_TITLE("playerstate.invsee.pick-title"),
 
     // /endersee
     ENDERSEE_OPENED("playerstate.endersee.opened"),
     ENDERSEE_TITLE("playerstate.endersee.title"),
+    // The /uxmess gui hub tile and the player picker it opens first.
+    ENDERSEE_HUB_TILE("playerstate.endersee.hub-tile"),
+    ENDERSEE_PICK_TITLE("playerstate.endersee.pick-title"),
 
     // /invsee and /endersee of a player who is offline
     OFFLINE_UNAVAILABLE("playerstate.offline.unavailable"),

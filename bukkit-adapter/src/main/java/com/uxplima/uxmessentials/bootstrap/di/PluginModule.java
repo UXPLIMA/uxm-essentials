@@ -141,9 +141,11 @@ import com.uxplima.uxmessentials.persistence.runtime.Persistence;
 import com.uxplima.uxmessentials.persistence.security.SecurityKeyFile;
 import com.uxplima.uxmessentials.playerstate.adapter.PlayerstateWiring;
 import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.MirrorWindow;
+import com.uxplima.uxmessentials.playerstate.adapter.inbound.gui.OthersGate;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlayerStateQueries;
 import com.uxplima.uxmessentials.playerstate.adapter.outbound.api.PlaytimeQueries;
 import com.uxplima.uxmessentials.playerstate.application.port.PlaytimeRepository;
+import com.uxplima.uxmessentials.playerstate.domain.PlayerstateMessageKey;
 import com.uxplima.uxmessentials.playerwarps.adapter.PlayerwarpsWiring;
 import com.uxplima.uxmessentials.playerwarps.adapter.outbound.api.PlayerWarpQueries;
 import com.uxplima.uxmessentials.poses.adapter.PosesWiring;
@@ -180,8 +182,10 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.UsageBinding;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.EntityListLayout;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiLayouts;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.GuiText;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementHubView;
+import com.uxplima.uxmessentials.shared.adapter.inbound.gui.PickPlayerTile;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApi;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.api.MenuApiImpl;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.menu.vocab.CommandActions;
@@ -288,6 +292,7 @@ import com.uxplima.uxmessentials.shared.application.permission.DestinationPermis
 import com.uxplima.uxmessentials.shared.application.permission.EconomyPermissions;
 import com.uxplima.uxmessentials.shared.application.permission.EnforcementPermissions;
 import com.uxplima.uxmessentials.shared.application.permission.ItemworldPermissions;
+import com.uxplima.uxmessentials.shared.application.permission.PlayerstatePermissions;
 import com.uxplima.uxmessentials.shared.application.permission.SocialPermissions;
 import com.uxplima.uxmessentials.shared.application.port.ClickActionEconomy;
 import com.uxplima.uxmessentials.shared.application.port.ClientProtocol;
@@ -299,6 +304,8 @@ import com.uxplima.uxmessentials.shared.application.port.PlayerNameIndex;
 import com.uxplima.uxmessentials.shared.application.port.PlayerNameRepository;
 import com.uxplima.uxmessentials.shared.application.reload.ReloadTask;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.SharedMessageKey;
 import com.uxplima.uxmessentials.skin.adapter.SkinWiring;
 import com.uxplima.uxmessentials.skin.adapter.outbound.api.SkinQueries;
 import com.uxplima.uxmessentials.staff.adapter.StaffWiring;
@@ -1576,7 +1583,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("kits"))) {
             wireKits(plugin, ctx, resources, links, guiLayouts, guiRegistry, textInput, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("playerstate"))) {
-            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts, menus, menuBindings);
+            wirePlayerstate(plugin, ctx, persistence, resources, links, guiLayouts, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("messaging"))) {
             wireMessaging(
                     plugin,
@@ -1686,7 +1693,7 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("ranks"))) {
             wireRanks(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("trade"))) {
-            wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, menus, menuBindings);
+            wireTrade(plugin, ctx, persistence, resources, textInput, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("security"))) {
             wireSecurity(
                     plugin,
@@ -1701,9 +1708,9 @@ public final class PluginModule {
         } else if (module.id().equals(ModuleId.of("commandcontrol"))) {
             wireCommandControl(plugin, ctx, resources, links);
         } else if (module.id().equals(ModuleId.of("villagers"))) {
-            wireVillagers(plugin, ctx, resources, links, menus, menuBindings);
+            wireVillagers(plugin, ctx, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("invrollback"))) {
-            wireInvrollback(plugin, ctx, persistence, resources, links, menus, menuBindings);
+            wireInvrollback(plugin, ctx, persistence, resources, links, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("guard"))) {
             wireGuard(plugin, ctx, persistence, resources, links, bus, guiRegistry, menus, menuBindings);
         } else if (module.id().equals(ModuleId.of("servertweaks"))) {
@@ -1831,6 +1838,7 @@ public final class PluginModule {
             Persistence persistence,
             CloseableResources resources,
             ContextLinks links,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // invrollback builds its jOOQ SnapshotRepository over persistence.dsl() and registers the death/logout
@@ -1859,6 +1867,18 @@ public final class PluginModule {
         // When this enable last snapshotted the player, read off the capture listener's own record rather than the
         // snapshot table, so a staff HUD line never turns into a query.
         links.placeholders.invrollback(wired.placeholders());
+        // A snapshot list is always one player's, so the hub tile asks for the player first and then opens the list
+        // /invrestore <player> opens, under the same node.
+        guiRegistry.register(new ManagementGuiEntry(
+                "invrollback",
+                com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey.INVROLLBACK_GUI_HUB_TILE,
+                Material.RECOVERY_COMPASS,
+                EnforcementPermissions.INVROLLBACK_RESTORE,
+                PickPlayerTile.opener(
+                        Objects.requireNonNull(links.playerPicker, "playerPicker"),
+                        com.uxplima.uxmessentials.invrollback.domain.InvrollbackMessageKey.INVROLLBACK_GUI_PICK_TITLE,
+                        ctx.kernel().playerLookup(),
+                        (player, viewer, target) -> wired.listView().open(viewer, target))));
     }
 
     private static void wireVillagers(
@@ -1866,6 +1886,7 @@ public final class PluginModule {
             ModuleContext ctx,
             CloseableResources resources,
             ContextLinks links,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // villagers persists nothing relational: the last-restock stamp, the disable flag, and the manager's custom
@@ -1884,6 +1905,17 @@ public final class PluginModule {
                 plugin.getDataFolder().toPath());
         wired.listeners().forEach(resources::addListener);
         wired.commands().forEach(resources::addCommand);
+        // The manager edits one villager, so the hub tile opens it on the villager in reach, as /villager manager
+        // does, and is offered only while the trade manager is switched on.
+        java.util.function.Consumer<org.bukkit.entity.Player> openManager = wired.openManager();
+        if (openManager != null) {
+            guiRegistry.register(new ManagementGuiEntry(
+                    "villagers",
+                    com.uxplima.uxmessentials.villagers.domain.VillagersMessageKey.VILLAGERS_MANAGER_HUB_TILE,
+                    Material.VILLAGER_SPAWN_EGG,
+                    ContentPermissions.VILLAGERS_MANAGER,
+                    (player, viewer) -> openManager.accept(player)));
+        }
         // Present only when the follow sub-feature wired: with nothing able to follow, there is nothing to count.
         VillagersPlaceholders villagers = wired.placeholders();
         if (villagers != null) {
@@ -2021,6 +2053,7 @@ public final class PluginModule {
             TextInput textInput,
             ContextLinks links,
             Bus bus,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // A live same-server trade is transient in-memory state (the TradeSessions registry and its per-trade
@@ -2056,6 +2089,18 @@ public final class PluginModule {
         links.queries.register(UxmTradeQuery.class, new TradeQueries(wired.sessions()));
         // Captured for the relational trade placeholders, which are wired unconditionally after the modules.
         links.tradeSessions = wired.sessions();
+        // The hub tile picks the partner, then sends the request /trade <player> sends, under the same node. A typed
+        // name that is not on this server goes out as a cross-server request, as it does from the command.
+        guiRegistry.register(new ManagementGuiEntry(
+                "trade",
+                com.uxplima.uxmessentials.trade.domain.TradeMessageKey.TRADE_HUB_TILE,
+                Material.BUNDLE,
+                com.uxplima.uxmessentials.trade.adapter.inbound.command.TradeCommand.PERMISSION,
+                PickPlayerTile.opener(
+                        Objects.requireNonNull(links.playerPicker, "playerPicker"),
+                        com.uxplima.uxmessentials.trade.domain.TradeMessageKey.TRADE_PICK_TITLE,
+                        ctx.kernel().playerLookup(),
+                        (player, viewer, target) -> wired.request().accept(player, target.name()))));
         // Both sides of a finished trade count one on the trades board.
         links.boards.define(com.uxplima.uxmlib.board.Board.counter("trades"));
         subscribeUntilClose(ctx, resources, event -> {
@@ -2736,6 +2781,7 @@ public final class PluginModule {
             CloseableResources resources,
             ContextLinks links,
             GuiLayouts guiLayouts,
+            ManagementGuiRegistry guiRegistry,
             Menus menus,
             MenuBindings menuBindings) {
         // playerstate's only durable state is the per-day playtime ledger behind /playtime, built over
@@ -2798,6 +2844,67 @@ public final class PluginModule {
         // Captured so presence (wired later) rebinds the playtime sampler's AFK seam to its live store, so the
         // sampler splits active vs AFK seconds. Until then, or when presence is disabled, it counts all active.
         links.playtimeAfkStatus = wired.afkStatus();
+        registerPlayerstateTiles(ctx, links, guiRegistry, wired);
+    }
+
+    /**
+     * The playerstate hub tiles: the viewer's own playtime panel, and the inventory and ender chest windows, which ask
+     * for the player first. Each tile sits under its command's use node, and a pick of somebody else also takes the
+     * command's others node, so the hub opens nothing the command would refuse.
+     */
+    private static void registerPlayerstateTiles(
+            ModuleContext ctx, ContextLinks links, ManagementGuiRegistry guiRegistry, PlayerstateWiring.Wired wired) {
+        KernelPorts kernel = ctx.kernel();
+        com.uxplima.uxmessentials.playerstate.application.OpenContainer open =
+                wired.services().openContainer();
+        com.uxplima.uxmessentials.shared.adapter.inbound.gui.PlayerPickerView picker =
+                Objects.requireNonNull(links.playerPicker, "playerPicker");
+        OthersGate invsee = new OthersGate(kernel.permissions(), PlayerstatePermissions.INVSEE_OTHERS);
+        OthersGate endersee = new OthersGate(kernel.permissions(), PlayerstatePermissions.ENDERSEE_OTHERS);
+        guiRegistry.register(new ManagementGuiEntry(
+                "playerstate-invsee",
+                PlayerstateMessageKey.INVSEE_HUB_TILE,
+                Material.SPYGLASS,
+                PlayerstatePermissions.INVSEE_USE,
+                PickPlayerTile.opener(
+                        picker,
+                        PlayerstateMessageKey.INVSEE_PICK_TITLE,
+                        kernel.playerLookup(),
+                        (player, viewer, target) -> {
+                            if (invsee.allows(viewer, target)) {
+                                open.openInventory(viewer, target);
+                            } else {
+                                refuse(kernel, viewer);
+                            }
+                        })));
+        guiRegistry.register(new ManagementGuiEntry(
+                "playerstate-endersee",
+                PlayerstateMessageKey.ENDERSEE_HUB_TILE,
+                Material.ENDER_EYE,
+                PlayerstatePermissions.ENDERSEE_USE,
+                PickPlayerTile.opener(
+                        picker,
+                        PlayerstateMessageKey.ENDERSEE_PICK_TITLE,
+                        kernel.playerLookup(),
+                        (player, viewer, target) -> {
+                            if (endersee.allows(viewer, target)) {
+                                open.openEnderChest(viewer, target);
+                            } else {
+                                refuse(kernel, viewer);
+                            }
+                        })));
+        guiRegistry.register(new ManagementGuiEntry(
+                "playerstate-playtime",
+                PlayerstateMessageKey.PLAYTIME_GUI_TITLE,
+                Material.DAYLIGHT_DETECTOR,
+                PlayerstatePermissions.PLAYTIME_USE,
+                (player, viewer) -> wired.playtimeView().open(player, viewer, viewer)));
+    }
+
+    /** The no-permission line a refused hub pick answers, as the command answers a refused name. */
+    private static void refuse(KernelPorts kernel, PlayerRef viewer) {
+        kernel.messageSink()
+                .deliver(viewer, kernel.messages().resolve(viewer, SharedMessageKey.COMMAND_NO_PERMISSION, Map.of()));
     }
 
     private static void wireMessaging(
