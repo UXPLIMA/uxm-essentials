@@ -64,10 +64,11 @@ class CrossServerJailTest {
     private final List<String> connects = new ArrayList<>();
     private final List<Backend> backends = new ArrayList<>();
     private boolean deliveredTwice;
+    private boolean proxyAvailable = true;
     private final HopConnector proxy = new HopConnector() {
         @Override
         public boolean isAvailable() {
-            return true;
+            return proxyAvailable;
         }
 
         @Override
@@ -231,6 +232,50 @@ class CrossServerJailTest {
         assertThat(connects).containsExactly("Alex->prison");
         assertThat(lobby.staff.lines).containsExactly(STAFF_FAILED);
         assertThat(survival.staff.lines).containsExactly(STAFF_FAILED);
+    }
+
+    @Test
+    void aTransferTurnedAwayEveryTimeWaitsLongerBeforeEachRetryUpToTheCap() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        proxyAvailable = false;
+
+        jailAlex();
+        assertThat(failedLines()).isEqualTo(1);
+
+        // Each retry is turned away at once; the waits go 30 s, 1 min, 2 min, 4 min, then stay at 5 min.
+        List<Duration> waits = List.of(
+                Duration.ofSeconds(30),
+                Duration.ofMinutes(1),
+                Duration.ofMinutes(2),
+                Duration.ofMinutes(4),
+                JailTransfer.LONGEST_RETRY,
+                JailTransfer.LONGEST_RETRY);
+        int expected = 1;
+        for (Duration wait : waits) {
+            scheduler.advance(wait.minusSeconds(1));
+            assertThat(failedLines()).isEqualTo(expected);
+            scheduler.advance(Duration.ofSeconds(1));
+            assertThat(failedLines()).isEqualTo(++expected);
+        }
+    }
+
+    @Test
+    void aNewJailAfterAReleaseStartsTheRetriesAgainFromTheFirstWait() {
+        jailSetOn(PRISON);
+        connect(ALEX, lobby);
+        proxyAvailable = false;
+        jailAlex();
+        scheduler.advance(Duration.ofMinutes(4));
+        lobby.unjail.unjail(SAM, ALEX);
+        // The retry still waiting finds the release and ends the transfer.
+        scheduler.advance(JailTransfer.LONGEST_RETRY);
+        int before = failedLines();
+
+        jailAlex();
+        scheduler.advance(JailTransfer.FIRST_RETRY);
+
+        assertThat(failedLines()).isEqualTo(before + 2);
     }
 
     @Test
@@ -398,6 +443,12 @@ class CrossServerJailTest {
         backend.arrival.onArrival(ALEX);
         backend.countdown.onJoin(ALEX);
         scheduler.advance(SETTLE);
+    }
+
+    private int failedLines() {
+        return (int) lobby.read.stream()
+                .filter("Alex moderation.jail.cross-server.failed"::equals)
+                .count();
     }
 
     private List<String> staffLines() {
