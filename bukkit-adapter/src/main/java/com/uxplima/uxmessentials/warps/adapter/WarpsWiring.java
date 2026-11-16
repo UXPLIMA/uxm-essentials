@@ -15,6 +15,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.NetworkConfig;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.WarpSync;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
@@ -169,6 +170,7 @@ public final class WarpsWiring {
                 kernel.playerLookup(),
                 warpHops,
                 paid,
+                PasswordAttempts.fromConfig(ctx.config(), java.time.Clock.systemUTC()),
                 kernel.log());
         // The per-warp editor hub now renders through the menu engine: a declarative spec over the edited warp as its
         // subject. The manager opens it on a warp click, the /warp editor command and the create flow open it, and the

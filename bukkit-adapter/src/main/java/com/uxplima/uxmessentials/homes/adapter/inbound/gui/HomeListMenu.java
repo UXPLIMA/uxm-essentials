@@ -29,7 +29,6 @@ import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
-import com.uxplima.uxmessentials.shared.domain.WorldRef;
 import com.uxplima.uxmessentials.shared.domain.claim.ClaimDecision;
 import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import com.uxplima.uxmlib.menu.Menus;
@@ -257,15 +256,10 @@ public final class HomeListMenu {
     }
 
     private int maxSlots(PlayerRef viewer) {
-        // Scope the quota to the viewer's world so a world-scoped limit node folds in, exactly as the old grid did.
-        // getWorld() reads a cached reference and is safe off the entity thread; an offline viewer resolves unscoped.
-        HomeLimit limit = quota.resolve(viewer, viewerWorld(viewer));
+        // The grid spans every world, so it is sized by the limit on all the viewer's homes; a world node only caps the
+        // homes in its own world.
+        HomeLimit limit = quota.resolve(viewer);
         return Math.min(limit.maxSlots(unlimitedMax), unlimitedMax);
-    }
-
-    @Nullable private WorldRef viewerWorld(PlayerRef viewer) {
-        Player live = org.bukkit.Bukkit.getPlayer(viewer.uuid());
-        return live == null ? null : BukkitRefs.toRef(live.getWorld());
     }
 
     private Map<String, String> nameOf(Home home) {

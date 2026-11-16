@@ -40,7 +40,7 @@ public final class RepositoryHomesPlaceholders implements HomesPlaceholders {
 
     @Override
     public int limit(PlayerRef who) {
-        HomeLimit limit = quota.resolve(Objects.requireNonNull(who, "who"), null);
+        HomeLimit limit = quota.resolve(Objects.requireNonNull(who, "who"));
         return limit.unlimited() ? -1 : limit.cap();
     }
 

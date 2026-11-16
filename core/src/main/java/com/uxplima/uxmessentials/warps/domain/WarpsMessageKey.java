@@ -69,6 +69,7 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_UNSAFE("warp.unsafe"),
     WARP_LOCKED("warp.locked"),
     WARP_WRONG_PASSWORD("warp.wrong-password"),
+    WARP_RATE_LIMITED("warp.rate-limited"),
     WARP_PASSWORD_SET("warp.password-set"),
     WARP_PASSWORD_CLEARED("warp.password-cleared"),
     WARP_LOCK_TOGGLED("warp.lock-toggled"),

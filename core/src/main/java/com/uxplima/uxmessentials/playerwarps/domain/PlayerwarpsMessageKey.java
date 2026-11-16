@@ -44,6 +44,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_NAME_TAKEN("pwarp.name-taken"),
     PWARP_LIMIT_REACHED("pwarp.limit-reached"),
     PWARP_WORLD_LIMIT_REACHED("pwarp.world-limit-reached"),
+    PWARP_TRANSFER_LIMIT_REACHED("pwarp.transfer-limit-reached"),
     PWARP_NOT_PUBLIC("pwarp.not-public"),
     PWARP_SUSPENDED("pwarp.suspended"),
     PWARP_BANNED("pwarp.banned"),

@@ -17,11 +17,14 @@ from 1 to the limit. A permission raises the limit for a player:
 | Node | Effect |
 |---|---|
 | `uxmessentials.home.limit.<n>` | up to `n` homes |
-| `uxmessentials.home.limit.<world>.<n>` | up to `n` homes when the new home is in `<world>` |
+| `uxmessentials.home.limit.<world>.<n>` | up to `n` homes in `<world>`, counting only the homes there; the limit on all homes still applies |
 | `uxmessentials.home.limit.-1` | no limit; the grid stops at `unlimited-max` slots |
 
 With `limit-mode = "highest"` the largest tier the player holds wins: a player with `limit.5` and `limit.10` keeps
-10 homes. With `limit-mode = "stack"` the tiers add up, so the same player keeps 15.
+10 homes. With `limit-mode = "stack"` the tiers add up, so the same player keeps 15. A world node is checked on its
+own, the largest one held for that world winning in either mode: a player with `limit.10` and
+`limit.world_nether.2` keeps up to 10 homes, at most 2 of them in `world_nether`. Moving a home into a world counts
+toward that world's limit as setting one there does.
 
 A player who loses a rank keeps the homes they already have. They cannot set a new one until they are under the
 new limit again, even if a lower slot is empty; the chat line names the limit.

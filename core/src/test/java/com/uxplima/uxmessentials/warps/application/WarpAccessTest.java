@@ -11,6 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -67,6 +68,7 @@ class WarpAccessTest {
                 new WarpFakes.Online(),
                 WarpHops.local(LOBBY),
                 new PaidTeleports(new SteppedScheduler(clock), new RecordingLogger()),
+                PasswordAttempts.defaults(clock),
                 new RecordingLogger());
     }
 

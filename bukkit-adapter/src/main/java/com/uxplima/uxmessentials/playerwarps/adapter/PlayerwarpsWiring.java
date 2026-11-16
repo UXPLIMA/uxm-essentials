@@ -46,7 +46,6 @@ import com.uxplima.uxmessentials.playerwarps.application.ListPlayerWarps;
 import com.uxplima.uxmessentials.playerwarps.application.ManageBans;
 import com.uxplima.uxmessentials.playerwarps.application.ManageMembers;
 import com.uxplima.uxmessentials.playerwarps.application.ManageWhitelist;
-import com.uxplima.uxmessentials.playerwarps.application.PasswordAttempts;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHopResolver;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpHops;
 import com.uxplima.uxmessentials.playerwarps.application.PlayerWarpQuota;
@@ -88,6 +87,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistr
 import com.uxplima.uxmessentials.shared.adapter.outbound.ChargeReceipts;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.hop.CrossServerHops;
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.hop.HopDepartures;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
@@ -246,7 +246,7 @@ public final class PlayerwarpsWiring {
                 memberStore,
                 whitelistStore,
                 passwordStore,
-                passwordAttempts(ctx),
+                PasswordAttempts.fromConfig(ctx.config(), Clock.systemUTC()),
                 economy,
                 localServerId,
                 new PlayerWarpHops(departures, hops.charges(), hopResolver, notifier),
@@ -306,7 +306,7 @@ public final class PlayerwarpsWiring {
         EditPlayerWarp editPlayerWarp = new EditPlayerWarp(
                 repository, warpAuthorization, notifier, passwordStore, Clock.systemUTC(), recordedServer, worldLimit);
         TransferPlayerWarp transferPlayerWarp =
-                new TransferPlayerWarp(repository, warpAuthorization, notifier, Clock.systemUTC());
+                new TransferPlayerWarp(repository, warpAuthorization, quota, worldLimit, notifier, Clock.systemUTC());
         // The sponsorship sub-group: an owner buys a paid, time-limited pinned browse slot through the same
         // WarpAuthorization (owner-only) and the economy seam already built. When economy is disabled the sub-group is
         // forced off (a paid feature cannot run for free), so its command branch, its manage button, its pinned slots,
@@ -793,20 +793,6 @@ public final class PlayerwarpsWiring {
                 transferPlayerWarp,
                 buySponsorship,
                 sponsorConfig);
-    }
-
-    /**
-     * The wrong-password limit, the module's {@code password-attempts} block. At least one attempt is always allowed;
-     * a lockout of 0 is the only way to turn the limit off.
-     */
-    private static PasswordAttempts passwordAttempts(ModuleContext ctx) {
-        int maxAttempts = Math.max(
-                1, ctx.config().getInt("password-attempts.max-attempts", PasswordAttempts.DEFAULT_MAX_ATTEMPTS));
-        long lockoutSeconds = Math.max(
-                0L,
-                ctx.config()
-                        .getLong("password-attempts.lockout-seconds", PasswordAttempts.DEFAULT_LOCKOUT.toSeconds()));
-        return new PasswordAttempts(maxAttempts, Duration.ofSeconds(lockoutSeconds), Clock.systemUTC());
     }
 
     private static int defaultLimit(ModuleContext ctx) {

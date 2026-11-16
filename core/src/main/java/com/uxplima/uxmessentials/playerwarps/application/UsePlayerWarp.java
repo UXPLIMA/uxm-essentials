@@ -20,6 +20,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpError;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
