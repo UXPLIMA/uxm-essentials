@@ -2,7 +2,6 @@ package com.uxplima.uxmessentials.shared.adapter.outbound.hop;
 
 import java.time.Clock;
 import java.util.Objects;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.bukkit.event.Listener;
 
@@ -39,7 +38,7 @@ public final class CrossServerHops {
     private final Scheduler scheduler;
     private final String server;
     private final Clock clock;
-    private final AtomicReference<LocalWarmups> localWarmups = new AtomicReference<>(LocalWarmups.NONE);
+    private volatile LocalWarmups localWarmups = LocalWarmups.NONE;
 
     /** {@code server} is this backend's network name, stamped as the origin of every hop it sends. */
     public CrossServerHops(
@@ -88,13 +87,12 @@ public final class CrossServerHops {
                 scheduler,
                 server,
                 clock,
-                who -> Objects.requireNonNull(localWarmups.get(), "localWarmups")
-                        .supersede(who));
+                who -> localWarmups.supersede(who));
     }
 
     /** Let every departure replace the warmups {@code warmups} tracks; called once when the teleport context wires. */
     public void bindLocalWarmups(LocalWarmups warmups) {
-        localWarmups.set(Objects.requireNonNull(warmups, "warmups"));
+        localWarmups = Objects.requireNonNull(warmups, "warmups");
     }
 
     /** The join listener that ends a hop on this backend. */

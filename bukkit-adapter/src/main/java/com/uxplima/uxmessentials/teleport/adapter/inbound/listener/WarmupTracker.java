@@ -1,10 +1,15 @@
 package com.uxplima.uxmessentials.teleport.adapter.inbound.listener;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import com.uxplima.uxmessentials.shared.application.port.Warmups.CancelCause;
 import com.uxplima.uxmessentials.shared.application.port.Warmups.WarmupHandle;
@@ -13,6 +18,7 @@ import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.teleport.domain.PendingTeleport;
 import com.uxplima.uxmessentials.teleport.domain.WarmupCancelReason;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Holds the in-flight warmups the move/damage listeners cancel, owning the <b>move-cancels-warmup</b>
@@ -29,9 +35,15 @@ import org.jspecify.annotations.NullMarked;
  * Ownership: <b>concurrent-collection</b>. {@code pending} is a {@link ConcurrentHashMap} keyed by player
  * uuid mutated via {@code computeIfPresent}; the move listener (sync, region thread) and the warmup
  * completion (which {@link #forget(UUID, WarmupHandle)} drops the entry) never observe a half-updated snapshot,
- * and the handle's own state machine resolves the cancel-vs-fire race to a single loser. A superseded entry is
- * taken out of the map atomically ({@code put} or {@code remove} hands it to exactly one caller) and cancelled
- * after, outside the map's lock, so its callback can start another teleport without re-entering the map.
+ * and the handle's own state machine resolves the cancel-vs-fire race to a single loser. Every stopped entry
+ * (moved, superseded, quit) is taken out of the map atomically ({@code put}, {@code remove} or the mapping that
+ * returns null hands it to exactly one caller) and cancelled after, outside the map's lock, so its callback can
+ * start another teleport, which re-enters the map for the same player, without corrupting it.
+ *
+ * <p>A warmup being set up when its player quits is caught by a ticket: {@link #beginning} hands one out before
+ * the setup, {@link #quit} voids every ticket of the player before it drops their entry, and {@link #stillHere}
+ * spends the ticket after the warmup is armed. Whichever order the two threads take, either the quit finds the
+ * armed entry or the setup finds its ticket voided.
  * Completion forgets only its own handle, so an earlier warmup that fires just as it is replaced cannot drop
  * the entry of the warmup that replaced it.
  */
@@ -39,6 +51,7 @@ import org.jspecify.annotations.NullMarked;
 public final class WarmupTracker {
 
     private final ConcurrentHashMap<UUID, Entry> pending = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<UUID, Set<Object>> beginning = new ConcurrentHashMap<>();
 
     /**
      * Arm a warmup for {@code who} anchored at {@code origin}, holding {@code handle} for cancellation and
@@ -105,10 +118,43 @@ public final class WarmupTracker {
      * As with a supersede, the entry leaves the map first and is cancelled outside its lock.
      */
     public void quit(UUID who) {
-        Entry previous = pending.remove(Objects.requireNonNull(who, "who"));
+        Objects.requireNonNull(who, "who");
+        // Tickets first, so a setup that arms after the entry is dropped below still sees it was voided.
+        beginning.remove(who);
+        Entry previous = pending.remove(who);
         if (previous != null) {
             previous.handle().cancel(CancelCause.QUIT);
         }
+    }
+
+    /**
+     * Note that a warmup for {@code who} is being set up, before anything is read about them. The returned ticket
+     * is spent with {@link #stillHere} once the warmup is armed, or once the setup gave up.
+     */
+    public Object beginning(UUID who) {
+        Objects.requireNonNull(who, "who");
+        Object ticket = new Object();
+        beginning.compute(who, (id, tickets) -> {
+            Set<Object> held = tickets != null ? tickets : new HashSet<>();
+            held.add(ticket);
+            return held;
+        });
+        return ticket;
+    }
+
+    /**
+     * Spend {@code ticket}: true when {@code who} has not quit since {@link #beginning} handed it out. On false the
+     * caller cancels the warmup it set up, which the quit could not reach.
+     */
+    public boolean stillHere(UUID who, Object ticket) {
+        Objects.requireNonNull(who, "who");
+        Objects.requireNonNull(ticket, "ticket");
+        AtomicBoolean held = new AtomicBoolean();
+        beginning.computeIfPresent(who, (id, tickets) -> {
+            held.set(tickets.remove(ticket));
+            return tickets.isEmpty() ? null : tickets;
+        });
+        return held.get();
     }
 
     /** Drop {@code handle} once it has completed; a newer warmup armed for the same player stays tracked. */
@@ -121,20 +167,27 @@ public final class WarmupTracker {
     /** Drop every tracked warmup on module stop. */
     public void clear() {
         pending.clear();
+        beginning.clear();
     }
 
-    private void reconcile(UUID who, java.util.function.Function<Entry, PendingTeleport.Outcome> step) {
-        // computeIfPresent runs the decision atomically; a cancelled warmup is removed (returns null)
-        // and its handle is flipped inside the mapping so move-vs-fire resolves to one loser.
+    private void reconcile(UUID who, Function<Entry, PendingTeleport.Outcome> step) {
+        // The decision is made atomically inside the mapping, which removes a cancelled warmup (returns null) and
+        // so hands it to this caller alone. The handle is stopped after, outside the lock: its callback may start
+        // another teleport for the same player, and re-entering the map from inside its own mapping corrupts it.
+        AtomicReference<@Nullable Stopped> stopped = new AtomicReference<>();
         pending.computeIfPresent(who, (id, entry) -> {
             PendingTeleport.Outcome outcome = step.apply(entry);
             WarmupCancelReason reason = outcome.cancelReason();
             if (reason != null) {
-                stop(entry.handle(), reason);
+                stopped.set(new Stopped(entry.handle(), reason));
                 return null;
             }
             return new Entry(outcome.state(), entry.handle(), entry.completesAt());
         });
+        Stopped due = stopped.get();
+        if (due != null) {
+            stop(due.handle(), due.reason());
+        }
     }
 
     /** Stop {@code handle} for {@code reason}, so the player is told what they did rather than that they moved. */
@@ -151,4 +204,6 @@ public final class WarmupTracker {
     }
 
     private record Entry(PendingTeleport warmup, WarmupHandle handle, Instant completesAt) {}
+
+    private record Stopped(WarmupHandle handle, WarmupCancelReason reason) {}
 }

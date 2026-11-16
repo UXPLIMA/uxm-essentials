@@ -51,6 +51,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>Before a new warmup begins, the player's earlier one, if any is still armed, is superseded. Doing it here
  * rather than only when the tracker is armed also covers a new teleport that skips its warmup: it lands at once and
  * is never armed, and the earlier warmup must not land after it.
+ *
+ * <p>A warmup begun for a player who is not online, or who quits while it is being set up (a command run off the
+ * player's thread can race the quit), is cancelled as a quit here: the quit listener cannot reach a warmup that was
+ * not armed yet, and the countdown would otherwise land the player after a fast relog.
  */
 @NullMarked
 public final class TrackingWarmups implements Warmups {
@@ -104,12 +108,41 @@ public final class TrackingWarmups implements Warmups {
             Runnable onSuperseded) {
         Objects.requireNonNull(who, "who");
         Objects.requireNonNull(kind, "kind");
+        Object ticket = tracker.beginning(who.uuid());
+        WarmupHandle handle;
+        try {
+            handle = beginArmed(who, kind, onComplete, onCancel, onSuperseded);
+        } catch (RuntimeException failure) {
+            var ignored = tracker.stillHere(who.uuid(), ticket);
+            throw failure;
+        }
+        if (!tracker.stillHere(who.uuid(), ticket)) {
+            // The player quit while this warmup was being set up, so the quit listener may have run before it was
+            // armed. Only this warmup is stopped: one a relogged player starts meanwhile belongs to the new session.
+            tracker.forget(who.uuid(), handle);
+            handle.cancel(CancelCause.QUIT);
+        }
+        return handle;
+    }
+
+    private WarmupHandle beginArmed(
+            PlayerRef who,
+            WarmupKind kind,
+            Runnable onComplete,
+            Consumer<CancelCause> onCancel,
+            Runnable onSuperseded) {
         Optional<Position> origin = locator.locate(who);
         tracker.supersede(who.uuid());
         AtomicReference<WarmupHandle> started = new AtomicReference<>();
         WarmupHandle handle = delegate.begin(who, kind, wrapComplete(who, started, onComplete), onCancel, onSuperseded);
         started.set(handle);
-        origin.ifPresent(at -> arm(who, kind, at, handle));
+        if (origin.isEmpty()) {
+            // Nobody to arm against: the player is already gone. Left running, the countdown would find them by uuid
+            // after a relog and land them in a session that never asked for it.
+            handle.cancel(CancelCause.QUIT);
+            return handle;
+        }
+        arm(who, kind, origin.get(), handle);
         return handle;
     }
 

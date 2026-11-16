@@ -13,8 +13,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * Warmups that end only when the test says: {@link #finish} counts one down, {@link #move} cancels it as a step off
- * the origin block would, {@link #supersede} stops it as the player's next teleport would. A player has one warmup at a time, and starting another supersedes the earlier one, as the
- * plugin's tracking warmups do. Each handle lets exactly one of its complete, cancel and supersede callbacks run.
+ * the origin block would, {@link #supersede} stops it as the player's next teleport would. A player has one warmup
+ * at a time, and starting another supersedes the earlier one, as the plugin's tracking warmups do. Each handle lets
+ * exactly one of its complete, cancel and supersede callbacks run.
  */
 public final class ManualWarmups implements Warmups {
 

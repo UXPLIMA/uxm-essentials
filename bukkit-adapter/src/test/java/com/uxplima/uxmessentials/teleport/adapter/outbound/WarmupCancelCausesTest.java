@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.shared.adapter.outbound.warmup.SchedulerWarmups;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
@@ -67,6 +68,7 @@ class WarmupCancelCausesTest {
     private final List<DomainEvent> published = new ArrayList<>();
     private final List<Position> landed = new ArrayList<>();
     private final WarmupTracker tracker = new WarmupTracker();
+    private Supplier<Optional<Position>> whereAlexStands = () -> Optional.of(STANDING);
     private final PaidTeleports paid = new PaidTeleports(scheduler, new QuietLog());
     private final TeleportEngine engine = engine();
     private int refunds;
@@ -86,7 +88,7 @@ class WarmupCancelCausesTest {
                 new NoNodes(),
                 Clock.fixed(Instant.parse("2026-11-15T12:00:00Z"), ZoneOffset.UTC),
                 notifier,
-                who -> Optional.of(STANDING),
+                who -> whereAlexStands.get(),
                 new QuietLog());
         return new TeleportEngine(
                 new NoCooldowns(), warmups, new Landing(), notifier, published::add, settings, who -> false);
@@ -223,6 +225,50 @@ class WarmupCancelCausesTest {
         assertThat(outcomes).containsExactly(TeleportOutcome.CANCELLED);
         assertThat(refunds).isEqualTo(1);
         assertThat(cancelReasons()).containsExactly(WarmupCancelReason.QUIT);
+    }
+
+    @Test
+    void aWarmupBegunAfterThePlayerLeftIsCancelledAsAQuitAndRefunded() {
+        // A /home run off the player's thread that only starts once they have gone.
+        whereAlexStands = Optional::empty;
+
+        List<TeleportOutcome> outcomes = paidTeleportTo(HOME);
+        // The player relogs fast: the countdown would find them by uuid.
+        scheduler.elapse();
+
+        assertThat(landed).isEmpty();
+        assertThat(outcomes).containsExactly(TeleportOutcome.CANCELLED);
+        assertThat(refunds).isEqualTo(1);
+        assertThat(cancelReasons()).containsExactly(WarmupCancelReason.QUIT);
+    }
+
+    @Test
+    void aQuitThatLandsWhileTheWarmupIsBeingSetUpStillCancelsIt() {
+        // The player is located, then quits before the warmup is armed, so the quit listener finds nothing to cancel.
+        whereAlexStands = () -> {
+            tracker.quit(ALEX.uuid());
+            return Optional.of(STANDING);
+        };
+
+        List<TeleportOutcome> outcomes = paidTeleportTo(HOME);
+        scheduler.elapse();
+
+        assertThat(landed).isEmpty();
+        assertThat(outcomes).containsExactly(TeleportOutcome.CANCELLED);
+        assertThat(refunds).isEqualTo(1);
+        assertThat(cancelReasons()).containsExactly(WarmupCancelReason.QUIT);
+        assertThat(tracker.isTracking(ALEX.uuid())).isFalse();
+    }
+
+    @Test
+    void aWarmupStartedAfterAnEarlierQuitIsNotTouchedByIt() {
+        tracker.quit(ALEX.uuid());
+
+        teleportTo(HOME);
+        scheduler.elapse();
+
+        assertThat(landed).containsExactly(HOME);
+        assertThat(cancelReasons()).isEmpty();
     }
 
     @Test

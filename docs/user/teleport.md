@@ -160,7 +160,8 @@ A warp can set its own warmup in its editor.
 A player has one warmup at a time. A new teleport replaces the waiting one, which never lands, and the player is told
 it was replaced; a home, warp or other hop to another server replaces it the same way. Logging off cancels it, and it
 does not land after the player rejoins. Each cause (moving, turning, damage, a click, leaving, a replacement) has its
-own line in the language files, and `UxmWarmupCancelEvent` names the same reason.
+own line in the language files, and `UxmWarmupCancelEvent` names the same reason: `QUIT` for leaving and
+`SUPERSEDED` for a replaced warmup, which earlier versions reported as `ABORTED`.
 
 ### Paid teleports that do not land
 
