@@ -71,6 +71,27 @@ public final class StorageLane {
     }
 
     /**
+     * Run the server's own bookkeeping about {@code player} (their join and quit) on the async lane, in order with
+     * every other piece of work about them. Nobody asked for it, so a failure is only logged, and it reads no
+     * permissions.
+     */
+    public void background(PlayerRef player, Runnable work) {
+        Objects.requireNonNull(player, "player");
+        Objects.requireNonNull(work, "work");
+        after(
+                player.uuid(),
+                player,
+                () -> {
+                    try {
+                        work.run();
+                    } catch (RuntimeException failure) {
+                        log.error("event=moderation_lane_failed player=" + player.name(), failure);
+                    }
+                },
+                dropped -> {});
+    }
+
+    /**
      * Like {@link #run(PlayerRef, PlayerRef, Runnable)}, for a caller that reports the outcome itself: the returned
      * future completes with what {@code work} returns, or with what it threw.
      */

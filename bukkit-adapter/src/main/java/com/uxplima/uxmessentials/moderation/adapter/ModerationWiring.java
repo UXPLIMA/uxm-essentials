@@ -65,6 +65,7 @@ import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
+import com.uxplima.uxmessentials.moderation.application.ModerationSessions;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
@@ -672,7 +673,8 @@ public final class ModerationWiring {
         return List.of(
                 new OnlineMutesListener(mutes),
                 new ModerationLoginListener(services.loginEnforcement()),
-                new ModerationJoinListener(services.jailCountdown(), repository, clock),
+                new ModerationJoinListener(
+                        new ModerationSessions(repository, services.jailCountdown(), services.lane(), clock)),
                 new FreezeMoveListener(
                         sanctions::isFrozen,
                         kernel.messages(),
