@@ -7,10 +7,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.Ban;
+import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailEntry;
 import com.uxplima.uxmessentials.moderation.domain.MuteEntry;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
+import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -33,6 +37,8 @@ import org.jspecify.annotations.NullMarked;
  * @param reason the optional free-text reason
  * @param until the wall-clock expiry for a timed sanction, or empty for a permanent one
  * @param remaining the online time still to serve for an online-only jail, or empty otherwise
+ * @param drawnReason the catalog line {@code reason} was drawn from, when the server wrote it; {@link #readBy} draws
+ *     it for the viewer
  */
 @NullMarked
 public record ActivePunishment(
@@ -42,7 +48,8 @@ public record ActivePunishment(
         Issuer issuer,
         Optional<String> reason,
         Optional<Instant> until,
-        Optional<Duration> remaining) {
+        Optional<Duration> remaining,
+        Optional<DrawnReason> drawnReason) {
 
     public ActivePunishment {
         Objects.requireNonNull(kind, "kind");
@@ -52,6 +59,23 @@ public record ActivePunishment(
         Objects.requireNonNull(reason, "reason");
         Objects.requireNonNull(until, "until");
         Objects.requireNonNull(remaining, "remaining");
+        Objects.requireNonNull(drawnReason, "drawnReason");
+    }
+
+    /** This punishment with its reason as {@code viewer} reads it, in their language when the server wrote it. */
+    public ActivePunishment readBy(Messages messages, PlayerRef viewer) {
+        if (drawnReason.isEmpty()) {
+            return this;
+        }
+        return new ActivePunishment(
+                kind,
+                target,
+                targetName,
+                issuer,
+                SanctionReasons.read(messages, viewer, reason, drawnReason),
+                until,
+                remaining,
+                Optional.empty());
     }
 
     /** Project an active ban row; a permanent ban, stored with a far-future expiry, gets an empty {@code until}. */
@@ -64,7 +88,8 @@ public record ActivePunishment(
                 ban.issuer(),
                 ban.reason(),
                 Ban.endOf(ban),
-                Optional.empty());
+                Optional.empty(),
+                ban.drawnReason());
     }
 
     /** Project an active mute row. A permanent mute has an empty {@code until}. */
@@ -77,7 +102,8 @@ public record ActivePunishment(
                 mute.issuer(),
                 mute.reason(),
                 mute.until(),
-                Optional.empty());
+                Optional.empty(),
+                mute.drawnReason());
     }
 
     /** Project an active jail row, carrying either its wall-clock expiry or its online-only remaining time. */
@@ -90,7 +116,8 @@ public record ActivePunishment(
                 jail.issuer(),
                 jail.reason(),
                 jail.until(),
-                jail.remaining());
+                jail.remaining(),
+                Optional.empty());
     }
 
     /** True when neither a wall-clock expiry nor an online-only remaining time is set: a permanent sanction. */

@@ -23,12 +23,28 @@ public sealed interface MuteState permits MuteState.None, MuteState.Permanent, M
 
     /** A permanent mute with the issuer and reason. */
     static MuteState permanent(Issuer issuer, Optional<String> reason, Instant issuedAt) {
-        return new Permanent(issuer, reason, issuedAt);
+        return new Permanent(issuer, reason, issuedAt, Optional.empty());
+    }
+
+    /** A permanent mute whose reason the server drew from a catalog line; {@code reason} is its punished-player text. */
+    static MuteState permanent(
+            Issuer issuer, Optional<String> reason, Instant issuedAt, Optional<DrawnReason> drawnReason) {
+        return new Permanent(issuer, reason, issuedAt, drawnReason);
     }
 
     /** A timed mute expiring at {@code until}. */
     static MuteState timed(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) {
-        return new Timed(until, issuer, reason, issuedAt);
+        return new Timed(until, issuer, reason, issuedAt, Optional.empty());
+    }
+
+    /** A timed mute whose reason the server drew from a catalog line; {@code reason} is its punished-player text. */
+    static MuteState timed(
+            Instant until,
+            Issuer issuer,
+            Optional<String> reason,
+            Instant issuedAt,
+            Optional<DrawnReason> drawnReason) {
+        return new Timed(until, issuer, reason, issuedAt, drawnReason);
     }
 
     /** True when this mute gags the target at {@code now}: a permanent mute always, a timed mute until expiry. */
@@ -53,13 +69,23 @@ public sealed interface MuteState permits MuteState.None, MuteState.Permanent, M
         }
     }
 
-    /** A mute with no expiry. */
-    record Permanent(Issuer issuer, Optional<String> reason, Instant issuedAt) implements MuteState {
+    /**
+     * A mute with no expiry. {@code reason} is the reason as given, or as drawn for the punished player when
+     * {@code drawnReason} is present, which each reader then reads in their own language.
+     */
+    record Permanent(Issuer issuer, Optional<String> reason, Instant issuedAt, Optional<DrawnReason> drawnReason)
+            implements MuteState {
 
         public Permanent {
             Objects.requireNonNull(issuer, "issuer");
             Objects.requireNonNull(reason, "reason");
             Objects.requireNonNull(issuedAt, "issuedAt");
+            Objects.requireNonNull(drawnReason, "drawnReason");
+        }
+
+        /** A mute whose reason a staff member gave. */
+        public Permanent(Issuer issuer, Optional<String> reason, Instant issuedAt) {
+            this(issuer, reason, issuedAt, Optional.empty());
         }
 
         @Override
@@ -74,14 +100,22 @@ public sealed interface MuteState permits MuteState.None, MuteState.Permanent, M
         }
     }
 
-    /** A mute that lifts at {@code until}. */
-    record Timed(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) implements MuteState {
+    /** A mute that lifts at {@code until}; {@code reason} and {@code drawnReason} as for {@link Permanent}. */
+    record Timed(
+            Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt, Optional<DrawnReason> drawnReason)
+            implements MuteState {
 
         public Timed {
             Objects.requireNonNull(until, "until");
             Objects.requireNonNull(issuer, "issuer");
             Objects.requireNonNull(reason, "reason");
             Objects.requireNonNull(issuedAt, "issuedAt");
+            Objects.requireNonNull(drawnReason, "drawnReason");
+        }
+
+        /** A mute whose reason a staff member gave. */
+        public Timed(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) {
+            this(until, issuer, reason, issuedAt, Optional.empty());
         }
 
         @Override

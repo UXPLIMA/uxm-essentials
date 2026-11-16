@@ -48,10 +48,11 @@ public final class ReviewStaffHistory {
                 viewer,
                 ModerationMessageKey.MOD_STAFFHISTORY_HEADER,
                 Map.of("staff", staff.name(), "count", Integer.toString(rows.size())));
-        rows.forEach(row -> notifier.send(viewer, ModerationMessageKey.MOD_STAFFHISTORY_ENTRY, entry(staff, row)));
+        rows.forEach(
+                row -> notifier.send(viewer, ModerationMessageKey.MOD_STAFFHISTORY_ENTRY, entry(viewer, staff, row)));
     }
 
-    private Map<String, String> entry(PlayerRef staff, SanctionHistoryEntry row) {
+    private Map<String, String> entry(PlayerRef viewer, PlayerRef staff, SanctionHistoryEntry row) {
         String target = players.findByUuid(row.target())
                 .map(PlayerRef::name)
                 .orElseGet(() -> row.target().toString());
@@ -59,7 +60,9 @@ public final class ReviewStaffHistory {
                 "staff", staff.name(),
                 "action", SanctionHistoryLine.label(row.action()),
                 "target", target,
-                "reason", row.reason().orElse(""),
+                "reason",
+                        SanctionReasons.read(notifier::render, viewer, row.reason(), row.drawnReason())
+                                .orElse(""),
                 "when", row.at().toString());
     }
 }

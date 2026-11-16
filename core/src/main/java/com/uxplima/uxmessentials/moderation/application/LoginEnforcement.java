@@ -90,10 +90,14 @@ public final class LoginEnforcement {
         }
         Optional<IpBan> ipBan = standing.ipBan().filter(ban -> !exempt && ban.isActiveAt(now));
         if (ipBan.isPresent()) {
+            IpBan ban = ipBan.get();
             return Decision.deny(render(
                     who,
                     ModerationMessageKey.BANIP_KICK,
-                    Map.of("reason", ipBan.get().reason().orElse(""))));
+                    Map.of(
+                            "reason",
+                            SanctionReasons.read(notifier::render, who, ban.reason(), ban.drawnReason())
+                                    .orElse(""))));
         }
         return Decision.allow();
     }

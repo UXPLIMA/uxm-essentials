@@ -15,7 +15,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.ToLongFunction;
 
 import com.uxplima.uxmessentials.moderation.application.port.SanctionHistory;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.SanctionAction;
 import com.uxplima.uxmessentials.moderation.domain.SanctionHistoryEntry;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
@@ -45,6 +47,26 @@ class JooqSanctionHistoryTest {
 
     @TempDir
     Path folder;
+
+    @Test
+    void aReasonDrawnFromACatalogLineIsStoredWithItsLine() {
+        SanctionHistory history = openStore();
+        DrawnReason drawn = new DrawnReason(
+                ModerationMessageKey.MOD_WARN_ESCALATION_REASON, Map.of("count", "3", "reason", "spam & more"));
+        SanctionHistoryEntry entry = new SanctionHistoryEntry(
+                SanctionAction.MUTE,
+                SAM,
+                Issuer.of(ALEX),
+                Optional.of("3 uyarıya ulaştı, sonuncusu: spam & more"),
+                NOW,
+                Optional.empty(),
+                Optional.empty(),
+                Optional.of(drawn));
+
+        history.append(entry);
+
+        assertThat(history.recentForTarget(SAM, 10)).containsExactly(entry);
+    }
 
     @Test
     void aReasonLongerThanTheColumnIsStoredFittedToIt() {

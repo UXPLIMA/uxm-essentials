@@ -42,6 +42,7 @@ public final class ReviewBanHistory {
                 actor,
                 ModerationMessageKey.BANHISTORY_HEADER,
                 Map.of("player", target.name(), "count", Integer.toString(rows.size())));
-        rows.forEach(row -> notifier.send(actor, ModerationMessageKey.BANHISTORY_ENTRY, SanctionHistoryLine.of(row)));
+        rows.forEach(row -> notifier.send(
+                actor, ModerationMessageKey.BANHISTORY_ENTRY, SanctionHistoryLine.of(notifier, actor, row)));
     }
 }

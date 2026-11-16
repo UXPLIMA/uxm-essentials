@@ -167,12 +167,12 @@ permanently banned player leaves the permanent ban in place. A step that is held
 audit log as not applied (`held_by_stronger`). A staff mute or ban that lands while a step is being written is kept
 by the same rule.
 
-The sanction a step applies is stored with a reason that names the warning count that tripped it and the reason of
-that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The reason is written once,
-when the step fires, and cut to 256 characters. Its language is the punished player's: their `/lang` choice, else
-their client's language while they are online, else the server default. The staff member reads what the
-sanction itself reports, such as the mute confirmation or why it could not be applied, followed by a line on how the
-step landed.
+A step's sanction names the warning count that tripped it and that warning's reason
+(`moderation.warn-escalation-reason`, or `-bare` when it had none), so `/history` shows what caused it. It is kept as
+that line, so each reader reads it in their own language (screens, lookups, lists, menus, the staff broadcast,
+placeholders; the API in the server default) and an edit of the line reaches steps already given. The audit log keeps
+the punished player's text, cut to 256 characters, as do sanctions from before this was stored. The staff member then
+reads what the sanction reports, such as the mute confirmation or why it failed, and a line on how the step landed.
 
 ## Kicks
 

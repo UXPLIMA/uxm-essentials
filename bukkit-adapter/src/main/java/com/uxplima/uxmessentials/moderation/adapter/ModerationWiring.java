@@ -303,7 +303,8 @@ public final class ModerationWiring {
         // Every list's read (with its name/kind/remaining resolution) runs off the tick thread at the open site, so
         // the list sources only read a pre-resolved subject. The active list's left click opens the still-bespoke
         // PunishmentDetailView; that view's back reopens the engine list, a cycle broken inside ModerationGuiViews.
-        ModerationHistoryMenu historyMenu = new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory);
+        ModerationHistoryMenu historyMenu =
+                new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory, kernel.messages());
         historyMenu.register(menuBindings, dataFolder, kernel.log());
         ModerationJailedMenu jailedMenu = new ModerationJailedMenu(
                 menus, kernel.scheduler(), services.unjail(), repository, kernel.playerLookup(), clock);
