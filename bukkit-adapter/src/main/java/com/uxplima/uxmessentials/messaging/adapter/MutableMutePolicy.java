@@ -3,6 +3,7 @@ package com.uxplima.uxmessentials.messaging.adapter;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
@@ -24,8 +25,8 @@ public final class MutableMutePolicy implements MutePolicy {
     private final AtomicReference<MutePolicy> delegate = new AtomicReference<>(MutePolicy.NEVER);
 
     @Override
-    public boolean isMuted(PlayerRef who) {
-        return Objects.requireNonNull(delegate.get(), "delegate").isMuted(who);
+    public MuteAnswer check(PlayerRef who) {
+        return Objects.requireNonNull(delegate.get(), "delegate").check(who);
     }
 
     /** Rebind to the real moderation-provided policy; called once when the moderation context wires. */

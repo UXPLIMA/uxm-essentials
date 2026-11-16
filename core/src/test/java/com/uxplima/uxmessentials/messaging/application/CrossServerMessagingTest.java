@@ -24,6 +24,7 @@ import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.application.port.MessageDelivery;
 import com.uxplima.uxmessentials.messaging.application.port.MessageToggleStore;
 import com.uxplima.uxmessentials.messaging.application.port.MessagingNetwork;
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.ReplyRoutingStore;
 import com.uxplima.uxmessentials.messaging.application.port.SocialSpyStore;
 import com.uxplima.uxmessentials.messaging.application.port.StaffAudience;
@@ -167,6 +168,28 @@ class CrossServerMessagingTest {
         survival.msg(ALEX, "Bob", "hi");
 
         assertThat(survival.lines()).containsExactly("Alex: msg.muted");
+        assertThat(lobby.lines()).isEmpty();
+    }
+
+    @Test
+    void aSenderWhoseMuteCannotBeReadIsHeldBackAndToldToTryAgain() {
+        network.unreadableMutes.add(ALEX.uuid());
+
+        survival.msg(ALEX, "Bob", "hi");
+
+        assertThat(survival.lines()).containsExactly("Alex: msg.mute-unchecked");
+        assertThat(lobby.lines()).isEmpty();
+        assertThat(survival.events.published()).isEmpty();
+    }
+
+    @Test
+    void aHelpRequestWhoseSendersMuteCannotBeReadReachesNoStaff() {
+        lobby.staff(MOD);
+        network.unreadableMutes.add(ALEX.uuid());
+
+        survival.helpOp.raise(ALEX, body("stuck"));
+
+        assertThat(survival.lines()).containsExactly("Alex: msg.mute-unchecked");
         assertThat(lobby.lines()).isEmpty();
     }
 
@@ -375,6 +398,7 @@ class CrossServerMessagingTest {
         final Map<UUID, IgnoreList> ignores = new HashMap<>();
         final List<MailItem> mail = new ArrayList<>();
         final Set<UUID> muted = new HashSet<>();
+        final Set<UUID> unreadableMutes = new HashSet<>();
         final Set<UUID> seeVanished = new HashSet<>();
         final Set<String> unreachable = new HashSet<>();
         final List<Runnable> heldAnswers = new ArrayList<>();
@@ -388,6 +412,14 @@ class CrossServerMessagingTest {
 
         Network(boolean offlineToMail) {
             this.offlineToMail = offlineToMail;
+        }
+
+        /** What the moderation store answers about {@code who}'s mute. */
+        MuteAnswer mute(PlayerRef who) {
+            if (unreadableMutes.contains(who.uuid())) {
+                return MuteAnswer.UNKNOWN;
+            }
+            return muted.contains(who.uuid()) ? MuteAnswer.MUTED : MuteAnswer.NOT_MUTED;
         }
 
         /** Deliver the answers held back so far, as a bus that was only slow finally does. */
@@ -465,7 +497,7 @@ class CrossServerMessagingTest {
                     new Conversations(),
                     new Switch(toggledOff),
                     new Spies(),
-                    who -> network.muted.contains(who.uuid()),
+                    network::mute,
                     (AfkStatus) who -> Optional.ofNullable(away.get(who.uuid())),
                     new Mail(),
                     network.offlineToMail,
@@ -487,7 +519,7 @@ class CrossServerMessagingTest {
                     relay);
             StaffAudience audience = node -> List.copyOf(staff);
             this.helpOp =
-                    new HelpOp(audience, delivery, who -> false, notifier, events, CLOCK, bus, presence, scheduler);
+                    new HelpOp(audience, delivery, network::mute, notifier, events, CLOCK, bus, presence, scheduler);
             this.staffChat = new SendStaffChat(new Channel(), events, bus, scheduler);
         }
 

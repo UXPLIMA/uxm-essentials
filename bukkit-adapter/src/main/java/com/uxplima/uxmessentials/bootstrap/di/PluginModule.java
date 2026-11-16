@@ -3081,6 +3081,10 @@ public final class PluginModule {
                 seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The players already online when the module starts (a reload) never join, so their mutes are read here.
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            wired.mutePolicy().joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online));
+        }
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
         // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
@@ -3576,7 +3580,7 @@ public final class PluginModule {
                         ctx.kernel().playerLookup(),
                         ctx.kernel().worldLookup(),
                         ctx.kernel().scheduler()));
-        // Arm the rent sweep when the rent sub-group is on (a no-op otherwise), and halt it on disable/reload so no
+        // Arm the background sweeps (each a no-op when its sub-group is off), and halt them on disable/reload so no
         // orphaned off-tick task survives.
         wired.startBackgroundWork();
         resources.onClose(wired::stop);

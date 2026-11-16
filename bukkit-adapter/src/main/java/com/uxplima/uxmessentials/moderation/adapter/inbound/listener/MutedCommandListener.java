@@ -10,7 +10,9 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
+import com.uxplima.uxmessentials.messaging.domain.MessagingMessageKey;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
@@ -18,6 +20,7 @@ import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
 import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -32,7 +35,8 @@ import org.jspecify.annotations.NullMarked;
  * the dispatch is stopped before the vanilla/dispatcher handler. The mute is the one kept in memory for every
  * connected player, so the server thread never waits on the database here, and an expired timed mute no longer
  * blocks. A player holding the moderation exempt node is never blocked. When the configured list is empty the
- * listener short-circuits before any mute lookup, so an operator who leaves the list blank pays nothing.
+ * listener short-circuits before any mute lookup, so an operator who leaves the list blank pays nothing. A mute that
+ * is not known yet (or could not be read) blocks the listed command too, and the player is told to try again.
  */
 @NullMarked
 public final class MutedCommandListener implements Listener {
@@ -62,11 +66,15 @@ public final class MutedCommandListener implements Listener {
         if (guard.isExempt(who)) {
             return;
         }
-        if (!mutes.isMuted(who)) {
+        MuteAnswer mute = mutes.check(who);
+        if (mute == MuteAnswer.NOT_MUTED) {
             return;
         }
         event.setCancelled(true);
-        sink.deliver(who, messages.resolve(who, ModerationMessageKey.MUTED_COMMAND_BLOCKED, Map.of()));
+        MessageKey why = mute == MuteAnswer.MUTED
+                ? ModerationMessageKey.MUTED_COMMAND_BLOCKED
+                : MessagingMessageKey.MSG_MUTE_UNCHECKED;
+        sink.deliver(who, messages.resolve(who, why, Map.of()));
     }
 
     private static String label(String rawMessage) {

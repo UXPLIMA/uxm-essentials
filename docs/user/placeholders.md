@@ -105,9 +105,9 @@ Registered when PlaceholderAPI is installed, as `%uxm_essentials_<key>%`. A `pla
 | `moderation_mute_reason` | moderation | Why the player was muted. | `"Spam"` | player |
 | `moderation_mute_remaining` | moderation | How long is left on the mute, in the compact 1d2h form. | `"1h30m"` | player |
 | `moderation_mute_remaining_formatted` | moderation | The same remaining mute, under the spelling a config may prefer. | `"1h30m"` | player |
-| `moderation_muted` | moderation | Whether the player is muted (yes/no). | `"yes"` | player |
+| `moderation_muted` | moderation | Whether the player is muted (yes/no, or a dash while it is not known). | `"yes"` | player |
 | `moderation_warns` | moderation | How many warnings the player carries. | `"1"` | player |
-| `muted` | moderation | Whether the player is muted (yes/no). | `"no"` | player |
+| `muted` | moderation | Whether the player is muted (yes/no, or a dash while it is not known). | `"no"` | player |
 | `nametags_format` | nametags | The nametag format the player wears, or a dash when they wear none. | `"staff"` | session |
 | `nametags_shown` | nametags | Whether the player wears a nametag at all (yes/no). | `"yes"` | session |
 | `npc_limit` | npc | How many NPCs the player may own, or unlimited. | `"3"` | player |

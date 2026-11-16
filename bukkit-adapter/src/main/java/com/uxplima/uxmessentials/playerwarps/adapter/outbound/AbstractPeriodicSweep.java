@@ -10,9 +10,9 @@ import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Shared scaffolding for the playerwarps background sweeps (rent and sponsor expiry): a self-rescheduling task that,
- * on a fixed interval and off the tick thread, runs one bounded pass and then queues the next. A disabled sub-group
- * schedules nothing: {@link #start()} returns immediately when {@link #enabled()} is false. Processing one batch per
+ * Shared scaffolding for the playerwarps background sweeps (rent, sponsor expiry, random order): a self-rescheduling
+ * task that, on an interval and off the tick thread, runs one bounded pass and then queues the next. A disabled
+ * sub-group schedules nothing: {@link #start()} returns immediately when {@link #enabled()} is false. One batch per
  * pass keeps a single pass's work bounded; a backlog larger than the batch drains over successive passes rather than
  * in one long off-tick burst.
  *
@@ -43,7 +43,11 @@ abstract class AbstractPeriodicSweep {
             return;
         }
         running = true;
-        scheduleNext();
+        if (passOnStart()) {
+            pass();
+        } else {
+            scheduleNext();
+        }
     }
 
     public void stop() {
@@ -52,14 +56,17 @@ abstract class AbstractPeriodicSweep {
 
     private void scheduleNext() {
         if (running) {
-            scheduler.asyncAfter(interval, this::tick);
+            scheduler.asyncAfter(untilNextPass(), this::tick);
         }
     }
 
     private void tick() {
-        if (!running) {
-            return;
+        if (running) {
+            pass();
         }
+    }
+
+    private void pass() {
         scheduler.async(() -> {
             // A pass that throws must not end the sweep: the next one is queued whatever happens to this one.
             try {
@@ -70,6 +77,16 @@ abstract class AbstractPeriodicSweep {
                 scheduleNext();
             }
         });
+    }
+
+    /** How long to wait before the next pass: the interval, unless a sweep keeps to boundaries of its own. */
+    protected Duration untilNextPass() {
+        return interval;
+    }
+
+    /** Whether {@link #start()} runs a pass at once instead of waiting for the first interval to pass. */
+    protected boolean passOnStart() {
+        return false;
     }
 
     /** Whether this sweep's sub-group is enabled; a disabled sweep schedules and touches nothing. */
