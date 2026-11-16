@@ -73,11 +73,11 @@ public final class Mute {
     }
 
     /**
-     * Mute {@code target}: permanent when {@code rawDuration} is blank, timed otherwise. A mute already in force is
-     * never replaced from here, longer or shorter: the request is refused with {@link ModerationError#ALREADY_MUTED}
-     * and the actor is told which mute runs and for how long, so changing a mute takes an explicit {@code /unmute}
-     * first. The write is compare and set, so a mute that lands elsewhere between the read and the write is refused
-     * the same way instead of being overwritten.
+     * Mute {@code target}: permanent when {@code rawDuration} is blank, timed otherwise. The rule bans follow: a mute
+     * that ends later than the running one, or a second permanent one, replaces it; one that would end sooner is
+     * refused with {@link ModerationError#ALREADY_MUTED} and the actor is told which mute runs and for how long, so
+     * shortening a mute takes an explicit {@code /unmute} first. The write is compare and set, so a mute that lands
+     * elsewhere between the read and the write is judged by the same rule instead of being overwritten.
      */
     public Result<MuteState, ModerationError> mute(
             PlayerRef actor, PlayerRef target, String rawDuration, Optional<String> reason, boolean silent) {
@@ -94,7 +94,8 @@ public final class Mute {
         Instant now = clock.instant();
         Plan plan = plan(actor, parsed);
         MuteState mute = proposal(actor, plan, reason, now);
-        return switch (GuardedWrite.storeMute(repository, target, mute, now, running -> true)) {
+        Predicate<MuteState> longer = GuardedWrite.outlasting(mute.expiry(), MuteState::expiry);
+        return switch (GuardedWrite.storeMute(repository, target, mute, now, longer)) {
             case GuardedWrite.Kept<MuteState> kept -> {
                 audit.muted(actor, target, label(rawDuration), false, reason);
                 GuardedWrite.tellKept(

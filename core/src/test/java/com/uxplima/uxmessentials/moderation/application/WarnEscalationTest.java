@@ -367,14 +367,14 @@ class WarnEscalationTest {
     @Test
     void aHeldRungIsAuditedApartFromARefusedMute() {
         mute.mute(ALEX, SAM, "", Optional.empty(), false);
-        mute.mute(ALEX, SAM, "", Optional.empty(), false);
+        mute.mute(ALEX, SAM, "2h", Optional.empty(), false);
 
         warnTimes(3, false);
 
         assertThat(audit.lines)
                 .containsExactly(
                         new AuditLine("mute", Optional.empty(), true, Optional.empty()),
-                        new AuditLine("mute", Optional.empty(), false, Optional.empty()),
+                        new AuditLine("mute", Optional.of("2h"), false, Optional.empty()),
                         new AuditLine("mute", Optional.of("1h"), false, Optional.of("held_by_stronger")));
     }
 

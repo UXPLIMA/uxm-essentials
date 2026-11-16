@@ -88,11 +88,11 @@ class MuteTest {
     }
 
     @Test
-    void aMuteOnATimedMuteIsRefusedWithTheTimeItStillRuns() {
+    void aShorterMuteOnATimedMuteIsRefusedWithTheTimeItStillRuns() {
         mute.mute(ROBIN, SAM, "1d", Optional.empty(), false);
         clock.advance(Duration.ofHours(1));
 
-        assertThat(mute.mute(ALEX, SAM, "", Optional.empty(), false).errorOrThrow())
+        assertThat(mute.mute(ALEX, SAM, "1h", Optional.empty(), false).errorOrThrow())
                 .isEqualTo(ModerationError.ALREADY_MUTED);
 
         assertThat(lastToldTo(ALEX))
@@ -101,6 +101,29 @@ class MuteTest {
                         ModerationMessageKey.MUTE_ALREADY_TIMED.key(),
                         Map.of("player", "Sam", "remaining", "23h")));
         assertThat(records.loadMute(SAM).expiry()).contains(NOW.plus(Duration.ofDays(1)));
+    }
+
+    @Test
+    void aLongerMuteReplacesTheRunningOne() {
+        mute.mute(ROBIN, SAM, "1h", Optional.empty(), false);
+
+        assertThat(mute.mute(ALEX, SAM, "7d", Optional.of("again"), false).isErr())
+                .isFalse();
+
+        assertThat(records.loadMute(SAM).expiry()).contains(NOW.plus(Duration.ofDays(7)));
+        assertThat(syncedMutes).containsExactly(SAM, SAM);
+    }
+
+    @Test
+    void aPermanentMuteReplacesATimedOne() {
+        mute.mute(ROBIN, SAM, "1d", Optional.empty(), false);
+
+        assertThat(mute.mute(ALEX, SAM, "", Optional.empty(), false).isErr()).isFalse();
+
+        assertThat(records.loadMute(SAM))
+                .isInstanceOfSatisfying(
+                        MuteState.Permanent.class,
+                        permanent -> assertThat(permanent.issuer().name()).isEqualTo("Alex"));
     }
 
     @Test

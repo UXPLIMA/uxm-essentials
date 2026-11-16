@@ -60,7 +60,11 @@ public interface UxmModerationActions {
     /** Mute this player with no reason recorded. */
     CompletableFuture<UxmResult<UxmSanction>> mute(UUID targetId);
 
-    /** Mute this player for {@code duration}, which must be positive. */
+    /**
+     * Mute this player for {@code duration}, which must be positive. A mute already in force that lasts longer is
+     * never cut short: the call is refused with {@link UxmFailure#ALREADY_IN_STATE} and the running mute stays. A
+     * shorter running mute is replaced.
+     */
     CompletableFuture<UxmResult<UxmSanction>> tempMute(UUID targetId, Duration duration, String reason);
 
     /** Mute this player for {@code duration} with no reason recorded. */
