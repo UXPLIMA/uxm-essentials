@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.worlds.domain.WorldTeleportCause;
 public interface WorldTeleporter {
 
     /**
-     * Begins a teleport of {@code who} to {@code to} for the given {@code cause}.
+     * On {@code who}'s region thread: begins a teleport of {@code who} to {@code to} for the given {@code cause}.
      *
      * @return whether the teleport was accepted (a warmup was queued). The implementation owns the
      *     warmup, cooldown, and the player-facing notification on its own failures, so a {@code false}

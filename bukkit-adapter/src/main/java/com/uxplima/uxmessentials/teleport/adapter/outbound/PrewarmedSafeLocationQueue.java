@@ -139,7 +139,7 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         AtomicBoolean guard = refilling.computeIfAbsent(world.uid(), id -> new AtomicBoolean());
         if (guard.compareAndSet(false, true)) {
-            scheduler.async(() -> launchSearch(world, queue, guard, 0));
+            scheduler.async(() -> guarded(world, guard, () -> launchSearch(world, queue, guard, 0)));
         }
     }
 
@@ -156,7 +156,8 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
         }
         try {
             var ignored = search.search(area.get(), current.searchBudget())
-                    .thenAccept(found -> afterSearch(world, queue, guard, launched, found));
+                    .thenAccept(
+                            found -> guarded(world, guard, () -> afterSearch(world, queue, guard, launched, found)));
         } catch (RuntimeException failure) {
             log.warn(
                     "rtp refill search failed to start for world {}: {}",
@@ -179,6 +180,19 @@ public final class PrewarmedSafeLocationQueue implements SafeLocationQueue {
             poolSink.record(RtpColumn.of(location));
         });
         launchSearch(world, queue, guard, launched + 1);
+    }
+
+    /**
+     * Run one step of a refill cycle, releasing the world's refill guard if it throws: the guard is otherwise only
+     * released at the end of the cycle, and a guard left set would stop that world from ever refilling again.
+     */
+    private void guarded(WorldRef world, AtomicBoolean guard, Runnable step) {
+        try {
+            step.run();
+        } catch (RuntimeException failure) {
+            guard.set(false);
+            log.warn("rtp refill failed for world {}: {}", world.name(), String.valueOf(failure.getMessage()));
+        }
     }
 
     private void finishRefill(
