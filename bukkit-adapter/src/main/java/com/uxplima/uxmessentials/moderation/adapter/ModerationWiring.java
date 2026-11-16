@@ -64,6 +64,7 @@ import com.uxplima.uxmessentials.moderation.application.ListJails;
 import com.uxplima.uxmessentials.moderation.application.ListMutes;
 import com.uxplima.uxmessentials.moderation.application.Lockdown;
 import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
+import com.uxplima.uxmessentials.moderation.application.LoginGate;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.ModerationSessions;
 import com.uxplima.uxmessentials.moderation.application.Mute;
@@ -691,7 +692,12 @@ public final class ModerationWiring {
         ModerationGuard live = new ModerationGuard(kernel.permissions());
         return List.of(
                 new OnlineMutesListener(mutes),
-                new ModerationLoginListener(services.loginEnforcement()),
+                new ModerationLoginListener(new LoginGate(
+                        services.loginEnforcement(),
+                        services.lane(),
+                        new Notifier(kernel.messages(), kernel.messageSink()),
+                        kernel.log(),
+                        clock)),
                 new ModerationJoinListener(
                         new ModerationSessions(repository, services.jailCountdown(), services.lane(), clock)),
                 new FreezeMoveListener(

@@ -101,7 +101,7 @@ class BanScreenTest {
         ban.ban(ALEX, SAM, Optional.of("cheating"), false);
         clock.advance(Duration.ofDays(30));
 
-        LoginEnforcement.Decision decision = login.evaluate(SAM, ADDRESS, false, false);
+        LoginEnforcement.Decision decision = Logins.check(login, SAM, ADDRESS, false, false);
 
         assertThat(here.kicked()).containsEntry(SAM, ModerationMessageKey.BAN_KICK.key());
         assertThat(decision.kickReason()).contains(ModerationMessageKey.BAN_KICK.key());
@@ -123,7 +123,7 @@ class BanScreenTest {
         tempBan.tempban(ALEX, SAM, "2h", Optional.of("grief"), false);
         clock.advance(Duration.ofMinutes(30));
 
-        login.evaluate(SAM, ADDRESS, false, false);
+        Logins.check(login, SAM, ADDRESS, false, false);
         otherServer.onRemoteBan(SAM.uuid());
 
         assertThat(elsewhere.kicked()).containsEntry(SAM, ModerationMessageKey.TEMPBAN_KICK.key());
@@ -140,7 +140,7 @@ class BanScreenTest {
 
         ban.ban(ALEX, SAM, Optional.of("spam"), false);
         clock.advance(Duration.ofMinutes(15));
-        login.evaluate(SAM, ADDRESS, false, false);
+        Logins.check(login, SAM, ADDRESS, false, false);
 
         assertThat(screensOfSam()).containsExactly(timedScreen("1h", "spam"), timedScreen("45m", "spam"));
     }
