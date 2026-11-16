@@ -14,6 +14,15 @@ On a network, a paid hop is now refunded, and a player warp owner paid, in exact
 Define the same currency ids on every backend; a backend that does not know one logs the refund instead of paying it
 in its own default. See [network.md](network.md).
 
+## Ladder reasons follow each reader's language
+
+The update adds two nullable columns, `reason_key` and `reason_args`, to `moderation_mutes`, `moderation_tempbans`,
+`moderation_ip_bans` and `moderation_sanction_history`. The first server to start on the new release adds them to the
+shared database; nothing needs editing. A sanction the warn ladder gives from then on keeps its reason as the catalog
+line, so staff read it in their own language. Sanctions already stored keep the text they were written with. A server
+still on the previous release reads the same rows and shows that text. See
+[moderation.md](moderation.md#warnings-and-the-escalation-ladder).
+
 ## Item columns hold more on MySQL and MariaDB
 
 On MySQL and MariaDB the columns that hold serialized items are widened from `TEXT`, which stops at 64 KB, to
@@ -25,6 +34,14 @@ with strict mode off. SQLite and PostgreSQL had no such limit and are not change
 Nothing needs editing. Back up the database first: the first server to start on the new release alters those tables,
 and MySQL and MariaDB rebuild a table to change a column, so the start takes longer while a large `inv_snapshots`
 table is copied. A row that was cut short before the upgrade stays cut short; the update cannot restore it.
+
+## Cross-server trades need the same release on both servers
+
+A cross-server trade opens the window of the player who accepted only after the inviter's server says its own
+window is open. A server on an older release never says so. While backends run different releases, as in a rolling
+upgrade, a player on an upgraded server who accepts an invite from a player on an older one waits a few seconds and
+is told the trade was cancelled; each player keeps their items. Upgrade every backend in the same window, as
+[upgrading a network](network.md#upgrading-a-network) asks.
 
 ## Trades keep items for a player who left
 

@@ -8,12 +8,15 @@ import java.util.Optional;
 
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.Ban;
+import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.application.port.Sanctions;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
 import com.uxplima.uxmessentials.moderation.domain.JailState;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.JailGate;
 import org.jspecify.annotations.NullMarked;
@@ -32,6 +35,9 @@ import org.jspecify.annotations.NullMarked;
  * with a far-future expiry, read back through {@link Ban#endOf} and rendered as permanent (empty remaining), matching
  * the permanent {@code /mute} shape.
  *
+ * <p>A reason the server drew from a catalog line (a warn ladder step) is drawn for the player the placeholder is
+ * about, in their language, with the line as it reads now.
+ *
  * <p>When the moderation module is disabled this adapter is never registered; the resolver degrades the
  * boolean keys to "no" and the rest to the dash when the seam is absent.
  */
@@ -42,6 +48,7 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
     private final JailGate jailGate;
     private final ModerationRepository repository;
     private final Sanctions sanctions;
+    private final Messages messages;
     private final Clock clock;
 
     public GateModerationPlaceholders(
@@ -49,11 +56,13 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
             JailGate jailGate,
             ModerationRepository repository,
             Sanctions sanctions,
+            Messages messages,
             Clock clock) {
         this.mutePolicy = Objects.requireNonNull(mutePolicy, "mutePolicy");
         this.jailGate = Objects.requireNonNull(jailGate, "jailGate");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.sanctions = Objects.requireNonNull(sanctions, "sanctions");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
@@ -84,7 +93,7 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
         Instant now = clock.instant();
         if (repository.loadTempban(who) instanceof TempbanState.Active ban && ban.isActiveAt(now)) {
             Optional<Duration> remaining = Ban.endOf(ban).map(end -> positive(Duration.between(now, end)));
-            return Optional.of(view(remaining, ban.reason(), ban.issuer()));
+            return Optional.of(view(remaining, reason(who, ban.reason(), ban.drawnReason()), ban.issuer()));
         }
         return Optional.empty();
     }
@@ -98,11 +107,14 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
             return Optional.empty();
         }
         if (mute instanceof MuteState.Timed timed) {
-            return Optional.of(
-                    view(Optional.of(positive(Duration.between(now, timed.until()))), timed.reason(), timed.issuer()));
+            return Optional.of(view(
+                    Optional.of(positive(Duration.between(now, timed.until()))),
+                    reason(who, timed.reason(), timed.drawnReason()),
+                    timed.issuer()));
         }
         if (mute instanceof MuteState.Permanent permanent) {
-            return Optional.of(view(Optional.empty(), permanent.reason(), permanent.issuer()));
+            return Optional.of(view(
+                    Optional.empty(), reason(who, permanent.reason(), permanent.drawnReason()), permanent.issuer()));
         }
         return Optional.empty();
     }
@@ -131,6 +143,10 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
             return Optional.of(positive(jail.remaining().get()));
         }
         return jail.until().map(until -> positive(Duration.between(now, until)));
+    }
+
+    private Optional<String> reason(PlayerRef who, Optional<String> text, Optional<DrawnReason> drawn) {
+        return SanctionReasons.read(messages, who, text, drawn);
     }
 
     private static SanctionView view(Optional<Duration> remaining, Optional<String> reason, Issuer issuer) {

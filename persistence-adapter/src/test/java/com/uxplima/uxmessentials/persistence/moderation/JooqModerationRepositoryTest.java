@@ -1,5 +1,6 @@
 package com.uxplima.uxmessentials.persistence.moderation;
 
+import static com.uxplima.uxmessentials.persistence.jooq.tables.ModerationMutes.MODERATION_MUTES;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Path;
@@ -11,8 +12,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
+import com.uxplima.uxmessentials.moderation.domain.DrawnReason;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
 import com.uxplima.uxmessentials.moderation.domain.Issuer;
+import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.moderation.domain.MuteState;
 import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.persistence.runtime.DatabaseBackend;
@@ -43,11 +46,13 @@ class JooqModerationRepositoryTest {
 
     private ModerationRepository first;
     private ModerationRepository second;
+    private DSLContext dsl;
 
     @BeforeEach
     void open() {
-        first = openStore();
-        second = openStore();
+        dsl = openDsl();
+        first = new JooqModerationRepository(dsl);
+        second = new JooqModerationRepository(openDsl());
         first.ensureUserExists(SAM, NOW);
     }
 
@@ -225,15 +230,71 @@ class JooqModerationRepositoryTest {
                 .isTrue();
     }
 
+    @Test
+    void aReasonDrawnFromACatalogLineIsStoredWithItsLineOnMutesBansAndIpBans() {
+        DrawnReason drawn = new DrawnReason(
+                ModerationMessageKey.MOD_WARN_ESCALATION_REASON,
+                Map.of("count", "3", "reason", "a=b & çok kötü %20 dil"));
+        MuteState mute = MuteState.timed(
+                NOW.plusSeconds(3600), Issuer.of(ALEX), Optional.of("3 uyarıya ulaştı"), NOW, Optional.of(drawn));
+        TempbanState ban = TempbanState.active(
+                NOW.plusSeconds(86_400), Issuer.of(ALEX), Optional.of("3 uyarıya ulaştı"), NOW, Optional.of(drawn));
+        IpBan ipBan = new IpBan(
+                ADDRESS,
+                Optional.empty(),
+                Optional.of("3 uyarıya ulaştı"),
+                Optional.of(SAM.uuid()),
+                Issuer.of(ALEX),
+                NOW,
+                Optional.of(drawn));
+
+        first.saveMute(SAM, mute);
+        first.saveTempban(SAM, ban);
+        first.saveIpBan(ipBan);
+
+        assertThat(second.loadMute(SAM)).isEqualTo(mute);
+        assertThat(second.loadTempban(SAM)).isEqualTo(ban);
+        assertThat(second.loadIpBan(ADDRESS)).contains(ipBan);
+        assertThat(second.activeBans(NOW, 10))
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.drawnReason()).contains(drawn));
+        assertThat(second.activeMutes(NOW, 10))
+                .singleElement()
+                .satisfies(entry -> assertThat(entry.drawnReason()).contains(drawn));
+    }
+
+    @Test
+    void aReplacedBanKeepsTheLineOfTheBanThatReplacedIt() {
+        DrawnReason drawn = new DrawnReason(ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE, Map.of("count", "5"));
+        TempbanState.Active hour = ban(Duration.ofHours(1), "spam", NOW);
+        first.saveTempban(SAM, hour);
+        TempbanState.Active ladder = (TempbanState.Active) TempbanState.active(
+                NOW.plus(Duration.ofDays(1)), Issuer.of(ALEX), Optional.of("5"), NOW, Optional.of(drawn));
+
+        assertThat(first.replaceTempban(SAM, hour, ladder)).isTrue();
+
+        assertThat(second.loadTempban(SAM)).isEqualTo(ladder);
+    }
+
+    @Test
+    void aStoredLineThisReleaseDoesNotKnowReadsAsTheKeptText() {
+        first.saveMute(SAM, MuteState.permanent(Issuer.of(ALEX), Optional.of("kept"), NOW));
+        dsl.update(MODERATION_MUTES)
+                .set(MODERATION_MUTES.REASON_KEY, "moderation.no-such-line")
+                .set(MODERATION_MUTES.REASON_ARGS, "count=3")
+                .execute();
+
+        assertThat(second.loadMute(SAM)).isEqualTo(MuteState.permanent(Issuer.of(ALEX), Optional.of("kept"), NOW));
+    }
+
     private static IpBan ipBan(Optional<Instant> until, String reason, Instant at) {
         return new IpBan(ADDRESS, until, Optional.of(reason), Optional.empty(), Issuer.of(ALEX), at);
     }
 
-    private ModerationRepository openStore() {
+    private DSLContext openDsl() {
         SQLiteDataSource data = new SQLiteDataSource();
         data.setUrl("jdbc:sqlite:" + folder.resolve("data.db"));
         new FlywayMigrationRunner(data, DatabaseBackend.SQLITE, "").migrate(List.of());
-        DSLContext dsl = DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
-        return new JooqModerationRepository(dsl);
+        return DslContextProvider.create(data, DatabaseBackend.SQLITE.dialect(), "");
     }
 }

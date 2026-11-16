@@ -29,7 +29,7 @@ class TempbanEventPermanenceTest {
     private final EventBridgeRegistry registry = new EventBridgeRegistry();
 
     TempbanEventPermanenceTest() {
-        ModerationEventBridges.register(registry);
+        ModerationEventBridges.register(registry, (viewer, key, placeholders) -> key.key());
     }
 
     private UxmPlayerTempbanEvent published(Instant until) {

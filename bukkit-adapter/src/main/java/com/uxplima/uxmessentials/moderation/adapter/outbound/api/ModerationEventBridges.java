@@ -30,6 +30,7 @@ import com.uxplima.uxmessentials.moderation.domain.event.PlayerUnmuted;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerWarned;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.EventBridgeRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.Region;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import org.jspecify.annotations.NullMarked;
 
 /**
@@ -41,14 +42,18 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The two facts with no player at their centre, an address ban and an alt finding, go global. A ban applies to an
  * address rather than an account, and an alt finding names an id without a name to go with it.
+ *
+ * <p>A reason the server drew from a catalog line (a warn ladder step) reads in the server's default language, as it
+ * does through the query API.
  */
 @NullMarked
 public final class ModerationEventBridges {
 
     private ModerationEventBridges() {}
 
-    public static void register(EventBridgeRegistry registry) {
+    public static void register(EventBridgeRegistry registry, Messages messages) {
         Objects.requireNonNull(registry, "registry");
+        Objects.requireNonNull(messages, "messages");
         registry.register(
                 PlayerMuted.class,
                 UxmPlayerMuteEvent.getHandlerList(),
@@ -56,7 +61,7 @@ public final class ModerationEventBridges {
                         fact.target().uuid(),
                         fact.target().name(),
                         issuer(muteIssuer(fact.mute())),
-                        muteReason(fact.mute()),
+                        muteReason(messages, fact.mute()),
                         muteUntil(fact.mute()),
                         fact.at()),
                 fact -> Region.entity(fact.target()));
@@ -91,7 +96,8 @@ public final class ModerationEventBridges {
                         fact.target().uuid(),
                         fact.target().name(),
                         issuer(fact.ban().issuer()),
-                        fact.ban().reason(),
+                        ModerationQueries.reason(
+                                messages, fact.ban().reason(), fact.ban().drawnReason()),
                         fact.ban().until(),
                         Ban.endOf(fact.ban()).isEmpty(),
                         fact.at()),
@@ -127,7 +133,8 @@ public final class ModerationEventBridges {
                         fact.ban().ip(),
                         fact.ban().target(),
                         fact.ban().until(),
-                        fact.ban().reason(),
+                        ModerationQueries.reason(
+                                messages, fact.ban().reason(), fact.ban().drawnReason()),
                         issuer(fact.ban().issuer()),
                         fact.ban().issuedAt()),
                 fact -> Region.global());
@@ -153,10 +160,11 @@ public final class ModerationEventBridges {
         };
     }
 
-    private static Optional<String> muteReason(MuteState mute) {
+    private static Optional<String> muteReason(Messages messages, MuteState mute) {
         return switch (mute) {
-            case MuteState.Permanent permanent -> permanent.reason();
-            case MuteState.Timed timed -> timed.reason();
+            case MuteState.Permanent permanent ->
+                ModerationQueries.reason(messages, permanent.reason(), permanent.drawnReason());
+            case MuteState.Timed timed -> ModerationQueries.reason(messages, timed.reason(), timed.drawnReason());
             case MuteState.None ignored -> throw new IllegalStateException("a mute fact carried no mute");
         };
     }

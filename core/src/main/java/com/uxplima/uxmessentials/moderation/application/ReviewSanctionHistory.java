@@ -45,6 +45,7 @@ public final class ReviewSanctionHistory {
                 viewer,
                 ModerationMessageKey.MOD_HISTORY_HEADER,
                 Map.of("player", target.name(), "count", Integer.toString(rows.size())));
-        rows.forEach(row -> notifier.send(viewer, ModerationMessageKey.MOD_HISTORY_ENTRY, SanctionHistoryLine.of(row)));
+        rows.forEach(row -> notifier.send(
+                viewer, ModerationMessageKey.MOD_HISTORY_ENTRY, SanctionHistoryLine.of(notifier, viewer, row)));
     }
 }

@@ -40,6 +40,7 @@ public final class ReviewMuteHistory {
                 actor,
                 ModerationMessageKey.MUTEHISTORY_HEADER,
                 Map.of("player", target.name(), "count", Integer.toString(rows.size())));
-        rows.forEach(row -> notifier.send(actor, ModerationMessageKey.MUTEHISTORY_ENTRY, SanctionHistoryLine.of(row)));
+        rows.forEach(row -> notifier.send(
+                actor, ModerationMessageKey.MUTEHISTORY_ENTRY, SanctionHistoryLine.of(notifier, actor, row)));
     }
 }

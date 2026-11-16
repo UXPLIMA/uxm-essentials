@@ -23,7 +23,17 @@ public sealed interface TempbanState permits TempbanState.None, TempbanState.Act
 
     /** A tempban expiring at {@code until}. */
     static TempbanState active(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) {
-        return new Active(until, issuer, reason, issuedAt);
+        return new Active(until, issuer, reason, issuedAt, Optional.empty());
+    }
+
+    /** A tempban whose reason the server drew from a catalog line; {@code reason} is its punished-player text. */
+    static TempbanState active(
+            Instant until,
+            Issuer issuer,
+            Optional<String> reason,
+            Instant issuedAt,
+            Optional<DrawnReason> drawnReason) {
+        return new Active(until, issuer, reason, issuedAt, drawnReason);
     }
 
     /** True when this ban still bars login at {@code now}. */
@@ -52,13 +62,21 @@ public sealed interface TempbanState permits TempbanState.None, TempbanState.Act
     }
 
     /** A live tempban with a wall-clock expiry. */
-    record Active(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) implements TempbanState {
+    record Active(
+            Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt, Optional<DrawnReason> drawnReason)
+            implements TempbanState {
 
         public Active {
             Objects.requireNonNull(until, "until");
             Objects.requireNonNull(issuer, "issuer");
             Objects.requireNonNull(reason, "reason");
             Objects.requireNonNull(issuedAt, "issuedAt");
+            Objects.requireNonNull(drawnReason, "drawnReason");
+        }
+
+        /** A ban whose reason a staff member gave. */
+        public Active(Instant until, Issuer issuer, Optional<String> reason, Instant issuedAt) {
+            this(until, issuer, reason, issuedAt, Optional.empty());
         }
 
         @Override

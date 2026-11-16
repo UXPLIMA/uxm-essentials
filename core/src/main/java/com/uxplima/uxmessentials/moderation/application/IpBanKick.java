@@ -23,10 +23,15 @@ final class IpBanKick {
 
     static void kickEveryoneOn(
             IpBan ban, Optional<UUID> actor, ModerationGuard guard, Sanctions sanctions, Notifier notifier) {
-        Map<String, String> placeholders = Map.of("reason", ban.reason().orElse(""));
         sanctions.kickAddress(
                 ban.ip(),
                 player -> !actor.equals(Optional.of(player.uuid())) && !guard.isExempt(player),
-                player -> notifier.render(player, ModerationMessageKey.BANIP_KICK, placeholders));
+                player -> notifier.render(
+                        player,
+                        ModerationMessageKey.BANIP_KICK,
+                        Map.of(
+                                "reason",
+                                SanctionReasons.read(notifier::render, player, ban.reason(), ban.drawnReason())
+                                        .orElse(""))));
     }
 }

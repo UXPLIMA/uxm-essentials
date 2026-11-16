@@ -18,6 +18,8 @@ import java.util.UUID;
  * @param target the UUID the ban was applied against, if any
  * @param issuer who issued the ban
  * @param issuedAt when the ban was issued
+ * @param drawnReason the catalog line {@code reason} was drawn from for the punished player, when the server wrote it
+ *     (a warn ladder ban under STRICT address strictness); each reader then reads it in their own language
  */
 public record IpBan(
         String ip,
@@ -25,7 +27,8 @@ public record IpBan(
         Optional<String> reason,
         Optional<UUID> target,
         Issuer issuer,
-        Instant issuedAt) {
+        Instant issuedAt,
+        Optional<DrawnReason> drawnReason) {
 
     public IpBan {
         Objects.requireNonNull(ip, "ip");
@@ -34,9 +37,21 @@ public record IpBan(
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(issuer, "issuer");
         Objects.requireNonNull(issuedAt, "issuedAt");
+        Objects.requireNonNull(drawnReason, "drawnReason");
         if (ip.isBlank()) {
             throw new IllegalArgumentException("banned ip must not be blank");
         }
+    }
+
+    /** An IP ban whose reason a staff member gave. */
+    public IpBan(
+            String ip,
+            Optional<Instant> until,
+            Optional<String> reason,
+            Optional<UUID> target,
+            Issuer issuer,
+            Instant issuedAt) {
+        this(ip, until, reason, target, issuer, issuedAt, Optional.empty());
     }
 
     /** True when this ban still bars the connecting address at {@code now} (permanent always). */

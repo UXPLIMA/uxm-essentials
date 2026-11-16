@@ -8,6 +8,7 @@ import org.bukkit.Server;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.teleport.application.port.CombatGate;
@@ -37,6 +38,7 @@ public final class ForeignCombatGate implements CombatGate {
     private static final String COMBAT_PLAYER_CLASS = "me.chancesd.pvpmanager.player.CombatPlayer";
 
     private final Server server;
+    private final OwningThreadReads reads;
     private final Logger log;
 
     private @Nullable Method combatLogXManager;
@@ -45,8 +47,9 @@ public final class ForeignCombatGate implements CombatGate {
     private @Nullable Method pvpManagerInCombat;
     private boolean unavailableLogged;
 
-    public ForeignCombatGate(Server server, Logger log) {
+    public ForeignCombatGate(Server server, OwningThreadReads reads, Logger log) {
         this.server = Objects.requireNonNull(server, "server");
+        this.reads = Objects.requireNonNull(reads, "reads");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -64,6 +67,13 @@ public final class ForeignCombatGate implements CombatGate {
     @Override
     public boolean isTagged(PlayerRef who) {
         Objects.requireNonNull(who, "who");
+        // A cross-server hop asks this on the async lane; the combat plugins keep their tags for the player's thread.
+        // A player who has left is in no fight, but one whose tag cannot be read in time counts as tagged, or lagging
+        // their own region would be a way out of combat.
+        return reads.forPlayer(who, () -> isTaggedNow(who), false, true);
+    }
+
+    private boolean isTaggedNow(PlayerRef who) {
         Player player = server.getPlayer(who.uuid());
         if (player == null) {
             // An offline player is in no fight, and neither plugin can answer for one.

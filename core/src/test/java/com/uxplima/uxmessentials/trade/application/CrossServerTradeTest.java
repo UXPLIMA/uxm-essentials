@@ -221,6 +221,81 @@ class CrossServerTradeTest {
         assertThat(escrows.rows).isEmpty();
     }
 
+    @Test
+    void anAbortThatOvertakesTheEscrowRefundsTheEscrowAsSoonAsItIsWritten() {
+        TradeSignal abort = new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival");
+        lobby.receive(abort);
+
+        assertThat(alexEscrows(coins("40"))).isTrue();
+
+        assertThat(lobby.delivered).containsExactly(new Delivery(ALEX, ALEX_ITEMS));
+        assertThat(wallets.balance(ALEX, "coins")).isEqualByComparingTo("100");
+        assertThat(escrows.rows).isEmpty();
+        assertThat(lobby.sent)
+                .as("the peer already gave up, so it is neither told it is ready nor told to abort")
+                .isEmpty();
+    }
+
+    @Test
+    void anOvertakingAbortRepeatedOrFollowedByARejoinReturnsTheItemsOnlyOnce() {
+        TradeSignal abort = new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival");
+        lobby.receive(abort);
+        alexEscrows(coins("40"));
+
+        lobby.receive(abort);
+        lobby.trade.reconcile(ALEX.uuid());
+        lobby.trade.cancel(id, ALEX.uuid());
+
+        assertThat(lobby.delivered).containsExactly(new Delivery(ALEX, ALEX_ITEMS));
+        assertThat(wallets.total("coins")).isEqualByComparingTo("120");
+        assertThat(wallets.balance(ALEX, "coins")).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void anOvertakingAbortForAnOwnerWhoLeftKeepsTheirItemsForTheirNextJoin() {
+        lobby.receive(new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival"));
+        lobby.online.remove(ALEX.uuid());
+
+        alexEscrows(coins("40"));
+        assertThat(lobby.delivered).isEmpty();
+        assertThat(escrows.rows).hasSize(1);
+
+        lobby.online.add(ALEX.uuid());
+        lobby.trade.reconcile(ALEX.uuid());
+
+        assertThat(lobby.delivered).containsExactly(new Delivery(ALEX, ALEX_ITEMS));
+        assertThat(wallets.balance(ALEX, "coins")).isEqualByComparingTo("100");
+        assertThat(escrows.rows).isEmpty();
+    }
+
+    @Test
+    void anAbortIsForgottenAfterAWhileAndAMuchLaterEscrowIsRefundedOnTheNextJoin() {
+        lobby.receive(new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival"));
+        clock.advance(CrossServerTrade.ABORT_MEMORY);
+
+        alexEscrows(coins("40"));
+        assertThat(lobby.delivered).isEmpty();
+
+        lobby.trade.reconcile(ALEX.uuid());
+
+        assertThat(lobby.delivered).containsExactly(new Delivery(ALEX, ALEX_ITEMS));
+        assertThat(wallets.balance(ALEX, "coins")).isEqualByComparingTo("100");
+        assertThat(escrows.rows).isEmpty();
+    }
+
+    @Test
+    void anAbortOfAnotherTradeLeavesThisOneToSettle() {
+        lobby.receive(new TradeSignal(TradeId.newId(), TradeSignalType.ABORT, SAM, ALEX, "survival"));
+        alexEscrows(coins("40"));
+        samEscrows(SAM_ITEMS, Map.of());
+
+        lobby.receive(survival.only(TradeSignalType.COMMIT));
+
+        assertThat(lobby.delivered).containsExactly(new Delivery(ALEX, SAM_ITEMS));
+        assertThat(survival.delivered).containsExactly(new Delivery(SAM, ALEX_ITEMS));
+        assertThat(escrows.rows).isEmpty();
+    }
+
     private record Delivery(PlayerRef to, String itemData) {}
 
     /** One backend: its own bus, its own online players and the items it handed to them. */

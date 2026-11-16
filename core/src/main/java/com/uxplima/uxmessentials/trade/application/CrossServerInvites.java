@@ -154,6 +154,12 @@ public final class CrossServerInvites {
     /** No backend answered within the expiry. */
     public record TimedOut(PlayerRef inviter, String targetName) implements Reply {}
 
+    /**
+     * The target's side gave the trade up before its accept reached this backend: the {@code ABORT} overtook the
+     * {@code ACCEPT}, which is then withdrawn when it comes.
+     */
+    public record CalledOff(PlayerRef inviter, PlayerRef target) implements Reply {}
+
     /** How an accept or deny matched against the invites shown to a player. */
     public enum Status {
         /** A live invite was found, removed and answered. */
@@ -287,8 +293,7 @@ public final class CrossServerInvites {
      */
     public List<Reply> expire() {
         Instant now = clock.instant();
-        tombstones.values().removeIf(stone -> !now.isBefore(stone.until()));
-        seenInvites.values().removeIf(seen -> !now.isBefore(seen.plus(ttl).plus(ANSWER_GRACE)));
+        prune(now);
         List<Reply> settled = new ArrayList<>();
         for (TradeId id : List.copyOf(outgoing.keySet())) {
             AtomicReference<@Nullable Outgoing> due = new AtomicReference<>();
@@ -319,6 +324,16 @@ public final class CrossServerInvites {
             }
         }
         return settled;
+    }
+
+    /**
+     * Drop tombstones and remembered invites older than one invite lifetime. The sweep that calls {@link #expire} is
+     * scheduled only when a local player invites, so an incoming invite prunes too: a backend whose players only ever
+     * receive invites would otherwise keep every id it saw for its whole uptime.
+     */
+    private void prune(Instant now) {
+        tombstones.values().removeIf(stone -> !now.isBefore(stone.until()));
+        seenInvites.values().removeIf(seen -> !now.isBefore(seen.plus(ttl).plus(ANSWER_GRACE)));
     }
 
     private Optional<Reply> accepted(TradeSignal signal) {
@@ -399,7 +414,9 @@ public final class CrossServerInvites {
      */
     public Optional<Incoming> onInvite(TradeSignal invite) {
         Objects.requireNonNull(invite, "invite");
-        if (seenInvites.putIfAbsent(invite.tradeId(), clock.instant()) != null) {
+        Instant now = clock.instant();
+        prune(now);
+        if (seenInvites.putIfAbsent(invite.tradeId(), now) != null) {
             return Optional.empty();
         }
         String name = invite.to().name();
@@ -496,22 +513,26 @@ public final class CrossServerInvites {
     }
 
     /**
-     * The peer withdrew the trade {@code abort} names. On the target side this drops its waiting invite, and returns
-     * the accepted invite that was still waiting for {@code OPENED}, which the caller releases. On the inviter side an
-     * invite not yet settled ends here, so an accept that arrives after it is withdrawn rather than opened.
+     * The peer withdrew the trade {@code abort} names. On the target side this drops its waiting invite and an
+     * accepted one still waiting for {@code OPENED}; the caller ends the target's side of that trade. On the inviter
+     * side an invite not yet settled ends here, so an accept that arrives after it is withdrawn rather than opened,
+     * and the inviter is told with the returned {@link CalledOff}. Only the backend that sent the invite settles it,
+     * so a repeated abort, or one reaching another backend, returns nothing.
      */
-    public Optional<Incoming> onAbort(TradeSignal abort) {
+    public Optional<Reply> onAbort(TradeSignal abort) {
         Objects.requireNonNull(abort, "abort");
         TradeId id = abort.tradeId();
         incomingByTarget.computeIfPresent(abort.to().uuid(), (target, waiting) -> {
             waiting.values().removeIf(held -> held.tradeId().equals(id));
             return waiting.isEmpty() ? null : waiting;
         });
-        if (outgoing.remove(id) != null) {
-            bury(id, Ending.CLOSED);
+        awaitingOpen.remove(id);
+        Outgoing sent = outgoing.remove(id);
+        if (sent == null) {
+            return Optional.empty();
         }
-        Awaiting accepted = awaitingOpen.remove(id);
-        return accepted == null ? Optional.empty() : Optional.of(accepted.invite());
+        bury(id, Ending.CLOSED);
+        return Optional.of(new CalledOff(sent.inviter(), abort.from()));
     }
 
     /** The names of everyone with a live invite waiting for {@code target}, the accept and deny suggestions. */

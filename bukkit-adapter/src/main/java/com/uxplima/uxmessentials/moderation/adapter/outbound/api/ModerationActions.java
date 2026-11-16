@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.moderation.domain.TempbanState;
 import com.uxplima.uxmessentials.moderation.domain.event.PlayerWarned;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiActors;
 import com.uxplima.uxmessentials.shared.adapter.outbound.api.ApiValues;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
 import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -46,25 +47,34 @@ public final class ModerationActions implements UxmModerationActions {
     private final ModerationApiWrites writes;
     private final PlayerLookup players;
     private final Scheduler scheduler;
+    private final Messages messages;
     private final String source;
     private final boolean silent;
 
-    public ModerationActions(ModerationApiWrites writes, PlayerLookup players, Scheduler scheduler, String source) {
-        this(writes, players, scheduler, source, false);
+    /** {@code messages} reads a sanction's reason the way {@link ModerationQueries} does. */
+    public ModerationActions(
+            ModerationApiWrites writes, PlayerLookup players, Scheduler scheduler, Messages messages, String source) {
+        this(writes, players, scheduler, messages, source, false);
     }
 
     private ModerationActions(
-            ModerationApiWrites writes, PlayerLookup players, Scheduler scheduler, String source, boolean silent) {
+            ModerationApiWrites writes,
+            PlayerLookup players,
+            Scheduler scheduler,
+            Messages messages,
+            String source,
+            boolean silent) {
         this.writes = Objects.requireNonNull(writes, "writes");
         this.players = Objects.requireNonNull(players, "players");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.messages = Objects.requireNonNull(messages, "messages");
         this.source = Objects.requireNonNull(source, "source");
         this.silent = silent;
     }
 
     @Override
     public UxmModerationActions silently() {
-        return silent ? this : new ModerationActions(writes, players, scheduler, source, true);
+        return silent ? this : new ModerationActions(writes, players, scheduler, messages, source, true);
     }
 
     @Override
@@ -181,7 +191,7 @@ public final class ModerationActions implements UxmModerationActions {
             }
             // A mute that lands is one of the two active states; None here would mean the use case reported
             // success for a player it did not mute, which is worth saying rather than publishing as a success.
-            return ModerationQueries.view(targetId, result.orElseThrow())
+            return ModerationQueries.view(messages, targetId, result.orElseThrow())
                     .map(UxmResult::ok)
                     .orElseGet(() -> UxmResult.failed(UxmFailure.FAILED, "the mute was applied but reads as absent"));
         });
@@ -209,10 +219,10 @@ public final class ModerationActions implements UxmModerationActions {
         });
     }
 
-    private static UxmResult<UxmSanction> sanction(UUID targetId, Result<TempbanState.Active, ModerationError> result) {
+    private UxmResult<UxmSanction> sanction(UUID targetId, Result<TempbanState.Active, ModerationError> result) {
         return result.isErr()
                 ? UxmResult.failed(failure(result.errorOrThrow()))
-                : UxmResult.ok(ModerationQueries.view(targetId, result.orElseThrow()));
+                : UxmResult.ok(ModerationQueries.view(messages, targetId, result.orElseThrow()));
     }
 
     /**

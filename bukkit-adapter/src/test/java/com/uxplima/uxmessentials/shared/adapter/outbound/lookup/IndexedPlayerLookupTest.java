@@ -19,6 +19,9 @@ import org.junit.jupiter.api.Test;
 class IndexedPlayerLookupTest {
 
     private static final PlayerRef ALEX = new PlayerRef(UUID.randomUUID(), "Alex");
+    private static final Object FIRST = new Object();
+    private static final Object SECOND = new Object();
+    private static final Object OTHER = new Object();
 
     private final OnlinePlayerIndex online = new OnlinePlayerIndex();
     private final ServerProfiles server = new ServerProfiles();
@@ -28,16 +31,16 @@ class IndexedPlayerLookupTest {
     void aPlayerIsOnlineFromJoinUntilQuit() {
         assertThat(lookup.isOnline(ALEX.uuid())).isFalse();
 
-        online.joined(ALEX);
+        online.joined(ALEX, FIRST);
         assertThat(lookup.isOnline(ALEX.uuid())).isTrue();
 
-        online.left(ALEX.uuid());
+        online.left(ALEX.uuid(), FIRST);
         assertThat(lookup.isOnline(ALEX.uuid())).isFalse();
     }
 
     @Test
     void aConnectedPlayerIsFoundByNameInAnyCaseAndByIdWithoutAskingTheServer() {
-        online.joined(ALEX);
+        online.joined(ALEX, FIRST);
 
         assertThat(lookup.findOnlineByName("aLEX")).contains(ALEX);
         assertThat(lookup.findByName("alex")).contains(ALEX);
@@ -47,8 +50,8 @@ class IndexedPlayerLookupTest {
 
     @Test
     void aPlayerWhoLeftIsNoLongerFoundOnlineButTheServerStillKnowsTheirProfile() {
-        online.joined(ALEX);
-        online.left(ALEX.uuid());
+        online.joined(ALEX, FIRST);
+        online.left(ALEX.uuid(), FIRST);
         server.profiles.put(ALEX.uuid(), ALEX);
 
         assertThat(lookup.findOnlineByName("Alex")).isEmpty();
@@ -57,10 +60,10 @@ class IndexedPlayerLookupTest {
 
     @Test
     void aPlayerWhoRejoinsUnderANewNameIsFoundOnlyByTheNewOne() {
-        online.joined(ALEX);
+        online.joined(ALEX, FIRST);
         PlayerRef renamed = new PlayerRef(ALEX.uuid(), "Alexandra");
 
-        online.joined(renamed);
+        online.joined(renamed, SECOND);
 
         assertThat(lookup.findOnlineByName("Alex")).isEmpty();
         assertThat(lookup.findOnlineByName("Alexandra")).contains(renamed);
@@ -68,30 +71,44 @@ class IndexedPlayerLookupTest {
 
     @Test
     void aQuitDoesNotTakeTheNameFromAnotherAccountNowOnlineUnderIt() {
-        online.joined(ALEX);
+        online.joined(ALEX, FIRST);
         PlayerRef other = new PlayerRef(UUID.randomUUID(), "Alex");
-        online.joined(other);
+        online.joined(other, OTHER);
 
-        online.left(ALEX.uuid());
+        online.left(ALEX.uuid(), FIRST);
 
         assertThat(lookup.findOnlineByName("Alex")).contains(other);
         assertThat(lookup.isOnline(other.uuid())).isTrue();
     }
 
+    @Test
+    void aLateQuitOfAnOldConnectionLeavesTheNewOneOnline() {
+        online.joined(ALEX, FIRST);
+        online.joined(ALEX, SECOND);
+
+        online.left(ALEX.uuid(), FIRST);
+
+        assertThat(lookup.isOnline(ALEX.uuid())).isTrue();
+        assertThat(lookup.findOnlineByName("Alex")).contains(ALEX);
+
+        online.left(ALEX.uuid(), SECOND);
+        assertThat(lookup.isOnline(ALEX.uuid())).isFalse();
+        assertThat(lookup.findOnlineByName("Alex")).isEmpty();
+    }
+
+    @Test
+    void anOfflineNameNobodyHereUsedResolvesToEmpty() {
+        assertThat(lookup.findByName("Nobody")).isEmpty();
+    }
+
     /** The server's offline profiles: counts every question, since the online answers must not need it. */
-    private static final class ServerProfiles implements PlayerLookup {
+    private static final class ServerProfiles implements OfflineProfiles {
 
         final Map<UUID, PlayerRef> profiles = new HashMap<>();
         int asked;
 
         @Override
-        public Optional<PlayerRef> findOnlineByName(String name) {
-            asked++;
-            return Optional.empty();
-        }
-
-        @Override
-        public Optional<PlayerRef> findByName(String name) {
+        public Optional<PlayerRef> byName(String name) {
             asked++;
             return profiles.values().stream()
                     .filter(ref -> ref.name().equalsIgnoreCase(name))
@@ -99,15 +116,9 @@ class IndexedPlayerLookupTest {
         }
 
         @Override
-        public Optional<PlayerRef> findByUuid(UUID uuid) {
+        public Optional<PlayerRef> byUuid(UUID uuid) {
             asked++;
             return Optional.ofNullable(profiles.get(uuid));
-        }
-
-        @Override
-        public boolean isOnline(UUID uuid) {
-            asked++;
-            return false;
         }
     }
 

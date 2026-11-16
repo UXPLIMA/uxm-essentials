@@ -104,6 +104,7 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_EDITOR_ICON_NAME("warp.editor.icon.name"),
     WARP_EDITOR_ICON_LORE("warp.editor.icon.lore"),
     WARP_EDITOR_ICON_ERROR_HAND("warp.editor.icon.error-hand"),
+    WARP_EDITOR_SAVE_FAILED("warp.editor.save-failed"),
     WARP_EDITOR_TELEPORT_NAME("warp.editor.teleport.name"),
     WARP_EDITOR_TELEPORT_LORE("warp.editor.teleport.lore"),
     WARP_EDITOR_CLOSE("warp.editor.close"),
