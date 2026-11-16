@@ -26,6 +26,7 @@ import com.uxplima.uxmessentials.moderation.domain.WarnEscalation;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationAction;
 import com.uxplima.uxmessentials.moderation.domain.WarnEscalation.EscalationStep;
 import com.uxplima.uxmessentials.shared.application.IpAlts;
+import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
 import com.uxplima.uxmessentials.shared.domain.OnlinePlayer;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -674,6 +675,41 @@ class WarnEscalationTest {
         });
         assertThat(toldAlex()).containsExactly(ModerationMessageKey.MOD_WARN_ESCALATED_HELD.key());
         assertThat(sync.mutesChanged).isEqualTo(1);
+    }
+
+    @Test
+    void aLongWarningReasonGivesTheRungAReasonThatFitsItsRow() {
+        Notifier filling = new Notifier(
+                (viewer, key, placeholders) -> key.equals(ModerationMessageKey.MOD_WARN_ESCALATION_REASON)
+                        ? "reached " + placeholders.get("count") + " warnings, the last for: "
+                                + placeholders.get("reason")
+                        : key.key(),
+                (viewer, text) -> {});
+        Mute muting = new Mute(
+                records, guard, filling, audit, events, history, limit, (key, placeholders) -> {}, sync, clock);
+        IssueWarn warning = new IssueWarn(
+                records,
+                guard,
+                filling,
+                audit,
+                events,
+                history,
+                (key, placeholders) -> {},
+                new WarnEscalator(LADDER, muting, tempBan, ban, kick, filling),
+                clock);
+        String essay = "x".repeat(240);
+
+        for (int i = 0; i < 3; i++) {
+            warning.warn(ALEX, SAM, Optional.of(essay), false);
+        }
+
+        assertThat(records.loadMute(SAM))
+                .isInstanceOfSatisfying(
+                        MuteState.Timed.class,
+                        timed -> assertThat(timed.reason()).hasValueSatisfying(reason -> {
+                            assertThat(reason).hasSize(WarnEscalator.MAX_REASON);
+                            assertThat(reason).startsWith("reached 3 warnings, the last for: xxx");
+                        }));
     }
 
     /** Every line the staff member who gave the warnings was told, in order. */

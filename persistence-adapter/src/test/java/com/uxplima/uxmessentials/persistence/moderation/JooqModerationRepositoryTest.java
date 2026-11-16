@@ -154,6 +154,21 @@ class JooqModerationRepositoryTest {
     }
 
     @Test
+    void aMuteDecidedOnAnExpiredRowReplacesIt() {
+        MuteState expired =
+                MuteState.timed(NOW.minusSeconds(60), Issuer.of(ALEX), Optional.of("old"), NOW.minusSeconds(3600));
+        first.saveMute(SAM, expired);
+        MuteState read = first.loadMute(SAM);
+        MuteState fresh = MuteState.timed(NOW.plus(Duration.ofHours(1)), Issuer.of(ALEX), Optional.of("new"), NOW);
+
+        assertThat(read.isActiveAt(NOW)).isFalse();
+        assertThat(first.replaceMute(SAM, MuteState.none(), fresh)).isFalse();
+        assertThat(first.replaceMute(SAM, read, fresh)).isTrue();
+
+        assertThat(second.loadMute(SAM)).isEqualTo(fresh);
+    }
+
+    @Test
     void anIpBanDecidedOnNoRowIsStoredAndDoesNotLandOverOneWrittenSince() {
         IpBan permanent = ipBan(Optional.empty(), "alts", NOW);
 

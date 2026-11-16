@@ -231,12 +231,14 @@ public final class Ban {
         if (capped) {
             notifier.send(told, ModerationMessageKey.MOD_DURATION_CAPPED, capLabel(effective));
         }
+        // The local kick above already removed the target here; this wakes peers that have them online so the
+        // ban takes live effect cluster-wide rather than only on each peer's next login (a no-op with no bus). It
+        // goes before the IP fan-out, whose guarded writes may give up and throw, so the stored ban always reaches
+        // the peers.
+        sync.banChanged(target);
         // A capped /ban lands a timed UUID ban, so its IP collateral must expire with it; a true permanent ban
         // (no cap) fans out permanent IP bans. Empty until = permanent, mirroring the UUID ban's own expiry.
         fanOutToIps(actor, told, target, reason, capped ? Optional.of(expiry) : Optional.empty(), now);
-        // The local kick above already removed the target here; this wakes peers that have them online so the
-        // ban takes live effect cluster-wide rather than only on each peer's next login (a no-op with no bus).
-        sync.banChanged(target);
         if (!silent) {
             broadcast.announce(broadcastKey(capped), broadcastPlaceholders(actor, target, reason, capped, effective));
         }

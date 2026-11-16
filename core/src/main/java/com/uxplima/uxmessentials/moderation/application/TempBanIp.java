@@ -82,7 +82,7 @@ public final class TempBanIp {
     }
 
     /** Ban {@code target}'s address until {@code rawDuration} elapses, refusing a permanent/blank span. */
-    public Result<BanIp.Result, ModerationError> tempBanIp(
+    public Result<BanIp.Outcome, ModerationError> tempBanIp(
             PlayerRef actor, BanIp.Target target, String rawDuration, Optional<String> reason) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -97,7 +97,7 @@ public final class TempBanIp {
         return apply(actor, target, span.get(), reason);
     }
 
-    private Result<BanIp.Result, ModerationError> apply(
+    private Result<BanIp.Outcome, ModerationError> apply(
             PlayerRef actor, BanIp.Target target, Duration span, Optional<String> reason) {
         Instant now = clock.instant();
         IpBan ban = new IpBan(target.ip(), Optional.of(now.plus(span)), reason, target.uuid(), Issuer.of(actor), now);
@@ -123,7 +123,7 @@ public final class TempBanIp {
         audit.altDetected(target.uuid().orElse(NO_UUID), target.ip(), alts, true);
         notify(actor, target, span, alts);
         sync.ipBanChanged(target.ip());
-        return Result.ok(new BanIp.Result(ban, alts));
+        return Result.ok(new BanIp.Outcome(ban, alts));
     }
 
     private void notify(PlayerRef actor, BanIp.Target target, Duration span, List<UUID> alts) {

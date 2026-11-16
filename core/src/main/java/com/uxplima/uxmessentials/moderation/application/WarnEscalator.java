@@ -37,6 +37,12 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  */
 public final class WarnEscalator {
 
+    /**
+     * The longest reason a step's sanction is given: the width of the reason columns its rows are stored in. The
+     * reason quotes a staff member's warning, so without this a long warning would make a reason no row can hold.
+     */
+    static final int MAX_REASON = 256;
+
     /** The stable system actor an escalated sanction is attributed to. */
     private static final PlayerRef SYSTEM_ACTOR = PlayerRef.system("system");
 
@@ -81,19 +87,29 @@ public final class WarnEscalator {
 
     /**
      * The reason a step's sanction is stored, shown and announced with: the count that tripped it and the reason of
-     * the warning that reached it. It is drawn in the punished player's language, since they read it on the kick
-     * screen and in the mute notice.
+     * the warning that reached it, cut to {@link #MAX_REASON} characters. It is resolved for the punished player, who
+     * reads it on the kick screen and in the mute notice, so it follows the language the resolver picks for them.
      */
     private String reasonFor(PlayerRef target, int count, Optional<String> warnReason) {
         String total = Integer.toString(count);
-        return warnReason
-                .filter(reason -> !reason.isBlank())
-                .map(reason -> notifier.render(
+        String reason = warnReason
+                .filter(text -> !text.isBlank())
+                .map(text -> notifier.render(
                         target,
                         ModerationMessageKey.MOD_WARN_ESCALATION_REASON,
-                        Map.of("count", total, "reason", reason)))
+                        Map.of("count", total, "reason", text)))
                 .orElseGet(() -> notifier.render(
                         target, ModerationMessageKey.MOD_WARN_ESCALATION_REASON_BARE, Map.of("count", total)));
+        return capped(reason);
+    }
+
+    /** {@code reason} cut to {@link #MAX_REASON} characters, never splitting a surrogate pair. */
+    private static String capped(String reason) {
+        if (reason.length() <= MAX_REASON) {
+            return reason;
+        }
+        int end = Character.isHighSurrogate(reason.charAt(MAX_REASON - 1)) ? MAX_REASON - 1 : MAX_REASON;
+        return reason.substring(0, end);
     }
 
     private Result<EscalationOutcome, ModerationError> applyAction(

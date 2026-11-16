@@ -155,9 +155,11 @@ audit log as not applied (`held_by_stronger`). A staff mute or ban that lands wh
 by the same rule.
 
 The sanction a step applies is stored with a reason that names the warning count that tripped it and the reason of
-that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The staff member who gave
-the warning reads what the sanction itself reports, such as the mute confirmation or why it could not be applied,
-followed by a line on how the step landed.
+that warning (`moderation.warn-escalation-reason`), so `/history` shows what caused it. The reason is written once,
+when the step fires, and cut to 256 characters. Its language is the punished player's `/lang` choice when they made
+one, otherwise usually the language of the staff member who gave the warning. The staff member reads what the
+sanction itself reports, such as the mute confirmation or why it could not be applied, followed by a line on how the
+step landed.
 
 ## Kicks
 

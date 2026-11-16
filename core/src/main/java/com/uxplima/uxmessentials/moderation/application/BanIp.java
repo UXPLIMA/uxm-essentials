@@ -25,6 +25,7 @@ import com.uxplima.uxmessentials.shared.application.IpAlts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
+import com.uxplima.uxmessentials.shared.domain.Result;
 
 /**
  * {@code /banip <player|ip> [reason]}: ban an address by stored IP (not only by UUID). When a player is
@@ -84,7 +85,7 @@ public final class BanIp {
      * Ban {@code target}'s address, run alt-detection, and report the alts found; or refuse when an IP ban already in
      * force on the address would outlast this one.
      */
-    public com.uxplima.uxmessentials.shared.domain.Result<Result, ModerationError> banIp(
+    public Result<Outcome, ModerationError> banIp(
             PlayerRef actor, Target target, String rawDuration, Optional<String> reason) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(target, "target");
@@ -104,7 +105,7 @@ public final class BanIp {
                     false,
                     SanctionStrength.HELD);
             GuardedWrite.tellIpBanKept(notifier, actor, kept.running(), now);
-            return com.uxplima.uxmessentials.shared.domain.Result.err(ModerationError.LONGER_BAN_RUNNING);
+            return Result.err(ModerationError.LONGER_BAN_RUNNING);
         }
         history.banIp(actor, target.uuid(), target.ip(), reason, span.map(now::plus));
         IpBanKick.kickEveryoneOn(ban, Optional.of(actor.uuid()), guard, sanctions, notifier);
@@ -116,7 +117,7 @@ public final class BanIp {
         notify(actor, target, alts);
         // The local kick above cleared this backend; peers kick the players they have on the address.
         sync.ipBanChanged(target.ip());
-        return com.uxplima.uxmessentials.shared.domain.Result.ok(new Result(ban, alts));
+        return Result.ok(new Outcome(ban, alts));
     }
 
     private void notify(PlayerRef actor, Target target, List<UUID> alts) {
@@ -153,9 +154,9 @@ public final class BanIp {
      * @param ban the applied IP ban
      * @param alts the other UUIDs sharing the banned IP
      */
-    public record Result(IpBan ban, List<UUID> alts) {
+    public record Outcome(IpBan ban, List<UUID> alts) {
 
-        public Result {
+        public Outcome {
             Objects.requireNonNull(ban, "ban");
             alts = List.copyOf(Objects.requireNonNull(alts, "alts"));
         }
