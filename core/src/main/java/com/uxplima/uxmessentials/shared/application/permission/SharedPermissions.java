@@ -107,7 +107,7 @@ public final class SharedPermissions {
                         PermissionDefault.OP),
                 PermissionSpec.sharedFamily(
                         cooldown("<label>") + ".<seconds>",
-                        "The wait between uses of one label a menu or custom command names, in seconds; the shortest tier held wins and 0 removes the wait. A built-in feature's wait is its own <feature>.cooldown.<seconds> node.",
+                        "The wait between uses of one label a menu or custom command names, in seconds; a held tier sets the wait, the shortest held wins and 0 removes it; with none held the configured wait applies. A built-in feature's wait is its own <feature>.cooldown.<seconds> node.",
                         PermissionDefault.TRUE,
                         PermissionShape.TIER),
                 PermissionSpec.sharedFamily(

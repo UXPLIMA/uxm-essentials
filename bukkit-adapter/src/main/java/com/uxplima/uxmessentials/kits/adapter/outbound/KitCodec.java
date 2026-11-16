@@ -136,7 +136,14 @@ final class KitCodec {
                         cooldownsNode.childrenMap().entrySet()) {
                     String group = String.valueOf(entry.getKey());
                     long seconds = entry.getValue().getLong(-1L);
-                    if (seconds >= 0) {
+                    if (isNumber(group)) {
+                        log.warn(
+                                "kit {}: permission-cooldowns group '{}' is skipped: uxmessentials.kit.cooldown.{}"
+                                        + " is the kit cooldown tier node, so a group must be named by a word",
+                                id,
+                                group,
+                                group);
+                    } else if (seconds >= 0) {
                         permissionCooldowns.put(group, Duration.ofSeconds(seconds));
                     }
                 }
@@ -382,6 +389,19 @@ final class KitCodec {
             }
         }
         return List.copyOf(values);
+    }
+
+    /**
+     * Whether {@code group} reads as a number the way the cooldown tier reducer reads a node's last segment. The group
+     * node and the tier node share {@code uxmessentials.kit.cooldown.}, so a group named so would also be a tier.
+     */
+    private static boolean isNumber(String group) {
+        try {
+            Long.parseLong(group);
+            return true;
+        } catch (NumberFormatException word) {
+            return false;
+        }
     }
 
     private static List<KitItem> readItems(ConfigurationNode node) {

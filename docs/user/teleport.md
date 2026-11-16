@@ -148,18 +148,22 @@ cooldown checks run before any charge, so a refused teleport costs nothing.
 
 | Node | Effect |
 |---|---|
-| `uxmessentials.tp.cooldown.<seconds>` | The wait after a teleport; the shortest node held wins, 0 removes it. |
+| `uxmessentials.tp.cooldown.<seconds>` | The wait after a teleport, in place of `default-cooldown`; the shortest node held wins, 0 removes it. |
 | `uxmessentials.bypass.cooldown.tp` | No teleport cooldown. |
-| `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, kept apart from the others. |
+| `uxmessentials.rtp.cooldown.<seconds>` | The wait between random teleports, kept apart from the others, in place of the `/rtp` default. |
 | `uxmessentials.bypass.cooldown.rtp` | No `/rtp` cooldown. |
 
 The two bypass nodes are listed in the permission pages under the `uxmessentials.bypass.cooldown.<feature>` row.
 
 By default every voluntary teleport shares one clock. `cooldowns.back`, `cooldowns.home`, `cooldowns.warp` and
-`cooldowns.spawn` set to 0 or more give that command its own clock and default; `-1` keeps the shared one. A warp with
+`cooldowns.spawn` set to 0 or more give that command its own clock and wait; `-1` keeps the shared one. A warp with
 its own cooldown in the editor uses the warp clock, one clock shared by every warp that sets one, with the warp's
-value as the default; a player's `uxmessentials.tp.cooldown.<seconds>` node overrides that value. `cooldowns.rtp`
-sets the default of the `/rtp` clock.
+value as the wait. `cooldowns.rtp` sets the default of the `/rtp` clock.
+
+A `uxmessentials.tp.cooldown.<seconds>` node a player holds sets their wait on the shared clock, longer or shorter
+than `default-cooldown`. On a command or warp with its own value the node can only lower that value, never raise
+it: one node covers all of them, and a node given as a perk must not make a player wait on a command you set to 0.
+The `/rtp` node sets the `/rtp` wait outright.
 
 `cooldown-start-phase` decides what starts the clock. With `teleport`, the default, a landing does. With `accept`,
 only an accepted request starts it, for the player who moves, and other teleports start none. With `request`, no
