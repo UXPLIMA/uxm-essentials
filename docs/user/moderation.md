@@ -53,8 +53,7 @@ Where a duration is optional (`/mute` and `/jail`), `perm` or `permanent` means 
 /jail Alex spawnjail 30m
 ```
 
-`/tempban`, `/tempmute`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. A permanent mute is
-`/mute <player>` or `/mute <player> perm`.
+`/tempban`, `/tempmute`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`.
 
 The reason is everything after the last argument, spaces included. It is stored with the sanction, shown to the
 player and written to the history.
@@ -93,11 +92,10 @@ ban, replaces the old one. When two servers of a network ban the same player or 
 longer ban is the one kept.
 
 A permanently banned player sees the `moderation.ban.kick` screen, with no time left on it, when the ban kicks them,
-when they are kicked on another server of a network and every time they try to log in again. A timed ban, including
-a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
-lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
-permanent.
-A `/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
+when they are kicked on another server of a network and every time they try to log in again. A timed ban, including a
+`/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff lookups
+(`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as permanent. A
+`/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the
@@ -112,8 +110,8 @@ A muted player cannot chat, and cannot use this plugin's private messages, mail 
 commands. Write each as the bare command word. It also stops the namespaced forms, such as `/minecraft:msg` and
 `/essentials:msg`. An entry blocks whatever command owns that word, under all of its names, whichever plugin
 registered it: if a ticket plugin's `/ticketreply` also answers to `/reply`, the entry `reply` blocks `/ticketreply`
-too. The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the
-default does.
+too. The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the default
+does.
 
 `muted-allowed-commands` lists words a muted player may always run. It is checked first and matches only the word
 written (with or without a namespace), never the command's other names, so it frees exactly that word:
@@ -123,15 +121,18 @@ muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop",
 muted-allowed-commands = ["ticketreply"]
 ```
 
-With that, a muted player can run `/ticketreply` but not `/reply`. The names of the listed commands are read from
-the server once and again after a plugin is enabled or disabled, the server finishes starting, `/minecraft:reload`
-or `/uxmess reload`. A command another plugin adds while the server runs without being enabled again (a script
-reload, for example) is only seen after `/uxmess reload`.
+With that, a muted player can run `/ticketreply` but not `/reply`. The listed commands' names are read again when a
+plugin is enabled or disabled, the server finishes starting, `/minecraft:reload` or `/uxmess reload` runs; a command
+added any other way (a script reload) waits for `/uxmess reload`.
 
 A mute follows the ban rule. A `/mute` or `/tempmute` that ends later than the running mute, or a second permanent
 mute, replaces it; one that would end sooner is refused, and the staff member is told how long the running mute still
 runs. To shorten a mute, `/unmute` first. When two servers of a network mute the same player at the same moment, the
 longer mute is the one kept. A timed mute ends on its own.
+
+Each connected player's mute is kept in memory. Until it is read (just after joining, after another server changes it,
+or while the database is down), what a mute stops is refused with a line to try again, though chat still uses a mute
+already kept. Failed reads are logged once a minute (`event=mute_check_read_failed`, `online_mute_read_failed`).
 
 ## Warnings and the escalation ladder
 
@@ -162,12 +163,11 @@ third warning and banned for a day at their fifth, and nothing happens at the fo
 escalates silently. A step with a bad count, an unknown action or a missing duration is skipped with a warning in
 the log. An empty list turns escalation off.
 
-A step never weakens what is already running. A mute or ban step leaves the player under whichever of its own
-sanction and the running one of that kind ends later: a permanent one beats any timed one, and a tie keeps the
-running one. So a `tempmute:10m` step extends a mute that has five minutes left, while a `tempban:1d` step on a
-permanently banned player leaves the permanent ban in place. A step that is held back this way is written to the
-audit log as not applied (`held_by_stronger`). A staff mute or ban that lands while a step is being written is kept
-by the same rule.
+A step never weakens what is already running. A mute or ban step leaves the player under whichever of its own sanction
+and the running one of that kind ends later: a permanent one beats any timed one, and a tie keeps the running one. So
+a `tempmute:10m` step extends a mute that has five minutes left, while a `tempban:1d` step on a permanently banned
+player leaves the permanent ban in place. A step that is held back this way is written to the audit log as not applied
+(`held_by_stronger`). A staff mute or ban that lands while a step is being written is kept by the same rule.
 
 A step's sanction names the warning count that tripped it and that warning's reason
 (`moderation.warn-escalation-reason`, or `-bare` when it had none), so `/history` shows what caused it. It is kept as

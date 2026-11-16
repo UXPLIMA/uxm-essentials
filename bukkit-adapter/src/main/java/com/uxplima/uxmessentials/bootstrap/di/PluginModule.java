@@ -3081,6 +3081,10 @@ public final class PluginModule {
                 seenVisibility(links, persistence));
         wired.commands().forEach(resources::addCommand);
         wired.listeners().forEach(resources::addListener);
+        // The players already online when the module starts (a reload) never join, so their mutes are read here.
+        for (Player online : plugin.getServer().getOnlinePlayers()) {
+            wired.mutePolicy().joined(com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs.toRef(online));
+        }
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
         // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.

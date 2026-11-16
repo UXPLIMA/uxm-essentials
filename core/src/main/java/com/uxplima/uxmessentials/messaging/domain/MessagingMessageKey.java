@@ -21,6 +21,7 @@ public enum MessagingMessageKey implements MessageKey {
     MSG_TARGET_OFFLINE("msg.target-offline"),
     MSG_TOGGLED_OFF("msg.toggled-off"),
     MSG_MUTED("msg.muted"),
+    MSG_MUTE_UNCHECKED("msg.mute-unchecked"),
     MSG_IGNORED("msg.ignored"),
     MSG_NO_REPLY_TARGET("msg.no-reply-target"),
     MSG_TARGET_AFK("msg.target-afk"),

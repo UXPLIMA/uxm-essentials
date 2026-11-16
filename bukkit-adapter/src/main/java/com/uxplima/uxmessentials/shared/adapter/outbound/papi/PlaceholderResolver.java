@@ -18,6 +18,7 @@ import com.uxplima.uxmessentials.economy.application.MoneyFormat;
 import com.uxplima.uxmessentials.economy.application.port.BaltopRow;
 import com.uxplima.uxmessentials.economy.domain.Currency;
 import com.uxplima.uxmessentials.economy.domain.Money;
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderCatalog;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.PlayerLookup;
@@ -2073,7 +2074,7 @@ public final class PlaceholderResolver {
             return NO;
         }
         ModerationPlaceholders moderation = seam.get();
-        return bool(key.equals("muted") ? moderation.isMuted(who) : moderation.isJailed(who));
+        return key.equals("muted") ? muted(moderation.muted(who)) : bool(moderation.isJailed(who));
     }
 
     /**
@@ -2091,7 +2092,7 @@ public final class PlaceholderResolver {
         ModerationPlaceholders moderation = seam.get();
         return switch (tail) {
             case "banned" -> bool(moderation.activeBan(who).isPresent());
-            case "muted" -> bool(moderation.isMuted(who));
+            case "muted" -> muted(moderation.muted(who));
             case "jailed" -> bool(moderation.isJailed(who));
             case "frozen" -> bool(moderation.isFrozen(who));
             case "warns" -> Integer.toString(moderation.warnCount(who));
@@ -2177,6 +2178,15 @@ public final class PlaceholderResolver {
 
     private static String bool(boolean value) {
         return value ? YES : NO;
+    }
+
+    /** A mute that could not be read is neither yes nor no: it reads as the dash, as an unknown value does. */
+    private static String muted(MuteAnswer answer) {
+        return switch (answer) {
+            case MUTED -> YES;
+            case NOT_MUTED -> NO;
+            case UNKNOWN -> EMPTY;
+        };
     }
 
     /**

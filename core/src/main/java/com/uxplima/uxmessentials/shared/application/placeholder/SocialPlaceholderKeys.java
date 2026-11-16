@@ -224,7 +224,11 @@ final class SocialPlaceholderKeys {
     private static List<PlaceholderSpec> moderation() {
         return List.of(
                 PlaceholderSpec.of(
-                        "muted", "Whether the player is muted (yes/no).", "no", PlaceholderScope.PLAYER, MODERATION),
+                        "muted",
+                        "Whether the player is muted (yes/no, or a dash while it is not known).",
+                        "no",
+                        PlaceholderScope.PLAYER,
+                        MODERATION),
                 PlaceholderSpec.of(
                         "jailed", "Whether the player is jailed (yes/no).", "no", PlaceholderScope.PLAYER, MODERATION),
                 PlaceholderSpec.of(
@@ -235,7 +239,7 @@ final class SocialPlaceholderKeys {
                         MODERATION),
                 PlaceholderSpec.of(
                         "moderation_muted",
-                        "Whether the player is muted (yes/no).",
+                        "Whether the player is muted (yes/no, or a dash while it is not known).",
                         "yes",
                         PlaceholderScope.PLAYER,
                         MODERATION),

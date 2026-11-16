@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.messaging.application.port.MuteAnswer;
 import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.Ban;
 import com.uxplima.uxmessentials.moderation.application.SanctionReasons;
@@ -67,8 +68,8 @@ public final class GateModerationPlaceholders implements ModerationPlaceholders 
     }
 
     @Override
-    public boolean isMuted(PlayerRef who) {
-        return mutePolicy.isMuted(Objects.requireNonNull(who, "who"));
+    public MuteAnswer muted(PlayerRef who) {
+        return mutePolicy.check(Objects.requireNonNull(who, "who"));
     }
 
     @Override

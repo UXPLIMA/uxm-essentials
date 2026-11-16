@@ -9,7 +9,6 @@ import java.util.Optional;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
-import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
@@ -74,7 +73,6 @@ import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
 import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
-import com.uxplima.uxmessentials.moderation.application.RepositoryMutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ResolveTemplate;
 import com.uxplima.uxmessentials.moderation.application.ReviewBanHistory;
 import com.uxplima.uxmessentials.moderation.application.ReviewMuteHistory;
@@ -710,11 +708,7 @@ public final class ModerationWiring {
                         settings.freezeNoticeInterval()),
                 new MutedCommandListener(mutes, mutedCommands, live, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
-                mutedChat(
-                        new RepositoryMutePolicy(repository, clock),
-                        kernel.permissions(),
-                        kernel.messages(),
-                        kernel.messageSink()),
+                mutedChat(mutes, kernel.permissions(), kernel.messages(), kernel.messageSink()),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
     }
 
@@ -723,8 +717,8 @@ public final class ModerationWiring {
      * answer and would count every speaker as exempt, so this one asks the live permissions, which read the speaker's
      * own thread and wait for the answer.
      */
-    static MutedChatListener mutedChat(MutePolicy mutes, Permissions live, Messages messages, MessageSink sink) {
-        return new MutedChatListener(mutes, new ModerationGuard(live)::isExempt, messages, sink);
+    static MutedChatListener mutedChat(OnlineMutes mutes, Permissions live, Messages messages, MessageSink sink) {
+        return new MutedChatListener(mutes.fresh(), mutes, new ModerationGuard(live)::isExempt, messages, sink);
     }
 
     /**
