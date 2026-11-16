@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -19,6 +20,7 @@ import com.uxplima.uxmessentials.economy.domain.CurrencyId;
 import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSlot;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
@@ -38,6 +40,7 @@ class UserRecordWriterTest {
             Currency.builder(CurrencyId.of("coins")).build();
     private static final PlayerRef STEVE_REF = new PlayerRef(STEVE, "Steve");
     private static final ImportOptions SKIP = ImportOptions.live(Path.of("Essentials"));
+    private static final KitId WELCOME = KitId.of("welcome");
 
     /** The rule the plugin's text renderer applies to typed text: every {@code <} and backslash is escaped. */
     private static String escape(String text) {
@@ -47,6 +50,7 @@ class UserRecordWriterTest {
     private final InMemoryHomes homes = new InMemoryHomes();
     private final InMemoryWallets wallets = new InMemoryWallets();
     private final InMemoryMail mail = new InMemoryMail();
+    private final InMemoryKitClaims kitClaims = new InMemoryKitClaims();
 
     private UserRecordWriter writer(Optional<MailRepository> mailStore) {
         return writer(mailStore, Duration.ZERO);
@@ -57,6 +61,7 @@ class UserRecordWriterTest {
                 homes,
                 wallets,
                 mailStore,
+                kitClaims,
                 retention,
                 UserRecordWriterTest::escape,
                 COINS,
@@ -177,6 +182,7 @@ class UserRecordWriterTest {
                                 new InMemoryHomes(),
                                 new InMemoryWallets(),
                                 Optional.of(new InMemoryMail()),
+                                new InMemoryKitClaims(),
                                 Duration.ZERO,
                                 UserRecordWriterTest::escape,
                                 COINS,
@@ -304,6 +310,53 @@ class UserRecordWriterTest {
 
         assertThat(homes.all()).containsExactly(home(STEVE_REF, 5));
         assertThat(result.outcome()).isEqualTo(RecordOutcome.OVERWRITTEN);
+    }
+
+    @Test
+    void aOneTimeKitClaimLandsWithItsTimeAndARerunKeepsIt() {
+        ImportedUser user = withKitClaim(WELCOME, at(1_700_000_100_000L));
+
+        RecordResult first = writer().write(user, SKIP);
+        RecordResult second = writer().write(user, SKIP);
+
+        assertThat(kitClaims.of(STEVE_REF)).containsExactly(Map.entry(WELCOME, at(1_700_000_100_000L)));
+        assertThat(first.outcome()).isEqualTo(RecordOutcome.WRITTEN);
+        assertThat(first.notes()).contains("kit_claims_written=1", "kit_claims_kept=0");
+        assertThat(second.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+        assertThat(second.notes()).contains("kit_claims_written=0", "kit_claims_kept=1");
+    }
+
+    @Test
+    void aClaimAlreadyRecordedHereStandsUnderEveryPolicyAndIsNotHeldBack() {
+        kitClaims.record(STEVE_REF, WELCOME, at(1_800_000_000_000L));
+        ImportOptions overwrite = new ImportOptions(
+                Path.of("Essentials"), ImportMode.LIVE, ConflictPolicy.OVERWRITE, BalancePolicy.OVERWRITE);
+
+        RecordResult result = writer().write(withKitClaim(WELCOME, at(1_700_000_100_000L)), overwrite);
+
+        assertThat(kitClaims.of(STEVE_REF)).containsExactly(Map.entry(WELCOME, at(1_800_000_000_000L)));
+        assertThat(result.outcome()).isEqualTo(RecordOutcome.SKIPPED);
+    }
+
+    @Test
+    void aDryRunCountsTheKitClaimsALiveRunWouldRecordAndRecordsNone() {
+        kitClaims.record(STEVE_REF, KitId.of("starter"), at(1_700_000_000_000L));
+        ImportedUser user = new ImportedUser(
+                STEVE_REF,
+                List.of(),
+                Optional.empty(),
+                List.of(),
+                Map.of(WELCOME, at(1_700_000_100_000L), KitId.of("starter"), at(1_700_000_000_000L)));
+
+        RecordResult preview = writer().preview(user, SKIP);
+
+        assertThat(preview.notes()).contains("kit_claims_written=1", "kit_claims_kept=1");
+        assertThat(preview.outcome()).isEqualTo(RecordOutcome.WRITTEN);
+        assertThat(kitClaims.of(STEVE_REF)).containsOnlyKeys(KitId.of("starter"));
+    }
+
+    private static ImportedUser withKitClaim(KitId kit, Instant claimedAt) {
+        return new ImportedUser(STEVE_REF, List.of(), Optional.empty(), List.of(), Map.of(kit, claimedAt));
     }
 
     private static ImportedUser onlyBalance(String amount) {

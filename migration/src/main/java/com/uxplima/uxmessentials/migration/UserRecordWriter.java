@@ -7,8 +7,10 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.UnaryOperator;
 
 import com.uxplima.uxmessentials.economy.application.port.WalletRepository;
@@ -17,6 +19,7 @@ import com.uxplima.uxmessentials.economy.domain.Money;
 import com.uxplima.uxmessentials.homes.application.port.HomeRepository;
 import com.uxplima.uxmessentials.homes.domain.Home;
 import com.uxplima.uxmessentials.homes.domain.HomeSet;
+import com.uxplima.uxmessentials.kits.domain.KitId;
 import com.uxplima.uxmessentials.messaging.application.port.MailRepository;
 import com.uxplima.uxmessentials.messaging.domain.MailId;
 import com.uxplima.uxmessentials.messaging.domain.MailItem;
@@ -28,9 +31,9 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The shared write path for an imported player: their homes, balance and mail, each through the port its own
- * context's commands use, so an import can never create a state {@code /sethome}, the ledger or
- * {@code /mail send} could not.
+ * The shared write path for an imported player: their homes, balance, mail and one-time kit claims, each through the
+ * port its own context uses, so an import can never create a state {@code /sethome}, the ledger, {@code /mail send}
+ * or a kit claim could not.
  *
  * <ul>
  *   <li><b>Homes</b> upsert by {@code (owner, slot)}. Under {@link ConflictPolicy#SKIP} an occupied slot keeps its
@@ -49,6 +52,9 @@ import org.jspecify.annotations.NullMarked;
  *       retention before importing.
  *   <li><b>Expiry.</b> The mailbox has no per-message expiry, so mail the source would still expire later is
  *       imported without one and lives as long as the retention allows.
+ *   <li><b>Kit claims</b> are recorded only where none is, under every policy: a claim already recorded here is the
+ *       same fact, and replacing it would change nothing a player can see. Like a message already in the box, one
+ *       kept is not held back.
  * </ul>
  *
  * <p>The mail text is what a player typed. It reaches readers inside a MiniMessage template, so it goes through
@@ -68,6 +74,7 @@ public final class UserRecordWriter {
     private final HomeRepository homes;
     private final WalletRepository wallets;
     private final Optional<MailRepository> mail;
+    private final KitClaimTarget kitClaims;
     private final Duration mailRetention;
     private final UnaryOperator<String> escapeText;
     private final Currency defaultCurrency;
@@ -83,6 +90,7 @@ public final class UserRecordWriter {
      * @param homes the homes context's repository
      * @param wallets the economy ledger
      * @param mail the messaging context's mailbox store, empty when the messaging module is off
+     * @param kitClaims where the one-time kits a player already claimed are recorded
      * @param mailRetention the age at which the mail sweep deletes mail; zero or negative when it never does
      * @param escapeText turns typed text into text that reads as written inside a MiniMessage template
      * @param defaultCurrency the currency an imported balance is paid in
@@ -92,6 +100,7 @@ public final class UserRecordWriter {
             HomeRepository homes,
             WalletRepository wallets,
             Optional<MailRepository> mail,
+            KitClaimTarget kitClaims,
             Duration mailRetention,
             UnaryOperator<String> escapeText,
             Currency defaultCurrency,
@@ -99,6 +108,7 @@ public final class UserRecordWriter {
         this.homes = Objects.requireNonNull(homes, "homes");
         this.wallets = Objects.requireNonNull(wallets, "wallets");
         this.mail = Objects.requireNonNull(mail, "mail");
+        this.kitClaims = Objects.requireNonNull(kitClaims, "kitClaims");
         this.mailRetention = Objects.requireNonNull(mailRetention, "mailRetention");
         this.escapeText = Objects.requireNonNull(escapeText, "escapeText");
         this.defaultCurrency = Objects.requireNonNull(defaultCurrency, "defaultCurrency");
@@ -122,6 +132,7 @@ public final class UserRecordWriter {
         writeHomes(user, options.onConflict(), live, tally);
         user.balance().ifPresent(balance -> writeBalance(user.owner(), balance, options.balancePolicy(), live, tally));
         writeMail(user, live, tally);
+        writeKitClaims(user, live, tally);
         return tally.result();
     }
 
@@ -202,6 +213,23 @@ public final class UserRecordWriter {
         }
     }
 
+    private void writeKitClaims(ImportedUser user, boolean live, Tally tally) {
+        if (user.kitClaims().isEmpty()) {
+            return;
+        }
+        tally.kitClaimsKnown = true;
+        Set<KitId> recorded = kitClaims.claimed(user.owner());
+        for (Map.Entry<KitId, Instant> claim : user.kitClaims().entrySet()) {
+            boolean landed = !recorded.contains(claim.getKey())
+                    && (!live || kitClaims.record(user.owner(), claim.getKey(), claim.getValue()));
+            if (landed) {
+                tally.kitClaimsWritten++;
+            } else {
+                tally.kitClaimsKept++;
+            }
+        }
+    }
+
     private boolean pastRetention(ImportedMail imported, Instant now) {
         if (mailRetention.isZero() || mailRetention.isNegative()) {
             return false;
@@ -270,6 +298,9 @@ public final class UserRecordWriter {
         private int mailExpired;
         private int mailDisabled;
         private int mailPastRetention;
+        private boolean kitClaimsKnown;
+        private int kitClaimsWritten;
+        private int kitClaimsKept;
         private int replaced;
 
         RecordResult result() {
@@ -288,16 +319,20 @@ public final class UserRecordWriter {
             if (mailDisabled > 0) {
                 notes.add("mail_skipped=messaging_disabled");
             }
+            if (kitClaimsKnown) {
+                notes.add("kit_claims_written=" + kitClaimsWritten);
+                notes.add("kit_claims_kept=" + kitClaimsKept);
+            }
             return new RecordResult(outcome(), notes);
         }
 
         /**
-         * Mail already in the box and mail the source had expired are not held back: nothing of the source is
-         * lost by leaving them. A kept home, a kept balance, mail past the retention and mail the messaging module
-         * could not take are.
+         * Mail already in the box, mail the source had expired and a kit claim already recorded are not held back:
+         * nothing of the source is lost by leaving them. A kept home, a kept balance, mail past the retention and mail
+         * the messaging module could not take are.
          */
         private RecordOutcome outcome() {
-            int written = homesWritten + mailWritten + ("written".equals(balance) ? 1 : 0);
+            int written = homesWritten + mailWritten + kitClaimsWritten + ("written".equals(balance) ? 1 : 0);
             int heldBack = homesKept + mailDisabled + mailPastRetention + ("kept".equals(balance) ? 1 : 0);
             if (written == 0) {
                 return RecordOutcome.SKIPPED;
