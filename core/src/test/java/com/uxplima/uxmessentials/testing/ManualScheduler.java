@@ -22,6 +22,7 @@ public final class ManualScheduler implements Scheduler {
     private final Set<UUID> gone = new HashSet<>();
     private boolean runningAsync;
     private boolean inline;
+    private boolean shutDown;
 
     /** From now on run async work at once, as a fast async lane would, instead of queueing it. */
     public void runAsyncInline() {
@@ -63,6 +64,11 @@ public final class ManualScheduler implements Scheduler {
         return async.size();
     }
 
+    /** Refuse every entity hop from now on by throwing, as a scheduler does while the plugin is being disabled. */
+    public void shutDown() {
+        shutDown = true;
+    }
+
     /** Treat {@code who} as having left: their entity hops take the retired branch from now on. */
     public void leave(PlayerRef who) {
         gone.add(who.uuid());
@@ -87,6 +93,9 @@ public final class ManualScheduler implements Scheduler {
 
     @Override
     public void onEntity(PlayerRef player, Runnable task, Runnable retired) {
+        if (shutDown) {
+            throw new IllegalStateException("plugin is disabled");
+        }
         if (gone.contains(player.uuid())) {
             retired.run();
         } else {

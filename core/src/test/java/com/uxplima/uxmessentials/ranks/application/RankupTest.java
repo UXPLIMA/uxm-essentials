@@ -2,6 +2,7 @@ package com.uxplima.uxmessentials.ranks.application;
 
 import static com.uxplima.uxmessentials.testing.Fixtures.ALEX;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -12,6 +13,7 @@ import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.ranks.application.RankupResult.Status;
+import com.uxplima.uxmessentials.ranks.application.port.OwedCredits;
 import com.uxplima.uxmessentials.ranks.application.port.RankActionRunner;
 import com.uxplima.uxmessentials.ranks.application.port.RankEconomy;
 import com.uxplima.uxmessentials.ranks.application.port.RankRequirementEvaluator;
@@ -48,6 +50,7 @@ class RankupTest {
     private final Requirements requirements = new Requirements(scheduler);
     private final Actions actions = new Actions();
     private final Purse purse = new Purse();
+    private final Owed owed = new Owed();
     private final RecordingEvents events = new RecordingEvents();
     private final Rankup rankup = new Rankup(
             new CurrentRank(cache, LADDER),
@@ -56,6 +59,7 @@ class RankupTest {
             requirements,
             actions,
             Optional.of(purse),
+            Optional.of(owed),
             events,
             scheduler,
             log);
@@ -125,6 +129,7 @@ class RankupTest {
         assertThat(purse.balance).isEqualTo(60);
         assertThat(log.errors()).hasSize(1);
         assertThat(log.warnings()).anyMatch(line -> line.startsWith("event=rankup_refund_refused"));
+        assertThat(owed.queued).containsExactly("40:default");
     }
 
     @Test
@@ -270,6 +275,7 @@ class RankupTest {
         private final ManualScheduler scheduler;
         boolean pass = true;
         boolean storedPass = true;
+        boolean storedDies;
 
         Requirements(ManualScheduler scheduler) {
             this.scheduler = scheduler;
@@ -278,12 +284,86 @@ class RankupTest {
         @Override
         public boolean passes(PlayerRef who, RankRequirement requirement) {
             checkedOnAsync.put(requirement.type(), scheduler.isRunningAsync());
+            if (storedDies && readsStorage(requirement)) {
+                throw new AssertionError("evaluator thread died");
+            }
             return readsStorage(requirement) ? storedPass : pass;
         }
 
         @Override
         public boolean readsStorage(RankRequirement requirement) {
             return requirement.type() == RankRequirementType.PLAYTIME;
+        }
+    }
+
+    @Test
+    void aRefundThatThrowsIsQueuedAsOwed() {
+        purse.balance = 100;
+        purse.failDeposits = true;
+        online(ALEX);
+        rows.failSaves(true);
+
+        CompletableFuture<RankupResult> result = rankup.rankUp(ALEX);
+        scheduler.runAsync();
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(owed.queued).containsExactly("40:default");
+    }
+
+    @Test
+    void aHopTheSchedulerRefusesStillAnswersAndFreesThePlayer() {
+        purse.balance = 200;
+        online(ALEX);
+        scheduler.shutDown();
+
+        CompletableFuture<RankupResult> result = rankup.rankUp(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(IllegalStateException.class);
+
+        assertThat(result).isDone();
+        assertThat(result.join().status()).isEqualTo(Status.RANKED_UP);
+        CompletableFuture<RankupResult> next = rankup.rankUp(ALEX);
+        assertThat(next.isDone() && next.join().status() == Status.BUSY).isFalse();
+    }
+
+    @Test
+    void anErrorOnTheAsyncLaneStillAnswersAndFreesThePlayer() {
+        purse.balance = 200;
+        online(ALEX);
+        requirements.storedDies = true;
+
+        CompletableFuture<RankupResult> result = rankup.rankUp(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(AssertionError.class);
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(purse.balance).isEqualTo(200);
+        requirements.storedDies = false;
+        CompletableFuture<RankupResult> next = rankup.rankUp(ALEX);
+        scheduler.runAsync();
+        assertThat(next.join().status()).isEqualTo(Status.RANKED_UP);
+    }
+
+    @Test
+    void aSaveThatDiesWithAnErrorRefundsTheChargeAndFreesThePlayer() {
+        purse.balance = 100;
+        online(ALEX);
+        rows.dieOnSaves(true);
+
+        CompletableFuture<RankupResult> result = rankup.rankUp(ALEX);
+        assertThatThrownBy(scheduler::runAsync).isInstanceOf(AssertionError.class);
+
+        assertThat(result.join().status()).isEqualTo(Status.FAILED);
+        assertThat(purse.balance).isEqualTo(100);
+        assertThat(actions.ran).isEmpty();
+    }
+
+    /** Refunds the economy would not take, queued for the next join as {@code amount:currency}. */
+    private static final class Owed implements OwedCredits {
+
+        final List<String> queued = new ArrayList<>();
+
+        @Override
+        public void owe(PlayerRef who, BigDecimal amount, String currencyId) {
+            queued.add(amount.toPlainString() + ":" + currencyId);
         }
     }
 
@@ -303,6 +383,7 @@ class RankupTest {
         long balance;
         long withdrawn;
         boolean refuseDeposits;
+        boolean failDeposits;
 
         @Override
         public boolean canAfford(PlayerRef who, BigDecimal amount, String currencyId) {
@@ -322,6 +403,9 @@ class RankupTest {
 
         @Override
         public boolean deposit(PlayerRef who, BigDecimal amount, String currencyId) {
+            if (failDeposits) {
+                throw new IllegalStateException("economy storage is down");
+            }
             if (refuseDeposits) {
                 return false;
             }

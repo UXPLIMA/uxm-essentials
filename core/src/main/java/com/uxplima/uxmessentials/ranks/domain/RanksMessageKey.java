@@ -39,6 +39,7 @@ public enum RanksMessageKey implements MessageKey {
     RANKS_PRESTIGE_MAX("ranks.prestige-max"),
     RANKS_PRESTIGE_REQUIREMENTS("ranks.prestige-requirements"),
     RANKS_PRESTIGE_COST("ranks.prestige-cost"),
+    RANKS_PRESTIGE_FAILED("ranks.prestige-failed"),
 
     // The /ranks ladder panel. The window title, the current-standing and next-rank display items, the rank-up
     // button, the close button, and the marker shown for the next rank when the player is already at the top.

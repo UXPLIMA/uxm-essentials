@@ -70,7 +70,12 @@ public final class PrestigeCommand implements CommandRegistration {
             return 0;
         }
         PlayerRef who = BukkitRefs.toRef(player);
-        render(player, prestige.prestige(who));
+        var unused = prestige.prestige(who).thenAccept(result -> {
+            // A player who left mid-save is answered off their thread; there is nobody to tell.
+            if (player.isOnline()) {
+                render(player, result);
+            }
+        });
         return Command.SINGLE_SUCCESS;
     }
 
@@ -89,6 +94,7 @@ public final class PrestigeCommand implements CommandRegistration {
             case CANNOT_AFFORD -> feedback.send(player, RanksMessageKey.RANKS_PRESTIGE_COST);
             // The rankup line already says "your rank is still being updated", which is what this is.
             case BUSY -> feedback.send(player, RanksMessageKey.RANKS_RANKUP_BUSY);
+            case FAILED -> feedback.send(player, RanksMessageKey.RANKS_PRESTIGE_FAILED);
         }
     }
 
