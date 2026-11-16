@@ -60,6 +60,8 @@ public enum ModerationMessageKey implements MessageKey {
     // /tempban
     TEMPBAN_APPLIED("moderation.tempban.applied"),
     TEMPBAN_KICK("moderation.tempban.kick"),
+    // a /tempban as long as the span a permanent ban is stored with is refused; /ban is the permanent ban
+    TEMPBAN_TOO_LONG("moderation.tempban.too-long"),
 
     // /ban, /unban, permanent UUID ban and its lift
     BAN_APPLIED("moderation.ban.applied"),

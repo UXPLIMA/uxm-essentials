@@ -95,6 +95,7 @@ when they are kicked on another server of a network and every time they try to l
 a `/ban` shortened by a duration cap, shows the `moderation.tempban.kick` screen with the time still left. Staff
 lookups (`/checkban`, `/banlist`, `/sanction` and the active punishments menu) show a permanent ban's end as
 permanent.
+A `/tempban` of 365000 days or more is refused: that is the span a permanent ban is stored with, so use `/ban`.
 
 With `address-strictness = "STRICT"`, a `/ban` also IP-bans every address the player is known to have connected
 from, so they cannot come back on a new account from the same connection. The default `NORMAL` bans only the

@@ -6,8 +6,9 @@ import java.util.Optional;
 
 /**
  * A target's tempban, as a closed set: {@link None} (not banned) and {@link Active} (banned until a
- * wall-clock instant). A tempban always has an expiry. A permanent ban is an external ban-list or an
- * {@code /banip}, not a tempban. The ban-on-login listener reads {@link #isActiveAt(Instant)} at
+ * wall-clock instant). A tempban always has an expiry: a permanent {@code /ban} is stored as an {@link Active} whose
+ * expiry is a far-future stand-in, so only {@code Ban.endOf} in the application layer tells the two apart. The
+ * ban-on-login listener reads {@link #isActiveAt(Instant)} at
  * {@code PlayerLoginEvent} and kicks before player data loads while the ban is still in the future.
  *
  * <p>The domain never reads the wall clock; the caller passes the login instant, so the expiry check is
@@ -28,7 +29,10 @@ public sealed interface TempbanState permits TempbanState.None, TempbanState.Act
     /** True when this ban still bars login at {@code now}. */
     boolean isActiveAt(Instant now);
 
-    /** The expiry instant if banned, else empty. */
+    /**
+     * The stored expiry if banned, else empty. For a permanent ban this is the far-future stand-in it is stored with,
+     * not a real end; read the end with {@code Ban.endOf}, which is empty for a permanent ban.
+     */
     Optional<Instant> expiry();
 
     /** The not-banned singleton. */
