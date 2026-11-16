@@ -149,7 +149,9 @@ public final class RanksWiring {
                     actions,
                     economy,
                     config.prestige(),
-                    kernel.events()));
+                    kernel.events(),
+                    kernel.scheduler(),
+                    kernel.log()));
             commands.add(new PrestigeCommand(prestige.orElseThrow(), kernel.messages()));
         }
         // Autorank reuses the same Rankup pipeline per online player on a schedule. start() no-ops when the scan is

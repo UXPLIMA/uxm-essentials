@@ -40,8 +40,14 @@ public record PrestigeResult(Status status, Optional<Prestige> newPrestige, doub
         /** The prestige cost could not be charged; nothing was charged and the level did not move. */
         CANNOT_AFFORD,
 
-        /** The player's rank pointer is not loaded yet; nothing happened and trying again a moment later will work. */
-        BUSY
+        /**
+         * The player's rank pointer is not loaded yet, or another prestige of theirs is still saving; nothing
+         * happened and trying again a moment later will work.
+         */
+        BUSY,
+
+        /** The reset could not be stored; the level did not move and any charge was refunded. */
+        FAILED
     }
 
     public PrestigeResult {
@@ -80,6 +86,11 @@ public record PrestigeResult(Status status, Optional<Prestige> newPrestige, doub
     /** The player's rank pointer is still loading. */
     public static PrestigeResult busy() {
         return new PrestigeResult(Status.BUSY, Optional.empty(), 1.0);
+    }
+
+    /** The reset could not be stored; the level did not move and any charge was refunded. */
+    public static PrestigeResult failed() {
+        return new PrestigeResult(Status.FAILED, Optional.empty(), 1.0);
     }
 
     /** The new prestige level as a plain number, or {@code 0} when the attempt did not prestige. */

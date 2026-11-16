@@ -4,7 +4,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.Supplier;
 
 import com.uxplima.uxmessentials.api.action.UxmFailure;
 import com.uxplima.uxmessentials.api.action.UxmOutcome;
@@ -49,26 +48,7 @@ public final class RanksActions implements UxmRanksActions {
 
     @Override
     public CompletableFuture<UxmOutcome> rankUp(UUID playerId) {
-        Objects.requireNonNull(playerId, "playerId");
-        if (!players.isOnline(playerId)) {
-            return CompletableFuture.completedFuture(offline());
-        }
-        PlayerRef subject = ApiValues.subject(players, playerId);
-        // The rankup starts on the player's thread and answers once its save on the async lane is back there. It
-        // never completes exceptionally, so only the left-before-the-hop case needs a branch of its own.
-        CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();
-        scheduler.onEntity(
-                subject,
-                () -> {
-                    try {
-                        var unused =
-                                writes.rankup().rankUp(subject).thenAccept(result -> answer.complete(outcome(result)));
-                    } catch (RuntimeException failure) {
-                        answer.completeExceptionally(failure);
-                    }
-                },
-                () -> answer.complete(gone()));
-        return answer;
+        return onPlayer(playerId, subject -> writes.rankup().rankUp(subject).thenApply(RanksActions::outcome));
     }
 
     @Override
@@ -90,7 +70,7 @@ public final class RanksActions implements UxmRanksActions {
             return CompletableFuture.completedFuture(
                     UxmOutcome.failed(UxmFailure.REFUSED, "prestige is switched off in the ranks config"));
         }
-        return onPlayer(playerId, subject -> outcome(prestige.get().prestige(subject)));
+        return onPlayer(playerId, subject -> prestige.get().prestige(subject).thenApply(RanksActions::outcome));
     }
 
     /** Every rankup refusal the use case models, mapped to the code a consumer branches on. */
@@ -116,19 +96,37 @@ public final class RanksActions implements UxmRanksActions {
             case MAX_LEVEL -> UxmOutcome.failed(UxmFailure.ALREADY_IN_STATE, "already at the prestige cap");
             case REQUIREMENTS_NOT_MET -> UxmOutcome.failed(UxmFailure.REFUSED, "the prestige requirements are not met");
             case CANNOT_AFFORD -> UxmOutcome.failed(UxmFailure.INSUFFICIENT_FUNDS, "the prestige cost was refused");
-            case BUSY -> UxmOutcome.failed(UxmFailure.REFUSED, "the player's rank is still loading");
+            case BUSY ->
+                UxmOutcome.failed(
+                        UxmFailure.REFUSED, "the player's rank is still loading or another prestige is saving");
+            case FAILED ->
+                UxmOutcome.failed(UxmFailure.FAILED, "the prestige could not be stored; any charge was refunded");
         };
     }
 
-    /** Refuse when nobody is there, otherwise run {@code write} on the thread that owns the player. */
+    /**
+     * Refuse when nobody is there, otherwise start {@code write} on the thread that owns the player. The use case
+     * saves on the async lane and answers once it is back there; it never completes exceptionally, so only the
+     * left-before-the-hop case needs a branch of its own.
+     */
     private CompletableFuture<UxmOutcome> onPlayer(UUID playerId, Write write) {
         Objects.requireNonNull(playerId, "playerId");
         if (!players.isOnline(playerId)) {
             return CompletableFuture.completedFuture(offline());
         }
         PlayerRef subject = ApiValues.subject(players, playerId);
-        Supplier<UxmOutcome> work = () -> write.apply(subject);
-        return AsyncActions.onPlayer(scheduler, subject, work, gone());
+        CompletableFuture<UxmOutcome> answer = new CompletableFuture<>();
+        scheduler.onEntity(
+                subject,
+                () -> {
+                    try {
+                        var unused = write.start(subject).thenAccept(answer::complete);
+                    } catch (RuntimeException failure) {
+                        answer.completeExceptionally(failure);
+                    }
+                },
+                () -> answer.complete(gone()));
+        return answer;
     }
 
     private static UxmOutcome offline() {
@@ -141,6 +139,6 @@ public final class RanksActions implements UxmRanksActions {
 
     @FunctionalInterface
     private interface Write {
-        UxmOutcome apply(PlayerRef subject);
+        CompletableFuture<UxmOutcome> start(PlayerRef subject);
     }
 }

@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.ranks.application.RanksConfig.PrestigeSettings;
 import com.uxplima.uxmessentials.ranks.application.port.PlayerRankRepository;
@@ -16,39 +20,37 @@ import com.uxplima.uxmessentials.ranks.domain.RankRequirement;
 import com.uxplima.uxmessentials.ranks.domain.RankStanding;
 import com.uxplima.uxmessentials.ranks.domain.event.PlayerPrestiged;
 import com.uxplima.uxmessentials.shared.application.port.DomainEventPublisher;
+import com.uxplima.uxmessentials.shared.application.port.Logger;
+import com.uxplima.uxmessentials.shared.application.port.Scheduler;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
  * {@code /prestige}: a player at the very top of the ladder resets back to the first rank in exchange for a
- * permanent prestige level and its reward multiplier. It mirrors {@link Rankup}'s pipeline shape, eligibility →
- * requirements → charge → mutate → actions, so a refused prestige leaves no trace, and reuses the same
- * requirement evaluator, action runner and economy seam a rankup goes through. This class holds no Bukkit type
- * and sends no message; it returns a typed {@link PrestigeResult} the command boundary renders.
+ * permanent prestige level and its reward multiplier. It runs {@link Rankup}'s pipeline (eligibility, requirements,
+ * charge, save, actions) on the same threads, and reuses the same requirement evaluator, action runner and economy
+ * seam a rankup goes through. This class holds no Bukkit type and sends no message; it returns a typed
+ * {@link PrestigeResult} the command boundary renders.
  *
- * <h2>Eligibility and ordering</h2>
+ * <h2>Ordering and threads</h2>
  * <ol>
- *   <li><b>At the top rank.</b> The current standing (via {@link CurrentRank}) must resolve to a rank with no
- *       {@link RankLadder#next(com.uxplima.uxmessentials.ranks.domain.RankId) next} rung, the top. Anything else
- *       (including an empty ladder) yields {@link PrestigeResult#notAtTop()}.</li>
- *   <li><b>Below the cap.</b> The player's prestige level must be
- *       {@link com.uxplima.uxmessentials.ranks.domain.Prestige#belowCap(int) below} the configured
- *       {@code max-level}; at the cap it yields {@link PrestigeResult#maxLevel()}.</li>
- *   <li><b>Requirements.</b> The configured prestige requirements are evaluated; a single failure yields
- *       {@link PrestigeResult#requirementsNotMet()} with nothing charged and the level unmoved.</li>
- *   <li><b>Charge.</b> Only once eligible and past the requirements is the prestige cost charged through the
- *       {@link RankEconomy} seam. A refused debit yields {@link PrestigeResult#cannotAfford()}; with no economy
- *       provider wired, or a zero cost, the charge is skipped and the prestige is free.</li>
- *   <li><b>Mutate.</b> The pointer is reset to {@link RankLadder#first()} and the prestige level incremented in
- *       one {@code save}.</li>
- *   <li><b>Actions.</b> The configured prestige actions run last, only after the reset is durable.</li>
+ *   <li><b>Check</b>, on the caller's thread, which must own the player: the standing must sit on the top rung
+ *       ({@link PrestigeResult#notAtTop()} otherwise), the level must be below the configured {@code max-level}
+ *       ({@link PrestigeResult#maxLevel()}), and the requirements that read the live player (inventory,
+ *       placeholder, permission, previous rank) must pass. A refusal here has charged and written nothing.</li>
+ *   <li><b>Commit</b>, on the async lane: the requirements that read storage (playtime, balance) are checked, then
+ *       the cost is charged in the default currency, then the pointer is reset to {@link RankLadder#first()} at the
+ *       next level in one {@code save}. A save that throws refunds the charge in the same currency, so a player
+ *       never pays for a prestige they did not get, and the answer is {@link PrestigeResult#failed()}.</li>
+ *   <li><b>Finish</b>, back on the player's thread: the prestige actions run and {@link PlayerPrestiged} is
+ *       published, both only after the reset is durable.</li>
  * </ol>
- * Charging strictly before the reset is what guarantees a failed charge never prestiges. The standing comes from
- * memory through {@link CurrentRank#of}, so a player whose pointer has not loaded yet gets
- * {@link PrestigeResult#busy()}.
+ * The returned future completes on the player's thread, or on the caller's thread when the check refuses. A player
+ * who left while the commit ran gets the future completed on the scheduler's retired branch, which may be off the
+ * tick, so a callback checks the player is still online before it touches them. It never completes exceptionally.
  *
- * <p>Unlike {@link Rankup}, a prestige still evaluates every requirement, charges and saves on the calling thread,
- * and there is a residual save-fault gap: when the guarded debit succeeds but the {@code save} then throws a genuine
- * database fault, the charge is not refunded and the fault surfaces to the command boundary.
+ * <p>Only one prestige per player is in flight at a time, so two quick commands cannot both pay for the same level.
+ * The standing comes from memory through {@link CurrentRank#of}, so a player whose pointer has not loaded yet gets
+ * {@link PrestigeResult#busy()}.
  */
 public final class Prestige {
 
@@ -63,6 +65,9 @@ public final class Prestige {
     private final Optional<RankEconomy> economy;
     private final PrestigeSettings settings;
     private final DomainEventPublisher events;
+    private final Scheduler scheduler;
+    private final Logger log;
+    private final Set<UUID> inFlight = ConcurrentHashMap.newKeySet();
 
     public Prestige(
             CurrentRank currentRank,
@@ -72,7 +77,9 @@ public final class Prestige {
             RankActionRunner actions,
             Optional<RankEconomy> economy,
             PrestigeSettings settings,
-            DomainEventPublisher events) {
+            DomainEventPublisher events,
+            Scheduler scheduler,
+            Logger log) {
         this.currentRank = Objects.requireNonNull(currentRank, "currentRank");
         this.repository = Objects.requireNonNull(repository, "repository");
         this.ladder = Objects.requireNonNull(ladder, "ladder");
@@ -81,52 +88,143 @@ public final class Prestige {
         this.economy = Objects.requireNonNull(economy, "economy");
         this.settings = Objects.requireNonNull(settings, "settings");
         this.events = Objects.requireNonNull(events, "events");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
-    /** Attempt to prestige {@code who}, resetting them to the first rank, and return the typed outcome. */
-    public PrestigeResult prestige(PlayerRef who) {
+    /**
+     * Attempt to prestige {@code who}, resetting them to the first rank, and answer the typed outcome. Call it on
+     * the thread that owns {@code who}.
+     */
+    public CompletableFuture<PrestigeResult> prestige(PlayerRef who) {
         Objects.requireNonNull(who, "who");
+        UUID id = who.uuid();
+        if (!inFlight.add(id)) {
+            return CompletableFuture.completedFuture(PrestigeResult.busy());
+        }
+        CompletableFuture<PrestigeResult> answer = new CompletableFuture<>();
+        // The caller chains on the released future, so a follow-up prestige from its callback is not refused as busy.
+        CompletableFuture<PrestigeResult> released = answer.whenComplete((result, failure) -> inFlight.remove(id));
+        try {
+            check(who, answer);
+        } catch (RuntimeException failure) {
+            log.error("prestige check failed for player " + id, failure);
+            answer.complete(PrestigeResult.failed());
+        }
+        return released;
+    }
+
+    private void check(PlayerRef who, CompletableFuture<PrestigeResult> answer) {
         Optional<RankStanding> standing = currentRank.of(who.uuid());
-        if (standing.isEmpty() && !ladder.isEmpty()) {
+        if (standing.isEmpty()) {
             // With a non-empty ladder an empty standing only means the pointer has not loaded yet.
-            return PrestigeResult.busy();
+            answer.complete(ladder.isEmpty() ? PrestigeResult.notAtTop() : PrestigeResult.busy());
+            return;
         }
-        if (standing.isEmpty() || ladder.next(standing.get().rank().id()).isPresent()) {
-            return PrestigeResult.notAtTop();
+        if (ladder.next(standing.get().rank().id()).isPresent()) {
+            answer.complete(PrestigeResult.notAtTop());
+            return;
         }
-        return advance(who, standing.get());
-    }
-
-    private PrestigeResult advance(PlayerRef who, RankStanding standing) {
-        if (!standing.prestige().belowCap(settings.maxLevel())) {
-            return PrestigeResult.maxLevel();
+        if (!standing.get().prestige().belowCap(settings.maxLevel())) {
+            answer.complete(PrestigeResult.maxLevel());
+            return;
         }
-        if (!requirements.passesAll(who, parseRequirements())) {
-            return PrestigeResult.requirementsNotMet();
+        List<RankRequirement> needs = parseRequirements();
+        if (!requirements.passesLive(who, needs)) {
+            answer.complete(PrestigeResult.requirementsNotMet());
+            return;
         }
-        if (!charge(who)) {
-            return PrestigeResult.cannotAfford();
-        }
-        return reset(who, standing);
-    }
-
-    /** Reset the pointer to the first rank at the next prestige level and run the configured prestige actions. */
-    private PrestigeResult reset(PlayerRef who, RankStanding standing) {
         Rank first = ladder.first().orElseThrow(); // non-empty: the standing already resolved a ladder rank
-        var next = standing.prestige().increment();
-        repository.save(who.uuid(), first.id(), next);
-        actions.run(who, settings.actions());
-        double multiplier = next.rewardMultiplier(settings.rewardMultiplier());
-        events.publish(new PlayerPrestiged(who, next.level(), multiplier));
-        return PrestigeResult.prestiged(next, multiplier);
+        Reset reset = new Reset(who, first, standing.get().prestige().increment(), needs, price());
+        scheduler.async(() -> commit(reset, answer));
     }
 
-    /** Charge the prestige cost, or pass through free when the cost is zero or no economy provider is wired. */
-    private boolean charge(PlayerRef who) {
-        if (settings.cost() <= 0L || economy.isEmpty()) {
-            return true;
+    /** Check stored requirements, charge and save on the async lane, then hop back to the player's thread. */
+    private void commit(Reset reset, CompletableFuture<PrestigeResult> answer) {
+        PrestigeResult result = chargeAndSave(reset);
+        scheduler.onEntity(
+                reset.who(), () -> finish(reset, result, true, answer), () -> finish(reset, result, false, answer));
+    }
+
+    private PrestigeResult chargeAndSave(Reset reset) {
+        PlayerRef who = reset.who();
+        boolean charged = false;
+        try {
+            if (!requirements.passesStored(who, reset.needs())) {
+                return PrestigeResult.requirementsNotMet();
+            }
+            if (reset.isPriced()) {
+                if (!economy.orElseThrow().withdraw(who, reset.cost(), DEFAULT_CURRENCY)) {
+                    return PrestigeResult.cannotAfford();
+                }
+                charged = true;
+            }
+            repository.save(who.uuid(), reset.first().id(), reset.level());
+            return PrestigeResult.prestiged(reset.level(), reset.level().rewardMultiplier(settings.rewardMultiplier()));
+        } catch (RuntimeException failure) {
+            log.error("prestige could not be stored for player " + who.uuid(), failure);
+            if (charged) {
+                refund(reset);
+            }
+            return PrestigeResult.failed();
         }
-        return economy.get().withdraw(who, BigDecimal.valueOf(settings.cost()), DEFAULT_CURRENCY);
+    }
+
+    private void refund(Reset reset) {
+        PlayerRef who = reset.who();
+        try {
+            if (economy.orElseThrow().deposit(who, reset.cost(), DEFAULT_CURRENCY)) {
+                return;
+            }
+            log.warn(
+                    "event=prestige_refund_refused player={} amount={} currency={}",
+                    who.uuid(),
+                    reset.cost(),
+                    DEFAULT_CURRENCY);
+        } catch (RuntimeException failure) {
+            log.error(
+                    "prestige refund of " + reset.cost() + " failed for player " + who.uuid()
+                            + "; the player is owed that amount",
+                    failure);
+        }
+    }
+
+    /**
+     * On the player's thread: run the actions and raise the event when the reset was saved, then answer. When the
+     * player left before the hop there is nobody to run actions on, but the event is still raised because the new
+     * level is durable.
+     */
+    private void finish(Reset reset, PrestigeResult result, boolean present, CompletableFuture<PrestigeResult> answer) {
+        try {
+            if (result.status() == PrestigeResult.Status.PRESTIGED) {
+                if (present) {
+                    runActions(reset);
+                }
+                events.publish(new PlayerPrestiged(reset.who(), reset.level().level(), result.rewardMultiplier()));
+            }
+        } catch (RuntimeException failure) {
+            log.error("prestige event failed for player " + reset.who().uuid(), failure);
+        } finally {
+            // Always answered, or the in-flight guard would refuse this player's every later prestige.
+            answer.complete(result);
+        }
+    }
+
+    private void runActions(Reset reset) {
+        try {
+            actions.run(reset.who(), settings.actions());
+        } catch (RuntimeException failure) {
+            // The prestige is already paid for and saved; a broken action line must not hide that from the player.
+            log.error("prestige actions failed for player " + reset.who().uuid(), failure);
+        }
+    }
+
+    /** The prestige cost, or zero when it is free or no economy provider is wired. */
+    private BigDecimal price() {
+        if (settings.cost() <= 0L || economy.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        return BigDecimal.valueOf(settings.cost());
     }
 
     /** Parse the prestige requirement lines, dropping any the codec cannot recognise (not enforced). */
@@ -135,5 +233,18 @@ public final class Prestige {
                 .map(RankRequirement::parse)
                 .flatMap(Optional::stream)
                 .toList();
+    }
+
+    /** One checked prestige on its way to storage: who, the rung and level it resets to, what it asks and costs. */
+    private record Reset(
+            PlayerRef who,
+            Rank first,
+            com.uxplima.uxmessentials.ranks.domain.Prestige level,
+            List<RankRequirement> needs,
+            BigDecimal cost) {
+
+        boolean isPriced() {
+            return cost.signum() > 0;
+        }
     }
 }
