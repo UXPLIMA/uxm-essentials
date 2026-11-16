@@ -225,21 +225,61 @@ class CrossServerInvitesTest {
         survival.accept();
         TradeSignal accept = survival.only(TradeSignalType.ACCEPT);
 
-        lobby.invites.onAbort(new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival"));
+        TradeSignal abort = new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival");
 
+        assertThat(lobby.invites.onAbort(abort))
+                .as("the inviter hears why nothing opens")
+                .contains(new CrossServerInvites.CalledOff(ALEX, SAM));
+        assertThat(lobby.invites.onAbort(abort))
+                .as("a repeated abort tells nothing more")
+                .isEmpty();
         assertThat(lobby.invites.onReply(accept)).isEmpty();
         assertThat(lobby.only(TradeSignalType.ABORT).to()).isEqualTo(SAM);
     }
 
     @Test
+    void anAbortAfterTheInviteSettledTellsTheInviterNothing() {
+        TradeId id = deliveredInvite();
+        survival.accept();
+        assertThat(lobby.invites.onReply(survival.only(TradeSignalType.ACCEPT))).isPresent();
+
+        assertThat(lobby.invites.onAbort(new TradeSignal(id, TradeSignalType.ABORT, SAM, ALEX, "survival")))
+                .isEmpty();
+    }
+
+    @Test
+    void aBackendThatOnlyReceivesInvitesForgetsTheOldOnesWithoutASweep() {
+        lobby.online(ALEX);
+        survival.online(SAM);
+        lobby.invites.invite(ALEX, "Sam");
+        TradeSignal first = lobby.only(TradeSignalType.INVITE);
+        assertThat(survival.invites.onInvite(first)).isPresent();
+
+        clock.advance(TTL.plus(CrossServerInvites.ANSWER_GRACE));
+        survival.invites.onInvite(new TradeSignal(
+                TradeId.newId(),
+                TradeSignalType.INVITE,
+                ALEX,
+                new PlayerRef(CrossServerInvites.UNRESOLVED, "Sam"),
+                "lobby"));
+
+        assertThat(survival.invites.onInvite(first))
+                .as("the first id was dropped by the newer invite, not by a sweep this backend never runs")
+                .isPresent();
+    }
+
+    @Test
     void anInviterInAnotherTradeWhenTheAcceptArrivesIsToldAndTheTargetReleased() {
-        deliveredInvite();
+        TradeId id = deliveredInvite();
         survival.accept();
         lobby.trading.add(ALEX.uuid());
 
         assertThat(lobby.invites.onReply(survival.only(TradeSignalType.ACCEPT)))
                 .contains(new CrossServerInvites.AcceptedWhileBusy(ALEX, SAM));
-        assertThat(survival.invites.onAbort(lobby.only(TradeSignalType.ABORT))).isPresent();
+        assertThat(survival.invites.onAbort(lobby.only(TradeSignalType.ABORT))).isEmpty();
+        assertThat(survival.invites.onOpened(new TradeSignal(id, TradeSignalType.OPENED, ALEX, SAM, "lobby")))
+                .as("the target no longer waits to open")
+                .isEmpty();
     }
 
     @Test

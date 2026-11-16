@@ -186,7 +186,7 @@ public final class CrossServerTradeView {
             case OPENED -> scheduler.onGlobal(() -> invites.onOpened(signal).ifPresent(this::openAccepted));
             case ABORT ->
                 scheduler.onGlobal(() -> {
-                    invites.onAbort(signal);
+                    invites.onAbort(signal).ifPresent(this::report);
                     onAbort(signal);
                 });
             case COMMIT -> notify(signal.to(), TradeMessageKey.TRADE_CROSS_SERVER_COMPLETED, Map.of());
@@ -233,6 +233,11 @@ public final class CrossServerTradeView {
                         expired.inviter(),
                         TradeMessageKey.TRADE_REQUEST_EXPIRED,
                         Map.of("player", expired.targetName()));
+            case CrossServerInvites.CalledOff calledOff ->
+                notify(
+                        calledOff.inviter(),
+                        TradeMessageKey.TRADE_CROSS_SERVER_CALLED_OFF,
+                        Map.of("player", calledOff.target().name()));
             case CrossServerInvites.TimedOut timedOut ->
                 notify(
                         timedOut.inviter(),

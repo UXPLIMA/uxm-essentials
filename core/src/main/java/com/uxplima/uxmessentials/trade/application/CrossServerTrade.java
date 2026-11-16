@@ -2,10 +2,13 @@ package com.uxplima.uxmessentials.trade.application;
 
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -29,9 +32,22 @@ import org.jspecify.annotations.NullMarked;
  * counterpart's committed row to deliver its goods to its own local player. A back-out before commit refunds the
  * still-{@code HELD} side and signals {@code ABORT} so the peer refunds too. Item delivery hops to the recipient's
  * region in the adapter; a claim whose recipient is offline is deferred to {@link #reconcile} on their next join.
+ *
+ * <p>An {@code ABORT} can overtake this side's own escrow: the player confirms, the write waits on the async lane, and
+ * the peer's abort arrives first and finds no row to refund. Each abort is therefore remembered for
+ * {@link #ABORT_MEMORY}, and an escrow written for a remembered trade is refunded at once instead of waiting for the
+ * owner's next join. The id is remembered before the refund is tried, so whichever of the two writes lands second
+ * sees the other; the refund itself is one guarded delete, so the items come back exactly once.
  */
 @NullMarked
 public final class CrossServerTrade {
+
+    /**
+     * How long an {@code ABORT} is remembered for an escrow of this side still on its way to the table. Far longer
+     * than an escrow write takes even on a stalled database; an escrow written later still is refunded on the
+     * owner's next join, as before.
+     */
+    static final Duration ABORT_MEMORY = Duration.ofMinutes(10);
 
     private final TradeEscrowStore escrows;
     private final TradeEconomy economy;
@@ -39,6 +55,7 @@ public final class CrossServerTrade {
     private final TradeItemDelivery delivery;
     private final Clock clock;
     private final Logger log;
+    private final ConcurrentHashMap<TradeId, Instant> aborted = new ConcurrentHashMap<>();
 
     public CrossServerTrade(
             TradeEscrowStore escrows,
@@ -85,6 +102,11 @@ public final class CrossServerTrade {
                 itemCount,
                 money,
                 clock.instant()));
+        if (wasAborted(id)) {
+            // The peer gave the trade up before this row existed, so its abort refunded nothing here.
+            refund(id, owner.uuid(), false);
+            return true;
+        }
         bus.send(new TradeSignal(id, TradeSignalType.READY, owner, counterparty, bus.localServer()));
         progress(id, owner.uuid(), counterparty.uuid());
         return true;
@@ -97,7 +119,10 @@ public final class CrossServerTrade {
         UUID peer = signal.from().uuid();
         switch (signal.type()) {
             case READY, COMMIT -> progress(signal.tradeId(), me, peer);
-            case ABORT -> refund(signal.tradeId(), me, false);
+            case ABORT -> {
+                rememberAbort(signal.tradeId());
+                refund(signal.tradeId(), me, false);
+            }
             case INVITE, ACCEPT, DECLINE, DELIVERED, NOT_FOUND, BUSY, OPENED -> {
                 // The rendezvous signals are handled by the request flow, not the escrow engine.
             }
@@ -186,6 +211,17 @@ public final class CrossServerTrade {
             }
             log.debug("cross-server trade {} refunded to {}", id, row.owner().name());
         }
+    }
+
+    private void rememberAbort(TradeId id) {
+        Instant now = clock.instant();
+        aborted.values().removeIf(at -> !now.isBefore(at.plus(ABORT_MEMORY)));
+        aborted.put(id, now);
+    }
+
+    private boolean wasAborted(TradeId id) {
+        Instant at = aborted.get(id);
+        return at != null && clock.instant().isBefore(at.plus(ABORT_MEMORY));
     }
 
     /** Drop both rows once both sides have been claimed; harmless if a leftover row lingers for a later rejoin. */
