@@ -43,8 +43,10 @@ public final class ModerationSettings {
 
     private final ConfigStore config;
     private final List<String> jails;
+    private final Optional<String> defaultJail;
     private final boolean wallClockDefault;
     private final Set<String> mutedBlockedCommands;
+    private final Set<String> mutedAllowedCommands;
     private final WarnEscalation warnEscalation;
     private final boolean silentByDefault;
     private final AddressStrictness addressStrictness;
@@ -58,8 +60,14 @@ public final class ModerationSettings {
         this.jails = config.getStringList("jails", List.of()).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .toList();
+        this.defaultJail = Optional.of(config.getString("default-jail", "").strip())
+                .filter(name -> !name.isEmpty())
+                .map(name -> name.toLowerCase(Locale.ROOT));
         this.wallClockDefault = "wall-clock".equalsIgnoreCase(config.getString("jail-countdown", "online-only"));
         this.mutedBlockedCommands = config.getStringList("muted-blocked-commands", DEFAULT_BLOCKED_COMMANDS).stream()
+                .map(name -> name.toLowerCase(Locale.ROOT))
+                .collect(Collectors.toUnmodifiableSet());
+        this.mutedAllowedCommands = config.getStringList("muted-allowed-commands", List.of()).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .collect(Collectors.toUnmodifiableSet());
         this.warnEscalation = parseEscalation(config.getStringList("warnings.actions", DEFAULT_ESCALATION), log);
@@ -73,6 +81,11 @@ public final class ModerationSettings {
     /** The command labels a muted player may not run (the mute-bypass guard list), case-folded. */
     public Set<String> mutedBlockedCommands() {
         return mutedBlockedCommands;
+    }
+
+    /** The command words a muted player may always run, checked before the blocked list, case-folded. */
+    public Set<String> mutedAllowedCommands() {
+        return mutedAllowedCommands;
     }
 
     /** The configured warn-escalation ladder ({@code count:action:duration} rungs), parsed at wire time. */
@@ -212,6 +225,11 @@ public final class ModerationSettings {
     /** The configured jail names, sorted, for {@code /jails} to list (already lower-cased and immutable). */
     public List<String> jailNames() {
         return jails;
+    }
+
+    /** The jail {@code /togglejail} uses when no jail is named; empty when {@code default-jail} is blank. */
+    public Optional<String> defaultJail() {
+        return defaultJail;
     }
 
     /** True when {@code jail} is a configured jail name. */

@@ -2931,6 +2931,11 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
+        // A reload can rename or add command aliases, so the muted-command list reads its commands' names again.
+        resources.addReloadTask(ReloadTask.kernel(
+                "muted commands",
+                wired.mutedCommands()::forgetCommandNames,
+                "names of the blocked commands re-read on next use"));
         links.placeholders.moderation(new GateModerationPlaceholders(
                 wired.mutePolicy(), wired.jailGate(), wired.repository(), wired.sanctions(), wired.clock()));
         links.queries.register(

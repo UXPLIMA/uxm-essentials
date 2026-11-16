@@ -135,7 +135,7 @@ public final class PunishmentGuiFlow {
             case TEMPBAN ->
                 (actor, target, reason, silent) -> services.tempBan().tempban(actor, target, duration, reason, silent);
             case TEMPMUTE ->
-                (actor, target, reason, silent) -> services.mute().mute(actor, target, duration, reason, silent);
+                (actor, target, reason, silent) -> services.mute().tempmute(actor, target, duration, reason, silent);
             case WARN -> (actor, target, reason, silent) -> services.warn().warn(actor, target, reason, silent);
             case BANIP -> (actor, target, reason, silent) -> banIp(actor, target, reason);
         };
