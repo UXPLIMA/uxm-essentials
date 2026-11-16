@@ -380,6 +380,9 @@ public final class PluginModule {
      */
     private static final int DEFAULT_NAME_INDEX_SIZE = 50_000;
 
+    /** How often a connected player's mute is read again from the database. */
+    private static final java.time.Duration MUTE_REFRESH = java.time.Duration.ofSeconds(60);
+
     private PluginModule() {}
 
     /** The theme the engine draws in, recorded during wiring; a module wired before it is a composition-root defect. */
@@ -2933,6 +2936,24 @@ public final class PluginModule {
         wired.listeners().forEach(resources::addListener);
         resources.onClose(wired::stop);
         resources.worldPhase().run("jail server claim", wired.jailServerAdoption());
+        // A mute or unmute issued here updates the in-memory mute of a connected player as it lands.
+        subscribeUntilClose(ctx, resources, event -> {
+            if (event instanceof com.uxplima.uxmessentials.moderation.domain.event.ModerationEvent moderation) {
+                wired.mutePolicy().onEvent(moderation);
+            }
+        });
+        // Connected players' mutes are read again every minute, and after an import that stored sanctions, so a
+        // change that reached the database without a bus frame still reaches the in-memory copy.
+        AutoCloseable muteRefresh =
+                ctx.kernel().scheduler().repeatGlobal(wired.mutePolicy()::refreshAll, MUTE_REFRESH, MUTE_REFRESH);
+        resources.onClose(() -> {
+            try {
+                muteRefresh.close();
+            } catch (Exception failure) {
+                ctx.kernel().log().error("event=online_mute_refresh_stop_failed", failure);
+            }
+        });
+        resources.onClose(links.importTargets.mutes(wired.mutePolicy()::refreshAll));
         // A reload can rename or add command aliases, so the muted-command list reads its commands' names again.
         resources.addReloadTask(ReloadTask.kernel(
                 "muted commands",

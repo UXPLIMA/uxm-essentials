@@ -56,7 +56,8 @@ public final class KickCommand extends ModerationCommandSupport implements Comma
         PlayerRef actor = actor(ctx);
         SilentReason parsed = silentReason(reason, silentByDefault);
         Optional<PlayerRef> target = targetByName(ctx, ctx.getArgument("player", String.class));
-        target.ifPresent(to -> services.kick().kick(actor, to, parsed.reason(), parsed.silent()));
+        target.ifPresent(to ->
+                offTick(actor, to, () -> services.kick().kick(actor, to, parsed.reason(), parsed.silent())));
         return Command.SINGLE_SUCCESS;
     }
 }

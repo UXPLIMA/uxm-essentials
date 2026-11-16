@@ -125,9 +125,16 @@ public final class PunishmentGuiFlow {
     /**
      * The verb-specific use-case call. For the timed verbs the chosen {@code duration} string is bound here so
      * the executor signature stays uniform; for {@code /banip} the target's last-known IP is resolved at confirm
-     * time and a missing address yields the {@code SEENIP_NO_IP} notice rather than a sanction.
+     * time and a missing address yields the {@code SEENIP_NO_IP} notice rather than a sanction. The call runs on the
+     * async lane, like the command it mirrors, so a confirm click never waits on the database.
      */
     private PunishmentAction.Executor executor(PunishmentAction action, String duration) {
+        PunishmentAction.Executor call = sanction(action, duration);
+        return (actor, target, reason, silent) ->
+                services.lane().run(actor, target, () -> call.execute(actor, target, reason, silent));
+    }
+
+    private PunishmentAction.Executor sanction(PunishmentAction action, String duration) {
         return switch (action) {
             case BAN -> (actor, target, reason, silent) -> services.ban().ban(actor, target, reason, silent);
             case MUTE ->

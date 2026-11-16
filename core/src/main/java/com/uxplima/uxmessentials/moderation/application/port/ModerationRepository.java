@@ -1,8 +1,12 @@
 package com.uxplima.uxmessentials.moderation.application.port;
 
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 import com.uxplima.uxmessentials.moderation.domain.BanEntry;
 import com.uxplima.uxmessentials.moderation.domain.IpBan;
@@ -33,6 +37,18 @@ public interface ModerationRepository {
 
     /** The current mute alone, for the {@code MutePolicy} hot path (no jail/tempban read). */
     MuteState loadMute(PlayerRef target);
+
+    /**
+     * The current mute of each of {@code targets}, keyed by UUID, with {@link MuteState#none()} for one who has none.
+     * A store that can answer for many players in one read overrides this.
+     */
+    default Map<UUID, MuteState> loadMutes(Collection<PlayerRef> targets) {
+        Map<UUID, MuteState> mutes = new HashMap<>();
+        for (PlayerRef target : targets) {
+            mutes.put(target.uuid(), loadMute(target));
+        }
+        return mutes;
+    }
 
     /** The current jail alone, for the {@code JailGate} hot path and the online-only tick. */
     JailState loadJail(PlayerRef target);

@@ -286,7 +286,8 @@ public final class MigrationWiring {
                 users, warps, ports.moderation(), kits, holograms, worldRegistry, playerWarps, ports.clock());
         // Both writers hold back a warp in a barred world the same way, so a dry run reports what a live run skips.
         return new Writers(
-                new AnnouncingRecordWriter(heldToWorldBlacklists(repositories, ports), publisher, scheduler),
+                new AnnouncingRecordWriter(
+                        heldToWorldBlacklists(repositories, ports), publisher, scheduler, targets::mutesImported),
                 heldToWorldBlacklists(dryRun, ports));
     }
 

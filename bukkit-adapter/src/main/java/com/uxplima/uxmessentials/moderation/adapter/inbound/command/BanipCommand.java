@@ -87,28 +87,45 @@ public final class BanipCommand extends ModerationCommandSupport implements Comm
     private int run(CommandContext<CommandSourceStack> ctx, Optional<String> reason) {
         PlayerRef actor = actor(ctx);
         String argument = ctx.getArgument("target", String.class);
-        Optional<BanIp.Target> resolved = resolveTarget(ctx, argument);
-        resolved.ifPresent(target -> services.banIp().banIp(actor, target, "", reason));
+        resolveTarget(ctx, argument, actor)
+                .ifPresent(resolving -> offTick(
+                        actor,
+                        () -> resolving
+                                .resolve()
+                                .ifPresent(target -> services.banIp().banIp(actor, target, "", reason))));
         return Command.SINGLE_SUCCESS;
     }
 
-    private Optional<BanIp.Target> resolveTarget(CommandContext<CommandSourceStack> ctx, String argument) {
+    /**
+     * How the command finds the address to ban, decided on the command thread: an address typed is used as it is, a
+     * player name is looked up here and their last address read from their seen record on the async lane. Empty, after
+     * a line to the sender, when the argument is neither.
+     */
+    private Optional<Resolving> resolveTarget(
+            CommandContext<CommandSourceStack> ctx, String argument, PlayerRef actor) {
         if (IpLiteral.looksLikeAddress(argument)) {
             Optional<String> ip = IpLiteral.canonical(argument);
             if (ip.isEmpty()) {
                 notify(ctx, ModerationMessageKey.BANIP_INVALID_IP, Map.of());
             }
-            return ip.map(address -> new BanIp.Target(address, Optional.empty()));
+            return ip.map(address -> () -> Optional.of(new BanIp.Target(address, Optional.empty())));
         }
-        return targetByName(ctx, argument).flatMap(player -> byPlayer(ctx, player));
+        return targetByName(ctx, argument).map(player -> () -> byPlayer(actor, player));
     }
 
-    private Optional<BanIp.Target> byPlayer(CommandContext<CommandSourceStack> ctx, PlayerRef player) {
+    /** The address a player was last seen on, read from storage; empty, after a line to the actor, when none. */
+    private Optional<BanIp.Target> byPlayer(PlayerRef actor, PlayerRef player) {
         Optional<String> ip = services.repository().seen(player).flatMap(SeenRecord::lastIp);
         if (ip.isEmpty()) {
-            notify(ctx, ModerationMessageKey.SEENIP_NO_IP, Map.of("player", player.name()));
+            tell(actor, ModerationMessageKey.SEENIP_NO_IP, Map.of("player", player.name()));
             return Optional.empty();
         }
         return Optional.of(new BanIp.Target(ip.get(), Optional.of(player.uuid())));
+    }
+
+    /** The address to ban, found on the async lane. */
+    @FunctionalInterface
+    private interface Resolving {
+        Optional<BanIp.Target> resolve();
     }
 }

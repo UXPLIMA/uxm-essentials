@@ -8,14 +8,14 @@ import com.uxplima.uxmessentials.moderation.application.port.ModerationRepositor
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
 /**
- * The real {@link MutePolicy} the moderation context provides for the messaging context to consume. It reads
- * the live mute state from the {@link ModerationRepository} and answers "is this player muted right now"
+ * A {@link MutePolicy} that asks the database every time, for a check that already runs off the server thread (the
+ * chat listener on Paper's async chat thread), so it sees a mute set on any server at once. It reads the live mute
+ * state from the {@link ModerationRepository} and answers "is this player muted right now"
  * against the injected {@link Clock}, so a timed mute that has expired no longer gags, even if the expiry
  * sweep has not yet deleted the row.
  *
- * <p>This is the implementation that replaces the {@code MutePolicy.NEVER} placeholder messaging binds until
- * moderation lands. It lives in {@code application} (pure) and imports only the messaging <em>port</em> and
- * the moderation repository port, no adapter type, so the soft couple stays a contract, not a hard edge.
+ * <p>The checks that answer on the server thread use {@link OnlineMutes} instead. This one lives in
+ * {@code application} (pure) and imports only the messaging <em>port</em> and the moderation repository port.
  */
 public final class RepositoryMutePolicy implements MutePolicy {
 

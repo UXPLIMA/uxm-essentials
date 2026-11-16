@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,6 +53,16 @@ class JooqModerationRepositoryTest {
 
     private static TempbanState.Active ban(Duration span, String reason, Instant at) {
         return (TempbanState.Active) TempbanState.active(at.plus(span), Issuer.of(ALEX), Optional.of(reason), at);
+    }
+
+    @Test
+    void manyPlayersMutesAreReadAtOnceWithNoneForAPlayerWithoutOne() {
+        first.ensureUserExists(ALEX, NOW);
+        MuteState permanent = MuteState.permanent(Issuer.of(ALEX), Optional.of("slurs"), NOW);
+        first.saveMute(SAM, permanent);
+
+        assertThat(second.loadMutes(List.of(SAM, ALEX)))
+                .isEqualTo(Map.of(SAM.uuid(), permanent, ALEX.uuid(), MuteState.none()));
     }
 
     @Test

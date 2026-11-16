@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.bukkit.event.Listener;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationCommands;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.command.ModerationGuiCommand;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.gui.JailGuiViews;
@@ -24,6 +25,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationL
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandNamesRefresh;
+import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.OnlineMutesListener;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitCommandNames;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
@@ -54,6 +56,7 @@ import com.uxplima.uxmessentials.moderation.application.JailHopResolver;
 import com.uxplima.uxmessentials.moderation.application.JailTransfer;
 import com.uxplima.uxmessentials.moderation.application.Kick;
 import com.uxplima.uxmessentials.moderation.application.KickAll;
+import com.uxplima.uxmessentials.moderation.application.LanePermissions;
 import com.uxplima.uxmessentials.moderation.application.ListAlts;
 import com.uxplima.uxmessentials.moderation.application.ListBans;
 import com.uxplima.uxmessentials.moderation.application.ListJailed;
@@ -64,6 +67,7 @@ import com.uxplima.uxmessentials.moderation.application.LoginEnforcement;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.Mute;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
+import com.uxplima.uxmessentials.moderation.application.OnlineMutes;
 import com.uxplima.uxmessentials.moderation.application.Punish;
 import com.uxplima.uxmessentials.moderation.application.PunishmentStats;
 import com.uxplima.uxmessentials.moderation.application.RepositoryJailGate;
@@ -81,6 +85,7 @@ import com.uxplima.uxmessentials.moderation.application.SanctionSummary;
 import com.uxplima.uxmessentials.moderation.application.Seen;
 import com.uxplima.uxmessentials.moderation.application.SetJail;
 import com.uxplima.uxmessentials.moderation.application.StaffRollback;
+import com.uxplima.uxmessentials.moderation.application.StorageLane;
 import com.uxplima.uxmessentials.moderation.application.TempBan;
 import com.uxplima.uxmessentials.moderation.application.TempBanIp;
 import com.uxplima.uxmessentials.moderation.application.TempWarn;
@@ -119,7 +124,10 @@ import com.uxplima.uxmessentials.shared.application.module.KernelPorts;
 import com.uxplima.uxmessentials.shared.application.module.ModuleContext;
 import com.uxplima.uxmessentials.shared.application.port.IpHistoryStore;
 import com.uxplima.uxmessentials.shared.application.port.IpTokens;
+import com.uxplima.uxmessentials.shared.application.port.MessageSink;
+import com.uxplima.uxmessentials.shared.application.port.Messages;
 import com.uxplima.uxmessentials.shared.application.port.NetworkPresence;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmlib.gui.input.TextInput;
 import com.uxplima.uxmlib.menu.Menus;
 import com.uxplima.uxmlib.menu.binding.MenuBindings;
@@ -206,7 +214,7 @@ public final class ModerationWiring {
         SanctionHistoryRecorder historyRecorder = new SanctionHistoryRecorder(sanctionHistory, clock);
         BukkitSanctions sanctions =
                 new BukkitSanctions(plugin.getServer(), kernel.scheduler(), settings, jailLocations);
-        ModerationGuard guard = new ModerationGuard(kernel.permissions());
+        ModerationGuard guard = new ModerationGuard(lanePermissions(plugin, kernel));
         InMemoryCommandSpyStore commandSpyStore = new InMemoryCommandSpyStore();
         SanctionSync sync = ModerationSync.publisher(bus.publisher());
         JailNetwork jailNetwork = jailNetwork(
@@ -237,7 +245,12 @@ public final class ModerationWiring {
                 repository, sanctions, new Notifier(kernel.messages(), kernel.messageSink()), clock);
         EnforceRemoteIpBan enforceIp = new EnforceRemoteIpBan(
                 repository, sanctions, guard, new Notifier(kernel.messages(), kernel.messageSink()), clock);
-        bus.registry().register(ModerationSync.listener(enforce::onRemoteBan, enforceIp::onRemoteIpBan));
+        // A connected player's mute is kept in memory for the checks on the server thread; a peer's change to it is
+        // read again here.
+        OnlineMutes mutePolicy = new OnlineMutes(repository, kernel.scheduler(), clock, kernel.log());
+        bus.registry()
+                .register(ModerationSync.listener(
+                        enforce::onRemoteBan, enforceIp::onRemoteIpBan, mutePolicy::changedElsewhere));
         // The live jail: a peer's jail or release is applied to a player connected here, and a jail hop a peer saw
         // fail is told to the staff here. With the network off this listener is never invoked.
         ApplyRemoteJail applyJail = new ApplyRemoteJail(
@@ -258,7 +271,6 @@ public final class ModerationWiring {
                 jailNetwork.alerts().failedOnPeer(frameId, target, targetName, jail);
             }
         }));
-        RepositoryMutePolicy mutePolicy = new RepositoryMutePolicy(repository, clock);
         RepositoryJailGate jailGate = new RepositoryJailGate(repository, clock);
         gates.bindMute(mutePolicy);
         gates.bindJail(jailGate);
@@ -350,9 +362,9 @@ public final class ModerationWiring {
                         repository,
                         kernel,
                         settings,
-                        guard,
                         commandSpyStore,
                         mutedCommands,
+                        mutePolicy,
                         clock),
                 new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
@@ -375,7 +387,8 @@ public final class ModerationWiring {
                         services.kick(),
                         services.warn(),
                         services.jail(),
-                        services.unjail()));
+                        services.unjail(),
+                        services.lane()));
     }
 
     /**
@@ -491,7 +504,7 @@ public final class ModerationWiring {
                 kernel.messages(),
                 kernel.messageSink(),
                 broadcastPrefix(kernel));
-        SanctionDurationLimit limit = new SanctionDurationLimit(kernel.permissions());
+        SanctionDurationLimit limit = new SanctionDurationLimit(lanePermissions(plugin, kernel));
         // The escalated sanctions a warning auto-applies run through their own use cases, never back through a
         // warn, so escalation cannot recurse; they are built first so the escalator can drive them.
         Mute mute =
@@ -529,7 +542,7 @@ public final class ModerationWiring {
         WarnEscalator escalator = new WarnEscalator(settings.warnEscalation(), mute, tempBan, ban, kick, notifier);
         // The revoke use cases are built as named locals so /staffrollback drives the same instances the
         // standalone /unmute, /unban and /unwarn commands do: one audited path, no parallel rollback logic.
-        Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, clock);
+        Unmute unmute = new Unmute(repository, notifier, audit, kernel.events(), history, sync, clock);
         Unban unban = new Unban(repository, notifier, audit, history);
         ClearWarns clearWarns = new ClearWarns(repository, notifier, audit);
         StaffRollback staffRollback =
@@ -611,7 +624,16 @@ public final class ModerationWiring {
                 .repository(repository)
                 .players(kernel.playerLookup())
                 .targets(new PlayerLookupTargetResolver(presence, kernel.playerLookup()))
+                .lane(new StorageLane(kernel.scheduler(), notifier, kernel.permissions(), kernel.log()))
                 .build();
+    }
+
+    /**
+     * The permission reader for punishment immunity and duration caps: the answers the storage lane read before the
+     * work left the server thread, or the live reader on the server thread.
+     */
+    private static Permissions lanePermissions(Plugin plugin, KernelPorts kernel) {
+        return new LanePermissions(kernel.permissions(), plugin.getServer()::isPrimaryThread, kernel.log());
     }
 
     /**
@@ -641,11 +663,14 @@ public final class ModerationWiring {
             ModerationRepository repository,
             KernelPorts kernel,
             ModerationSettings settings,
-            ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
             MutedCommandPolicy mutedCommands,
+            OnlineMutes mutes,
             Clock clock) {
+        // The listeners answer on the event's own thread, never the storage lane's, so they read permissions live.
+        ModerationGuard live = new ModerationGuard(kernel.permissions());
         return List.of(
+                new OnlineMutesListener(mutes),
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),
                 new FreezeMoveListener(
@@ -654,15 +679,22 @@ public final class ModerationWiring {
                         kernel.messageSink(),
                         clock,
                         settings.freezeNoticeInterval()),
-                new MutedCommandListener(
-                        repository, mutedCommands, guard, kernel.messages(), kernel.messageSink(), clock),
+                new MutedCommandListener(mutes, mutedCommands, live, kernel.messages(), kernel.messageSink()),
                 new MutedCommandNamesRefresh(mutedCommands),
-                new MutedChatListener(
+                mutedChat(
                         new RepositoryMutePolicy(repository, clock),
-                        guard::isExempt,
+                        kernel.permissions(),
                         kernel.messages(),
                         kernel.messageSink()),
                 new CommandSpyListener(commandSpyStore, kernel.messages(), kernel.messageSink()));
+    }
+
+    /**
+     * The public chat mute check. Chat arrives on its own async thread, where the lane's permission reader has no
+     * answer and would count every speaker as exempt, so this one reads the live permissions, as Paper allows there.
+     */
+    static MutedChatListener mutedChat(MutePolicy mutes, Permissions live, Messages messages, MessageSink sink) {
+        return new MutedChatListener(mutes, new ModerationGuard(live)::isExempt, messages, sink);
     }
 
     /**
@@ -730,7 +762,7 @@ public final class ModerationWiring {
             Runnable jailServerAdoption,
             BukkitSanctions sanctions,
             InMemoryCommandSpyStore commandSpyStore,
-            RepositoryMutePolicy mutePolicy,
+            OnlineMutes mutePolicy,
             RepositoryJailGate jailGate,
             Freeze freeze,
             TempBan tempBan,

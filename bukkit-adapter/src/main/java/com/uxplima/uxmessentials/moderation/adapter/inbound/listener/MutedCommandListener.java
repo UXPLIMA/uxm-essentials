@@ -1,6 +1,5 @@
 package com.uxplima.uxmessentials.moderation.adapter.inbound.listener;
 
-import java.time.Clock;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -11,9 +10,9 @@ import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerCommandPreprocessEvent;
 
+import com.uxplima.uxmessentials.messaging.application.port.MutePolicy;
 import com.uxplima.uxmessentials.moderation.application.ModerationGuard;
 import com.uxplima.uxmessentials.moderation.application.MutedCommandPolicy;
-import com.uxplima.uxmessentials.moderation.application.port.ModerationRepository;
 import com.uxplima.uxmessentials.moderation.domain.ModerationMessageKey;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRefs;
 import com.uxplima.uxmessentials.shared.application.port.MessageSink;
@@ -30,34 +29,27 @@ import org.jspecify.annotations.NullMarked;
  * catches third-party and vanilla commands an operator names.
  *
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but
- * the dispatch is stopped before the vanilla/dispatcher handler. The mute state is read live from the
- * repository against the injected {@link Clock}, so an expired timed mute no longer blocks; a player holding
- * the moderation exempt node is never blocked. When the configured list is empty the listener short-circuits
- * before any mute lookup, so an operator who leaves the list blank pays nothing.
+ * the dispatch is stopped before the vanilla/dispatcher handler. The mute is the one kept in memory for every
+ * connected player, so the server thread never waits on the database here, and an expired timed mute no longer
+ * blocks. A player holding the moderation exempt node is never blocked. When the configured list is empty the
+ * listener short-circuits before any mute lookup, so an operator who leaves the list blank pays nothing.
  */
 @NullMarked
 public final class MutedCommandListener implements Listener {
 
-    private final ModerationRepository repository;
+    private final MutePolicy mutes;
     private final MutedCommandPolicy policy;
     private final ModerationGuard guard;
     private final Messages messages;
     private final MessageSink sink;
-    private final Clock clock;
 
     public MutedCommandListener(
-            ModerationRepository repository,
-            MutedCommandPolicy policy,
-            ModerationGuard guard,
-            Messages messages,
-            MessageSink sink,
-            Clock clock) {
-        this.repository = Objects.requireNonNull(repository, "repository");
+            MutePolicy mutes, MutedCommandPolicy policy, ModerationGuard guard, Messages messages, MessageSink sink) {
+        this.mutes = Objects.requireNonNull(mutes, "mutes");
         this.policy = Objects.requireNonNull(policy, "policy");
         this.guard = Objects.requireNonNull(guard, "guard");
         this.messages = Objects.requireNonNull(messages, "messages");
         this.sink = Objects.requireNonNull(sink, "sink");
-        this.clock = Objects.requireNonNull(clock, "clock");
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -70,7 +62,7 @@ public final class MutedCommandListener implements Listener {
         if (guard.isExempt(who)) {
             return;
         }
-        if (!repository.loadMute(who).isActiveAt(clock.instant())) {
+        if (!mutes.isMuted(who)) {
             return;
         }
         event.setCancelled(true);

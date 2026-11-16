@@ -68,7 +68,8 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.unmute().unmute(a, t)),
+                        (a, t) -> services.lane()
+                                .run(a, t, () -> services.unmute().unmute(a, t))),
                 new JailCommand(services, messages, sink, jailGui),
                 target(
                         "unjail",
@@ -77,7 +78,8 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.unjail().unjail(a, t)),
+                        (a, t) -> services.lane()
+                                .run(a, t, () -> services.unjail().unjail(a, t))),
                 new ToggleJailCommand(services, messages, sink),
                 new JailsCommand(services, messages, sink, scheduler, jailGui),
                 new JailedPlayersCommand(services, messages, sink, scheduler, jailGui),
@@ -108,7 +110,8 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.reviewWarns().review(a, t)),
+                        (a, t) -> services.lane()
+                                .run(a, () -> services.reviewWarns().review(a, t))),
                 new SanctionCommand(services, messages, sink, scheduler),
                 new BanipCommand(services, messages, sink, guiFlow),
                 new TempbanipCommand(services, messages, sink),
@@ -150,7 +153,7 @@ public final class ModerationCommands {
                         services,
                         messages,
                         sink,
-                        (a, t) -> services.seen().seenIp(a, t)),
+                        (a, t) -> services.lane().run(a, () -> services.seen().seenIp(a, t))),
                 new AltsCommand(services, messages, sink, scheduler),
                 new CommandSpyCommand(services, messages, sink),
                 new LockdownCommand(services, messages, sink, scheduler),
