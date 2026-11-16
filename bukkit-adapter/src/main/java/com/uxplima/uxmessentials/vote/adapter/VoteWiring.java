@@ -28,6 +28,7 @@ import com.uxplima.uxmessentials.shared.adapter.inbound.command.ListDisplayMode;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiEntry;
 import com.uxplima.uxmessentials.shared.adapter.inbound.gui.ManagementGuiRegistry;
 import com.uxplima.uxmessentials.shared.adapter.outbound.BukkitRegistryKeys;
+import com.uxplima.uxmessentials.shared.adapter.outbound.OwningThreadReads;
 import com.uxplima.uxmessentials.shared.adapter.outbound.action.BukkitClickCommandRunner;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.Bus;
 import com.uxplima.uxmessentials.shared.adapter.outbound.bus.VoteSync;
@@ -167,7 +168,10 @@ public final class VoteWiring {
         int offlineLimit = Math.max(0, ctx.config().getInt("offline-vote-limit", 0));
         RewardApplier applier =
                 new BukkitRewardApplier(repository, dispatcher, kernel.scheduler(), offlineLimit, kernel.log());
-        VoteContext context = new BukkitVoteContext(kernel.permissions());
+        VoteContext context = new BukkitVoteContext(
+                kernel.permissions(),
+                kernel.playerLookup(),
+                OwningThreadReads.onServer(kernel.scheduler(), plugin, kernel.log()));
         Set<String> disabledWorlds = Set.copyOf(ctx.config().getStringList("reward.disabled-worlds", List.of()));
         RewardEngine engine = new RewardEngine(loadCatalog(plugin, kernel), disabledWorlds);
         VoterNameRules nameRules = loadNameRules(ctx.config(), kernel);
