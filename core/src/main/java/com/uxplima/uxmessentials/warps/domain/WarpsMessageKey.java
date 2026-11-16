@@ -36,6 +36,7 @@ public enum WarpsMessageKey implements MessageKey {
     WARP_SERVER_INVALID("warp.server-invalid"),
     WARP_SERVER_NOT_RUNNING("warp.server-not-running"),
     WARP_SERVER_UNRECORDED("warp.server-unrecorded"),
+    WARP_SERVER_DEFAULT("warp.server-default"),
 
     // listing
     WARP_LIST_HEADER("warp.list.header"),

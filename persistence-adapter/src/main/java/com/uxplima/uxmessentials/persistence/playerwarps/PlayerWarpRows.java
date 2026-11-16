@@ -34,9 +34,10 @@ import org.jspecify.annotations.Nullable;
  * milliseconds, money as {@code DECIMAL(20,4)}, and the {@link WarpAccess}/{@link WarpStatus} axes as their
  * uppercase enum names. This class is the single place that translation lives.
  *
- * <p>Two subtleties are load-bearing. The owner's display name is stored on the row ({@code owner_name}) but falls
- * back to the {@code names} resolver when a legacy row left it null, so a browse always renders a name rather than a
- * raw uuid. And the password is never mapped back onto the aggregate: the domain carries only a {@code passwordSet}
+ * <p>Two subtleties are load-bearing. The owner's display name is stored on the row ({@code owner_name}) only when
+ * it is a real name. An owner known only by uuid carries the uuid string as its name in the domain, the same fallback
+ * the {@code names} resolver gives; that is stored as null and resolved again on every read, so the owner's name
+ * appears once the server knows it, and a 36-character uuid never meets the 32-character column. And the password is never mapped back onto the aggregate: the domain carries only a {@code passwordSet}
  * flag (derived from whether {@code password_algorithm} is present), and {@link #apply} deliberately never writes the
  * three {@code password_*} columns: a save that flips visibility must never disturb a set password. Password writes
  * are a separate concern handled outside this mapping.
@@ -93,7 +94,7 @@ final class PlayerWarpRows {
         Position location = warp.location();
         record.setName(warp.name().value())
                 .setOwner(warp.owner().uuid().toString())
-                .setOwnerName(warp.ownerName())
+                .setOwnerName(storedOwnerName(warp))
                 .setServerId(warp.serverId().orElse(null))
                 .setWorld(location.world().uid().toString())
                 .setWorldName(location.world().name())
@@ -102,6 +103,12 @@ final class PlayerWarpRows {
                 .setZ(location.z())
                 .setYaw(location.yaw())
                 .setPitch(location.pitch());
+    }
+
+    /** The name to keep on the row, or null when only the owner's uuid is known (see the class note). */
+    private static @Nullable String storedOwnerName(PlayerWarp warp) {
+        String name = warp.ownerName();
+        return name.equals(warp.owner().uuid().toString()) ? null : name;
     }
 
     private static void applyPresentation(PlayerWarpsRecord record, PlayerWarp warp) {

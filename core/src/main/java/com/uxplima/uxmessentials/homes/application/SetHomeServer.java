@@ -19,7 +19,8 @@ import com.uxplima.uxmessentials.shared.domain.Result;
  * This is how an operator follows a renamed {@code network.server-name}, or fixes homes the automatic claim gave to
  * the wrong backend (a copied world claimed by the backend that started first). {@value Home#UNSCOPED} as the new
  * server clears it, so the backend holding each home's world claims it again at its next start. It is refused as the
- * old server: those rows are the claim's to take, by the backend that holds their world. The command gate checks the
+ * old server: those rows are the claim's to take, by the backend that holds their world. The shipped default server
+ * name is refused as the new server, since a backend still under it records no server. The command gate checks the
  * operator permission; this use case validates, writes, reports and logs an audit line.
  *
  * <p>Every cached home set is stale afterwards, so {@code announce} drops this backend's and tells the peers once.
@@ -34,14 +35,25 @@ public final class SetHomeServer {
     private final NetworkPresence presence;
     private final Runnable announce;
     private final Logger log;
+    private final String defaultServerName;
 
+    /**
+     * @param defaultServerName the shipped {@code network.server-name}: a backend still under it records no server, so
+     *     a home moved to that name would be reached by no backend at all
+     */
     public SetHomeServer(
-            HomeServers servers, Notifier notifier, NetworkPresence presence, Runnable announce, Logger log) {
+            HomeServers servers,
+            Notifier notifier,
+            NetworkPresence presence,
+            Runnable announce,
+            Logger log,
+            String defaultServerName) {
         this.servers = Objects.requireNonNull(servers, "servers");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.presence = Objects.requireNonNull(presence, "presence");
         this.announce = Objects.requireNonNull(announce, "announce");
         this.log = Objects.requireNonNull(log, "log");
+        this.defaultServerName = Objects.requireNonNull(defaultServerName, "defaultServerName");
     }
 
     /** Off-tick: record {@code to} on every home recorded on {@code from}, answering how many changed. */
@@ -57,6 +69,10 @@ public final class SetHomeServer {
         }
         if (from.equals(Home.UNSCOPED)) {
             notifier.send(actor, HomesMessageKey.HOME_SERVER_FROM_UNSCOPED, Map.of("server", from));
+            return Result.err(HomeError.INVALID_SERVER);
+        }
+        if (to.equals(defaultServerName)) {
+            notifier.send(actor, HomesMessageKey.HOME_SERVER_DEFAULT, Map.of("server", to));
             return Result.err(HomeError.INVALID_SERVER);
         }
         // A name no running backend answers to is set anyway: the operator may be preparing a server not up yet.

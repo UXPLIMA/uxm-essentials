@@ -63,10 +63,11 @@ Renaming `network.server-name` leaves every row on the old name. Move them with:
 | `/worlds setserver <from> <to>` | Every managed world of one server, settings included. See [worlds](worlds.md#worlds-on-a-network). |
 
 Naming `unscoped` as the new server clears the record, so the backend that has the world loaded claims it again at
-its next start. Two backends running copies of one world folder share its `uid.dat`, and the first to start claims
-every warp and home in it: give each copy its own `uid.dat`, or set the server afterwards. A world loaded after the
-server finished starting is claimed at the next restart. The log names each claim (`event=warp_server_claim`,
-`event=home_server_claim`).
+its next start. `server-1` cannot be the new server: a backend still under that name records no server, so no backend
+would reach the rows. Two backends running copies of one world folder share its `uid.dat`, and the first to start
+claims every warp and home in it: give each copy its own `uid.dat`, or set the server afterwards. A world loaded
+after the server finished starting is claimed at the next restart. The log names each claim
+(`event=warp_server_claim`, `event=home_server_claim`).
 
 ## Carriers
 
@@ -75,8 +76,9 @@ always read from the shared database.
 
 ### Velocity (`transport = "velocity"`, the default)
 
-Put `uxmEssentials-velocity` in the proxy's `plugins/`. It needs no configuration: it registers the bus channel and
-relays each frame to every other backend the proxy knows. A BungeeCord proxy does not relay the bus; use Redis there.
+Put `uxmEssentials-velocity` in the proxy's `plugins/`. It needs no configuration: it registers the bus channel,
+relays each frame to every other backend the proxy knows, and sends each heartbeat back to the backend it came from,
+so a backend can tell that the proxy plugin is there. A BungeeCord proxy does not relay the bus; use Redis there.
 
 Plugin messages ride a player's connection, which sets the limits:
 
@@ -85,8 +87,8 @@ Plugin messages ride a player's connection, which sets the limits:
   when its first player joins, and warps, spawns, worlds, NPCs, holograms and the vote counter also reload every
   `network.cache-refresh-seconds` (default 300; `0` turns the timer off). Balances, homes and other per-player data
   expire on their own after a few minutes.
-- Frames waiting for a player are kept in a queue of 256. When it is full the oldest frame is dropped. The size is
-  `network.bus.outbound-queue-size`, which the shipped file does not list; add it inside `network` to change it.
+- Frames waiting for a player are kept in a queue of `network.bus.outbound-queue-size` (default 256). When it is
+  full the oldest frame is dropped.
 - A frame larger than 32767 bytes is never sent; the log reports the drop, at most once a minute.
 - `network.bus-channel` must match the proxy. Leave it as shipped.
 
@@ -122,9 +124,12 @@ Backend commands are gated by the `commandcontrol` module on each backend.
 
 `/uxmess doctor` on a backend shows:
 
-- the bus line: disabled, connected, or `DISCONNECTED`. Connected does not prove that frames travel: with Velocity
-  it only means the channel is registered on this backend, so it reads connected even with no proxy jar installed,
-  and with `both` either carrier counts;
+- the bus line: disabled, or one verdict per carrier. Velocity reads connected only while frames come back through
+  the proxy plugin, at least once in three heartbeats. Frames ride a player's connection, so with nobody online on
+  the backend it reads `idle` and says so. Otherwise it reads `NOT ANSWERING`: install `uxmEssentials-velocity`, or
+  update it to the same release, since an older proxy jar does not answer. Redis reads connected while its
+  connection is up, `DISCONNECTED` otherwise. A carrier not working is a warning, since the backends reached only
+  through it are cut off. Idle is a warning on Velocity alone, but not with `both` while Redis is connected;
 - the peers line: how many other backends sent a heartbeat recently (`network.heartbeat-seconds`, default 30; a peer
   drops out after three missed beats) and how long ago. This is the line that shows frames arrive: on a working
   network it counts every other backend that has players (or every other backend, with Redis);
@@ -166,9 +171,8 @@ Both keys are in the root `config.conf` and read on start.
   money back. If the target refuses them on arrival (the warp or home is gone, the world is full or will not load,
   the spot is unsafe), the server they reached gives it back, in the currency it was taken in; keep the economy module
   on wherever a move can land. A player warp's fee goes to its owner only when the visitor arrives.
-- **Safety.** Warps, homes and worlds check the spot on the server the player lands on. A player warp is checked on
-  the origin before the player leaves, against the origin's copy of the world, so a player warp whose world is not
-  loaded on the origin is refused as unsafe.
+- **Safety.** Warps, player warps, homes and worlds check the spot on the server the player lands on, the only one
+  that has its world.
 - **Warmup.** A warp or player warp on another server sends the player right after the checks and the charge, with
   no warmup. An accepted teleport request runs the usual warmup on the mover's server first.
 - **Switches.** Turn each module's `cross-server` switch on on every backend. With it off, a warp or home is used on
@@ -282,8 +286,8 @@ same everywhere so transaction times agree.
    `event=playerwarp_server_claim`, `event=home_server_claim`, `event=jail_server_claim`, `event=world_server_claim`,
    `world_server_claim_conflict`, `world_server_claim_skipped`) and fix a wrong claim with the
    [setserver commands](#renaming-a-server-or-fixing-a-wrong-claim), or `/setjail` for a jail.
-5. Run `/uxmess doctor` on each backend once players are on: the expected peer count and no server name failure. The
-   bus line alone does not prove frames travel.
+5. Run `/uxmess doctor` on each backend once players are on: a connected bus line, the expected peer count and no
+   server name failure.
 6. Move permission grants and placeholders to the new names as [upgrading](upgrading.md) describes. That release
    renames every exemption node to `uxmessentials.bypass.*` and every placeholder to `%uxm_essentials_<path>%`.
 

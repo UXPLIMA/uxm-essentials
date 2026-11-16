@@ -31,7 +31,8 @@ import org.jspecify.annotations.Nullable;
  *       which is what the browse rollup shows; the per-vote timestamp Athelion never kept is left at the epoch.
  *   <li><b>The rest.</b> {@code admission} becomes the entry price in the server default currency, {@code blocked-players}
  *       become warp bans, {@code category} carries across (Athelion's {@code all} bucket meaning "uncategorised" is
- *       dropped to empty), and the owner <em>name</em>, which Athelion never serialised, falls back to a placeholder.
+ *       dropped to empty), and the owner <em>name</em>, which Athelion never serialised, is left empty for the writer to
+ *       look up.
  * </ul>
  *
  * <p>A warp whose world the live server does not know is dropped ({@link Optional#empty()}, counted as skipped), exactly
@@ -43,9 +44,6 @@ public final class AthelionWarpMapper {
 
     /** The currency imported prices are recorded in; Athelion's admission is a bare economy amount, not a currency id. */
     private static final String DEFAULT_CURRENCY = "default";
-
-    /** Athelion does not serialise the owner's name; the browse author line falls back to this until the owner logs in. */
-    private static final String UNKNOWN_OWNER = "Unknown";
 
     /** Athelion's default category bucket; it means "uncategorised", so it maps to no category rather than a real id. */
     private static final String ALL_CATEGORY = "all";
@@ -72,7 +70,7 @@ public final class AthelionWarpMapper {
         Optional<String> password = password(warp.password());
         return new ImportedPlayerWarp(
                 warp.owner(),
-                UNKNOWN_OWNER,
+                Optional.empty(),
                 warp.name(),
                 Optional.of(warp.displayName()),
                 position(world, warp.location()),

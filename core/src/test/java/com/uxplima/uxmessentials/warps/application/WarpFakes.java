@@ -169,6 +169,9 @@ final class WarpFakes {
         /** Make every local teleport throw where it starts, as a launch that fails on the caller's thread does. */
         boolean throwsOnTeleport;
 
+        /** Make every arrival throw, as a jail or combat lookup that fails on the player's thread does. */
+        boolean throwsOnArrive;
+
         @Nullable TeleportEngine engine;
 
         @Override
@@ -209,6 +212,9 @@ final class WarpFakes {
 
         @Override
         public void arrive(PlayerRef who, Warp warp, Runnable onLanded, Runnable onMissed) {
+            if (throwsOnArrive) {
+                throw new IllegalStateException("the jail lookup failed");
+            }
             if (refuses) {
                 onMissed.run();
                 return;

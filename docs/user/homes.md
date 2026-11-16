@@ -101,7 +101,9 @@ that run a copy of the same world folder share its `uid.dat`, so the first to st
 copy its own `uid.dat`. `/home setserver <from> <to>` moves every home recorded on one server to another, after a
 renamed `network.server-name` or to undo a wrong claim. `unscoped` as the new server clears it, so the server that
 has each home's world claims it again at its next start; it is refused as the old server, since those homes are the
-claim's to take. A home relocated on a server that records no server is cleared the same way.
+claim's to take. `server-1` is refused as the new server: a server still under that name records no server, so no
+server would reach a home recorded on it. A home relocated on a server that records no server is cleared the same
+way.
 
 | Key | Default | Meaning |
 |---|---|---|

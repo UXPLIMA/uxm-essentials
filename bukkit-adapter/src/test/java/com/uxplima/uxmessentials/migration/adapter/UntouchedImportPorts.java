@@ -62,7 +62,8 @@ final class UntouchedImportPorts {
                 new Whitelist(),
                 new Bans(),
                 new Favourites(),
-                new Ratings());
+                new Ratings(),
+                uuid -> java.util.Optional.empty());
     }
 
     static final class Homes implements HomeRepository {
@@ -233,6 +234,11 @@ final class UntouchedImportPorts {
 
         @Override
         public void saveTempban(PlayerRef target, TempbanState tempban) {
+            throw touched();
+        }
+
+        @Override
+        public boolean replaceTempban(PlayerRef target, TempbanState expected, TempbanState.Active replacement) {
             throw touched();
         }
 
