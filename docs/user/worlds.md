@@ -73,9 +73,13 @@ warning names the worlds whose shared settings belonged to a different world of 
 per server name, so a world you unregister or delete does not come back on the next start; a world that arrives on a
 server after its first start is taken with `/worlds claim <world>`, which copies it there, and `/worlds load <world>`
 then loads it. A world loaded on a server after its first start (by `bukkit.yml` or another plugin) is adopted with
-the shared copy's settings while `auto-adopt-loaded` is on, not with defaults. One no server has copied is listed as
-unclaimed. If the world folders cannot be read at the first start, nothing is claimed, a `world_server_claim_failed`
-warning says why, and the next start tries again.
+the shared copy's settings while `auto-adopt-loaded` is on, not with defaults, and a `world_server_claim_conflict`
+warning names it when the shared copy belonged to a different world of that name. That includes a world you
+unregister while something still loads it: at the next start it comes back with the shared copy's settings, which
+date from the upgrade or the last hand-back to `unscoped`, not the ones it had when you unregistered it. Turn
+`auto-adopt-loaded` off to keep such a world out. One no server has copied is listed as unclaimed. If the world
+folders cannot be read at the first start, nothing is claimed, a `world_server_claim_failed` warning says why, and
+the next start tries again.
 
 The shared world stays in the database, hidden from `/worlds list` once a server has copied it, for servers that get
 the world later. Nothing removes it on its own: `/worlds setserver <server> unscoped` replaces it with that server's
@@ -93,7 +97,8 @@ no folder for.
 `/worlds setserver <from> <to>` moves every world recorded on one server to another, settings included, without
 touching any files. Use it after renaming `network.server-name`, or when a world was claimed by the wrong server.
 `unscoped` as the new server hands the worlds back to the claim, replacing the shared copy of the same name, and the old
-server claims again at its next start, so its worlds come back to it and auto-load as before; `unscoped` cannot be the
-old one. A move to a new name carries the record that the claim has run, so the renamed server does not claim again,
-and a later server under the old name does. `server-1` cannot be the new one: a server still under that name records no server, so no server would
+server claims again at its next start, so the worlds it has loaded or has a folder of come back to it and auto-load as
+before. A world with no folder on that server is not copied back: take it with `/worlds claim <world>`. `unscoped`
+cannot be the old one. A move to a new name carries the record that the claim has run, so the renamed server does
+not claim again, and a later server under the old name does. `server-1` cannot be the new one: a server still under that name records no server, so no server would
 see those worlds.
