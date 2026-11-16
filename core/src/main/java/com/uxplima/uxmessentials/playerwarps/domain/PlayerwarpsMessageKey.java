@@ -43,6 +43,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     PWARP_INVALID_NAME("pwarp.invalid-name"),
     PWARP_NAME_TAKEN("pwarp.name-taken"),
     PWARP_LIMIT_REACHED("pwarp.limit-reached"),
+    PWARP_WORLD_LIMIT_REACHED("pwarp.world-limit-reached"),
     PWARP_NOT_PUBLIC("pwarp.not-public"),
     PWARP_SUSPENDED("pwarp.suspended"),
     PWARP_BANNED("pwarp.banned"),
@@ -113,6 +114,7 @@ public enum PlayerwarpsMessageKey implements MessageKey {
     // cross-server teleport. Routing a warp that lives on another backend of the network
     PWARP_CROSS_SERVER_SENDING("pwarp.cross-server.sending"),
     PWARP_CROSS_SERVER_UNAVAILABLE("pwarp.cross-server.unavailable"),
+    PWARP_CROSS_SERVER_OFF("pwarp.cross-server.off"),
     PWARP_CROSS_SERVER_ARRIVED("pwarp.cross-server.arrived"),
     PWARP_CROSS_SERVER_FAILED("pwarp.cross-server.failed"),
     PWARP_CROSS_SERVER_TIMED_OUT("pwarp.cross-server.timed-out"),

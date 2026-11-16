@@ -1,7 +1,6 @@
 package com.uxplima.uxmessentials.warps.application;
 
 import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -235,9 +234,7 @@ final class WarpFakes {
         }
 
         private static Destination destinationOf(Warp warp) {
-            Optional<Duration> cooldown =
-                    warp.cooldownOverrideSeconds().map(seconds -> Duration.ofMillis((long) (seconds * 1000)));
-            return Destination.at(warp.location(), Optional.empty(), cooldown);
+            return Destination.at(warp.location(), Optional.empty(), warp.ownCooldown());
         }
     }
 

@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.domain.OwnCooldown;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.warps.domain.WarpCost;
@@ -265,5 +266,19 @@ public record PlayerWarp(
     public PlayerWarp withId(PlayerWarpId assignedId) {
         Objects.requireNonNull(assignedId, "assignedId");
         return toBuilder().id(Optional.of(assignedId)).build();
+    }
+
+    /**
+     * The cooldown this warp sets, on a clock of its own named after the warp's id, so a rename keeps the clock and a
+     * warp with a long wait never holds back another warp that sets a short one. Only a stored warp is teleported to,
+     * so a warp that sets a cooldown carries its id here.
+     */
+    public Optional<OwnCooldown> ownCooldown() {
+        return timing.cooldown()
+                .map(wait -> new OwnCooldown(
+                        "pwarp."
+                                + id.orElseThrow(() -> new IllegalStateException("an unsaved warp has no clock"))
+                                        .value(),
+                        wait));
     }
 }

@@ -23,7 +23,6 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerwarpsMessageKey;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpStatus;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
-import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
@@ -76,10 +75,11 @@ import org.jspecify.annotations.Nullable;
  * <p>A warp tagged for another backend of the network takes a different post-charge route: rather than the local
  * hop it hands off to the shared cross-server hop through {@link PlayerWarpHops}, which records the intent and
  * connects the player across the proxy. Such a use first passes the teleport context's jail, combat and cooldown checks,
- * ahead of the cost step, since the engine's own launch gate never runs for it. Its safe-landing step is left to the
- * target, the only backend holding the warp's world, which refuses an unsafe landing and refunds through the hop. The
- * charge stays the gate's concern and is passed through so a route that never leaves (the sub-group off, or the proxy
- * unreachable) refunds exactly what was debited.
+ * ahead of the cost step, since the engine's own launch gate never runs for it; with the cross-server sub-group off it
+ * is refused there instead, before anything is charged. Its safe-landing step is left to the target, the only backend
+ * holding the warp's world, which refuses an unsafe landing and refunds through the hop. The charge stays the gate's
+ * concern and is passed through so a route that never leaves (the proxy unreachable) refunds exactly what was
+ * debited.
  */
 public final class UsePlayerWarp {
 
@@ -98,7 +98,7 @@ public final class UsePlayerWarp {
     private final WarpMemberStore memberStore;
     private final WarpWhitelistStore whitelistStore;
     private final PlayerWarpPasswordStore passwordStore;
-    private final Cooldowns cooldowns;
+    private final PasswordAttempts passwordAttempts;
     private final Optional<PlayerWarpEconomy> economy;
     private final String localServerId;
     private final PlayerWarpHops hops;
@@ -116,7 +116,7 @@ public final class UsePlayerWarp {
             WarpMemberStore memberStore,
             WarpWhitelistStore whitelistStore,
             PlayerWarpPasswordStore passwordStore,
-            Cooldowns cooldowns,
+            PasswordAttempts passwordAttempts,
             Optional<PlayerWarpEconomy> economy,
             String localServerId,
             PlayerWarpHops hops,
@@ -132,7 +132,7 @@ public final class UsePlayerWarp {
         this.memberStore = Objects.requireNonNull(memberStore, "memberStore");
         this.whitelistStore = Objects.requireNonNull(whitelistStore, "whitelistStore");
         this.passwordStore = Objects.requireNonNull(passwordStore, "passwordStore");
-        this.cooldowns = Objects.requireNonNull(cooldowns, "cooldowns");
+        this.passwordAttempts = Objects.requireNonNull(passwordAttempts, "passwordAttempts");
         this.economy = Objects.requireNonNull(economy, "economy");
         this.localServerId = Objects.requireNonNull(localServerId, "localServerId");
         this.hops = Objects.requireNonNull(hops, "hops");
@@ -337,24 +337,25 @@ public final class UsePlayerWarp {
     }
 
     /**
-     * The PASSWORD access branch, rate-limited through the {@link Cooldowns} per-warp attempt label. The password
-     * bypass skips it entirely. An active attempt cooldown refuses {@link PlayerWarpError#RATE_LIMITED} before any
-     * match is tried; otherwise a correct password passes, and a wrong (or absent) one stamps the attempt cooldown
-     * and refuses {@link PlayerWarpError#WRONG_PASSWORD}. The plaintext is only ever handed to the password store
-     * to verify: it is never logged, rendered, or placed in a message placeholder.
+     * The PASSWORD access branch, rate-limited by {@link PasswordAttempts} per player and warp. The password bypass
+     * skips it entirely. A player locked out by too many wrong passwords is refused {@link PlayerWarpError#RATE_LIMITED}
+     * before any match is tried; otherwise a correct password passes and clears the count, and a wrong (or absent) one
+     * is counted and refused {@link PlayerWarpError#WRONG_PASSWORD}. The plaintext is only ever handed to the password
+     * store to verify: it is never logged, rendered, or placed in a message placeholder.
      */
     private @Nullable PlayerWarpError passwordStep(PlayerRef actor, PlayerWarp warp, Optional<String> entered) {
         if (permissions.has(actor, BYPASS_PASSWORD)) {
             return null;
         }
-        String label = attemptLabel(warp.id().orElseThrow());
-        if (cooldowns.checkLabel(actor, label).isErr()) {
+        PlayerWarpId id = warp.id().orElseThrow();
+        if (passwordAttempts.lockedFor(actor.uuid(), id).isPresent()) {
             return PlayerWarpError.RATE_LIMITED;
         }
-        if (entered.isPresent() && passwordStore.matches(warp.id().orElseThrow(), entered.get())) {
+        if (entered.isPresent() && passwordStore.matches(id, entered.get())) {
+            passwordAttempts.succeeded(actor.uuid(), id);
             return null;
         }
-        cooldowns.stampLabel(actor, label);
+        passwordAttempts.failed(actor.uuid(), id);
         return PlayerWarpError.WRONG_PASSWORD;
     }
 
@@ -395,11 +396,6 @@ public final class UsePlayerWarp {
         Result<Unit, ChargeError> charged =
                 economy.get().charge(actor, warp.price().amount(), warp.price().currencyId());
         return charged.isErr() ? Admission.refused(PlayerWarpError.CANNOT_AFFORD) : Admission.paid(warp.price());
-    }
-
-    /** The per-warp password-attempt cooldown label, keyed by the warp's surrogate id. */
-    private static String attemptLabel(PlayerWarpId id) {
-        return "pwarp-password:" + id.value();
     }
 
     private Result<Unit, PlayerWarpError> refuse(PlayerRef actor, PlayerWarp warp, PlayerWarpError error) {

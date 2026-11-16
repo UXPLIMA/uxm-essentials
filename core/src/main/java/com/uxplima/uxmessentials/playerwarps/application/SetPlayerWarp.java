@@ -21,6 +21,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
+import com.uxplima.uxmessentials.shared.domain.WorldRef;
 
 /**
  * {@code /setpwarp <name>}: create a player-owned warp at the player's current position, or re-anchor an
@@ -32,8 +33,9 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * the cap returns {@link PlayerWarpError#LIMIT_REACHED}. Otherwise it is stored as a new private warp and
  * publishes {@code PlayerWarpCreated}.
  *
- * <p>The owner's limit is resolved through {@link PlayerWarpQuota} scoped to the warp's world, so a world-scoped
- * {@code uxmessentials.pwarp.limit.<world>.<n>} node folds in. {@code ownerName} is the player's display name,
+ * <p>Two limits gate a new warp, both resolved through {@link PlayerWarpQuota}: the owner's limit across every world,
+ * against all their warps, and, when they hold a {@code uxmessentials.pwarp.limit.<world>.<n>} node for the new warp's
+ * world, that world's limit against their warps in that world only. {@code ownerName} is the player's display name,
  * captured onto the new warp so a browse can render its author without a lookup; the edit timestamp comes from
  * the injected {@link Clock}, never from the domain.
  *
@@ -128,10 +130,20 @@ public final class SetPlayerWarp {
     }
 
     private Result<Unit, PlayerWarpError> create(PlayerRef owner, String ownerName, PlayerWarpName name, Position at) {
-        PlayerWarpLimit limit = quota.resolve(owner, at.world());
+        PlayerWarpLimit limit = quota.resolve(owner);
         if (limit.isReachedAt(repository.count(owner))) {
             notifier.send(
                     owner, PlayerWarpError.LIMIT_REACHED.messageKey(), Map.of("limit", Integer.toString(limit.cap())));
+            return Result.err(PlayerWarpError.LIMIT_REACHED);
+        }
+        Optional<PlayerWarpLimit> worldLimit = quota.inWorld(owner, at.world());
+        if (worldLimit.isPresent() && worldLimit.get().isReachedAt(ownedIn(owner, at.world()))) {
+            notifier.send(
+                    owner,
+                    PlayerwarpsMessageKey.PWARP_WORLD_LIMIT_REACHED,
+                    Map.of(
+                            "limit", Integer.toString(worldLimit.get().cap()),
+                            "world", at.world().name()));
             return Result.err(PlayerWarpError.LIMIT_REACHED);
         }
         // Past the owner's quota and with nothing written yet. Only the create is asked about: re-anchoring keeps
@@ -145,5 +157,12 @@ public final class SetPlayerWarp {
         events.publish(new PlayerWarpCreated(owner, name, at));
         notifier.send(owner, PlayerwarpsMessageKey.PWARP_SET, Map.of("warp", name.value()));
         return Result.ok();
+    }
+
+    /** How many of {@code owner}'s warps are in {@code world}, matched by the world's uid as every position is. */
+    private int ownedIn(PlayerRef owner, WorldRef world) {
+        return Math.toIntExact(repository.ownedBy(owner).stream()
+                .filter(warp -> warp.location().world().equals(world))
+                .count());
     }
 }

@@ -133,8 +133,9 @@ land claims and guard or WorldGuard regions while `respect-claims` and `respect-
 `persist-pool` the spots survive a restart. The picker offers each loaded world that has a ring to search.
 `fallback-world.<world> = "<other>"` sends `/rtp` from a world without one to another world.
 
-`uxmessentials.rtp.radius.<blocks>` sets the outer edge of the ring for `/rtp biome`: the largest node held replaces
-`max-radius`, and may reach beyond it. Plain `/rtp` draws from the shared ready spots and ignores it.
+`uxmessentials.rtp.radius.<blocks>` narrows the ring for `/rtp biome`: the largest node held becomes the outer edge
+when it is smaller than `max-radius`. It never reaches beyond `max-radius`, and below `min-radius` it leaves only the
+inner edge. Plain `/rtp` draws from the shared ready spots and ignores it.
 
 `cost` is charged in the default currency. A player who cannot pay is refused before anything is searched. The money
 is taken when the warmup ends, and given back if the hop then fails; a warmup cancelled by moving costs nothing. With
@@ -183,9 +184,11 @@ cooldown checks run before any charge, so a refused teleport costs nothing.
 The two bypass nodes are listed in the permission pages under the `uxmessentials.bypass.cooldown.<feature>` row.
 
 By default every voluntary teleport shares one clock. `cooldowns.back`, `cooldowns.home`, `cooldowns.warp` and
-`cooldowns.spawn` set to 0 or more give that command its own clock and wait; `-1` keeps the shared one. A warp with
-its own cooldown in the editor uses the warp clock, one clock shared by every warp that sets one, with the warp's
-value as the wait. `cooldowns.rtp` sets the default of the `/rtp` clock.
+`cooldowns.spawn` set to 0 or more give that command its own clock and wait; `-1` keeps the shared one. A warp or
+player warp with its own cooldown in the editor runs it on a clock of its own, with the warp's value as the wait, so
+using one warp never holds back another. The clock is kept with the player's other cooldowns, in their data on a
+single server or in the shared database on a network, and a hop to a warp on another server checks and starts the
+same clock. `cooldowns.rtp` sets the default of the `/rtp` clock.
 
 A `uxmessentials.tp.cooldown.<seconds>` node a player holds sets their wait on the shared clock, longer or shorter
 than `default-cooldown`. On a command or warp with its own value the node can only lower that value, never raise
