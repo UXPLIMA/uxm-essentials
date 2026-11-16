@@ -4,6 +4,9 @@ import java.time.Clock;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -23,6 +26,7 @@ import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.PendingRelocation;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
 import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
+import org.jspecify.annotations.Nullable;
 
 /**
  * {@code /tpoffline} and {@code /tpofflinehere}, for a player who is not on this server.
@@ -34,8 +38,9 @@ import com.uxplima.uxmessentials.teleport.domain.TeleportMessageKey;
  * joins again. A hop that misses (the player left again, or another plugin cancelled the teleport) puts the row back
  * for the next join, up to {@link #MAX_MISSES} times, and then drops it.
  *
- * <p>A jailed player is never moved: the relocation waits, untouched, for a join after their release, through the
- * same jail gate an accepted request asks.
+ * <p>A jailed player is never moved by a join: neither the relocation, which waits untouched for a join after their
+ * release, nor the join's own spawn or RTP. The jail sends them to their cell. The check is the jail gate an accepted
+ * request asks.
  *
  * <p>A player online here whom the staff member can see is refused: their saved data is stale while they play, and
  * they can be moved directly. A player the staff member may not see because of vanish is handled exactly as if they
@@ -58,6 +63,14 @@ public final class OfflineTeleport {
     private final Clock clock;
     private final String server;
     private final Logger log;
+
+    /**
+     * The players with a relocation waiting on this server. Only this backend writes its own server's rows, so after
+     * the load it is kept current by the saves, claims and restores made here.
+     */
+    private final Set<UUID> waiting = ConcurrentHashMap.newKeySet();
+
+    private volatile boolean indexLoaded;
 
     public OfflineTeleport(
             LogoutPositions positions,
@@ -129,6 +142,7 @@ public final class OfflineTeleport {
                 TeleportMessageKey reply = TeleportMessageKey.TPOFFLINE_MOVED;
                 try {
                     relocations.save(relocation);
+                    waiting.add(relocation.player());
                 } catch (RuntimeException failed) {
                     log.error("the relocation of " + target.name() + " could not be stored", failed);
                     reply = TeleportMessageKey.TPOFFLINE_FAILED;
@@ -140,32 +154,65 @@ public final class OfflineTeleport {
     }
 
     /**
-     * Apply the relocation waiting for {@code who} on this server, once they have joined. When none is applied (there
-     * is none, it waits for a release from jail or for its world, or it could not be read), {@code otherwise} runs on
-     * the player's thread instead: the join's own move, which a relocation replaces, so the two never race.
+     * Load which players have a relocation waiting on this server, off the tick, so a join that has none needs no
+     * database read. Called when the module starts. Until it has loaded, every join asks the database instead; a load
+     * that fails leaves it that way.
      */
-    public void arrive(PlayerRef who, Runnable otherwise) {
-        Objects.requireNonNull(who, "who");
-        Objects.requireNonNull(otherwise, "otherwise");
+    public void loadIndex() {
         scheduler.async(() -> {
-            Optional<PendingRelocation> waiting = waitingFor(who);
-            if (waiting.isEmpty()) {
-                scheduler.onEntity(who, otherwise);
-                return;
+            try {
+                waiting.addAll(relocations.playersWaitingOn(server));
+                indexLoaded = true;
+            } catch (RuntimeException failed) {
+                log.error("the players with a relocation waiting could not be loaded; every join will ask", failed);
             }
+        });
+    }
+
+    /**
+     * Called on the joining player's thread. Their jail decides where a jailed player goes, so a jailed player gets
+     * no join move ({@code joinMove}, the join's own spawn or RTP, or null for none) and no relocation.
+     *
+     * <p>With no relocation waiting, which the in-memory index answers, the join move runs here and now, with no
+     * database read. With one waiting, it is applied once the row is read and claimed off the tick, and the join move
+     * runs only if it is not applied (its world is not loaded, or it was gone), so the two never race.
+     */
+    public void arrive(PlayerRef who, @Nullable Runnable joinMove) {
+        Objects.requireNonNull(who, "who");
+        if (indexLoaded && !waiting.contains(who.uuid())) {
+            if (joinMove != null && !jail.isJailed(who)) {
+                joinMove.run();
+            }
+            return;
+        }
+        Runnable otherwise = joinMove == null ? OfflineTeleport::stay : joinMove;
+        scheduler.async(() -> {
             if (jail.isJailed(who)) {
-                log.info("event=relocation_held_jailed player={}", who.name());
+                log.info("event=join_move_held_jailed player={}", who.name());
+                return;
+            }
+            Optional<PendingRelocation> found = waitingFor(who);
+            if (found.isEmpty()) {
                 scheduler.onEntity(who, otherwise);
                 return;
             }
-            PendingRelocation relocation = waiting.get();
+            PendingRelocation relocation = found.get();
             scheduler.onEntity(who, () -> placeIfLoaded(who, relocation, otherwise));
         });
     }
 
+    private static void stay() {
+        // No join move is configured: the player stays where they joined.
+    }
+
+    /** The row waiting for {@code who}; a row that is gone leaves the index, so the next join reads nothing. */
     private Optional<PendingRelocation> waitingFor(PlayerRef who) {
         try {
-            return relocations.find(who.uuid(), server);
+            Optional<PendingRelocation> found = relocations.find(who.uuid(), server);
+            if (found.isEmpty()) {
+                waiting.remove(who.uuid());
+            }
+            return found;
         } catch (RuntimeException failed) {
             log.error("the relocation of " + who.name() + " could not be read", failed);
             return Optional.empty();
@@ -194,7 +241,11 @@ public final class OfflineTeleport {
 
     private boolean claimed(PendingRelocation relocation) {
         try {
-            return relocations.claim(relocation);
+            boolean removed = relocations.claim(relocation);
+            if (removed) {
+                waiting.remove(relocation.player());
+            }
+            return removed;
         } catch (RuntimeException failed) {
             log.error("the relocation of " + relocation.player() + " could not be claimed", failed);
             return false;
@@ -218,6 +269,7 @@ public final class OfflineTeleport {
         scheduler.async(() -> {
             try {
                 relocations.restore(again);
+                waiting.add(relocation.player());
             } catch (RuntimeException failed) {
                 log.error("the relocation of " + relocation.player() + " could not be put back", failed);
             }
@@ -265,7 +317,7 @@ public final class OfflineTeleport {
 
     /** The world a saved position names: by uid when the data has one, otherwise by its dimension key. */
     private Optional<WorldRef> worldOf(SavedSpot spot) {
-        java.util.UUID uid = spot.worldUid();
+        UUID uid = spot.worldUid();
         if (uid != null) {
             return worlds.findByUid(uid);
         }

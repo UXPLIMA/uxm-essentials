@@ -1,6 +1,7 @@
 package com.uxplima.uxmessentials.teleport.application.port;
 
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import com.uxplima.uxmessentials.teleport.domain.PendingRelocation;
@@ -13,6 +14,9 @@ public interface PendingRelocations {
 
     /** Store {@code relocation}, replacing any the player already has on its backend. */
     void save(PendingRelocation relocation);
+
+    /** The players with a relocation waiting on {@code server}. */
+    Set<UUID> playersWaitingOn(String server);
 
     /** The relocation waiting for {@code player} on {@code server}, if any. */
     Optional<PendingRelocation> find(UUID player, String server);

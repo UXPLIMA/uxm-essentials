@@ -50,6 +50,8 @@ class JooqPendingRelocationsTest {
         assertThat(store.find(SAM, "survival")).contains(to("survival", 10.5, SET));
         assertThat(store.find(SAM, "lobby")).contains(to("lobby", 99.5, SET));
         assertThat(store.find(ALEX, "survival")).isEmpty();
+        assertThat(store.playersWaitingOn("survival")).containsExactly(SAM);
+        assertThat(store.playersWaitingOn("creative")).isEmpty();
     }
 
     @Test

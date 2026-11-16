@@ -19,13 +19,16 @@ import com.uxplima.uxmessentials.teleport.application.TeleportSettings;
 import com.uxplima.uxmessentials.teleport.application.port.TeleportExecutor;
 import com.uxplima.uxmessentials.teleport.domain.Destination;
 import com.uxplima.uxmessentials.teleport.domain.TeleportKind;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Owns all automatic join movement, so no two join handlers race to move a player. A {@code /tpofflinehere}
- * relocation waiting for the player on this server comes first; only when none is applied does the join's own move
- * run: first-join RTP when enabled, otherwise first- or every-join spawn through the same resolution chain as
- * {@code /spawn}. Deciding that needs the relocation table, so the join's own move runs a moment after the join, on
- * the player's thread. Both moves are immediate, untracked relocations and do not overwrite {@code /back}.
+ * Owns all automatic join movement. First-join RTP has precedence when enabled; otherwise first/every-join spawn
+ * uses the exact same resolution chain as {@code /spawn}. Both paths are immediate, untracked relocations and do
+ * not overwrite {@code /back}. A single listener prevents two independently configured join handlers racing.
+ *
+ * <p>The move is handed to {@link OfflineTeleport#arrive}, which runs it at once, on this join tick, unless the
+ * player is jailed (the jail decides where they go) or a {@code /tpofflinehere} relocation is waiting for them on
+ * this server. A waiting relocation is applied off the tick instead, and the join move runs only if it is not.
  */
 public final class SpawnJoinListener implements Listener {
 
@@ -58,11 +61,11 @@ public final class SpawnJoinListener implements Listener {
         relocations.arrive(who, joinMove(player, who));
     }
 
-    /** The join's own move, decided here where the player is read, and run only when no relocation is applied. */
-    private Runnable joinMove(Player player, PlayerRef who) {
+    /** The join's own move, decided here where the player is read, or null when there is none. */
+    private @Nullable Runnable joinMove(Player player, PlayerRef who) {
         String exemption = settings.joinSpawnExemptPermission();
         if (!exemption.isEmpty() && permissions.has(who, exemption)) {
-            return SpawnJoinListener::stay;
+            return null;
         }
         boolean firstJoin = !player.hasPlayedBefore();
         WorldRef world = BukkitRefs.toRef(player.getWorld());
@@ -70,16 +73,12 @@ public final class SpawnJoinListener implements Listener {
             return () -> resolveRtp.firstJoin(who, world);
         }
         if (!settings.spawnOnEveryJoin() && !(firstJoin && settings.spawnOnFirstJoin())) {
-            return SpawnJoinListener::stay;
+            return null;
         }
         return () -> resolveSpawn
                 .resolveDefault(world)
                 .ifPresent(position -> executor.relocate(
                         who, Destination.at(position), TeleportKind.SPAWN, SpawnJoinListener::landed));
-    }
-
-    private static void stay() {
-        // No join move is configured for this player: they stay where they logged in.
     }
 
     private static void landed() {

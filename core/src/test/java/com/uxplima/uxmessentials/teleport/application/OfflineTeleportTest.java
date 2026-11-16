@@ -253,6 +253,81 @@ class OfflineTeleportTest {
     }
 
     @Test
+    void aJoinWithNoMoveWaitingRunsTheJoinMoveAtOnceWithoutReadingTheStore() {
+        offline.loadIndex();
+        scheduler.runAll();
+
+        offline.arrive(SAM, this::joinMove);
+
+        assertThat(joinMoves).isEqualTo(1);
+        assertThat(relocations.finds).isZero();
+    }
+
+    @Test
+    void beforeTheIndexHasLoadedAJoinAsksTheStore() {
+        offline.arrive(SAM, this::joinMove);
+        assertThat(joinMoves).isZero();
+
+        scheduler.runAll();
+
+        assertThat(relocations.finds).isEqualTo(1);
+        assertThat(joinMoves).isEqualTo(1);
+    }
+
+    @Test
+    void aJailedPlayerGetsNoJoinMoveWhetherOrNotAMoveWaits() {
+        offline.loadIndex();
+        scheduler.runAll();
+        jailed = true;
+
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+
+        assertThat(joinMoves).isZero();
+        assertThat(moves.moved).isEmpty();
+        assertThat(relocations.stored).hasSize(1);
+    }
+
+    @Test
+    void theIndexFollowsSavesClaimsRestoresAndDrops() {
+        relocations.save(
+                new PendingRelocation(SAM.uuid(), SURVIVAL, WORLD.uid(), 1.5, 64, 1.5, 0f, 0f, NOW, ALEX.uuid(), 0));
+        offline.loadIndex();
+        scheduler.runAll();
+
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(relocations.finds).isEqualTo(1);
+        assertThat(moves.moved).hasSize(1);
+
+        offline.arrive(SAM, this::joinMove);
+        assertThat(relocations.finds).isEqualTo(1);
+        assertThat(joinMoves).isEqualTo(1);
+
+        offline.bring(ALEX, "Sam", HERE);
+        scheduler.runAll();
+        moves.misses = true;
+        offline.arrive(SAM, this::joinMove);
+        scheduler.runAll();
+        assertThat(relocations.finds).isEqualTo(2);
+
+        for (int join = 1; join < OfflineTeleport.MAX_MISSES; join++) {
+            offline.arrive(SAM, this::joinMove);
+            scheduler.runAll();
+        }
+        assertThat(relocations.stored).isEmpty();
+        int readsBeforeDropped = relocations.finds;
+
+        offline.arrive(SAM, this::joinMove);
+        assertThat(relocations.finds).isEqualTo(readsBeforeDropped);
+        assertThat(joinMoves).isEqualTo(2);
+    }
+
+    @Test
     void theJoinsOwnMoveRunsOnlyWhenNoRelocationIsApplied() {
         offline.arrive(SAM, this::joinMove);
         scheduler.runAll();
@@ -318,9 +393,19 @@ class OfflineTeleportTest {
     private static final class Relocations implements PendingRelocations {
 
         final Map<String, PendingRelocation> stored = new HashMap<>();
+        int finds;
 
         private static String key(UUID player, String server) {
             return player + "@" + server;
+        }
+
+        @Override
+        public Set<UUID> playersWaitingOn(String server) {
+            Set<UUID> players = new HashSet<>();
+            stored.values().stream()
+                    .filter(relocation -> relocation.server().equals(server))
+                    .forEach(relocation -> players.add(relocation.player()));
+            return players;
         }
 
         @Override
@@ -330,6 +415,7 @@ class OfflineTeleportTest {
 
         @Override
         public Optional<PendingRelocation> find(UUID player, String server) {
+            finds++;
             return Optional.ofNullable(stored.get(key(player, server)));
         }
 

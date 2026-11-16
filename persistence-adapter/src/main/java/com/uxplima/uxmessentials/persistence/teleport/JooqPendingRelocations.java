@@ -5,7 +5,9 @@ import static com.uxplima.uxmessentials.persistence.jooq.tables.TeleportRelocati
 import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import com.uxplima.uxmessentials.persistence.jooq.tables.records.TeleportRelocationsRecord;
 import com.uxplima.uxmessentials.persistence.runtime.JooqRepository;
@@ -44,6 +46,19 @@ final class JooqPendingRelocations extends JooqRepository implements PendingRelo
                 .set(TELEPORT_RELOCATIONS.ACTOR, row.getActor())
                 .set(TELEPORT_RELOCATIONS.MISSES, row.getMisses())
                 .execute());
+    }
+
+    @Override
+    public Set<UUID> playersWaitingOn(String server) {
+        Objects.requireNonNull(server, "server");
+        return read(dsl -> dsl
+                .select(TELEPORT_RELOCATIONS.PLAYER_UUID)
+                .from(TELEPORT_RELOCATIONS)
+                .where(TELEPORT_RELOCATIONS.SERVER_ID.eq(server))
+                .fetch(TELEPORT_RELOCATIONS.PLAYER_UUID)
+                .stream()
+                .map(UUID::fromString)
+                .collect(Collectors.toUnmodifiableSet()));
     }
 
     @Override

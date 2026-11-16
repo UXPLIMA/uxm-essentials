@@ -232,6 +232,9 @@ public final class TeleportWiring {
                 services.rtpQueue(),
                 graceGuard,
                 settings::rtpOnRespawnWorlds);
+        // Which players have a /tpofflinehere move waiting here is read once, off the tick, so a join without one reads
+        // nothing and keeps its join move on the join tick.
+        services.offlineTeleport().loadIndex();
         SpawnJoinListener joinListener = new SpawnJoinListener(
                 settings,
                 services.resolveSpawn(),

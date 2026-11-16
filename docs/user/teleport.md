@@ -75,9 +75,10 @@ gliding, swimming, in water or lava, or riding, since the spot is used exactly a
 in flight comes back with them and can still carry them off when it lands.
 
 The move waits, untouched, while the player is jailed, and while its world is not loaded; it is applied at a later
-join. When it applies, the join's own move (first-join RTP or spawn, every-join spawn) is skipped. When the teleport
-misses, because the player left again or another plugin cancelled it, the move is kept for the next join; after 3
-misses it is dropped and the console says so.
+join. While a move waits for a player, their join's own move (first-join RTP or spawn, every-join spawn) runs a moment
+after the join, and only if the waiting move is not applied. When the teleport misses, because the player left again
+or another plugin cancelled it, the move is kept for the next join; after 3 misses it is dropped and the console says
+so.
 
 Both refuse a player online on this server whom you can see: use `/tp` or `/tphere`. A player hidden from you by
 vanish is handled as if offline, so the answer does not give them away.
@@ -110,8 +111,9 @@ falls back to, and `server`, `server:<id>` or `set:<name>` write that scope's.
 The `spawn` block sends new players to spawn (`first-join`), every player on login (`every-join`), and handles death
 respawns (`respawn`) through `respawn-chain`, whose steps are `home`, `bed`, `anchor`, `spawn`, `warp:<name>` and
 `rtp`. `respawn.chain.<world>` overrides the chain for deaths in one world, and an empty list there gives that world
-vanilla respawns. `uxmessentials.bypass.join-spawn` leaves a player where they logged out. The join moves run a
-moment after the join, once the database has said no `/tpofflinehere` move is waiting for the player.
+vanilla respawns. `uxmessentials.bypass.join-spawn` leaves a player where they logged out. A jailed player gets no
+join move: their jail decides where they go. A player with a [`/tpofflinehere`](#staff-teleports) move waiting gets it
+instead of the join move.
 
 ## Random teleport
 
