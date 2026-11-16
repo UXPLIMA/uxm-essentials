@@ -11,6 +11,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
@@ -57,6 +58,12 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
     private final Path messagesDir;
     private final Supplier<Theme> theme;
     private final AtomicReference<Map<String, Map<String, String>>> byLanguage;
+
+    /**
+     * Whether each language asked about has a file, kept because the question comes with every line a reader who
+     * follows their client is sent. A reload forgets it, so a file the operator adds counts from then on.
+     */
+    private final ConcurrentHashMap<String, Boolean> written = new ConcurrentHashMap<>();
 
     /** Whether {@link #declares} has read in every language once since the last reload. */
     private volatile boolean everyLanguageLoaded;
@@ -147,6 +154,23 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         return Set.copyOf(locales);
     }
 
+    /**
+     * The bundled file or the operator's own. A language loaded with neither holds an empty table, so the loaded set
+     * alone would count a language somebody merely asked for.
+     */
+    @Override
+    public boolean covers(Locale locale) {
+        Objects.requireNonNull(locale, "locale");
+        String language = locale.getLanguage();
+        if (language.isEmpty()) {
+            return false;
+        }
+        return written.computeIfAbsent(
+                language,
+                key -> getClass().getClassLoader().getResource(RESOURCE_DIR + "messages_" + key + ".conf") != null
+                        || Files.isRegularFile(messagesDir.resolve("messages_" + key + ".conf")));
+    }
+
     @Override
     public void reload() {
         // Parse every currently loaded locale into a private candidate first. One malformed disk catalog rejects
@@ -158,6 +182,7 @@ public final class HoconLocaleCatalog implements LocaleCatalog {
         }
         candidate.computeIfAbsent(Locale.ENGLISH.getLanguage(), language -> loadLanguage(language, true));
         byLanguage.set(Map.copyOf(candidate));
+        written.clear();
         everyLanguageLoaded = false;
     }
 

@@ -214,7 +214,10 @@ final class KernelWiring {
         LanguageSettings language = languageSettings(config, log);
         java.util.Locale serverDefault = language.defaultLocale();
         LocaleResolver resolver = new LocaleResolver(
-                localeStore, new com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales(), language);
+                localeStore,
+                new com.uxplima.uxmessentials.shared.adapter.outbound.message.ClientLocales(),
+                language,
+                catalog::covers);
         // The translatable-key path: register every catalog key with Adventure's
         // GlobalTranslator so a Component.translatable("uxmessentials.<key>") renders per the receiving
         // connection's locale. The MessageKey-resolve path stays the primary surface.

@@ -206,7 +206,7 @@ final class SharedPlaceholderKeys {
                 PlaceholderSpec.shared(
                         "player_language",
                         "The language the player reads in, as tr or pt_br: the forced one, else their /lang choice,"
-                                + " else their client's.",
+                                + " else their client's when the server has messages in it, else the default.",
                         "tr",
                         PlaceholderScope.SESSION),
                 PlaceholderSpec.shared(
