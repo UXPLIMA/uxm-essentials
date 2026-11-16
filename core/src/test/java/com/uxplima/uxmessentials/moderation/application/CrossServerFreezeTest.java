@@ -156,8 +156,17 @@ class CrossServerFreezeTest {
             this.name = name;
             this.roster = new NetworkRoster(name, clock, Duration.ofSeconds(90));
             this.track = new TrackNetworkPresence(roster, NetworkPresenceBroadcast.NONE, NO_NAMES, clock);
-            FreezeSync bus =
-                    (target, isFrozen, at) -> wire.add(NetworkMessageCodec.encode(frame(target, isFrozen, at)));
+            FreezeSync bus = new FreezeSync() {
+                @Override
+                public void freezeChanged(PlayerRef target, boolean isFrozen, Instant at) {
+                    wire.add(NetworkMessageCodec.encode(frame(target, isFrozen, at)));
+                }
+
+                @Override
+                public void cleared(Instant at) {
+                    // Only the proxy reads it.
+                }
+            };
             this.freezes = new NetworkFreeze(new FrozenSet(frozen), bus, roster, notifier.notifier(), clock);
             this.freeze = new Freeze(
                     freezes,

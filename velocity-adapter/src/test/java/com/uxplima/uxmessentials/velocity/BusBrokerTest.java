@@ -12,6 +12,7 @@ import java.util.concurrent.CompletableFuture;
 
 import com.uxplima.uxmessentials.shared.network.BusChannel;
 import com.uxplima.uxmessentials.shared.network.FreezeChanged;
+import com.uxplima.uxmessentials.shared.network.FreezeReset;
 import com.uxplima.uxmessentials.shared.network.HomeChanged;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import com.uxplima.uxmessentials.shared.network.ServerPing;
@@ -37,7 +38,7 @@ class BusBrokerTest {
     private final FakeServer lobby = new FakeServer("lobby-1");
     private final FakeServer survival = new FakeServer("survival-1");
     private final FakeServer creative = new FakeServer("creative-1");
-    private final ProxyFreezes freezes = new ProxyFreezes();
+    private final ProxyFreezes freezes = new ProxyFreezes(() -> 1_700_000_000_000L);
     private final BusBroker broker =
             new BusBroker(() -> List.of(lobby, survival, creative), freezes, NOPLogger.NOP_LOGGER);
 
@@ -105,6 +106,45 @@ class BusBrokerTest {
         assertThat(freezes.frozenOn(steve)).isEmpty();
         assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "survival-1", true))
                 .isInstanceOf(FrozenServerSwitch.Decision.Allow.class);
+    }
+
+    @Test
+    void aRestartOfTheServerThatFrozeAPlayerLetsThemMoveAndARestartElsewhereDoesNot() {
+        UUID steve = new UUID(3L, 4L);
+        UUID alex = new UUID(9L, 10L);
+        broker.relay(fromLobby(NetworkMessageCodec.encode(
+                new FreezeChanged("lobby-1", new UUID(5L, 6L), steve, "Steve", true, 1_000L))));
+        FakeConnection fromSurvival = new FakeConnection(survival);
+        broker.relay(new PluginMessageEvent(
+                fromSurvival,
+                fromSurvival,
+                CHANNEL,
+                NetworkMessageCodec.encode(
+                        new FreezeChanged("survival-1", new UUID(7L, 8L), alex, "Alex", true, 1_500L))));
+
+        broker.relay(new PluginMessageEvent(
+                fromSurvival,
+                fromSurvival,
+                CHANNEL,
+                NetworkMessageCodec.encode(new FreezeReset("survival-1", 2_000L))));
+        assertThat(freezes.frozenOn(steve)).contains("lobby-1");
+        assertThat(freezes.frozenOn(alex)).isEmpty();
+
+        broker.relay(fromLobby(NetworkMessageCodec.encode(new FreezeReset("lobby-1", 3_000L))));
+
+        assertThat(freezes.frozenOn(steve)).isEmpty();
+        assertThat(FrozenServerSwitch.decide(freezes.frozenOn(steve), "survival-1", true))
+                .isInstanceOf(FrozenServerSwitch.Decision.Allow.class);
+    }
+
+    @Test
+    void aFreezeMadeAfterTheRestartIsKept() {
+        UUID steve = new UUID(3L, 4L);
+        broker.relay(fromLobby(NetworkMessageCodec.encode(new FreezeReset("lobby-1", 3_000L))));
+        broker.relay(fromLobby(NetworkMessageCodec.encode(
+                new FreezeChanged("lobby-1", new UUID(5L, 6L), steve, "Steve", true, 4_000L))));
+
+        assertThat(freezes.frozenOn(steve)).contains("lobby-1");
     }
 
     @Test

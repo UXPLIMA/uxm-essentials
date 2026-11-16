@@ -259,7 +259,9 @@ mutes again once a minute). `/kick` and
 reach them. A freeze is announced over the bus and held on every server, so a frozen player who switches server stays
 frozen, and `/unfreeze` on any server lifts it everywhere. Over Velocity a server that was empty when the freeze was
 announced never heard it, so the proxy plugin keeps a frozen player off other servers and sends one who logs out
-frozen back to the server that froze them. Redis reaches every server, empty or not. `/lockdown` is one row in the shared database, so it
+frozen back to the server that froze them. Redis reaches every server, empty or not. A server that restarts, or
+reloads its moderation module, holds no freeze any more, and the proxy lets go of the players frozen there once that
+server has a player online to carry the news. `/lockdown` is one row in the shared database, so it
 closes every server on it to new joins, but its announcement goes only to the server it was run on. Command spy and
 staff broadcasts stay on one server.
 

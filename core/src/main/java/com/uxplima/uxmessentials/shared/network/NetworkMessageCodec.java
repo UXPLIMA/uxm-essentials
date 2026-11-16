@@ -295,6 +295,7 @@ public final class NetworkMessageCodec {
                 out.writeBoolean(freeze.frozen());
                 out.writeLong(freeze.changedAtMillis());
             }
+            case FreezeReset reset -> out.writeLong(reset.clearedAtMillis());
         }
     }
 
@@ -390,6 +391,7 @@ public final class NetworkMessageCodec {
             case WORLD_CHANGED -> new WorldChanged(origin, readUuid(in), in.readUTF(), in.readUTF());
             case FREEZE_CHANGED ->
                 new FreezeChanged(origin, readUuid(in), readUuid(in), in.readUTF(), in.readBoolean(), in.readLong());
+            case FREEZE_RESET -> new FreezeReset(origin, in.readLong());
         };
     }
 

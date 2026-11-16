@@ -1,12 +1,15 @@
 package com.uxplima.uxmessentials.velocity;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.LongSupplier;
 
 import com.uxplima.uxmessentials.shared.network.FreezeChanged;
+import com.uxplima.uxmessentials.shared.network.FreezeReset;
 import com.uxplima.uxmessentials.shared.network.NetworkMessage;
 import com.uxplima.uxmessentials.shared.network.NetworkMessageCodec;
 import org.jspecify.annotations.NullMarked;
@@ -17,30 +20,53 @@ import org.jspecify.annotations.NullMarked;
  * which sees every frame a backend sends, keeps a frozen player on the server that froze them.
  *
  * <p>Only frames a backend sent reach this: the broker never reads a frame a client wrote. Changes are kept by the
- * time they were made, so a freeze and its release relayed out of order leave the later one. Memory only: a proxy
- * restart forgets every freeze, as a backend restart forgets its own.
+ * time they were made, so a freeze and its release relayed out of order leave the later one. A release is remembered
+ * for {@link #RELEASE_MEMORY} only, long enough for a freeze it overtook to arrive, so the memory holds the players
+ * frozen now rather than everyone ever frozen.
+ *
+ * <p>A backend announces a {@link FreezeReset} when its moderation module starts, since a restart or a reload drops
+ * every freeze it held; the freezes kept for that server from before then are forgotten. Memory only: a proxy restart
+ * forgets every freeze.
  */
 @NullMarked
 final class ProxyFreezes {
 
-    private final Map<UUID, Change> latest = new ConcurrentHashMap<>();
+    /** How long a release is remembered after the proxy saw it. */
+    static final Duration RELEASE_MEMORY = Duration.ofMinutes(5);
 
-    /** Take note of {@code frame}, relayed from {@code sourceServer}, when it is a freeze or a release. */
+    private final Map<UUID, Change> latest = new ConcurrentHashMap<>();
+    private final LongSupplier clock;
+
+    /** Freezes as the broker relays them; {@code clock} is the proxy's time in epoch milliseconds. */
+    ProxyFreezes(LongSupplier clock) {
+        this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /** Take note of {@code frame}, relayed from {@code sourceServer}, when it is a freeze, a release or a reset. */
     void observe(byte[] frame, String sourceServer) {
         Objects.requireNonNull(frame, "frame");
         Objects.requireNonNull(sourceServer, "sourceServer");
-        if (!NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.FREEZE_CHANGED)) {
+        boolean change = NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.FREEZE_CHANGED);
+        if (!change && !NetworkMessageCodec.isType(frame, NetworkMessage.MessageType.FREEZE_RESET)) {
             return;
         }
-        FreezeChanged change;
+        NetworkMessage message;
         try {
-            change = (FreezeChanged) NetworkMessageCodec.decode(frame);
+            message = NetworkMessageCodec.decode(frame);
         } catch (IllegalArgumentException malformed) {
             // A body that does not read is no change to hold.
             return;
         }
-        Change next = new Change(change.frozen(), sourceServer, change.changedAtMillis());
-        latest.merge(change.target(), next, (held, incoming) -> incoming.at() < held.at() ? held : incoming);
+        long now = clock.getAsLong();
+        latest.values().removeIf(held -> !held.frozen() && now - held.seenAt() > RELEASE_MEMORY.toMillis());
+        if (message instanceof FreezeChanged freeze) {
+            Change next = new Change(freeze.frozen(), sourceServer, freeze.changedAtMillis(), now);
+            latest.merge(freeze.target(), next, (held, incoming) -> incoming.at() < held.at() ? held : incoming);
+        } else if (message instanceof FreezeReset reset) {
+            latest.values()
+                    .removeIf(held ->
+                            held.frozen() && held.server().equals(sourceServer) && held.at() < reset.clearedAtMillis());
+        }
     }
 
     /** The server {@code player} was frozen on, or empty when they are not frozen. */
@@ -50,5 +76,13 @@ final class ProxyFreezes {
         return change == null || !change.frozen() ? Optional.empty() : Optional.of(change.server());
     }
 
-    private record Change(boolean frozen, String server, long at) {}
+    /**
+     * One player's last change.
+     *
+     * @param frozen whether it froze them
+     * @param server the server whose frame carried it
+     * @param at when the change was made, by that server's clock
+     * @param seenAt when the proxy saw it, by the proxy's clock
+     */
+    private record Change(boolean frozen, String server, long at, long seenAt) {}
 }

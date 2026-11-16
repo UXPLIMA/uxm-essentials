@@ -229,6 +229,12 @@ public final class ModerationWiring {
                 new Notifier(kernel.messages(), kernel.messageSink()),
                 clock);
         bus.registry().register(ModerationSync.freezeListener(freezes::changedElsewhere));
+        if (networked) {
+            // This start dropped every freeze held here, so the proxy forgets the ones it kept for this server. The
+            // bus starts on the first global tick, after every module is wired, and a task queued from that tick
+            // runs on the next one, so the announcement leaves through a started transport.
+            kernel.scheduler().onGlobal(() -> kernel.scheduler().onGlobal(freezes::announceCleared));
+        }
         JailNetwork jailNetwork = jailNetwork(
                 plugin, kernel, bus, repository, jailLocations, sanctions, hops, networked, presence, clock);
         ModerationServices services = assemble(

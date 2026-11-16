@@ -23,6 +23,13 @@ class FreezeChangedTest {
     }
 
     @Test
+    void aResetCrossesTheWireUnchanged() {
+        FreezeReset sent = new FreezeReset("lobby", 1_763_300_000_000L);
+
+        assertThat(NetworkMessageCodec.decode(NetworkMessageCodec.encode(sent))).isEqualTo(sent);
+    }
+
+    @Test
     void theProxyFindsAFreezeFrameByItsHeader() {
         byte[] wire = NetworkMessageCodec.encode(new FreezeChanged("lobby", FRAME, ALEX, "Alex", true, 1L));
 

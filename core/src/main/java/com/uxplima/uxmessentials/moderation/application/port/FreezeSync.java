@@ -13,8 +13,24 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 public interface FreezeSync {
 
     /** Announces nothing: with the network off the freeze held here is the only one. */
-    FreezeSync NONE = (target, frozen, at) -> {};
+    FreezeSync NONE = new FreezeSync() {
+        @Override
+        public void freezeChanged(PlayerRef target, boolean frozen, Instant at) {
+            // No peers to tell.
+        }
+
+        @Override
+        public void cleared(Instant at) {
+            // No proxy keeps a freeze for this backend.
+        }
+    };
 
     /** Announce that {@code target} was frozen ({@code frozen}) or released here at {@code at}. */
     void freezeChanged(PlayerRef target, boolean frozen, Instant at);
+
+    /**
+     * Announce that this backend holds no freeze as of {@code at}, because it just started; whatever the proxy kept
+     * for a player frozen here before then is stale.
+     */
+    void cleared(Instant at);
 }

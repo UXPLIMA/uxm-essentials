@@ -66,6 +66,14 @@ public final class NetworkFreeze {
     }
 
     /**
+     * Tell the network this backend holds no freeze: it just started, so a freeze it held before is gone, and the
+     * proxy must not keep a player frozen here off other servers for it.
+     */
+    public void announceCleared() {
+        sync.cleared(clock.instant());
+    }
+
+    /**
      * A peer froze ({@code frozen}) or released {@code target} at {@code at}; {@code frame} tells copies of one change
      * apart. A player connected here is told, since the line they read on the other backend never reached them.
      */

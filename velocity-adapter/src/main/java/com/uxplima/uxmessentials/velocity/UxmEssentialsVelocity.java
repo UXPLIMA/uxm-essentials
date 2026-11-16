@@ -43,7 +43,7 @@ public final class UxmEssentialsVelocity {
     private final ProxyServer proxy;
     private final Logger logger;
     private final Path dataDirectory;
-    private final ProxyFreezes freezes = new ProxyFreezes();
+    private final ProxyFreezes freezes = new ProxyFreezes(System::currentTimeMillis);
     private final BusBroker broker;
     private final MinecraftChannelIdentifier channel;
 
