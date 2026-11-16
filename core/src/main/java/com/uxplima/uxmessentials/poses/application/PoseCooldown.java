@@ -27,8 +27,8 @@ import org.jspecify.annotations.Nullable;
 public final class PoseCooldown {
 
     /**
-     * One tier space, one stamp, keyed by the {@code poses} feature segment. The configured wait is zero, so the
-     * wait comes from the {@code poses.cooldown.<seconds>} tier alone, which sets it (not only lowers it). The start phase is irrelevant here (poses
+     * One tier space, one stamp, keyed by the {@code poses} feature segment. The configured wait is zero, so the wait
+     * comes from the {@code poses.cooldown.<seconds>} tier alone. The start phase is irrelevant here (poses
      * stamp explicitly on a successful start, not through the teleport arrival machinery), so it takes the plain
      * default.
      */

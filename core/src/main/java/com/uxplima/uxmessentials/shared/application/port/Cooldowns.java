@@ -12,7 +12,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * Outbound port for per-player cooldown gates. One cooldown is a "ready-at" timestamp stamped per
  * holder; the adapter keeps the transient stamp in PDC under a pre-created key. How long a cooldown
- * lasts is resolved by {@link CooldownTiers} from the numbered
+ * lasts is resolved by {@link com.uxplima.uxmessentials.shared.application.ledger.CooldownTiers} from the numbered
  * {@code uxmessentials.<feature>.cooldown.<seconds>} nodes the player holds: a held tier sets the wait,
  * the shortest one held wins, {@code 0} means no wait, and the configured wait applies only when the
  * player holds no tier. {@code uxmessentials.bypass.cooldown.<feature>} skips the gate entirely.

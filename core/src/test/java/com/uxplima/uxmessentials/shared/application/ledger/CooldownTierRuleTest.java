@@ -43,7 +43,7 @@ class CooldownTierRuleTest {
 
     @Test
     void aPosesTierAddsAWaitTheConfigLeavesOut() {
-        permissions.holdTier("uxmessentials.poses.cooldown", 30);
+        permissions.holdTier(ALEX, "uxmessentials.poses.cooldown", 30);
         PoseCooldown poses = PoseCooldown.backedBy(cooldowns);
 
         poses.stamp(ALEX);
@@ -64,14 +64,14 @@ class CooldownTierRuleTest {
 
     @Test
     void aTierLongerThanTheConfiguredWaitSetsIt() {
-        permissions.holdTier("uxmessentials.tp.cooldown", 30);
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", 30);
 
         assertThat(waitAfterStamp(TELEPORT)).isEqualTo(Duration.ofSeconds(30));
     }
 
     @Test
     void theShortestHeldTierWins() {
-        permissions.holdTier("uxmessentials.tp.cooldown", 30).holdTier("uxmessentials.tp.cooldown", 10);
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", 30).holdTier(ALEX, "uxmessentials.tp.cooldown", 10);
 
         assertThat(waitAfterStamp(TELEPORT)).isEqualTo(Duration.ofSeconds(10));
     }
@@ -83,21 +83,21 @@ class CooldownTierRuleTest {
 
     @Test
     void aZeroTierRemovesTheWait() {
-        permissions.holdTier("uxmessentials.tp.cooldown", 0);
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", 0);
 
         assertThat(waitAfterStamp(TELEPORT)).isZero();
     }
 
     @Test
     void theBypassStillWinsOverAHeldTier() {
-        permissions.holdTier("uxmessentials.tp.cooldown", 30).grant(ALEX, "uxmessentials.bypass.cooldown.tp");
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", 30).grant(ALEX, "uxmessentials.bypass.cooldown.tp");
 
         assertThat(waitAfterStamp(TELEPORT)).isZero();
     }
 
     @Test
     void aTierSharedByWaitsConfiguredApartOnlyLowersThem() {
-        permissions.holdTier("uxmessentials.tp.cooldown", 30);
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", 30);
         CooldownKind freeBack = CooldownKind.scoped("tp", "tp.back", 0, CooldownStartPhase.TELEPORT);
         CooldownKind slowWarp = CooldownKind.scoped("tp", "tp.warp", 60, CooldownStartPhase.TELEPORT);
 
@@ -106,8 +106,15 @@ class CooldownTierRuleTest {
     }
 
     @Test
+    void aTierTooLongToCountInMillisStillHoldsThePlayer() {
+        permissions.holdTier(ALEX, "uxmessentials.tp.cooldown", Long.MAX_VALUE / 10);
+
+        assertThat(waitAfterStamp(TELEPORT)).isGreaterThan(Duration.ofDays(365L * 1000));
+    }
+
+    @Test
     void aLabelTierSetsTheWaitOverTheDeclaredOne() {
-        permissions.holdTier("uxmessentials.cooldown.customcommand.daily", 30);
+        permissions.holdTier(ALEX, "uxmessentials.cooldown.customcommand.daily", 30);
 
         cooldowns.stampLabel(ALEX, "customcommand.daily", Duration.ofSeconds(10));
         scheduler.runAll();

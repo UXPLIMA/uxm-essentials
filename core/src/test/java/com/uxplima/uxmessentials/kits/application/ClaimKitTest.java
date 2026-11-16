@@ -166,7 +166,7 @@ class ClaimKitTest {
     @Test
     void aKitCooldownTierShortensAKitsWait() {
         define(starter().cooldown(Duration.ofHours(1)).build());
-        permissions.holdTier("uxmessentials.kit.cooldown", 600);
+        permissions.holdTier(ALEX, "uxmessentials.kit.cooldown", 600);
         QueuedScheduler scheduler = new QueuedScheduler();
         ClaimKit claim = networkClaimKit(new MemoryClaimLedger(), scheduler);
         scheduler.runAll();
@@ -181,7 +181,7 @@ class ClaimKitTest {
     @Test
     void aKitCooldownTierNeverLengthensAKitConfiguredShorter() {
         define(starter().build());
-        permissions.holdTier("uxmessentials.kit.cooldown", 3600);
+        permissions.holdTier(ALEX, "uxmessentials.kit.cooldown", 3600);
         QueuedScheduler scheduler = new QueuedScheduler();
         ClaimKit claim = networkClaimKit(new MemoryClaimLedger(), scheduler);
         scheduler.runAll();

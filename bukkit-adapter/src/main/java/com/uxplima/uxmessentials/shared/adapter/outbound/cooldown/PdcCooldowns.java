@@ -10,8 +10,8 @@ import org.bukkit.entity.Player;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.Plugin;
 
+import com.uxplima.uxmessentials.shared.application.ledger.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
-import com.uxplima.uxmessentials.shared.application.port.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -117,7 +117,7 @@ public final class PdcCooldowns implements Cooldowns {
         if (player == null) {
             return;
         }
-        long readyAt = clock.millis() + seconds * 1000L;
+        long readyAt = CooldownTiers.readyAt(clock.millis(), seconds);
         player.getPersistentDataContainer().set(key, PersistentDataType.LONG, readyAt);
     }
 }

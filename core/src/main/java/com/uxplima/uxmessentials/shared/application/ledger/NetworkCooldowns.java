@@ -6,7 +6,6 @@ import java.util.Objects;
 import java.util.OptionalLong;
 
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
-import com.uxplima.uxmessentials.shared.application.port.CooldownTiers;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -104,6 +103,6 @@ public final class NetworkCooldowns implements Cooldowns {
         if (seconds <= 0 || who.isSystem()) {
             return;
         }
-        claims.stampCooldown(who.uuid(), CooldownScope.normalize(name), clock.millis() + seconds * 1000L);
+        claims.stampCooldown(who.uuid(), CooldownScope.normalize(name), CooldownTiers.readyAt(clock.millis(), seconds));
     }
 }

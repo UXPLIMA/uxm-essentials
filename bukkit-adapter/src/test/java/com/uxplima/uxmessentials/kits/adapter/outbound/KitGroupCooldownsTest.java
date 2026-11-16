@@ -8,10 +8,12 @@ import java.io.StringReader;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
 
 import com.uxplima.uxmessentials.kits.domain.KitDefinition;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 import org.junit.jupiter.api.Test;
+import org.spongepowered.configurate.CommentedConfigurationNode;
 import org.spongepowered.configurate.ConfigurationNode;
 import org.spongepowered.configurate.hocon.HoconConfigurationLoader;
 
@@ -39,18 +41,36 @@ class KitGroupCooldownsTest {
                 """);
 
         assertThat(kit.permissionCooldowns()).containsOnlyKeys("vip");
-        assertThat(log.warnings).hasSize(1);
+        assertThat(log.warnings).singleElement().asString().contains("'60'", "uxmessentials.kit.cooldown.60");
+    }
+
+    @Test
+    void aSaveKeepsTheSkippedGroupInTheFile() throws IOException {
+        ConfigurationNode previous = parse("""
+                cooldown = 86400
+                permission-cooldowns { vip = 3600, "60" = 60 }
+                """);
+        KitDefinition kit = KitCodec.read("daily", previous, log).orElseThrow();
+        ConfigurationNode saved = CommentedConfigurationNode.root();
+
+        KitCodec.write(saved, kit, previous);
+
+        assertThat(saved.node("permission-cooldowns", "60").getLong()).isEqualTo(60L);
+        assertThat(saved.node("permission-cooldowns", "vip").getLong()).isEqualTo(3600L);
     }
 
     private KitDefinition read(String text) throws IOException {
-        ConfigurationNode node = HoconConfigurationLoader.builder()
+        return KitCodec.read("daily", parse(text), log).orElseThrow();
+    }
+
+    private static ConfigurationNode parse(String text) throws IOException {
+        return HoconConfigurationLoader.builder()
                 .source(() -> new BufferedReader(new StringReader(text)))
                 .build()
                 .load();
-        return KitCodec.read("daily", node, log).orElseThrow();
     }
 
-    /** Keeps the warnings, the lines an operator is told about a kit file. */
+    /** Keeps the warnings with their placeholders filled, the way an operator reads them. */
     private static final class Warnings implements Logger {
 
         final List<String> warnings = new ArrayList<>();
@@ -60,7 +80,11 @@ class KitGroupCooldownsTest {
 
         @Override
         public void warn(String message, Object... args) {
-            warnings.add(message);
+            String filled = message;
+            for (Object arg : args) {
+                filled = filled.replaceFirst("\\{}", Matcher.quoteReplacement(String.valueOf(arg)));
+            }
+            warnings.add(filled);
         }
 
         @Override

@@ -1,10 +1,12 @@
-package com.uxplima.uxmessentials.shared.application.port;
+package com.uxplima.uxmessentials.shared.application.ledger;
 
 import java.util.Objects;
 
 import com.uxplima.uxmessentials.shared.application.permission.SharedPermissions;
+import com.uxplima.uxmessentials.shared.application.port.Cooldowns;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.CooldownKind;
 import com.uxplima.uxmessentials.shared.application.port.Cooldowns.TierRule;
+import com.uxplima.uxmessentials.shared.application.port.Permissions;
 import com.uxplima.uxmessentials.shared.application.port.Permissions.QuotaFamily;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 
@@ -26,6 +28,19 @@ public final class CooldownTiers {
     private static final long NO_TIER = Long.MAX_VALUE;
 
     private CooldownTiers() {}
+
+    /**
+     * The epoch millis a wait of {@code seconds} started at {@code nowMillis} ends, held at {@link Long#MAX_VALUE}
+     * instead of overflowing. A tier is not bounded by the config, so a huge one must read as a wait that never ends,
+     * never as a time in the past that lets the player straight through.
+     */
+    public static long readyAt(long nowMillis, long seconds) {
+        try {
+            return Math.addExact(nowMillis, Math.multiplyExact(seconds, 1000L));
+        } catch (ArithmeticException beyondLong) {
+            return Long.MAX_VALUE;
+        }
+    }
 
     /** The wait in seconds {@code who} gets for {@code kind}. */
     public static long waitSeconds(Permissions permissions, PlayerRef who, CooldownKind kind) {

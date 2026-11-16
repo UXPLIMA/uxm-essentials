@@ -32,9 +32,10 @@ public final class FakePermissions implements Permissions {
         return this;
     }
 
-    /** Hold the numbered node {@code family.value}, as a permission plugin would grant it. */
-    public FakePermissions holdTier(String family, long value) {
-        tiers.computeIfAbsent(family, unused -> new ArrayList<>()).add(value);
+    /** Let {@code who} hold the numbered node {@code family.value}, as a permission plugin would grant it. */
+    public FakePermissions holdTier(PlayerRef who, String family, long value) {
+        tiers.computeIfAbsent(who.uuid() + "|" + family, unused -> new ArrayList<>())
+                .add(value);
         return this;
     }
 
@@ -49,7 +50,7 @@ public final class FakePermissions implements Permissions {
         if (fixed != null) {
             return fixed;
         }
-        List<Long> held = tiers.getOrDefault(family.node(), List.of());
+        List<Long> held = tiers.getOrDefault(who.uuid() + "|" + family.node(), List.of());
         if (family.direction() == QuotaReduction.STACK) {
             return QuotaResult.limited(
                     held.isEmpty()
