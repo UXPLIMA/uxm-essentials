@@ -37,11 +37,14 @@ public interface VanishBus {
     /** What a peer backend can tell this one. Called on the bus dispatch thread, never on a region thread. */
     interface Listener {
 
-        /** Run {@code run} of peer {@code origin} vanished, revealed or re-resolved a player. */
-        void changed(String origin, long run, VanishSync change);
+        /**
+         * Run {@code run} of peer {@code origin} vanished, revealed or re-resolved a player, in its frame number
+         * {@code sequence}.
+         */
+        void changed(String origin, long run, long sequence, VanishSync change);
 
-        /** A vanished player left peer {@code origin}. */
-        void departed(String origin, UUID player);
+        /** A vanished player left peer {@code origin}, said in frame number {@code sequence} of its run {@code run}. */
+        void departed(String origin, long run, long sequence, UUID player);
 
         /**
          * Run {@code run} of peer {@code origin} sent a heartbeat; {@code kind} says whether it is the first heard, the

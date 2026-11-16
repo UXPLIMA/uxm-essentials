@@ -48,18 +48,21 @@ public final class VanishNetworkSync implements VanishBus.Listener {
     }
 
     @Override
-    public void changed(String origin, long run, VanishSync change) {
+    public void changed(String origin, long run, long sequence, VanishSync change) {
         Objects.requireNonNull(origin, "origin");
         Objects.requireNonNull(change, "change");
-        network.apply(origin, run, change);
+        if (!network.apply(origin, run, sequence, change)) {
+            // An older frame than one already applied: acting on it here would undo the newer state.
+            return;
+        }
         PlayerRef target = new PlayerRef(change.player(), change.playerName());
         // The scheduler drops the task when the player is not online here, which is the usual case.
         scheduler.onEntity(target, () -> reconcileOnline(target, change));
     }
 
     @Override
-    public void departed(String origin, UUID player) {
-        network.depart(origin, player);
+    public void departed(String origin, long run, long sequence, UUID player) {
+        network.depart(origin, run, sequence, player);
     }
 
     @Override
