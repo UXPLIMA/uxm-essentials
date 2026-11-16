@@ -58,7 +58,7 @@ import com.uxplima.uxmlib.menu.binding.MenuBindings;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Constructs the ranks context's use cases over the injected kernel ports and the shared persistence DSL. Phase 2
+ * Constructs the ranks context's use cases over the injected kernel ports and the shared persistence DSL. It
  * builds the rankup pipeline: the parsed ladder, the DB-backed {@link PlayerRankRepository}, the
  * {@link CurrentRank} read, the {@link RankRequirementEvaluator} that resolves a rank's typed requirements against
  * the economy / playtime / permission / stored-rank / placeholder / inventory seams, and the

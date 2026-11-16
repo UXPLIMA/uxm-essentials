@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * the target is away (and why), so they know not to expect an immediate reply. AFK is a notice, never a
  * block: the message still delivers.
  *
- * <p>The coupling is soft: when the presence module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the presence module is disabled the wiring binds
  * {@link #NEVER}, so messaging degrades to "no one is AFK" rather than failing, the same
  * degrade-when-the-other-module-is-off pattern {@link MutePolicy} uses against moderation and
  * {@link VanishVisibility} uses against vanish.

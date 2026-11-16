@@ -53,7 +53,7 @@ public interface EconomyProvider {
     /**
      * Guarded single-sided debit; rejects with {@link TransferError#INSUFFICIENT_FUNDS} rather than going
      * below the currency's minimum. The guard is at the database (the guarded {@code UPDATE}), not in the
-     * JVM, so two concurrent debits never both succeed past zero (§3).
+     * JVM, so two concurrent debits never both succeed past zero, even from two servers.
      */
     Result<Unit, TransferError> debit(PlayerRef owner, Money amount);
 

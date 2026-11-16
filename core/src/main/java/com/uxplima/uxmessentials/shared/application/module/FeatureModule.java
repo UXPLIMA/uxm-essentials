@@ -38,7 +38,7 @@ public interface FeatureModule {
     boolean enabled(ConfigStore config);
 
     /**
-     * Capability gate beyond the operator switch (§2.5 of the feature-module design). The default
+     * Capability gate beyond the operator switch. The default
      * is "always loadable"; a module that needs a soft dependency or runtime flavour overrides this
      * to return a human-readable reason when the environment cannot satisfy it.
      */

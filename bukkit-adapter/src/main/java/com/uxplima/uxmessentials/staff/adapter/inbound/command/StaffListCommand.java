@@ -100,7 +100,7 @@ public final class StaffListCommand extends StaffCommandSupport implements Comma
 
     /**
      * Snapshot the visible online staff roster on the global region thread, then either open the picker over it or
-     * send the empty line: mirroring the old view's onGlobal open and empty-roster handling.
+     * send the empty line, since the roster is readable only there on Folia.
      */
     private void openRoster(Player sender, PlayerRef lookerRef) {
         List<PlayerRef> roster = server.getOnlinePlayers().stream()

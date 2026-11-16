@@ -49,7 +49,7 @@ public final class NpcModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The join/quit/world-change lifecycle listener is Bukkit-facing and is installed by the inbound adapter
-        // wiring; a disabled or not-yet-adapted module registers none here.
+        // wiring; a disabled module registers none here.
         return List.of();
     }
 

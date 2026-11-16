@@ -84,9 +84,8 @@ public final class ModerationJailedMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("moderation:jailed", ctx -> subject(ctx).rows());
-        // The empty state. An empty jail used to draw an empty box while the sentence written for it sat
-        // unread in twelve catalogues; the tile is gated on this and gives the slot back as soon as somebody
-        // is in there.
+        // The empty state. An empty jail would otherwise draw an empty box with no word of why; the tile is
+        // gated on this and gives the slot back as soon as somebody is in there.
         bindings.condition(
                 "moderation:none-jailed", (ctx, args) -> subject(ctx).rows().isEmpty());
         bindings.placeholder("mod_jailed_player", ctx -> row(ctx).player());

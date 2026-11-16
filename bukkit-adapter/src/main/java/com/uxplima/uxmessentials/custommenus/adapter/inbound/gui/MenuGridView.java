@@ -54,7 +54,7 @@ import org.jspecify.annotations.Nullable;
  * stays on the engine like every other editor surface.
  *
  * <p>An open clones the registered {@link MenuSpec} into a {@link MenuEditSession} held per viewer, so every edit
- * mutates a private working copy and the live menu changes only on Save (which validates through the P0 writer and
+ * mutates a private working copy and the live menu changes only on Save (which validates through the menu file writer and
  * hot-reloads the single file, off the tick thread). The interactions mirror the OGUI editor: left-click a filled cell
  * opens its item editor, left-click an empty cell adds a default item and opens that same editor, right-click picks a
  * cell up and the next click drops it (moving, or swapping with the target), and shift-click clears a cell behind a
@@ -230,7 +230,7 @@ public final class MenuGridView {
         return Map.of("name", state.menuId, "rows", Integer.toString(state.session.rows()));
     }
 
-    /** The control-row buttons: back to the overview, a live preview of the working copy, and save over the P0 path. */
+    /** The control-row buttons: back to the overview, a live preview of the working copy, and save. */
     private List<GridSpec.Control> controls(PlayerRef viewer, GridEditState state) {
         return List.of(
                 new GridSpec.Control(
@@ -407,7 +407,7 @@ public final class MenuGridView {
         }
     }
 
-    /** Save the edited session over the P0 write path off the tick thread, then report the outcome to the viewer. */
+    /** Save the edited session off the tick thread, then report the outcome to the viewer. */
     private void saveGrid(Player player, PlayerRef viewer, GridEditState state) {
         scheduler.async(() -> {
             EditOutcome outcome = service.saveSession(state.menuId, state.session);
@@ -445,7 +445,7 @@ public final class MenuGridView {
         return "item-" + n;
     }
 
-    /** A minimal valid item at {@code menuSlot}: a plain stone with no name, lore, decor or actions: a P3 canvas. */
+    /** A minimal valid item at {@code menuSlot}: a plain stone with no name, lore, decor or actions. */
     private static MenuItemSpec defaultItem(int menuSlot) {
         return new MenuItemSpec(
                 new SlotSet(List.of(menuSlot)),

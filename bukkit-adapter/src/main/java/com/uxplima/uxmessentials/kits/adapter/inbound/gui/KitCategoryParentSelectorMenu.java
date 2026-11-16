@@ -94,7 +94,7 @@ public final class KitCategoryParentSelectorMenu {
 
     /**
      * The bound candidate's lore as one string the renderer splits per line: its own lore lines, a spacer, its id
-     * line, a spacer, then the click hint. This is what the bespoke grid drew, line for line.
+     * line, a spacer, then the click hint.
      */
     private String lore(MenuContext ctx) {
         KitCategory candidate = candidateOf(ctx);

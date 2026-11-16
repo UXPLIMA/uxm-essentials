@@ -35,8 +35,8 @@ import org.jspecify.annotations.NullMarked;
  * The {@code /uxmess placeholders} subcommand: every key the plugin answers, read back to the operator who has to
  * type them into a scoreboard, a hologram or a chat format.
  *
- * <p>Discovering a placeholder used to mean reading a page written by hand, which could name a key the build does
- * not have. This reads the catalogue the resolver is checked against, so what it prints is what this build answers.
+ * <p>A page written by hand can name a key the build does not have. This reads the catalogue the resolver is
+ * checked against, so what it prints is what this build answers.
  * {@code export} writes the whole thing as markdown into the data folder.
  */
 @NullMarked

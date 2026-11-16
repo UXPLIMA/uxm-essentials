@@ -96,7 +96,7 @@ public final class KitCategorySelectorMenu {
 
     /**
      * The bound category's lore as one string the renderer splits per line: the category's own lore lines, a spacer,
-     * the category id line, a spacer, then the click hint. This is what the bespoke grid drew, line for line.
+     * the category id line, a spacer, then the click hint.
      */
     private String lore(MenuContext ctx) {
         KitCategory category = categoryOf(ctx);

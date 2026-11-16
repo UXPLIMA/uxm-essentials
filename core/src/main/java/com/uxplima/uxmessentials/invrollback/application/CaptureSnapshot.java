@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.invrollback.domain.SnapshotCause;
  * Records one inventory snapshot: it builds the {@link Snapshot} aggregate from the owner, cause, capture instant
  * and the adapter's already-serialized inventory bytes, persists it through the {@link SnapshotRepository}, then
  * enforces the per-player count cap at write time so a player's snapshots stay bounded (the age-based half of
- * retention runs on the scheduled sweep in a later phase).
+ * retention runs on the scheduled prune sweep).
  *
  * <p>Pure application code: it never touches a Bukkit type. The inbound listener reads the live inventory on the
  * tick thread, serializes it, and calls {@link #capture} off the tick thread through the {@code Scheduler.async}

@@ -56,8 +56,8 @@ public final class CommunicationModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The join/quit/death connection listeners are Bukkit-facing and land with the inbound adapter; a
-        // disabled or not-yet-adapted module registers none here.
+        // The join/quit/death connection listeners are Bukkit-facing and come from the inbound adapter; a
+        // disabled module registers none here.
         return List.of();
     }
 

@@ -49,7 +49,7 @@ import org.jspecify.annotations.Nullable;
  * {@code %max_page%}.
  *
  * <p>The slot list is built off the viewer's region thread because it reads homes and resolves the quota; it touches no
- * Bukkit API. The create flow replicates the old view exactly: the click reads the player's live position, hops to that
+ * Bukkit API. The create flow: the click reads the player's live position, hops to that
  * column's region for the block-safety and claim checks, then persists off-thread through the same
  * {@link CreateHomeAtSlot} the rest of homes uses, and reopens the grid. The action menu the filled cell opens is
  * reached through an injected seam so the grid does not name it directly.
@@ -188,7 +188,7 @@ public final class HomeListMenu {
 
     /**
      * Left-click a cell. A filled cell opens the per-home action menu through the injected seam; an empty cell creates
-     * a home at the player's current position, exactly as the old grid did.
+     * a home at the player's current position.
      */
     private void openSlot(MenuActionContext ctx) {
         HomeCell cell = ctx.entry(HomeCell.class);
@@ -203,7 +203,7 @@ public final class HomeListMenu {
     /**
      * Create a home at {@code slotIndex}. The click runs on the viewer's entity thread, so the live position is read
      * here; the block-safety check reads the target column, which is only legal on that column's region thread, so we
-     * hop there first, then persist async and reopen: the same threads and checks the old view used.
+     * hop there first, then persist async and reopen.
      */
     private void create(Player player, PlayerRef viewer, int slotIndex) {
         Position at = BukkitRefs.toPosition(Objects.requireNonNull(player.getLocation(), "player location"));

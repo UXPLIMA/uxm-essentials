@@ -31,12 +31,12 @@ import org.jspecify.annotations.Nullable;
 /**
  * The teleport-particle selector a warp editor opens to pick a warp's departure or arrival particle: a three-row
  * picker with one icon per particle the warps file lists ({@link WarpPresets}), a custom-name button, a back button to
- * the editor, and a remove button. Clicking a particle runs the same set the old bespoke window did. The pick is saved through the editor's
+ * the editor, and a remove button. Clicking a particle runs the editor's own set. The pick is saved through the editor's
  * per-warp queue off the tick, then the viewer is returned to the warp editor.
  *
  * <p>The window draws through the menu engine's selector runtime ({@link Menus#openSelector}), so it is a
  * holder-backed engine selector routed and torn down by the one menu listener and one {@code closeMenu}. The
- * selector serves both server and player warps: the edit names the warp and its (nullable) owner, so the single picker covers either kind exactly as before. Every visible string resolves
+ * selector serves both server and player warps: the edit names the warp and its (nullable) owner, so the single picker covers either kind. Every visible string resolves
  * from the warps catalog, except a particle's name, which the warps file writes per language.
  */
 @NullMarked
@@ -144,7 +144,7 @@ public final class WarpParticleSelectorView {
                 () -> editorView.open(player, viewer, name, owner));
     }
 
-    /** Prompt for a custom particle name through the shared input seam, exactly as the old custom button did. */
+    /** Prompt for a custom particle name through the shared input seam. */
     private void custom(Player player, PlayerRef viewer, String name, @Nullable PlayerRef owner, boolean isDeparture) {
         player.closeInventory();
         MessageKey promptKey = isDeparture

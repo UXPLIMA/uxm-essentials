@@ -62,15 +62,15 @@ import org.jspecify.annotations.Nullable;
 /**
  * Constructs the trade context's adapters over the injected kernel ports. The same-server trade window is the in-memory
  * {@link TradeSessions} registry, the {@link TradeView} that opens and drives each participant's inventory view over a
- * shared session, and the {@link TradeListener} that routes the window's click/drag/close/quit events. Phase 3 adds the
+ * shared session, and the {@link TradeListener} that routes the window's click/drag/close/quit events. Then the
  * money row: the {@link TextInput}-backed amount prompt behind the {@link TradeMoneyPrompt} seam and the
  * {@link TradeSettlement} that moves staked money all-or-nothing through the {@link TradeEconomy} port at commit, the
- * port is present only when economy is wired, so without it a trade moves items only. Phase 4 adds the {@code /trade}
+ * port is present only when economy is wired, so without it a trade moves items only. Then the {@code /trade}
  * request/accept flow. The in-memory {@link TradeRequests} book and the per-player {@link TradeCooldown}, both clock
  * driven: plus the config-gated completed-trade audit through the {@link TradeAudit} port. A same-server trade holds
  * its session purely in memory; the one thing it stores is the stacks it had to hand back to a player who was gone by
- * then, kept by {@link ReturnTradeItems} and handed over on their next join. The cross-server bus escrow lands in the
- * final phase behind this same {@link Wired} seam.
+ * then, kept by {@link ReturnTradeItems} and handed over on their next join. The cross-server bus escrow sits behind
+ * this same {@link Wired} seam.
  */
 @NullMarked
 public final class TradeWiring {

@@ -48,7 +48,7 @@ public final class TradeSessions {
         return byTrade.get(tradeId);
     }
 
-    /** Whether {@code player} is already in a trade, the {@code /trade} busy check the later phase reads. */
+    /** Whether {@code player} is already in a trade, the {@code /trade} busy check reads. */
     public boolean isTrading(UUID player) {
         Objects.requireNonNull(player, "player");
         return byPlayer.containsKey(player);

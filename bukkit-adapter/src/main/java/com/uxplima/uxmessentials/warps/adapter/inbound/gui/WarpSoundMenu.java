@@ -22,8 +22,8 @@ import com.uxplima.uxmlib.menu.spec.MenuSpecs;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * Registers the warp sound selector with the menu engine and opens it. This is the pilot proving the engine
- * end-to-end on real domain code, and the shape every feature menu follows when Phase 3 migrates the rest: a small
+ * Registers the warp sound selector with the menu engine and opens it, in the shape every feature menu follows: a
+ * small
  * class that registers a list source, the placeholders its entries need, and the click actions, then loads the
  * {@code warp-sounds} spec and hands it to {@link Menus}.
  *
@@ -92,7 +92,7 @@ public final class WarpSoundMenu {
         saveThenReopen(ctx, Optional.of(option.soundName()));
     }
 
-    /** Prompt for a custom sound name through the shared text-input seam, exactly as the old custom button did. */
+    /** Prompt for a custom sound name through the shared text-input seam. */
     private void customSound(MenuActionContext ctx) {
         WarpSoundEdit edit = ctx.subject(WarpSoundEdit.class);
         Player player = ctx.player();

@@ -24,8 +24,7 @@ import org.spongepowered.configurate.serialize.SerializationException;
  * once at {@code plugins/uxmTheme/theme.conf}. A {@code theme.conf} in this plugin's own folder is read on
  * top of it, key by key, for the server that wants this plugin to read differently.
  *
- * <p>Neither file has to exist. A server that writes nothing keeps the colours this plugin ships, which is
- * what every server has seen until now.
+ * <p>Neither file has to exist. A server that writes nothing keeps the colours this plugin ships.
  */
 @NullMarked
 public final class ThemeFile {

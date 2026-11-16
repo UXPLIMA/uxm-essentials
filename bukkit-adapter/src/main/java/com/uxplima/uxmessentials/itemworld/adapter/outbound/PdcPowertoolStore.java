@@ -20,8 +20,8 @@ import org.jspecify.annotations.NullMarked;
  * surface free of persistence. The binding travels with the item the player holds and is gone when the item
  * is, exactly the standard powertool semantics.
  *
- * <p>One {@link NamespacedKey} is created once in the constructor and reused, never on the interact hot path
- * ([CLAUDE.md] §NamespacedKey). Command lines are stored newline-joined under that key; reading splits them
+ * <p>One {@link NamespacedKey} is created once in the constructor and reused, never on the interact hot path,
+ * where building a key per click would allocate on every interaction. Command lines are stored newline-joined under that key; reading splits them
  * back. {@link PowertoolBinding#isClear() Clearing} a binding removes the key so a freshly-stamped item carries
  * no residue. All methods must run on the item owner's region thread (they read/write a live {@link ItemStack}).
  */

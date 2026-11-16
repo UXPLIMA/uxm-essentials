@@ -5,9 +5,9 @@ import java.util.UUID;
 
 /**
  * One economy back-end, bound to a single currency, behind a uniform {@code UUID}/{@code double} surface. A
- * provider is reached by spec id through {@link Currencies#resolve(String)}; the later money actions
- * ({@code [givemoney]}/{@code [takemoney]}/{@code [setmoney]}, Phase 2) and the {@code has-money} requirement
- * (Phase 3) consume it without ever naming a provider SDK type.
+ * provider is reached by spec id through {@link Currencies#resolve(String)}; the money actions
+ * ({@code [givemoney]}/{@code [takemoney]}/{@code [setmoney]}) and the {@code has-money} requirement consume it
+ * without ever naming a provider SDK type.
  *
  * <p>Every method is total: an unavailable back-end (its plugin absent, its hook off, the player offline for an
  * online-only back-end) never throws. It answers {@code 0}/{@code false} and {@link #deposit}/{@link #withdraw}

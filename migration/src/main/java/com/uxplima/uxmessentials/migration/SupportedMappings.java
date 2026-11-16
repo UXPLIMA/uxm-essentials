@@ -25,7 +25,7 @@ import org.jspecify.annotations.NullMarked;
  * AxPlayerWarps (a JDBC source), Athelion PlayerWarps (a serialised {@code data.yml} source) and Olzie PlayerWarps (a
  * JDBC source). Only built sources
  * contribute rows. A planned source has no code table, so it appears nowhere here until it is built
- * (planned ≠ stubbed, §1.2). The drift guard reads this aggregate to assert the three-way equality
+ * (a planned source is not a stub). The drift guard reads this aggregate to assert the three-way equality
  * code ⇄ doc ⇄ fixtures.
  */
 @NullMarked
@@ -45,7 +45,7 @@ public final class SupportedMappings {
 
     private SupportedMappings() {}
 
-    /** The source ids that contribute a mapping table: the built sources (§1.2). */
+    /** The source ids that contribute a mapping table: the built sources. */
     public static java.util.Set<SourceId> builtSources() {
         return BY_SOURCE.keySet();
     }

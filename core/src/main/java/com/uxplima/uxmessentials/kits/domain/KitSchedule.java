@@ -22,7 +22,7 @@ import java.util.Set;
  * </ul>
  *
  * <p>The {@link #always() empty schedule} imposes no constraint and is the default every kit carries, so a kit
- * authored with no {@code schedule} block stays claimable exactly as before. All times are evaluated in the
+ * authored with no {@code schedule} block is claimable at any time. All times are evaluated in the
  * server's local zone: the zone an operator naturally authors the window in.
  *
  * @param days the weekdays the kit may be claimed on, in enum order; empty for every day

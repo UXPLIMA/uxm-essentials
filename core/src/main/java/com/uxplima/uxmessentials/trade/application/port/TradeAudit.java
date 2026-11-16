@@ -9,7 +9,7 @@ import com.uxplima.uxmessentials.trade.application.TradeReceipt;
  * completed trade is always replayable from the audit channel and the optional Discord bridge can surface it.
  *
  * <p>The audit is config-gated: the caller emits only when the module's {@code audit} knob is on, so a
- * {@link TradeReceipt} reaches the port only for a trade that actually completed. The implementation lands with the
+ * {@link TradeReceipt} reaches the port only for a trade that actually completed. The implementation lives in the
  * bukkit-adapter; the application depends only on this contract.
  */
 public interface TradeAudit {

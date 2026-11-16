@@ -28,8 +28,7 @@ import org.jspecify.annotations.Nullable;
  * anything; the spec is fixed at creation, so this screen only shows it.
  *
  * <p>The world's spec is read on the viewer's entity thread at open and handed in as the {@link Subject}, so each info
- * line fills from the {@code world_gen_*} placeholders without the renderer touching a port. This replays the old
- * bespoke {@code WorldGenerationView} verbatim through the engine; the per-world hub it returns to is injected through
+ * line fills from the {@code world_gen_*} placeholders without the renderer touching a port. The per-world hub it returns to is injected through
  * {@link #bind} after this menu so their re-open cycle is broken. Every visible string resolves from the worlds
  * catalog.
  */

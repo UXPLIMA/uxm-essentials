@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The world's summary is read on the viewer's entity thread at open and handed in as the {@link Subject}, so the
  * title and summary line fill from the {@code world_main_*} placeholders without the renderer touching a port. The hub
- * holds no new domain logic: it replays the old bespoke {@code WorldMainView} verbatim through the engine. The
+ * holds no new domain logic: it runs the worlds context's existing use cases through the engine. The
  * sub-screen collaborators and the toggle handler are injected through {@link #bind} after this menu so their re-open
  * cycle is broken, mirroring the warp editor's {@code bind}. Every visible string resolves from the worlds catalog.
  */

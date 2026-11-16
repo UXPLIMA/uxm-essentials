@@ -38,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
  * reads the bound entry to label each head, and the click actions route through the same {@link Unignore} and
  * {@link Ignore} use cases the {@code /unignore} and {@code /ignore <player>} verbs drive, so a notifier line still
  * fires and the store stays consistent. The add button prompts for a name through the shared text-input seam, then
- * ignores that player and reopens, exactly as the old view's create button did.
+ * ignores that player and reopens.
  */
 @NullMarked
 public final class IgnoreListMenu {
@@ -114,7 +114,7 @@ public final class IgnoreListMenu {
         });
     }
 
-    /** Prompt for a name through the shared text-input seam, exactly as the old create button did. */
+    /** Prompt for a name through the shared text-input seam. */
     private void promptAdd(MenuActionContext ctx) {
         Player player = ctx.player();
         player.closeInventory();

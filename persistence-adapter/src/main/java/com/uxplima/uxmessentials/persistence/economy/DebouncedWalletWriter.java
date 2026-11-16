@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  * settles overwrites that reference (last write wins) and the row is flushed once per debounce window by a
  * self-rescheduling {@link Scheduler#asyncAfter} task gated on {@link #running}.
  *
- * <p>The hard boundary that keeps this safe: <strong>the guarded transfer/withdraw path in §3 is never
+ * <p>The hard boundary that keeps this safe: <strong>the guarded transfer/withdraw path is never
  * debounced</strong>. A transactional debit must hit the database synchronously inside its transaction so the
  * {@code AMOUNT >= ?} check is authoritative; debouncing applies only to idempotent last-value-wins settles
  * (a recomputed balance, a starting-balance credit, a reset) where collapsing intermediate values loses
@@ -59,7 +59,7 @@ public final class DebouncedWalletWriter {
     /**
      * Enqueue a last-write-wins settle of {@code (owner, currency)} to {@code latest}. Collapses with any
      * other settle for the same key before the next flush; never call this on the guarded transfer/withdraw
-     * path (§3).
+     * path, whose balance check must see the row as it is.
      */
     public void enqueue(PlayerRef owner, Money latest) {
         Objects.requireNonNull(owner, "owner");

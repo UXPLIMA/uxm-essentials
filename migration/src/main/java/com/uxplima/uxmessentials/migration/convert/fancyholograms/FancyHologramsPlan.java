@@ -18,7 +18,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code holograms.yml}, so the file is parsed once into its entries and each is mapped on demand as the
  * importer's bounded executor drains the stream. A hologram whose world the server
  * does not know, or that carries no text line (item and block holograms), is dropped from the stream and
- * counted as skipped downstream (§4); an unreadable file yields no records rather than aborting the run.
+ * counted as skipped downstream; an unreadable file yields no records rather than aborting the run.
  */
 @NullMarked
 final class FancyHologramsPlan implements ImportPlan {

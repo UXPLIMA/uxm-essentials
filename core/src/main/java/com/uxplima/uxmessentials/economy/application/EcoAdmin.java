@@ -30,7 +30,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * actor, and records no ledger row or audit entry; {@code resetall} leaves that target out of its count.
  *
  * <p>An offline target is first materialised via {@link WalletRepository#ensureOwner}, so a give/set to a
- * never-joined player never breaks a foreign key (the {@code ensureUserExists} invariant, §10.2).
+ * never-joined player never breaks a foreign key: every ledger row names an owner that exists.
  */
 public final class EcoAdmin {
 

@@ -48,7 +48,7 @@ public final class HologramsModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The uxmLib hologram lifecycle listener is Bukkit-facing and is installed by the inbound adapter
-        // wiring; a disabled or not-yet-adapted module registers none here.
+        // wiring; a disabled module registers none here.
         return List.of();
     }
 

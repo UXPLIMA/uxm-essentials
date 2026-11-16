@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 /**
  * Outbound port for a warp's per-player bans. One row per {@code (warp, player)}, so {@link #ban} is an upsert:
  * re-banning a player who is already banned overwrites the existing row (updating the reason, expiry, and who
- * imposed it) rather than inserting a second. The ordered access gate (P4-T3) calls {@link #isBannedAt} to reject
+ * imposed it) rather than inserting a second. The ordered access gate calls {@link #isBannedAt} to reject
  * a teleport, so the active-at check lives here rather than in the caller.
  */
 public interface WarpBanStore {

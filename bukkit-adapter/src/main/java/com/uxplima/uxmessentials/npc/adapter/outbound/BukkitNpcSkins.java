@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
  * value and its signature, exactly the two strings the spawn packet carries. The creator's own skin is the
  * default for {@code /npc create}, and {@code /npc skin <name> player:<other>} copies another online player's
  * skin; both read the live profile, which is already populated at login, so this is a pure off-the-profile read
- * with no Mojang round-trip (resolving an offline player's skin by name is deferred to a later sub-phase).
+ * with no Mojang round-trip (an offline player's skin by name goes through the shared Mojang lookup instead).
  *
  * <p>An online player on an offline-mode server has no {@code textures} property, so the read returns empty and
  * the caller renders the NPC skinless (the default Steve).

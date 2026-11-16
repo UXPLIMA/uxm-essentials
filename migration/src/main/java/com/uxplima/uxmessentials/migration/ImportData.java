@@ -27,7 +27,8 @@ import org.jspecify.annotations.NullMarked;
  * </ol>
  *
  * <p>Every write is an upsert keyed by stable identity, so a re-run is idempotent and resumable; this use
- * case never performs an additive balance mutation (§6). It runs entirely off the tick thread, the
+ * case never performs an additive balance mutation, which a second run would double. It runs entirely off the
+ * tick thread, the
  * command handler dispatches it and returns immediately.
  */
 @NullMarked

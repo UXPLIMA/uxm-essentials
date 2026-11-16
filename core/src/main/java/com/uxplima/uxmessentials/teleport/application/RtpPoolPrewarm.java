@@ -26,7 +26,7 @@ import com.uxplima.uxmessentials.teleport.domain.SafeSearchArea;
  *
  * <p>Nothing here blocks or storms. The load is dispatched through the {@link Scheduler} so the synchronous
  * relational read never runs on a region thread, and the re-probes are run one at a time, spaced a couple of ticks
- * apart through the same scheduler, the P1 budget/slicing discipline, so pre-warm itself never fires N chunk
+ * apart through the same scheduler under the search budget, so pre-warm itself never fires N chunk
  * loads at once. Each re-validated location is handed to the {@code sink} (which offers it into the queue); a
  * column the world has changed under resolves to empty and is silently dropped, never served stale.
  */

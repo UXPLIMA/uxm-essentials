@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.economy.application.Worth;
  * <p>A row is keyed by its canonical lowercase material id, so {@link #set} is an upsert, a {@code /setworth}
  * onto an existing material overwrites that price (and currency) in place. The override carries the currency it
  * pays out in, so an operator can price an item in any configured currency from in-game, matching what the
- * config {@code worth.items} list already supports. The implementation lands in the persistence adapter; the
+ * config {@code worth.items} list already supports. The implementation lives in the persistence adapter; the
  * use cases depend only on this contract.
  */
 public interface WorthOverrideStore {

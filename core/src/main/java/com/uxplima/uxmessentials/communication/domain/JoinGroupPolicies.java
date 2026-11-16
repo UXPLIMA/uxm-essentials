@@ -12,13 +12,12 @@ import org.jspecify.annotations.Nullable;
  * {@link #policyFor(String)}, which returns the group's own policy when one is configured and the default
  * otherwise.
  *
- * <p>This keeps the pre-per-group behaviour intact: a file that authors only the flat {@code join} block yields a
- * table with an empty per-group map, so every player, whatever their group, is greeted through the default
- * policy exactly as before. The group is matched case-insensitively, since a permission plugin reports its groups
+ * <p>A file that authors only the flat {@code join} block yields a table with an empty per-group map, so every
+ * player, whatever their group, is greeted through the default policy. The group is matched case-insensitively, since a permission plugin reports its groups
  * lowercased while an operator may author the key in any case (mirrors {@code ChatFormatPolicy.formatFor}).
  *
  * @param byGroup the per-group overrides, keyed by the joiner's primary group; a group absent here takes the default
- * @param defaultPolicy the policy applied to any group with no override (and to the whole channel pre-migration)
+ * @param defaultPolicy the policy applied to any group with no override
  */
 public record JoinGroupPolicies(Map<String, MessagePolicy> byGroup, MessagePolicy defaultPolicy) {
 

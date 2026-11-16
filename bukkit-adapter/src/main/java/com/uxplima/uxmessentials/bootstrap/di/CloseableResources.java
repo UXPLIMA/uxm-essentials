@@ -206,7 +206,7 @@ public final class CloseableResources implements AutoCloseable {
     }
 
     /**
-     * Captures the multi-currency façade so the Phase-2 economy actions and Phase-3 requirements read every
+     * Captures the multi-currency façade so the menu economy actions and requirements read every
      * back-end (Vault, Exp, PlayerPoints, CoinsEngine, zEssentials) from one place. Built once at wiring, beside
      * the hooks it depends on.
      */
@@ -234,7 +234,7 @@ public final class CloseableResources implements AutoCloseable {
     }
 
     /**
-     * Captures the persistent player-data store so the Phase-2 data actions (SET/ADD/SUB/MUL/DIV) and the Phase-6
+     * Captures the persistent player-data store so the menu data actions (SET/ADD/SUB/MUL/DIV) and the
      * {@code %..._value_<key>%} placeholders read and write per-player data from one place. Built once at wiring,
      * beside the cross-cutting menu substrate; its join/quit cache lifecycle is registered as a normal listener.
      */
@@ -248,7 +248,7 @@ public final class CloseableResources implements AutoCloseable {
     }
 
     /**
-     * Captures the proxy {@link ServerConnector} so the Phase-2 {@code [connect]} movement action can move a
+     * Captures the proxy {@link ServerConnector} so the {@code [connect]} movement action can move a
      * viewer to another backend through one shared BungeeCord/Velocity channel. Built once at wiring beside the
      * other menu substrate; with no proxy in front the underlying frame is harmlessly discarded, so a
      * single-server install reads this as a logged no-op rather than an error.

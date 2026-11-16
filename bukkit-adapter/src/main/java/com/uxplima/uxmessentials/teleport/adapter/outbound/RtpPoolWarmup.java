@@ -20,7 +20,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The world iteration reads the live server on the enable (global) thread, but every heavy step is dispatched off
  * it: {@link RtpPoolStore#deleteStale} runs through the {@link Scheduler}'s async dispatch, and each per-world
- * pre-warm loads and re-probes columns off-tick and tick-sliced (the P1 discipline), so warming never storms. A world
+ * pre-warm loads and re-probes columns off-tick and tick-sliced under the same budget as a refill, so warming
+ * never storms. A world
  * with no players online is skipped when {@code prewarm-requires-players} is set, so an empty server does no warming
  * work it will not use.
  */

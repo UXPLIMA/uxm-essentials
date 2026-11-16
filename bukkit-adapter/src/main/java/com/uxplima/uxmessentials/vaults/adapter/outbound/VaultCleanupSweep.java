@@ -16,8 +16,8 @@ import org.jspecify.annotations.NullMarked;
  * least the configured window, reclaiming storage held by players who long ago abandoned a vault. It mirrors
  * the mail-expiry sweep: it runs off the tick thread (the delete is a bounded {@code DELETE ... WHERE
  * last_touched < ?} on the indexed column), observes the module's {@code running} flag so it stops cleanly on
- * disable, and arms its first sweep one interval out so enable is never blocked. The §6.10 self-rescheduling
- * loop pattern, on the kernel {@link Scheduler} port, never a {@code BukkitScheduler}.
+ * disable, and arms its first sweep one interval out so enable is never blocked. It reschedules itself on the
+ * kernel {@link Scheduler} port, never a {@code BukkitScheduler}, so it runs the same on Folia.
  *
  * <p>A sweep that actually removes rows logs the count and writes one {@code event=vault_purge} audit line, so
  * the reclaim is traceable; a sweep that finds nothing to purge is silent. The sweep is opt-in: the wiring only

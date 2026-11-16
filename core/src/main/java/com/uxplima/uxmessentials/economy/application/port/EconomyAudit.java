@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  *
  *
  * <p>Each method maps to one {@code event=...} audit line. The
- * implementation lands with the bukkit-adapter; the use cases depend only on this contract.
+ * implementation lives in the bukkit-adapter; the use cases depend only on this contract.
  */
 public interface EconomyAudit {
 

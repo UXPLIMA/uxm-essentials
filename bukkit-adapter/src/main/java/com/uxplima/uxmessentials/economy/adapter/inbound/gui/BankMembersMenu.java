@@ -49,8 +49,8 @@ import org.jspecify.annotations.NullMarked;
  * reads that subject. The {@code bank_member} / {@code bank_member_role} placeholders fill each head from the bound
  * member, prefixed so they never collide with another menu's fields, and the {@code bank_members_title} title
  * argument reads the subject's bank name. The {@code economy:can-add-member} view condition gates the add button to a
- * member who may add, mirroring the old menu. Every label resolves from the economy catalog, so no user-facing text
- * lives here. The geometry mirrors the original list: a grid across the top five rows, the prev/next arrows at the
+ * member who may add. Every label resolves from the economy catalog, so no user-facing text
+ * lives here. The geometry: a grid across the top five rows, the prev/next arrows at the
  * corners of the bottom row, and the back/add buttons between them.
  */
 @NullMarked
@@ -144,7 +144,7 @@ public final class BankMembersMenu {
         });
     }
 
-    /** Left-click the add button: open the bespoke name prompt, exactly as the old add button did. */
+    /** Left-click the add button: open the bespoke name prompt. */
     private void addMember(MenuActionContext ctx) {
         promptAddMember(ctx.player(), ctx.subject(SharedBank.class));
     }

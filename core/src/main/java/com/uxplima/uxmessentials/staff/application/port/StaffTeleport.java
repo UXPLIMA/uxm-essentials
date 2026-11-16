@@ -11,7 +11,7 @@ import org.jspecify.annotations.NullMarked;
  * does not own teleportation; it orchestrates the existing teleport module's admin teleport through this port
  * rather than moving the player itself.
  *
- * <p>The coupling is soft: when the teleport module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the teleport module is disabled the wiring binds
  * {@link #NONE}, so the COMPASS gadget degrades to "teleport could not be started" rather than failing
  * mirroring {@link StaffVanish#NONE} and {@link StaffInspector#NONE}.
  */

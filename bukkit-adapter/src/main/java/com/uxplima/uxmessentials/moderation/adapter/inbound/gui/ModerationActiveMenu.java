@@ -35,7 +35,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the active-punishments management list (the management GUI's entry point, {@code /mod} with no args and
  * the {@code /uxmess gui} hub entry) with the menu engine and opens it. A paginated grid of one icon per currently
  * active ban, mute, and jail, each showing the target, the kind, the issuer, the reason and the remaining time. A
- * left click opens that entry's still-bespoke {@link PunishmentDetailView}, the confirm-gated detail/revoke screen.
+ * left click opens that entry's bespoke {@link PunishmentDetailView}, the confirm-gated detail/revoke screen.
  *
  * <p>The three active reads ({@code activeBans} / {@code activeMutes} / {@code activeJails}) are DB queries, each
  * target's display name resolves through the {@link PlayerLookup}, and the kind label and {@code permanent} marker
@@ -93,9 +93,9 @@ public final class ModerationActiveMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("moderation:active", ctx -> subject(ctx).rows());
-        // The empty state. A quiet server used to show an empty box while the sentence written for it sat
-        // unread in twelve catalogues, so the spec draws a tile gated on this condition and the tile gives
-        // the slot back the moment there is a row to put there.
+        // The empty state. A quiet server would otherwise show an empty box with no word of why, so the spec
+        // draws a tile gated on this condition and the tile gives the slot back the moment there is a row to
+        // put there.
         bindings.condition(
                 "moderation:none-active", (ctx, args) -> subject(ctx).rows().isEmpty());
         bindings.placeholder("mod_active_icon", ctx -> row(ctx).icon());

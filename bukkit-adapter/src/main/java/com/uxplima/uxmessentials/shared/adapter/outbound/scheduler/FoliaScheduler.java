@@ -182,7 +182,7 @@ public final class FoliaScheduler implements com.uxplima.uxmessentials.shared.ap
         Objects.requireNonNull(delay, "delay");
         Objects.requireNonNull(task, "task");
         // A delayed task asked for while the plugin stops can never run. Paper marks the plugin disabled before
-        // onDisable, so a self-rescheduling loop firing in between used to log a rejected task on every stop.
+        // onDisable, so a self-rescheduling loop firing in between would log a rejected task on every stop.
         if (disabled()) {
             return;
         }

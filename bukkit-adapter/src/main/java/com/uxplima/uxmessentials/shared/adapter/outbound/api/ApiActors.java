@@ -10,8 +10,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The plugin behind an API write, as the use cases see it.
  *
- * <p>Use cases take a {@code PlayerRef} for whoever is acting, because until now that was always a player or the
- * console. A plugin is neither, so it gets a ref named after itself and keyed by a UUID derived from that name:
+ * <p>Use cases take a {@code PlayerRef} for whoever is acting, because without the API that is always a player or
+ * the console. A plugin is neither, so it gets a ref named after itself and keyed by a UUID derived from that name:
  * stable across restarts, so an audit trail groups by plugin, and not a UUID any account could hold.
  *
  * <p>Feedback addressed to the actor lands nowhere, which is what we want. Nobody is holding that UUID, and the

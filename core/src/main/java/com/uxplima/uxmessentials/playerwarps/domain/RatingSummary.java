@@ -7,8 +7,8 @@ package com.uxplima.uxmessentials.playerwarps.domain;
  * ranking value the "top rated" listing sorts on.
  *
  * <p>The {@link #score} is a Bayesian-adjusted figure (so a single five-star vote does not outrank a warp with
- * hundreds of votes averaging 4.8) that is computed elsewhere, in P6, where the smoothing constants live in
- * config. This value object only stores whatever score it is handed; deliberately not recomputing it here keeps
+ * hundreds of votes averaging 4.8) that is computed elsewhere, by {@link BayesianRating}, with smoothing
+ * constants from config. This value object only stores whatever score it is handed; deliberately not recomputing it here keeps
  * the ranking policy in one place instead of leaking config into the domain type.
  *
  * @param sum total stars awarded across all votes

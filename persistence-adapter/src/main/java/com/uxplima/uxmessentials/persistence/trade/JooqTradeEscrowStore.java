@@ -115,7 +115,7 @@ public final class JooqTradeEscrowStore extends JooqRepository implements TradeE
      * from the UPDATE's own affected-row count rather than a prior non-locking count. A write that moves fewer than
      * both rows (a leg already committed, claimed, or refunded away by the peer between our two backends) throws
      * {@link CommitConflict} so the enclosing transaction rolls the partial flip back and {@link #commitBoth} reports
-     * failure. This closes the count-then-update TOCTOU: the decision and the transition are now the same statement,
+     * failure. This closes the count-then-update TOCTOU: the decision and the transition are the same statement,
      * so no interleaving can leave one side committed while its counterpart is still refundable.
      */
     private static boolean commitBothLegs(DSLContext dsl, String id, List<String> owners) {

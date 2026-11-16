@@ -20,7 +20,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The rows of one query are collected into a list inside the try-with-resources block rather than handed
  * back as a live cursor: a moderation table (bans/mutes/warnings) is small relative to the streamed
- * 50 000-file userdata tree (§7), and collecting eagerly is what lets the connection close immediately
+ * 50 000-file userdata tree, and collecting eagerly is what lets the connection close immediately
  * without a half-drained {@code ResultSet} pinning it open. The plan still composes these per-table lists
  * lazily, so the import stays bounded across tables.
  *

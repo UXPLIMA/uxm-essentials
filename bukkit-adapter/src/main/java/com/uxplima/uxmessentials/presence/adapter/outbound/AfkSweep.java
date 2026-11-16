@@ -19,8 +19,7 @@ import org.jspecify.annotations.NullMarked;
  * the configured threshold to AFK. It runs off the tick thread: the scan reads
  * immutable aggregates from the {@code ConcurrentHashMap} via {@link PresenceStore#snapshotAll}, never touching
  * a live {@code Player}, and observes the module's {@code running} flag so it stops cleanly on disable, the
- * §6.10 self-rescheduling-loop pattern matching the messaging mail-expiry sweep and the teleport request-expiry
- * sweep.
+ * same self-rescheduling loop as the messaging mail-expiry sweep and the teleport request-expiry sweep.
  *
  * <p>When the sweep decides a player is idle it does not mutate state inline: it hops to that player's owning
  * region/entity thread through the {@link Scheduler} port and runs {@link MarkAfk#markAuto} there, so the AFK

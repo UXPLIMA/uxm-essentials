@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
  * {@code (player, warp)}, so {@link #add} is idempotent: starring an already-favourited warp is a no-op.
  *
  * <p>This store owns only the membership rows; the denormalised {@code player_warps.favourite_count} tally is
- * maintained by the favourite use case (P4-T6), not here.
+ * maintained by the favourite use case, not here.
  */
 public interface WarpFavouriteStore {
 

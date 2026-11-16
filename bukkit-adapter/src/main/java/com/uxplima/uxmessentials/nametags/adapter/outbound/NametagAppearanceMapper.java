@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * The packet {@link Appearance} carries the background as a single ARGB int ({@code 0} = the renderer's transparent
  * default), so an operator's {@code background-color} and {@code background-opacity} are folded into one int: the
  * colour supplies the RGB, the opacity (or the colour's own authored alpha, or full opacity) supplies the A. A
- * background opacity with no colour to carry it is dropped, exactly as the old hologram mapper did.
+ * background opacity with no colour to carry it is dropped.
  *
  * <h2>Offset and scale</h2>
  *

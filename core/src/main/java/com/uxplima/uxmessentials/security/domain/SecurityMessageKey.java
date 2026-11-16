@@ -8,8 +8,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * compile-time handle, the catalog holds the text. There are no inline player-facing literals anywhere in the
  * context: every message resolves through one of these.
  *
- * <p>This is the Phase-1 seed: the enrolment surface ({@code /2fa setup|confirm|disable}, {@code /pin set}). Later
- * phases (join verification, op-command protection, IP/alt guard) add their own keys here as their behaviour lands.
+ * <p>The keys cover the enrolment surface ({@code /2fa setup|confirm|disable}, {@code /pin set}), join
+ * verification, op-command protection, and the IP/alt guard.
  * Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the locale-parity
  * guard sees the full {@code en} key set.
  */
@@ -95,7 +95,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_ADMIN_RESET_DONE("security.admin.reset-done"),
     SECURITY_ADMIN_RESET_NOTHING("security.admin.reset-nothing"),
 
-    // Phase 2, join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons
+    // Join verification: the freeze prompt on join, the keypad GUI (title, digit/clear/submit/TOTP buttons
     // and the masked entry display), the TOTP text prompt, the success and failed replies, the must-verify nudge when
     // a frozen player tries to act, and the lockout kick after too many failures.
     SECURITY_VERIFY_PROMPT("security.verify.prompt"),
@@ -126,7 +126,7 @@ public enum SecurityMessageKey implements MessageKey {
     // the lockout ban reason the shipped config points at with @security.verify.lockout-ban-reason
     SECURITY_VERIFY_LOCKOUT_BAN_REASON("security.verify.lockout-ban-reason"),
 
-    // Phase 3. Op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
+    // Op-command protection: the prompt when a protected command is blocked pending a fresh proof, the
     // reply when the re-auth succeeds and the command is retried, the reply when the submitted code is wrong, and the
     // refusal when the shared lockout blocks any further attempt.
     SECURITY_REAUTH_REQUIRED("security.reauth.required"),
@@ -139,7 +139,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_OPERATORS_NOT_ALLOWED("security.operators.not-allowed"),
     SECURITY_OPERATORS_REFUSED("security.operators.refused"),
 
-    // Phase 4, IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
+    // IP/alt guard: the /alts header/entry/empty lines shown to staff, the staff notice raised when a
     // joining player shares an IP with other accounts, and the kick shown when an IP is over the account cap.
     SECURITY_ALTS_HEADER("security.alts.header"),
     SECURITY_ALTS_ENTRY("security.alts.entry"),
@@ -147,7 +147,7 @@ public enum SecurityMessageKey implements MessageKey {
     SECURITY_ALTS_NOTIFY("security.alts.notify"),
     SECURITY_ALTS_KICKED("security.alts.kicked"),
 
-    // Phase 4. ClientID: the /clientinfo line reporting a player's recorded brand (or that none was seen), the
+    // ClientID: the /clientinfo line reporting a player's recorded brand (or that none was seen), the
     // staff notice when a flagged/blocked brand joins, and the kick shown when a client is not allowed.
     SECURITY_CLIENT_INFO("security.client.info"),
     SECURITY_CLIENT_UNKNOWN("security.client.unknown"),

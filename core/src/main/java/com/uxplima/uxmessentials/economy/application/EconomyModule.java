@@ -50,8 +50,8 @@ public final class EconomyModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // A join-time wallet warm-up / starting-balance listener is Bukkit-facing and lands with the inbound
-        // adapter; a disabled or not-yet-adapted module registers none.
+        // A join-time wallet warm-up / starting-balance listener is Bukkit-facing and comes from the inbound
+        // adapter; a disabled module registers none.
         return List.of();
     }
 

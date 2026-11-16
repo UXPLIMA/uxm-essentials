@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>{@code returnLocation} is where the player stood the instant the pose began, so a {@code return-to-start}
  * server can put them back exactly there when the pose ends. {@code seatHandle} is the adapter's opaque handle for
- * the seat entity or client-side render behind the pose (a Phase-1+ concern). The domain treats it as an opaque
+ * the seat entity or client-side render behind the pose. The domain treats it as an opaque
  * token and never interprets it. {@code target} is populated only for {@link PoseType#PLAYER_SIT}: the player being
  * sat upon; it is {@code null} for every other pose.
  *

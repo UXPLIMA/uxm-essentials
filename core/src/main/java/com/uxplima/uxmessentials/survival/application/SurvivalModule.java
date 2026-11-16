@@ -12,9 +12,9 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The survival bounded context as a first-class {@link FeatureModule}: opt-in gameplay mechanics, each an
- * independently toggleable sub-feature. Phase 1 ships the harvesting core, tree-feller (fell a whole tree from one
+ * independently toggleable sub-feature, among them the harvesting core, tree-feller (fell a whole tree from one
  * log) and veinminer (break a whole ore vein): with per-player {@code /treefeller} and {@code /veinminer} toggles.
- * The commands, the {@code BlockBreakEvent} listeners, and the PDC toggle store are Bukkit-facing and land with the
+ * The commands, the {@code BlockBreakEvent} listeners, and the PDC toggle store are Bukkit-facing and come from the
  * adapter wiring ({@code SurvivalWiring}); this module stands up the identity, the enable gate, and the lifecycle
  * bookkeeping so the mechanics wire behind it.
  *
@@ -47,7 +47,7 @@ public final class SurvivalModule implements FeatureModule {
 
     @Override
     public List<ListenerFactory> listeners() {
-        // The BlockBreakEvent listeners land through the inbound adapter wiring; a disabled or not-yet-adapted
+        // The BlockBreakEvent listeners come from the inbound adapter wiring; a disabled
         // module registers none here.
         return List.of();
     }

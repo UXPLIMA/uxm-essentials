@@ -38,7 +38,7 @@ import org.jspecify.annotations.NullMarked;
  * viewer's region thread. Each NPC's icon is its type icon (a player head for the default fake player, that mob's
  * spawn egg otherwise) through the {@code npc_icon} placeholder; the {@code npc_name} / {@code npc_type} /
  * {@code npc_world} / {@code npc_x} / {@code npc_y} / {@code npc_z} placeholders fill that NPC's name, type, world,
- * and rounded coordinates into the catalog entry. A left click runs {@code npc:edit}, which opens the still-bespoke
+ * and rounded coordinates into the catalog entry. A left click runs {@code npc:edit}, which opens the bespoke
  * {@link NpcEditorView} for the clicked NPC; the create button runs {@code npc:create}, which prompts for a name and
  * creates a fresh fake-player NPC at the operator's feet with their own skin through the same {@link
  * NpcServices#create()} use case {@code /npc create} drives, so the list adds no domain logic of its own.

@@ -19,7 +19,7 @@ import com.uxplima.uxmessentials.shared.application.placeholder.PlaceholderSpec;
 /**
  * Renders the command, permission and placeholder reference under {@code docs/user/} from the code catalogues.
  *
- * <p>The pages used to be written by hand and fell behind the code by a third of their rows. They are now an output:
+ * <p>Pages written by hand fall behind the code. These are an output:
  * {@link ReferencePagesTest} fails when a committed page differs from what this renders, and
  * {@code ./gradlew :core:generateReference} writes them. The prose around each table lives here, so a page is edited
  * by editing this class or the catalogue it reads, never the page.

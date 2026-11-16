@@ -148,7 +148,7 @@ final class TablistContentCodec {
         Optional<String> nameFormat = optionalString(node.node("name-format"));
         OptionalInt sortOrder = sortOrder(node.node("sort-order"));
         Optional<TablistSkinSource> skin = skinSource(node.node("skin"));
-        // Default false, so an unauthored or malformed value leaves the tab unchanged (real players show as before).
+        // Default false, so an unauthored or malformed value leaves the tab unchanged (real players show as usual).
         boolean suppressRealPlayers = node.node("suppress-real-players").getBoolean(false);
         TablistLayout layout = layout(node.node("layout"), name, suppressRealPlayers, log);
         // A format that neither shows header/footer nor sets a name, order, skin, paints fillers, nor suppresses real

@@ -29,7 +29,7 @@ public final class NpcQuota {
     /**
      * @param permissions the permission port used to resolve quota nodes
      * @param configDefault the per-server default NPC limit for a player with no matching tier node; {@code -1}
-     *     means unlimited (the backward-compatible default, since NPCs were previously uncapped)
+     *     means unlimited (the default, so a server that sets no limit keeps every NPC its players made)
      */
     public NpcQuota(Permissions permissions, int configDefault) {
         this.permissions = Objects.requireNonNull(permissions, "permissions");

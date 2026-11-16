@@ -20,8 +20,8 @@ import com.uxplima.uxmlib.menu.runtime.MenuActionContext;
  * money, experience or a permission node onto the viewer without a feature wiring it. Registered once at startup
  * into the shared {@link MenuBindings} alongside {@link MenuVocabulary}, {@link MessagingActions},
  * {@link CommandActions} and {@link MovementActions}, so a disk-loaded spec resolves {@code give-money} /
- * {@code take-exp} / {@code give-permission} the same way a code-registered feature menu does. This is the first
- * consumer of the Phase-0 {@link Currencies} multi-currency façade and the Vault {@link PermissionQuery} seam.
+ * {@code take-exp} / {@code give-permission} the same way a code-registered feature menu does. It consumes the
+ * {@link Currencies} multi-currency façade and the Vault {@link PermissionQuery} seam.
  *
  * <p>Every effect here is <em>silent</em> by design: none of them tells the player anything. That mirrors
  * DeluxeMenus: an operator who wants feedback pairs the economy action with a {@code [message]} action of their own.
@@ -46,7 +46,7 @@ public final class EconomyActions {
     private EconomyActions() {}
 
     /**
-     * Register the economy actions into {@code bindings}. {@code currencies} is the Phase-0 multi-currency façade
+     * Register the economy actions into {@code bindings}. {@code currencies} is the multi-currency façade
      * the money actions resolve a back-end through; {@code permissions} is the Vault permission seam the permission
      * actions grant/revoke through (its {@link PermissionQuery#ABSENT} default makes those graceful no-ops when
      * Vault is absent); {@code log} is the operator console logger a fail-soft or malformed action warns through.

@@ -8,8 +8,8 @@ import org.jspecify.annotations.NullMarked;
 /**
  * The server-economy capability the menu engine reads through the Vault hook: query a balance, test
  * affordability, move money, and render an amount. It is a small typed seam over {@code UUID}/{@code double}.
- * The later money actions ({@code [givemoney]}/{@code [takemoney]}, Phase 2) and the {@code has-money}
- * requirement (Phase 3) consume it without ever touching a provider SDK.
+ * The money actions ({@code [givemoney]}/{@code [takemoney]}) and the {@code has-money} requirement consume it
+ * without ever touching a provider SDK.
  *
  * <p>Vault's economy API is main-thread/entity-thread only, so a caller must invoke this capability on the
  * viewer's entity thread; the menu engine's click and action chains already run there. This interface and its

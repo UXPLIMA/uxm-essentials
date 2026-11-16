@@ -71,9 +71,8 @@ public final class ModerationHistoryMenu {
         Objects.requireNonNull(dataFolder, "dataFolder");
         Objects.requireNonNull(log, "log");
         bindings.list("moderation:history", ctx -> subject(ctx).entries());
-        // The empty state. A player with a clean record used to open an empty box while the sentence written
-        // for it sat unread in twelve catalogues; the tile is gated on this and gives the slot back the
-        // moment there is a row to put there.
+        // The empty state. A player with a clean record would otherwise open an empty box with no word of why;
+        // the tile is gated on this and gives the slot back the moment there is a row to put there.
         bindings.condition(
                 "moderation:no-history", (ctx, args) -> subject(ctx).entries().isEmpty());
         bindings.placeholder("mod_history_icon", ctx -> iconMaterial(entry(ctx)));

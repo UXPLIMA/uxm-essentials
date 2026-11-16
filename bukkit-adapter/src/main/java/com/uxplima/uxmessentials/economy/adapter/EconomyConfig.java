@@ -31,8 +31,8 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>A fresh install ships exactly one currency. The configured default with a sensible symbol/format/
  * precision, and every command that omits {@code [currency]} resolves to it. Operators declare more under
- * {@code currencies.<id>}; this reader builds only the default currency from the well-known keys, with the
- * additional-currency map a documented follow-up that needs a structured-list config read not on the narrow
+ * {@code currencies.<id>}; this reader builds only the default currency from the well-known keys, because the
+ * additional-currency map needs a structured-list config read that is not on the narrow
  * {@link ConfigStore} contract (the registry, port, and commands already carry a multi-currency set, so
  * adding more is a config-read change, not a model change).
  */

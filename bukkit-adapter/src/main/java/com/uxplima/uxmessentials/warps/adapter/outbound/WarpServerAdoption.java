@@ -87,7 +87,7 @@ public final class WarpServerAdoption implements Runnable {
             cache.reloadAll();
             bus.publish(new WarpChanged(server, "*"));
         } catch (RuntimeException unclaimed) {
-            // The warps keep reading as unknown and are used locally, as before; the next start tries again.
+            // The warps keep reading as unknown and are used locally; the next start tries again.
             kernel.log().error("event=warp_server_claim_failed server=" + server, unclaimed);
         }
     }

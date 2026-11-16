@@ -24,14 +24,14 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
 
 /**
- * The typed, immutable view of {@code modules/security/config.conf} for Phase 1: the module enable gate and the
+ * The typed, immutable view of {@code modules/security/config.conf}: the module enable gate, the
  * two-factor tunables (which factors are offered, the authenticator issuer label, the verification window, and the
  * PIN length policy). Resolved once from the module's scoped {@link ConfigStore} on start and, per the atomic-reload
  * rule, swapped whole on reload, so a command dispatched mid-reload sees one coherent snapshot.
  *
  * <p>The HOCON keys are kebab-case under a {@code two-factor { … }} block; the record components are the camelCase
  * views the application reads. Every knob carries the default the bundled config ships, so an operator who deletes a
- * line falls back to the shipped value. The op-protection and IP/alt-guard blocks land with the later phases.
+ * line falls back to the shipped value.
  *
  * @param enabled the module enable gate ({@code enabled}, default {@code true})
  * @param twoFactor the two-factor enrolment settings ({@code two-factor.*})

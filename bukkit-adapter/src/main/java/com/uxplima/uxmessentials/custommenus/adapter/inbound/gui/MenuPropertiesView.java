@@ -52,13 +52,13 @@ import org.jspecify.annotations.Nullable;
  * landed on straight after a create), it edits everything about a menu that is not a slot, its title, row count,
  * inventory shape, click cooldown, chest-only / bottom-inventory flags, open requirement, open / close actions, refresh
  * policy, and its {@code command {}} open-command block. It is a thin consumer of the shared {@link EntityEditorView}
- * each field is one {@link EditableProperty} wired to a {@link MenuEditSession} setter, the ref lists reuse the P4
+ * each field is one {@link EditableProperty} wired to a {@link MenuEditSession} setter, the ref lists reuse the
  * {@link MenuRefListEditor}, the requirement / command sub-editors open as engine child windows, so no raw Bukkit
  * inventory is built here and the editor stays on the menu engine like every other surface.
  *
  * <p>An open clones the registered {@link MenuSpec} (and its open command) into a per-viewer {@link MenuEditSession};
  * every field reads that working copy fresh on each draw and writes back through its setters, and the live menu changes
- * only on Save (the P0 validate → write → hot-reload path, off the tick thread). Shrinking the row count can orphan
+ * only on Save (the validate → write → hot-reload path, off the tick thread). Shrinking the row count can orphan
  * items in now-out-of-range slots: {@link MenuEditSession#setRows} drops those items so the working copy stays valid
  * and Save never fails on them; the smaller item count shows on the redraw. Back returns to the overview, Delete gates
  * behind the engine confirm and returns to the picker list.

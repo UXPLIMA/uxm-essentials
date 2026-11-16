@@ -9,7 +9,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The bundle of read seams the {@link PlaceholderResolver} consults, one per feature context that
- * contributes placeholders. Every seam is optional: a disabled (or not yet landed) context contributes no
+ * contributes placeholders. Every seam is optional: a disabled context contributes no
  * seam, and the resolver degrades that context's placeholders to their empty/"-" default rather than
  * failing.
  *

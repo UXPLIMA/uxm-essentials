@@ -16,7 +16,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * {@code /kit list}: list the kits a player may claim. The list is filtered to the kits the player can actually
  * obtain. Those whose per-kit permission they hold (a kit not gated behind a permission is always shown) and
  * which they have not already consumed if the kit is one-time. A one-time kit the player has claimed is
- * omitted entirely (§15.5), so the list never advertises a kit the player can no longer take.
+ * omitted entirely, so the list never advertises a kit the player can no longer take.
  *
  * <p>The visible kits (in catalog order) are returned for the adapter to render as a clickable MiniMessage
  * list; the header / per-entry / empty feedback is pushed through the notifier so all text resolves from

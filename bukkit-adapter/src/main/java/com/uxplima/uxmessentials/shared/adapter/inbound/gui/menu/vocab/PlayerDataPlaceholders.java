@@ -14,7 +14,7 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The read side of the player-data vocabulary: placeholders that surface, in a spec's name/lore/title, exactly what
- * the Phase-2 {@code data-*}/{@code meta-*} actions write. Registered once at startup as a single placeholder
+ * the {@code data-*}/{@code meta-*} actions write. Registered once at startup as a single placeholder
  * fallback over the two backing stores, it lets an operator display stored state. A coin balance, a saved choice, a
  * PDC rank: without a feature wiring a per-token handler.
  *

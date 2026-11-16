@@ -91,7 +91,8 @@ public final class Wallet {
      * Debit {@code amount} from the matching currency. Rejected (not clamped) when the owner cannot cover it
      * without dropping below the currency's {@code min-balance}; otherwise raises {@link WalletDebited}
      * carrying the minted {@link Transaction}. This is the in-aggregate guard; the load-bearing concurrent
-     * guard for the {@code /pay} path lives at the database (the guarded {@code UPDATE}, §3).
+     * guard for the {@code /pay} path lives at the database (the guarded {@code UPDATE}), which every server
+     * shares.
      */
     public Result<Change, Rejection> debit(Money amount, Instant now) {
         Money have = requireAmount(amount, now);

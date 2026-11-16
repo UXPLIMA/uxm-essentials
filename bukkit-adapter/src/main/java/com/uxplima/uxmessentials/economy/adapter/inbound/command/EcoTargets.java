@@ -20,10 +20,10 @@ import org.jspecify.annotations.NullMarked;
  * <p>Scope note: the canonical {@code giveall}/{@code resetall}
  * operate over <em>every known wallet</em>, online and offline, materialising offline rows via
  * {@code ensureUserExists} first. Enumerating the full offline owner set needs a repository
- * {@code allOwners()} read-model not yet on the {@code WalletRepository} port; until that lands, the bulk
- * verbs operate over the currently-online set (each target still passes through {@code ensureOwner} in the
- * use case, so a never-credited online player is materialised). The offline-wide sweep is a documented
- * follow-up, not a behavioural change to the per-target verbs.
+ * {@code allOwners()} read-model the {@code WalletRepository} port does not have, so the bulk verbs operate
+ * over the currently-online set (each target still passes through {@code ensureOwner} in the use case, so a
+ * never-credited online player is materialised). An offline-wide sweep would change only the target set, not
+ * the per-target verbs.
  */
 @NullMarked
 final class EcoTargets {

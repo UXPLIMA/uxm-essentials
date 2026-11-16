@@ -31,8 +31,8 @@ import org.jspecify.annotations.Nullable;
  * player can have joined yet.
  *
  * <p>The index holds the {@code warmLimit} most recently seen names and lets the least recently seen one go when a
- * new one arrives past it. The window used to bound the warm only, so a long-running server held every name it
- * had ever seen.
+ * new one arrives past it. The window bounds the live map as well as the warm, so a long-running server does
+ * not hold every name it has ever seen.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>lock</b>. The map is a {@link LinkedHashMap} in the order names were last seen, and every read and

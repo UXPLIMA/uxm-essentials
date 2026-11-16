@@ -43,7 +43,7 @@ import org.jspecify.annotations.Nullable;
  * entity thread at open, so the {@code worlds:grid} list source reads only that subject and the placeholders read the
  * bound row: the engine touches no port off-thread. A cycle is optimistic: the new value is written through the use
  * case and the re-opened subject carries it, so the viewer sees the change without re-reading the cache the async save
- * updates. This replays the old bespoke {@code WorldPropertyGridView} verbatim through the engine. The per-world hub
+ * updates. The per-world hub
  * the back button returns to is injected through {@link #bind} after this menu so their re-open cycle is broken.
  */
 @NullMarked

@@ -21,7 +21,7 @@ import com.uxplima.uxmlib.command.Gate;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * {@code /more}: fill the held stack to its maximum size. Owned here, not in playerstate (§15.6 deferred it).
+ * {@code /more}: fill the held stack to its maximum size. An item command, so itemworld owns it, not playerstate.
  * The fill target is the smaller of the item's natural max stack size and the configured {@code more-cap}, so
  * an operator can bound stack-filling below vanilla; an already-full stack replies
  * {@link ItemworldMessageKey#MORE_ALREADY_FULL} and is left untouched. An empty hand replies

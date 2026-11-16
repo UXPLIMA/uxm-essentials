@@ -8,7 +8,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 /**
  * The narrow economy seam the warps context owns so a per-warp cost can be charged <em>without</em> a hard
  * dependency on the economy context. This is the entire economy surface warps needs, a balance check and a
- * withdrawal. Expressed in warps' own terms; the economy context (which lands in P3) supplies an adapter
+ * withdrawal. Expressed in warps' own terms; the economy context supplies an adapter
  * that bridges this to its {@code EconomyProvider}/{@code Wallet}, and the warps context never imports an
  * economy type.
  *

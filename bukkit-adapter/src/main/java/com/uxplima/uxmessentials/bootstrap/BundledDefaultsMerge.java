@@ -79,8 +79,8 @@ final class BundledDefaultsMerge {
      * {@code operator} with every top-level line the operator never touched brought to this version's wording.
      *
      * <p>A line is untouched when it reads exactly as the previous version shipped it. The append in
-     * {@link #newSettings} only ever adds keys, so before this a corrected message reached new servers only and
-     * every existing one kept the old wording forever. A line the operator rewrote, a key that appears twice, and
+     * {@link #newSettings} only ever adds keys, so without this a corrected message would reach new servers only and
+     * every existing one would keep the old wording forever. A line the operator rewrote, a key that appears twice, and
      * an indented line inside a block are all left as they are.
      */
     static String updatedLines(String bundled, String baseline, String operator) {

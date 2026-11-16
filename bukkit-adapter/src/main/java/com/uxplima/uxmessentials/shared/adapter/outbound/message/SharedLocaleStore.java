@@ -25,9 +25,8 @@ import org.jspecify.annotations.Nullable;
  * {@code uxmlib:language}, the key every plugin of ours reads. A choice made here is the language the others
  * write in, and a choice made in one of them is the language this plugin writes in.
  *
- * <p>It used to live under this plugin's own key, {@code uxmessentials:lang-override}. The first time a player
- * is read on their own thread, a choice under the old key is moved to the shared one and the old key is
- * removed. A shared choice already there is newer, so it wins and the old one is only removed.
+ * <p>A choice still kept under this plugin's own key, {@code uxmessentials:lang-override}, is moved: the first time
+ * a player is read on their own thread, it goes to the shared key and the plugin's key is removed. A shared choice already there is newer, so it wins and the old one is only removed.
  *
  * <p>The server writes a player's data only while they are on it. A choice an operator makes for a player who
  * is away waits in {@code languages.conf} and is applied by {@link #settle} when they join.

@@ -30,7 +30,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>The hub carries the viewer reference as its menu subject, so the three opens reach the live viewer without
  * the renderer touching a port. The picker's offline resolver is backed by {@link PlayerLookup}, so a staff
  * member can type an offline name the head grid does not show and still manage that player's wallet. The picker
- * stays a bespoke view (a transitional cross-runtime seam); the bulk and history opens both route through the
+ * stays a bespoke view (a cross-runtime seam); the bulk and history opens both route through the
  * already-engine menus. Every visible string resolves from the economy catalog.
  */
 @NullMarked
@@ -85,7 +85,7 @@ public final class EconomyAdminMenu {
         menus.open(viewer, SPEC_ID, viewerRef);
     }
 
-    /** Open the shared player picker; the picked target routes to the per-player manage screen, as before. */
+    /** Open the shared player picker; the picked target routes to the per-player manage screen. */
     private void openPicker(MenuActionContext ctx) {
         Player viewer = ctx.player();
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
@@ -101,12 +101,12 @@ public final class EconomyAdminMenu {
         return players.findByName(name);
     }
 
-    /** Open the server-wide bulk screen through the engine, exactly as the old hub did. */
+    /** Open the server-wide bulk screen through the engine. */
     private void openBulk(MenuActionContext ctx) {
         bulkMenu.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
-    /** Open the global transaction-history list, exactly as the old hub did. */
+    /** Open the global transaction-history list. */
     private void openGlobalHistory(MenuActionContext ctx) {
         PlayerRef viewerRef = BukkitRefs.toRef(ctx.viewer());
         scheduler.onEntity(viewerRef, () -> historyView.open(ctx.viewer(), null, "Global"));

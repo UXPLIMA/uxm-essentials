@@ -22,7 +22,7 @@ public final class UxmEssentialsBootstrap implements PluginBootstrap {
 
     @Override
     public void bootstrap(BootstrapContext context) {
-        // No registry-entry-add handlers yet; itemworld custom content lands in a later phase.
+        // No registry-entry-add handlers: nothing this plugin ships adds registry entries.
     }
 
     @Override

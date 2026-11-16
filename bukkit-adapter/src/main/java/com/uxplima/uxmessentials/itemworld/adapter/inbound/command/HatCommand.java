@@ -23,7 +23,7 @@ import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 /**
- * {@code /hat}: wear the held item as a helmet. Owned here, not in playerstate (§15.6 deferred it). The held
+ * {@code /hat}: wear the held item as a helmet. An item command, so itemworld owns it, not playerstate. The held
  * item is swapped into the helmet slot and whatever was on the head returns to the hand, so the action is
  * reversible. An empty hand replies {@link ItemworldMessageKey#HAT_NO_ITEM}.
  */

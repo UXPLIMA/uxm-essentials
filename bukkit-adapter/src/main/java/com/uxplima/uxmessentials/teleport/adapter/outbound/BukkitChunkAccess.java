@@ -24,12 +24,12 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The production {@link ChunkAccess}: it resolves a random-teleport candidate column through Paper's
- * asynchronous chunk loading rather than the old synchronous {@code getHighestBlockYAt}/{@code getBlockAt}
- * that generated far chunks on the tick thread. The flow is:
+ * asynchronous chunk loading rather than the synchronous {@code getHighestBlockYAt}/{@code getBlockAt}, which
+ * would generate far chunks on the tick thread. The flow is:
  *
  * <ol>
- *   <li>Resolve the live world; an absent world completes the future empty at once (never orphaned, the
- *       bug that used to hang the refill loop when the world had unloaded mid-search).</li>
+ *   <li>Resolve the live world; an absent world completes the future empty at once (never orphaned, which
+ *       would hang the refill loop when the world unloads mid-search).</li>
  *   <li>Record whether the target chunk was already resident, then call {@code World#getChunkAtAsync}, which
  *       loads/generates the chunk <em>off the main thread</em> and completes on the chunk's owning region
  *       thread. There is no synchronous chunk load on a tick thread.</li>
@@ -37,8 +37,7 @@ import org.jspecify.annotations.Nullable;
  *       facts from that copy (highest ground, biome, standing safety, landing block) so nothing touches the
  *       live chunk once the snapshot is taken.</li>
  *   <li><strong>Chunk-lifecycle ownership:</strong> if the probe is what pulled the chunk in, request its
- *       unload again. Probed-but-unserved chunks otherwise accumulate on the heap and in the region files
- *       the leak the redesign set out to close. A chunk that was already resident is left to its own
+ *       unload again. Probed-but-unserved chunks otherwise accumulate on the heap and in the region files. A chunk that was already resident is left to its own
  *       lifecycle. The winning location's chunk is reloaded later by the teleport itself.</li>
  * </ol>
  *
@@ -56,7 +55,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The candidate build reads the highest non-air block by scanning the snapshot top-down rather than
  * calling {@code ChunkSnapshot#getHighestBlockYAt}: the scan runs entirely on the copy (so the live chunk is
- * free to unload immediately) and mirrors the previous engine's "highest non-empty block" semantics.
+ * free to unload immediately) and keeps the "highest non-empty block" semantics.
  */
 @NullMarked
 public final class BukkitChunkAccess implements ChunkAccess {

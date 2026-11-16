@@ -9,8 +9,7 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * message resolves through one of these.
  *
  * <p>Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the locale-parity
- * guard sees the full {@code en} key set. This is the Phase-0 seed: the feedback lines the first behaviour phases
- * ({@code /sit} and the region gate) will resolve through. Later phases add their own keys here as their verbs land.
+ * guard sees the full {@code en} key set: the feedback lines of the pose verbs and the region gate.
  */
 public enum PosesMessageKey implements MessageKey {
 

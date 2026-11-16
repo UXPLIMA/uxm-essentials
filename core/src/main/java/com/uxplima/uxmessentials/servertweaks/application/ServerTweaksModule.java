@@ -19,7 +19,7 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The tweaks are Bukkit-facing side effects (a join-time plugin message for the brand, a Log4j2 filter on the
  * server logger, an unsigned-chat re-delivery listener, and a plugin-message channel for the proxy handshake), so they
- * land with the adapter wiring; the module publishes no command, registers no declarative listener, and runs no
+ * come from the adapter wiring; the module publishes no command, registers no declarative listener, and runs no
  * migration here. A disabled module wires zero of them, per the {@code FeatureModule} contract, and the adapter's stop
  * hook detaches the log filter and unregisters the brand and SignedVelocity channels so a disable or reload leaves no
  * residual state.
@@ -44,7 +44,7 @@ public final class ServerTweaksModule implements FeatureModule {
     @Override
     public List<ListenerFactory> listeners() {
         // The F3-brand join listener is Bukkit-facing and gated per-tweak, so it lands through the adapter wiring; a
-        // disabled or not-yet-adapted module registers none here.
+        // disabled module registers none here.
         return List.of();
     }
 

@@ -22,7 +22,7 @@ import org.jspecify.annotations.NullMarked;
 @NullMarked
 public final class ImportExecutor implements AutoCloseable {
 
-    /** Fixed writer count, caps concurrent DB write pressure (SQLite single-writer interplay, §7.1). */
+    /** Fixed writer count, caps concurrent DB write pressure: SQLite takes one writer at a time anyway. */
     public static final int WRITERS = 4;
 
     /** Bounded queue depth; full queue triggers caller-runs backpressure. */

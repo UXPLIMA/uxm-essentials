@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
  * Reads the operator's ladder from {@code modules/ranks/ranks.conf} into a domain {@link RankLadder}. The
  * layout loader mounts that sibling file under the module's scoped {@code ranks} key, so each rank is a section
  * at {@code ranks.<id>} carrying its {@code order}, {@code display-name}, {@code cost}, and the raw
- * {@code requirements} / {@code actions} lists later phases parse. Every rank id is the section name.
+ * {@code requirements} / {@code actions} lists the rankup pipeline parses. Every rank id is the section name.
  *
  * <p>This is application code, not domain: it depends on the {@link ConfigStore} port to read the tree, then
  * hands the pure list to {@link RankLadder#of(List)} which owns the ordering and uniqueness invariants. A

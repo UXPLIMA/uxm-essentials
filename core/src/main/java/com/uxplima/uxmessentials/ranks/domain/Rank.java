@@ -6,9 +6,9 @@ import java.util.Objects;
 /**
  * One rung of the rank ladder: its identity, the {@code order} that places it relative to its neighbours (lower
  * ranks up first), the operator's display name, the rankup {@code cost}, and the raw requirement and action
- * strings. The requirements and actions stay opaque {@link String}s here. Phase 1 only needs to carry them
- * through from {@code ranks.conf}; the requirement evaluator and the action executor that parse them land in the
- * rankup phase, so the domain does not interpret their grammar yet.
+ * strings. The requirements and actions stay opaque {@link String}s here: they are carried through from
+ * {@code ranks.conf} and parsed by the requirement evaluator and the action runner in the rankup pipeline, so the
+ * domain does not interpret their grammar.
  *
  * <p>The lists are defensively copied so a {@link Rank} is immutable once built, and the cost is non-negative
  * (a rank cannot pay the player to advance). The order is a plain {@code int} so an operator may leave gaps
@@ -18,8 +18,8 @@ import java.util.Objects;
  * @param order the ladder position (ascending); lower advances to higher
  * @param displayName the operator-authored display name shown in messages and the GUI
  * @param cost the amount charged through the economy port on rankup ({@code 0} for a free rank)
- * @param requirements the raw requirement strings, parsed by the rankup phase
- * @param actions the raw action strings, run on rankup by the rankup phase
+ * @param requirements the raw requirement strings, parsed by the rankup pipeline
+ * @param actions the raw action strings, run on rankup by the rankup pipeline
  */
 public record Rank(
         RankId id, int order, String displayName, long cost, List<String> requirements, List<String> actions) {

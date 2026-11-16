@@ -38,9 +38,9 @@ import org.jspecify.annotations.NullMarked;
  * placeholders and the fixed catalog-key lore (cooldown, cost, permission, one-time, first-join, auto-equip, a spacer,
  * the edit hint) read the bound row, reproducing the old {@code KitManagerView}'s icon slot for slot.
  *
- * <p>A left click on a kit runs {@code kits:manager-edit}, opening that kit's still-bespoke {@link KitSettingsView}; the
+ * <p>A left click on a kit runs {@code kits:manager-edit}, opening that kit's bespoke {@link KitSettingsView}; the
  * create button runs {@code kits:manager-create}, the same name-prompt → empty-kit → settings flow the old create
- * button drove; the categories button runs {@code kits:manager-categories}, opening the still-bespoke
+ * button drove; the categories button runs {@code kits:manager-categories}, opening the bespoke
  * {@link KitCategoryManagerMenu}; the close button shuts the window. The list adds no domain logic of its own.
  */
 @NullMarked
@@ -62,7 +62,7 @@ public final class KitManagerMenu {
 
     /**
      * @param createPrompt opens the name-prompt → empty-kit → settings flow for the viewer; reopening the manager on
-     *     cancel is the caller's concern, exactly as the old manager's create button did
+     *     cancel is the caller's concern
      */
     public KitManagerMenu(
             Menus menus,
@@ -140,16 +140,16 @@ public final class KitManagerMenu {
         createPrompt.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
-    /** Left-click the categories button: open the bespoke category manager, as the old slot-51 button did. */
+    /** Left-click the categories button: open the bespoke category manager. */
     private void categories(MenuActionContext ctx) {
         categoryManagerView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     /**
      * The kit icon's display name as a MiniMessage source the engine renders for the {@code %kit_manager_name%} name
-     * line, reproducing the old view: the kit's own display name when it sets one, otherwise the
-     * {@code kit.menu.entry.name} catalog line filled with the kit id. The engine renders this string through the same
-     * styled MiniMessage parser the old view used, so the rendered label matches.
+     * line: the kit's own display name when it sets one, otherwise the {@code kit.menu.entry.name} catalog line
+     * filled with the kit id. The engine renders this string through the styled MiniMessage parser, so the theme's
+     * tags work in it.
      */
     private String name(PlayerRef viewer, KitDefinition kit) {
         if (kit.display().name().isPresent()) {
@@ -161,7 +161,7 @@ public final class KitManagerMenu {
                 Map.of("kit", kit.id().value()));
     }
 
-    /** The kit icon material, reproducing the old view: a valid per-kit override, else the first item's type, else CHEST. */
+    /** The kit icon material: a valid per-kit override, else the first item's type, else CHEST. */
     private Material material(KitDefinition kit) {
         if (kit.display().material().isPresent()) {
             Material override =

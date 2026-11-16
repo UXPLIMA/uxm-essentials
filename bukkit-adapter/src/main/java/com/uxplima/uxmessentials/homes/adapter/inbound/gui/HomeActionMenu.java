@@ -55,7 +55,7 @@ import org.jspecify.annotations.NullMarked;
  * <p>Each mutating use case runs off the click thread (the write hits SQLite); the menu re-opens through {@link Menus}
  * with the (re-read) home subject so a flip or rename shows immediately. Delete and relocate optionally confirm
  * through {@link Menus#confirm} first, and teleport reads the destination region for claim access and an unsafe-tp
- * warning: exactly the threads and decisions the old view used. The icon picker, invited-players list, and the grid
+ * warning, each on the thread that owns what it reads. The icon picker, invited-players list, and the grid
  * are reached through injected seams so this menu does not need to know which renders them.
  */
 @NullMarked

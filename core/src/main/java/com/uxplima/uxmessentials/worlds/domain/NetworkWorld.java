@@ -16,7 +16,7 @@ public record NetworkWorld(String server, ManagedWorld world) {
     /**
      * The server of a world no networked backend has claimed: a world from before worlds recorded one, or a world of a
      * backend that records no server (off a network, or under the shipped default name). Such a backend reads and
-     * writes these rows as its own, so a standalone server behaves as before, and a backend that joins a network
+     * writes these rows as its own, so a standalone server needs no server name, and a backend that joins a network
      * under a real name claims them.
      */
     public static final String UNSCOPED = "unscoped";

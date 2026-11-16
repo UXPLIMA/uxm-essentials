@@ -12,7 +12,7 @@ import com.uxplima.uxmessentials.security.domain.TwoFactorSecret;
  * The second step of TOTP enrolment ({@code /2fa confirm <code>}): verify a code against the pending secret from
  * {@link BeginTotpEnrollment}, and only on success persist that secret (encrypted, by the repository) as the
  * player's enabled factor. Requiring a confirming code before the factor takes effect is the safety property that
- * keeps a mistyped or never-scanned secret from silently becoming a lockout at the Phase-2 join check.
+ * keeps a mistyped or never-scanned secret from silently becoming a lockout at the join check.
  */
 public final class ConfirmTotpEnrollment {
 

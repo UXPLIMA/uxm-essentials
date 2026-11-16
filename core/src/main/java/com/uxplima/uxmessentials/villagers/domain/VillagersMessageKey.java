@@ -8,12 +8,11 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * is the compile-time handle, the catalog holds the text. There are no inline player-facing literals in the context
  * every message resolves through one of these.
  *
- * <p>Phase 1 seeded the one refusal a player sees when they right-click a villager whose trading is turned off
- * (globally or per-villager); Phase 2 adds the trade-manager surface, the "look at a villager" hint, the manager
- * GUI title, and the two button labels (the disable toggle, in its two states, and the per-row remove control) plus
- * the usage help. Phase 3 adds the protection toggle's two confirmations and its no-target hint, and the name the
- * villager-in-a-bucket item carries. Phase 4 adds the follow toggle's two confirmations and its no-target hint
- * (leashing is silent, like vanilla leashing). Later phases add their own keys here as their verbs land.
+ * <p>The keys cover the refusal a player sees when they right-click a villager whose trading is turned off
+ * (globally or per-villager); the trade-manager surface, the "look at a villager" hint, the manager GUI title, and the
+ * two button labels (the disable toggle, in its two states, and the per-row remove control) plus the usage help; the
+ * protection toggle's two confirmations and its no-target hint, and the name the villager-in-a-bucket item carries;
+ * and the follow toggle's two confirmations and its no-target hint (leashing is silent, like vanilla leashing).
  */
 public enum VillagersMessageKey implements MessageKey {
 

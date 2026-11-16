@@ -27,7 +27,7 @@ import org.jspecify.annotations.NullMarked;
  * it. Each table is queried through {@link JdbcSource}, which opens and closes its own
  * read-only connection per query, so no handle is held across records.
  *
- * <p>Resilience mirrors the EssentialsX source's "one bad record is skipped, never fatal" rule (§4): a table
+ * <p>Resilience mirrors the EssentialsX source's "one bad record is skipped, never fatal" rule: a table
  * that fails to query (missing, or the database unreachable) is logged and yields no rows rather than
  * aborting the run, and a single row that fails to map is dropped so one malformed sanction never stops the
  * stream. Only currently-meaningful rows are imported: a row with {@code active = false} (a manually-removed
@@ -63,7 +63,7 @@ final class LiteBansPlan implements ImportPlan {
         return Stream.concat(bans, Stream.concat(mutes, warns));
     }
 
-    /** Defer a table's query into the stream so it runs only when this segment is drained (§7). */
+    /** Defer a table's query into the stream so it runs only when this segment is drained, keeping memory flat. */
     private Stream<ImportRecord> table(
             Supplier<List<LiteBansRow>> query, java.util.function.Function<LiteBansRow, Optional<ImportRecord>> map) {
         return Stream.<Supplier<List<LiteBansRow>>>of(query)

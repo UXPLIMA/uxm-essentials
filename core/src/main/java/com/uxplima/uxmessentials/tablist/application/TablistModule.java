@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
  * The tablist bounded context as a first-class feature module: a per-player tablist header and footer rendered from
  * operator-authored MiniMessage content under {@code modules/tablist/config.conf} through the placeholder pipeline. It
  * owns the self-rescheduling render timer on the {@code Scheduler} port that re-renders every viewer each configured
- * refresh interval; the render/join/quit machinery is Bukkit-facing and lands with the adapter wiring.
+ * refresh interval; the render/join/quit machinery is Bukkit-facing and comes from the adapter wiring.
  *
  * <p><b>Ships disabled by default.</b> The tab list is a surface a dedicated tab plugin also draws, and two of them
  * fight over it. A fresh install still bundles an example header/footer authored with the built-in

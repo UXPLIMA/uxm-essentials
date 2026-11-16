@@ -10,8 +10,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  *
  * <p>Per the i18n contract a disabled module still ships its keys so the catalog stays whole and the locale-parity
  * guard sees the full {@code en} key set. This covers the request/accept flow, the window lifecycle, the refusals,
- * and the trade window's own control text (its title and the confirm/partner-status items); the later phases (money,
- * blacklist, cross-server) add their own keys here as their verbs land.
+ * and the trade window's own control text (its title and the confirm/partner-status items), plus the money,
+ * blacklist and cross-server lines.
  */
 public enum TradeMessageKey implements MessageKey {
 

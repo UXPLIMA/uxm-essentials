@@ -20,8 +20,8 @@ import org.jspecify.annotations.NullMarked;
  * a per-payer slot holding the staged {@link PendingPay}, with
  * a self-cancelling {@link Scheduler#asyncAfter} expiry that discards a stale prompt and logs
  * {@code event=economy_pay_confirm_expired} and calls {@code onExpired} so the payer hears about it.
- * Telling them is the point of the seam: the expiry used to write one console line and leave the player
- * looking at a prompt that was no longer there, while pay.confirm-expired sat unread in twelve catalogues.
+ * Telling them is the point of the seam: a console line alone would leave the player looking at a prompt
+ * that is no longer there.
  * Staging never debits. No money has moved while a pending pay is
  * held, so a dropped or expired entry loses nothing.
  *

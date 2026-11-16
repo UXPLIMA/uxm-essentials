@@ -57,7 +57,7 @@ public final class RequirementConditions {
     private RequirementConditions() {}
 
     /**
-     * Register the requirement conditions into {@code bindings}. {@code currencies} is the Phase-0 multi-currency
+     * Register the requirement conditions into {@code bindings}. {@code currencies} is the multi-currency
      * façade {@code has-money} resolves a back-end through; {@code playerMeta} is the PDC accessor {@code has-meta}
      * reads; {@code log} is the operator console logger a fail-closed condition warns through when a lookup throws.
      * Left separate from {@link MenuVocabulary#registerConditions} so that method's existing call-sites stay

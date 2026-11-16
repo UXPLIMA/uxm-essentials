@@ -259,7 +259,7 @@ public final class NpcWiring {
      * Build the NPC management list (drawn through the menu engine) and editor over the shared GUI framework. The
      * editor's back button reopens the list, so a one-slot holder breaks the list↔editor construction cycle (the
      * editor is built first, the list second, and the holder is filled before either is shown). The list still
-     * needs the bundled npc-editor layout loaded for the editor it opens; only the list geometry now lives in the
+     * needs the bundled npc-editor layout loaded for the editor it opens; only the list geometry lives in the
      * engine spec rather than the npc-list.conf layout.
      */
     private static NpcListMenu buildGui(

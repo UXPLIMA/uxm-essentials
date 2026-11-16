@@ -387,8 +387,8 @@ public final class JooqPlayerWarpRepository extends JooqRepository implements Pl
      * Assign every warp a fresh {@code random_sort} key so the RANDOM browse order is not frozen forever. One
      * transaction: read the ids, then batch an update per row binding a new random long. It is done application-side
      * because no single SQL {@code RANDOM()} name is portable across SQLite, MySQL, and PostgreSQL. Meant to be
-     * called on a config cadence off the tick thread; wiring that scheduled task is a P6 follow-up. Returns how many
-     * rows were reshuffled.
+     * called on a config cadence off the tick thread; no task schedules it, so until one does the RANDOM order stays
+     * as the rows were created. Returns how many rows were reshuffled.
      */
     public int reshuffle() {
         return write(dsl -> {

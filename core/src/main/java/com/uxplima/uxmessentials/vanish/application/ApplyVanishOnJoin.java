@@ -122,7 +122,8 @@ public final class ApplyVanishOnJoin {
     /**
      * Apply a kept state that was read after {@code joiner} had already joined. Returns whether they are vanished
      * afterwards. A change the player made on this backend since joining is newer than anything the read returned, so
-     * it stands; otherwise the kept state decides, and a joiner hidden only until now is revealed when it does not
+     * it stands; otherwise the kept state decides, and a joiner hidden only while the read was pending is revealed
+     * when it does not
      * carry over.
      */
     public boolean lateLoad(PlayerRef joiner, Optional<StoredVanish> stored, boolean persist) {
@@ -147,7 +148,7 @@ public final class ApplyVanishOnJoin {
     }
 
     /**
-     * The kept state could not be read at all. A joiner hidden only until now stays hidden, the safe side for a player
+     * The kept state could not be read at all. A joiner hidden only while the read was pending stays hidden, the safe side for a player
      * who may vanish, and their vanish is settled properly; they reveal themselves with {@code /vanish}.
      */
     public void readFailed(PlayerRef joiner) {

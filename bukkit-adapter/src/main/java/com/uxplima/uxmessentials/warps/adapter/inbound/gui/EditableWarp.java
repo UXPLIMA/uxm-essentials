@@ -135,9 +135,9 @@ interface EditableWarp {
     }
 
     /**
-     * Wrap a loaded player warp; every change is written back through {@code repository}. The surrogate-id rebuild
-     * dropped the lock, password, and welcome-message facets from the player-warp aggregate (they return in the P4
-     * access gate), so the lock/password/welcome members of this shared interface are inert on the player side. The
+     * Wrap a loaded player warp; every change is written back through {@code repository}. The player-warp aggregate
+     * has no lock, password, or welcome-message facets (access is the player-warps access gate's job), so the
+     * lock/password/welcome members of this shared interface are inert on the player side. The
      * shared editor does open for a player warp, {@code /pwarp edit} routes through it, but warp-editor.conf gates
      * those three controls to server warps ({@code view = warps:editor-server-warp}), so a player warp never renders
      * them and these no-op members are never reached; they exist only to satisfy the server branch. The sounds,
@@ -173,7 +173,8 @@ interface EditableWarp {
 
             @Override
             public void setPassword(Optional<String> password) {
-                // No password facet on a player warp (it returns as the P4 access gate). Unreachable: warp-editor.conf
+                // No password facet on a player warp (access is the player-warps gate's job). Unreachable:
+                // warp-editor.conf
                 // gates the password control to server warps, so a player warp never renders it to click.
             }
 

@@ -7,8 +7,8 @@ import java.util.UUID;
  * Identity of a single trade session: a surrogate {@link UUID} minted when two players open a trade.
  *
  * <p>A trade has no natural key: the same pair of players may trade many times, so the session is addressed by a
- * generated id rather than by its participants. The id travels with the session across a region hop and, in the
- * cross-server phase, over the bus and into the escrow table, so the two backend servers agree on which exchange a
+ * generated id rather than by its participants. The id travels with the session across a region hop and, for a
+ * cross-server trade, over the bus and into the escrow table, so the two backend servers agree on which exchange a
  * message refers to.
  *
  * @param value the session's stable identifier

@@ -13,7 +13,7 @@ import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.NullMarked;
 
 /**
- * The custommenus bounded context as a first-class {@link FeatureModule}: the operator surface over the Phase-1 menu
+ * The custommenus bounded context as a first-class {@link FeatureModule}: the operator surface over the menu
  * engine. When enabled, the adapter loads every {@code menus/*.conf} the operator authored and registers the
  * {@code /menu} command (open / list / reload); when disabled, no menus load, the command is not registered, and the
  * engine sees no operator specs at all.

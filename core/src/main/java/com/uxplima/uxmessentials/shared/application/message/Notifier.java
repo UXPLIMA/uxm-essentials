@@ -13,9 +13,8 @@ import com.uxplima.uxmessentials.shared.domain.message.MessageKey;
  * viewer something in one call. Resolution happens in the viewer's locale and delivery hops to their region
  * thread, silently no-opping when they are offline.
  *
- * <p>This is the one send surface for every context. Each context used to carry its own copy of these two
- * methods, twenty classes that differed only in their package, which meant twenty places to change when the
- * pairing changed. A context that needs more than a send (money formatting, a vault's named messages) wraps
+ * <p>This is the one send surface for every context, so a change to the pairing is a change in one place
+ * rather than one copy per context. A context that needs more than a send (money formatting, a vault's named messages) wraps
  * this rather than repeating it.
  */
 public final class Notifier {

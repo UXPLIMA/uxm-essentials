@@ -153,7 +153,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // DSL, the Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but
         // inert until an operator creates an NPC, so it lands last after staff.
         delegate.register(new NpcModule());
-        // custommenus is the 21st context, the operator surface over the Phase-2 menu engine (/menu open/list/reload
+        // custommenus is the 21st context, the operator surface over the menu engine (/menu open/list/reload
         // over operator-authored menus/*.conf). It consumes the always-on engine bindings rather than owning a domain
         // aggregate, carries no hard dependency edge (its only collaborators are the shared menu façade + bindings,
         // built in bootstrap), and like the steady-state features ships ENABLED but inert until an operator authors a
@@ -166,52 +166,52 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         delegate.register(new CustomCommandsModule());
         // poses is the 22nd context. Built-in GSit-parity sitting and posing (/sit, player-sit, /lay, /bellyflop,
         // /spin, /crawl). It carries no hard dependency edge (its collaborators are the shared Scheduler, messages,
-        // permissions, and event ports, plus the claim/region gate it consults through a soft-couple in a later
-        // phase), and like the steady-state features it ships ENABLED, so it lands last after custommenus.
+        // permissions, and event ports, plus the claim/region gate it consults through a soft-couple), and
+        // like the steady-state features it ships ENABLED, so it lands last after custommenus.
         delegate.register(new PoseModule());
-        // survival is the 23rd context. Opt-in gameplay mechanics (Phase 1: tree-feller + veinminer), each an
+        // survival is the 23rd context. Opt-in gameplay mechanics (tree-feller, veinminer and the rest), each an
         // independently toggleable sub-feature. It carries no hard dependency edge (its collaborators are the shared
         // Scheduler, messages, and event ports), persists nothing (per-player toggles are PDC stamps), and like the
         // steady-state features ships ENABLED, so it lands last after poses.
         delegate.register(new SurvivalModule());
         // ranks is the 24th context. Rankup/prestige/autorank progression, tracking each player's current rank
         // with a DB-backed pointer of our own rather than reading a permission plugin's group. It carries no hard
-        // dependency edge in Phase 1 (its collaborators are the shared persistence DSL for the pointer plus the
-        // Scheduler, messages and event ports; the economy/permissions/playtime seams it consults on rankup are
-        // soft-coupled and land with the later phases), and like the steady-state features it ships ENABLED but
+        // dependency edge (its collaborators are the shared persistence DSL for the pointer plus the Scheduler,
+        // messages and event ports; the economy, permission and playtime seams it consults on rankup are
+        // soft-coupled), and like the steady-state features it ships ENABLED but
         // inert until an operator authors a ladder, so it lands last after survival.
         delegate.register(new RanksModule());
         // security is a new bounded context. Account-security features (NOT a login system; on an offline-mode
         // server it waits for the login plugin rather than replacing it).
-        // Phase 1 is the two-factor enrolment surface (/2fa and /pin) over a DB-backed store with the PIN hashed and
-        // the TOTP secret AES-encrypted at rest. It carries no hard dependency edge in Phase 1 (its collaborator is the
-        // shared persistence DSL plus the Scheduler, messages and event ports; the join-verification freeze,
-        // op-command protection and IP/alt guard land with the later phases), and like the steady-state features it
+        // It holds the two-factor enrolment surface (/2fa and /pin) over a DB-backed store with the PIN hashed and
+        // the TOTP secret AES-encrypted at rest, the join-verification freeze, op-command protection and the IP/alt
+        // guard. It carries no hard dependency edge (its collaborator is the shared persistence DSL plus the
+        // Scheduler, messages and event ports; moderation is reached softly), and like the steady-state features it
         // ships ENABLED but inert until a player enrols a factor. It is registered before trade so trade stays last.
         delegate.register(new SecurityModule());
         // commandcontrol is a new bounded context. PlHidePro / CommandWhitelist-parity gating of which commands a
-        // player may run. Phase 1 is the per-group command whitelist/blacklist and the custom "unknown command" deny
-        // message (a single PlayerCommandPreprocessEvent gate); the tab-completion filter, plugin-hide, and
-        // namespace-bypass block land in the later phases. It carries no hard dependency edge (its collaborators are
+        // player may run: the per-group command whitelist/blacklist with the custom "unknown command" deny message,
+        // the tab-completion filter, plugin-hide, and the namespace-bypass block. It carries no hard dependency edge
+        // (its collaborators are
         // the shared messages/sink ports plus the LuckPerms group seam), persists nothing (the rule set is derived
         // from config), and like the steady-state features ships ENABLED but inert until an operator names commands.
         // It is registered before trade so trade stays last.
         delegate.register(new CommandControlModule());
-        // trade is the 25th context. Secure player-to-player trading (/trade) with a live dual-inventory window and,
-        // in the later phases, staked money and cross-server escrow. It carries no hard dependency edge in Phase 1
-        // (its collaborators, the economy trade port and the bus transport, land with the money and cross-server
-        // phases), a same-server trade is transient in-memory state (no DB), and like the steady-state features it
+        // trade is the 25th context. Secure player-to-player trading (/trade) with a live dual-inventory window,
+        // staked money and cross-server escrow. It carries no hard dependency edge (the economy trade port and the
+        // bus transport are optional), a same-server trade is transient in-memory state, and like the steady-state
+        // features it
         // ships ENABLED, so it lands last after ranks.
         delegate.register(new TradeModule());
-        // villagers is a new bounded context. Villager trade management (Phase 1: infinite trading, a restock timer,
+        // villagers is a new bounded context. Villager trade management (infinite trading, a restock timer,
         // instant restock, and a global/per-villager trade toggle), each an independently toggleable sub-feature. It
         // carries no hard dependency edge (its collaborators are the shared Scheduler, messages, and event ports),
         // persists nothing (the last-restock stamp and disable flag are PDC state on the villager entity), and like the
         // steady-state features ships ENABLED but inert until an operator turns a feature on, so it lands last.
         delegate.register(new VillagersModule());
         // invrollback is a new bounded context. AxInventoryRestore-parity inventory snapshots captured on death
-        // and logout, DB-backed so a lost inventory survives a world rollback and staff can restore it from a GUI
-        // (Phase 2). It carries no hard dependency edge (its collaborators are the shared persistence DSL, the
+        // and logout, DB-backed so a lost inventory survives a world rollback and staff can restore it from a GUI.
+        // It carries no hard dependency edge (its collaborators are the shared persistence DSL, the
         // Scheduler, messages, and event ports), and like the steady-state features it ships ENABLED but inert
         // until a capture happens, so it lands last after villagers.
         delegate.register(new InvrollbackModule());
@@ -221,7 +221,7 @@ public final class DefaultModuleRegistry implements ModuleRegistry {
         // listener, so an idle module costs nothing. It lands after invrollback.
         delegate.register(new GuardModule());
         // servertweaks is the last bounded context, a grab-bag of small, independently-toggleable server/infra
-        // tweaks (Phase 1: a custom F3 server brand and a console-spam log filter). It carries no hard dependency
+        // tweaks (a custom F3 server brand, a console-spam log filter and the like). It carries no hard dependency
         // edge (its collaborators are the shared Scheduler-free config + logger ports and Bukkit's Messenger/Log4j2
         // seams at the adapter edge), persists nothing (each tweak is a live side effect), and ships ENABLED so a
         // single tweak can be turned on in isolation, but every individual tweak defaults OFF, so a fresh install

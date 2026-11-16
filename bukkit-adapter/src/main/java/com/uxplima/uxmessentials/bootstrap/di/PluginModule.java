@@ -452,7 +452,7 @@ public final class PluginModule {
         CloseableResources resources = new CloseableResources(log);
         // Assigned before any module is wired: the plugin loads at STARTUP so that the default world can reach
         // getDefaultWorldGenerator, which means every wiring step below runs with no worlds loaded. Anything that
-        // needs one hands its work to this phase (see WorldPhase).
+        // needs one hands its work to the world phase (see WorldPhase).
         resources.worldPhase(new WorldPhase(plugin.getServer(), log));
         return closeOnFailure(resources, () -> wireUnchecked(plugin, resources));
     }
@@ -601,7 +601,7 @@ public final class PluginModule {
         // seen by the already-built engine. The single click listener is installed once here, before any feature
         // wires, and both it and the open windows are torn down on disable so a reload re-installs cleanly. The
         // façade and the bindings are threaded into module wiring (the warp sound selector is the first feature to
-        // register its bindings and open a spec through them); Phase 3 reuses the same path for the rest.
+        // register its bindings and open a spec through them); every other feature menu goes the same path.
         MenuBindings menuBindings = new MenuBindings();
         // The icon chain backs every menu item's material field: the skull and equipment providers, the four
         // custom-item providers (ItemsAdder/Oraxen/Nexo/CraftEngine/MMOItems, reached reflectively behind a guard),
@@ -693,7 +693,7 @@ public final class PluginModule {
         // the enabled branch of each forServer names an org.geysermc class, so a Java-only server never loads
         // Floodgate, Geyser or Cumulus. Both are threaded into the façade so the open choke-point can redirect a
         // Bedrock viewer to a native SimpleForm; the detector is also held on resources.bedrock() for any other
-        // consumer. A Java viewer (isBedrock false) opens the chest exactly as before.
+        // consumer. A Java viewer (isBedrock false) opens the chest window untouched.
         // This plugin enables at STARTUP, before Floodgate whatever load order it declares, so a choice made here
         // was NONE for the life of the server. The resolving pair asks again on each use until a backend answers,
         // and the line operators read is written once the server has finished loading.
@@ -836,7 +836,7 @@ public final class PluginModule {
         // The sound slice (broadcast-sound/soundall to every online player, rawsound/raw-sound for a verbatim
         // namespaced resource-pack key) registers alongside the other slices; like them it has its own entry point
         // so the MenuVocabulary signature stays untouched. It shares the <key> [volume] [pitch] grammar the
-        // in-place `sound` action now reads, and needs only the shared bindings and the operator logger.
+        // in-place `sound` action reads, and needs only the shared bindings and the operator logger.
         SoundActions.register(menuBindings, kernel.log());
         PapiPlaceholders.registerInto(menuBindings);
         resources.onClose(() -> {
@@ -844,9 +844,9 @@ public final class PluginModule {
             menus.shutdown();
         });
 
-        // The multi-currency seam over the economy's own backend set: a Phase-2 economy action and a warp fee now
-        // spend through the same backend. The configured default currency (custommenus config, vault out of the box)
-        // is what an action with no explicit currency spec falls back to; Phase-2/3 vocab reads this façade from
+        // The multi-currency seam over the economy's own backend set: a menu economy action and a warp fee spend
+        // through the same backend. The configured default currency (custommenus config, vault out of the box)
+        // is what an action with no explicit currency spec falls back to; the menu vocabulary reads this façade from
         // resources.currencies(). The economy module wires much later (wireEconomy, below), so the façade takes a
         // deferred reference to the registries and reads it on the first click: filled the moment economy is up.
         AtomicReference<EconomyBackends> menuCurrencyBackends = new AtomicReference<>();
@@ -861,7 +861,7 @@ public final class PluginModule {
         EconomyActions.register(menuBindings, menuCurrencies, hooks.capability(PermissionQuery.class), kernel.log());
 
         // The persistent player-data store reuses the plugin database (the same Flyway+jOOQ pattern every context
-        // uses, V68's menu_player_data table) behind an in-memory cache, so the Phase-2 data actions and the Phase-6
+        // uses, V68's menu_player_data table) behind an in-memory cache, so the menu data actions and the
         // %..._value_<key>% placeholders read player-scoped data as entity-thread cache hits and persist their
         // writes off-tick. Cross-cutting menu substrate, so it is built here beside the currencies and hooks; its
         // join/quit cache lifecycle registers as a normal listener through the shared listener path.
@@ -1961,8 +1961,9 @@ public final class PluginModule {
             IpCapture ipCapture) {
         // security stands up the DB-backed two-factor store (the PIN hashed, the TOTP secret AES-encrypted under a
         // key-file kept beside the module's config) and publishes the /2fa and /pin enrolment verbs over the shared
-        // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). Phase 2 adds
-        // the join-verification freeze: an enrolled player on an untrusted device is frozen and made to prove a factor
+        // persistence DSL (through the security persistence factory, so no jOOQ type reaches this layer). It also
+        // wires the join-verification freeze: an enrolled player on an untrusted device is frozen and made to prove a
+        // factor
         // through the keypad GUI (or the TOTP text prompt) before they can act, with a device-trust store and a
         // failure lockout. The transient freeze/enrolment state is cleared and every keypad closed on stop, so a
         // disable or reload leaves no residual secret and no locked player.
@@ -2084,9 +2085,8 @@ public final class PluginModule {
         // A live same-server trade is transient in-memory state (the TradeSessions registry and its per-trade
         // TradeExchange); the one thing trade stores is the stacks it could not hand to a player who was gone, kept in
         // trade_item_returns for their next join. The config is read once into an immutable snapshot. The window view
-        // and its
-        // click/drag/close/quit listener stand up here; Phase 3 adds the money row over the shared TextInput seam and
-        // the trade economy port, bridged from the provider captured at economy-wiring time (trade registers after
+        // and its click/drag/close/quit listener stand up here, with the money row over the shared TextInput seam
+        // and the trade economy port, bridged from the provider captured at economy-wiring time (trade registers after
         // economy), or left empty when economy is disabled, in which case a trade moves items only. closeAll() drains
         // every live trade on module stop or reload, returning both sides' offered items or keeping them for a player
         // who is gone, so a disable leaves nothing behind.
@@ -3159,8 +3159,8 @@ public final class PluginModule {
         // itemworld persists nothing: it is the full item/world command surface as stateless ACL-thin
         // mutations validated at the adapter boundary and applied through the kernel Scheduler. The only runtime
         // state is the powertool/unlimited per-player toggles and the item-PDC powertool bindings, all transient
-        // and dropped with the wiring on module stop. /repair /repairall /hat /more are owned here (playerstate
-        // deferred them, §15.6), so they register here and the two modules never double-register. The utilities
+        // and dropped with the wiring on module stop. /repair /repairall /hat /more are item commands, so itemworld
+        // owns them rather than playerstate, and the two modules never double-register. The utilities
         // hub, the /recipe grid, and the /entitycount tally render through the shared menu engine.
         ItemworldWiring.Wired wired =
                 ItemworldWiring.wire(plugin, ctx, links.auditChannel, guiLayouts, textInput, menus, menuBindings);
@@ -3334,7 +3334,7 @@ public final class PluginModule {
             GuiLayouts guiLayouts,
             ManagementGuiRegistry guiRegistry,
             Menus menus) {
-        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Vanish now lives
+        // presence persists nothing: the per-player PlayerPresence map is transient in-memory state. Vanish lives
         // in its own context (wired earlier), so presence receives that authority's isVanished lookup, overlaid onto
         // its store so the %..._vanished% placeholder and the sleep exclusion reflect the one vanish state, and a
         // vanish-toggle handle for the settings panel; both degrade to no-ops when the vanish module is off. The

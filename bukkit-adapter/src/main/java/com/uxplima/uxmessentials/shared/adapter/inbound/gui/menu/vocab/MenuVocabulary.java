@@ -247,7 +247,7 @@ public final class MenuVocabulary {
      * A parsed {@code open:<menu> [page]} target: the first whitespace-delimited token is the id of another
      * registered spec to open for the same viewer, and an optional second token is a zero-based start page (a blank,
      * non-numeric, or negative page opens page zero). Parsing is Bukkit-free so a plain-JUnit grammar test can
-     * exercise it. The fuller {@code open <menu> <args> <page>} grammar's typed {@code <args>} are Phase-4 typed menu
+     * exercise it. The fuller {@code open <menu> <args> <page>} grammar's typed {@code <args>} are typed menu
      * arguments, not parsed here; only the leading menu id and a trailing page are read.
      */
     public record OpenTarget(String menu, int page) {

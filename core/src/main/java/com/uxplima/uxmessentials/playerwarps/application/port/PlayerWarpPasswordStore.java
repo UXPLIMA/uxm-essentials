@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
  * a set password.
  *
  * <p>This store answers match-or-not only. Attempt <b>rate-limiting is not here</b>. The ordered access gate
- * (P4-T3) throttles password attempts through the {@code Cooldowns} port and calls {@link #matches} for the
+ * throttles password attempts through the {@code Cooldowns} port and calls {@link #matches} for the
  * PASSWORD access step.
  */
 public interface PlayerWarpPasswordStore {

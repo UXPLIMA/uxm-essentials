@@ -13,9 +13,9 @@ import org.slf4j.LoggerFactory;
  * Flyway's log, without the warning MariaDB writes for every named primary key.
  *
  * <p>The migrations name their primary keys so the schema reads the same on every backend. MariaDB ignores the name
- * and says so, code 1280, once per table, and a first start printed seventy six such warnings: an operator read a wall
- * of WARN as a failed install. That one line is dropped. Every other line, every other warning included, reaches the
- * server log as before.
+ * and says so, code 1280, once per table, so a first start would print one such warning per table: an operator reads
+ * a wall of WARN as a failed install. That one line is dropped. Every other line, every other warning included, reaches
+ * the server log.
  *
  * <p>{@link FlywayMigrationRunner} hands Flyway an instance before it migrates.
  */

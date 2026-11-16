@@ -9,8 +9,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * One placeholder the plugin answers, described once.
  *
- * <p>A key used to exist only as a branch inside the resolver, which meant the published list was written by hand
- * from memory and fell behind the code. This record is the one place a key is declared: a guard checks the resolver
+ * <p>A key that exists only as a branch inside the resolver leaves the published list to be written by hand from
+ * memory, and it falls behind the code. This record is the one place a key is declared: a guard checks the resolver
  * against it in both directions, {@code /uxmess placeholders} lists it in game, and the reference page is built
  * from it.
  *

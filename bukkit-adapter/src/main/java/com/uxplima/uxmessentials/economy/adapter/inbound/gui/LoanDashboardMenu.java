@@ -42,8 +42,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the {@code /loan} dashboard with the menu engine and opens it. A three-row panel: the viewer's credit
  * profile, a strip of their active loans (one book per loan), a request-a-new-loan button, and a close button. The
  * credit profile and the active loans are read off the tick thread when the panel opens and handed in as the
- * {@link LoanDashboardSubject} the profile display and the loan strip render from. Exactly as the old view did;
- * the repayment and request use cases are dispatched off-tick as the {@code /loan} command does.
+ * {@link LoanDashboardSubject} the profile display and the loan strip render from; the repayment and request use cases are dispatched off-tick as the {@code /loan} command does.
  *
  * <p>Each loan in the strip is multi-gesture: every click routes through the one {@code economy:loan-entry} action,
  * which branches on the gesture, left pays an installment, right pays the loan off, and a shift-click prompts for a
@@ -112,7 +111,7 @@ public final class LoanDashboardMenu {
 
     /**
      * Open the dashboard for {@code player}. The credit profile and the active loans are read off the tick thread
-     * (the old view's threading), then the panel is opened through the engine, which renders it on the viewer's
+     * so the database is never read on a tick, then the panel is opened through the engine, which renders it on the viewer's
      * entity thread.
      */
     public void open(Player player) {

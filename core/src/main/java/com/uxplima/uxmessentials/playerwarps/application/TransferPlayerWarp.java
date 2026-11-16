@@ -69,7 +69,7 @@ public final class TransferPlayerWarp {
             notifier.send(actor, PlayerWarpError.NO_PERMISSION.messageKey(), Map.of("warp", name.value()));
             return Result.err(PlayerWarpError.NO_PERMISSION);
         }
-        // A sponsored warp cannot be transferred (spec §6): a paid pinned slot is bought against the owner, and the
+        // A sponsored warp cannot be transferred: a paid pinned slot is bought against the owner, and the
         // per-player concurrent cap and the post-expiry cooldown are both keyed to the current owner, so handing the
         // warp off mid-sponsorship would let a colluding pair sidestep either. Refuse until the sponsorship lapses.
         if (isSponsored(warp)) {

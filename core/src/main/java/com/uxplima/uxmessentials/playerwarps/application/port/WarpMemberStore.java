@@ -11,7 +11,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.WarpRole;
 /**
  * Outbound port for a warp's members (co-owners and managers). The delegates a warp owner grants a management
  * {@link WarpRole}. One row per {@code (warp, player)}, so {@link #put} is an upsert: granting a player a new
- * role overwrites their existing row rather than inserting a second. The ordered access gate (P4-T3) calls
+ * role overwrites their existing row rather than inserting a second. The ordered access gate calls
  * {@link #roleOf} to let a member reach a private warp and to decide which management actions they may take.
  */
 public interface WarpMemberStore {

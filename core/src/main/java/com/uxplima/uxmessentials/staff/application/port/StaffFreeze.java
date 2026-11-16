@@ -8,7 +8,7 @@ import org.jspecify.annotations.NullMarked;
  * does not own the freeze machinery; it orchestrates the existing moderation module's freeze handling through
  * this port, so there is no second frozen-state to keep in sync with moderation's.
  *
- * <p>The coupling is soft: when the moderation module is disabled (or has not yet landed) the wiring binds
+ * <p>The coupling is soft: when the moderation module is disabled the wiring binds
  * {@link #NONE}, so the FREEZE gadget degrades to "freeze is unavailable" rather than failing, the same
  * degrade-when-the-other-module-is-off pattern as {@link StaffVanish#NONE} and {@link StaffInspector#NONE}.
  */

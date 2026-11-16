@@ -18,7 +18,7 @@ import com.uxplima.uxmessentials.worlds.domain.SpawnCodec;
 /**
  * How {@link WorldTeleportService} hands a world on another backend to the shared cross-server hop. Both departures
  * are empty while the worlds {@code cross-server} block is off; a world of another backend is then not reachable from
- * here at all, as before, so turning the block on is what changes behaviour.
+ * here at all, so turning the block on is what changes behaviour.
  *
  * <p>A player's own {@code /worlds spawn} and a staff {@code /worlds tp} leave through different departures, because
  * each passes the teleport rules of its local counterpart: the spawn rules for one, the staff teleport rules for the

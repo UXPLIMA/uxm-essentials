@@ -10,7 +10,7 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.shared.domain.Position;
 
 /**
- * The real {@link PoseRegionGate} wired from Phase 5: a pose is allowed unless a land claim or a WorldGuard region
+ * The real {@link PoseRegionGate}: a pose is allowed unless a land claim or a WorldGuard region
  * flag forbids it here. It composes two seams. The shared {@link ClaimService} the homes and warps contexts already
  * consult, and the poses {@link PoseRegionFlags} WorldGuard seam. Behind the two {@code respect-*} config toggles,
  * so it stays a thin, Bukkit-free decision the adapter feeds real backends into.

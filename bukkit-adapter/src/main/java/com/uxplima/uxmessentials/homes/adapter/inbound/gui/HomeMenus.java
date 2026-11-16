@@ -29,8 +29,8 @@ import org.jspecify.annotations.NullMarked;
  * to a home's action menu).
  *
  * <p>Each menu carries the {@link Home} it is about as its engine subject. A click that opens another menu in the
- * chain re-opens it through {@link Menus} with the same home subject, so the bespoke {@code Runnable reopen}
- * threading the old views passed around disappears. The icon palette is a fixed configured list, so its source
+ * chain re-opens it through {@link Menus} with the same home subject, so no view has to pass a
+ * {@code Runnable reopen} along. The icon palette is a fixed configured list, so its source
  * touches no Bukkit API and the engine may resolve it off the viewer's region thread; the set/reset writes hit the
  * database, so they run through the kernel {@link Scheduler} before the action menu re-opens.
  */

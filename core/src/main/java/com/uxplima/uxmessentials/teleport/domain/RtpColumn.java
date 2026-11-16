@@ -19,8 +19,8 @@ import org.jspecify.annotations.Nullable;
  * the servable queue. Persisting X/Z and recomputing Y live is what makes a restart pre-warm one cheap,
  * high-hit-rate probe per column instead of a cold 40-attempt search.
  *
- * <p>{@link #biome} is nullable and reserved for the P5 per-biome pool: it is written now (from the
- * validated candidate, when known) so the schema and this value carry it forward, and read there.
+ * <p>{@link #biome} is nullable and feeds the per-biome pool: it is written from the validated candidate, when
+ * known, and read by {@code /rtp biome}.
  *
  * @param world the world the column belongs to. The pool is keyed per world
  * @param x the column's block x coordinate
@@ -36,7 +36,7 @@ public record RtpColumn(
         Objects.requireNonNull(validatedAt, "validatedAt");
     }
 
-    /** A column with no recorded biome, the common P2 case, since the servable location carries none yet. */
+    /** A column with no recorded biome, for a servable location that carries none. */
     public RtpColumn(WorldRef world, int x, int z, Instant validatedAt) {
         this(world, x, z, null, validatedAt);
     }
@@ -45,7 +45,7 @@ public record RtpColumn(
      * The durable column form of a servable {@link RtpSafeLocation}: its world and block x/z with the
      * validation instant and the biome it validated in, dropping the resolved Y (recomputed live on pre-warm)
      * and the radius (an on-serve guard, not persisted). The biome is threaded through so the persisted pool can
-     * be sliced per biome (the P5 {@code /rtp biome} path); it is {@code null} only when the location carried none.
+     * be sliced per biome (the {@code /rtp biome} path); it is {@code null} only when the location carried none.
      */
     public static RtpColumn of(RtpSafeLocation location) {
         Objects.requireNonNull(location, "location");

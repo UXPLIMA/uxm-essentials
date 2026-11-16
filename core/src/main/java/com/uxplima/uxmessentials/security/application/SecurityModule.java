@@ -12,11 +12,10 @@ import org.jspecify.annotations.NullMarked;
 
 /**
  * The security bounded context as a first-class {@link FeatureModule}: account-security features that are not a
- * login system, and on an offline-mode server wait for the one installed rather than replacing it. Phase 1 stands up
- * the module identity, the enable gate, and the
- * two-factor enrolment surface. The {@code /2fa} and {@code /pin} verbs backed by the DB-backed
- * {@code security_2fa} store, with the PIN hashed and the TOTP secret encrypted at rest. The join-verification
- * flow, op-command protection, and IP/alt guard land as the later phases do, contributed through the adapter wiring.
+ * login system, and on an offline-mode server wait for the one installed rather than replacing it. The module stands
+ * up the identity, the enable gate, and the two-factor enrolment surface: the {@code /2fa} and {@code /pin} verbs
+ * backed by the DB-backed {@code security_2fa} store, with the PIN hashed and the TOTP secret encrypted at rest. The
+ * join-verification flow, op-command protection, and IP/alt guard are contributed through the adapter wiring.
  *
  * <p><b>Ships enabled by default.</b> The module is inert until a player enrols a factor, so like the steady-state
  * contexts {@link #enabled(ConfigStore)} defaults to {@code true}; an operator flips {@code modules.security.enabled
@@ -79,7 +78,7 @@ public final class SecurityModule implements FeatureModule {
         this.running = false;
     }
 
-    /** True while the module is started; the later phases' background work observes this and exits on stop. */
+    /** True while the module is started; background work observes this and exits on stop. */
     public boolean isRunning() {
         return running;
     }

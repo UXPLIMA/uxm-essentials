@@ -301,7 +301,7 @@ public final class ModerationWiring {
         // The active-punishments list, the history list and the jailed-players release list all render through the
         // shared menu engine: each registers its spec and bindings once here, then opens through the Menus façade.
         // Every list's read (with its name/kind/remaining resolution) runs off the tick thread at the open site, so
-        // the list sources only read a pre-resolved subject. The active list's left click opens the still-bespoke
+        // the list sources only read a pre-resolved subject. The active list's left click opens the bespoke
         // PunishmentDetailView; that view's back reopens the engine list, a cycle broken inside ModerationGuiViews.
         ModerationHistoryMenu historyMenu =
                 new ModerationHistoryMenu(menus, kernel.scheduler(), sanctionHistory, kernel.messages());
@@ -415,7 +415,7 @@ public final class ModerationWiring {
     /**
      * The jail's network half: the frames that carry a jail to the backend holding the player, the hop that takes
      * a player to a jail on another backend, and the staff line when that hop fails. Only on a network is the jail
-     * hop registered, so with the network off every jail is applied on this backend as before and a join does no
+     * hop registered, so with the network off every jail is applied on this backend and a join does no
      * hop work for it.
      */
     private static JailNetwork jailNetwork(

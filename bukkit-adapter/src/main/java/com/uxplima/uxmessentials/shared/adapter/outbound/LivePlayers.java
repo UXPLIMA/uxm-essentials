@@ -17,8 +17,8 @@ import org.jspecify.annotations.NullMarked;
  * recorded at some earlier moment, and the player behind it may have logged out since.
  *
  * <p>It exists because uxmLib's menu engine takes a live {@code Player} and this plugin stores a ref in the state
- * that outlives one click. Empty means the same thing the engine used to mean when its own lookup missed: the
- * viewer left, so there is nothing to draw and nothing to say.
+ * that outlives one click. Empty means the same as a miss in the engine's own lookup: the viewer left, so there
+ * is nothing to draw and nothing to say.
  */
 @NullMarked
 public final class LivePlayers {

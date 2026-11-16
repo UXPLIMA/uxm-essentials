@@ -33,21 +33,22 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Decorator for {@link WalletRepository} that intercepts physical-currency operations. A physical balance lives
  * in the player's live inventory, so every read or mutation here touches the Bukkit inventory/world API and must
- * run on that player's region (entity) thread. Folia forbids the off-thread inventory access the previous
- * version performed. The repository contract is synchronous, so each physical branch marshals its inventory work
+ * run on that player's region (entity) thread, since Folia forbids inventory access from any other thread. The
+ * repository contract is synchronous, so each physical branch marshals its inventory work
  * onto the holder's entity thread through the injected {@link Scheduler} and waits for the result; the baltop scan
  * enumerates the roster on the global region thread and then reads each holder's inventory on that holder's own
  * entity thread, joining the per-player results off the tick thread. When the caller already owns the target thread
  * the work runs
- * inline rather than scheduling onto itself and blocking. That self-schedule-and-wait is a deadlock, and was
- * the cause of the {@code /baltop} marshalling timeouts. Off the owning thread the bounded wait is the standard
+ * inline rather than scheduling onto itself and blocking: that self-schedule-and-wait is a deadlock that ends
+ * only at the marshalling timeout. Off the owning thread the bounded wait is the standard
  * anti-corruption bridge; the entity branch passes a retired callback so a player who logs off mid-flight
  * releases the wait immediately instead of letting it run to the timeout. A wait that does run out abandons work
  * that has not started, so a credit or debit the caller was told failed never lands later (see
  * {@link EntityHandoff}).
  *
  * <p>Online players read/write their active inventory; an offline player's credit is queued in the pending
- * transactions table and an offline debit/transfer is refused, exactly as before. The {@link PlayerLookup} port
+ * transactions table and an offline debit/transfer is refused, since there is no inventory to take from. The
+ * {@link PlayerLookup} port
  * resolves online state without an off-thread {@code Bukkit.getPlayer} call from this thread.
  */
 @NullMarked

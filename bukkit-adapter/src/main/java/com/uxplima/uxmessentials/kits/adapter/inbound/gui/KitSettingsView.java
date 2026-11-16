@@ -48,7 +48,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>The edited kit is handed in as the menu subject, so the title and every current-value line fill from the
  * {@code kit_set_*} placeholders without the renderer touching a port. The panel holds no new domain logic: it
- * replays the old bespoke window's handlers verbatim through the engine. This is the kit category settings-panel
+ * runs the kit context's existing handlers through the engine. This is the kit category settings-panel
  * pattern (subject-carried state, the input seam, and re-open after a mutation). Every visible string resolves from
  * the kits catalog.
  */
@@ -170,7 +170,7 @@ public final class KitSettingsView {
         menus.open(player, SPEC_ID, kit);
     }
 
-    /** Open the bespoke item-editor grid for this kit's stacks: the old edit-items button's effect. */
+    /** Open the bespoke item-editor grid for this kit's stacks. */
     private void editItems(MenuActionContext ctx) {
         Player player = ctx.player();
         player.closeInventory();
@@ -369,7 +369,7 @@ public final class KitSettingsView {
     /**
      * The display item the kit actually shows in the browse menu. The configured display material if it parses,
      * otherwise the first kit item's type, otherwise {@link Material#CHEST}. The display-material button renders with
-     * this so the editor always reflects the live icon rather than a fixed placeholder. Mirrors the old view exactly.
+     * this so the editor always reflects the live icon rather than a fixed placeholder.
      */
     private Material displayMaterial(KitDefinition kit) {
         if (kit.display().material().isPresent()) {

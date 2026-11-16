@@ -58,9 +58,9 @@ import org.jspecify.annotations.Nullable;
  * {@link PasswordHasher} and stored only as its salted digest; the plaintext is never persisted or logged. The
  * welcome-message blob is dropped (its count is logged as one aggregate line). Ratings are rehomed onto the new
  * surrogate id with their star value clamped to {@code [1,5]}, and every warp that received ratings has its
- * {@code rating_sum}/{@code rating_count}/{@code rating_average} recomputed ({@code rating_score} tracks the
- * average for now; the Bayesian score is a later phase). {@code server_id} is left NULL for the cross-server phase
- * to claim.
+ * {@code rating_sum}/{@code rating_count}/{@code rating_average} recomputed ({@code rating_score} is seeded with
+ * the average; the live rate use case recomputes the Bayesian score on the next vote). {@code server_id} is left NULL
+ * for {@code PlayerWarpServerClaimer} to claim.
  */
 public final class PlayerWarpDataMigration extends JooqRepository {
 
@@ -245,7 +245,7 @@ public final class PlayerWarpDataMigration extends JooqRepository {
                     .set(PLAYER_WARPS.RATING_SUM, sum)
                     .set(PLAYER_WARPS.RATING_COUNT, count)
                     .set(PLAYER_WARPS.RATING_AVERAGE, average)
-                    // rating_score mirrors the average until the Bayesian score lands in a later phase.
+                    // rating_score starts at the average; the rate use case recomputes it on the next vote.
                     .set(PLAYER_WARPS.RATING_SCORE, average)
                     .where(PLAYER_WARPS.ID.eq(entry.getKey()))
                     .execute();

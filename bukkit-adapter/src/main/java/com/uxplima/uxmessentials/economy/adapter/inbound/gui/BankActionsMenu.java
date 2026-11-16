@@ -42,11 +42,10 @@ import org.jspecify.annotations.NullMarked;
  * the renderer touching a port; every button resolves its label from the economy catalog.
  *
  * <p>Deposit and withdraw capture an amount through the shared input seam, then the bank use case runs off the tick
- * thread, exactly as the old view did. Members opens the engine bank-members grid, logs opens the engine
+ * thread. Members opens the engine bank-members grid, logs opens the engine
  * transaction-history list scoped to this bank, and back reopens the engine bank list. All resolved through the
  * {@link BankNavigation} supplier injected at construction so the cross-links stay final and non-null without
- * post-construction setters. The menu holds no new domain logic. It replays the old view's handlers verbatim through
- * the engine.
+ * post-construction setters. The menu holds no new domain logic: it runs the bank use cases through the engine.
  */
 @NullMarked
 public final class BankActionsMenu {
@@ -105,25 +104,25 @@ public final class BankActionsMenu {
         menus.open(player, SPEC_ID, new BankActionsSubject(bank));
     }
 
-    /** Members button: open the engine bank-members grid for this bank, exactly as the old members button did. */
+    /** Members button: open the engine bank-members grid for this bank. */
     private void openMembers(MenuActionContext ctx) {
         SharedBank bank = ctx.subject(BankActionsSubject.class).bank();
         navigation.get().bankMembersMenu().open(ctx.player(), bank);
     }
 
-    /** Logs button: open the engine transaction-history list scoped to this bank, as the old logs button did. */
+    /** Logs button: open the engine transaction-history list scoped to this bank. */
     private void openLogs(MenuActionContext ctx) {
         SharedBank bank = ctx.subject(BankActionsSubject.class).bank();
         historyView.openForBank(ctx.viewer(), bank.id(), bank.name());
     }
 
-    /** Back button: reopen the engine bank list, exactly as the old back button did. */
+    /** Back button: reopen the engine bank list. */
     private void openBankList(MenuActionContext ctx) {
         navigation.get().bankListMenu().open(ctx.player());
     }
 
     /**
-     * Capture an amount through the input seam, then deposit (or withdraw) it, exactly as the old view did. A
+     * Capture an amount through the input seam, then deposit (or withdraw) it. A
      * malformed amount sends the existing parse-error rejection and reopens the bank list, no op runs.
      */
     private void promptTransfer(MenuActionContext ctx, boolean deposit) {
@@ -144,7 +143,7 @@ public final class BankActionsMenu {
     /**
      * Parse the typed amount against the bank's currency and, when valid, run the deposit/withdraw off the tick
      * thread, then reopen the bank list. A malformed amount sends the parse rejection and reopens, no op runs.
-     * Package-private so the amount branch is unit-tested without driving a live anvil, mirroring the old view.
+     * Package-private so the amount branch is unit-tested without driving a live anvil.
      */
     void applyTransfer(Player player, PlayerRef viewer, SharedBank bank, String input, boolean deposit) {
         Result<Money, AmountParseError> parsed =

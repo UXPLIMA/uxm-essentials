@@ -29,7 +29,7 @@ import org.jspecify.annotations.NullMarked;
  * Registers the admin warp manager list (opened by {@code /warp editor} with no warp name, or the category manager's
  * back button) with the menu engine and opens it. One icon per stored warp across the top five rows, with a create, a
  * manage-categories, and a close button on the bottom row, and, like the original, no page arrows, so the grid is a
- * single page that truncates past what fits, exactly as the old view did.
+ * single page that truncates past what fits.
  *
  * <p>The grid is the {@code warps:manager} list source. The repository read happens on the viewer's entity thread at
  * open and the rows are handed to the engine as the menu subject, so the engine renders off that snapshot without a
@@ -37,9 +37,9 @@ import org.jspecify.annotations.NullMarked;
  * {@code warp_manager_icon} / {@code warp_manager_name} placeholders and the fixed catalog-key lore (category, location,
  * a spacer, the edit hint) read the bound row, reproducing the old fixed warp manager's icon slot for slot.
  *
- * <p>A left click on a warp runs {@code warps:manager-edit}, opening that warp's still-bespoke {@link WarpEditorView};
+ * <p>A left click on a warp runs {@code warps:manager-edit}, opening that warp's bespoke {@link WarpEditorView};
  * the create button runs {@code warps:manager-create}, the same name-prompt → create-at-position → editor flow the old
- * create button drove; the categories button runs {@code warps:manager-categories}, opening the still-bespoke
+ * create button drove; the categories button runs {@code warps:manager-categories}, opening the bespoke
  * {@link WarpCategoryManagerMenu}; the close button shuts the window. The list adds no domain logic of its own.
  */
 @NullMarked
@@ -61,7 +61,7 @@ public final class WarpManagerMenu {
 
     /**
      * @param createPrompt opens the name-prompt → create-at-position → editor flow for the viewer; reopening the
-     *     manager on cancel is the caller's concern, exactly as the old manager's create button did
+     *     manager on cancel is the caller's concern
      */
     public WarpManagerMenu(
             Menus menus,
@@ -132,21 +132,20 @@ public final class WarpManagerMenu {
                 null);
     }
 
-    /** Left-click the create button: run the name-prompt → create-at-position → editor flow the old button drove. */
+    /** Left-click the create button: run the name-prompt → create-at-position → editor flow. */
     private void create(MenuActionContext ctx) {
         createPrompt.accept(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
-    /** Left-click the categories button: open the bespoke category manager, as the old slot-51 button did. */
+    /** Left-click the categories button: open the bespoke category manager. */
     private void categories(MenuActionContext ctx) {
         categoryManagerView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()));
     }
 
     /**
      * The warp icon's display name as a MiniMessage source the engine renders for the {@code %warp_manager_name%}
-     * name line, reproducing the old view: the {@code warp.menu.entry.name} catalog line filled with the warp's name.
-     * The engine renders this string through the same styled MiniMessage parser the old view used, so the rendered
-     * label matches.
+     * name line: the {@code warp.menu.entry.name} catalog line filled with the warp's name. The engine renders this
+     * string through the styled MiniMessage parser, so the theme's tags work in it.
      */
     private String name(PlayerRef viewer, Warp warp) {
         return messages.resolve(
@@ -161,7 +160,7 @@ public final class WarpManagerMenu {
                 .orElseGet(() -> messages.resolve(viewer, WarpsMessageKey.WARP_EDITOR_VALUE_NONE, Map.of()));
     }
 
-    /** The warp icon material, reproducing the old view: a valid per-warp override, else the ENDER_PEARL fallback. */
+    /** The warp icon material: a valid per-warp override, else the ENDER_PEARL fallback. */
     private Material material(Warp warp) {
         if (warp.iconMaterial().isPresent()) {
             Material parsed = Material.matchMaterial(warp.iconMaterial().get());

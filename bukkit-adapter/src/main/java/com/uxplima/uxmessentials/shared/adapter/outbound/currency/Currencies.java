@@ -19,9 +19,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * The multi-currency façade the menu vocabulary spends through: it maps a spec string to the
  * {@link CurrencyProvider} that serves it, over the same {@link CurrencyBackend} set a warp fee or a
- * {@code /pay} routes through. A {@code give-money} click and a warp fee therefore move the same money, a
- * native currency now passes through the guarded debit and lands in the transaction ledger, which it never
- * did while this façade owned a parallel, {@code double}-surfaced set of providers.
+ * {@code /pay} routes through. A {@code give-money} click and a warp fee therefore move the same money, and a
+ * native currency passes through the guarded debit and lands in the transaction ledger, which a parallel,
+ * {@code double}-surfaced set of providers here would bypass.
  *
  * <p>Ordering: this façade is built while the menu engine wires, long before the economy module does, so it
  * cannot receive the registries at construction. It holds a supplier of {@link EconomyBackends} instead and

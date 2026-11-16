@@ -25,9 +25,8 @@ import org.jspecify.annotations.NullMarked;
  * <p>The routine self-disables: it drops the legacy tables after a successful copy, so running it on every enable
  * is safe, because after the first run there is nothing left to migrate and it returns immediately. A name that
  * would now collide is renamed on the way in and the owner is told through a callback, so the migration itself
- * need not know about the messaging module. Delivering that notice as mail rather than as an operator log line is
- * a follow-up: it would mean threading the messaging context's send-mail port through the player-warps wiring,
- * which it does not carry today.
+ * need not know about the messaging module. The notice is an operator log line, not mail: mail would mean threading
+ * the messaging context's send-mail port through the player-warps wiring, which does not carry it.
  *
  * <p><strong>Why this is its own class.</strong> It reads the world list, and the plugin enables before any world
  * exists ({@code load: STARTUP}, see {@code WorldPhase}). Wiring therefore never enumerates worlds, so this
@@ -37,7 +36,7 @@ import org.jspecify.annotations.NullMarked;
  * {@code ServerLoadEvent}, because before that there are no worlds to snapshot. The snapshot itself is taken on
  * the global region thread, because {@code Server#getWorlds()} is a main-thread read. The scan and its writes then
  * go off-tick, because they must never block a tick. A world loaded after the snapshot keeps a NULL
- * {@code server_id} until the next enable claims it, which is acceptable: the cross-server phase only needs a
+ * {@code server_id} until the next enable claims it, which is acceptable: the cross-server teleport only needs a
  * stable home tag.
  */
 @NullMarked
