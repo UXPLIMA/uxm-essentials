@@ -46,6 +46,6 @@ mail:
 timestamps:
   lastteleport: 1700000000000
   kits:
-    welcome: 1700000100000
+    Welcome: 1700000100000
     starter: 1700000200000
     retired: 1700000300000

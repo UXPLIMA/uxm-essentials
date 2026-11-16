@@ -328,8 +328,8 @@ public final class UserRecordWriter {
 
         /**
          * Mail already in the box, mail the source had expired and a kit claim already recorded are not held back:
-         * nothing of the source is lost by leaving them. A kept home, a kept balance, mail past the retention and mail the messaging module
-         * could not take are.
+         * nothing of the source is lost by leaving them. A kept home, a kept balance, mail past the retention and mail
+         * the messaging module could not take are.
          */
         private RecordOutcome outcome() {
             int written = homesWritten + mailWritten + kitClaimsWritten + ("written".equals(balance) ? 1 : 0);

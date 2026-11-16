@@ -88,9 +88,10 @@ Each `userdata/<uuid>.yml` gives one player:
   online time left, or for good.
 - **One-time kit claims.** A player who already took a kit whose `delay` is negative keeps it claimed, with the time
   in `timestamps.kits` of their file. Claims of repeatable kits and of kits `kits.yml` no longer has are not read. The
-  claim goes into the database whatever `on-conflict` says, and never twice. With the network on, every server sees
-  it at once. On a single server it reaches the player's data when they next join, or at once if they are online
-  during the import; `/kit reset` clears it again.
+  claim goes into the database whatever `on-conflict` says, and never twice; it is written even when `skip` keeps an
+  existing kit of the same name. With the network on, a server that loaded the player before the import may still
+  show the kit in their menu until they log in again, but refuses the claim. On a single server the claim reaches the
+  player's data when they next join, or at once if they are online during the import; `/kit reset` clears it again.
 
 Each `warps/<name>.yml` becomes a warp of that name, free and open to everyone. Each entry of `kits.yml` becomes a
 kit (see [What is not imported](#what-is-not-imported) for what a kit loses). An unreadable file, a warp in a world
@@ -320,7 +321,8 @@ their `-group`. `greeting`, `farewell`, their `-title` forms, `entry-deny-messag
 ## On a network
 
 With a shared database, run each import once, from one server. Homes, balances, mail, warps, moderation, player
-warps, holograms and one-time kit claims go into the shared database and every server sees them. Once a live import
+warps, holograms and one-time kit claims go into the shared database and every server sees them; a server that
+loaded a player before the import may still list an imported claimed kit to them, but refuses it. Once a live import
 ends, the importing server tells the others: warps reload at once, holograms reload by name over the following
 minutes (16 every 10 seconds), and homes, balances and player warps are picked up as each server's cache refreshes.
 A good time to import is before players join.

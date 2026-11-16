@@ -2672,7 +2672,7 @@ public final class PluginModule {
                 ctx,
                 Optional.ofNullable(links.kitEconomy),
                 links.networkClaims,
-                java.util.Objects.requireNonNull(links.claimLedger, "claimLedger"),
+                Objects.requireNonNull(links.claimLedger, "claimLedger"),
                 guiLayouts,
                 textInput,
                 menus,

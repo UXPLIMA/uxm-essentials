@@ -8,6 +8,7 @@ import java.util.UUID;
 
 import com.uxplima.uxmessentials.kits.application.port.KitClaimStore;
 import com.uxplima.uxmessentials.kits.domain.KitId;
+import com.uxplima.uxmessentials.shared.application.port.PlayerClaimLedger;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
 import com.uxplima.uxmessentials.testing.MemoryClaimLedger;
 import com.uxplima.uxmessentials.testing.QueuedScheduler;
@@ -25,7 +26,7 @@ class LocalKitClaimsTest {
     private static final KitId WELCOME = KitId.of("welcome");
     private static final KitId STARTER = KitId.of("starter");
 
-    private final MemoryClaimLedger ledger = new MemoryClaimLedger();
+    private final Ledger ledger = new Ledger();
     private final Stamps stamps = new Stamps();
     private final QueuedScheduler scheduler = new QueuedScheduler();
     private final RecordingLogger log = new RecordingLogger();
@@ -113,6 +114,128 @@ class LocalKitClaimsTest {
         assertThat(claims.hasClaimed(STEVE, STARTER)).isTrue();
         assertThat(claims.hasClaimed(STEVE, WELCOME)).isFalse();
         assertThat(log.warnings()).isNotEmpty();
+    }
+
+    @Test
+    void aResetThatLandsWhileTheLoginReadIsInFlightIsNotUndoneByTheJoin() {
+        ledger.claimKit(STEVE.uuid(), "welcome", 1L);
+        // The read has its rows when the reset comes in, and the reset's delete lands before the read is used.
+        ledger.duringNextRead(() -> {
+            claims.reset(STEVE, WELCOME);
+            scheduler.runAll();
+        });
+
+        claims.load(STEVE.uuid());
+        claims.joined(STEVE);
+
+        assertThat(claims.hasClaimed(STEVE, WELCOME)).isFalse();
+        assertThat(ledger.hasKit(STEVE.uuid(), "welcome")).isFalse();
+    }
+
+    @Test
+    void aResetWhoseDeleteIsStillQueuedIsNotUndoneByAJoin() {
+        ledger.claimKit(STEVE.uuid(), "welcome", 1L);
+        ledger.duringNextRead(() -> claims.reset(STEVE, WELCOME));
+
+        claims.load(STEVE.uuid());
+        claims.joined(STEVE);
+
+        assertThat(claims.hasClaimed(STEVE, WELCOME)).isFalse();
+        scheduler.runAll();
+        assertThat(ledger.hasKit(STEVE.uuid(), "welcome")).isFalse();
+    }
+
+    @Test
+    void aResetWhoseDeleteFailsStaysResetOnThisServerAndTellsTheOperator() {
+        ledger.claimKit(STEVE.uuid(), "welcome", 1L);
+        ledger.claimKit(STEVE.uuid(), "starter", 1L);
+        ledger.failReleases();
+
+        claims.reset(STEVE, WELCOME);
+        scheduler.runAll();
+        claims.load(STEVE.uuid());
+        claims.joined(STEVE);
+
+        assertThat(claims.hasClaimed(STEVE, WELCOME)).isFalse();
+        assertThat(claims.hasClaimed(STEVE, STARTER)).isTrue();
+        assertThat(log.warnings()).anySatisfy(line -> assertThat(line).contains("kit_claim_reset_failed"));
+    }
+
+    @Test
+    void aResetOfEveryKitWhoseDeleteFailsKeepsEveryRecordedClaimOff() {
+        ledger.claimKit(STEVE.uuid(), "welcome", 1L);
+        ledger.failReleases();
+
+        claims.resetAll(STEVE);
+        scheduler.runAll();
+        claims.load(STEVE.uuid());
+        claims.joined(STEVE);
+
+        assertThat(claims.hasClaimed(STEVE, WELCOME)).isFalse();
+    }
+
+    /** The claim table, which can run something in the middle of a read and refuse deletes. */
+    private static final class Ledger implements PlayerClaimLedger {
+
+        private final MemoryClaimLedger rows = new MemoryClaimLedger();
+        private Runnable duringNextRead = () -> {};
+        private boolean failReleases;
+
+        void duringNextRead(Runnable action) {
+            duringNextRead = action;
+        }
+
+        void failReleases() {
+            failReleases = true;
+        }
+
+        void failNextLoads(int count) {
+            rows.failNextLoads(count);
+        }
+
+        boolean hasKit(UUID player, String kit) {
+            return rows.hasKit(player, kit);
+        }
+
+        @Override
+        public Claims load(UUID player, long now) {
+            return rows.load(player, now);
+        }
+
+        @Override
+        public Set<String> kits(UUID player) {
+            Set<String> read = rows.kits(player);
+            Runnable action = duringNextRead;
+            duringNextRead = () -> {};
+            action.run();
+            return read;
+        }
+
+        @Override
+        public boolean claimKit(UUID player, String kit, long claimedAt) {
+            return rows.claimKit(player, kit, claimedAt);
+        }
+
+        @Override
+        public void releaseKit(UUID player, String kit) {
+            if (failReleases) {
+                throw new IllegalStateException("the database is unreachable");
+            }
+            rows.releaseKit(player, kit);
+        }
+
+        @Override
+        public void releaseAllKits(UUID player) {
+            if (failReleases) {
+                throw new IllegalStateException("the database is unreachable");
+            }
+            rows.releaseAllKits(player);
+        }
+
+        @Override
+        public void saveCooldown(UUID player, String scope, long readyAt) {
+            rows.saveCooldown(player, scope, readyAt);
+        }
     }
 
     /** A player's own stamps, standing in for PDC. */
