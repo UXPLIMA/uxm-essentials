@@ -139,4 +139,40 @@ class MuteTest {
         assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
         assertThat(syncedMutes).isEmpty();
     }
+
+    @Test
+    void aTempmuteRefusesPermAsTempbanDoesAndMutesNobody() {
+        assertThat(mute.tempmute(ALEX, SAM, "perm", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.BAD_DURATION);
+
+        assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
+        assertThat(lastToldTo(ALEX).key()).isEqualTo(ModerationMessageKey.BAD_DURATION.key());
+        assertThat(syncedMutes).isEmpty();
+        assertThat(broadcasts).isEmpty();
+    }
+
+    @Test
+    void aTempmuteRefusesAMissingOrMalformedDuration() {
+        assertThat(mute.tempmute(ALEX, SAM, "", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.BAD_DURATION);
+        assertThat(mute.tempmute(ALEX, SAM, "soon", Optional.empty(), false).errorOrThrow())
+                .isEqualTo(ModerationError.BAD_DURATION);
+
+        assertThat(records.loadMute(SAM)).isEqualTo(MuteState.none());
+    }
+
+    @Test
+    void aTempmuteWithARealDurationMutesForThatLong() {
+        assertThat(mute.tempmute(ALEX, SAM, "1h", Optional.empty(), false).isOk())
+                .isTrue();
+
+        assertThat(records.loadMute(SAM).expiry()).contains(NOW.plus(Duration.ofHours(1)));
+    }
+
+    @Test
+    void aMuteStillTakesPermForAPermanentMute() {
+        assertThat(mute.mute(ALEX, SAM, "perm", Optional.empty(), false).isOk()).isTrue();
+
+        assertThat(records.loadMute(SAM)).isInstanceOf(MuteState.Permanent.class);
+    }
 }

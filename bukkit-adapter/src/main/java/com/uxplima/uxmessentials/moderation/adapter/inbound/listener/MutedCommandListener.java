@@ -24,9 +24,10 @@ import org.jspecify.annotations.NullMarked;
 /**
  * Closes the mute-bypass through chat-adjacent commands: when a muted player runs a command on the
  * configured {@code muted-blocked-commands} list (e.g. {@code /me}, {@code /msg}, {@code /mail}), the
- * dispatch is cancelled before the command runs and the player is told they are muted. The messaging context
- * already blocks the use cases this plugin owns; this listener is the wider net that also catches third-party
- * and vanilla commands an operator names.
+ * dispatch is cancelled before the command runs and the player is told they are muted. A namespaced form
+ * ({@code /minecraft:msg}) or another name of a listed command is caught too; {@link MutedCommandPolicy} says how.
+ * The messaging context already blocks the use cases this plugin owns; this listener is the wider net that also
+ * catches third-party and vanilla commands an operator names.
  *
  * <p>Runs at {@link EventPriority#HIGH} so cooperating plugins at NORMAL still see an uncancelled event but
  * the dispatch is stopped before the vanilla/dispatcher handler. The mute state is read live from the

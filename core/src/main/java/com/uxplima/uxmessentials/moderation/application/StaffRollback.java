@@ -43,10 +43,15 @@ import com.uxplima.uxmessentials.shared.domain.PlayerRef;
  * banned then re-banned) is un-banned once. {@link SanctionAction#UNBAN}, {@link SanctionAction#UNMUTE} and
  * {@link SanctionAction#KICK} rows are skipped. A kick is a live disconnect with nothing to undo, and a lift is
  * itself not a sanction. The {@code limit} caps how far back the history read reaches (newest-first), so an
- * operator can scope a rollback to a staff member's recent activity. The result is a {@link RollbackSummary} of
- * the counts undone, reported to the actor; when nothing was in effect the actor is told so instead.
+ * operator can scope a rollback to a staff member's recent activity. A limit above {@link #MAX_LIMIT} is lowered
+ * to it so the history scan stays bounded, and the actor is told, so a rollback that read fewer rows than asked
+ * never passes for a complete one. The result is a {@link RollbackSummary} of the counts undone, reported to the
+ * actor; when nothing was in effect the actor is told so instead.
  */
 public final class StaffRollback {
+
+    /** The most history rows one rollback reads. */
+    public static final int MAX_LIMIT = 500;
 
     private final SanctionHistory history;
     private final ModerationRepository repository;
@@ -73,10 +78,20 @@ public final class StaffRollback {
         this.clock = Objects.requireNonNull(clock, "clock");
     }
 
-    /** Revoke {@code staff}'s still-active sanctions over their most recent {@code limit} history rows. */
-    public RollbackSummary rollback(PlayerRef actor, PlayerRef staff, int limit) {
+    /**
+     * Revoke {@code staff}'s still-active sanctions over their most recent {@code requested} history rows, at most
+     * {@link #MAX_LIMIT}.
+     */
+    public RollbackSummary rollback(PlayerRef actor, PlayerRef staff, int requested) {
         Objects.requireNonNull(actor, "actor");
         Objects.requireNonNull(staff, "staff");
+        int limit = Math.min(requested, MAX_LIMIT);
+        if (limit < requested) {
+            notifier.send(
+                    actor,
+                    ModerationMessageKey.MOD_STAFFROLLBACK_CAPPED,
+                    Map.of("requested", Integer.toString(requested), "limit", Integer.toString(limit)));
+        }
         Instant now = clock.instant();
         List<SanctionHistoryEntry> rows = history.recentByActor(staff.uuid(), limit);
         Set<UUID> unbanned = new HashSet<>();

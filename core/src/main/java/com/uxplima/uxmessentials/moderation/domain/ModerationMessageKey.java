@@ -28,6 +28,8 @@ public enum ModerationMessageKey implements MessageKey {
     JAIL_APPLIED_TIMED("moderation.jail.applied-timed"),
     JAIL_NOTIFY_TARGET("moderation.jail.notify-target"),
     JAIL_UNKNOWN("moderation.jail.unknown-jail"),
+    // /togglejail with no jail name and no default-jail: the jails to choose from
+    TOGGLEJAIL_NAME_NEEDED("moderation.togglejail.name-needed"),
     JAIL_ALREADY("moderation.jail.already"),
     JAIL_HOP_SENDING("moderation.jail.cross-server.sending"),
     JAIL_HOP_ARRIVED("moderation.jail.cross-server.arrived"),
@@ -109,6 +111,8 @@ public enum ModerationMessageKey implements MessageKey {
     // /staffrollback. Revoke a staff member's still-active sanctions
     MOD_STAFFROLLBACK_SUMMARY("moderation.staffrollback.summary"),
     MOD_STAFFROLLBACK_NONE("moderation.staffrollback.none"),
+    // a limit above the most a rollback reads was lowered to it
+    MOD_STAFFROLLBACK_CAPPED("moderation.staffrollback.capped"),
 
     // /modstats. Staff punishment analytics: the server-wide leaderboard and a single-staff breakdown, each
     // with an all-time and a windowed variant so the time frame is stated in the line rather than an inline literal

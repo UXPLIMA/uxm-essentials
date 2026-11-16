@@ -53,8 +53,8 @@ Where a duration is optional (`/mute` and `/jail`), `perm` or `permanent` means 
 /jail Alex spawnjail 30m
 ```
 
-`/tempban`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. `/tempmute <player> perm` is
-accepted and gives a permanent mute, the same as `/mute <player> perm`.
+`/tempban`, `/tempmute`, `/tempwarn` and `/tempbanip` need a real duration and refuse `perm`. A permanent mute is
+`/mute <player>` or `/mute <player> perm`.
 
 The reason is everything after the last argument, spaces included. It is stored with the sanction, shown to the
 player and written to the history.
@@ -107,8 +107,10 @@ banned at least as long keeps its own ban, so a capped `/ban` never shortens a p
 
 A muted player cannot chat, and cannot use this plugin's private messages, mail or helpop. The commands in
 `muted-blocked-commands` are also refused while muted, which covers other plugins' and the game's own message
-commands. Write each as the bare command word. A namespaced form such as `/minecraft:msg` or `/essentials:msg` is a
-different word and must be listed on its own:
+commands. Write each as the bare command word. It also stops the namespaced forms, such as `/minecraft:msg` and
+`/essentials:msg`, and the other names the server lists for that command, such as an alias another plugin gave it.
+The server does not list the game's own aliases (`/tell` and `/w` for `/msg`), so name them too, as the default
+does:
 
 ```
 muted-blocked-commands = ["me", "msg", "tell", "w", "whisper", "mail", "helpop", "r", "reply"]
@@ -165,7 +167,8 @@ step landed.
 
 `/kick` disconnects a player on this server with an optional reason. On a network, a player connected to another
 server cannot be kicked from here; the command says which server they are on. A player who is not online anywhere
-is not kicked, and the command says so. `/kickall` kicks everyone on this server but you and exempt players.
+is not kicked, and the command says so. `/kickall` kicks everyone on this server but you and exempt players, and
+writes a kick to the history of each player it kicked, the same row `/kick` writes.
 
 ## Jail
 
@@ -188,8 +191,15 @@ jail {
 ```
 
 `/jails` lists both kinds. When both have the same name, the one made with `/setjail` wins. A config jail is removed
-by editing the file. `/togglejail` without a jail name uses the config jail whose name comes first in alphabetical
-order, and never a jail made with `/setjail`; with no config jail it is refused as an unknown jail.
+by editing the file.
+
+`/togglejail` without a jail name uses `default-jail`, which can name a config jail or one made with `/setjail`.
+With `default-jail` empty (the default) it is refused, and the staff member is shown the jails `/jail` accepts, so
+nobody is sent to a jail no one chose. A jailed player is released without naming a jail.
+
+```
+default-jail = "spawnjail"
+```
 
 ### Time
 
@@ -297,7 +307,8 @@ Discord bridge forwards. Without the bridge the line only lands in the audit log
 ## History and lookups
 
 Every ban, tempban, IP ban, unban, mute, unmute, warning and kick is written to a history that is never edited. Jails
-are not in it, and neither are the kicks of `/kickall` or the IP bans a STRICT `/ban` adds.
+are not in it. `/kickall` writes one kick for each player it kicked. A STRICT `/ban` writes one IP ban for each address
+it banned, naming the player; an address that kept its own longer ban gets no row.
 
 | Command | Permission | What it shows |
 |---|---|---|
@@ -308,7 +319,7 @@ are not in it, and neither are the kicks of `/kickall` or the IP bans a STRICT `
 | `/checkban <player>`, `/checkmute <player>` | `uxmessentials.moderation.check` | Whether the player is banned or muted now. |
 | `/banlist`, `/mutelist` | `uxmessentials.moderation.banlist`, `uxmessentials.moderation.mutelist` | Bans and mutes in effect (up to 50). |
 | `/staffhistory <staff>` | `uxmessentials.moderation.staffhistory` | What one staff member has issued. |
-| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given, at most 500. A sanction since replaced by another staff member's is left alone. |
+| `/staffrollback <staff> [limit]` | `uxmessentials.moderation.staffrollback` | Lifts the bans and mutes that staff member issued that are still in effect, and clears the warnings they gave. Reads their last 100 actions unless a limit is given, at most 500; a larger limit is lowered to 500 and the command says so. A sanction since replaced by another staff member's is left alone. |
 | `/modstats [staff] [days]` | `uxmessentials.moderation.stats` | The most active staff, or one staff member's breakdown. |
 | `/seen <player>` | `uxmessentials.moderation.seen` | First join and last seen, or the server the player is on now. |
 | `/seenip <player>`, `/alts <player>` | `uxmessentials.moderation.seen` | The last address and the accounts that share it; every account that shared any of the player's addresses. |
@@ -353,6 +364,7 @@ EssentialsX and LiteBans.
 |---|---|---|
 | `enabled` | `true` | Switches the module on or off. |
 | `jails` | `[]` | The config jails, each placed in the `jail` block. |
+| `default-jail` | `""` | The jail `/togglejail` uses when no jail is named; empty refuses and lists the jails. |
 | `jail-countdown` | `"online-only"` | How timed jails count down: `online-only` or `wall-clock`. |
 | `muted-blocked-commands` | see [Mutes](#mutes) | Commands a muted player cannot run. |
 | `warnings.actions` | `["3:tempmute:1h", "5:tempban:1d"]` | The escalation ladder. |

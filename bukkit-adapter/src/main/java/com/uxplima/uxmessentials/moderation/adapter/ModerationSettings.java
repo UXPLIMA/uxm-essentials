@@ -43,6 +43,7 @@ public final class ModerationSettings {
 
     private final ConfigStore config;
     private final List<String> jails;
+    private final Optional<String> defaultJail;
     private final boolean wallClockDefault;
     private final Set<String> mutedBlockedCommands;
     private final WarnEscalation warnEscalation;
@@ -58,6 +59,9 @@ public final class ModerationSettings {
         this.jails = config.getStringList("jails", List.of()).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
                 .toList();
+        this.defaultJail = Optional.of(config.getString("default-jail", "").strip())
+                .filter(name -> !name.isEmpty())
+                .map(name -> name.toLowerCase(Locale.ROOT));
         this.wallClockDefault = "wall-clock".equalsIgnoreCase(config.getString("jail-countdown", "online-only"));
         this.mutedBlockedCommands = config.getStringList("muted-blocked-commands", DEFAULT_BLOCKED_COMMANDS).stream()
                 .map(name -> name.toLowerCase(Locale.ROOT))
@@ -212,6 +216,11 @@ public final class ModerationSettings {
     /** The configured jail names, sorted, for {@code /jails} to list (already lower-cased and immutable). */
     public List<String> jailNames() {
         return jails;
+    }
+
+    /** The jail {@code /togglejail} uses when no jail is named; empty when {@code default-jail} is blank. */
+    public Optional<String> defaultJail() {
+        return defaultJail;
     }
 
     /** True when {@code jail} is a configured jail name. */

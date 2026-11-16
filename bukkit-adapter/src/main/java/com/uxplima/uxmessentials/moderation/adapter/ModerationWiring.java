@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationJ
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.ModerationLoginListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedChatListener;
 import com.uxplima.uxmessentials.moderation.adapter.inbound.listener.MutedCommandListener;
+import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitCommandNames;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.BukkitSanctions;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.CombinedJailDirectory;
 import com.uxplima.uxmessentials.moderation.adapter.outbound.ConfigJailDirectory;
@@ -88,6 +89,7 @@ import com.uxplima.uxmessentials.moderation.application.UnbanIp;
 import com.uxplima.uxmessentials.moderation.application.Unjail;
 import com.uxplima.uxmessentials.moderation.application.Unmute;
 import com.uxplima.uxmessentials.moderation.application.WarnEscalator;
+import com.uxplima.uxmessentials.moderation.application.port.CommandNames;
 import com.uxplima.uxmessentials.moderation.application.port.JailLocationStore;
 import com.uxplima.uxmessentials.moderation.application.port.JailSync;
 import com.uxplima.uxmessentials.moderation.application.port.ModerationAudit;
@@ -338,7 +340,16 @@ public final class ModerationWiring {
         commands.add(new ModerationGuiCommand(services, kernel.messages(), kernel.messageSink(), guiViews));
         return new Wired(
                 commands,
-                listeners(services, sanctions, repository, kernel, settings, guard, commandSpyStore, clock),
+                listeners(
+                        services,
+                        sanctions,
+                        repository,
+                        kernel,
+                        settings,
+                        guard,
+                        commandSpyStore,
+                        new BukkitCommandNames(plugin.getServer().getCommandMap()),
+                        clock),
                 new JailServerAdoption(persistence, kernel, jailNetwork.recordedServer()),
                 sanctions,
                 commandSpyStore,
@@ -522,13 +533,13 @@ public final class ModerationWiring {
                 .unmute(unmute)
                 .jail(jail)
                 .unjail(unjail)
-                .toggleJail(new ToggleJail(repository, jails, jail, unjail))
+                .toggleJail(new ToggleJail(repository, jails, jail, unjail, notifier, settings.defaultJail()))
                 .tempBan(tempBan)
                 .ban(ban)
                 .punish(punish)
                 .unban(unban)
                 .kick(kick)
-                .kickAll(new KickAll(sanctionPort, guard, notifier, audit))
+                .kickAll(new KickAll(sanctionPort, guard, notifier, audit, history))
                 .warn(new IssueWarn(
                         repository, guard, notifier, audit, kernel.events(), history, broadcast, escalator, clock))
                 .tempWarn(new TempWarn(
@@ -605,8 +616,9 @@ public final class ModerationWiring {
             ModerationSettings settings,
             ModerationGuard guard,
             InMemoryCommandSpyStore commandSpyStore,
+            CommandNames commandNames,
             Clock clock) {
-        MutedCommandPolicy mutedCommands = new MutedCommandPolicy(settings.mutedBlockedCommands());
+        MutedCommandPolicy mutedCommands = new MutedCommandPolicy(settings.mutedBlockedCommands(), commandNames);
         return List.of(
                 new ModerationLoginListener(services.loginEnforcement()),
                 new ModerationJoinListener(services.jailCountdown(), repository, clock),

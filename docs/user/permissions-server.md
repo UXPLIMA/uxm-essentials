@@ -158,7 +158,7 @@ The guard nodes are listed in [guard.md](guard.md#permissions).
 | `uxmessentials.moderation.sudo` | /sudo <player> <command>: run a command as another player. | op |
 | `uxmessentials.moderation.tempban` | /tempban <player> <duration> [reason]. | op |
 | `uxmessentials.moderation.templates` | /punish <player> <template>: apply a configured punishment template (a preset reason + optional duration) as a ban or tempban. | op |
-| `uxmessentials.moderation.togglejail` | /togglejail <player> [jail] [reason]: release the target if jailed, otherwise jail them in the named jail (or the first configured jail). | op |
+| `uxmessentials.moderation.togglejail` | /togglejail <player> [jail] [reason]: release the target if jailed, otherwise jail them in the named jail (or the default-jail setting). | op |
 | `uxmessentials.moderation.unjail` | /unjail <player>. | op |
 | `uxmessentials.moderation.unmute` | /unmute <player>. | op |
 | `uxmessentials.moderation.warn` | /warn <player> [reason], /tempwarn <player> <duration> [reason], /warns <player> and /unwarn <player>: issue (standing or timed), review and clear warning history. | op |
