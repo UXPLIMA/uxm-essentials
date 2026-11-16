@@ -1,4 +1,4 @@
-package com.uxplima.uxmessentials.playerwarps.application;
+package com.uxplima.uxmessentials.shared.application;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -9,10 +9,11 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.uxplima.uxmessentials.shared.application.port.ConfigStore;
 import org.jspecify.annotations.Nullable;
 
 /**
- * How many passwords one player may try on one player warp before they must wait. Up to {@code maxAttempts} tries
+ * How many passwords one player may try on one warp, a server warp or a player warp, before they must wait. Up to {@code maxAttempts} tries
  * within {@code lockout} of the first are allowed; the try that reaches the limit locks the player out of that warp's
  * password for {@code lockout}. A right password, or a window that passes without reaching the limit, starts the count
  * again.
@@ -25,8 +26,8 @@ import org.jspecify.annotations.Nullable;
  * accident: only the password bypass, which skips the password altogether, gets past it. A {@code lockout} of zero
  * turns the limit off, which an operator can only do on purpose in the config.
  *
- * <p>The count is keyed by the warp's {@code stableKey}, never by an id a later warp may reuse, and lives in this
- * server's memory: it starts again on a restart, and each server of a network counts the tries typed on it.
+ * <p>The count is keyed by the key the caller names the warp with (a player warp's {@code stableKey}, never an id a later
+ * warp may reuse; a server warp's name), and lives in this server's memory: it starts again on a restart, and each server of a network counts the tries typed on it.
  *
  * <h2>Concurrency</h2>
  * Ownership: <b>concurrent-collection</b>. Uses of a warp run on the async lane, so each player and warp's count is
@@ -59,6 +60,18 @@ public final class PasswordAttempts {
         this.maxAttempts = maxAttempts;
         this.lockout = lockout;
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    /**
+     * The limit a module's {@code password-attempts} block sets: {@code max-attempts} (at least one is always allowed)
+     * and {@code lockout-seconds} (0 is the only way to turn the limit off), each falling back to the shipped value.
+     */
+    public static PasswordAttempts fromConfig(ConfigStore config, Clock clock) {
+        Objects.requireNonNull(config, "config");
+        int maxAttempts = Math.max(1, config.getInt("password-attempts.max-attempts", DEFAULT_MAX_ATTEMPTS));
+        long lockoutSeconds =
+                Math.max(0L, config.getLong("password-attempts.lockout-seconds", DEFAULT_LOCKOUT.toSeconds()));
+        return new PasswordAttempts(maxAttempts, Duration.ofSeconds(lockoutSeconds), clock);
     }
 
     /** The shipped limit, on {@code clock}. */

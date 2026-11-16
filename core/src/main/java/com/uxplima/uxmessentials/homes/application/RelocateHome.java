@@ -33,6 +33,7 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
 public final class RelocateHome {
 
     private final HomeRepository repository;
+    private final HomeWorldLimit worldLimit;
     private final List<SethomeGuard> guards;
     private final Notifier notifier;
     private final DomainEventPublisher events;
@@ -43,6 +44,7 @@ public final class RelocateHome {
 
     public RelocateHome(
             HomeRepository repository,
+            HomeQuota quota,
             List<SethomeGuard> guards,
             Notifier notifier,
             DomainEventPublisher events,
@@ -51,6 +53,7 @@ public final class RelocateHome {
             Clock clock,
             Optional<String> recordedServer) {
         this.repository = Objects.requireNonNull(repository, "repository");
+        this.worldLimit = new HomeWorldLimit(quota, notifier);
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
@@ -79,6 +82,11 @@ public final class RelocateHome {
             HomeError error = outcome.errorOrThrow();
             notifier.send(owner, error.messageKey(), slotPlaceholder(slot));
             return Result.err(error);
+        }
+        // A home moved into another world counts toward that world's limit, so the limit cannot be walked past by
+        // setting homes elsewhere and moving them in.
+        if (!worldLimit.admits(set, slot, at.world())) {
+            return Result.err(HomeError.LIMIT_REACHED);
         }
         // Asked once our own rules have passed and before the charge, so a refused move costs the player nothing.
         if (!gate.allows(new HomeRelocating(owner, slot, at))) {

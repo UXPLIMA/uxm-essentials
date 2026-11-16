@@ -31,6 +31,7 @@ import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpId;
 import com.uxplima.uxmessentials.playerwarps.domain.PlayerWarpName;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpAccess;
 import com.uxplima.uxmessentials.playerwarps.domain.WarpTimingOverrides;
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.hop.HopArrival;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharge;
 import com.uxplima.uxmessentials.shared.application.hop.HopCharges;

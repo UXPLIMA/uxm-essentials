@@ -24,8 +24,9 @@ import com.uxplima.uxmessentials.shared.domain.Result;
 import com.uxplima.uxmessentials.shared.domain.Unit;
 
 /**
- * {@code /sethome}: create a home in a given slot at the player's current position. The owner's limit is
- * resolved through {@link HomeQuota} scoped to the home's world and folded into a maximum-slot count, then
+ * {@code /sethome}: create a home in a given slot at the player's current position. The owner's limit on all their
+ * homes is resolved through {@link HomeQuota} and folded into a maximum-slot count, and their limit in the home's world,
+ * if they hold one, is checked apart by {@link HomeWorldLimit}. Then
  * every registered {@link SethomeGuard} runs in order. The first failure short-circuits with its
  * {@link HomeError} and no aggregate change. If the guards pass, the aggregate gates the slot against the
  * range/occupancy/limit invariants and creates the home; if the transition succeeds, the optional economy
@@ -40,6 +41,7 @@ public final class CreateHomeAtSlot {
     private final HomeRepository repository;
     private final HomeInviteRepository invites;
     private final HomeQuota quota;
+    private final HomeWorldLimit worldLimit;
     private final List<SethomeGuard> guards;
     private final Notifier notifier;
     private final DomainEventPublisher events;
@@ -64,6 +66,7 @@ public final class CreateHomeAtSlot {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.invites = Objects.requireNonNull(invites, "invites");
         this.quota = Objects.requireNonNull(quota, "quota");
+        this.worldLimit = new HomeWorldLimit(quota, notifier);
         this.guards = List.copyOf(Objects.requireNonNull(guards, "guards"));
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.events = Objects.requireNonNull(events, "events");
@@ -83,7 +86,7 @@ public final class CreateHomeAtSlot {
         Objects.requireNonNull(slot, "slot");
         Objects.requireNonNull(at, "at");
         HomeSet set = repository.load(owner);
-        HomeLimit limit = quota.resolve(owner, at.world());
+        HomeLimit limit = quota.resolve(owner);
         int max = limit.maxSlots(unlimitedMaxSlots);
         Result<Unit, HomeError> guarded = runGuards(owner, slot, at);
         if (guarded.isErr()) {
@@ -93,6 +96,9 @@ public final class CreateHomeAtSlot {
         Result<HomeSet.Change, HomeError> outcome = set.createAt(slot, at, recordedServer, limit, max, clock.instant());
         if (outcome.isErr()) {
             return reject(set, limit, outcome.errorOrThrow());
+        }
+        if (!worldLimit.admits(set, slot, at.world())) {
+            return Result.err(HomeError.LIMIT_REACHED);
         }
         // Everything uxmEssentials itself would refuse has now passed, so this is the point to ask whether anybody
         // outside the plugin refuses it. Before the charge, so a vetoed create never takes the player's money.

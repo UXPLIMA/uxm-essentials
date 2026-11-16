@@ -10,6 +10,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import java.math.BigDecimal;
 import java.util.Optional;
 
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.teleport.PaidTeleports;
 import com.uxplima.uxmessentials.shared.application.teleport.TeleportOutcome;
 import com.uxplima.uxmessentials.shared.domain.PlayerRef;
@@ -48,6 +49,7 @@ class UseWarpTest {
     private static final BigDecimal START = new BigDecimal("100");
 
     private final MutableClock clock = new MutableClock(NOW);
+    private final PasswordAttempts attempts = PasswordAttempts.defaults(clock);
     private final SteppedScheduler scheduler = new SteppedScheduler(clock);
     private final WarpFakes.Warps warps = new WarpFakes.Warps();
     private final WarpFakes.Purse purse = new WarpFakes.Purse();
@@ -83,6 +85,7 @@ class UseWarpTest {
                 new WarpFakes.Online(),
                 WarpHops.local(LOBBY),
                 new PaidTeleports(scheduler, log),
+                attempts,
                 log);
     }
 
@@ -289,6 +292,34 @@ class UseWarpTest {
         assertThat(used.asError()).contains(WarpError.WRONG_PASSWORD);
         assertThat(purse.wallet).isEqualByComparingTo(START);
         assertThat(moves.made).isEmpty();
+    }
+
+    @Test
+    void wrongPasswordsUpToTheLimitLockTheWarpEvenForTheRightOneUntilTheLockoutEnds() {
+        warps.put(shop().withPassword(Optional.of("secret")));
+        UseWarp use = useWarp();
+        for (int i = 0; i < PasswordAttempts.DEFAULT_MAX_ATTEMPTS; i++) {
+            assertThat(use.use(ALEX, SHOP, "guess").asError()).contains(WarpError.WRONG_PASSWORD);
+        }
+
+        assertThat(use.use(ALEX, SHOP, "secret").asError()).contains(WarpError.RATE_LIMITED);
+        assertThat(notifier.keys()).last().isEqualTo("warp.rate-limited");
+        clock.advance(PasswordAttempts.DEFAULT_LOCKOUT);
+
+        assertThat(use.use(ALEX, SHOP, "secret").isOk()).isTrue();
+    }
+
+    @Test
+    void aRightPasswordStartsTheCountAgain() {
+        warps.put(shop().withPassword(Optional.of("secret")));
+        UseWarp use = useWarp();
+        use.use(ALEX, SHOP, "guess");
+        use.use(ALEX, SHOP, "guess");
+        use.use(ALEX, SHOP, "secret");
+
+        use.use(ALEX, SHOP, "guess");
+
+        assertThat(use.use(ALEX, SHOP, "guess").asError()).contains(WarpError.WRONG_PASSWORD);
     }
 
     @Test

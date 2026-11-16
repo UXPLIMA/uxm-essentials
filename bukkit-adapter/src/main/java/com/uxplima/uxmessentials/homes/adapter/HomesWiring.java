@@ -260,7 +260,7 @@ public final class HomesWiring {
                 clock,
                 recordedServer);
         RelocateHome relocateHome = new RelocateHome(
-                repository, guards, notifier, kernel.events(), kernel.gate(), charge, clock, recordedServer);
+                repository, quota, guards, notifier, kernel.events(), kernel.gate(), charge, clock, recordedServer);
         RenameHome renameHome = new RenameHome(repository, notifier, kernel.events(), clock);
         SetHomeIcon setHomeIcon = new SetHomeIcon(repository, notifier, kernel.events(), clock);
         SetHomeVisibility setHomeVisibility = new SetHomeVisibility(repository, notifier, kernel.events(), clock);
@@ -283,6 +283,7 @@ public final class HomesWiring {
                         recordedServer),
                 new RelocateHome(
                         repository,
+                        quota,
                         guards,
                         notifier,
                         kernel.events(),

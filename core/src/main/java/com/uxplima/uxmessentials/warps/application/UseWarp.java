@@ -5,6 +5,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
+import com.uxplima.uxmessentials.shared.application.PasswordAttempts;
 import com.uxplima.uxmessentials.shared.application.message.Notifier;
 import com.uxplima.uxmessentials.shared.application.permission.DestinationPermissions;
 import com.uxplima.uxmessentials.shared.application.port.Logger;
@@ -62,6 +63,7 @@ public final class UseWarp {
     private final PlayerLookup players;
     private final WarpHops hops;
     private final PaidTeleports paid;
+    private final PasswordAttempts passwordAttempts;
     private final Logger log;
 
     public UseWarp(
@@ -75,6 +77,7 @@ public final class UseWarp {
             PlayerLookup players,
             WarpHops hops,
             PaidTeleports paid,
+            PasswordAttempts passwordAttempts,
             Logger log) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.access = Objects.requireNonNull(access, "access");
@@ -86,6 +89,7 @@ public final class UseWarp {
         this.players = Objects.requireNonNull(players, "players");
         this.hops = Objects.requireNonNull(hops, "hops");
         this.paid = Objects.requireNonNull(paid, "paid");
+        this.passwordAttempts = Objects.requireNonNull(passwordAttempts, "passwordAttempts");
         this.log = Objects.requireNonNull(log, "log");
     }
 
@@ -267,6 +271,26 @@ public final class UseWarp {
         return Result.err(WarpError.TELEPORT_REFUSED);
     }
 
+    /**
+     * The password check, rate-limited by {@link PasswordAttempts} per player and warp as a player warp's is. The try
+     * is counted before the match, so tries racing each other cannot all pass the limit; a player locked out is refused
+     * {@link WarpError#RATE_LIMITED} before any match. A right password clears the count. The password bypass skips it.
+     */
+    private @Nullable WarpError passwordStep(PlayerRef recipient, Warp warp, Optional<String> entered) {
+        if (warp.password().isEmpty() || permissions.has(recipient, DestinationPermissions.WARP_BYPASS_PASSWORD)) {
+            return null;
+        }
+        String key = "warp:" + warp.name().value();
+        if (passwordAttempts.reserve(recipient.uuid(), key).isPresent()) {
+            return WarpError.RATE_LIMITED;
+        }
+        if (entered.equals(warp.password())) {
+            passwordAttempts.succeeded(recipient.uuid(), key);
+            return null;
+        }
+        return WarpError.WRONG_PASSWORD;
+    }
+
     /** The first check {@code recipient} fails before any money moves, or null when they pass them all. */
     private @Nullable WarpError refusal(PlayerRef recipient, Warp warp, Optional<String> enteredPassword) {
         if (!access.permits(recipient, warp)) {
@@ -275,10 +299,9 @@ public final class UseWarp {
         if (warp.isLocked() && !permissions.has(recipient, DestinationPermissions.WARP_BYPASS_LOCK)) {
             return WarpError.LOCKED;
         }
-        if (warp.password().isPresent()
-                && !permissions.has(recipient, DestinationPermissions.WARP_BYPASS_PASSWORD)
-                && !enteredPassword.equals(warp.password())) {
-            return WarpError.WRONG_PASSWORD;
+        WarpError password = passwordStep(recipient, warp, enteredPassword);
+        if (password != null) {
+            return password;
         }
         // A warp on another backend points into a world this one does not hold, so only the target can judge it.
         if (!hops.routes(warp)

@@ -89,6 +89,7 @@ class PermissionFamiliesTest {
             checked(tier(cooldownNode("skin"), "30"), "30"),
             checked(tier(RtpRadiusTier.FAMILY.node(), "2000"), "2000"),
             checked(tier(DestinationPermissions.HOME_LIMIT, "5"), "5"),
+            checked(tier(DestinationPermissions.homeWorldLimit("nether"), "2"), "nether", "2"),
             checked(DestinationPermissions.warpUse("spawn"), "spawn"),
             checked(tier(PlayerWarpQuota.FAMILY.node(), "3"), "3"),
             checked(tier(DestinationPermissions.pwarpWorldLimit("nether"), "2"), "nether", "2"),

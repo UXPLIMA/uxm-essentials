@@ -140,6 +140,14 @@ public final class DestinationPermissions {
         return PWARP_LIMIT + "." + world;
     }
 
+    /**
+     * The head of the home quota in one world; the number held is appended to it. It caps the owner's homes in
+     * {@code world} only, beside the {@link #HOME_LIMIT} cap on all of them.
+     */
+    public static String homeWorldLimit(String world) {
+        return HOME_LIMIT + "." + world;
+    }
+
     /** The node a player needs to enter {@code world} when it is restricted. */
     public static String worldEnter(String world) {
         return WORLD_PREFIX + world + ".enter";
@@ -183,6 +191,12 @@ public final class DestinationPermissions {
                 PermissionSpec.family(
                         HOME_LIMIT + ".<n>",
                         "How many homes you may keep; the largest tier held wins.",
+                        PermissionDefault.TRUE,
+                        PermissionShape.QUOTA,
+                        HOMES),
+                PermissionSpec.family(
+                        homeWorldLimit("<world>") + ".<n>",
+                        "How many homes you may keep in one world, counting only your homes there; the largest tier held wins. The limit across every world still applies.",
                         PermissionDefault.TRUE,
                         PermissionShape.QUOTA,
                         HOMES),

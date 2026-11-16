@@ -24,18 +24,32 @@ import com.uxplima.uxmessentials.shared.domain.Unit;
  * ({@link PlayerWarpError#NOT_FOUND} when absent), gates the actor ({@link PlayerWarpError#NO_PERMISSION} when they
  * are not the owner), then re-owns the warp in place: the members, whitelist, bans, accrued earnings, and history
  * stay with the warp, only the owner identity moves.
+ *
+ * <p>The new owner's limits apply as if they had set the warp themselves: their limit on all their warps, and their
+ * limit in the warp's world. A transfer that would put them past either is refused with
+ * {@link PlayerWarpError#LIMIT_REACHED}, and the warp stays with its owner. The operator's {@link #adminSetOwner} is not
+ * held to them, as an operator moving a warp is not.
  */
 public final class TransferPlayerWarp {
 
     private final PlayerWarpRepository repository;
     private final WarpAuthorization authorization;
+    private final PlayerWarpQuota quota;
+    private final PlayerWarpWorldLimit worldLimit;
     private final Notifier notifier;
     private final Clock clock;
 
     public TransferPlayerWarp(
-            PlayerWarpRepository repository, WarpAuthorization authorization, Notifier notifier, Clock clock) {
+            PlayerWarpRepository repository,
+            WarpAuthorization authorization,
+            PlayerWarpQuota quota,
+            PlayerWarpWorldLimit worldLimit,
+            Notifier notifier,
+            Clock clock) {
         this.repository = Objects.requireNonNull(repository, "repository");
         this.authorization = Objects.requireNonNull(authorization, "authorization");
+        this.quota = Objects.requireNonNull(quota, "quota");
+        this.worldLimit = Objects.requireNonNull(worldLimit, "worldLimit");
         this.notifier = Objects.requireNonNull(notifier, "notifier");
         this.clock = Objects.requireNonNull(clock, "clock");
     }
@@ -61,6 +75,13 @@ public final class TransferPlayerWarp {
         if (isSponsored(warp)) {
             notifier.send(actor, PlayerWarpError.SPONSORED_LOCKED.messageKey(), Map.of("warp", name.value()));
             return Result.err(PlayerWarpError.SPONSORED_LOCKED);
+        }
+        if (!warp.owner().equals(newOwner) && !hasRoomFor(newOwner, warp)) {
+            notifier.send(
+                    actor,
+                    PlayerwarpsMessageKey.PWARP_TRANSFER_LIMIT_REACHED,
+                    Map.of("warp", name.value(), "player", newOwner.name()));
+            return Result.err(PlayerWarpError.LIMIT_REACHED);
         }
         repository.save(warp.transferredTo(newOwner, newOwner.name(), clock.instant()));
         notifier.send(
@@ -93,6 +114,13 @@ public final class TransferPlayerWarp {
         }
         repository.save(warp.transferredTo(newOwner, newOwner.name(), clock.instant()));
         return Result.ok();
+    }
+
+    /** Whether {@code newOwner} may own one more warp, in all and in {@code warp}'s world. */
+    private boolean hasRoomFor(PlayerRef newOwner, PlayerWarp warp) {
+        int owned = repository.ownedBy(newOwner).size();
+        return !quota.resolve(newOwner).isReachedAt(owned)
+                && worldLimit.hasRoom(newOwner, warp.location().world());
     }
 
     /** True while {@code warp} holds a sponsorship still live at the current instant. */
