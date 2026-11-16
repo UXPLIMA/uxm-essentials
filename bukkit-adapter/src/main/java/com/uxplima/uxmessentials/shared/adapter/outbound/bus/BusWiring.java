@@ -56,6 +56,7 @@ public final class BusWiring {
                             + " backends left on the same name drop each other's sync frames.",
                     network.serverId());
         }
+        network.busSecretProblem().ifPresent(problem -> log.warn("{}", problem));
         RemoteSyncRegistry registry = new RemoteSyncRegistry();
         Carriers carriers = selectTransport(plugin, network, scheduler, log);
         BusTransport transport = carriers.transport();
@@ -127,7 +128,13 @@ public final class BusWiring {
     private static PluginMessagingTransport pluginMessaging(
             Plugin plugin, NetworkConfig network, Scheduler scheduler, Logger log) {
         return new PluginMessagingTransport(
-                plugin, scheduler, network.channel(), network.outboundQueueSize(), network.peerLivenessWindow(), log);
+                plugin,
+                scheduler,
+                network.channel(),
+                network.outboundQueueSize(),
+                network.peerLivenessWindow(),
+                network.busSecret(),
+                log);
     }
 
     /**

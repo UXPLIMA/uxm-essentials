@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The plugin-messaging {@link BusTransport}: it moves opaque frame bytes over a carrier player's connection
  * through the proxy. Registers the plugin-messaging channel with Bukkit's {@code Messenger}, buffers outbound
- * frames and flushes them on any online player, and feeds every inbound frame's bytes back to the
+ * frames and flushes them on any online player, and feeds every trusted inbound frame's bytes back to the
  * {@code onFrame} sink the {@link BusCore} above the seam registers. It knows nothing about
  * {@code NetworkMessage} or the codec, the encode/decode, origin stamp, self-origin loop sentinel and listener
  * dispatch all live above this seam in {@link BusCore}; only the byte-moving machinery is here.
@@ -41,12 +41,20 @@ import org.jspecify.annotations.Nullable;
  * the plugin runs fully local. This is the "degrades to local-only when no proxy/peer responds" contract:
  * nothing about the single-server happy path depends on the transport.
  *
+ * <h2>Trust</h2>
+ * Whatever sits in front of a backend decides whether a player's client can write on the channel: the
+ * {@code uxmEssentials-velocity} broker stops it, but a proxy without the broker, a BungeeCord proxy, or a backend
+ * players reach directly passes it on. So every frame is sealed with the shared {@link BusSecret} when it leaves, and
+ * an inbound frame reaches the core only when its {@link FrameSeal} checks out; the rest are counted and reported by
+ * {@link RefusedFrameReport}. Without a usable secret the channel is never registered: nothing is sent, and nothing a
+ * client writes is read.
+ *
  * <h2>Proxy contact</h2>
- * A registered channel proves nothing about the proxy: without the {@code uxmEssentials-velocity} broker every frame
- * leaves and none comes back from another backend. With the broker, a frame arrives as a peer's frame or as this
- * backend's own heartbeat, which the broker returns to its sender. {@link #link()} reports when a frame last arrived,
- * which {@code /uxmess doctor} reads as the proxy answering. It is a diagnostic: without the broker Velocity passes a
- * client's plugin messages on to the backend, so a frame on the channel is evidence of the broker, not proof.
+ * A registered channel proves nothing about the proxy: without the broker every frame leaves and none comes back from
+ * another backend. With the broker, a frame arrives as a peer's frame or as this backend's own heartbeat, which the
+ * broker returns to its sender. {@link #link()} reports when a signed frame last arrived, which {@code /uxmess doctor}
+ * reads as the proxy answering. A client that receives this backend's frames (with no broker in front) could hand a
+ * heartbeat straight back, so it stays a diagnostic; that client still cannot forge a frame the core acts on.
  * {@link #link()} also says whether the last flush found nobody online to carry the queue, the other reason frames
  * stop.
  */
@@ -64,6 +72,8 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     private final OversizeFrameReport oversize;
     private final LongSupplier clock;
     private final Duration answerWindow;
+    private final @Nullable FrameSeal seal;
+    private final RefusedFrameReport refusals;
 
     private volatile boolean running;
     private volatile long lastHeardMillis = NEVER;
@@ -71,8 +81,9 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     private @Nullable Consumer<byte[]> onFrame;
 
     /**
-     * A transport on {@code channel} that counts the proxy as answering while a frame came back within
-     * {@code answerWindow}, a few heartbeats, so one late frame does not flip it.
+     * A transport on {@code channel} that signs and checks frames with {@code secret}, and counts the proxy as
+     * answering while a signed frame came back within {@code answerWindow}, a few heartbeats, so one late frame does
+     * not flip it. A secret that is not {@link BusSecret#usable() usable} leaves the channel closed.
      */
     public PluginMessagingTransport(
             Plugin plugin,
@@ -80,6 +91,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             String channel,
             int outboundQueueSize,
             Duration answerWindow,
+            BusSecret secret,
             Logger log) {
         this(
                 new BukkitChannel(plugin, channel),
@@ -87,6 +99,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
                 channel,
                 outboundQueueSize,
                 answerWindow,
+                secret,
                 log,
                 System::currentTimeMillis);
     }
@@ -97,9 +110,13 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
             String channel,
             int outboundQueueSize,
             Duration answerWindow,
+            BusSecret secret,
             Logger log,
             LongSupplier clock) {
+        Objects.requireNonNull(secret, "secret");
         this.oversize = new OversizeFrameReport(Objects.requireNonNull(log, "log"), clock);
+        this.refusals = new RefusedFrameReport(log, clock);
+        this.seal = secret.usable() ? new FrameSeal(secret, clock) : null;
         this.pluginChannel = Objects.requireNonNull(pluginChannel, "pluginChannel");
         this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
         this.channel = Objects.requireNonNull(channel, "channel");
@@ -111,10 +128,16 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         this.answerWindow = Objects.requireNonNull(answerWindow, "answerWindow");
     }
 
-    /** Register the plugin-messaging channel and route every inbound frame's bytes to {@code onFrame}. */
+    /**
+     * Register the plugin-messaging channel and route the bytes of every trusted inbound frame to {@code onFrame}.
+     * Without a usable secret nothing is registered and the transport stays stopped.
+     */
     @Override
     public void start(Consumer<byte[]> onFrame) {
         this.onFrame = Objects.requireNonNull(onFrame, "onFrame");
+        if (seal == null) {
+            return;
+        }
         pluginChannel.open(this);
         running = true;
     }
@@ -132,6 +155,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         }
         lastHeardMillis = NEVER;
         waitingForPlayer = false;
+        refusals.reset();
     }
 
     /**
@@ -145,9 +169,10 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         if (!running) {
             return;
         }
-        if (frame.length > BusChannel.MAX_FRAME_BYTES) {
+        int sealedLength = frame.length + FrameSeal.TRAILER_BYTES;
+        if (sealedLength > BusChannel.MAX_FRAME_BYTES) {
             // The proxy relays the frame serverbound, and a backend disconnects the carrier for a payload this large.
-            oversize.dropped(frame.length);
+            oversize.dropped(sealedLength);
             return;
         }
         synchronized (outbound) {
@@ -160,7 +185,7 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     }
 
     /**
-     * True when the channel is registered and a frame came back through the proxy within the answer window. A
+     * True when the channel is registered and a signed frame came back through the proxy within the answer window. A
      * registered channel alone is not enough, since frames leave whether or not anything on the proxy relays them.
      */
     @Override
@@ -169,13 +194,18 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
     }
 
     /**
-     * What the doctor reports for this carrier: whether the channel is up, when the proxy last answered, and whether
-     * the last flush found nobody online to carry the queue.
+     * What the doctor reports for this carrier: whether it has a secret to sign with, whether the channel is up, when
+     * the proxy last answered, whether the last flush found nobody online to carry the queue, and what was refused.
      */
     BusHealth.ProxyLink link() {
         long heard = lastHeardMillis;
         return new BusHealth.ProxyLink(
-                running, heard == NEVER ? OptionalLong.empty() : OptionalLong.of(heard), waitingForPlayer);
+                seal != null,
+                running,
+                heard == NEVER ? OptionalLong.empty() : OptionalLong.of(heard),
+                waitingForPlayer,
+                refusals.count(),
+                refusals.last());
     }
 
     @Override
@@ -183,20 +213,38 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         received(inboundChannel, frame);
     }
 
-    /** Take one inbound frame: note that the proxy answered, then hand the bytes to the core off the tick thread. */
+    /**
+     * Take one inbound frame off the tick thread: check its seal, then note that the proxy answered and hand the frame
+     * to the core, or count it as refused.
+     */
     void received(String inboundChannel, byte[] frame) {
         Consumer<byte[]> sink = onFrame;
-        if (!running || sink == null || !channel.equals(inboundChannel)) {
+        FrameSeal check = seal;
+        if (!running || sink == null || check == null || !channel.equals(inboundChannel)) {
             return;
         }
-        lastHeardMillis = clock.getAsLong();
-        // Hand the bytes off the tick thread: this handler may run on the carrier's region thread and the core's
-        // decode + dispatch does cache work, not Bukkit work.
+        // Off the tick thread: this handler may run on the carrier's region thread, and the signature check and the
+        // core's decode + dispatch do no Bukkit work.
         byte[] copy = frame.clone();
-        scheduler.async(() -> sink.accept(copy));
+        scheduler.async(() -> {
+            if (!running) {
+                return;
+            }
+            FrameSeal.Check verdict = check.check(copy);
+            if (verdict != FrameSeal.Check.TRUSTED) {
+                refusals.refused(verdict);
+                return;
+            }
+            lastHeardMillis = clock.getAsLong();
+            sink.accept(FrameSeal.frame(copy));
+        });
     }
 
     private void flush() {
+        FrameSeal sealer = seal;
+        if (sealer == null) {
+            return;
+        }
         Consumer<byte[]> carrier = pluginChannel.carrier();
         // Read on the global thread, where the online list may be asked; the doctor only reads the flag.
         waitingForPlayer = carrier == null;
@@ -205,8 +253,9 @@ public final class PluginMessagingTransport implements PluginMessageListener, Bu
         }
         // Drain the buffer through one carrier. The proxy routes by channel, not by the carrier identity, so any
         // online player can carry a server-wide frame.
+        // Sealed as it leaves, not when queued, so a frame that waited for a player is not stale on arrival.
         for (byte[] frame = drainOne(); frame.length > 0; frame = drainOne()) {
-            carrier.accept(frame);
+            carrier.accept(sealer.seal(frame));
         }
     }
 

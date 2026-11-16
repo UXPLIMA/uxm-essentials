@@ -34,6 +34,8 @@ import org.jspecify.annotations.NullMarked;
  *     safety net for frames the transport lost; {@code 0} turns the timer off
  * @param sharedSets the shared sets this backend belongs to, which decide where a hologram, an NPC or a main spawn
  *     scoped to {@code set:<name>} applies
+ * @param busSecret the secret every backend signs and checks plugin-channel frames with; without a usable one the
+ *     proxy carrier stays off
  */
 @NullMarked
 public record NetworkConfig(
@@ -46,7 +48,8 @@ public record NetworkConfig(
         boolean transportRecognized,
         Redis redis,
         int cacheRefreshSeconds,
-        List<String> sharedSets) {
+        List<String> sharedSets,
+        BusSecret busSecret) {
 
     private static final int DEFAULT_QUEUE = 256;
     private static final int DEFAULT_HEARTBEAT_SECONDS = 30;
@@ -62,6 +65,7 @@ public record NetworkConfig(
         Objects.requireNonNull(channel, "channel");
         Objects.requireNonNull(transport, "transport");
         Objects.requireNonNull(redis, "redis");
+        Objects.requireNonNull(busSecret, "busSecret");
         if (serverId.isBlank()) {
             throw new IllegalArgumentException("server-id must not be blank");
         }
@@ -123,6 +127,21 @@ public record NetworkConfig(
      */
     public boolean relaysThroughProxy() {
         return transport != Transport.REDIS;
+    }
+
+    /**
+     * What keeps the proxy carrier off, for the start log: empty when the carrier is not used or has a usable secret.
+     * The secret itself is never part of the text.
+     */
+    public java.util.Optional<String> busSecretProblem() {
+        if (!enabled || !relaysThroughProxy() || busSecret.usable()) {
+            return java.util.Optional.empty();
+        }
+        String state = busSecret.blank() ? "is not set" : "is shorter than " + BusSecret.MIN_LENGTH + " characters";
+        return java.util.Optional.of("network.bus.secret in config.conf " + state + ", so this backend neither sends"
+                + " nor accepts bus frames through the proxy: a player's client can write on that channel too, and"
+                + " only a signature tells the two apart. Put the same secret of " + BusSecret.MIN_LENGTH
+                + " or more characters on every backend (the proxy needs none) and restart");
     }
 
     /** The carrier(s) the bus rides. {@link #VELOCITY} is the proxy default: no Redis connection is opened. */
@@ -250,6 +269,7 @@ public record NetworkConfig(
                 parsed.isPresent(),
                 Redis.from(config),
                 cacheRefresh,
-                sets);
+                sets,
+                BusSecret.of(config.getString("network.bus.secret", "")));
     }
 }

@@ -14,6 +14,7 @@ or does across servers.
 | `network.enabled = true` | `config.conf` on every backend | Off, a backend runs alone and records no server on anything. |
 | A unique `network.server-name` per backend, equal to the name the proxy gives it | `config.conf` | See [the server name](#the-server-name). |
 | A carrier for the bus | the `uxmEssentials-velocity` jar on the proxy, or the `uxmEssentials-redis` jar on every backend | See [carriers](#carriers). |
+| The same `network.bus.secret` on every backend, for the Velocity carrier | `config.conf` | Without it the Velocity carrier is off. See [signed frames](#signed-frames). |
 | The same release on every backend and the proxy | `plugins/` | See [upgrading a network](#upgrading-a-network). |
 
 A server of the network that has no business in the shared database (a creative or build server) keeps the same
@@ -91,6 +92,30 @@ Plugin messages ride a player's connection, which sets the limits:
 - A frame larger than 32767 bytes is never sent; the log reports the drop, at most once a minute.
 - `network.bus-channel` must match the proxy. Leave it as shipped.
 
+#### Signed frames
+
+A player's client can send messages on the bus channel too. The proxy plugin stops them, but a proxy without it, a
+BungeeCord proxy, or a backend players can join directly passes them on. So every backend signs the frames it sends
+through the proxy with `network.bus.secret` and acts only on frames signed with the same secret:
+
+```hocon
+network {
+  bus {
+    secret = "paste 32 or more random characters here"
+  }
+}
+```
+
+- Use 32 or more random characters, for example the output of `openssl rand -hex 32`, and the same value on every
+  backend. The proxy needs none: it relays signed frames unchanged. Keep it out of anything you share.
+- While it is empty or shorter, `transport = "velocity"` and `"both"` send and accept nothing through the proxy. The
+  start log says so, and `/uxmess doctor` reads `proxy OFF`. Redis needs no secret: only the backends reach it.
+- A frame signed with another secret, or more than 60 seconds away from this backend's clock, is refused and logged
+  at most once a minute, and the doctor reads `REFUSED`. Keep every backend on the same secret and release, and their
+  clocks in time. A client sending forged frames shows the same way.
+- The signed time also stops a captured frame from being replayed later. Within the 60 seconds, a frame that acts
+  carries an id and acts once, and a repeated cache update is harmless.
+
 ### Redis (`transport = "redis"`)
 
 Put `uxmEssentials-redis` in `plugins/` of every backend and fill `network.redis` (`host`, `port`, `password`,
@@ -123,11 +148,13 @@ Backend commands are gated by the `commandcontrol` module on each backend.
 
 `/uxmess doctor` on a backend shows:
 
-- the bus line: disabled, or one verdict per carrier. Velocity reads connected only while frames come back through
-  the proxy plugin, at least once in three heartbeats. Frames ride a player's connection, so with nobody online on
+- the bus line: disabled, or one verdict per carrier. Velocity reads `proxy OFF` without a usable
+  `network.bus.secret`, and connected only while signed frames come back through the proxy plugin, at least once in
+  three heartbeats. Frames ride a player's connection, so with nobody online on
   the backend it reads `idle` and says so. Otherwise it reads `NOT ANSWERING`: install `uxmEssentials-velocity`, or
   update it to the same release, since an older proxy jar does not answer. Redis reads connected while its
-  connection is up, `DISCONNECTED` otherwise. A carrier not working is a warning, since the backends reached only
+  connection is up, `DISCONNECTED` otherwise. Frames refused for a wrong secret or clock in the same three heartbeats
+  add `REFUSED` and the count. A carrier not working, or refusing frames, is a warning, since the backends reached only
   through it are cut off. Idle is a warning on Velocity alone, but not with `both` while Redis is connected;
 - the peers line: how many other backends sent a heartbeat recently (`network.heartbeat-seconds`, default 30; a peer
   drops out after three missed beats) and how long ago. This is the line that shows frames arrive: on a working
@@ -279,7 +306,8 @@ same everywhere so transaction times agree.
    release ignores frame types it does not know, and the proxy relays frames it does not know, but mixed releases
    are not supported.
 2. Back up the database first. Migrations run on the first backend that starts.
-3. Before that start, give every backend its own `network.server-name`, equal to its proxy name. A release that
+3. Before that start, give every backend its own `network.server-name`, equal to its proxy name, and, for the
+   Velocity carrier, the same `network.bus.secret` (see [signed frames](#signed-frames)). A release that
    records servers clears warps and player warps recorded under `server-1`, and each backend claims its rows by world
    at its first start under a real name.
 4. Start one backend, read its log, then start the others. Check the claim lines (`event=warp_server_claim`,

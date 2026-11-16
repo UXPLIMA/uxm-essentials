@@ -33,6 +33,10 @@ import org.slf4j.Logger;
  * own frame, but its transport counts it as an answer from the broker, which is how {@code /uxmess doctor} on a
  * backend tells a proxy running this plugin from one without it, where frames leave and nothing relays them.
  *
+ * <p>Backends sign each frame with their shared {@code network.bus.secret} and check the signature on arrival. The
+ * signature trails the frame, so the header read here is where it always was, and the broker relays the bytes unchanged
+ * without holding the secret.
+ *
  * <p>Every relayed frame is marked {@link PluginMessageEvent.ForwardResult#handled() handled} so the proxy
  * does not also forward it onward through its default plugin-message routing. A frame that fails to decode
  * (a truncated or version-incompatible payload) is dropped with a logged warning rather than relayed blind.

@@ -15,9 +15,9 @@ import org.jspecify.annotations.NullMarked;
  *
  * <p>The two carriers prove different things. A Redis subscribe connection that is up reaches the broker every peer
  * subscribes to, so its flag is the answer. The proxy carrier sends frames whether or not anything on the proxy
- * relays them, so all it can show is when a frame last came back through the broker. Every read is a cheap
- * volatile-field read, never a blocking connect, so the doctor may call it on the run thread. A disabled backend
- * reports {@code enabled() == false} and the doctor reads nothing else.
+ * relays them, so all it can show is when a signed frame last came back through the broker, and how many frames on
+ * the channel it refused. Every read is a cheap volatile-field read, never a blocking connect, so the doctor may call
+ * it on the run thread. A disabled backend reports {@code enabled() == false} and the doctor reads nothing else.
  */
 @NullMarked
 public interface BusHealth {
@@ -40,15 +40,27 @@ public interface BusHealth {
     /**
      * The proxy carrier at one moment.
      *
+     * @param signing whether {@code network.bus.secret} is set and long enough; without it the carrier stays off, since
+     *     a backend cannot tell a frame from the proxy broker from one a player's client wrote
      * @param registered whether the plugin-messaging channel is registered, false until the bus starts
-     * @param lastAnswerMillis when a frame last arrived through the proxy broker, in epoch milliseconds, empty
+     * @param lastAnswerMillis when a signed frame last arrived through the proxy broker, in epoch milliseconds, empty
      *     when none has since the bus started
      * @param waitingForPlayer whether the last attempt to send found nobody online on this backend to carry frames
+     * @param refusedFrames how many frames on the channel were refused for a missing or wrong signature, or a signed
+     *     time too far from this server's clock, since the bus started
+     * @param lastRefusedMillis when the last frame was refused, in epoch milliseconds, empty when none was
      */
-    record ProxyLink(boolean registered, OptionalLong lastAnswerMillis, boolean waitingForPlayer) {
+    record ProxyLink(
+            boolean signing,
+            boolean registered,
+            OptionalLong lastAnswerMillis,
+            boolean waitingForPlayer,
+            long refusedFrames,
+            OptionalLong lastRefusedMillis) {
 
         public ProxyLink {
             Objects.requireNonNull(lastAnswerMillis, "lastAnswerMillis");
+            Objects.requireNonNull(lastRefusedMillis, "lastRefusedMillis");
         }
 
         /** Whether the channel is up and the proxy answered no longer than {@code window} before {@code now}. */
@@ -56,6 +68,11 @@ public interface BusHealth {
             return registered
                     && lastAnswerMillis.isPresent()
                     && now - lastAnswerMillis.getAsLong() <= window.toMillis();
+        }
+
+        /** Whether a frame was refused no longer than {@code window} before {@code now}. */
+        public boolean refusedWithin(long now, Duration window) {
+            return lastRefusedMillis.isPresent() && now - lastRefusedMillis.getAsLong() <= window.toMillis();
         }
     }
 }
