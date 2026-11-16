@@ -33,7 +33,7 @@ class LoginEnforcementTest {
         repository.saveIpBan(
                 new IpBan(BANNED, Optional.empty(), Optional.empty(), Optional.empty(), Issuer.of(ALEX), NOW));
 
-        LoginEnforcement.Decision decision = login.evaluate(ALEX, BANNED, false, false);
+        LoginEnforcement.Decision decision = Logins.check(login, ALEX, BANNED, false, false);
 
         assertThat(decision.allowed()).isFalse();
         assertThat(decision.kickReason()).contains(ModerationMessageKey.BANIP_KICK.key());
@@ -44,7 +44,7 @@ class LoginEnforcementTest {
         repository.saveIpBan(
                 new IpBan(BANNED, Optional.empty(), Optional.empty(), Optional.empty(), Issuer.of(ALEX), NOW));
 
-        LoginEnforcement.Decision decision = login.evaluate(ALEX, BANNED, false, true);
+        LoginEnforcement.Decision decision = Logins.check(login, ALEX, BANNED, false, true);
 
         assertThat(decision.allowed()).isTrue();
     }

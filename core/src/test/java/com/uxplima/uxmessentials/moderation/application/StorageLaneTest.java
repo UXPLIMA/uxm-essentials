@@ -106,7 +106,7 @@ class StorageLaneTest {
         scheduler.runAll();
 
         assertThat(online.kicked()).isEmpty();
-        assertThat(login.evaluate(SAM, ADDRESS, false, false).allowed()).isFalse();
+        assertThat(Logins.check(login, SAM, ADDRESS, false, false).allowed()).isFalse();
     }
 
     @Test
