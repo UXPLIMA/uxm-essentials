@@ -165,7 +165,7 @@ public record GuardConfig(
                 if (!RoleName.BUILT_IN.contains(role)) {
                     roles.add(role);
                 }
-            } catch (IllegalArgumentException e) {
+            } catch (IllegalArgumentException invalid) {
                 problems.accept("roles.extra: not a role name: " + raw);
             }
         }
@@ -248,7 +248,7 @@ public record GuardConfig(
                 return Optional.empty();
             }
             return Optional.of(new Rule(action, target.get(), effect.get()));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             return Optional.empty();
         }
     }

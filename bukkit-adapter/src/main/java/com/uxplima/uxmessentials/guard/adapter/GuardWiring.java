@@ -191,8 +191,8 @@ public final class GuardWiring {
             if (error == null && !service.loadFailed()) {
                 try {
                     backups.write(service.all(), "start", config.backupsKept());
-                } catch (RuntimeException e) {
-                    warn.accept("guard start backup failed: " + e.getMessage());
+                } catch (RuntimeException failure) {
+                    warn.accept("guard start backup failed: " + failure.getMessage());
                 }
             }
         });
@@ -218,8 +218,8 @@ public final class GuardWiring {
                                             .minus(Duration.ofDays(
                                                     service.config().denialLog().keepDays())));
                                 }
-                            } catch (RuntimeException e) {
-                                warn.accept("guard denial log write failed: " + e.getMessage());
+                            } catch (RuntimeException failure) {
+                                warn.accept("guard denial log write failed: " + failure.getMessage());
                             }
                         }),
                         Duration.ofSeconds(5),
@@ -246,8 +246,8 @@ public final class GuardWiring {
                 kernel.scheduler().async(() -> {
                     try {
                         names.complete(backups.list());
-                    } catch (RuntimeException e) {
-                        names.completeExceptionally(e);
+                    } catch (RuntimeException failure) {
+                        names.completeExceptionally(failure);
                     }
                 });
                 return names;
@@ -271,9 +271,9 @@ public final class GuardWiring {
                                 done.complete(Optional.of(new GuardCommand.Restored(outcome, before)));
                             }
                         });
-                    } catch (RuntimeException e) {
-                        warn.accept("guard backup restore failed: " + e.getMessage());
-                        done.completeExceptionally(e);
+                    } catch (RuntimeException failure) {
+                        warn.accept("guard backup restore failed: " + failure.getMessage());
+                        done.completeExceptionally(failure);
                     }
                 });
                 return done;
@@ -318,8 +318,8 @@ public final class GuardWiring {
             tracks.restoreAll(plugin.getServer().getOnlinePlayers());
             try {
                 runtime.flushLog();
-            } catch (RuntimeException e) {
-                warn.accept("guard denial log flush on stop failed: " + e.getMessage());
+            } catch (RuntimeException failure) {
+                warn.accept("guard denial log flush on stop failed: " + failure.getMessage());
             }
         };
         Objects.requireNonNull(loaded, "loaded");

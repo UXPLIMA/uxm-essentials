@@ -613,7 +613,7 @@ public final class PlayerTracks {
     private static int parseInt(String raw, int fallback) {
         try {
             return Integer.parseInt(raw.strip());
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return fallback;
         }
     }

@@ -87,8 +87,8 @@ public final class BukkitWorldEngine implements WorldEngine {
                 return Result.err(WorldError.IO_ERROR);
             }
             return Result.ok();
-        } catch (RuntimeException e) {
-            log.error("Failed to create/load world " + name.value(), e);
+        } catch (RuntimeException failure) {
+            log.error("Failed to create/load world " + name.value(), failure);
             return Result.err(WorldError.IO_ERROR);
         }
     }
@@ -139,8 +139,8 @@ public final class BukkitWorldEngine implements WorldEngine {
         try (var paths = Files.walk(folder)) {
             paths.sorted(Comparator.reverseOrder()).forEach(this::deleteQuietly);
             return Files.exists(folder) ? Result.err(WorldError.IO_ERROR) : Result.ok();
-        } catch (IOException e) {
-            log.error("Failed to delete world folder " + name.value(), e);
+        } catch (IOException ioFailure) {
+            log.error("Failed to delete world folder " + name.value(), ioFailure);
             return Result.err(WorldError.IO_ERROR);
         }
     }
@@ -148,8 +148,8 @@ public final class BukkitWorldEngine implements WorldEngine {
     private void deleteQuietly(Path path) {
         try {
             Files.deleteIfExists(path);
-        } catch (IOException e) {
-            log.error("Failed to delete " + path, e);
+        } catch (IOException ioFailure) {
+            log.error("Failed to delete " + path, ioFailure);
         }
     }
 
@@ -232,8 +232,8 @@ public final class BukkitWorldEngine implements WorldEngine {
         Set<WorldName> names = new HashSet<>();
         try {
             folders.onDisk().forEach(name -> addIfValid(names, name));
-        } catch (UncheckedIOException e) {
-            log.error("Failed to scan the world folders", e);
+        } catch (UncheckedIOException ioFailure) {
+            log.error("Failed to scan the world folders", ioFailure);
         }
         return names;
     }
@@ -266,7 +266,7 @@ public final class BukkitWorldEngine implements WorldEngine {
     private void addIfValid(Set<WorldName> names, String name) {
         try {
             names.add(WorldName.of(name));
-        } catch (IllegalArgumentException e) {
+        } catch (IllegalArgumentException invalid) {
             log.warn("Skipping world folder with an unusable name: {}", name);
         }
     }

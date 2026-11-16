@@ -61,8 +61,8 @@ public final class ViaVersionClientProtocol implements ClientProtocol {
         Objects.requireNonNull(who, "who");
         try {
             return read(who.uuid());
-        } catch (Throwable t) {
-            return degrade(t);
+        } catch (Throwable failure) {
+            return degrade(failure);
         }
     }
 

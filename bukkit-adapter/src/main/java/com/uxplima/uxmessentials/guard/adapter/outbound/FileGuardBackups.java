@@ -60,8 +60,8 @@ public final class FileGuardBackups implements GuardBackups {
                 Files.deleteIfExists(folder.resolve(all.get(i)));
             }
             return name;
-        } catch (IOException e) {
-            throw new UncheckedIOException("guard backup could not be written", e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException("guard backup could not be written", ioFailure);
         }
     }
 
@@ -73,8 +73,8 @@ public final class FileGuardBackups implements GuardBackups {
         }
         try {
             return RegionJson.readAll(Files.readString(file, StandardCharsets.UTF_8));
-        } catch (IOException e) {
-            throw new UncheckedIOException("guard backup could not be read", e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException("guard backup could not be read", ioFailure);
         }
     }
 
@@ -88,8 +88,8 @@ public final class FileGuardBackups implements GuardBackups {
                     .filter(n -> n.endsWith(".json"))
                     .sorted(Comparator.reverseOrder())
                     .toList();
-        } catch (IOException e) {
-            throw new UncheckedIOException("guard backups could not be listed", e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException("guard backups could not be listed", ioFailure);
         }
     }
 }

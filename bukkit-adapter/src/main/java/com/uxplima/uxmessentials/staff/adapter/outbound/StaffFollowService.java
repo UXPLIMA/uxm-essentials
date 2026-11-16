@@ -102,10 +102,10 @@ public final class StaffFollowService {
     public void shutdown() {
         try {
             task.close();
-        } catch (Exception e) {
+        } catch (Exception failure) {
             // A cancel failure must not strand the caller (the wiring exits staff after this); log and carry on
             // so the session map is still cleared and the module disable completes.
-            log.error("failed to cancel the staff follow task", e);
+            log.error("failed to cancel the staff follow task", failure);
         }
         sessions.clear();
     }

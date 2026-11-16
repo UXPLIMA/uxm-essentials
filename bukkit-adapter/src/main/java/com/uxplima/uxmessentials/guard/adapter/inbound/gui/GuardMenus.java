@@ -307,7 +307,7 @@ public final class GuardMenus {
             int value;
             try {
                 value = Integer.parseInt(ctx.arg().strip());
-            } catch (NumberFormatException e) {
+            } catch (NumberFormatException notANumber) {
                 feedback.send(ctx.player(), GuardMessageKey.ERROR_BAD_VALUE, Map.of("value", ctx.arg()));
                 return;
             }

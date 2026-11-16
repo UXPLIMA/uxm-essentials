@@ -205,10 +205,10 @@ public final class BukkitPacketPosePort implements PosePort {
         });
         try {
             tickTask.close();
-        } catch (Exception e) {
+        } catch (Exception failure) {
             // A cancel failure must not strand the caller (the wiring disables the module after this); log and
             // carry on so the copies are still dropped and the disable completes.
-            log.error("failed to cancel the poses refresh task", e);
+            log.error("failed to cancel the poses refresh task", failure);
         }
         copies.clear();
     }

@@ -233,8 +233,8 @@ public final class BukkitWorldPregen implements WorldPregen {
         }
         try {
             handle.close();
-        } catch (Exception e) {
-            log.error("failed to cancel a world pre-generation loop", e);
+        } catch (Exception failure) {
+            log.error("failed to cancel a world pre-generation loop", failure);
         }
     }
 }

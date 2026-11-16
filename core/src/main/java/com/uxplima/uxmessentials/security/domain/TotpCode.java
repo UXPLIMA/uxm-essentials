@@ -113,10 +113,11 @@ public final class TotpCode {
             Mac mac = Mac.getInstance(HMAC_ALGORITHM);
             mac.init(new SecretKeySpec(key, HMAC_ALGORITHM));
             return mac.doFinal(message);
-        } catch (NoSuchAlgorithmException | InvalidKeyException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeyException cryptoUnavailable) {
             // HmacSHA1 is mandated on every JDK, so this is unreachable in practice; rethrow rather than swallow so
             // a broken crypto provider fails loud instead of silently rejecting every code.
-            throw new IllegalStateException("JDK is missing the mandatory " + HMAC_ALGORITHM + " provider", e);
+            throw new IllegalStateException(
+                    "JDK is missing the mandatory " + HMAC_ALGORITHM + " provider", cryptoUnavailable);
         }
     }
 

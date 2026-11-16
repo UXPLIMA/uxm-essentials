@@ -139,16 +139,16 @@ class PermissionLiteralsTest {
             }
             assertThat(files).as("main sources under " + root).isNotEmpty();
             return files;
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 
     private static String read(Path file) {
         try {
             return Files.readString(file, StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
+        } catch (IOException ioFailure) {
+            throw new UncheckedIOException(ioFailure);
         }
     }
 

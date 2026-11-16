@@ -61,10 +61,11 @@ public final class Pbkdf2PasswordHasher implements PasswordHasher {
         PBEKeySpec spec = new PBEKeySpec(plaintext.toCharArray(), salt, ITERATIONS, KEY_LENGTH_BITS);
         try {
             return SecretKeyFactory.getInstance(ALGORITHM).generateSecret(spec).getEncoded();
-        } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+        } catch (NoSuchAlgorithmException | InvalidKeySpecException cryptoUnavailable) {
             // PBKDF2WithHmacSHA256 is mandated on every JDK 25, so this branch is unreachable in practice;
             // rethrow rather than swallow so a broken crypto provider fails loud instead of silently.
-            throw new IllegalStateException("JDK is missing the mandatory " + ALGORITHM + " provider", e);
+            throw new IllegalStateException(
+                    "JDK is missing the mandatory " + ALGORITHM + " provider", cryptoUnavailable);
         } finally {
             spec.clearPassword();
         }

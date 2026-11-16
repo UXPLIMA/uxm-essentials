@@ -188,7 +188,7 @@ public enum BehaviourKey {
     private static Optional<Integer> parseInt(String raw) {
         try {
             return Optional.of(Integer.parseInt(raw));
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return Optional.empty();
         }
     }
@@ -197,7 +197,7 @@ public enum BehaviourKey {
         try {
             double value = Double.parseDouble(raw);
             return Double.isFinite(value) ? Optional.of(value) : Optional.empty();
-        } catch (NumberFormatException e) {
+        } catch (NumberFormatException notANumber) {
             return Optional.empty();
         }
     }

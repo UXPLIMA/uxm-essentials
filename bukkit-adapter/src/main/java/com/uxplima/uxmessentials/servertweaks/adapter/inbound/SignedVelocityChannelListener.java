@@ -41,8 +41,8 @@ public final class SignedVelocityChannelListener implements PluginMessageListene
         }
         try {
             queue.offer(SignedVelocityFrame.decode(message));
-        } catch (IllegalArgumentException | java.io.UncheckedIOException e) {
-            log.warn("dropping malformed SignedVelocity frame: {}", e.toString());
+        } catch (IllegalArgumentException | java.io.UncheckedIOException malformed) {
+            log.warn("dropping malformed SignedVelocity frame: {}", malformed.toString());
         }
     }
 }

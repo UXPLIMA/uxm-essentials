@@ -99,8 +99,8 @@ public final class ForeignCombatGate implements CombatGate {
                 combatLogXInCombat = manager.getClass().getMethod("isInCombat", Player.class);
             }
             return Boolean.TRUE.equals(combatLogXInCombat.invoke(manager, player));
-        } catch (Throwable t) {
-            return degrade(COMBATLOGX, t);
+        } catch (Throwable failure) {
+            return degrade(COMBATLOGX, failure);
         }
     }
 
@@ -120,8 +120,8 @@ public final class ForeignCombatGate implements CombatGate {
                 pvpManagerInCombat = combatPlayer.getClass().getMethod("isInCombat");
             }
             return Boolean.TRUE.equals(pvpManagerInCombat.invoke(combatPlayer));
-        } catch (Throwable t) {
-            return degrade(PVPMANAGER, t);
+        } catch (Throwable failure) {
+            return degrade(PVPMANAGER, failure);
         }
     }
 

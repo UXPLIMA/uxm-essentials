@@ -96,11 +96,11 @@ public final class WorldArchiver {
         for (Path path : ordered) {
             try {
                 Files.delete(path);
-            } catch (IOException e) {
+            } catch (IOException ioFailure) {
                 if (failure == null) {
-                    failure = e;
+                    failure = ioFailure;
                 } else {
-                    failure.addSuppressed(e);
+                    failure.addSuppressed(ioFailure);
                 }
             }
         }
