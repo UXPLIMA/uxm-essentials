@@ -127,11 +127,13 @@ public final class WarpCategoryParentSelectorMenu {
         settingsView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), editedOf(ctx));
     }
 
-    /** Save the edited category under {@code parentId} through the repository, then reopen its settings. */
+    /** Nest the edited category under {@code parentId}, then reopen its settings once that is saved. */
     private void assign(MenuActionContext ctx, Optional<String> parentId) {
-        WarpCategory updated = editedOf(ctx).withParentCategoryId(parentId);
-        categoryRepository.save(updated);
-        settingsView.open(ctx.player(), BukkitRefs.toRef(ctx.viewer()), updated);
+        settingsView.edit(
+                ctx.player(),
+                BukkitRefs.toRef(ctx.viewer()),
+                editedOf(ctx).id(),
+                stored -> stored.withParentCategoryId(parentId));
     }
 
     private static WarpCategory candidateOf(MenuContext ctx) {

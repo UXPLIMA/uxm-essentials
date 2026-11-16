@@ -220,7 +220,8 @@ public final class WarpsWiring {
                 menus,
                 kernel.messages(),
                 textInput,
-                categoryRepository,
+                new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategoryEdits(
+                        categoryRepository, kernel.scheduler()),
                 (player, viewer) -> categoryManagerView.open(player, viewer));
         categorySettingsView.register(menuBindings, guiLayouts.dataFolder(), kernel.log());
         var categorySelectorView = new com.uxplima.uxmessentials.warps.adapter.inbound.gui.WarpCategorySelectorMenu(
