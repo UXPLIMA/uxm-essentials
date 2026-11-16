@@ -23,6 +23,7 @@ import com.uxplima.uxmessentials.worlds.domain.NetworkWorld;
 import org.jooq.DSLContext;
 import org.jooq.Record2;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Gives this backend its own copy of the world rows no networked backend has claimed: the rows the migration marked
@@ -49,9 +50,10 @@ import org.jspecify.annotations.NullMarked;
 public final class WorldServerClaimer extends JooqRepository {
 
     /**
-     * What one start-up claim did.
+     * What one start-up claim or adopt of loaded worlds did.
      *
-     * @param ran false when this server name had already run its start-up claim, so nothing was looked at
+     * @param ran false when this server name had already run its start-up claim, so nothing was looked at; always
+     *     true for an adopt, which runs at every start
      * @param claimed the unclaimed rows this backend got its own copy of
      * @param conflicting the claimed rows whose template recorded another uid than the world this backend has, which
      *     means two different worlds shared one row before servers were recorded
@@ -93,7 +95,7 @@ public final class WorldServerClaimer extends JooqRepository {
     }
 
     /** {@link #adoptLoaded} over the shared {@link Persistence} handle. */
-    public static List<String> adoptLoaded(Persistence persistence, String serverId, Map<String, String> loadedUids) {
+    public static Claims adoptLoaded(Persistence persistence, String serverId, Map<String, String> loadedUids) {
         Objects.requireNonNull(persistence, "persistence");
         return new WorldServerClaimer(persistence.dsl()).adoptLoaded(serverId, loadedUids);
     }
@@ -102,6 +104,12 @@ public final class WorldServerClaimer extends JooqRepository {
     public static boolean claimNamed(Persistence persistence, String serverId, String name) {
         Objects.requireNonNull(persistence, "persistence");
         return new WorldServerClaimer(persistence.dsl()).claimNamed(serverId, name);
+    }
+
+    /** {@link #keeps} over the shared {@link Persistence} handle. */
+    public static boolean keeps(Persistence persistence, String serverId, String name) {
+        Objects.requireNonNull(persistence, "persistence");
+        return new WorldServerClaimer(persistence.dsl()).keeps(serverId, name);
     }
 
     /** {@link #rename} over the shared {@link Persistence} handle. */
@@ -144,8 +152,7 @@ public final class WorldServerClaimer extends JooqRepository {
                 Optional<String> uid = Optional.ofNullable(uids.get(name));
                 if (copy(dsl, serverId, name, uid)) {
                     claimed.add(name);
-                    Optional<String> rowUid = Optional.ofNullable(row.value2());
-                    if (uid.isPresent() && rowUid.isPresent() && !rowUid.equals(uid)) {
+                    if (conflicts(row.value2(), uid)) {
                         conflicting.add(name);
                     }
                 }
@@ -164,51 +171,64 @@ public final class WorldServerClaimer extends JooqRepository {
      * Copy the unclaimed world named {@code name} onto {@code serverId} with its settings, for an operator who knows
      * it belongs here. False when no unclaimed world has that name, or this backend already keeps a world of that
      * name. The template stays, as it does for the start-up claim.
+     *
+     * @throws PersistenceException if the write failed; {@link #keeps} then tells whether the world is kept here
+     *     anyway, because another claim of the name won the race or the commit went through before the failure
      */
     public boolean claimNamed(String serverId, String name) {
         requireClaimable(serverId);
         Objects.requireNonNull(name, "name");
-        try {
-            return write(dsl -> !keptBy(dsl, serverId).contains(name) && copy(dsl, serverId, name, Optional.empty()));
-        } catch (PersistenceException raced) {
-            // Two claims of one name on this backend at once: the other one inserted the row first. Any other failure
-            // leaves the name unkept and is rethrown.
-            if (read(dsl -> keptBy(dsl, serverId).contains(name))) {
-                return false;
-            }
-            throw raced;
-        }
+        return write(dsl -> !keptBy(dsl, serverId).contains(name) && copy(dsl, serverId, name, Optional.empty()));
+    }
+
+    /** Whether {@code serverId} keeps a world named {@code name}. */
+    public boolean keeps(String serverId, String name) {
+        Objects.requireNonNull(serverId, "serverId");
+        Objects.requireNonNull(name, "name");
+        return read(dsl -> keptBy(dsl, serverId).contains(name));
     }
 
     /**
      * Copy onto {@code serverId} the template of each world loaded here that this backend does not keep yet, under the
-     * loaded world's uid, returning the names copied. This is the adopt of a loaded world that has a template: a world
-     * that came to this backend after its first start (bukkit.yml, another plugin) keeps the template's settings
-     * instead of being adopted with defaults beside it, which would also make {@link #claimNamed} refuse it.
+     * loaded world's uid, returning the names copied and, among them, those whose template recorded another uid. This
+     * is the adopt of a loaded world that has a template: a world that came to this backend after its first start
+     * (bukkit.yml, another plugin) keeps the template's settings instead of being adopted with defaults beside it,
+     * which would also make {@link #claimNamed} refuse it.
      *
      * @param loadedUids the uid of every world loaded here, by world name
      */
-    public List<String> adoptLoaded(String serverId, Map<String, String> loadedUids) {
+    public Claims adoptLoaded(String serverId, Map<String, String> loadedUids) {
         requireClaimable(serverId);
         Objects.requireNonNull(loadedUids, "loadedUids");
         if (loadedUids.isEmpty()) {
-            return List.of();
+            return new Claims(true, List.of(), List.of());
         }
         return write(dsl -> {
             Set<String> kept = keptBy(dsl, serverId);
             List<String> adopted = new ArrayList<>();
-            for (String name : dsl.select(WORLD.NAME)
+            List<String> conflicting = new ArrayList<>();
+            for (Record2<String, String> row : dsl.select(WORLD.NAME, WORLD.UID)
                     .from(WORLD)
                     .where(WORLD.SERVER_ID.eq(NetworkWorld.UNSCOPED))
                     .and(WORLD.NAME.in(loadedUids.keySet()))
                     .orderBy(WORLD.NAME)
-                    .fetch(WORLD.NAME)) {
-                if (!kept.contains(name) && copy(dsl, serverId, name, Optional.ofNullable(loadedUids.get(name)))) {
+                    .fetch()) {
+                String name = row.value1();
+                Optional<String> uid = Optional.ofNullable(loadedUids.get(name));
+                if (!kept.contains(name) && copy(dsl, serverId, name, uid)) {
                     adopted.add(name);
+                    if (conflicts(row.value2(), uid)) {
+                        conflicting.add(name);
+                    }
                 }
             }
-            return adopted;
+            return new Claims(true, adopted, conflicting);
         });
+    }
+
+    /** Whether the template recorded another uid than this backend's world, so it held another world's settings. */
+    private static boolean conflicts(@Nullable String templateUid, Optional<String> uid) {
+        return templateUid != null && uid.isPresent() && !uid.get().equals(templateUid);
     }
 
     /**

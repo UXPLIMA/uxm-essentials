@@ -355,11 +355,13 @@ class WorldServerTest {
         upgrade();
         claimer().claimPresent(LOBBY, Set.of("world"), Map.of("world", LOBBY_WORLD_UID));
 
-        List<String> adopted = claimer().adoptLoaded(LOBBY, Map.of("world", LOBBY_WORLD_UID, "arena", LOBBY_WORLD_UID));
-        List<String> again = claimer().adoptLoaded(LOBBY, Map.of("arena", LOBBY_WORLD_UID));
+        WorldServerClaimer.Claims adopted =
+                claimer().adoptLoaded(LOBBY, Map.of("world", LOBBY_WORLD_UID, "arena", LOBBY_WORLD_UID));
+        WorldServerClaimer.Claims again = claimer().adoptLoaded(LOBBY, Map.of("arena", LOBBY_WORLD_UID));
 
-        assertThat(adopted).containsExactly("arena");
-        assertThat(again).isEmpty();
+        assertThat(adopted.claimed()).containsExactly("arena");
+        assertThat(adopted.conflicting()).containsExactly("arena");
+        assertThat(again.isEmpty()).isTrue();
         ManagedWorld arena = on(LOBBY).find(ARENA).orElseThrow();
         assertThat(arena.settings().get(WorldProperties.PVP)).isFalse();
         assertThat(arena.knownUid()).contains(UUID.fromString(LOBBY_WORLD_UID));
@@ -395,6 +397,16 @@ class WorldServerTest {
         assertThat(on(SURVIVAL).find(ARENA).orElseThrow().settings().get(WorldProperties.PVP))
                 .isFalse();
         assertThat(claimer().claimNamed(LOBBY, "games")).isFalse();
+    }
+
+    @Test
+    void aServerKeepsOnlyTheWorldsRecordedUnderItsOwnName() {
+        oldReleaseRegisters(ARENA, Optional.empty(), "false");
+        upgrade();
+        claimer().claimNamed(SURVIVAL, "arena");
+
+        assertThat(claimer().keeps(SURVIVAL, "arena")).isTrue();
+        assertThat(claimer().keeps(LOBBY, "arena")).isFalse();
     }
 
     @Test
